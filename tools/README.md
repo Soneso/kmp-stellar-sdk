@@ -39,7 +39,7 @@ The XDR definition files (`.x` files) should be obtained from the [stellar-xdr](
 ### Generated Code
 
 The generator produces:
-- **467 XDR type files** covering all Stellar protocol types (accounts, transactions, operations, ledger entries, etc.)
+- All Stellar protocol XDR types (accounts, transactions, operations, ledger entries, etc.)
 - Zero-cost inline value classes for type safety (using `@kotlin.jvm.JvmInline`)
 - Platform-agnostic multiplatform code compatible with JVM, JS, and Native
 - `XdrReader` and `XdrWriter` expect declarations (actual implementations are hand-written per platform in `jvmMain`, `jsMain`, and `nativeMain`)
