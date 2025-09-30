@@ -100,6 +100,15 @@ class HorizonServer(
     }
 
     /**
+     * Returns an [OperationsRequestBuilder] instance for querying operations.
+     *
+     * @return [OperationsRequestBuilder] instance
+     */
+    fun operations(): org.stellar.sdk.horizon.requests.OperationsRequestBuilder {
+        return org.stellar.sdk.horizon.requests.OperationsRequestBuilder(httpClient, serverUri)
+    }
+
+    /**
      * Closes the HTTP clients and releases resources.
      * Call this when you're done using the HorizonServer instance.
      */
