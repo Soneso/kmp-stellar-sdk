@@ -97,3 +97,4 @@ gradle.properties.local
 # Test outputs
 test-results/
 *.test
+.claude/
