@@ -1,0 +1,92 @@
+================================================================================
+  STELLAR KMP SDK - iOS DISTRIBUTION PACKAGE
+================================================================================
+
+Version: 0.1.0-alpha
+Build Date: 2025-09-30
+Platform: iOS 13.0+, macOS 11.0+
+
+================================================================================
+  CONTENTS
+================================================================================
+
+1. stellar_sdk.xcframework (116MB)
+   - iOS device support (arm64)
+   - iOS simulator support (arm64 + x86_64)
+   - Kotlin/Native compiled framework
+
+2. README.md
+   - Complete API documentation
+   - Usage examples
+   - Troubleshooting guide
+
+3. INTEGRATION_GUIDE.md
+   - 5-minute quick start
+   - Step-by-step Xcode integration
+   - Common issues and fixes
+
+================================================================================
+  IMPORTANT: LIBSODIUM DEPENDENCY
+================================================================================
+
+The Stellar SDK requires libsodium (1.0.18+) for cryptographic operations.
+
+*** You must add libsodium to your project separately ***
+
+Recommended method:
+  • Swift Package Manager:
+    https://github.com/jedisct1/swift-libsodium
+
+Alternative methods:
+  • CocoaPods: pod 'SwiftLibsodium'
+  • Manual: Download from libsodium.org
+
+See INTEGRATION_GUIDE.md for detailed instructions.
+
+================================================================================
+  QUICK START
+================================================================================
+
+1. Drag stellar_sdk.xcframework into your Xcode project
+2. Set to "Embed & Sign" in target settings
+3. Add libsodium via Swift Package Manager
+4. Import and use:
+
+   import stellar_sdk
+
+   let keypair = KeyPair.Companion().random()
+   print(keypair.getAccountId())
+
+================================================================================
+  VERIFICATION
+================================================================================
+
+Framework contents:
+  • Binary size: ~52MB per architecture
+  • Includes: KeyPair, StrKey, Ed25519Crypto
+  • Crypto backend: libsodium (external)
+  • Minimum iOS: 13.0
+  • Kotlin version: 2.1.0
+
+To verify libsodium is properly linked:
+  • Build should succeed without linker errors
+  • KeyPair.random() should generate valid keypairs
+  • No "undefined symbol" errors at runtime
+
+================================================================================
+  SUPPORT
+================================================================================
+
+Documentation: See README.md
+Issues: https://github.com/stellar/kmp-stellar-sdk
+Discord: https://discord.gg/stellar
+Security: security@stellar.org
+
+================================================================================
+  LICENSE
+================================================================================
+
+Apache 2.0
+Copyright (c) 2025 Stellar Development Foundation
+
+================================================================================
