@@ -82,16 +82,29 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
 
 ## Development Commands
 
-- **Build**: `./gradlew build`
+### Building
+- **Build all**: `./gradlew build`
 - **Clean build**: `./gradlew clean build`
+- **Assemble artifacts**: `./gradlew assemble`
+- **Check (build + test)**: `./gradlew check`
+
+### Testing
 - **Run all tests**: `./gradlew test`
 - **Run JVM tests**: `./gradlew jvmTest`
-- **Run JS tests (Browser)**: `./gradlew jsBrowserTest`
+- **Run JS tests (Browser)**: `./gradlew jsBrowserTest` (requires Chrome)
 - **Run JS tests (Node.js)**: `./gradlew jsNodeTest`
 - **Run macOS tests**: `./gradlew macosArm64Test` or `./gradlew macosX64Test`
 - **Run iOS Simulator tests**: `./gradlew iosSimulatorArm64Test` or `./gradlew iosX64Test`
-- **Assemble artifacts**: `./gradlew assemble`
-- **Check (build + test)**: `./gradlew check`
+
+### Sample Apps
+- **Android**: `./gradlew :stellarSample:androidApp:installDebug`
+- **iOS**: `./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64` then open in Xcode
+- **Web (dev)**: `./gradlew :stellarSample:webApp:jsBrowserDevelopmentRun`
+- **Web (production)**: `./gradlew :stellarSample:webApp:jsBrowserProductionWebpack`
+
+### Native Development
+- **Build iOS framework**: `./gradlew :stellar-sdk:linkDebugFrameworkIosSimulatorArm64`
+- **Build libsodium XCFramework**: `./build-libsodium-xcframework.sh`
 
 ## Module Structure
 
@@ -100,10 +113,19 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
   - `commonTest`: Shared test code
   - `jvmMain`: JVM-specific implementations
   - `jvmTest`: JVM-specific tests
+  - `jsMain`: JavaScript-specific implementations
+  - `jsTest`: JavaScript-specific tests
+  - `nativeMain`: Shared native code (libsodium interop)
   - `iosMain`: iOS-specific implementations (shared across iosX64, iosArm64, iosSimulatorArm64)
   - `iosTest`: iOS-specific tests
   - `macosMain`: macOS-specific implementations (useful for local development)
   - `macosTest`: macOS-specific tests
+
+- **stellarSample**: KMP sample application demonstrating shared business logic
+  - `shared`: Shared Kotlin module with StellarDemo class and tests
+  - `androidApp`: Android app with Jetpack Compose UI
+  - `iosApp`: iOS app with SwiftUI (Xcode project)
+  - `webApp`: Web app with Kotlin/JS and HTML
 
 ## Dependencies
 
@@ -163,4 +185,17 @@ Run tests:
 - JVM: `./gradlew jvmTest`
 - JS Browser: `./gradlew jsBrowserTest` (requires Chrome)
 - JS Node: `./gradlew jsNodeTest` (requires Node.js + libsodium-wrappers)
-- Native: Requires libsodium installed
+- Native: `./gradlew macosArm64Test` or `./gradlew iosSimulatorArm64Test`
+
+Sample app tests:
+- Shared tests: `./gradlew :stellarSample:shared:allTests`
+- Android tests: `./gradlew :stellarSample:shared:testDebugUnitTest`
+- iOS tests: `./gradlew :stellarSample:shared:iosSimulatorArm64Test`
+- JS tests: `./gradlew :stellarSample:shared:jsTest`
+
+## Reference Implementation
+
+When implementing features, use the Java Stellar SDK as a reference:
+- Located at: `/Users/chris/projects/Stellar/java-stellar-sdk`
+- Provides production-tested implementations of Stellar protocols
+- Use as a guide for API design and feature completeness

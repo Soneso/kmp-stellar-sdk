@@ -22,6 +22,10 @@ stellarSample/
 │   ├── ContentView.swift
 │   └── StellarSampleApp.swift
 │
+├── macosApp/                       # macOS app with SwiftUI
+│   ├── ContentView.swift
+│   └── StellarSampleApp.swift
+│
 └── webApp/                         # Web app with Kotlin/JS
     ├── src/jsMain/kotlin/
     │   └── Main.kt
@@ -31,9 +35,10 @@ stellarSample/
 
 ## Key Concept
 
-All three platforms share **the same business logic** written in Kotlin (`shared` module), but have platform-specific UIs:
+All four platforms share **the same business logic** written in Kotlin (`shared` module), but have platform-specific UIs:
 - **Android**: Jetpack Compose
 - **iOS**: SwiftUI
+- **macOS**: SwiftUI
 - **Web**: Kotlin/JS with HTML
 
 ## What's Shared
@@ -70,8 +75,38 @@ Or open in Android Studio and run.
 ./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64
 ```
 
-2. Open `stellarSample/iosApp` in Xcode
-3. Build and run
+2. Generate Xcode project:
+```bash
+cd stellarSample/iosApp
+xcodegen generate
+```
+
+3. Open `stellarSample/iosApp/StellarSample.xcodeproj` in Xcode
+4. Build and run
+
+### macOS
+
+**Note**: The macOS app requires libsodium to be installed via Homebrew:
+
+```bash
+brew install libsodium
+```
+
+1. Build the shared framework:
+```bash
+./gradlew :stellarSample:shared:linkDebugFrameworkMacosArm64
+```
+
+2. Generate Xcode project:
+```bash
+cd stellarSample/macosApp
+xcodegen generate
+```
+
+3. Open `stellarSample/macosApp/StellarSampleMac.xcodeproj` in Xcode
+4. Build and run
+
+**Troubleshooting**: If you get linker errors about libsodium symbols, ensure libsodium is installed via Homebrew and visible to the system.
 
 ### Web
 
@@ -101,6 +136,7 @@ Then open `stellarSample/webApp/build/distributions/index.html`
 - `stellarSample/shared/` - 500 lines of shared logic (written once)
 - `stellarSample/androidApp/` - 200 lines of UI only
 - `stellarSample/iosApp/` - 200 lines of UI only
+- `stellarSample/macosApp/` - 200 lines of UI only
 - `stellarSample/webApp/` - 200 lines of UI only
 
 **Result**: Business logic written once, runs everywhere
@@ -288,7 +324,7 @@ This sample demonstrates:
 
 ### stellarSample (KMP)
 - 500 lines of shared Kotlin business logic
-- 600 lines of platform-specific UI code
+- 800 lines of platform-specific UI code (4 platforms)
 - **Works on all platforms** with the same code
 - Business logic tested once, runs everywhere
 - Platform-native UIs for best user experience
@@ -307,8 +343,10 @@ To use this as a template for your own KMP app:
 
 - **Kotlin**: 1.9.20+
 - **Gradle**: 8.0+
+- **XcodeGen**: For generating Xcode projects (install via `brew install xcodegen`)
 - **Android**: API 24+
-- **iOS**: iOS 13+
+- **iOS**: iOS 15+
+- **macOS**: macOS 12+
 - **Web**: Modern browsers with WebAssembly support
 
 ## License

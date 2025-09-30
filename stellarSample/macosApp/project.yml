@@ -1,0 +1,22 @@
+name: StellarSampleMac
+options:
+  bundleIdPrefix: com.stellar
+targets:
+  StellarSampleMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "12.0"
+    sources:
+      - .
+    dependencies:
+      - framework: ../shared/build/bin/macosArm64/debugFramework/shared.framework
+        embed: true
+    settings:
+      FRAMEWORK_SEARCH_PATHS: $(inherited) $(PROJECT_DIR)/../shared/build/bin/macosArm64/debugFramework
+      PRODUCT_BUNDLE_IDENTIFIER: com.stellar.StellarSampleMac
+      INFOPLIST_FILE: Info.plist
+      SWIFT_VERSION: "5.0"
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      LIBRARY_SEARCH_PATHS: $(inherited) /opt/homebrew/lib
+      HEADER_SEARCH_PATHS: $(inherited) /opt/homebrew/include
+      OTHER_LDFLAGS: $(inherited) -lsodium

@@ -46,6 +46,9 @@ Icon
 xcuserdata/
 *.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
+*.xcodeproj/
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
 DerivedData/
 *.moved-aside
 *.xcuserstate
