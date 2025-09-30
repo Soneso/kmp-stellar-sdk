@@ -22,6 +22,7 @@ abstract class RequestBuilder(
     init {
         if (defaultSegment != null) {
             setSegments(defaultSegment)
+            segmentsAdded = false // Allow overwriting default segment
         }
     }
 

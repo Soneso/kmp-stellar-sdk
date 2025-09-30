@@ -91,6 +91,15 @@ class HorizonServer(
     }
 
     /**
+     * Returns a [TransactionsRequestBuilder] instance for querying transactions.
+     *
+     * @return [TransactionsRequestBuilder] instance
+     */
+    fun transactions(): org.stellar.sdk.horizon.requests.TransactionsRequestBuilder {
+        return org.stellar.sdk.horizon.requests.TransactionsRequestBuilder(httpClient, serverUri)
+    }
+
+    /**
      * Closes the HTTP clients and releases resources.
      * Call this when you're done using the HorizonServer instance.
      */
