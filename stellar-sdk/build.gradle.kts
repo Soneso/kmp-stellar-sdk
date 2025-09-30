@@ -31,6 +31,8 @@ kotlin {
                 }
             }
         }
+        // Generate both library (for consumption) and executable (for tests)
+        binaries.library()
         binaries.executable()
     }
 

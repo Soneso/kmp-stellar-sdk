@@ -1,0 +1,23 @@
+{
+  "name": "stellar-sdk-web-sample",
+  "version": "0.1.0",
+  "description": "Web sample application for Stellar KMP SDK",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack serve --mode development --open",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "css-loader": "^6.8.1",
+    "html-webpack-plugin": "^5.5.4",
+    "style-loader": "^3.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "author": "Stellar Development Foundation",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.15"
+  }
+}

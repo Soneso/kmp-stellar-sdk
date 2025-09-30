@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar KMP SDK - Web Sample</title>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⭐ Stellar KMP SDK</h1>
+            <p class="subtitle">Web Integration Demo</p>
+        </header>
+
+        <!-- SDK Info Card -->
+        <div class="card">
+            <h2>SDK Information</h2>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="label">Platform:</span>
+                    <span class="value">JavaScript (Browser)</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Crypto Library:</span>
+                    <span class="value" id="crypto-lib">Loading...</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Algorithm:</span>
+                    <span class="value">Ed25519 (RFC 8032)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keypair Generation Card -->
+        <div class="card">
+            <h2>Generate Keypair</h2>
+            <button id="generate-btn" class="primary-btn">
+                Generate New Keypair
+            </button>
+            <div id="keypair-result" class="result-box hidden">
+                <div class="result-item">
+                    <label>Account ID:</label>
+                    <div class="copyable" id="account-id">
+                        <code></code>
+                        <button class="copy-btn" data-copy="account-id">Copy</button>
+                    </div>
+                </div>
+                <div class="result-item">
+                    <label>Secret Seed:</label>
+                    <div class="copyable" id="secret-seed">
+                        <code></code>
+                        <button class="copy-btn" data-copy="secret-seed">Copy</button>
+                    </div>
+                </div>
+                <p class="warning">
+                    ⚠️ Never share your secret seed! This is for demonstration only.
+                </p>
+            </div>
+        </div>
+
+        <!-- Test Suite Card -->
+        <div class="card">
+            <h2>Comprehensive Test Suite</h2>
+            <button id="run-tests-btn" class="primary-btn">
+                Run All Tests
+            </button>
+            <div id="test-results" class="test-results hidden"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>
+                Stellar KMP SDK •
+                <a href="https://developers.stellar.org" target="_blank">Documentation</a> •
+                <a href="https://github.com/stellar" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Initializing SDK...</p>
+    </div>
+</body>
+</html>
