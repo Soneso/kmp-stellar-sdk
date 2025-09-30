@@ -43,7 +43,6 @@ import kotlin.js.Promise
  * @see <a href="https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto">Web Crypto API</a>
  * @see <a href="https://github.com/jedisct1/libsodium.js">libsodium.js</a>
  */
-@OptIn(ExperimentalJsExport::class)
 internal class JsEd25519Crypto : Ed25519Crypto {
 
     override val libraryName: String = "libsodium.js / Web Crypto API"

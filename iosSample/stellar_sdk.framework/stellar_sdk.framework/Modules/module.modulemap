@@ -1,8 +1,0 @@
-framework module "stellar_sdk" {
-    umbrella header "stellar_sdk.h"
-
-    export *
-    module * { export * }
-
-    use Foundation
-}

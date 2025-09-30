@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar KMP Sample</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 16px;
+            font-size: 1.5rem;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .keypair-details, .test-list {
+            margin-top: 16px;
+        }
+
+        .info-row {
+            margin-bottom: 16px;
+        }
+
+        .info-label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .monospace {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+
+        .test-summary {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .test-summary.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .test-summary.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .test-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .test-pass {
+            background: #f0f9ff;
+            border-left: 4px solid #10b981;
+        }
+
+        .test-fail {
+            background: #fff5f5;
+            border-left: 4px solid #ef4444;
+        }
+
+        .test-status {
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .test-pass .test-status {
+            color: #10b981;
+        }
+
+        .test-fail .test-status {
+            color: #ef4444;
+        }
+
+        .test-details {
+            flex: 1;
+        }
+
+        .test-name {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .test-message {
+            font-size: 0.875rem;
+            color: #666;
+        }
+
+        .test-duration {
+            font-size: 0.75rem;
+            color: #999;
+            align-self: center;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            padding: 12px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 8px;
+            color: #c33;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="stellar-sample.js"></script>
+</body>
+</html>

@@ -1,9 +1,6 @@
 package com.stellar.sdk
 
 import com.stellar.sdk.crypto.getEd25519Crypto
-import kotlin.js.ExperimentalJsExport
-import kotlin.js.JsExport
-import kotlin.js.JsName
 import kotlin.jvm.JvmStatic
 
 /**
@@ -13,7 +10,7 @@ import kotlin.jvm.JvmStatic
  *
  * This class uses production-ready, platform-specific cryptographic implementations:
  *
- * ### JVM
+ * ### JVM/Android
  * - **Library**: BouncyCastle (org.bouncycastle:bcprov-jdk18on)
  * - **Algorithm**: Ed25519 (RFC 8032 compliant)
  * - **Security**: Mature, widely-audited implementation
@@ -24,6 +21,12 @@ import kotlin.jvm.JvmStatic
  * - **Algorithm**: Ed25519 (crypto_sign_*)
  * - **Security**: Audited, constant-time operations, memory-safe
  * - **Distribution**: Requires libsodium via Swift Package Manager or static linking
+ *
+ * ### JavaScript/Web
+ * - **Library**: libsodium-wrappers (WebAssembly)
+ * - **Algorithm**: Ed25519 (crypto_sign_*)
+ * - **Security**: Same audited libsodium implementation compiled to WebAssembly
+ * - **Distribution**: Bundled via npm/webpack
  *
  * ### Security Considerations
  *
@@ -49,8 +52,6 @@ import kotlin.jvm.JvmStatic
  * @see <a href="https://libsodium.gitbook.io/doc/">libsodium documentation</a>
  * @see <a href="https://www.bouncycastle.org/">BouncyCastle</a>
  */
-@OptIn(ExperimentalJsExport::class)
-@JsExport
 class KeyPair private constructor(
     private val publicKey: ByteArray,
     private val privateKey: ByteArray?
@@ -88,7 +89,6 @@ class KeyPair private constructor(
          *         wrong version byte, or invalid length
          */
         @JvmStatic
-        @JsName("fromSecretSeedCharArray")
         fun fromSecretSeed(seed: CharArray): KeyPair {
             require(seed.isNotEmpty()) { "Secret seed cannot be empty" }
             val decoded = try {
@@ -124,7 +124,6 @@ class KeyPair private constructor(
          * @see fromSecretSeed(CharArray) for secure alternative
          */
         @JvmStatic
-        @JsName("fromSecretSeedString")
         fun fromSecretSeed(seed: String): KeyPair {
             require(seed.isNotEmpty()) { "Secret seed cannot be empty" }
             val charSeed = seed.toCharArray()
@@ -153,7 +152,6 @@ class KeyPair private constructor(
          * @throws IllegalStateException if key derivation fails (crypto implementation error)
          */
         @JvmStatic
-        @JsName("fromSecretSeedBytes")
         fun fromSecretSeed(seed: ByteArray): KeyPair {
             require(seed.size == 32) { "Secret seed must be exactly 32 bytes, got ${seed.size}" }
 
