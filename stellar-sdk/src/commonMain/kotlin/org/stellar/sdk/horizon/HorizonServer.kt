@@ -109,6 +109,15 @@ class HorizonServer(
     }
 
     /**
+     * Returns a [PaymentsRequestBuilder] instance for querying payment operations.
+     *
+     * @return [PaymentsRequestBuilder] instance
+     */
+    fun payments(): org.stellar.sdk.horizon.requests.PaymentsRequestBuilder {
+        return org.stellar.sdk.horizon.requests.PaymentsRequestBuilder(httpClient, serverUri)
+    }
+
+    /**
      * Closes the HTTP clients and releases resources.
      * Call this when you're done using the HorizonServer instance.
      */
