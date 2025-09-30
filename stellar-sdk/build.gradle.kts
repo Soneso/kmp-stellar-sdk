@@ -115,15 +115,8 @@ kotlin {
         val nativeMain by creating {
             dependsOn(commonMain)
 
-            // Exclude the appropriate crypto implementation
+            // Using libsodium for all native platforms
             kotlin.srcDir("src/nativeMain/kotlin")
-            if (useCryptoKit) {
-                // Using CryptoKit, exclude libsodium implementation
-                kotlin.exclude("**/Ed25519.native.kt")
-            } else {
-                // Using libsodium, exclude CryptoKit implementation
-                kotlin.exclude("**/Ed25519.cryptokit.kt")
-            }
         }
 
         val iosMain by creating {

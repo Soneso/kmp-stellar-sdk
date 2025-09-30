@@ -75,6 +75,15 @@ reports/
 */build/
 */reports/
 
+# Android specific
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+output.json
+google-services.json
+
 # Native libraries (keep static libs for development)
 # stellar-sdk/native-libs/ is kept for development
 
