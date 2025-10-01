@@ -36,7 +36,7 @@ data class OfferResponse(
     val id: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("seller")
     val seller: String,
@@ -79,7 +79,7 @@ data class OfferResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * HAL links connected to this offer.

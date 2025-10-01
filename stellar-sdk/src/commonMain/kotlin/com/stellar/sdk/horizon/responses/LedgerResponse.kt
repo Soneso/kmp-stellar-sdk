@@ -38,7 +38,7 @@ data class LedgerResponse(
     val id: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("hash")
     val hash: String,
@@ -87,7 +87,7 @@ data class LedgerResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * HAL links connected to this ledger.

@@ -14,7 +14,7 @@ data class TransactionResponse(
     val id: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("successful")
     val successful: Boolean,
@@ -93,7 +93,7 @@ data class TransactionResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * Preconditions of a transaction per CAP-21.

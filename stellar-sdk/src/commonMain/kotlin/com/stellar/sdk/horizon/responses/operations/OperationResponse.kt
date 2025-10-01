@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import com.stellar.sdk.horizon.responses.Link
+import com.stellar.sdk.horizon.responses.Pageable
 import com.stellar.sdk.horizon.responses.Response
 import com.stellar.sdk.horizon.responses.TransactionResponse
 
@@ -15,12 +16,12 @@ import com.stellar.sdk.horizon.responses.TransactionResponse
  */
 @Serializable
 @JsonClassDiscriminator("type")
-sealed class OperationResponse : Response() {
+sealed class OperationResponse : Response(), Pageable {
     abstract val id: String
     abstract val sourceAccount: String
     abstract val sourceAccountMuxed: String?
     abstract val sourceAccountMuxedId: String?
-    abstract val pagingToken: String
+    abstract override val pagingToken: String
     abstract val createdAt: String
     abstract val transactionHash: String
     abstract val transactionSuccessful: Boolean

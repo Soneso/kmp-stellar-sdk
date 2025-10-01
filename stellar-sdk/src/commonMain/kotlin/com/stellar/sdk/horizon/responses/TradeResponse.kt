@@ -41,7 +41,7 @@ data class TradeResponse(
     val id: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("ledger_close_time")
     val ledgerCloseTime: String,
@@ -105,7 +105,7 @@ data class TradeResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * HAL links connected to this trade.

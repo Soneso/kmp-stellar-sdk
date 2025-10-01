@@ -40,7 +40,7 @@ data class AssetResponse(
     val assetIssuer: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("contract_id")
     val contractId: String? = null,
@@ -74,7 +74,7 @@ data class AssetResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * Statistics about accounts holding this asset.

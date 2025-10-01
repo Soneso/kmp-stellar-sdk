@@ -96,6 +96,40 @@ object StrKey {
         }
     }
 
+    /**
+     * Encodes raw bytes to strkey muxed ed25519 public key (M...)
+     */
+    fun encodeMed25519PublicKey(data: ByteArray): String {
+        require(data.size == 40) { "Muxed public key must be 40 bytes" }
+        return encodeCheck(VersionByte.MED25519_PUBLIC_KEY, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey muxed ed25519 public key (M...) to raw bytes
+     */
+    fun decodeMed25519PublicKey(data: String): ByteArray {
+        return decodeCheck(VersionByte.MED25519_PUBLIC_KEY, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of muxed ed25519 public key (M...)
+     *
+     * Muxed accounts (M...) are virtual accounts that share the same underlying ed25519 key
+     * but have different IDs. They are used for memo-less payments as defined in SEP-0023.
+     *
+     * @param med25519PublicKey The muxed public key to check
+     * @return true if the given muxed public key is valid, false otherwise
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md">SEP-0023</a>
+     */
+    fun isValidMed25519PublicKey(med25519PublicKey: String): Boolean {
+        return try {
+            decodeMed25519PublicKey(med25519PublicKey)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun encodeCheck(versionByte: VersionByte, data: ByteArray): CharArray {
         val payload = byteArrayOf(versionByte.value) + data
         val checksum = calculateChecksum(payload)

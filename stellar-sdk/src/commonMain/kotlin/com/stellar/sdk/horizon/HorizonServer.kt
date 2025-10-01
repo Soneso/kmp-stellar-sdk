@@ -84,6 +84,21 @@ class HorizonServer(
     val httpClient: HttpClient = httpClient ?: createDefaultHttpClient()
     val submitHttpClient: HttpClient = submitHttpClient ?: createSubmitHttpClient()
 
+    // SEP-29 checker for memo required validation
+    private val sep29Checker = Sep29Checker(this.httpClient, this.serverUri)
+
+    /**
+     * Returns a [RootRequestBuilder] instance for querying server and network information.
+     *
+     * The root endpoint provides information about the Horizon server and the Stellar network
+     * it's connected to, including version information, protocol versions, and network passphrase.
+     *
+     * @return [com.stellar.sdk.horizon.requests.RootRequestBuilder] instance
+     */
+    fun root(): com.stellar.sdk.horizon.requests.RootRequestBuilder {
+        return com.stellar.sdk.horizon.requests.RootRequestBuilder(httpClient, serverUri)
+    }
+
     /**
      * Returns an [AccountsRequestBuilder] instance for querying accounts.
      *
@@ -281,11 +296,13 @@ class HorizonServer(
      * Submits a transaction to the Stellar network.
      *
      * This method submits a base64-encoded transaction envelope to Horizon and waits for it
-     * to be ingested into a ledger. The submission uses the submitHttpClient with extended
-     * timeout (65 seconds) to account for transaction processing time.
+     * to be ingested into a ledger. By default, this function checks if destination accounts
+     * require a memo as defined in SEP-0029. Use the overloaded version with skipMemoRequiredCheck
+     * to bypass this validation.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @return [com.stellar.sdk.horizon.responses.TransactionResponse] containing the result
+     * @throws com.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when a transaction is trying to submit an operation to an account which requires a memo
      * @throws com.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
      * @throws com.stellar.sdk.horizon.exceptions.BadRequestException if the request fails due to a bad request (4xx)
      * @throws com.stellar.sdk.horizon.exceptions.BadResponseException if the request fails due to a bad response from the server (5xx)
@@ -293,8 +310,40 @@ class HorizonServer(
      * @throws com.stellar.sdk.horizon.exceptions.RequestTimeoutException when Horizon returns a Timeout or connection timeout occurred
      * @throws com.stellar.sdk.horizon.exceptions.UnknownResponseException if the server returns an unknown status code
      * @throws com.stellar.sdk.horizon.exceptions.ConnectionErrorException when the request cannot be executed due to cancellation or connectivity problems
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md">SEP-0029</a>
      */
     suspend fun submitTransaction(transactionEnvelopeXdr: String): com.stellar.sdk.horizon.responses.TransactionResponse {
+        return submitTransaction(transactionEnvelopeXdr, skipMemoRequiredCheck = false)
+    }
+
+    /**
+     * Submits a transaction to the Stellar network with optional memo required check.
+     *
+     * This method submits a base64-encoded transaction envelope to Horizon and waits for it
+     * to be ingested into a ledger. The submission uses the submitHttpClient with extended
+     * timeout (65 seconds) to account for transaction processing time.
+     *
+     * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
+     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check
+     * @return [com.stellar.sdk.horizon.responses.TransactionResponse] containing the result
+     * @throws com.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when skipMemoRequiredCheck is false and a transaction is trying to submit an operation to an account which requires a memo
+     * @throws com.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
+     * @throws com.stellar.sdk.horizon.exceptions.BadRequestException if the request fails due to a bad request (4xx)
+     * @throws com.stellar.sdk.horizon.exceptions.BadResponseException if the request fails due to a bad response from the server (5xx)
+     * @throws com.stellar.sdk.horizon.exceptions.TooManyRequestsException if the request fails due to too many requests sent to the server
+     * @throws com.stellar.sdk.horizon.exceptions.RequestTimeoutException when Horizon returns a Timeout or connection timeout occurred
+     * @throws com.stellar.sdk.horizon.exceptions.UnknownResponseException if the server returns an unknown status code
+     * @throws com.stellar.sdk.horizon.exceptions.ConnectionErrorException when the request cannot be executed due to cancellation or connectivity problems
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md">SEP-0029</a>
+     */
+    suspend fun submitTransaction(
+        transactionEnvelopeXdr: String,
+        skipMemoRequiredCheck: Boolean
+    ): com.stellar.sdk.horizon.responses.TransactionResponse {
+        if (!skipMemoRequiredCheck) {
+            sep29Checker.checkMemoRequired(transactionEnvelopeXdr)
+        }
+
         return executePostRequest(
             client = submitHttpClient,
             url = URLBuilder(serverUri).apply {
@@ -311,11 +360,12 @@ class HorizonServer(
      *
      * Unlike the synchronous version ([submitTransaction]), which blocks and waits for the
      * transaction to be ingested in Horizon, this endpoint relays the response from Stellar Core
-     * directly back to the user. This is useful for fire-and-forget scenarios or when you want
-     * to poll for results separately.
+     * directly back to the user. By default, this function checks if destination accounts
+     * require a memo as defined in SEP-0029.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @return [com.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse] containing the submission status
+     * @throws com.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when a transaction is trying to submit an operation to an account which requires a memo
      * @throws com.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
      * @throws com.stellar.sdk.horizon.exceptions.BadRequestException if the request fails due to a bad request (4xx)
      * @throws com.stellar.sdk.horizon.exceptions.BadResponseException if the request fails due to a bad response from the server (5xx)
@@ -324,8 +374,41 @@ class HorizonServer(
      * @throws com.stellar.sdk.horizon.exceptions.UnknownResponseException if the server returns an unknown status code
      * @throws com.stellar.sdk.horizon.exceptions.ConnectionErrorException when the request cannot be executed due to cancellation or connectivity problems
      * @see <a href="https://developers.stellar.org/docs/data/horizon/api-reference/submit-async-transaction">Submit a Transaction Asynchronously</a>
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md">SEP-0029</a>
      */
     suspend fun submitTransactionAsync(transactionEnvelopeXdr: String): com.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse {
+        return submitTransactionAsync(transactionEnvelopeXdr, skipMemoRequiredCheck = false)
+    }
+
+    /**
+     * Submits a transaction to the Stellar network asynchronously with optional memo required check.
+     *
+     * Unlike the synchronous version, which blocks and waits for the transaction to be ingested
+     * in Horizon, this endpoint relays the response from Stellar Core directly back to the user.
+     * This is useful for fire-and-forget scenarios or when you want to poll for results separately.
+     *
+     * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
+     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check
+     * @return [com.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse] containing the submission status
+     * @throws com.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when skipMemoRequiredCheck is false and a transaction is trying to submit an operation to an account which requires a memo
+     * @throws com.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
+     * @throws com.stellar.sdk.horizon.exceptions.BadRequestException if the request fails due to a bad request (4xx)
+     * @throws com.stellar.sdk.horizon.exceptions.BadResponseException if the request fails due to a bad response from the server (5xx)
+     * @throws com.stellar.sdk.horizon.exceptions.TooManyRequestsException if the request fails due to too many requests sent to the server
+     * @throws com.stellar.sdk.horizon.exceptions.RequestTimeoutException when Horizon returns a Timeout or connection timeout occurred
+     * @throws com.stellar.sdk.horizon.exceptions.UnknownResponseException if the server returns an unknown status code
+     * @throws com.stellar.sdk.horizon.exceptions.ConnectionErrorException when the request cannot be executed due to cancellation or connectivity problems
+     * @see <a href="https://developers.stellar.org/docs/data/horizon/api-reference/submit-async-transaction">Submit a Transaction Asynchronously</a>
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md">SEP-0029</a>
+     */
+    suspend fun submitTransactionAsync(
+        transactionEnvelopeXdr: String,
+        skipMemoRequiredCheck: Boolean
+    ): com.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse {
+        if (!skipMemoRequiredCheck) {
+            sep29Checker.checkMemoRequired(transactionEnvelopeXdr)
+        }
+
         return executePostRequest(
             client = submitHttpClient,
             url = URLBuilder(serverUri).apply {
@@ -410,6 +493,8 @@ class HorizonServer(
                 }
             }
         } catch (e: com.stellar.sdk.horizon.exceptions.NetworkException) {
+            throw e
+        } catch (e: com.stellar.sdk.horizon.exceptions.SdkException) {
             throw e
         } catch (e: Exception) {
             throw com.stellar.sdk.horizon.exceptions.ConnectionErrorException(e)

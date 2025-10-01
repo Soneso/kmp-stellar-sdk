@@ -49,11 +49,11 @@ data class ClaimableBalanceResponse(
     val flags: Flags? = null,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * Flags set on this claimable balance.

@@ -65,11 +65,11 @@ data class AccountResponse(
     val sponsor: String? = null,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * Gets the incremented sequence number (current sequence + 1).

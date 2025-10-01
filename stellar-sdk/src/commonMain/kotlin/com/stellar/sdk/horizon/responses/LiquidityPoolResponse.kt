@@ -28,7 +28,7 @@ data class LiquidityPoolResponse(
     val id: String,
 
     @SerialName("paging_token")
-    val pagingToken: String,
+    override val pagingToken: String,
 
     @SerialName("fee_bp")
     val feeBp: Int? = null,
@@ -53,7 +53,7 @@ data class LiquidityPoolResponse(
 
     @SerialName("_links")
     val links: Links
-) : Response() {
+) : Response(), Pageable {
 
     /**
      * Represents liquidity pool reserves.

@@ -5,6 +5,9 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import com.stellar.sdk.horizon.exceptions.*
+import com.stellar.sdk.horizon.responses.Response
+import kotlinx.serialization.KSerializer
+import kotlin.time.Duration
 
 /**
  * Abstract base class for all Horizon API request builders.
@@ -144,6 +147,33 @@ abstract class RequestBuilder(
         } catch (e: Exception) {
             throw ConnectionErrorException(e)
         }
+    }
+
+    /**
+     * Creates a Server-Sent Events (SSE) stream for this request.
+     * The stream will automatically reconnect on connection loss and resume from the last received event.
+     *
+     * @param T The type of response objects expected from the stream
+     * @param serializer The serializer for deserializing event data
+     * @param listener The event listener for handling incoming events and failures
+     * @param reconnectTimeout Optional custom reconnection timeout (default: 15 seconds)
+     * @return An SSEStream instance that can be closed to stop streaming
+     *
+     * @see SSEStream
+     * @see EventListener
+     */
+    fun <T : Response> stream(
+        serializer: KSerializer<T>,
+        listener: EventListener<T>,
+        reconnectTimeout: Duration = SSEStream.DEFAULT_RECONNECT_TIMEOUT
+    ): SSEStream<T> {
+        return SSEStream.create(
+            httpClient = httpClient,
+            requestBuilder = this,
+            serializer = serializer,
+            listener = listener,
+            reconnectTimeout = reconnectTimeout
+        )
     }
 
     /**

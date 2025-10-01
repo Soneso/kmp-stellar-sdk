@@ -1,6 +1,7 @@
 package com.stellar.sdk.horizon.responses.effects
 
 import com.stellar.sdk.horizon.responses.Link
+import com.stellar.sdk.horizon.responses.Pageable
 import com.stellar.sdk.horizon.responses.Response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -14,7 +15,7 @@ import kotlinx.serialization.Serializable
  * @see [Effect Documentation](https://developers.stellar.org/docs/data/horizon/api-reference/resources/effects)
  */
 @Serializable
-abstract class EffectResponse : Response() {
+abstract class EffectResponse : Response(), Pageable {
     /**
      * A unique identifier for this effect
      */
@@ -53,7 +54,7 @@ abstract class EffectResponse : Response() {
      * A cursor value for use in pagination
      */
     @SerialName("paging_token")
-    abstract val pagingToken: String
+    abstract override val pagingToken: String
 
     /**
      * Links related to this effect
