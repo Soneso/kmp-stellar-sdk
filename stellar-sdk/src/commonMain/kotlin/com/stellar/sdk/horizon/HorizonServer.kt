@@ -502,6 +502,27 @@ class HorizonServer(
     }
 
     /**
+     * Loads an account from Horizon and returns it as a TransactionBuilderAccount.
+     *
+     * This is a convenience method that fetches the account from Horizon and wraps it
+     * in a format suitable for building transactions. The account object includes the
+     * current sequence number which is incremented automatically when building transactions.
+     *
+     * For muxed accounts (M...), this method fetches the underlying G... account and
+     * preserves the muxed account ID in the returned Account object.
+     *
+     * @param address The account address (G... or M...)
+     * @return Account object ready for use with TransactionBuilder
+     * @throws com.stellar.sdk.horizon.exceptions.NetworkException If the request fails
+     * @throws com.stellar.sdk.horizon.exceptions.BadRequestException If the account is not found (404)
+     */
+    suspend fun loadAccount(address: String): com.stellar.sdk.Account {
+        val muxedAccount = com.stellar.sdk.MuxedAccount(address)
+        val accountResponse = accounts().account(muxedAccount.accountId)
+        return com.stellar.sdk.Account(address, accountResponse.sequenceNumber.toLong())
+    }
+
+    /**
      * Closes the HTTP clients and releases resources.
      * Call this when you're done using the HorizonServer instance.
      */

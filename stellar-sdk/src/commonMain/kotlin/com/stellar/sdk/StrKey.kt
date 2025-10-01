@@ -130,6 +130,89 @@ object StrKey {
         }
     }
 
+    /**
+     * Encodes raw bytes to strkey pre-authorized transaction hash (T...)
+     */
+    fun encodePreAuthTx(data: ByteArray): String {
+        require(data.size == 32) { "Pre-auth transaction hash must be 32 bytes" }
+        return encodeCheck(VersionByte.PRE_AUTH_TX, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey pre-authorized transaction hash (T...) to raw bytes
+     */
+    fun decodePreAuthTx(data: String): ByteArray {
+        return decodeCheck(VersionByte.PRE_AUTH_TX, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of pre-authorized transaction hash (T...)
+     */
+    fun isValidPreAuthTx(preAuthTx: String): Boolean {
+        return try {
+            decodePreAuthTx(preAuthTx)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Encodes raw bytes to strkey SHA-256 hash (X...)
+     */
+    fun encodeSha256Hash(data: ByteArray): String {
+        require(data.size == 32) { "SHA-256 hash must be 32 bytes" }
+        return encodeCheck(VersionByte.SHA256_HASH, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey SHA-256 hash (X...) to raw bytes
+     */
+    fun decodeSha256Hash(data: String): ByteArray {
+        return decodeCheck(VersionByte.SHA256_HASH, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of SHA-256 hash (X...)
+     */
+    fun isValidSha256Hash(sha256Hash: String): Boolean {
+        return try {
+            decodeSha256Hash(sha256Hash)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Encodes raw bytes to strkey signed payload (P...)
+     */
+    fun encodeSignedPayload(data: ByteArray): String {
+        require(data.size in (32 + 4 + 4)..(32 + 4 + 64)) {
+            "Signed payload must be between 40 and 100 bytes, got ${data.size}"
+        }
+        return encodeCheck(VersionByte.SIGNED_PAYLOAD, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey signed payload (P...) to raw bytes
+     */
+    fun decodeSignedPayload(data: String): ByteArray {
+        return decodeCheck(VersionByte.SIGNED_PAYLOAD, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of signed payload (P...)
+     */
+    fun isValidSignedPayload(signedPayload: String): Boolean {
+        return try {
+            decodeSignedPayload(signedPayload)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun encodeCheck(versionByte: VersionByte, data: ByteArray): CharArray {
         val payload = byteArrayOf(versionByte.value) + data
         val checksum = calculateChecksum(payload)

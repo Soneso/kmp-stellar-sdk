@@ -1,6 +1,9 @@
 package com.stellar.sdk
 
 import com.stellar.sdk.crypto.getEd25519Crypto
+import com.stellar.sdk.xdr.AccountIDXdr
+import com.stellar.sdk.xdr.PublicKeyXdr
+import com.stellar.sdk.xdr.Uint256Xdr
 import kotlin.jvm.JvmStatic
 
 /**
@@ -261,6 +264,21 @@ class KeyPair private constructor(
     fun getPublicKey(): ByteArray = publicKey.copyOf()
 
     /**
+     * Returns the XDR AccountID for this keypair.
+     *
+     * This is used when encoding operations and transactions to XDR format.
+     *
+     * @return The XDR AccountID object
+     */
+    fun getXdrAccountId(): AccountIDXdr {
+        return AccountIDXdr(
+            PublicKeyXdr.Ed25519(
+                Uint256Xdr(publicKey)
+            )
+        )
+    }
+
+    /**
      * Sign the provided data with the keypair's private key.
      *
      * @param data The data to sign
@@ -272,6 +290,25 @@ class KeyPair private constructor(
             "KeyPair does not contain secret key. Use KeyPair.fromSecretSeed method to create a new KeyPair with a secret key."
         )
         return crypto.sign(data, key)
+    }
+
+    /**
+     * Sign the provided data with the keypair's private key and return a decorated signature.
+     *
+     * A decorated signature includes:
+     * - The signature hint (last 4 bytes of the public key)
+     * - The actual signature bytes
+     *
+     * This is the format required for Stellar transaction signatures.
+     *
+     * @param data The data to sign (usually a transaction hash)
+     * @return A DecoratedSignature containing the hint and signature
+     * @throws IllegalStateException if the private key for this keypair is null
+     */
+    fun signDecorated(data: ByteArray): DecoratedSignature {
+        val signature = sign(data)
+        val hint = publicKey.copyOfRange(publicKey.size - 4, publicKey.size)
+        return DecoratedSignature(hint, signature)
     }
 
     /**
