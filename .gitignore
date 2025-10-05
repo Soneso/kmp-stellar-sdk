@@ -98,3 +98,8 @@ gradle.properties.local
 test-results/
 *.test
 .claude/
+
+# Agent-generated summary files
+*_SUMMARY.md
+*_RESULTS.md
+*_COMPARISON.md

@@ -483,7 +483,7 @@ class AssembledTransaction<T>(
  * @param keepWaitingIf Predicate to determine if we should continue waiting
  * @return List of all attempts
  */
-private suspend fun <T> withExponentialBackoff(
+internal suspend fun <T> withExponentialBackoff(
     timeout: Int,
     fn: suspend () -> T,
     keepWaitingIf: (T) -> Boolean
