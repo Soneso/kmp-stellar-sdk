@@ -21,6 +21,8 @@ kotlin {
             testTask {
                 useKarma {
                     useChromeHeadless()
+                    // Use our custom karma config
+                    useConfigDirectory(project.projectDir)
                 }
             }
         }
@@ -31,10 +33,28 @@ kotlin {
                 }
             }
         }
+        compilations["test"].defaultSourceSet {
+            resources.srcDir("src/jsTest/resources")
+        }
         // Generate both library (for consumption) and executable (for tests)
         binaries.library()
         binaries.executable()
     }
+
+    // Configure NODE_PATH for test environment
+    tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest> {
+        if (name == "jsNodeTest") {
+            // Set NODE_PATH to include the build/js/node_modules directory
+            val nodePath = project.rootProject.projectDir.resolve("build/js/node_modules").absolutePath
+            environment("NODE_PATH", nodePath)
+        }
+    }
+
+    // Configure JS test resource processing
+    tasks.named("jsTestProcessResources") {
+        (this as ProcessResources).duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+
 
     // iOS targets
     val iosX64 = iosX64()

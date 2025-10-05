@@ -3,11 +3,6 @@ package com.stellar.sdk.crypto
 import kotlinx.coroutines.await
 import kotlin.js.Promise
 
-// External declaration for libsodium module
-@JsModule("libsodium-wrappers")
-@JsNonModule
-private external val libsodiumModule: dynamic
-
 /**
  * Singleton manager for libsodium initialization in JavaScript environments.
  *
@@ -21,8 +16,7 @@ private external val libsodiumModule: dynamic
  *
  * 1. Load the libsodium-wrappers module (via npm dependency)
  * 2. Wait for the `sodium.ready` promise to complete
- * 3. Set the global `_sodium` variable for backward compatibility
- * 4. Cache the initialized state to avoid re-initialization
+ * 3. Cache the initialized state to avoid re-initialization
  *
  * ## Thread Safety
  *
@@ -103,41 +97,23 @@ internal object LibsodiumInit {
     private fun initializeLibsodium(): Promise<Unit> {
         return Promise { resolve, reject ->
             try {
-                // Check if already initialized globally (backward compatibility)
-                val globalSodium = js("typeof _sodium !== 'undefined' ? _sodium : null")
-                if (globalSodium != null && js("globalSodium.ready") != null) {
-                    // Already initialized by app
-                    js("globalSodium.ready").unsafeCast<Promise<Unit>>().then(
-                        onFulfilled = {
-                            sodiumInstance = globalSodium
-                            initialized = true
-                            resolve(Unit)
-                        },
-                        onRejected = { error ->
-                            reject(error as? Throwable ?: Exception(error.toString()))
-                        }
-                    )
-                } else {
-                    // Initialize from module
-                    val readyPromise = js("libsodiumModule.ready").unsafeCast<Promise<Unit>>()
-                    readyPromise.then(
-                        onFulfilled = {
-                            // Store the sodium instance
-                            sodiumInstance = libsodiumModule
+                // Import libsodium-wrappers using dynamic import
+                // This works with webpack bundling automatically
+                val sodium = js("require('libsodium-wrappers')")
 
-                            // Set global _sodium for backward compatibility
-                            js("globalThis._sodium = libsodiumModule")
+                // Wait for sodium.ready promise
+                val readyPromise = js("sodium.ready").unsafeCast<Promise<Unit>>()
 
-                            // Mark as initialized
-                            initialized = true
-
-                            resolve(Unit)
-                        },
-                        onRejected = { error ->
-                            reject(error as? Throwable ?: Exception(error.toString()))
-                        }
-                    )
-                }
+                readyPromise.then(
+                    onFulfilled = {
+                        sodiumInstance = sodium
+                        initialized = true
+                        resolve(Unit)
+                    },
+                    onRejected = { error ->
+                        reject(error as? Throwable ?: Exception(error.toString()))
+                    }
+                )
             } catch (e: Throwable) {
                 reject(e)
             }

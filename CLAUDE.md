@@ -150,9 +150,40 @@ MainScope().launch {
 - **Run all tests**: `./gradlew test`
 - **Run JVM tests**: `./gradlew jvmTest`
 - **Run JS tests (Browser)**: `./gradlew jsBrowserTest` (requires Chrome)
-- **Run JS tests (Node.js)**: `./gradlew jsNodeTest`
+- **Run JS tests (Node.js)**:
+  - Individual test class: `./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"`
+  - Pattern matching: `./gradlew :stellar-sdk:jsNodeTest --tests "*Key*"`
+  - **Note**: Running all Node.js tests together currently hangs (see JS Testing Notes below)
 - **Run macOS tests**: `./gradlew macosArm64Test` or `./gradlew macosX64Test`
 - **Run iOS Simulator tests**: `./gradlew iosSimulatorArm64Test` or `./gradlew iosX64Test`
+
+#### JS Testing Notes (Node.js)
+
+**Current Status**: Individual test classes work perfectly, but running all tests together hangs.
+
+**Working Approach**:
+```bash
+# Run specific test classes
+./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"
+./gradlew :stellar-sdk:jsNodeTest --tests "StrKeyTest"
+
+# Or use patterns
+./gradlew :stellar-sdk:jsNodeTest --tests "*Test"
+```
+
+**Why This Happens**:
+- ✅ Libsodium initialization works correctly
+- ✅ Individual async tests pass (including crypto tests)
+- ✅ NODE_PATH is configured to find libsodium-wrappers
+- ⚠️ Running all tests in a single bundle causes a hang (likely Kotlin/JS + Mocha interaction)
+
+**Investigation Done**:
+- Attempted Mocha `--no-parallel` configuration
+- Tried `.mocharc.js` with sequential settings
+- Confirmed not a timeout issue (tests complete in <1s)
+- Root cause appears to be test bundling/compilation interaction
+
+**Recommendation**: Use test filtering (common pattern for large test suites) or run test classes individually in CI/CD.
 
 ### Sample Apps
 - **Android**: `./gradlew :stellarSample:androidApp:installDebug`
