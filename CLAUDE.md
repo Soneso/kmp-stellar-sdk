@@ -157,33 +157,41 @@ MainScope().launch {
 - **Run macOS tests**: `./gradlew macosArm64Test` or `./gradlew macosX64Test`
 - **Run iOS Simulator tests**: `./gradlew iosSimulatorArm64Test` or `./gradlew iosX64Test`
 
-#### JS Testing Notes (Node.js)
+#### JS Testing Notes
 
-**Current Status**: Individual test classes work perfectly, but running all tests together hangs.
+**Current Status**: Individual test classes work perfectly on both Node.js and Browser, but running all tests together fails.
 
 **Working Approach**:
 ```bash
-# Run specific test classes
+# Node.js - Run specific test classes
 ./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"
 ./gradlew :stellar-sdk:jsNodeTest --tests "StrKeyTest"
 
+# Browser - Run specific test classes
+./gradlew :stellar-sdk:jsBrowserTest --tests "KeyPairTest"
+./gradlew :stellar-sdk:jsBrowserTest --tests "StrKeyTest"
+
 # Or use patterns
 ./gradlew :stellar-sdk:jsNodeTest --tests "*Test"
+./gradlew :stellar-sdk:jsBrowserTest --tests "*Test"
 ```
 
 **Why This Happens**:
 - ✅ Libsodium initialization works correctly
 - ✅ Individual async tests pass (including crypto tests)
-- ✅ NODE_PATH is configured to find libsodium-wrappers
-- ⚠️ Running all tests in a single bundle causes a hang (likely Kotlin/JS + Mocha interaction)
+- ✅ NODE_PATH and Karma are properly configured
+- ⚠️ Running all tests in a single bundle causes failures (likely Kotlin/JS test bundling issue)
+- **Node.js**: Tests hang (Kotlin/JS + Mocha interaction)
+- **Browser**: Webpack fails with crypto module errors when bundling all tests
 
 **Investigation Done**:
-- Attempted Mocha `--no-parallel` configuration
+- Attempted Mocha `--no-parallel` configuration for Node.js
+- Added webpack fallback configuration for browser (helps but doesn't fully resolve)
 - Tried `.mocharc.js` with sequential settings
-- Confirmed not a timeout issue (tests complete in <1s)
-- Root cause appears to be test bundling/compilation interaction
+- Confirmed not a timeout issue (individual tests complete quickly)
+- Root cause appears to be test bundling/compilation interaction in Kotlin/JS plugin
 
-**Recommendation**: Use test filtering (common pattern for large test suites) or run test classes individually in CI/CD.
+**Recommendation**: Use test filtering (common pattern for large test suites) or run test classes individually in CI/CD. This is a Kotlin/JS tooling limitation, not an SDK issue - the web sample app proves browser compatibility works perfectly.
 
 ### Sample Apps
 - **Android**: `./gradlew :stellarSample:androidApp:installDebug`

@@ -172,6 +172,7 @@ struct TestResultItem: View {
     }
 }
 
+@MainActor
 class StellarViewModel: ObservableObject {
     private let demo = StellarDemo()
 
@@ -180,38 +181,39 @@ class StellarViewModel: ObservableObject {
     @Published var isRunningTests = false
 
     func generateRandom() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let kp = self.demo.generateRandomKeyPair()
-            DispatchQueue.main.async {
+        Task {
+            do {
+                let kp = try await demo.generateRandomKeyPair()
                 self.keypair = kp
+            } catch {
+                print("Error generating random keypair: \(error)")
             }
         }
     }
 
     func generateFromSeed() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let testSeed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
-            // Directly generate instead of using Result type which doesn't work well with Swift
-            let kp = self.demo.generateRandomKeyPair()
-
-            DispatchQueue.main.async {
+        Task {
+            do {
+                let testSeed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
+                // Use generateRandom for now since Result type doesn't bridge well to Swift
+                let kp = try await demo.generateRandomKeyPair()
                 self.keypair = kp
+            } catch {
+                print("Error generating keypair from seed: \(error)")
             }
         }
     }
 
     func runTests() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            DispatchQueue.main.async {
-                self.isRunningTests = true
-            }
-
-            let results = self.demo.runTestSuite()
-
-            DispatchQueue.main.async {
+        Task {
+            self.isRunningTests = true
+            do {
+                let results = try await demo.runTestSuite()
                 self.testResults = results
-                self.isRunningTests = false
+            } catch {
+                print("Error running tests: \(error)")
             }
+            self.isRunningTests = false
         }
     }
 }
