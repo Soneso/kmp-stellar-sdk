@@ -206,8 +206,7 @@ abstract class AbstractTransaction(
                 is TransactionEnvelopeXdr.V0 -> Transaction.fromV0EnvelopeXdr(envelope.value, network)
                 is TransactionEnvelopeXdr.V1 -> Transaction.fromV1EnvelopeXdr(envelope.value, network)
                 is TransactionEnvelopeXdr.FeeBump -> {
-                    // FeeBumpTransaction not yet implemented
-                    throw IllegalArgumentException("FeeBumpTransaction not yet supported")
+                    FeeBumpTransaction.fromFeeBumpTransactionEnvelope(envelope.value, network)
                 }
             }
         }
