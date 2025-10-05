@@ -269,6 +269,17 @@ MainScope().launch {
 - ✅ Version byte validation
 - ✅ Base32 encoding (platform-specific)
 
+### Auth (`com.stellar.sdk.Auth`)
+- ✅ Sign Soroban authorization entries for smart contract invocations
+- ✅ Build new authorization entries from scratch
+- ✅ Support for custom Signer interface (hardware wallets, multi-sig)
+- ✅ Network replay protection (network ID included in signatures)
+- ✅ Signature verification after signing
+- ✅ Immutable design (clones entries to avoid mutation)
+- ✅ **Async API**: All methods use `suspend` functions for proper JavaScript support
+- ✅ **Cross-platform compatible**: Signatures identical across JVM, JS, and Native
+- ✅ **Java SDK compatible**: Same test vectors, identical behavior
+
 ## Testing
 
 All cryptographic operations have comprehensive test coverage:
