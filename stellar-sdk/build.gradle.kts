@@ -106,6 +106,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("io.ktor:ktor-client-mock:2.3.8")
             }
         }
 

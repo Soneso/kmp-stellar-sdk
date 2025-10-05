@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soneso.sample.StellarDemo
 import com.soneso.sample.KeyPairInfo
+import com.soneso.sample.SorobanDemoResult
 import com.soneso.sample.TestResult
 
 class MainActivity : ComponentActivity() {
@@ -33,6 +34,8 @@ fun StellarSampleApp(viewModel: StellarViewModel = viewModel()) {
     val keypair by viewModel.keypair.collectAsState()
     val testResults by viewModel.testResults.collectAsState()
     val isRunningTests by viewModel.isRunningTests.collectAsState()
+    val sorobanResult by viewModel.sorobanResult.collectAsState()
+    val isRunningSoroban by viewModel.isRunningSoroban.collectAsState()
 
     Scaffold(
         topBar = {
@@ -60,6 +63,16 @@ fun StellarSampleApp(viewModel: StellarViewModel = viewModel()) {
                 keypair = keypair,
                 onGenerateRandom = { viewModel.generateRandom() },
                 onGenerateFromSeed = { viewModel.generateFromSeed() }
+            )
+
+            // Soroban Smart Contracts Card
+            SorobanCard(
+                result = sorobanResult,
+                isRunning = isRunningSoroban,
+                onNetworkInfo = { viewModel.runSorobanNetworkInfo() },
+                onSimulation = { viewModel.runSorobanSimulation() },
+                onFullFlow = { viewModel.runSorobanFullFlow() },
+                onEventQuery = { viewModel.runSorobanEventQuery() }
             )
 
             // Test Suite Card
@@ -150,6 +163,166 @@ fun KeyPairInfoDisplay(keypair: KeyPairInfo) {
         }
         InfoRow("Can Sign:", if (keypair.canSign) "Yes" else "No")
         InfoRow("Crypto Library:", keypair.cryptoLibrary)
+    }
+}
+
+@Composable
+fun SorobanCard(
+    result: SorobanDemoResult?,
+    isRunning: Boolean,
+    onNetworkInfo: () -> Unit,
+    onSimulation: () -> Unit,
+    onFullFlow: () -> Unit,
+    onEventQuery: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Soroban Smart Contracts",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Interact with smart contracts on Stellar testnet",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Demo buttons in a grid
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onNetworkInfo,
+                        enabled = !isRunning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Network Info", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Button(
+                        onClick = onSimulation,
+                        enabled = !isRunning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Simulate", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onFullFlow,
+                        enabled = !isRunning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Full Flow", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Button(
+                        onClick = onEventQuery,
+                        enabled = !isRunning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Query Events", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            if (isRunning) {
+                Spacer(modifier = Modifier.height(16.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Running...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
+            }
+
+            if (result != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SorobanResultDisplay(result)
+            }
+        }
+    }
+}
+
+@Composable
+fun SorobanResultDisplay(result: SorobanDemoResult) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Status header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (result.success) "Success" else "Failed",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (result.success) Color(0xFF4CAF50) else Color(0xFFF44336)
+            )
+            Text(
+                text = "${result.duration}ms",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f)
+            )
+        }
+
+        Text(
+            text = result.message,
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        // Steps
+        if (result.steps.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .fillMaxWidth()
+                ) {
+                    result.steps.take(15).forEach { step ->
+                        Text(
+                            text = step,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                    }
+                    if (result.steps.size > 15) {
+                        Text(
+                            text = "... and ${result.steps.size - 15} more steps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Additional data
+        if (result.data.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            result.data.forEach { (key, value) ->
+                InfoRow(label = "$key:", value = value)
+            }
+        }
     }
 }
 

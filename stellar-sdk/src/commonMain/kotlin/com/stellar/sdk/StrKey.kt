@@ -213,6 +213,33 @@ object StrKey {
         }
     }
 
+    /**
+     * Encodes raw bytes to strkey contract address (C...)
+     */
+    fun encodeContract(data: ByteArray): String {
+        require(data.size == 32) { "Contract address must be 32 bytes" }
+        return encodeCheck(VersionByte.CONTRACT, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey contract address (C...) to raw bytes
+     */
+    fun decodeContract(data: String): ByteArray {
+        return decodeCheck(VersionByte.CONTRACT, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of contract address (C...)
+     */
+    fun isValidContract(address: String): Boolean {
+        return try {
+            decodeContract(address)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun encodeCheck(versionByte: VersionByte, data: ByteArray): CharArray {
         val payload = byteArrayOf(versionByte.value) + data
         val checksum = calculateChecksum(payload)

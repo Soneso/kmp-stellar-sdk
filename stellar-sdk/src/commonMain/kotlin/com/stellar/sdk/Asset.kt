@@ -65,6 +65,40 @@ sealed class Asset : Comparable<Asset> {
      * @return The XDR Asset union representing this asset
      */
     abstract fun toXdr(): AssetXdr
+    /**
+     * Returns the contract ID for this asset on the given network.
+     *
+     * For native assets (XLM), returns the native contract ID.
+     * For issued assets, derives the contract ID from the asset and network.
+     *
+     * This contract ID can be used to interact with the Stellar Asset Contract (SAC)
+     * for this asset using Soroban smart contracts.
+     *
+     * @param network The network to get the contract ID for
+     * @return The contract address (C...) for this asset's contract
+     *
+     * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract</a>
+     */
+    fun getContractId(network: Network): String {
+        // Build the HashIDPreimage for CONTRACT_ID
+        val preimage = HashIDPreimageXdr.ContractID(
+            HashIDPreimageContractIDXdr(
+                networkId = HashXdr(network.networkId()),
+                contractIdPreimage = ContractIDPreimageXdr.FromAsset(this.toXdr())
+            )
+        )
+
+        // Serialize to XDR bytes
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val xdrBytes = writer.toByteArray()
+
+        // Hash the preimage
+        val rawContractId = Util.hash(xdrBytes)
+
+        // Encode as contract address (C...)
+        return StrKey.encodeContract(rawContractId)
+    }
 
     /**
      * Returns a canonical string representation of this asset.
