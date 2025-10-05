@@ -216,17 +216,8 @@ object Scv {
             "invalid value, expected between $INT128_MIN_VALUE and $INT128_MAX_VALUE, but got $value"
         }
 
-        val bytes = value.toByteArray()
-        val paddedBytes = ByteArray(16)
-
-        if (value.signum() >= 0) {
-            val numBytesToCopy = minOf(bytes.size, 16)
-            val copyStartIndex = bytes.size - numBytesToCopy
-            bytes.copyInto(paddedBytes, 16 - numBytesToCopy, copyStartIndex, bytes.size)
-        } else {
-            paddedBytes.fill(0xFF.toByte(), 0, 16 - bytes.size)
-            bytes.copyInto(paddedBytes, 16 - bytes.size, 0, bytes.size)
-        }
+        // Use platform-specific conversion
+        val paddedBytes = bigIntegerToBytesSigned(value, 16)
 
         val hi = bytesToLong(paddedBytes.copyOfRange(0, 8))
         val lo = bytesToULong(paddedBytes.copyOfRange(8, 16))
@@ -258,18 +249,8 @@ object Scv {
         hiBytes.copyInto(fullBytes, 0, 0, 8)
         loBytes.copyInto(fullBytes, 8, 0, 8)
 
-        // Java BigInteger(byte[]) treats bytes as signed two's complement
-        // For Kotlin BigInteger: if high bit is set, it's negative in two's complement
-        return if ((fullBytes[0].toInt() and 0x80) != 0) {
-            // Negative: convert from two's complement
-            // Method: -(~bytes + 1) where ~ is bitwise NOT
-            val inverted = fullBytes.map { (it.toInt().inv() and 0xFF).toByte() }.toByteArray()
-            val magnitude = BigInteger.fromByteArray(inverted, Sign.POSITIVE) + BigInteger.ONE
-            -magnitude
-        } else {
-            // Positive: direct conversion
-            BigInteger.fromByteArray(fullBytes, Sign.POSITIVE)
-        }
+        // Use platform-specific conversion
+        return bytesToBigIntegerSigned(fullBytes)
     }
 
     // ============================================================================
@@ -349,17 +330,8 @@ object Scv {
             "invalid value, expected between $INT256_MIN_VALUE and $INT256_MAX_VALUE, but got $value"
         }
 
-        val bytes = value.toByteArray()
-        val paddedBytes = ByteArray(32)
-
-        if (value.signum() >= 0) {
-            val numBytesToCopy = minOf(bytes.size, 32)
-            val copyStartIndex = bytes.size - numBytesToCopy
-            bytes.copyInto(paddedBytes, 32 - numBytesToCopy, copyStartIndex, bytes.size)
-        } else {
-            paddedBytes.fill(0xFF.toByte(), 0, 32 - bytes.size)
-            bytes.copyInto(paddedBytes, 32 - bytes.size, 0, bytes.size)
-        }
+        // Use platform-specific conversion
+        val paddedBytes = bigIntegerToBytesSigned(value, 32)
 
         val hiHi = bytesToLong(paddedBytes.copyOfRange(0, 8))
         val hiLo = bytesToULong(paddedBytes.copyOfRange(8, 16))
@@ -394,18 +366,8 @@ object Scv {
         ulongToBytes(scVal.value.loHi.value).copyInto(fullBytes, 16, 0, 8)
         ulongToBytes(scVal.value.loLo.value).copyInto(fullBytes, 24, 0, 8)
 
-        // Java BigInteger(byte[]) treats bytes as signed two's complement
-        // For Kotlin BigInteger: if high bit is set, it's negative in two's complement
-        return if ((fullBytes[0].toInt() and 0x80) != 0) {
-            // Negative: convert from two's complement
-            // Method: -(~bytes + 1) where ~ is bitwise NOT
-            val inverted = fullBytes.map { (it.toInt().inv() and 0xFF).toByte() }.toByteArray()
-            val magnitude = BigInteger.fromByteArray(inverted, Sign.POSITIVE) + BigInteger.ONE
-            -magnitude
-        } else {
-            // Positive: direct conversion
-            BigInteger.fromByteArray(fullBytes, Sign.POSITIVE)
-        }
+        // Use platform-specific conversion
+        return bytesToBigIntegerSigned(fullBytes)
     }
 
     // ============================================================================
