@@ -198,3 +198,13 @@ internal object Util {
         return "$wholePart.$fractionalPart"
     }
 }
+
+/**
+ * Returns the current time in milliseconds since the Unix epoch (January 1, 1970, 00:00:00 UTC).
+ *
+ * This is a platform-specific implementation used internally by the SDK for timeouts and
+ * exponential backoff calculations.
+ *
+ * @return Current time in milliseconds
+ */
+internal expect fun currentTimeMillis(): Long

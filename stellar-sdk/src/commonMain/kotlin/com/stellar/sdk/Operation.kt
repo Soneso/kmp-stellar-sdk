@@ -1535,6 +1535,48 @@ data class InvokeHostFunctionOperation(
                 auth = op.auth
             )
         }
+
+        /**
+         * Creates an InvokeHostFunctionOperation for invoking a specific function on a contract.
+         *
+         * This is a convenience factory method that builds the necessary XDR structures
+         * for contract invocation.
+         *
+         * @param contractAddress The contract address (C... format)
+         * @param functionName The name of the contract function to invoke
+         * @param parameters The function parameters as SCVal XDR values
+         * @return An InvokeHostFunctionOperation ready to be added to a transaction
+         *
+         * ## Example
+         * ```kotlin
+         * val operation = InvokeHostFunctionOperation.invokeContractFunction(
+         *     contractAddress = "CABC123...",
+         *     functionName = "transfer",
+         *     parameters = listOf(
+         *         Scv.toAddress(fromAccount),
+         *         Scv.toAddress(toAccount),
+         *         Scv.toInt128(amount)
+         *     )
+         * )
+         * ```
+         */
+        fun invokeContractFunction(
+            contractAddress: String,
+            functionName: String,
+            parameters: List<SCValXdr>
+        ): InvokeHostFunctionOperation {
+            val address = Address(contractAddress)
+            val invokeArgs = InvokeContractArgsXdr(
+                contractAddress = address.toSCAddress(),
+                functionName = SCSymbolXdr(functionName),
+                args = parameters
+            )
+            val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+            return InvokeHostFunctionOperation(
+                hostFunction = hostFunction,
+                auth = emptyList()
+            )
+        }
     }
 }
 

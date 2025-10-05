@@ -280,6 +280,21 @@ MainScope().launch {
 - ✅ **Cross-platform compatible**: Signatures identical across JVM, JS, and Native
 - ✅ **Java SDK compatible**: Same test vectors, identical behavior
 
+### ContractClient & AssembledTransaction (`com.stellar.sdk.contract.*`)
+- ✅ High-level API for Soroban smart contract interactions
+- ✅ Full transaction lifecycle management (simulate → sign → submit → parse)
+- ✅ Type-safe generic results with custom parser support
+- ✅ Automatic simulation and resource estimation
+- ✅ Read-only vs write call detection
+- ✅ Authorization handling (auto-auth and custom auth)
+- ✅ Automatic state restoration when needed
+- ✅ Transaction status polling with exponential backoff
+- ✅ Comprehensive error handling with 10 exception types
+- ✅ **Developer-friendly**: Reduces contract calls from ~20 lines to 2-3 lines
+- ✅ **Async API**: All methods use `suspend` functions
+- ✅ **Cross-platform compatible**: Works on JVM, JS, iOS, macOS
+- ✅ **Production-ready**: Full feature parity with Java SDK
+
 ## Testing
 
 All cryptographic operations have comprehensive test coverage:
