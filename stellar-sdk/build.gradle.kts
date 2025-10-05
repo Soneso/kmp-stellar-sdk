@@ -99,6 +99,8 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:2.3.8")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+                // BigInteger support for multiplatform
+                implementation("com.ionspin.kotlin:bignum:0.3.9")
             }
         }
 

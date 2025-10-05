@@ -1,5 +1,12 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.DiagnosticEventXdr
+import com.stellar.sdk.xdr.LedgerEntryXdr
+import com.stellar.sdk.xdr.LedgerKeyXdr
+import com.stellar.sdk.xdr.SCValXdr
+import com.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
+import com.stellar.sdk.xdr.SorobanTransactionDataXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.Serializable
 
 /**
@@ -37,33 +44,21 @@ data class SimulateTransactionResponse(
     /**
      * Parses the [transactionData] field from a base64-encoded string to a SorobanTransactionData XDR object.
      *
-     * Note: This is a placeholder for XDR parsing functionality.
-     * The actual implementation will be added when XDR parsing utilities are available.
-     *
      * @return the parsed SorobanTransactionData object, or null if transactionData is null
-     * @throws IllegalStateException if XDR parsing is not yet implemented
+     * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
      */
-    fun parseTransactionData(): Any? {
-        if (transactionData == null) return null
-        // TODO: Implement XDR parsing when XDR utilities are available
-        // return SorobanTransactionData.fromXdrBase64(transactionData)
-        throw IllegalStateException("XDR parsing not yet implemented")
+    fun parseTransactionData(): SorobanTransactionDataXdr? {
+        return transactionData?.let { SorobanTransactionDataXdr.fromXdrBase64(it) }
     }
 
     /**
      * Parses the [events] field from a list of base64-encoded strings to a list of DiagnosticEvent XDR objects.
      *
-     * Note: This is a placeholder for XDR parsing functionality.
-     * The actual implementation will be added when XDR parsing utilities are available.
-     *
      * @return list of parsed DiagnosticEvent objects, or null if events is null
-     * @throws IllegalStateException if XDR parsing is not yet implemented
+     * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
      */
-    fun parseEvents(): List<Any>? {
-        if (events == null) return null
-        // TODO: Implement XDR parsing when XDR utilities are available
-        // return events.map { DiagnosticEvent.fromXdrBase64(it) }
-        throw IllegalStateException("XDR parsing not yet implemented")
+    fun parseEvents(): List<DiagnosticEventXdr>? {
+        return events?.map { DiagnosticEventXdr.fromXdrBase64(it) }
     }
 
     /**
@@ -81,33 +76,21 @@ data class SimulateTransactionResponse(
          * Parses the [auth] field from a list of base64-encoded strings to a list of
          * SorobanAuthorizationEntry XDR objects.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return list of parsed SorobanAuthorizationEntry objects, or null if auth is null
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
          */
-        fun parseAuth(): List<Any>? {
-            if (auth == null) return null
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return auth.map { SorobanAuthorizationEntry.fromXdrBase64(it) }
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseAuth(): List<SorobanAuthorizationEntryXdr>? {
+            return auth?.map { SorobanAuthorizationEntryXdr.fromXdrBase64(it) }
         }
 
         /**
          * Parses the [xdr] field from a base64-encoded string to an SCVal XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed SCVal object, or null if xdr is null
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseXdr(): Any? {
-            if (xdr == null) return null
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return SCVal.fromXdrBase64(xdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseXdr(): SCValXdr? {
+            return xdr?.let { SCValXdr.fromXdrBase64(it) }
         }
     }
 
@@ -128,16 +111,11 @@ data class SimulateTransactionResponse(
         /**
          * Parses the [transactionData] field from a base64-encoded string to a SorobanTransactionData XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed SorobanTransactionData object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseTransactionData(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return SorobanTransactionData.fromXdrBase64(transactionData)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseTransactionData(): SorobanTransactionDataXdr {
+            return SorobanTransactionDataXdr.fromXdrBase64(transactionData)
         }
     }
 
@@ -164,48 +142,31 @@ data class SimulateTransactionResponse(
         /**
          * Parses the [key] field from a base64-encoded string to a LedgerKey XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed LedgerKey object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseKey(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return LedgerKey.fromXdrBase64(key)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseKey(): LedgerKeyXdr {
+            return LedgerKeyXdr.fromXdrBase64(key)
         }
 
         /**
          * Parses the [before] field from a base64-encoded string to a LedgerEntry XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed LedgerEntry object, or null if before is null
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseBefore(): Any? {
-            if (before == null) return null
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return LedgerEntry.fromXdrBase64(before)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseBefore(): LedgerEntryXdr? {
+            return before?.let { LedgerEntryXdr.fromXdrBase64(it) }
         }
 
         /**
          * Parses the [after] field from a base64-encoded string to a LedgerEntry XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed LedgerEntry object, or null if after is null
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseAfter(): Any? {
-            if (after == null) return null
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return LedgerEntry.fromXdrBase64(after)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseAfter(): LedgerEntryXdr? {
+            return after?.let { LedgerEntryXdr.fromXdrBase64(it) }
         }
     }
 }

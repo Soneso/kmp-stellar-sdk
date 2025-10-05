@@ -1,5 +1,8 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.LedgerCloseMetaXdr
+import com.stellar.sdk.xdr.LedgerHeaderHistoryEntryXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.Serializable
 
 /**
@@ -46,31 +49,21 @@ data class GetLedgersResponse(
         /**
          * Parses the [headerXdr] field from a base64-encoded string to a LedgerHeaderHistoryEntry XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed LedgerHeaderHistoryEntry object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseHeaderXdr(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return LedgerHeaderHistoryEntry.fromXdrBase64(headerXdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseHeaderXdr(): LedgerHeaderHistoryEntryXdr {
+            return LedgerHeaderHistoryEntryXdr.fromXdrBase64(headerXdr)
         }
 
         /**
          * Parses the [metadataXdr] field from a base64-encoded string to a LedgerCloseMeta XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed LedgerCloseMeta object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseMetadataXdr(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return LedgerCloseMeta.fromXdrBase64(metadataXdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseMetadataXdr(): LedgerCloseMetaXdr {
+            return LedgerCloseMetaXdr.fromXdrBase64(metadataXdr)
         }
     }
 }

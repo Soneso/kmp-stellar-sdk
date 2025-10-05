@@ -1,5 +1,8 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.ContractEventXdr
+import com.stellar.sdk.xdr.DiagnosticEventXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.Serializable
 
 /**
@@ -47,29 +50,27 @@ data class Events(
      * @return A list of parsed DiagnosticEvent XDR objects, or null if no diagnostic events exist.
      * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded.
      */
-    // TODO: Implement XDR parsing once XDR classes are available
-    // fun parseDiagnosticEventsXdr(): List<DiagnosticEvent>? {
-    //     return diagnosticEventsXdr?.map { xdr ->
-    //         DiagnosticEvent.fromXdrBase64(xdr)
-    //     }
-    // }
+    fun parseDiagnosticEventsXdr(): List<DiagnosticEventXdr>? {
+        return diagnosticEventsXdr?.map { xdr ->
+            DiagnosticEventXdr.fromXdrBase64(xdr)
+        }
+    }
 
     /**
      * Parses the [transactionEventsXdr] field from a list of base64-encoded XDR strings
-     * to a list of typed TransactionEvent objects.
+     * to a list of typed ContractEvent objects.
      *
      * Transaction events are associated with the transaction as a whole rather than
      * individual contract invocations.
      *
-     * @return A list of parsed TransactionEvent XDR objects, or null if no transaction events exist.
+     * @return A list of parsed ContractEvent XDR objects, or null if no transaction events exist.
      * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded.
      */
-    // TODO: Implement XDR parsing once XDR classes are available
-    // fun parseTransactionEventsXdr(): List<TransactionEvent>? {
-    //     return transactionEventsXdr?.map { xdr ->
-    //         TransactionEvent.fromXdrBase64(xdr)
-    //     }
-    // }
+    fun parseTransactionEventsXdr(): List<ContractEventXdr>? {
+        return transactionEventsXdr?.map { xdr ->
+            ContractEventXdr.fromXdrBase64(xdr)
+        }
+    }
 
     /**
      * Parses the [contractEventsXdr] field from a nested list of base64-encoded XDR strings
@@ -88,12 +89,11 @@ data class Events(
      * @return A nested list of parsed ContractEvent XDR objects, or null if no contract events exist.
      * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded.
      */
-    // TODO: Implement XDR parsing once XDR classes are available
-    // fun parseContractEventsXdr(): List<List<ContractEvent>>? {
-    //     return contractEventsXdr?.map { operationEvents ->
-    //         operationEvents.map { xdr ->
-    //             ContractEvent.fromXdrBase64(xdr)
-    //         }
-    //     }
-    // }
+    fun parseContractEventsXdr(): List<List<ContractEventXdr>>? {
+        return contractEventsXdr?.map { operationEvents ->
+            operationEvents.map { xdr ->
+                ContractEventXdr.fromXdrBase64(xdr)
+            }
+        }
+    }
 }

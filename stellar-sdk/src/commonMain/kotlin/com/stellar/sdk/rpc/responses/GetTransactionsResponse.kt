@@ -1,5 +1,10 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.DiagnosticEventXdr
+import com.stellar.sdk.xdr.TransactionEnvelopeXdr
+import com.stellar.sdk.xdr.TransactionMetaXdr
+import com.stellar.sdk.xdr.TransactionResultXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -60,46 +65,31 @@ data class GetTransactionsResponse(
         /**
          * Parses the [envelopeXdr] field from a base64-encoded string to a TransactionEnvelope XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed TransactionEnvelope object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseEnvelopeXdr(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return TransactionEnvelope.fromXdrBase64(envelopeXdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseEnvelopeXdr(): TransactionEnvelopeXdr {
+            return TransactionEnvelopeXdr.fromXdrBase64(envelopeXdr)
         }
 
         /**
          * Parses the [resultXdr] field from a base64-encoded string to a TransactionResult XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed TransactionResult object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseResultXdr(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return TransactionResult.fromXdrBase64(resultXdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseResultXdr(): TransactionResultXdr {
+            return TransactionResultXdr.fromXdrBase64(resultXdr)
         }
 
         /**
          * Parses the [resultMetaXdr] field from a base64-encoded string to a TransactionMeta XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed TransactionMeta object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseResultMetaXdr(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return TransactionMeta.fromXdrBase64(resultMetaXdr)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseResultMetaXdr(): TransactionMetaXdr {
+            return TransactionMetaXdr.fromXdrBase64(resultMetaXdr)
         }
 
         /**
@@ -109,18 +99,12 @@ data class GetTransactionsResponse(
          * This method is deprecated and will be removed in a future version.
          * Use [events].[Events.parseDiagnosticEventsXdr] instead.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return list of parsed DiagnosticEvent objects, or null if diagnosticEventsXdr is null
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
          */
         @Deprecated("Use events.parseDiagnosticEventsXdr() instead. This method will be removed in a future version.")
-        fun parseDiagnosticEventsXdr(): List<Any>? {
-            if (diagnosticEventsXdr == null) return null
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return diagnosticEventsXdr.map { DiagnosticEvent.fromXdrBase64(it) }
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseDiagnosticEventsXdr(): List<DiagnosticEventXdr>? {
+            return diagnosticEventsXdr?.map { DiagnosticEventXdr.fromXdrBase64(it) }
         }
     }
 }

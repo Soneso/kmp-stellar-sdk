@@ -24,6 +24,21 @@ class SorobanDataBuilderTest {
         write: Long = testWriteBytes
     ) = SorobanDataBuilder.Resources(cpu, read, write)
 
+    // Helper to create a test ledger key (contract instance)
+    private fun createTestLedgerKey(): LedgerKeyXdr {
+        // Create a simple contract instance ledger key for testing
+        val contractAddress = SCAddressXdr.ContractId(
+            ContractIDXdr(HashXdr(ByteArray(32) { it.toByte() }))
+        )
+        return LedgerKeyXdr.ContractData(
+            LedgerKeyContractDataXdr(
+                contract = contractAddress,
+                key = SCValXdr.U32(Uint32Xdr(0u)),
+                durability = ContractDataDurabilityXdr.PERSISTENT
+            )
+        )
+    }
+
     // ========== Constructor Tests ==========
 
     @Test
@@ -35,24 +50,34 @@ class SorobanDataBuilderTest {
         val data = builder.build()
 
         // Then: All values should be zero/empty
-        // Note: This test will be enabled when XDR implementation is complete
-        // assertNotNull(data)
-        // assertEquals(0, data.resourceFee.int64)
-        // assertEquals(0, data.resources.instructions.uint32)
+        assertNotNull(data)
+        assertEquals(0L, data.resourceFee.value)
+        assertEquals(0u, data.resources.instructions.value)
+        assertEquals(0u, data.resources.diskReadBytes.value)
+        assertEquals(0u, data.resources.writeBytes.value)
+        assertTrue(data.resources.footprint.readOnly.isEmpty())
+        assertTrue(data.resources.footprint.readWrite.isEmpty())
+        assertEquals(SorobanTransactionDataExtXdr.Void, data.ext)
     }
 
     @Test
     fun testConstructorFromBase64_parsesValidXdr() {
-        // Given: Valid base64-encoded SorobanTransactionData
-        val validXdr = "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8AAAAFAAAAAEAAAAH8dTe2OoI0BnhlDbH0fWvXmvprkBvBAgKIcL9busuuMEAAAABAAAABgAAAAHpt+eLvUk0FquW9xHdY/bTnpry+8VdDT8IZ+IF4NAD/AAAABAAAAABAAAAAgAAAA8AAAAHQ291bnRlcgAAAAASAAAAAAAAAABYt8SiyPKXqo89JHEoH9/M7K/kjlZjMT7BjhKnPsqYoQAAAAEAHifGAAAFlAAAAIgAAAAAAAAAAg=="
+        // Given: Create initial data and encode it
+        val originalData = SorobanDataBuilder()
+            .setResourceFee(12345L)
+            .setResources(createTestResources(100000, 200, 300))
+            .build()
+        val base64 = originalData.toXdrBase64()
 
         // When: Creating builder from base64
-        val exception = assertFailsWith<NotImplementedError> {
-            SorobanDataBuilder(validXdr)
-        }
+        val builder = SorobanDataBuilder(base64)
+        val decodedData = builder.build()
 
-        // Then: Constructor is not yet implemented (TODO)
-        assertTrue(exception.message?.contains("requires XDR fromXdrBase64") ?: false)
+        // Then: Data should match original
+        assertEquals(12345L, decodedData.resourceFee.value)
+        assertEquals(100000u, decodedData.resources.instructions.value)
+        assertEquals(200u, decodedData.resources.diskReadBytes.value)
+        assertEquals(300u, decodedData.resources.writeBytes.value)
     }
 
     @Test
@@ -60,25 +85,36 @@ class SorobanDataBuilderTest {
         // Given: Invalid base64 string
         val invalidXdr = "not-valid-base64!!!"
 
-        // When/Then: Should fail (when implemented)
-        assertFailsWith<NotImplementedError> {
+        // When/Then: Should throw IllegalArgumentException
+        val exception = assertFailsWith<IllegalArgumentException> {
             SorobanDataBuilder(invalidXdr)
         }
+
+        assertTrue(exception.message?.contains("Invalid SorobanData") ?: false)
     }
 
     @Test
     fun testConstructorFromXdrObject_createsDeepCopy() {
         // Given: Existing SorobanTransactionData XDR object
-        // val existingData = SorobanTransactionDataXdr(...)
+        val original = SorobanDataBuilder()
+            .setResourceFee(99999L)
+            .setResources(createTestResources(50000, 100, 200))
+            .build()
 
         // When: Creating builder from XDR object
-        val exception = assertFailsWith<NotImplementedError> {
-            // SorobanDataBuilder(existingData)
-            TODO("Requires XDR implementation")
-        }
+        val builder = SorobanDataBuilder(original)
+        val copy = builder.build()
 
-        // Then: Constructor is not yet implemented (TODO)
-        assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+        // Then: Should be a deep copy with same values
+        assertEquals(original.resourceFee.value, copy.resourceFee.value)
+        assertEquals(original.resources.instructions.value, copy.resources.instructions.value)
+        assertEquals(original.resources.diskReadBytes.value, copy.resources.diskReadBytes.value)
+        assertEquals(original.resources.writeBytes.value, copy.resources.writeBytes.value)
+
+        // Verify it's actually a copy by modifying the builder
+        val modified = builder.setResourceFee(11111L).build()
+        assertEquals(99999L, copy.resourceFee.value) // Original copy unchanged
+        assertEquals(11111L, modified.resourceFee.value) // New build has new value
     }
 
     // ========== Resources Tests ==========
@@ -232,12 +268,11 @@ class SorobanDataBuilderTest {
         val builder = SorobanDataBuilder()
 
         // When: Setting resource fee
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setResourceFee(testResourceFee)
-        }
+        builder.setResourceFee(testResourceFee)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Resource fee is set correctly
+        assertEquals(testResourceFee, data.resourceFee.value)
     }
 
     @Test
@@ -246,12 +281,11 @@ class SorobanDataBuilderTest {
         val builder = SorobanDataBuilder()
 
         // When: Setting zero resource fee
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setResourceFee(0)
-        }
+        builder.setResourceFee(0)
+        val data = builder.build()
 
-        // Then: Zero is valid (but not yet implemented)
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Zero is valid
+        assertEquals(0L, data.resourceFee.value)
     }
 
     @Test
@@ -275,97 +309,99 @@ class SorobanDataBuilderTest {
         val resources = createTestResources()
 
         // When: Setting resources
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setResources(resources)
-        }
+        builder.setResources(resources)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Resources are set correctly
+        assertEquals(testCpuInstructions.toUInt(), data.resources.instructions.value)
+        assertEquals(testDiskReadBytes.toUInt(), data.resources.diskReadBytes.value)
+        assertEquals(testWriteBytes.toUInt(), data.resources.writeBytes.value)
     }
 
     @Test
     fun testSetReadOnly_validKeys_setsSuccessfully() {
         // Given: Builder and valid ledger keys
         val builder = SorobanDataBuilder()
-        // val ledgerKeys = listOf<LedgerKeyXdr>(...)
+        val ledgerKeys = listOf(createTestLedgerKey())
 
         // When: Setting read-only keys
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadOnly(emptyList())
-        }
+        builder.setReadOnly(ledgerKeys)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Read-only footprint is set correctly
+        assertEquals(1, data.resources.footprint.readOnly.size)
     }
 
     @Test
     fun testSetReadOnly_nullKeys_leavesUnchanged() {
-        // Given: Builder with null read-only keys
+        // Given: Builder with existing read-only keys
         val builder = SorobanDataBuilder()
+        val originalKey = createTestLedgerKey()
+        builder.setReadOnly(listOf(originalKey))
 
         // When: Setting null (should leave unchanged)
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadOnly(null)
-        }
+        builder.setReadOnly(null)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Original keys are preserved
+        assertEquals(1, data.resources.footprint.readOnly.size)
     }
 
     @Test
     fun testSetReadOnly_emptyList_clearsFootprint() {
-        // Given: Builder with empty list
+        // Given: Builder with existing read-only keys
         val builder = SorobanDataBuilder()
+        builder.setReadOnly(listOf(createTestLedgerKey()))
 
         // When: Setting empty list (should clear)
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadOnly(emptyList())
-        }
+        builder.setReadOnly(emptyList())
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Footprint is cleared
+        assertTrue(data.resources.footprint.readOnly.isEmpty())
     }
 
     @Test
     fun testSetReadWrite_validKeys_setsSuccessfully() {
         // Given: Builder and valid ledger keys
         val builder = SorobanDataBuilder()
+        val ledgerKeys = listOf(createTestLedgerKey())
 
         // When: Setting read-write keys
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadWrite(emptyList())
-        }
+        builder.setReadWrite(ledgerKeys)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Read-write footprint is set correctly
+        assertEquals(1, data.resources.footprint.readWrite.size)
     }
 
     @Test
     fun testSetReadWrite_nullKeys_leavesUnchanged() {
-        // Given: Builder with null read-write keys
+        // Given: Builder with existing read-write keys
         val builder = SorobanDataBuilder()
+        val originalKey = createTestLedgerKey()
+        builder.setReadWrite(listOf(originalKey))
 
         // When: Setting null (should leave unchanged)
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadWrite(null)
-        }
+        builder.setReadWrite(null)
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Original keys are preserved
+        assertEquals(1, data.resources.footprint.readWrite.size)
     }
 
     @Test
     fun testSetReadWrite_emptyList_clearsFootprint() {
-        // Given: Builder with empty list
+        // Given: Builder with existing read-write keys
         val builder = SorobanDataBuilder()
+        builder.setReadWrite(listOf(createTestLedgerKey()))
 
         // When: Setting empty list (should clear)
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.setReadWrite(emptyList())
-        }
+        builder.setReadWrite(emptyList())
+        val data = builder.build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Footprint is cleared
+        assertTrue(data.resources.footprint.readWrite.isEmpty())
     }
 
     // ========== Build Method Tests ==========
@@ -374,28 +410,35 @@ class SorobanDataBuilderTest {
     fun testBuild_createsDeepCopy() {
         // Given: Builder with data
         val builder = SorobanDataBuilder()
+            .setResourceFee(1000)
 
         // When: Building multiple times
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.build()
-        }
+        val data1 = builder.build()
+        val data2 = builder.setResourceFee(2000).build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Each build is independent
+        assertEquals(1000L, data1.resourceFee.value)
+        assertEquals(2000L, data2.resourceFee.value)
     }
 
     @Test
     fun testBuildBase64_returnsBase64String() {
         // Given: Builder with data
         val builder = SorobanDataBuilder()
+            .setResourceFee(1000)
+            .setResources(createTestResources())
 
         // When: Building as base64
-        val exception = assertFailsWith<NotImplementedError> {
-            builder.buildBase64()
-        }
+        val base64 = builder.buildBase64()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires build()") ?: false)
+        // Then: Should be valid base64 that can be decoded
+        assertNotNull(base64)
+        assertTrue(base64.isNotEmpty())
+
+        // Verify it can be decoded back
+        val decoded = SorobanDataBuilder(base64).build()
+        assertEquals(1000L, decoded.resourceFee.value)
+        assertEquals(testCpuInstructions.toUInt(), decoded.resources.instructions.value)
     }
 
     // ========== Integration Tests ==========
@@ -403,20 +446,25 @@ class SorobanDataBuilderTest {
     @Test
     fun testBuilderChaining_multipleSetters_appliesAllValues() {
         // Given: Builder with chained setters
-        val builder = SorobanDataBuilder()
+        val resources = createTestResources()
+        val readOnlyKeys = listOf(createTestLedgerKey())
+        val readWriteKeys = listOf(createTestLedgerKey())
 
         // When: Chaining multiple setters
-        val exception = assertFailsWith<NotImplementedError> {
-            builder
-                .setResourceFee(testResourceFee)
-                .setResources(createTestResources())
-                .setReadOnly(emptyList())
-                .setReadWrite(emptyList())
-                .build()
-        }
+        val data = SorobanDataBuilder()
+            .setResourceFee(testResourceFee)
+            .setResources(resources)
+            .setReadOnly(readOnlyKeys)
+            .setReadWrite(readWriteKeys)
+            .build()
 
-        // Then: Chaining works (when implemented)
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: All values are applied correctly
+        assertEquals(testResourceFee, data.resourceFee.value)
+        assertEquals(testCpuInstructions.toUInt(), data.resources.instructions.value)
+        assertEquals(testDiskReadBytes.toUInt(), data.resources.diskReadBytes.value)
+        assertEquals(testWriteBytes.toUInt(), data.resources.writeBytes.value)
+        assertEquals(1, data.resources.footprint.readOnly.size)
+        assertEquals(1, data.resources.footprint.readWrite.size)
     }
 
     @Test
@@ -425,38 +473,87 @@ class SorobanDataBuilderTest {
         val builder = SorobanDataBuilder()
 
         // When: Building, modifying, and building again
-        // This test verifies defensive copying works correctly
-        val exception = assertFailsWith<NotImplementedError> {
-            val data1 = builder.setResourceFee(1000).build()
-            val data2 = builder.setResourceFee(2000).build()
-            // data1 should still have fee=1000, data2 should have fee=2000
-        }
+        val data1 = builder.setResourceFee(1000).build()
+        val data2 = builder.setResourceFee(2000).build()
+        val data3 = builder.setResourceFee(3000).build()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: Each build is independent
+        assertEquals(1000L, data1.resourceFee.value)
+        assertEquals(2000L, data2.resourceFee.value)
+        assertEquals(3000L, data3.resourceFee.value)
     }
 
     @Test
     fun testCompleteExample_buildsValidSorobanData() {
         // Given: Complete builder setup
-        val builder = SorobanDataBuilder()
         val resources = SorobanDataBuilder.Resources(
             cpuInstructions = 1000000,
             diskReadBytes = 5000,
             writeBytes = 2000
         )
+        val readOnlyKey = createTestLedgerKey()
+        val readWriteKey = createTestLedgerKey()
 
         // When: Building complete soroban data
-        val exception = assertFailsWith<NotImplementedError> {
-            builder
-                .setResourceFee(50000)
-                .setResources(resources)
-                .setReadOnly(emptyList())
-                .setReadWrite(emptyList())
-                .build()
-        }
+        val data = SorobanDataBuilder()
+            .setResourceFee(50000)
+            .setResources(resources)
+            .setReadOnly(listOf(readOnlyKey))
+            .setReadWrite(listOf(readWriteKey))
+            .build()
 
-        // Then: Complete flow works (when implemented)
-        assertTrue(exception.message?.contains("requires SorobanTransactionDataXdr") ?: false)
+        // Then: All values are correct
+        assertNotNull(data)
+        assertEquals(50000L, data.resourceFee.value)
+        assertEquals(1000000u, data.resources.instructions.value)
+        assertEquals(5000u, data.resources.diskReadBytes.value)
+        assertEquals(2000u, data.resources.writeBytes.value)
+        assertEquals(1, data.resources.footprint.readOnly.size)
+        assertEquals(1, data.resources.footprint.readWrite.size)
+    }
+
+    @Test
+    fun testRoundTrip_base64EncodingDecoding() {
+        // Given: Complete soroban data
+        val original = SorobanDataBuilder()
+            .setResourceFee(12345L)
+            .setResources(createTestResources(100000, 2000, 3000))
+            .setReadOnly(listOf(createTestLedgerKey()))
+            .build()
+
+        // When: Encoding to base64 and decoding back
+        val base64 = original.toXdrBase64()
+        val decoded = SorobanTransactionDataXdr.fromXdrBase64(base64)
+
+        // Then: Decoded data matches original
+        assertEquals(original.resourceFee.value, decoded.resourceFee.value)
+        assertEquals(original.resources.instructions.value, decoded.resources.instructions.value)
+        assertEquals(original.resources.diskReadBytes.value, decoded.resources.diskReadBytes.value)
+        assertEquals(original.resources.writeBytes.value, decoded.resources.writeBytes.value)
+        assertEquals(original.resources.footprint.readOnly.size, decoded.resources.footprint.readOnly.size)
+    }
+
+    @Test
+    fun testModifyExistingData_preservesUnmodifiedFields() {
+        // Given: Existing soroban data with all fields set
+        val original = SorobanDataBuilder()
+            .setResourceFee(10000)
+            .setResources(createTestResources())
+            .setReadOnly(listOf(createTestLedgerKey()))
+            .setReadWrite(listOf(createTestLedgerKey()))
+            .build()
+
+        // When: Modifying only the resource fee
+        val modified = SorobanDataBuilder(original)
+            .setResourceFee(20000)
+            .build()
+
+        // Then: Only resource fee changed, other fields preserved
+        assertEquals(20000L, modified.resourceFee.value)
+        assertEquals(original.resources.instructions.value, modified.resources.instructions.value)
+        assertEquals(original.resources.diskReadBytes.value, modified.resources.diskReadBytes.value)
+        assertEquals(original.resources.writeBytes.value, modified.resources.writeBytes.value)
+        assertEquals(original.resources.footprint.readOnly.size, modified.resources.footprint.readOnly.size)
+        assertEquals(original.resources.footprint.readWrite.size, modified.resources.footprint.readWrite.size)
     }
 }

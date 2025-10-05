@@ -1,7 +1,9 @@
 package com.stellar.sdk.rpc
 
 import com.stellar.sdk.Account
+import com.stellar.sdk.Address
 import com.stellar.sdk.Asset
+import com.stellar.sdk.InvokeHostFunctionOperation
 import com.stellar.sdk.KeyPair
 import com.stellar.sdk.MuxedAccount
 import com.stellar.sdk.Network
@@ -13,6 +15,7 @@ import com.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.stellar.sdk.rpc.exception.SorobanRpcException
 import com.stellar.sdk.rpc.requests.*
 import com.stellar.sdk.rpc.responses.*
+import com.stellar.sdk.scval.Scv
 import com.stellar.sdk.xdr.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -452,8 +455,32 @@ class SorobanServer(
         key: SCValXdr,
         durability: Durability
     ): GetLedgerEntriesResponse.LedgerEntryResult? {
-        // TODO: Implement when Address class is available
-        throw UnsupportedOperationException("getContractData requires Address class implementation")
+        // Convert durability enum to XDR
+        val contractDataDurability = when (durability) {
+            Durability.TEMPORARY -> ContractDataDurabilityXdr.TEMPORARY
+            Durability.PERSISTENT -> ContractDataDurabilityXdr.PERSISTENT
+        }
+
+        // Parse contract address
+        val address = Address(contractId)
+
+        // Create ledger key for contract data
+        val ledgerKeyContractData = LedgerKeyContractDataXdr(
+            contract = address.toSCAddress(),
+            key = key,
+            durability = contractDataDurability
+        )
+        val ledgerKey = LedgerKeyXdr.ContractData(ledgerKeyContractData)
+
+        // Fetch ledger entry
+        val response = getLedgerEntries(listOf(ledgerKey))
+        val entries = response.entries
+
+        if (entries.isNullOrEmpty()) {
+            return null
+        }
+
+        return entries[0]
     }
 
     /**
@@ -761,7 +788,7 @@ class SorobanServer(
      * ## Example
      *
      * ```kotlin
-     * val contractId = "CCJZ5D..."
+     * val contractId = "GABC..."
      * val asset = Asset.native()
      * val response = server.getSACBalance(contractId, asset, Network.TESTNET)
      * response.balanceEntry?.let {
@@ -774,6 +801,7 @@ class SorobanServer(
      * @param asset The Stellar asset to check balance for
      * @param network The network (needed for asset contract ID calculation)
      * @return Balance information if the contract holds the asset
+     * @throws IllegalArgumentException If contractId is not a valid contract address
      * @throws SorobanRpcException If the RPC request fails
      *
      * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract documentation</a>
@@ -783,8 +811,67 @@ class SorobanServer(
         asset: Asset,
         network: Network
     ): GetSACBalanceResponse {
-        // TODO: Implement when Address class and SCVal utilities are available
-        throw UnsupportedOperationException("getSACBalance requires Address class and SCVal utilities implementation")
+        require(StrKey.isValidContract(contractId)) {
+            "Invalid contract ID: $contractId"
+        }
+
+        // Build the ledger key for the balance entry
+        val assetContractAddress = Address(asset.getContractId(network))
+        val balanceKey = Scv.toVec(
+            listOf(
+                Scv.toSymbol("Balance"),
+                Address(contractId).toSCVal()
+            )
+        )
+
+        val ledgerKey = LedgerKeyXdr.ContractData(
+            LedgerKeyContractDataXdr(
+                contract = assetContractAddress.toSCAddress(),
+                key = balanceKey,
+                durability = ContractDataDurabilityXdr.PERSISTENT
+            )
+        )
+
+        // Fetch the ledger entry
+        val response = getLedgerEntries(listOf(ledgerKey))
+        val entries = response.entries
+
+        if (entries.isNullOrEmpty()) {
+            return GetSACBalanceResponse(
+                latestLedger = response.latestLedger,
+                balanceEntry = null
+            )
+        }
+
+        // Parse the balance data from XDR
+        val entry = entries[0]
+        val ledgerEntryData = LedgerEntryDataXdr.fromXdrBase64(entry.xdr)
+        val contractData = when (ledgerEntryData) {
+            is LedgerEntryDataXdr.ContractData -> ledgerEntryData.value
+            else -> throw IllegalStateException("Expected ContractData entry, got ${ledgerEntryData.discriminant}")
+        }
+
+        // Extract balance information from the map
+        val balanceMap = Scv.fromMap(contractData.`val`)
+        val amountKey = Scv.toSymbol("amount")
+        val authorizedKey = Scv.toSymbol("authorized")
+        val clawbackKey = Scv.toSymbol("clawback")
+
+        // Convert Int128 to string for amount (Scv.fromInt128 returns BigInteger directly)
+        val amountBigInt = Scv.fromInt128(balanceMap[amountKey]!!)
+
+        val balanceEntry = GetSACBalanceResponse.BalanceEntry(
+            amount = amountBigInt.toString(),
+            authorized = Scv.fromBoolean(balanceMap[authorizedKey]!!),
+            clawback = Scv.fromBoolean(balanceMap[clawbackKey]!!),
+            lastModifiedLedgerSeq = entry.lastModifiedLedger,
+            liveUntilLedgerSeq = entry.liveUntilLedger
+        )
+
+        return GetSACBalanceResponse(
+            latestLedger = response.latestLedger,
+            balanceEntry = balanceEntry
+        )
     }
 
     /**
@@ -866,10 +953,40 @@ fun assembleTransaction(
     val totalFee = classicFeeNum + minResourceFeeNum
 
     // Get the operation (should be exactly one)
-    val operation = transaction.operations[0]
+    var operation = transaction.operations[0]
 
-    // TODO: For InvokeHostFunctionOperation, update auth entries if needed
-    // This requires the operation classes to be imported and available
+    // For InvokeHostFunctionOperation, update auth entries if needed
+    if (operation is InvokeHostFunctionOperation) {
+        // If the operation is an InvokeHostFunctionOperation, we need to update the auth entries
+        // if existing entries are empty and the simulation result contains auth entries.
+        if (simulateResponse.results == null || simulateResponse.results.size != 1) {
+            throw IllegalArgumentException(
+                "invalid simulateTransactionResponse: results must contain exactly one element if the operation is an InvokeHostFunctionOperation"
+            )
+        }
+
+        val simulateHostFunctionResult = simulateResponse.results[0]
+
+        // Check if we need to update auth entries
+        val existingEntries = operation.auth
+        if (existingEntries.isEmpty() &&
+            simulateHostFunctionResult.auth != null &&
+            simulateHostFunctionResult.auth.isNotEmpty()
+        ) {
+            // Parse auth entries from base64-encoded XDR strings
+            val authorizationEntries = simulateHostFunctionResult.auth.map { authXdr ->
+                SorobanAuthorizationEntryXdr.fromXdrBase64(authXdr)
+            }
+
+            // Create new operation with updated auth entries
+            operation = InvokeHostFunctionOperation(
+                hostFunction = operation.hostFunction,
+                auth = authorizationEntries
+            ).apply {
+                sourceAccount = operation.sourceAccount
+            }
+        }
+    }
 
     // Parse soroban data from simulation
     val sorobanData = SorobanTransactionDataXdr.fromXdrBase64(simulateResponse.transactionData!!)
@@ -879,7 +996,7 @@ fun assembleTransaction(
         sourceAccount = transaction.sourceAccount,
         fee = totalFee,
         sequenceNumber = transaction.sequenceNumber,
-        operations = transaction.operations,
+        operations = listOf(operation),
         memo = transaction.memo,
         preconditions = transaction.preconditions,
         sorobanData = sorobanData,

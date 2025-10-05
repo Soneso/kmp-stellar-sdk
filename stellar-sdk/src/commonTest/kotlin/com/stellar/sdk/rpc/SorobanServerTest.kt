@@ -1,7 +1,11 @@
 package com.stellar.sdk.rpc
 
+import com.stellar.sdk.*
 import com.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.stellar.sdk.rpc.exception.SorobanRpcException
+import com.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.stellar.sdk.xdr.*
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -10,6 +14,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import io.ktor.serialization.JsonConvertException
 import kotlin.test.*
 
 /**
@@ -66,7 +71,7 @@ class SorobanServerTest {
         "xdr": "AAAAAwAAABQ="
       }
     ],
-    "latestLedger": "14245"
+    "latestLedger": 14245
   }
 }"""
 
@@ -75,7 +80,7 @@ class SorobanServerTest {
   "id": "7a469b9d6ed4444893491be530862ce3",
   "result": {
     "error": "HostError: Error(WasmVm, InvalidAction)",
-    "latestLedger": "14245"
+    "latestLedger": 14245
   }
 }"""
 
@@ -85,8 +90,8 @@ class SorobanServerTest {
   "result": {
     "status": "PENDING",
     "hash": "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7",
-    "latestLedger": "45075",
-    "latestLedgerCloseTime": "1690594566"
+    "latestLedger": 45075,
+    "latestLedgerCloseTime": 1690594566
   }
 }"""
 
@@ -127,44 +132,118 @@ class SorobanServerTest {
   "id": "198cb1a8-9104-4446-a269-88bf000c2721",
   "result": {
     "sorobanInclusionFee": {
-      "max": "10000",
-      "min": "100",
-      "mode": "500",
-      "p10": "150",
-      "p20": "200",
-      "p30": "250",
-      "p40": "300",
-      "p50": "500",
-      "p60": "600",
-      "p70": "700",
-      "p80": "800",
-      "p90": "1000",
-      "p95": "5000",
-      "p99": "9000",
-      "transactionCount": "100",
+      "max": 10000,
+      "min": 100,
+      "mode": 500,
+      "p10": 150,
+      "p20": 200,
+      "p30": 250,
+      "p40": 300,
+      "p50": 500,
+      "p60": 600,
+      "p70": 700,
+      "p80": 800,
+      "p90": 1000,
+      "p95": 5000,
+      "p99": 9000,
+      "transactionCount": 100,
       "ledgerCount": 50
     },
     "inclusionFee": {
-      "max": "1000",
-      "min": "100",
-      "mode": "100",
-      "p10": "100",
-      "p20": "100",
-      "p30": "100",
-      "p40": "100",
-      "p50": "100",
-      "p60": "200",
-      "p70": "300",
-      "p80": "400",
-      "p90": "500",
-      "p95": "800",
-      "p99": "900",
-      "transactionCount": "10",
+      "max": 1000,
+      "min": 100,
+      "mode": 100,
+      "p10": 100,
+      "p20": 100,
+      "p30": 100,
+      "p40": 100,
+      "p50": 100,
+      "p60": 200,
+      "p70": 300,
+      "p80": 400,
+      "p90": 500,
+      "p95": 800,
+      "p99": 900,
+      "transactionCount": 10,
       "ledgerCount": 50
     },
     "latestLedger": 4519945
   }
 }"""
+
+        private const val GET_TRANSACTION_RESPONSE = """{
+  "jsonrpc": "2.0",
+  "id": "198cb1a8-9104-4446-a269-88bf000c2721",
+  "result": {
+    "status": "SUCCESS",
+    "latestLedger": 14245,
+    "latestLedgerCloseTime": 1690594566,
+    "oldestLedger": 1000,
+    "oldestLedgerCloseTime": 1690500000
+  }
+}"""
+
+        private const val GET_LEDGER_ENTRIES_RESPONSE = """{
+  "jsonrpc": "2.0",
+  "id": "198cb1a8-9104-4446-a269-88bf000c2721",
+  "result": {
+    "entries": null,
+    "latestLedger": 14245
+  }
+}"""
+
+        /**
+         * Creates a simple test transaction for Soroban testing.
+         *
+         * The transaction includes:
+         * - An InvokeHostFunctionOperation
+         * - Minimal sorobanData to make it a valid Soroban transaction
+         * - Empty auth entries (to be filled by simulation)
+         */
+        private suspend fun createTestTransaction(): Transaction {
+            val sourceKeypair = KeyPair.random()
+            val sourceAccount = Account(sourceKeypair.getAccountId(), 1L)
+
+            // Create a simple contract ID (32 zero bytes)
+            val contractHash = ByteArray(32)
+            val contractId = ContractIDXdr(HashXdr(contractHash))
+
+            // Create minimal soroban data to make this a valid Soroban transaction
+            val minimalSorobanData = SorobanTransactionDataXdr(
+                ext = SorobanTransactionDataExtXdr.Void,
+                resources = SorobanResourcesXdr(
+                    footprint = LedgerFootprintXdr(
+                        readOnly = emptyList(),
+                        readWrite = emptyList()
+                    ),
+                    instructions = Uint32Xdr(0u),
+                    diskReadBytes = Uint32Xdr(0u),
+                    writeBytes = Uint32Xdr(0u)
+                ),
+                resourceFee = Int64Xdr(0L)
+            )
+
+            val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
+                .addOperation(
+                    InvokeHostFunctionOperation(
+                        hostFunction = HostFunctionXdr.InvokeContract(
+                            InvokeContractArgsXdr(
+                                contractAddress = SCAddressXdr.ContractId(contractId),
+                                functionName = SCSymbolXdr("test"),
+                                args = emptyList()
+                            )
+                        ),
+                        auth = emptyList() // Empty auth entries - to be filled by simulation
+                    )
+                )
+                .setTimeout(300)
+                .setBaseFee(100)
+                .setSorobanData(minimalSorobanData)
+                .build()
+
+            transaction.sign(sourceKeypair)
+            return transaction
+        }
     }
 
     // ========== Helper Methods ==========
@@ -246,12 +325,13 @@ class SorobanServerTest {
         // Given: Server with mocked health response
         createMockServer(HEALTH_RESPONSE).use { server ->
             // When: Getting health
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getHealth()
-            }
+            val health = server.getHealth()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetHealthResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals("healthy", health.status)
+            assertEquals(50000L, health.latestLedger)
+            assertEquals(1L, health.oldestLedger)
+            assertEquals(10000L, health.ledgerRetentionWindow)
         }
     }
 
@@ -260,12 +340,12 @@ class SorobanServerTest {
         // Given: Server with mocked network response
         createMockServer(GET_NETWORK_RESPONSE).use { server ->
             // When: Getting network info
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getNetwork()
-            }
+            val network = server.getNetwork()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetNetworkResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals("https://friendbot-futurenet.stellar.org/", network.friendbotUrl)
+            assertEquals("Test SDF Future Network ; October 2022", network.passphrase)
+            assertEquals(20, network.protocolVersion)
         }
     }
 
@@ -274,12 +354,12 @@ class SorobanServerTest {
         // Given: Server with mocked latest ledger response
         createMockServer(GET_LATEST_LEDGER_RESPONSE).use { server ->
             // When: Getting latest ledger
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getLatestLedger()
-            }
+            val ledger = server.getLatestLedger()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetLatestLedgerResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals("e73d7654b72daa637f396669182c6072549736a26d1f31bc53ba6a08f9e3ca1f", ledger.id)
+            assertEquals(20, ledger.protocolVersion)
+            assertEquals(24170L, ledger.sequence)
         }
     }
 
@@ -288,12 +368,14 @@ class SorobanServerTest {
         // Given: Server with mocked version info response
         createMockServer(GET_VERSION_INFO_RESPONSE).use { server ->
             // When: Getting version info
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getVersionInfo()
-            }
+            val version = server.getVersionInfo()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetVersionInfoResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals("20.0.0", version.version)
+            assertEquals("9ab9d7f7b5c7e6f5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1", version.commitHash)
+            assertEquals("2023-05-15T12:34:56Z", version.buildTimestamp)
+            assertEquals("19.10.1", version.captiveCoreVersion)
+            assertEquals(20, version.protocolVersion)
         }
     }
 
@@ -302,12 +384,26 @@ class SorobanServerTest {
         // Given: Server with mocked fee stats response
         createMockServer(GET_FEE_STATS_RESPONSE).use { server ->
             // When: Getting fee stats
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getFeeStats()
-            }
+            val feeStats = server.getFeeStats()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetFeeStatsResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals(4519945L, feeStats.latestLedger)
+
+            // Soroban inclusion fee stats
+            assertEquals(10000L, feeStats.sorobanInclusionFee.max)
+            assertEquals(100L, feeStats.sorobanInclusionFee.min)
+            assertEquals(500L, feeStats.sorobanInclusionFee.mode)
+            assertEquals(500L, feeStats.sorobanInclusionFee.p50)
+            assertEquals(100L, feeStats.sorobanInclusionFee.transactionCount)
+            assertEquals(50L, feeStats.sorobanInclusionFee.ledgerCount)
+
+            // Regular inclusion fee stats
+            assertEquals(1000L, feeStats.inclusionFee.max)
+            assertEquals(100L, feeStats.inclusionFee.min)
+            assertEquals(100L, feeStats.inclusionFee.mode)
+            assertEquals(100L, feeStats.inclusionFee.p50)
+            assertEquals(10L, feeStats.inclusionFee.transactionCount)
+            assertEquals(50L, feeStats.inclusionFee.ledgerCount)
         }
     }
 
@@ -318,13 +414,14 @@ class SorobanServerTest {
         // Given: Server that returns RPC error
         createMockServer(ERROR_RESPONSE).use { server ->
             // When: Making any request that returns an error
-            val exception = assertFailsWith<NotImplementedError> {
+            val exception = assertFailsWith<SorobanRpcException> {
                 server.getHealth()
             }
 
-            // Then: Would throw SorobanRpcException (when implemented)
-            // Expected: SorobanRpcException(code=-32601, message="method not found")
-            assertTrue(exception.message?.contains("requires GetHealthResponse") ?: false)
+            // Then: Exception contains error details
+            assertEquals(-32601, exception.code)
+            assertTrue(exception.message?.contains("method not found") ?: false)
+            assertEquals("mockTest", exception.data)
         }
     }
 
@@ -333,62 +430,68 @@ class SorobanServerTest {
         // Given: Server that returns detailed error
         createMockServer(ERROR_RESPONSE).use { server ->
             // When/Then: Error should preserve code, message, and data
-            val exception = assertFailsWith<NotImplementedError> {
+            val exception = assertFailsWith<SorobanRpcException> {
                 server.getHealth()
             }
 
-            // When implemented, should verify:
-            // - exception.code == -32601
-            // - exception.message.contains("method not found")
-            // - exception.data == "mockTest"
-            assertTrue(exception.message?.contains("requires GetHealthResponse") ?: false)
+            assertEquals(-32601, exception.code)
+            assertTrue(exception.message?.contains("method not found") ?: false)
+            assertEquals("mockTest", exception.data)
         }
     }
 
     @Test
     fun testNetworkError_propagatesException() = runTest {
-        // Given: Server with network error (500)
-        val errorClient = createMockClient("{}", HttpStatusCode.InternalServerError)
+        // Given: Server with malformed response (missing required fields)
+        val errorClient = createMockClient("""{"invalid": "json"}""", HttpStatusCode.OK)
         SorobanServer(TEST_SERVER_URL, errorClient).use { server ->
-            // When: Making request with network error
-            val exception = assertFailsWith<NotImplementedError> {
+            // When: Making request with malformed response
+            // Then: JsonConvertException is thrown for missing required fields
+            assertFailsWith<JsonConvertException> {
                 server.getHealth()
             }
-
-            // Then: Would propagate network exception (when implemented)
-            assertTrue(exception.message?.contains("requires GetHealthResponse") ?: false)
         }
     }
 
     // ========== Transaction Methods Tests ==========
 
     @Test
-    fun testSimulateTransaction_notImplemented() = runTest {
-        // Given: Server with mocked simulate response
+    fun testSimulateTransaction_successfulResponse_returnsSimulationData() = runTest {
+        // Given: Server with mocked simulate response and test transaction
         createMockServer(SIMULATE_TRANSACTION_RESPONSE).use { server ->
-            // When: Simulating transaction
-            val exception = assertFailsWith<NotImplementedError> {
-                // server.simulateTransaction(transaction)
-                TODO("Requires Transaction implementation")
-            }
+            val transaction = createTestTransaction()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // When: Simulating transaction
+            val simulation = server.simulateTransaction(transaction)
+
+            // Then: Response is properly deserialized
+            assertNotNull(simulation.transactionData)
+            assertEquals(58181L, simulation.minResourceFee)
+            assertEquals(1, simulation.events?.size)
+            assertEquals(1, simulation.results?.size)
+            assertEquals(14245L, simulation.latestLedger)
         }
     }
 
     @Test
-    fun testPrepareTransaction_withSimulation_notImplemented() = runTest {
+    fun testPrepareTransaction_withSimulation_preparesTransaction() = runTest {
         // Given: Server and transaction
         createMockServer(SIMULATE_TRANSACTION_RESPONSE).use { server ->
-            // When: Preparing transaction
-            val exception = assertFailsWith<NotImplementedError> {
-                // server.prepareTransaction(transaction)
-                TODO("Requires Transaction implementation")
-            }
+            val transaction = createTestTransaction()
+            val originalFee = transaction.fee
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // When: Preparing transaction
+            val prepared = server.prepareTransaction(transaction)
+
+            // Then: Transaction is prepared with updated fee and soroban data
+            assertNotNull(prepared)
+            assertNotNull(prepared.sorobanData)
+            assertTrue(prepared.fee > originalFee) // Fee increased with resource fee
+            assertEquals(1, prepared.operations.size) // Should have exactly 1 operation
+
+            // Verify the operation has auth entries from simulation
+            val operation = prepared.operations[0] as InvokeHostFunctionOperation
+            assertEquals(1, operation.auth.size) // Auth entry added from simulation
         }
     }
 
@@ -396,62 +499,76 @@ class SorobanServerTest {
     fun testPrepareTransaction_withError_throwsPrepareTransactionException() = runTest {
         // Given: Server with simulation error
         createMockServer(SIMULATE_ERROR_RESPONSE).use { server ->
+            val transaction = createTestTransaction()
+
             // When: Preparing transaction that fails simulation
-            val exception = assertFailsWith<NotImplementedError> {
-                // server.prepareTransaction(transaction)
-                TODO("Requires Transaction and SimulateTransactionResponse")
+            val exception = assertFailsWith<PrepareTransactionException> {
+                server.prepareTransaction(transaction)
             }
 
-            // Then: Would throw PrepareTransactionException (when implemented)
-            // Expected: PrepareTransactionException with simulationError
-            assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // Then: PrepareTransactionException with simulationError
+            assertTrue(exception.message?.contains("Simulation failed") ?: false)
+            assertEquals("HostError: Error(WasmVm, InvalidAction)", exception.simulationError)
         }
     }
 
     @Test
-    fun testSendTransaction_notImplemented() = runTest {
+    fun testSendTransaction_successfulResponse_returnsSendData() = runTest {
         // Given: Server with mocked send response
         createMockServer(SEND_TRANSACTION_RESPONSE).use { server ->
-            // When: Sending transaction
-            val exception = assertFailsWith<NotImplementedError> {
-                // server.sendTransaction(transaction)
-                TODO("Requires Transaction implementation")
-            }
+            val transaction = createTestTransaction()
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // When: Sending transaction
+            val response = server.sendTransaction(transaction)
+
+            // Then: Response is properly deserialized
+            assertEquals(SendTransactionStatus.PENDING, response.status)
+            assertEquals("a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7", response.hash)
+            assertEquals(45075L, response.latestLedger)
+            assertEquals(1690594566L, response.latestLedgerCloseTime)
         }
     }
 
     @Test
-    fun testGetTransaction_notImplemented() = runTest {
+    fun testGetTransaction_successfulResponse_returnsTransactionData() = runTest {
         // Given: Server and transaction hash
-        createMockServer("{}").use { server ->
+        createMockServer(GET_TRANSACTION_RESPONSE).use { server ->
             val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
 
             // When: Getting transaction
-            val exception = assertFailsWith<NotImplementedError> {
-                server.getTransaction(txHash)
-            }
+            val response = server.getTransaction(txHash)
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetTransactionResponse") ?: false)
+            // Then: Response is properly deserialized
+            assertEquals(GetTransactionStatus.SUCCESS, response.status)
+            assertEquals(14245L, response.latestLedger)
+            assertEquals(1690594566L, response.latestLedgerCloseTime)
+            assertEquals(1000L, response.oldestLedger)
+            assertEquals(1690500000L, response.oldestLedgerCloseTime)
         }
     }
 
     @Test
     fun testPollTransaction_respectsMaxAttempts() = runTest {
         // Given: Server that always returns NOT_FOUND
-        createMockServer("{}").use { server ->
-            val txHash = "test-hash"
+        val notFoundResponse = """{
+  "jsonrpc": "2.0",
+  "id": "test-id",
+  "result": {
+    "status": "NOT_FOUND",
+    "latestLedger": 14245,
+    "latestLedgerCloseTime": 1690594566,
+    "oldestLedger": 1000,
+    "oldestLedgerCloseTime": 1690500000
+  }
+}"""
+        createMockServer(notFoundResponse).use { server ->
+            val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
 
             // When: Polling with max attempts
-            val exception = assertFailsWith<NotImplementedError> {
-                server.pollTransaction(hash = txHash, maxAttempts = 3)
-            }
+            val response = server.pollTransaction(hash = txHash, maxAttempts = 3, sleepStrategy = { 10L })
 
-            // Then: Would stop after max attempts (when implemented)
-            assertTrue(exception.message?.contains("requires GetTransactionResponse") ?: false)
+            // Then: Stops after max attempts and returns NOT_FOUND
+            assertEquals(GetTransactionStatus.NOT_FOUND, response.status)
         }
     }
 
@@ -486,61 +603,72 @@ class SorobanServerTest {
     // ========== Helper Function Tests ==========
 
     @Test
-    fun testAssembleTransaction_notImplemented() {
+    fun testAssembleTransaction_assemblesCorrectly() = runTest {
         // Given: Transaction and simulation response
-        val exception = assertFailsWith<NotImplementedError> {
-            // assembleTransaction(transaction, simulationResponse)
-            TODO("Requires Transaction and SimulateTransactionResponse")
-        }
+        createMockServer(SIMULATE_TRANSACTION_RESPONSE).use { server ->
+            val transaction = createTestTransaction()
+            val simulation = server.simulateTransaction(transaction)
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // When: Assembling transaction
+            val assembled = assembleTransaction(transaction, simulation)
+
+            // Then: Transaction is assembled correctly
+            assertNotNull(assembled)
+            assertNotNull(assembled.sorobanData)
+            assertTrue(assembled.fee > transaction.fee)
+            assertEquals(1, assembled.operations.size) // Should have exactly 1 operation
+
+            // Verify the operation has auth entries from simulation
+            val operation = assembled.operations[0] as InvokeHostFunctionOperation
+            assertEquals(1, operation.auth.size) // Auth entry added from simulation
+        }
     }
 
     // ========== Account Methods Tests ==========
 
     @Test
-    fun testGetAccount_notImplemented() = runTest {
-        // Given: Server and account address
-        createMockServer("{}").use { server ->
-            val accountId = "GABC123..."
+    fun testGetAccount_notFound_throwsAccountNotFoundException() = runTest {
+        // Given: Server and valid account address that doesn't exist
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            // Use a valid Stellar address format (56 characters, valid checksum)
+            val accountId = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ"
 
-            // When: Getting account
-            val exception = assertFailsWith<NotImplementedError> {
+            // When: Getting account that doesn't exist (entries is null in mock response)
+            val exception = assertFailsWith<com.stellar.sdk.rpc.exception.AccountNotFoundException> {
                 server.getAccount(accountId)
             }
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires getLedgerEntries") ?: false)
+            // Then: AccountNotFoundException is thrown with account ID
+            assertTrue(exception.message?.contains(accountId) ?: false)
         }
     }
 
     @Test
-    fun testGetLedgerEntries_notImplemented() = runTest {
-        // Given: Server and ledger keys
+    fun testGetLedgerEntries_emptyKeys_throwsException() = runTest {
+        // Given: Server and empty keys list
         createMockServer("{}").use { server ->
-            // When: Getting ledger entries
-            val exception = assertFailsWith<NotImplementedError> {
+            // When: Getting ledger entries with empty keys
+            val exception = assertFailsWith<IllegalArgumentException> {
                 server.getLedgerEntries(emptyList())
             }
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("requires GetLedgerEntriesResponse") ?: false)
+            // Then: Exception is thrown
+            assertTrue(exception.message?.contains("At least one key must be provided") ?: false)
         }
     }
 
     @Test
-    fun testGetContractData_notImplemented() = runTest {
+    fun testGetContractData_withValidParams_callsGetLedgerEntries() = runTest {
         // Given: Server, contract ID, key, and durability
-        createMockServer("{}").use { server ->
-            // When: Getting contract data
-            val exception = assertFailsWith<NotImplementedError> {
-                // server.getContractData(contractId, key, SorobanServer.Durability.PERSISTENT)
-                TODO("Requires SCValXdr implementation")
-            }
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+            val key = SCValXdr.Sym(SCSymbolXdr("balance"))
 
-            // Then: Not yet implemented
-            assertTrue(exception.message?.contains("Not yet implemented") ?: false)
+            // When: Getting contract data
+            val result = server.getContractData(contractId, key, SorobanServer.Durability.PERSISTENT)
+
+            // Then: Returns null (no entries in mock response)
+            assertNull(result)
         }
     }
 }

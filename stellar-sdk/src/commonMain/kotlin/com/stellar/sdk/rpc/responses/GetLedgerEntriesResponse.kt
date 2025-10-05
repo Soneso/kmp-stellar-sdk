@@ -1,5 +1,8 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.LedgerEntryDataXdr
+import com.stellar.sdk.xdr.LedgerKeyXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -69,8 +72,7 @@ data class GetLedgerEntriesResponse(
          * @return The parsed LedgerKey XDR object.
          * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded.
          */
-        // TODO: Implement XDR parsing once XDR classes are available
-        // fun parseKey(): LedgerKey = LedgerKey.fromXdrBase64(key)
+        fun parseKey(): LedgerKeyXdr = LedgerKeyXdr.fromXdrBase64(key)
 
         /**
          * Parses the [xdr] field from base64-encoded XDR string to a typed LedgerEntry.LedgerEntryData object.
@@ -81,7 +83,6 @@ data class GetLedgerEntriesResponse(
          * @return The parsed LedgerEntry.LedgerEntryData XDR object.
          * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded.
          */
-        // TODO: Implement XDR parsing once XDR classes are available
-        // fun parseXdr(): LedgerEntry.LedgerEntryData = LedgerEntry.LedgerEntryData.fromXdrBase64(xdr)
+        fun parseXdr(): LedgerEntryDataXdr = LedgerEntryDataXdr.fromXdrBase64(xdr)
     }
 }

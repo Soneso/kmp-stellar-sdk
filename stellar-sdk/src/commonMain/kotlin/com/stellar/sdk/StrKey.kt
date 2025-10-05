@@ -240,6 +240,60 @@ object StrKey {
         }
     }
 
+    /**
+     * Encodes raw bytes to strkey liquidity pool ID (L...)
+     */
+    fun encodeLiquidityPool(data: ByteArray): String {
+        require(data.size == 32) { "Liquidity pool ID must be 32 bytes" }
+        return encodeCheck(VersionByte.LIQUIDITY_POOL, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey liquidity pool ID (L...) to raw bytes
+     */
+    fun decodeLiquidityPool(data: String): ByteArray {
+        return decodeCheck(VersionByte.LIQUIDITY_POOL, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of liquidity pool ID (L...)
+     */
+    fun isValidLiquidityPool(liquidityPoolId: String): Boolean {
+        return try {
+            decodeLiquidityPool(liquidityPoolId)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Encodes raw bytes to strkey claimable balance ID (B...)
+     */
+    fun encodeClaimableBalance(data: ByteArray): String {
+        require(data.size == 33) { "Claimable balance ID must be 33 bytes" }
+        return encodeCheck(VersionByte.CLAIMABLE_BALANCE, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey claimable balance ID (B...) to raw bytes
+     */
+    fun decodeClaimableBalance(data: String): ByteArray {
+        return decodeCheck(VersionByte.CLAIMABLE_BALANCE, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of claimable balance ID (B...)
+     */
+    fun isValidClaimableBalance(claimableBalanceId: String): Boolean {
+        return try {
+            decodeClaimableBalance(claimableBalanceId)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun encodeCheck(versionByte: VersionByte, data: ByteArray): CharArray {
         val payload = byteArrayOf(versionByte.value) + data
         val checksum = calculateChecksum(payload)

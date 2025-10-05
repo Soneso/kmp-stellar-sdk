@@ -1,5 +1,9 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.TransactionEnvelopeXdr
+import com.stellar.sdk.xdr.TransactionMetaXdr
+import com.stellar.sdk.xdr.TransactionResultXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -46,49 +50,31 @@ data class GetTransactionResponse(
     /**
      * Parses the [envelopeXdr] field from a base64-encoded string to a TransactionEnvelope XDR object.
      *
-     * Note: This is a placeholder for XDR parsing functionality.
-     * The actual implementation will be added when XDR parsing utilities are available.
-     *
      * @return the parsed TransactionEnvelope object, or null if envelopeXdr is null
-     * @throws IllegalStateException if XDR parsing is not yet implemented
+     * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
      */
-    fun parseEnvelopeXdr(): Any? {
-        if (envelopeXdr == null) return null
-        // TODO: Implement XDR parsing when XDR utilities are available
-        // return TransactionEnvelope.fromXdrBase64(envelopeXdr)
-        throw IllegalStateException("XDR parsing not yet implemented")
+    fun parseEnvelopeXdr(): TransactionEnvelopeXdr? {
+        return envelopeXdr?.let { TransactionEnvelopeXdr.fromXdrBase64(it) }
     }
 
     /**
      * Parses the [resultXdr] field from a base64-encoded string to a TransactionResult XDR object.
      *
-     * Note: This is a placeholder for XDR parsing functionality.
-     * The actual implementation will be added when XDR parsing utilities are available.
-     *
      * @return the parsed TransactionResult object, or null if resultXdr is null
-     * @throws IllegalStateException if XDR parsing is not yet implemented
+     * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
      */
-    fun parseResultXdr(): Any? {
-        if (resultXdr == null) return null
-        // TODO: Implement XDR parsing when XDR utilities are available
-        // return TransactionResult.fromXdrBase64(resultXdr)
-        throw IllegalStateException("XDR parsing not yet implemented")
+    fun parseResultXdr(): TransactionResultXdr? {
+        return resultXdr?.let { TransactionResultXdr.fromXdrBase64(it) }
     }
 
     /**
      * Parses the [resultMetaXdr] field from a base64-encoded string to a TransactionMeta XDR object.
      *
-     * Note: This is a placeholder for XDR parsing functionality.
-     * The actual implementation will be added when XDR parsing utilities are available.
-     *
      * @return the parsed TransactionMeta object, or null if resultMetaXdr is null
-     * @throws IllegalStateException if XDR parsing is not yet implemented
+     * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
      */
-    fun parseResultMetaXdr(): Any? {
-        if (resultMetaXdr == null) return null
-        // TODO: Implement XDR parsing when XDR utilities are available
-        // return TransactionMeta.fromXdrBase64(resultMetaXdr)
-        throw IllegalStateException("XDR parsing not yet implemented")
+    fun parseResultMetaXdr(): TransactionMetaXdr? {
+        return resultMetaXdr?.let { TransactionMetaXdr.fromXdrBase64(it) }
     }
 }
 

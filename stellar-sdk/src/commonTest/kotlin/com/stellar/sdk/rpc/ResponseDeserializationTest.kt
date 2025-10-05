@@ -285,71 +285,65 @@ class ResponseDeserializationTest {
     // ========== XDR Parsing Helper Tests ==========
 
     @Test
-    fun testSimulateTransactionResponse_parseTransactionData_notImplemented() {
+    fun testSimulateTransactionResponse_parseTransactionData_parsesXdr() {
         // Given: Response with transaction data
         val response = SimulateTransactionResponse(
-            transactionData = "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8="
+            transactionData = "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8AAAAFAAAAAEAAAAH8dTe2OoI0BnhlDbH0fWvXmvprkBvBAgKIcL9busuuMEAAAABAAAABgAAAAHpt+eLvUk0FquW9xHdY/bTnpry+8VdDT8IZ+IF4NAD/AAAABAAAAABAAAAAgAAAA8AAAAHQ291bnRlcgAAAAASAAAAAAAAAABYt8SiyPKXqo89JHEoH9/M7K/kjlZjMT7BjhKnPsqYoQAAAAEAHifGAAAFlAAAAIgAAAAAAAAAAg=="
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            response.parseTransactionData()
-        }
+        val parsed = response.parseTransactionData()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
     }
 
     @Test
-    fun testSimulateTransactionResponse_parseEvents_notImplemented() {
+    fun testSimulateTransactionResponse_parseEvents_parsesXdr() {
         // Given: Response with events
         val response = SimulateTransactionResponse(
-            events = listOf("AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAADAAAADw==")
+            events = listOf("AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAADAAAADwAAAAdmbl9jYWxsAAAAAA0AAAAg6bfni71JNBarlvcR3WP2056a8vvFXQ0/CGfiBeDQA/wAAAAPAAAACWluY3JlbWVudAAAAAAAABAAAAABAAAAAgAAABIAAAAAAAAAAFi3xKLI8peqjz0kcSgf38zsr+SOVmMxPsGOEqc+ypihAAAAAwAAAAo=")
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            response.parseEvents()
-        }
+        val parsed = response.parseEvents()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
+        assertEquals(1, parsed?.size)
     }
 
     @Test
-    fun testSimulateHostFunctionResult_parseAuth_notImplemented() {
+    fun testSimulateHostFunctionResult_parseAuth_parsesXdr() {
         // Given: Result with auth
         val result = SimulateTransactionResponse.SimulateHostFunctionResult(
-            auth = listOf("AAAAAAAAAAAAAAAB6bfni71JNBarlvcR3WP2056a8vvFXQ0=")
+            auth = listOf("AAAAAAAAAAAAAAAB6bfni71JNBarlvcR3WP2056a8vvFXQ0/CGfiBeDQA/wAAAAJaW5jcmVtZW50AAAAAAAAAgAAABIAAAAAAAAAAFi3xKLI8peqjz0kcSgf38zsr+SOVmMxPsGOEqc+ypihAAAAAwAAAAoAAAAA")
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            result.parseAuth()
-        }
+        val parsed = result.parseAuth()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
+        assertEquals(1, parsed?.size)
     }
 
     @Test
-    fun testSimulateHostFunctionResult_parseXdr_notImplemented() {
+    fun testSimulateHostFunctionResult_parseXdr_parsesXdr() {
         // Given: Result with xdr
         val result = SimulateTransactionResponse.SimulateHostFunctionResult(
             xdr = "AAAAAwAAABQ="
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            result.parseXdr()
-        }
+        val parsed = result.parseXdr()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
     }
 
     @Test
-    fun testLedgerEntryChange_parseKey_notImplemented() {
+    fun testLedgerEntryChange_parseKey_parsesXdr() {
         // Given: State change with key
         val change = SimulateTransactionResponse.LedgerEntryChange(
             type = "created",
@@ -357,29 +351,25 @@ class ResponseDeserializationTest {
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            change.parseKey()
-        }
+        val parsed = change.parseKey()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
     }
 
     @Test
-    fun testRestorePreamble_parseTransactionData_notImplemented() {
+    fun testRestorePreamble_parseTransactionData_parsesXdr() {
         // Given: Restore preamble
         val preamble = SimulateTransactionResponse.RestorePreamble(
-            transactionData = "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8=",
+            transactionData = "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8AAAAFAAAAAEAAAAH8dTe2OoI0BnhlDbH0fWvXmvprkBvBAgKIcL9busuuMEAAAABAAAABgAAAAHpt+eLvUk0FquW9xHdY/bTnpry+8VdDT8IZ+IF4NAD/AAAABAAAAABAAAAAgAAAA8AAAAHQ291bnRlcgAAAAASAAAAAAAAAABYt8SiyPKXqo89JHEoH9/M7K/kjlZjMT7BjhKnPsqYoQAAAAEAHifGAAAFlAAAAIgAAAAAAAAAAg==",
             minResourceFee = 1000
         )
 
         // When: Calling parse helper
-        val exception = assertFailsWith<IllegalStateException> {
-            preamble.parseTransactionData()
-        }
+        val parsed = preamble.parseTransactionData()
 
-        // Then: Not yet implemented
-        assertTrue(exception.message?.contains("XDR parsing not yet implemented") ?: false)
+        // Then: XDR is successfully parsed
+        assertNotNull(parsed)
     }
 
     // ========== Null Handling Tests ==========

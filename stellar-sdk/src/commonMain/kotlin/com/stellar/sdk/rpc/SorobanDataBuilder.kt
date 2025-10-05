@@ -86,7 +86,7 @@ class SorobanDataBuilder {
      * The internal SorobanTransactionData being built.
      * This is mutable and copied on [build].
      */
-    private var data: SorobanTransactionDataXdr = null!!
+    private var data: SorobanTransactionDataXdr
 
     /**
      * Creates a new builder with empty SorobanTransactionData.
@@ -100,10 +100,19 @@ class SorobanDataBuilder {
      * - Empty read-write footprint
      */
     constructor() {
-        TODO("SorobanDataBuilder() requires SorobanTransactionDataXdr initialization")
-        // Unreachable code - prevents uninitialized property error
-        @Suppress("UNREACHABLE_CODE")
-        data = throw NotImplementedError()
+        data = SorobanTransactionDataXdr(
+            ext = SorobanTransactionDataExtXdr.Void,
+            resources = SorobanResourcesXdr(
+                footprint = LedgerFootprintXdr(
+                    readOnly = emptyList(),
+                    readWrite = emptyList()
+                ),
+                instructions = Uint32Xdr(0u),
+                diskReadBytes = Uint32Xdr(0u),
+                writeBytes = Uint32Xdr(0u)
+            ),
+            resourceFee = Int64Xdr(0L)
+        )
     }
 
     /**
@@ -123,10 +132,11 @@ class SorobanDataBuilder {
      * @throws IllegalArgumentException If the XDR is invalid
      */
     constructor(sorobanData: String) {
-        TODO("SorobanDataBuilder(String) requires XDR fromXdrBase64 implementation")
-        // Unreachable code - prevents uninitialized property error
-        @Suppress("UNREACHABLE_CODE")
-        data = throw NotImplementedError()
+        try {
+            data = SorobanTransactionDataXdr.fromXdrBase64(sorobanData)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid SorobanData: $sorobanData", e)
+        }
     }
 
     /**
@@ -147,10 +157,15 @@ class SorobanDataBuilder {
      * @param sorobanData The SorobanTransactionData to copy
      */
     constructor(sorobanData: SorobanTransactionDataXdr) {
-        TODO("SorobanDataBuilder(SorobanTransactionDataXdr) requires deep copy implementation")
-        // Unreachable code - prevents uninitialized property error
-        @Suppress("UNREACHABLE_CODE")
-        data = throw NotImplementedError()
+        // Create deep copy by encoding and decoding
+        try {
+            val writer = XdrWriter()
+            sorobanData.encode(writer)
+            val reader = XdrReader(writer.toByteArray())
+            data = SorobanTransactionDataXdr.decode(reader)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid SorobanData: $sorobanData", e)
+        }
     }
 
     /**
@@ -176,7 +191,8 @@ class SorobanDataBuilder {
      */
     fun setResourceFee(fee: Long): SorobanDataBuilder {
         require(fee >= 0) { "Resource fee must be non-negative, got $fee" }
-        TODO("setResourceFee requires SorobanTransactionDataXdr field access")
+        data = data.copy(resourceFee = Int64Xdr(fee))
+        return this
     }
 
     /**
@@ -211,7 +227,16 @@ class SorobanDataBuilder {
         require(resources.writeBytes >= 0) {
             "Write bytes must be non-negative, got ${resources.writeBytes}"
         }
-        TODO("setResources requires SorobanTransactionDataXdr field access")
+
+        // Update the resources in the data structure
+        data = data.copy(
+            resources = data.resources.copy(
+                instructions = Uint32Xdr(resources.cpuInstructions.toUInt()),
+                diskReadBytes = Uint32Xdr(resources.diskReadBytes.toUInt()),
+                writeBytes = Uint32Xdr(resources.writeBytes.toUInt())
+            )
+        )
+        return this
     }
 
     /**
@@ -238,7 +263,16 @@ class SorobanDataBuilder {
      * @return This builder instance for chaining
      */
     fun setReadOnly(readOnly: Collection<LedgerKeyXdr>?): SorobanDataBuilder {
-        TODO("setReadOnly requires SorobanTransactionDataXdr footprint access")
+        if (readOnly != null) {
+            data = data.copy(
+                resources = data.resources.copy(
+                    footprint = data.resources.footprint.copy(
+                        readOnly = readOnly.toList()
+                    )
+                )
+            )
+        }
+        return this
     }
 
     /**
@@ -266,7 +300,16 @@ class SorobanDataBuilder {
      * @return This builder instance for chaining
      */
     fun setReadWrite(readWrite: Collection<LedgerKeyXdr>?): SorobanDataBuilder {
-        TODO("setReadWrite requires SorobanTransactionDataXdr footprint access")
+        if (readWrite != null) {
+            data = data.copy(
+                resources = data.resources.copy(
+                    footprint = data.resources.footprint.copy(
+                        readWrite = readWrite.toList()
+                    )
+                )
+            )
+        }
+        return this
     }
 
     /**
@@ -286,7 +329,11 @@ class SorobanDataBuilder {
      * @return A copy of the SorobanTransactionData
      */
     fun build(): SorobanTransactionDataXdr {
-        TODO("build requires SorobanTransactionDataXdr deep copy")
+        // Create deep copy by encoding and decoding
+        val writer = XdrWriter()
+        data.encode(writer)
+        val reader = XdrReader(writer.toByteArray())
+        return SorobanTransactionDataXdr.decode(reader)
     }
 
     /**
@@ -305,7 +352,7 @@ class SorobanDataBuilder {
      * @return Base64-encoded XDR string
      */
     fun buildBase64(): String {
-        TODO("buildBase64 requires build() and toXdrBase64()")
+        return build().toXdrBase64()
     }
 
     /**

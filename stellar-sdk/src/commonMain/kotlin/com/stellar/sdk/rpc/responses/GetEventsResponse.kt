@@ -1,5 +1,7 @@
 package com.stellar.sdk.rpc.responses
 
+import com.stellar.sdk.xdr.SCValXdr
+import com.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -61,31 +63,21 @@ data class GetEventsResponse(
         /**
          * Parses the [topic] field from a list of base64-encoded strings to a list of SCVal XDR objects.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return list of parsed SCVal objects
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
          */
-        fun parseTopic(): List<Any> {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return topic.map { SCVal.fromXdrBase64(it) }
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseTopic(): List<SCValXdr> {
+            return topic.map { SCValXdr.fromXdrBase64(it) }
         }
 
         /**
          * Parses the [value] field from a base64-encoded string to an SCVal XDR object.
          *
-         * Note: This is a placeholder for XDR parsing functionality.
-         * The actual implementation will be added when XDR parsing utilities are available.
-         *
          * @return the parsed SCVal object
-         * @throws IllegalStateException if XDR parsing is not yet implemented
+         * @throws IllegalArgumentException if the XDR string is malformed or cannot be decoded
          */
-        fun parseValue(): Any {
-            // TODO: Implement XDR parsing when XDR utilities are available
-            // return SCVal.fromXdrBase64(value)
-            throw IllegalStateException("XDR parsing not yet implemented")
+        fun parseValue(): SCValXdr {
+            return SCValXdr.fromXdrBase64(value)
         }
     }
 }
