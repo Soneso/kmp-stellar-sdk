@@ -13,7 +13,7 @@ class StellarDemo {
     /**
      * Generate a random keypair using the platform's crypto library.
      */
-    fun generateRandomKeyPair(): KeyPairInfo {
+    suspend fun generateRandomKeyPair(): KeyPairInfo {
         val keypair = KeyPair.random()
         currentKeyPair = keypair
 
@@ -28,7 +28,7 @@ class StellarDemo {
     /**
      * Create a keypair from a secret seed string.
      */
-    fun createFromSeed(seed: String): Result<KeyPairInfo> {
+    suspend fun createFromSeed(seed: String): Result<KeyPairInfo> {
         return try {
             val keypair = KeyPair.fromSecretSeed(seed)
             currentKeyPair = keypair
@@ -66,7 +66,7 @@ class StellarDemo {
     /**
      * Sign a message with the current keypair.
      */
-    fun signMessage(message: String): Result<SignatureResult> {
+    suspend fun signMessage(message: String): Result<SignatureResult> {
         val kp = currentKeyPair
         if (kp == null) {
             return Result.failure(IllegalStateException("No keypair available"))
@@ -93,7 +93,7 @@ class StellarDemo {
     /**
      * Verify a signature against a message.
      */
-    fun verifySignature(signature: SignatureResult): Boolean {
+    suspend fun verifySignature(signature: SignatureResult): Boolean {
         val kp = currentKeyPair ?: return false
         val data = signature.message.encodeToByteArray()
         return kp.verify(data, signature.signature)
@@ -102,7 +102,7 @@ class StellarDemo {
     /**
      * Run the complete test suite.
      */
-    fun runTestSuite(): List<TestResult> {
+    suspend fun runTestSuite(): List<TestResult> {
         return listOf(
             testRandomGeneration(),
             testFromSeed(),
@@ -115,7 +115,7 @@ class StellarDemo {
         )
     }
 
-    private fun testRandomGeneration(): TestResult {
+    private suspend fun testRandomGeneration(): TestResult {
         val startTime = currentTimeMillis()
         return try {
             val info = generateRandomKeyPair()
@@ -147,7 +147,7 @@ class StellarDemo {
         }
     }
 
-    private fun testFromSeed(): TestResult {
+    private suspend fun testFromSeed(): TestResult {
         val startTime = currentTimeMillis()
         val testSeed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
         return try {
@@ -213,7 +213,7 @@ class StellarDemo {
         }
     }
 
-    private fun testSigning(): TestResult {
+    private suspend fun testSigning(): TestResult {
         val startTime = currentTimeMillis()
         return try {
             generateRandomKeyPair() // Ensure we have a keypair that can sign
@@ -245,7 +245,7 @@ class StellarDemo {
         }
     }
 
-    private fun testVerification(): TestResult {
+    private suspend fun testVerification(): TestResult {
         val startTime = currentTimeMillis()
         return try {
             generateRandomKeyPair()
@@ -289,7 +289,7 @@ class StellarDemo {
         }
     }
 
-    private fun testInvalidSeed(): TestResult {
+    private suspend fun testInvalidSeed(): TestResult {
         val startTime = currentTimeMillis()
         return try {
             val result = createFromSeed("INVALID_SEED")

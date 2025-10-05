@@ -1,54 +1,34 @@
 package com.stellar.sdk.crypto
 
-import kotlinx.coroutines.await
-import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
-import org.khronos.webgl.get
-import kotlin.js.Promise
 
 /**
  * JavaScript implementation of Ed25519 cryptographic operations.
  *
  * ## Implementation Strategy
  *
- * This implementation uses a **dual-strategy approach** for maximum compatibility:
+ * This implementation uses libsodium.js for Ed25519 operations:
  *
- * ### Primary: Web Crypto API (Modern Browsers)
- * - **Availability**: Chrome 113+, Firefox 120+, Safari 17+, Edge 113+
- * - **Algorithm**: Ed25519 via `crypto.subtle.sign/verify`
- * - **Security**: Native browser implementation, hardware-accelerated
- * - **Performance**: Fastest option
- * - **Limitation**: Not all browsers support Ed25519 yet
- *
- * ### Fallback: libsodium.js (Universal Compatibility)
- * - **Library**: libsodium-wrappers (0.7.13)
+ * - **Library**: libsodium-wrappers (0.7.13 via npm)
  * - **Algorithm**: Ed25519 via `crypto_sign_*` functions
- * - **Security**: Same audited C library compiled to WebAssembly
- * - **Compatibility**: Works in all browsers (IE11+) and Node.js
- * - **Performance**: Slightly slower than native, but still fast
+ * - **Security**: Audited C library compiled to WebAssembly
+ * - **Compatibility**: Works in all browsers and Node.js
+ * - **Initialization**: Lazy - happens on first crypto operation
  *
- * The implementation **automatically detects** which to use and falls back gracefully.
+ * All methods are suspend functions to properly handle libsodium initialization.
  *
- * ## Browser Support
+ * ## Why This Approach?
  *
- * | Browser | Web Crypto Ed25519 | libsodium.js Fallback |
- * |---------|-------------------|----------------------|
- * | Chrome 113+ | ✅ Native | ✅ Available |
- * | Firefox 120+ | ✅ Native | ✅ Available |
- * | Safari 17+ | ✅ Native | ✅ Available |
- * | Edge 113+ | ✅ Native | ✅ Available |
- * | Older browsers | ❌ Not supported | ✅ **Used** |
- * | Node.js | ❌ Not supported | ✅ **Used** |
+ * 1. **Self-contained**: SDK manages its own dependencies
+ * 2. **Production-ready**: Proper error handling and initialization
+ * 3. **Coroutine-friendly**: Natural suspend function API
+ * 4. **Test-friendly**: Works in test environments without manual setup
  *
- * @see <a href="https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto">Web Crypto API</a>
  * @see <a href="https://github.com/jedisct1/libsodium.js">libsodium.js</a>
  */
 internal class JsEd25519Crypto : Ed25519Crypto {
 
-    override val libraryName: String = "libsodium.js / Web Crypto API"
-
-    private var sodiumInitialized = false
-    private var webCryptoAvailable: Boolean? = null
+    override val libraryName: String = "libsodium.js"
 
     companion object {
         private const val SEED_BYTES = 32
@@ -58,100 +38,127 @@ internal class JsEd25519Crypto : Ed25519Crypto {
     }
 
     /**
-     * Check if Web Crypto API supports Ed25519.
-     * This is cached to avoid repeated checks.
+     * Generates a new random Ed25519 private key (32 bytes).
+     *
+     * Uses Web Crypto API's `crypto.getRandomValues()` for cryptographically
+     * secure random number generation.
      */
-    private fun isWebCryptoEd25519Available(): Boolean {
-        webCryptoAvailable?.let { return it }
-
-        val available = try {
-            // Check if SubtleCrypto exists and supports Ed25519
-            js("typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined' && typeof crypto.subtle.generateKey === 'function'") as Boolean
-        } catch (e: Throwable) {
-            false
-        }
-
-        webCryptoAvailable = available
-        return available
-    }
-
-    override fun generatePrivateKey(): ByteArray {
+    override suspend fun generatePrivateKey(): ByteArray {
+        // We don't need libsodium for random generation - use Web Crypto API
         return try {
-            // Use Web Crypto API if available
-            if (isWebCryptoEd25519Available()) {
-                generatePrivateKeyWebCrypto()
-            } else {
-                // Fall back to libsodium
-                generatePrivateKeySodium()
-            }
+            val array = Uint8Array(SEED_BYTES)
+            js("crypto.getRandomValues(array)")
+            array.toByteArray()
         } catch (e: Throwable) {
-            throw IllegalStateException("Failed to generate private key: ${e.message}", e)
+            throw IllegalStateException("Failed to generate random private key: ${e.message}", e)
         }
     }
 
-    private fun generatePrivateKeyWebCrypto(): ByteArray {
-        // Web Crypto API for secure random bytes
-        val array = Uint8Array(SEED_BYTES)
-        js("crypto.getRandomValues(array)")
-        return array.toByteArray()
-    }
-
-    private fun generatePrivateKeySodium(): ByteArray {
-        return js("(function() { if (!_sodium || !_sodium.ready) { throw new Error('libsodium not initialized'); } return _sodium.randombytes_buf(32); })()").unsafeCast<Uint8Array>().toByteArray()
-    }
-
-    override fun derivePublicKey(privateKey: ByteArray): ByteArray {
+    /**
+     * Derives the Ed25519 public key from a private key (seed).
+     *
+     * @param privateKey The 32-byte Ed25519 seed
+     * @return The 32-byte Ed25519 public key
+     */
+    override suspend fun derivePublicKey(privateKey: ByteArray): ByteArray {
         require(privateKey.size == SEED_BYTES) { "Private key must be $SEED_BYTES bytes" }
 
+        // Ensure libsodium is initialized
+        LibsodiumInit.ensureInitialized()
+
         return try {
-            // libsodium.js for key derivation (Web Crypto doesn't have raw key derivation)
-            derivePublicKeySodium(privateKey)
+            val sodium = LibsodiumInit.getSodium()
+            val seedArray = privateKey.toUint8Array()
+
+            // Use libsodium to derive keypair from seed
+            val result = js(
+                """
+                (function() {
+                    var keypair = sodium.crypto_sign_seed_keypair(seedArray);
+                    return keypair.publicKey;
+                })()
+                """
+            ).unsafeCast<Uint8Array>()
+
+            result.toByteArray()
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to derive public key: ${e.message}", e)
         }
     }
 
-    private fun derivePublicKeySodium(seed: ByteArray): ByteArray {
-        val seedArray = seed.toUint8Array()
-        return js("(function() { if (!_sodium || !_sodium.ready) { throw new Error('libsodium not initialized'); } var keypair = _sodium.crypto_sign_seed_keypair(seedArray); return keypair.publicKey; })()").unsafeCast<Uint8Array>().toByteArray()
-    }
-
-    override fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
+    /**
+     * Signs data using Ed25519.
+     *
+     * @param data The data to sign
+     * @param privateKey The 32-byte Ed25519 seed
+     * @return The 64-byte Ed25519 signature
+     */
+    override suspend fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
         require(privateKey.size == SEED_BYTES) { "Private key must be $SEED_BYTES bytes" }
 
+        // Ensure libsodium is initialized
+        LibsodiumInit.ensureInitialized()
+
         return try {
-            // Use libsodium for signing (Web Crypto Ed25519 API is complex for raw keys)
-            signSodium(data, privateKey)
+            val sodium = LibsodiumInit.getSodium()
+            val dataArray = data.toUint8Array()
+            val seedArray = privateKey.toUint8Array()
+
+            // Derive keypair and sign
+            val result = js(
+                """
+                (function() {
+                    var keypair = sodium.crypto_sign_seed_keypair(seedArray);
+                    var signature = sodium.crypto_sign_detached(dataArray, keypair.privateKey);
+                    return signature;
+                })()
+                """
+            ).unsafeCast<Uint8Array>()
+
+            result.toByteArray()
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to sign data: ${e.message}", e)
         }
     }
 
-    private fun signSodium(data: ByteArray, seed: ByteArray): ByteArray {
-        val dataArray = data.toUint8Array()
-        val seedArray = seed.toUint8Array()
-
-        return js("(function() { if (!_sodium || !_sodium.ready) { throw new Error('libsodium not initialized'); } var keypair = _sodium.crypto_sign_seed_keypair(seedArray); var signature = _sodium.crypto_sign_detached(dataArray, keypair.privateKey); return signature; })()").unsafeCast<Uint8Array>().toByteArray()
-    }
-
-    override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+    /**
+     * Verifies an Ed25519 signature.
+     *
+     * @param data The data that was signed
+     * @param signature The 64-byte signature
+     * @param publicKey The 32-byte Ed25519 public key
+     * @return true if the signature is valid, false otherwise
+     */
+    override suspend fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
         require(publicKey.size == PUBLIC_KEY_BYTES) { "Public key must be $PUBLIC_KEY_BYTES bytes" }
         require(signature.size == SIGNATURE_BYTES) { "Signature must be $SIGNATURE_BYTES bytes" }
 
+        // Ensure libsodium is initialized
+        LibsodiumInit.ensureInitialized()
+
         return try {
-            // Use libsodium for verification
-            verifySodium(data, signature, publicKey)
+            val sodium = LibsodiumInit.getSodium()
+            val dataArray = data.toUint8Array()
+            val signatureArray = signature.toUint8Array()
+            val publicKeyArray = publicKey.toUint8Array()
+
+            // Verify signature
+            val result = js(
+                """
+                (function() {
+                    try {
+                        return sodium.crypto_sign_verify_detached(signatureArray, dataArray, publicKeyArray);
+                    } catch (e) {
+                        return false;
+                    }
+                })()
+                """
+            ).unsafeCast<Boolean>()
+
+            result
         } catch (e: Throwable) {
             false
         }
-    }
-
-    private fun verifySodium(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
-        val dataArray = data.toUint8Array()
-        val signatureArray = signature.toUint8Array()
-        val publicKeyArray = publicKey.toUint8Array()
-
-        return js("(function() { if (!_sodium || !_sodium.ready) { throw new Error('libsodium not initialized'); } try { return _sodium.crypto_sign_verify_detached(signatureArray, dataArray, publicKeyArray); } catch (e) { return false; } })()").unsafeCast<Boolean>()
     }
 
     // Helper extension functions
@@ -171,6 +178,8 @@ internal class JsEd25519Crypto : Ed25519Crypto {
 }
 
 /**
- * Get the JS-specific Ed25519 crypto implementation.
+ * Get the platform-specific Ed25519 crypto implementation.
+ *
+ * Returns the JavaScript implementation using libsodium.js.
  */
 actual fun getEd25519Crypto(): Ed25519Crypto = JsEd25519Crypto()

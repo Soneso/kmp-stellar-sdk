@@ -1,11 +1,12 @@
 package com.stellar.sdk
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class KeyPairTest {
 
     @Test
-    fun testRandomKeyPairGeneration() {
+    fun testRandomKeyPairGeneration() = runTest {
         val keypair1 = KeyPair.random()
         val keypair2 = KeyPair.random()
 
@@ -20,7 +21,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testFromSecretSeed() {
+    fun testFromSecretSeed() = runTest {
         val seed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
         val keypair = KeyPair.fromSecretSeed(seed)
 
@@ -36,7 +37,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testFromSecretSeedCharArray() {
+    fun testFromSecretSeedCharArray() = runTest {
         val seed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE".toCharArray()
         val keypair = KeyPair.fromSecretSeed(seed)
 
@@ -70,7 +71,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testSignAndVerify() {
+    fun testSignAndVerify() = runTest {
         val keypair = KeyPair.random()
         val data = "test data to sign".encodeToByteArray()
 
@@ -94,7 +95,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testCannotSignWithoutPrivateKey() {
+    fun testCannotSignWithoutPrivateKey() = runTest {
         val accountId = "GCZHXL5HXQX5ABDM26LHYRCQZ5OJFHLOPLZX47WEBP3V2PF5AVFK2A5D"
         val keypair = KeyPair.fromAccountId(accountId)
 
@@ -107,7 +108,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testEquals() {
+    fun testEquals() = runTest {
         val seed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
         val keypair1 = KeyPair.fromSecretSeed(seed)
         val keypair2 = KeyPair.fromSecretSeed(seed)
@@ -130,7 +131,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testInvalidSecretSeed() {
+    fun testInvalidSecretSeed() = runTest {
         assertFailsWith<IllegalArgumentException> {
             KeyPair.fromSecretSeed("INVALIDKEYSEED")
         }
@@ -152,7 +153,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testInvalidSecretSeedSize() {
+    fun testInvalidSecretSeedSize() = runTest {
         val tooShort = byteArrayOf(1, 2, 3)
         assertFailsWith<IllegalArgumentException> {
             KeyPair.fromSecretSeed(tooShort)
@@ -160,7 +161,7 @@ class KeyPairTest {
     }
 
     @Test
-    fun testGetPublicKeyReturnsCopy() {
+    fun testGetPublicKeyReturnsCopy() = runTest {
         val keypair = KeyPair.random()
         val publicKey1 = keypair.getPublicKey()
         val publicKey2 = keypair.getPublicKey()

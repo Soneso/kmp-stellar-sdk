@@ -92,7 +92,7 @@ class KeyPair private constructor(
          *         wrong version byte, or invalid length
          */
         @JvmStatic
-        fun fromSecretSeed(seed: CharArray): KeyPair {
+        suspend fun fromSecretSeed(seed: CharArray): KeyPair {
             require(seed.isNotEmpty()) { "Secret seed cannot be empty" }
             val decoded = try {
                 StrKey.decodeEd25519SecretSeed(seed)
@@ -127,7 +127,7 @@ class KeyPair private constructor(
          * @see fromSecretSeed(CharArray) for secure alternative
          */
         @JvmStatic
-        fun fromSecretSeed(seed: String): KeyPair {
+        suspend fun fromSecretSeed(seed: String): KeyPair {
             require(seed.isNotEmpty()) { "Secret seed cannot be empty" }
             val charSeed = seed.toCharArray()
             try {
@@ -155,7 +155,7 @@ class KeyPair private constructor(
          * @throws IllegalStateException if key derivation fails (crypto implementation error)
          */
         @JvmStatic
-        fun fromSecretSeed(seed: ByteArray): KeyPair {
+        suspend fun fromSecretSeed(seed: ByteArray): KeyPair {
             require(seed.size == 32) { "Secret seed must be exactly 32 bytes, got ${seed.size}" }
 
             val publicKey = try {
@@ -215,7 +215,7 @@ class KeyPair private constructor(
          * @throws IllegalStateException if random generation or key derivation fails
          */
         @JvmStatic
-        fun random(): KeyPair {
+        suspend fun random(): KeyPair {
             val privateKey = try {
                 crypto.generatePrivateKey()
             } catch (e: Exception) {
@@ -285,7 +285,7 @@ class KeyPair private constructor(
      * @return signed bytes (64 bytes)
      * @throws IllegalStateException if the private key for this keypair is null
      */
-    fun sign(data: ByteArray): ByteArray {
+    suspend fun sign(data: ByteArray): ByteArray {
         val key = privateKey ?: throw IllegalStateException(
             "KeyPair does not contain secret key. Use KeyPair.fromSecretSeed method to create a new KeyPair with a secret key."
         )
@@ -305,7 +305,7 @@ class KeyPair private constructor(
      * @return A DecoratedSignature containing the hint and signature
      * @throws IllegalStateException if the private key for this keypair is null
      */
-    fun signDecorated(data: ByteArray): DecoratedSignature {
+    suspend fun signDecorated(data: ByteArray): DecoratedSignature {
         val signature = sign(data)
         val hint = publicKey.copyOfRange(publicKey.size - 4, publicKey.size)
         return DecoratedSignature(hint, signature)
@@ -318,7 +318,7 @@ class KeyPair private constructor(
      * @param signature The signature (64 bytes)
      * @return True if they match, false otherwise
      */
-    fun verify(data: ByteArray, signature: ByteArray): Boolean {
+    suspend fun verify(data: ByteArray, signature: ByteArray): Boolean {
         return crypto.verify(data, signature, publicKey)
     }
 

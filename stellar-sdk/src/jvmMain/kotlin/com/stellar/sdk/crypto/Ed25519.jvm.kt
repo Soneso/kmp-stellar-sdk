@@ -26,12 +26,12 @@ internal class JvmEd25519Crypto : Ed25519Crypto {
         }
     }
 
-    override fun generatePrivateKey(): ByteArray {
+    override suspend fun generatePrivateKey(): ByteArray {
         val privateKey = Ed25519PrivateKeyParameters(SecureRandom())
         return privateKey.encoded
     }
 
-    override fun derivePublicKey(privateKey: ByteArray): ByteArray {
+    override suspend fun derivePublicKey(privateKey: ByteArray): ByteArray {
         require(privateKey.size == 32) { "Private key must be 32 bytes" }
 
         val ed25519PrivateKey = Ed25519PrivateKeyParameters(privateKey, 0)
@@ -39,7 +39,7 @@ internal class JvmEd25519Crypto : Ed25519Crypto {
         return publicKey.encoded
     }
 
-    override fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
+    override suspend fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
         require(privateKey.size == 32) { "Private key must be 32 bytes" }
 
         val ed25519PrivateKey = Ed25519PrivateKeyParameters(privateKey, 0)
@@ -49,7 +49,7 @@ internal class JvmEd25519Crypto : Ed25519Crypto {
         return signer.generateSignature()
     }
 
-    override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+    override suspend fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
         require(publicKey.size == 32) { "Public key must be 32 bytes" }
         require(signature.size == 64) { "Signature must be 64 bytes" }
 

@@ -1,10 +1,11 @@
 package com.stellar.sdk
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class FeeBumpTransactionTest {
 
-    private fun createInnerTransaction(
+    private suspend fun createInnerTransaction(
         baseFee: Long = AbstractTransaction.MIN_BASE_FEE,
         network: Network = Network.TESTNET
     ): Transaction {
@@ -32,7 +33,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testCreateWithBaseFee() {
+    fun testCreateWithBaseFee() = runTest {
         val inner = createInnerTransaction()
         val feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
 
@@ -50,7 +51,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testCreateWithFee() {
+    fun testCreateWithFee() = runTest {
         val inner = createInnerTransaction()
         val feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
         val fee = 10000L
@@ -67,7 +68,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSetBaseFeeBelowNetworkMinimum() {
+    fun testSetBaseFeeBelowNetworkMinimum() = runTest {
         val inner = createInnerTransaction()
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -82,7 +83,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSetBaseFeeBelowInner() {
+    fun testSetBaseFeeBelowInner() = runTest {
         val inner = createInnerTransaction(baseFee = AbstractTransaction.MIN_BASE_FEE + 1)
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -97,7 +98,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSetBaseFeeOverflowsLong() {
+    fun testSetBaseFeeOverflowsLong() = runTest {
         val inner = createInnerTransaction(baseFee = AbstractTransaction.MIN_BASE_FEE + 1)
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -112,7 +113,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSetBaseFeeEqualToInner() {
+    fun testSetBaseFeeEqualToInner() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump = FeeBumpTransaction.createWithBaseFee(
@@ -126,7 +127,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testHash() {
+    fun testHash() = runTest {
         val inner = createInnerTransaction()
         assertEquals(
             "2a8ead3351faa7797b284f59027355ddd69c21adb8e4da0b9bb95531f7f32681",
@@ -146,7 +147,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testRoundTripXdr() {
+    fun testRoundTripXdr() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump = FeeBumpTransaction.createWithBaseFee(
@@ -171,7 +172,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSign() {
+    fun testSign() = runTest {
         val inner = createInnerTransaction()
         val feeSourceKeypair = KeyPair.fromSecretSeed("SB7ZMPZB3YMMK5CUWENXVLZWBK4KYX4YU5JBXQNZSK2DP2Q7V3LVTO5V")
 
@@ -193,7 +194,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testSignHashX() {
+    fun testSignHashX() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump = FeeBumpTransaction.createWithBaseFee(
@@ -209,7 +210,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testBuilder() {
+    fun testBuilder() = runTest {
         val inner = createInnerTransaction()
         val feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
 
@@ -223,7 +224,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testBuilderWithFee() {
+    fun testBuilderWithFee() = runTest {
         val inner = createInnerTransaction()
         val feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
         val fee = 10000L
@@ -238,7 +239,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testBuilderMissingFeeSource() {
+    fun testBuilderMissingFeeSource() = runTest {
         val inner = createInnerTransaction()
 
         val exception = assertFailsWith<IllegalStateException> {
@@ -251,7 +252,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testBuilderMissingFee() {
+    fun testBuilderMissingFee() = runTest {
         val inner = createInnerTransaction()
 
         val exception = assertFailsWith<IllegalStateException> {
@@ -264,7 +265,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testBuilderBothBaseFeeAndFee() {
+    fun testBuilderBothBaseFeeAndFee() = runTest {
         val inner = createInnerTransaction()
 
         // Setting baseFee then fee should fail
@@ -289,7 +290,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testEquals() {
+    fun testEquals() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump1 = FeeBumpTransaction.createWithBaseFee(
@@ -309,7 +310,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testNotEquals() {
+    fun testNotEquals() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump1 = FeeBumpTransaction.createWithBaseFee(
@@ -328,7 +329,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testInvalidFeeSource() {
+    fun testInvalidFeeSource() = runTest {
         val inner = createInnerTransaction()
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -343,7 +344,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testNegativeFee() {
+    fun testNegativeFee() = runTest {
         val inner = createInnerTransaction()
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -358,7 +359,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testFeeLowerThanInner() {
+    fun testFeeLowerThanInner() = runTest {
         val inner = createInnerTransaction(baseFee = 1000)
 
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -373,7 +374,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testMuxedFeeSource() {
+    fun testMuxedFeeSource() = runTest {
         val inner = createInnerTransaction()
         // Create a muxed account using the MuxedAccount class
         val baseAccount = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
@@ -390,7 +391,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testToEnvelopeXdr() {
+    fun testToEnvelopeXdr() = runTest {
         val inner = createInnerTransaction()
 
         val feeBump = FeeBumpTransaction.createWithBaseFee(
@@ -404,7 +405,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testFromEnvelopeXdr() {
+    fun testFromEnvelopeXdr() = runTest {
         val inner = createInnerTransaction()
         val feeSourceKeypair = KeyPair.fromSecretSeed("SB7ZMPZB3YMMK5CUWENXVLZWBK4KYX4YU5JBXQNZSK2DP2Q7V3LVTO5V")
 
@@ -426,7 +427,7 @@ class FeeBumpTransactionTest {
     }
 
     @Test
-    fun testFromEnvelopeXdrWrongType() {
+    fun testFromEnvelopeXdrWrongType() = runTest {
         val inner = createInnerTransaction()
         val xdrBase64 = inner.toEnvelopeXdrBase64()
 

@@ -10,10 +10,8 @@ import org.w3c.dom.HTMLDivElement
 import kotlinx.html.*
 import kotlinx.html.dom.append
 import kotlinx.html.js.onClickFunction
-
-@JsModule("libsodium-wrappers")
-@JsNonModule
-external val sodium: dynamic
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 private val demo = StellarDemo()
 private var currentKeypair: KeyPairInfo? = null
@@ -21,17 +19,13 @@ private var currentKeypair: KeyPairInfo? = null
 fun main() {
     console.log("Initializing app...")
 
-    // Initialize libsodium
-    sodium.ready.then {
-        console.log("libsodium ready")
-        window.asDynamic()._sodium = sodium
+    // Initialize app with coroutine support
+    MainScope().launch {
         initializeApp()
-    }.catch { error: dynamic ->
-        console.error("Failed to initialize libsodium:", error)
     }
 }
 
-fun initializeApp() {
+suspend fun initializeApp() {
     val root = document.getElementById("root") as? HTMLDivElement
     if (root == null) {
         console.error("Root element not found")
@@ -60,11 +54,19 @@ fun initializeApp() {
                 div("button-group") {
                     button(classes = "btn btn-primary") {
                         +"Generate Random"
-                        onClickFunction = { generateRandom() }
+                        onClickFunction = {
+                            MainScope().launch {
+                                generateRandom()
+                            }
+                        }
                     }
                     button(classes = "btn btn-primary") {
                         +"From Seed"
-                        onClickFunction = { generateFromSeed() }
+                        onClickFunction = {
+                            MainScope().launch {
+                                generateFromSeed()
+                            }
+                        }
                     }
                 }
 
@@ -80,7 +82,11 @@ fun initializeApp() {
                 button(classes = "btn btn-primary") {
                     id = "run-tests-btn"
                     +"Run Tests"
-                    onClickFunction = { runTests() }
+                    onClickFunction = {
+                        MainScope().launch {
+                            runTests()
+                        }
+                    }
                 }
 
                 div {
@@ -91,7 +97,7 @@ fun initializeApp() {
     }
 }
 
-fun generateRandom() {
+suspend fun generateRandom() {
     try {
         currentKeypair = demo.generateRandomKeyPair()
         displayKeypair(currentKeypair!!)
@@ -101,7 +107,7 @@ fun generateRandom() {
     }
 }
 
-fun generateFromSeed() {
+suspend fun generateFromSeed() {
     try {
         val testSeed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
         val result = demo.createFromSeed(testSeed)
@@ -149,7 +155,7 @@ fun displayKeypair(keypair: KeyPairInfo) {
     }
 }
 
-fun runTests() {
+suspend fun runTests() {
     val btn = document.getElementById("run-tests-btn") as? HTMLButtonElement
     val resultsContainer = document.getElementById("test-results") as? HTMLDivElement ?: return
 
@@ -162,18 +168,16 @@ fun runTests() {
     }
 
     // Run tests asynchronously
-    window.setTimeout({
-        try {
-            val results = demo.runTestSuite()
-            displayTestResults(results)
-        } catch (e: Exception) {
-            console.error("Error running tests:", e)
-            showError("test-results", "Error running tests: ${e.message}")
-        } finally {
-            btn?.disabled = false
-            btn?.textContent = "Run Tests"
-        }
-    }, 100)
+    try {
+        val results = demo.runTestSuite()
+        displayTestResults(results)
+    } catch (e: Exception) {
+        console.error("Error running tests:", e)
+        showError("test-results", "Error running tests: ${e.message}")
+    } finally {
+        btn?.disabled = false
+        btn?.textContent = "Run Tests"
+    }
 }
 
 fun displayTestResults(results: List<TestResult>) {

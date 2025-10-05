@@ -128,7 +128,7 @@ abstract class AbstractTransaction(
      * @param signer The keypair to sign with (must have private key)
      * @throws IllegalStateException if the keypair doesn't contain a private key
      */
-    fun sign(signer: KeyPair) {
+    suspend fun sign(signer: KeyPair) {
         val txHash = hash()
         val decoratedSignature = signer.signDecorated(txHash)
         signatures.add(decoratedSignature)

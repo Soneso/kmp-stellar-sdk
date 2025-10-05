@@ -1,5 +1,6 @@
 package com.stellar.sdk
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class AccountTest {
@@ -18,7 +19,7 @@ class AccountTest {
     }
 
     @Test
-    fun testCreateAccountFromKeypair() {
+    fun testCreateAccountFromKeypair() = runTest {
         val seed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
         val keypair = KeyPair.fromSecretSeed(seed)
         val account = Account(keypair, sequenceNumber)
@@ -126,7 +127,7 @@ class AccountTest {
     }
 
     @Test
-    fun testAccountWithKeypairInterface() {
+    fun testAccountWithKeypairInterface() = runTest {
         val seed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
         val keypair = KeyPair.fromSecretSeed(seed)
         val account = Account(keypair, 0L)

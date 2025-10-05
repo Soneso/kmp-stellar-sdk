@@ -6,11 +6,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertEquals
+import kotlinx.coroutines.test.runTest
 
 class StellarDemoTest {
 
     @Test
-    fun testRandomKeyPairGeneration() {
+    fun testRandomKeyPairGeneration() = runTest {
         val demo = StellarDemo()
         val keypair = demo.generateRandomKeyPair()
 
@@ -23,7 +24,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testFromSecretSeed() {
+    fun testFromSecretSeed() = runTest {
         val demo = StellarDemo()
         val seed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
         val result = demo.createFromSeed(seed)
@@ -48,7 +49,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testSigning() {
+    fun testSigning() = runTest {
         val demo = StellarDemo()
         demo.generateRandomKeyPair()
 
@@ -62,7 +63,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testVerification() {
+    fun testVerification() = runTest {
         val demo = StellarDemo()
         demo.generateRandomKeyPair()
 
@@ -75,7 +76,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testInvalidSeed() {
+    fun testInvalidSeed() = runTest {
         val demo = StellarDemo()
         val result = demo.createFromSeed("INVALID_SEED")
 
@@ -83,7 +84,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testPublicKeyOnlyCannotSign() {
+    fun testPublicKeyOnlyCannotSign() = runTest {
         val demo = StellarDemo()
         val accountId = "GCZHXL5HXQX5ABDM26LHYRCQZ5OJFHLOPLZX47WEBP3V2PF5AVFK2A5D"
         demo.createFromAccountId(accountId)
@@ -93,7 +94,7 @@ class StellarDemoTest {
     }
 
     @Test
-    fun testRunTestSuite() {
+    fun testRunTestSuite() = runTest {
         val demo = StellarDemo()
         val results = demo.runTestSuite()
 

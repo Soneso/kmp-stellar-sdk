@@ -43,17 +43,14 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
   - No Homebrew installation required for iOS apps
 
 #### JavaScript Platforms (Browser & Node.js)
-- **Primary Library**: Web Crypto API (native browser implementation)
-  - Available: Chrome 113+, Firefox 120+, Safari 17+, Edge 113+
-  - Hardware-accelerated, fastest performance
-- **Fallback Library**: libsodium-wrappers (0.7.13)
+- **Library**: libsodium-wrappers (0.7.13 via npm)
   - Same audited C library compiled to WebAssembly
   - Universal compatibility (all browsers, Node.js)
-  - Automatic detection and graceful fallback
-- **Random**: `crypto.getRandomValues()` (CSPRNG)
-- **Installation**:
-  - Browser: Include via CDN or npm
-  - Node.js: `npm install libsodium-wrappers`
+  - **Automatic initialization**: SDK handles libsodium initialization internally
+- **Algorithm**: Ed25519 (`crypto_sign_*` functions)
+- **Random**: `crypto.getRandomValues()` (CSPRNG) for key generation
+- **Security**: Audited library, same as native implementation
+- **Installation**: Declared as npm dependency, bundled automatically
 
 #### Base32 Encoding (StrKey)
 - **JVM**: Apache Commons Codec (`commons-codec:commons-codec:1.16.1`)
@@ -71,11 +68,72 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
 4. **Input Validation**: All inputs validated before crypto operations
 5. **Error Handling**: Comprehensive validation with clear error messages
 
+### Async API Design
+
+The SDK uses Kotlin's `suspend` functions for cryptographic operations to properly support JavaScript's async libsodium initialization while maintaining zero overhead on JVM and Native platforms.
+
+#### Why Suspend Functions?
+
+- **JavaScript**: libsodium requires async initialization - suspend functions allow proper event loop integration
+- **JVM/Native**: Zero overhead - suspend functions that don't actually suspend compile to regular functions
+- **Consistent API**: Same async pattern works correctly on all platforms
+- **Coroutine-friendly**: Natural integration with Kotlin coroutines ecosystem
+
+#### Which Methods Are Suspend?
+
+**KeyPair - Suspend (crypto operations)**:
+- `suspend fun random(): KeyPair`
+- `suspend fun fromSecretSeed(seed: String): KeyPair`
+- `suspend fun fromSecretSeed(seed: CharArray): KeyPair`
+- `suspend fun fromSecretSeed(seed: ByteArray): KeyPair`
+- `suspend fun sign(data: ByteArray): ByteArray`
+- `suspend fun signDecorated(data: ByteArray): DecoratedSignature`
+- `suspend fun verify(data: ByteArray, signature: ByteArray): Boolean`
+
+**KeyPair - Not Suspend (data operations)**:
+- `fun fromAccountId(accountId: String): KeyPair`
+- `fun fromPublicKey(publicKey: ByteArray): KeyPair`
+- `fun getCryptoLibraryName(): String`
+- `fun canSign(): Boolean`
+- `fun getAccountId(): String`
+- `fun getSecretSeed(): CharArray?`
+- `fun getPublicKey(): ByteArray`
+
+**Transactions**:
+- `suspend fun sign(signer: KeyPair)` - Transaction and FeeBumpTransaction signing
+
+#### Usage Examples
+
+```kotlin
+// In a coroutine
+suspend fun example() {
+    val keypair = KeyPair.random()  // Suspend function
+    val signature = keypair.sign(data)
+}
+
+// In tests
+@Test
+fun test() = runTest {
+    val keypair = KeyPair.random()
+    // ...
+}
+
+// In Android
+lifecycleScope.launch {
+    val keypair = KeyPair.random()
+}
+
+// In JavaScript/Web
+MainScope().launch {
+    val keypair = KeyPair.random()
+}
+```
+
 ### Code Organization
 
 - `commonMain`: Shared Stellar protocol logic, StrKey, KeyPair API
 - `jvmMain`: JVM-specific crypto (BouncyCastle), Base32 (Apache Commons)
-- `jsMain`: JS-specific crypto (Web Crypto API + libsodium-wrappers fallback)
+- `jsMain`: JS-specific crypto (libsodium-wrappers with automatic initialization)
 - `nativeMain`: Native crypto (libsodium), shared by iOS/macOS
 - Platform-specific networking goes in respective source sets
 - XDR types will be central to transaction handling
@@ -141,9 +199,8 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
 
 ### JavaScript (Browser & Node.js)
 - **ktor-client-js**: HTTP client for JavaScript
-- **libsodium-wrappers** (0.7.13 via npm): Ed25519 cryptography fallback
-  - Browser: CDN or bundled
-  - Node.js: `npm install libsodium-wrappers`
+- **libsodium-wrappers** (0.7.13 via npm): Ed25519 cryptography with automatic async initialization
+- **kotlinx-coroutines-core**: Required for async crypto operations
 
 ### Native (iOS/macOS)
 - **ktor-client-darwin**: HTTP client for Apple platforms
@@ -164,6 +221,7 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
 - ✅ Export to strkey format (G... for accounts, S... for seeds)
 - ✅ Comprehensive input validation and error handling
 - ✅ Thread-safe, immutable design
+- ✅ **Async API**: Crypto operations use `suspend` functions for proper JavaScript support
 
 ### StrKey (`com.stellar.sdk.StrKey`)
 - ✅ Encode/decode Ed25519 public keys (G...)
@@ -182,16 +240,13 @@ All cryptographic operations have comprehensive test coverage:
 - Input validation
 
 Run tests:
-- JVM: `./gradlew jvmTest`
-- JS Browser: `./gradlew jsBrowserTest` (requires Chrome)
-- JS Node: `./gradlew jsNodeTest` (requires Node.js + libsodium-wrappers)
-- Native: `./gradlew macosArm64Test` or `./gradlew iosSimulatorArm64Test`
+- JVM: `./gradlew :stellar-sdk:jvmTest`
+- Native: `./gradlew :stellar-sdk:macosArm64Test` or `./gradlew :stellar-sdk:iosSimulatorArm64Test`
+- **Note**: All tests use `runTest { }` wrapper for suspend function support
 
 Sample app tests:
-- Shared tests: `./gradlew :stellarSample:shared:allTests`
-- Android tests: `./gradlew :stellarSample:shared:testDebugUnitTest`
-- iOS tests: `./gradlew :stellarSample:shared:iosSimulatorArm64Test`
-- JS tests: `./gradlew :stellarSample:shared:jsTest`
+- macOS tests: `./gradlew :stellarSample:shared:macosArm64Test`
+- **Note**: Sample app demonstrates async KeyPair API usage with coroutines
 
 ## Reference Implementation
 

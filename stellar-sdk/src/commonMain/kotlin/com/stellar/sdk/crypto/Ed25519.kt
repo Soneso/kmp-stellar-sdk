@@ -50,7 +50,7 @@ interface Ed25519Crypto {
     /**
      * Generates a new random Ed25519 private key (32 bytes).
      */
-    fun generatePrivateKey(): ByteArray
+    suspend fun generatePrivateKey(): ByteArray
 
     /**
      * Derives the public key from a private key.
@@ -58,7 +58,7 @@ interface Ed25519Crypto {
      * @param privateKey The 32-byte Ed25519 private key
      * @return The 32-byte Ed25519 public key
      */
-    fun derivePublicKey(privateKey: ByteArray): ByteArray
+    suspend fun derivePublicKey(privateKey: ByteArray): ByteArray
 
     /**
      * Signs data using Ed25519.
@@ -67,7 +67,7 @@ interface Ed25519Crypto {
      * @param privateKey The 32-byte Ed25519 private key
      * @return The 64-byte signature
      */
-    fun sign(data: ByteArray, privateKey: ByteArray): ByteArray
+    suspend fun sign(data: ByteArray, privateKey: ByteArray): ByteArray
 
     /**
      * Verifies an Ed25519 signature.
@@ -77,7 +77,7 @@ interface Ed25519Crypto {
      * @param publicKey The 32-byte Ed25519 public key
      * @return true if the signature is valid, false otherwise
      */
-    fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean
+    suspend fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean
 }
 
 /**

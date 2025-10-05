@@ -40,7 +40,7 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
         private const val SIGNATURE_BYTES = 64  // crypto_sign_BYTES
     }
 
-    override fun generatePrivateKey(): ByteArray {
+    override suspend fun generatePrivateKey(): ByteArray {
         return UByteArray(SEED_BYTES).apply {
             usePinned { pinned ->
                 // Generate cryptographically secure random bytes
@@ -49,7 +49,7 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
         }.asByteArray()
     }
 
-    override fun derivePublicKey(privateKey: ByteArray): ByteArray {
+    override suspend fun derivePublicKey(privateKey: ByteArray): ByteArray {
         require(privateKey.size == SEED_BYTES) { "Private key must be $SEED_BYTES bytes" }
 
         return memScoped {
@@ -81,7 +81,7 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
         }
     }
 
-    override fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
+    override suspend fun sign(data: ByteArray, privateKey: ByteArray): ByteArray {
         require(privateKey.size == SEED_BYTES) { "Private key must be $SEED_BYTES bytes" }
 
         return memScoped {
@@ -138,7 +138,7 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
         }
     }
 
-    override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+    override suspend fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
         require(publicKey.size == PUBLIC_KEY_BYTES) { "Public key must be $PUBLIC_KEY_BYTES bytes" }
         require(signature.size == SIGNATURE_BYTES) { "Signature must be $SIGNATURE_BYTES bytes" }
 
