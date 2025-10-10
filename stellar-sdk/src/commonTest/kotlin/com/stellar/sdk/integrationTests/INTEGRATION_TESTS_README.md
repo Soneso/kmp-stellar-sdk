@@ -24,6 +24,34 @@ Comprehensive tests for account-related operations:
 | `testManageData` | Set and delete account data entries | ManageData |
 | `testMuxedAccountIdParsing` | Parse M... addresses | N/A (unit test) |
 | `testAccountDataEndpoint` | Retrieve account data via endpoint | AccountData API |
+| `testStreamTransactionsForAccount` | Stream transactions for an account | Transaction streaming |
+
+### ClaimableBalanceIntegrationTest.kt
+
+Comprehensive tests for claimable balance operations:
+
+| Test | Description | Operations Tested |
+|------|-------------|-------------------|
+| `testClaimableBalance` | Complete claimable balance workflow with complex predicates | CreateClaimableBalance, ClaimClaimableBalance |
+
+**Test Details**: `testClaimableBalance`
+- Creates claimable balance with two claimants
+- First claimant: Unconditional predicate
+- Second claimant: Complex nested predicate (And, Or, Not, BeforeAbsoluteTime, BeforeRelativeTime)
+- Tests StrKey encoding/decoding for claimable balance IDs (hex ↔ B... format)
+- Queries claimable balances by claimant
+- Claims the balance
+- Verifies all operations and effects
+
+**Predicate Structure**:
+```kotlin
+predicateA = BeforeRelativeTime(100)
+predicateB = BeforeAbsoluteTime(1634000400)
+predicateC = Not(predicateA)
+predicateD = And(predicateC, predicateB)
+predicateE = BeforeAbsoluteTime(1601671345)
+predicateF = Or(predicateD, predicateE)
+```
 
 ### ContractClientIntegrationTest.kt
 

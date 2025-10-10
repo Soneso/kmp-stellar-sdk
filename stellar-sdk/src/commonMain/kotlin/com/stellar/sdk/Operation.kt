@@ -1007,8 +1007,9 @@ data class ClaimClaimableBalanceOperation(
 
     override fun toOperationBody(): OperationBodyXdr {
         val balanceIdBytes = Util.hexToBytes(balanceId)
-        // Claimable balance ID is a union, most common is HASH type (discriminant 0)
-        val claimableBalanceId = ClaimableBalanceIDXdr.V0(HashXdr(balanceIdBytes))
+        // Deserialize the full XDR bytes to get the ClaimableBalanceID
+        val reader = XdrReader(balanceIdBytes)
+        val claimableBalanceId = ClaimableBalanceIDXdr.decode(reader)
 
         val op = ClaimClaimableBalanceOpXdr(
             balanceId = claimableBalanceId
@@ -1018,10 +1019,12 @@ data class ClaimClaimableBalanceOperation(
 
     companion object {
         fun fromXdr(op: ClaimClaimableBalanceOpXdr): ClaimClaimableBalanceOperation {
-            val balanceId = when (val id = op.balanceId) {
-                is ClaimableBalanceIDXdr.V0 -> Util.bytesToHex(id.value.value)
-            }
-            return ClaimClaimableBalanceOperation(balanceId.lowercase())
+            // Serialize the entire ClaimableBalanceID XDR to bytes
+            val writer = XdrWriter()
+            op.balanceId.encode(writer)
+            val balanceIdBytes = writer.toByteArray()
+            val balanceId = Util.bytesToHex(balanceIdBytes).lowercase()
+            return ClaimClaimableBalanceOperation(balanceId)
         }
     }
 }
@@ -1049,7 +1052,9 @@ data class ClawbackClaimableBalanceOperation(
 
     override fun toOperationBody(): OperationBodyXdr {
         val balanceIdBytes = Util.hexToBytes(balanceId)
-        val claimableBalanceId = ClaimableBalanceIDXdr.V0(HashXdr(balanceIdBytes))
+        // Deserialize the full XDR bytes to get the ClaimableBalanceID
+        val reader = XdrReader(balanceIdBytes)
+        val claimableBalanceId = ClaimableBalanceIDXdr.decode(reader)
 
         val op = ClawbackClaimableBalanceOpXdr(
             balanceId = claimableBalanceId
@@ -1059,10 +1064,12 @@ data class ClawbackClaimableBalanceOperation(
 
     companion object {
         fun fromXdr(op: ClawbackClaimableBalanceOpXdr): ClawbackClaimableBalanceOperation {
-            val balanceId = when (val id = op.balanceId) {
-                is ClaimableBalanceIDXdr.V0 -> Util.bytesToHex(id.value.value)
-            }
-            return ClawbackClaimableBalanceOperation(balanceId.lowercase())
+            // Serialize the entire ClaimableBalanceID XDR to bytes
+            val writer = XdrWriter()
+            op.balanceId.encode(writer)
+            val balanceIdBytes = writer.toByteArray()
+            val balanceId = Util.bytesToHex(balanceIdBytes).lowercase()
+            return ClawbackClaimableBalanceOperation(balanceId)
         }
     }
 }
