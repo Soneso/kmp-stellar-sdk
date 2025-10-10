@@ -720,10 +720,10 @@ data class SetOptionsOperation(
             require(it in 0..255) { "Signer weight must be between 0 and 255, got $it" }
         }
         clearFlags?.let {
-            require(it in 0..7) { "Clear flags must be between 0 and 7, got $it" }
+            require(it >= 0) { "Clear flags must be non-negative, got $it" }
         }
         setFlags?.let {
-            require(it in 0..7) { "Set flags must be between 0 and 7, got $it" }
+            require(it >= 0) { "Set flags must be non-negative, got $it" }
         }
         homeDomain?.let {
             require(it.encodeToByteArray().size <= 32) {
