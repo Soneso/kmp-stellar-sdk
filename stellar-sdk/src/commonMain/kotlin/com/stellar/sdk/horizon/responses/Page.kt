@@ -19,12 +19,28 @@ import com.stellar.sdk.horizon.exceptions.*
  */
 @Serializable
 data class Page<T>(
-    @SerialName("records")
-    val records: List<T>,
+    @SerialName("_embedded")
+    val embedded: Embedded<T>? = null,
 
     @SerialName("_links")
     val links: Links
 ) : Response() {
+
+    /**
+     * Embedded records in the page response.
+     */
+    @Serializable
+    data class Embedded<T>(
+        @SerialName("records")
+        val records: List<T>
+    )
+
+    /**
+     * Returns the records in this page.
+     * This is a convenience method to access records from the embedded object.
+     */
+    val records: List<T>
+        get() = embedded?.records ?: emptyList()
 
     /**
      * Links for navigating between pages.

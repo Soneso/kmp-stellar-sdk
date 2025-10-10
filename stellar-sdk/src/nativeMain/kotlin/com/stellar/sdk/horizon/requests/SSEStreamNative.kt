@@ -170,7 +170,13 @@ internal actual fun currentTimeMillis(): Long {
  * Native implementation of JSON deserialization.
  */
 internal actual fun <T> deserializeJson(json: String, serializer: KSerializer<T>): T {
-    return Json.decodeFromString(serializer, json)
+    val jsonConfig = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+    }
+    return jsonConfig.decodeFromString(serializer, json)
 }
 
 /**

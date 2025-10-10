@@ -59,16 +59,16 @@ data class TransactionResponse(
     val operationCount: Int,
 
     @SerialName("envelope_xdr")
-    val envelopeXdr: String,
+    val envelopeXdr: String? = null,
 
     @SerialName("result_xdr")
-    val resultXdr: String,
+    val resultXdr: String? = null,
 
     @SerialName("result_meta_xdr")
-    val resultMetaXdr: String,
+    val resultMetaXdr: String? = null,
 
     @SerialName("fee_meta_xdr")
-    val feeMetaXdr: String,
+    val feeMetaXdr: String? = null,
 
     @SerialName("signatures")
     val signatures: List<String>,
@@ -123,10 +123,10 @@ data class TransactionResponse(
         @Serializable
         data class TimeBounds(
             @SerialName("min_time")
-            val minTime: String,
+            val minTime: String? = null,
 
             @SerialName("max_time")
-            val maxTime: String
+            val maxTime: String? = null
         )
 
         @Serializable

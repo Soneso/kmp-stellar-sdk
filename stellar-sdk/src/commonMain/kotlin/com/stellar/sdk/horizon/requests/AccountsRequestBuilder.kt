@@ -147,6 +147,29 @@ class AccountsRequestBuilder(
         return executeGetRequest(buildUrl())
     }
 
+    /**
+     * Requests a specific data entry for an account.
+     *
+     * This endpoint retrieves the value of a specific data entry (key-value pair) stored on an account.
+     * The data is returned base64-encoded.
+     *
+     * @param accountId The account ID to fetch data from
+     * @param key The data entry key name
+     * @return AccountDataResponse containing the base64-encoded value
+     * @throws NetworkException All the exceptions below are subclasses of NetworkException
+     * @throws BadRequestException If the account or key doesn't exist (404) or request is malformed (4xx)
+     * @throws BadResponseException If the request fails due to a bad response from the server (5xx)
+     * @throws TooManyRequestsException If the request fails due to too many requests sent to the server
+     * @throws RequestTimeoutException When Horizon returns a Timeout or connection timeout occurred
+     * @throws UnknownResponseException If the server returns an unknown status code
+     * @throws ConnectionErrorException When the request cannot be executed due to cancellation or connectivity problems
+     * @see <a href="https://developers.stellar.org/api/resources/accounts/retrieve-account-data">Account Data</a>
+     */
+    suspend fun accountData(accountId: String, key: String): com.stellar.sdk.horizon.responses.AccountDataResponse {
+        setSegments("accounts", accountId, "data", key)
+        return executeGetRequest(buildUrl())
+    }
+
     override fun cursor(cursor: String): AccountsRequestBuilder {
         super.cursor(cursor)
         return this

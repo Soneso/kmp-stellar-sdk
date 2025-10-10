@@ -2,7 +2,6 @@ package com.stellar.sdk.horizon.responses.operations
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonClassDiscriminator
 import com.stellar.sdk.horizon.responses.Link
 import com.stellar.sdk.horizon.responses.Pageable
 import com.stellar.sdk.horizon.responses.Response
@@ -10,12 +9,13 @@ import com.stellar.sdk.horizon.responses.TransactionResponse
 
 /**
  * Base class for all operation responses from the Horizon API.
- * Uses polymorphic serialization based on the "type" field.
+ * Polymorphic deserialization is handled via a custom JsonContentPolymorphicSerializer that
+ * preserves the "type" field as both a discriminator and a property.
  *
  * @see <a href="https://developers.stellar.org/api/resources/operations/">Operation documentation</a>
+ * @see OperationResponseSerializer
  */
-@Serializable
-@JsonClassDiscriminator("type")
+@Serializable(with = OperationResponseSerializer::class)
 sealed class OperationResponse : Response(), Pageable {
     abstract val id: String
     abstract val sourceAccount: String

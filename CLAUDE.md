@@ -149,6 +149,9 @@ MainScope().launch {
 ### Testing
 - **Run all tests**: `./gradlew test`
 - **Run JVM tests**: `./gradlew jvmTest`
+- **Run single test class**: `./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest"`
+- **Run single test method**: `./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest.testRandomKeyPair"`
+- **Run tests with pattern**: `./gradlew :stellar-sdk:jvmTest --tests "*Key*"`
 - **Run JS tests (Browser)**: `./gradlew jsBrowserTest` (requires Chrome)
 - **Run JS tests (Node.js)**:
   - Individual test class: `./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"`
@@ -193,15 +196,60 @@ MainScope().launch {
 
 **Recommendation**: Use test filtering (common pattern for large test suites) or run test classes individually in CI/CD. This is a Kotlin/JS tooling limitation, not an SDK issue - the web sample app proves browser compatibility works perfectly.
 
+#### Integration Tests
+
+The SDK includes comprehensive integration tests that validate against a live Stellar Testnet:
+
+- **Location**: `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/ContractClientIntegrationTest.kt`
+- **Documentation**: See `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/INTEGRATION_TESTS_README.md` for detailed setup
+- **Status**: Integration tests are `@Ignore`d by default (require testnet account funding)
+- **Coverage**: ContractClient, AssembledTransaction, authorization, state restoration, error handling, polling, custom result parsing
+- **Run tests**: Remove `@Ignore` annotation, then run:
+  ```bash
+  ./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest"
+  ```
+
+**Prerequisites**:
+- Testnet connectivity to `https://soroban-testnet.stellar.org:443`
+- Funded test account via Friendbot
+- Pre-deployed contract (contract ID provided in tests)
+
+**Duration**: 3-5 minutes for full suite (network latency dependent)
+
 ### Sample Apps
-- **Android**: `./gradlew :stellarSample:androidApp:installDebug`
-- **iOS**: `./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64` then open in Xcode
-- **Web (dev)**: `./gradlew :stellarSample:webApp:jsBrowserDevelopmentRun`
-- **Web (production)**: `./gradlew :stellarSample:webApp:jsBrowserProductionWebpack`
+
+The `stellarSample` directory demonstrates **proper KMP architecture** with shared business logic and platform-specific UIs:
+
+- **Shared module** (`stellarSample/shared`): Common Kotlin business logic (KeyPair operations, signing, verification)
+- **Android** (`stellarSample/androidApp`): Jetpack Compose UI
+  ```bash
+  ./gradlew :stellarSample:androidApp:installDebug
+  ```
+- **iOS** (`stellarSample/iosApp`): SwiftUI
+  ```bash
+  ./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64
+  cd stellarSample/iosApp && xcodegen generate && open StellarSample.xcodeproj
+  ```
+- **macOS** (`stellarSample/macosApp`): SwiftUI (requires `brew install libsodium`)
+  ```bash
+  ./gradlew :stellarSample:shared:linkDebugFrameworkMacosArm64
+  cd stellarSample/macosApp && xcodegen generate && open StellarSampleMac.xcodeproj
+  ```
+- **Web** (`stellarSample/webApp`): Kotlin/JS with HTML
+  ```bash
+  # Development mode
+  ./gradlew :stellarSample:webApp:jsBrowserDevelopmentRun
+  # Production build
+  ./gradlew :stellarSample:webApp:jsBrowserProductionWebpack
+  ```
+
+**Architecture**: ~500 lines of shared business logic written once, runs on all platforms with platform-native UIs (200 lines each). See `stellarSample/README.md` for architecture details and code examples.
 
 ### Native Development
 - **Build iOS framework**: `./gradlew :stellar-sdk:linkDebugFrameworkIosSimulatorArm64`
-- **Build libsodium XCFramework**: `./build-libsodium-xcframework.sh`
+- **Build libsodium XCFramework**: `./build-libsodium-xcframework.sh` (for iOS framework distribution)
+- **Build SDK XCFramework**: `./build-xcframework.sh` (for SDK framework distribution)
+- **Note**: End-user iOS apps should add libsodium via Swift Package Manager (Clibsodium), not via Homebrew
 
 ## Module Structure
 

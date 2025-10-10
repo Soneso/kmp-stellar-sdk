@@ -91,19 +91,19 @@ class MuxedAccount {
                 // Decode M... address to get account ID and muxed ID
                 val rawMed25519 = StrKey.decodeMed25519PublicKey(address)
 
-                // StrKey format is: 8 bytes (id) + 32 bytes (ed25519 public key)
+                // StrKey format is: 32 bytes (ed25519 public key) + 8 bytes (id)
                 require(rawMed25519.size == 40) {
                     "Invalid muxed account address: expected 40 bytes, got ${rawMed25519.size}"
                 }
 
-                // Extract ID (first 8 bytes, big-endian)
-                val idBytes = rawMed25519.copyOfRange(0, 8)
+                // Extract ed25519 public key (first 32 bytes)
+                val ed25519Bytes = rawMed25519.copyOfRange(0, 32)
+
+                // Extract ID (last 8 bytes, big-endian)
+                val idBytes = rawMed25519.copyOfRange(32, 40)
                 val idValue = idBytes.fold(0UL) { acc, byte ->
                     (acc shl 8) or (byte.toUByte().toULong())
                 }
-
-                // Extract ed25519 public key (last 32 bytes)
-                val ed25519Bytes = rawMed25519.copyOfRange(8, 40)
 
                 this.accountId = StrKey.encodeEd25519PublicKey(ed25519Bytes)
                 this.id = idValue
@@ -127,18 +127,18 @@ class MuxedAccount {
             // Encode as M... address
             val ed25519Bytes = StrKey.decodeEd25519PublicKey(accountId)
 
-            // Build raw muxed format for StrKey: 8 bytes (id) + 32 bytes (ed25519)
+            // Build raw muxed format for StrKey: 32 bytes (ed25519) + 8 bytes (id)
             val rawMed25519 = ByteArray(40)
 
-            // Write ID as big-endian 8 bytes (first 8 bytes)
+            // Write ed25519 public key (first 32 bytes)
+            ed25519Bytes.copyInto(rawMed25519, destinationOffset = 0)
+
+            // Write ID as big-endian 8 bytes (last 8 bytes)
             var currentId = muxedId
-            for (i in 7 downTo 0) {
+            for (i in 39 downTo 32) {
                 rawMed25519[i] = (currentId and 0xFFUL).toByte()
                 currentId = currentId shr 8
             }
-
-            // Write ed25519 public key (last 32 bytes)
-            ed25519Bytes.copyInto(rawMed25519, destinationOffset = 8)
 
             return StrKey.encodeMed25519PublicKey(rawMed25519)
         }

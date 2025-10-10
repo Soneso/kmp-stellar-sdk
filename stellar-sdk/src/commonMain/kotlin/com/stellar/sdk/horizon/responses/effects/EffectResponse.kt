@@ -7,15 +7,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Abstract class for effect responses.
+ * Sealed class for effect responses.
  *
  * Effects represent specific changes that occur in the ledger as a result of successful operations,
  * but are not operations themselves.
  *
+ * All effect types must be subclasses of this sealed class to enable polymorphic serialization.
+ * Polymorphic deserialization is handled via a custom JsonContentPolymorphicSerializer that
+ * preserves the "type" field as both a discriminator and a property.
+ *
  * @see [Effect Documentation](https://developers.stellar.org/docs/data/horizon/api-reference/resources/effects)
+ * @see EffectResponseSerializer
  */
-@Serializable
-abstract class EffectResponse : Response(), Pageable {
+@Serializable(with = EffectResponseSerializer::class)
+sealed class EffectResponse : Response(), Pageable {
     /**
      * A unique identifier for this effect
      */
