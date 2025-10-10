@@ -391,6 +391,91 @@ The SDK also includes comprehensive account integration tests in `AccountIntegra
 | `testAccountDataEndpoint` | Tests account data retrieval | AccountData endpoint |
 | `testStreamTransactionsForAccount` | Tests transaction streaming | SSE streaming, EventListener, cursor("now") |
 
+## Query Integration Tests
+
+The SDK includes comprehensive Horizon query integration tests in `QueryIntegrationTest.kt`:
+
+| Test | Description | Features Tested |
+|------|-------------|-----------------|
+| `testQueryAccounts` | Tests account queries | forSigner, forAsset, pagination, ordering |
+| `testQueryAssets` | Tests asset queries | assetCode, assetIssuer filters, asset statistics |
+| `testQueryEffects` | Tests effects queries | forAccount, forLedger, forTransaction, forOperation |
+| `testQueryOperationsForClaimableBalance` | Tests operations for claimable balance | Hex and base58 claimable balance IDs |
+| `testQueryTransactionsForClaimableBalance` | Tests transactions for claimable balance | Claimable balance transaction queries |
+| `testQueryLedgers` | Tests ledger queries | Latest ledger, specific ledger by sequence |
+| `testQueryFeeStats` | Tests fee statistics queries | Fee charged, max fee, percentiles |
+| `testQueryOffersAndOrderBook` | Tests offers and order book | forAccount, forBuyingAsset, order book bids/asks |
+| `testQueryStrictSendReceivePathsAndTrades` | Tests path payments and trades | Strict send paths, strict receive paths, trade execution, trade streaming |
+| `testQueryRoot` | Tests root endpoint | Server version, protocol version |
+
+### Query Test Details
+
+The query integration tests validate the SDK's ability to query various Horizon endpoints:
+
+1. **Account Queries** (`testQueryAccounts`):
+   - Creates multiple accounts with shared signers
+   - Tests `forSigner()` query with pagination
+   - Creates custom assets with trustlines
+   - Tests `forAsset()` query with pagination
+   - Validates ordering (ASC/DESC) and limits
+
+2. **Asset Queries** (`testQueryAssets`):
+   - Queries assets by code and issuer
+   - Validates asset statistics (accounts, balances, claimable balances)
+   - Tests pagination and ordering
+
+3. **Effects Queries** (`testQueryEffects`):
+   - Queries effects for accounts, ledgers, transactions, operations
+   - Validates effect types (AccountCreatedEffectResponse, etc.)
+   - Tests pagination across different query types
+
+4. **Claimable Balance Queries**:
+   - Queries operations and transactions for claimable balances
+   - Tests both hex and base58 encoded balance IDs
+
+5. **Ledger Queries** (`testQueryLedgers`):
+   - Queries latest ledger with ordering
+   - Queries specific ledger by sequence number
+
+6. **Fee Stats Queries** (`testQueryFeeStats`):
+   - Validates fee statistics fields (min, max, mode, percentiles)
+   - Tests both `feeCharged` and `maxFee` statistics
+
+7. **Offers and Order Book** (`testQueryOffersAndOrderBook`):
+   - Creates offers using ManageBuyOffer
+   - Queries offers by account and buying asset
+   - Queries order book with both asset orderings
+   - Validates bids, asks, base, and counter assets
+
+8. **Path Payments and Trades** (`testQueryStrictSendReceivePathsAndTrades`):
+   - Sets up complex trading paths with multiple assets
+   - Tests strict send paths (source asset/amount → destination)
+   - Tests strict receive paths (source → destination asset/amount)
+   - Executes PathPaymentStrictSend and PathPaymentStrictReceive
+   - Queries and validates trades
+   - Tests trade streaming with SSE
+
+9. **Root Endpoint** (`testQueryRoot`):
+   - Queries server version and network information
+   - Validates protocol versions
+
+### Running Query Integration Tests
+
+```bash
+# Run all query integration tests
+./gradlew :stellar-sdk:jvmTest --tests "QueryIntegrationTest"
+
+# Run a specific query test
+./gradlew :stellar-sdk:jvmTest --tests "QueryIntegrationTest.testQueryRoot"
+./gradlew :stellar-sdk:jvmTest --tests "QueryIntegrationTest.testQueryAccounts"
+./gradlew :stellar-sdk:jvmTest --tests "QueryIntegrationTest.testQueryFeeStats"
+
+# Run with verbose output
+./gradlew :stellar-sdk:jvmTest --tests "QueryIntegrationTest" --info
+```
+
+**Note:** Query tests automatically fund accounts using FriendBot, so no manual setup is required beyond having network connectivity.
+
 ### Streaming Test Details
 
 The `testStreamTransactionsForAccount` test demonstrates SSE (Server-Sent Events) streaming:

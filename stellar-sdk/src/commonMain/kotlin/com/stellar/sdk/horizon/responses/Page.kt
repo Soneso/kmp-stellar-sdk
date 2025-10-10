@@ -23,7 +23,7 @@ data class Page<T>(
     val embedded: Embedded<T>? = null,
 
     @SerialName("_links")
-    val links: Links
+    val links: Links? = null
 ) : Response() {
 
     /**
@@ -75,7 +75,7 @@ data class Page<T>(
      * @throws ConnectionErrorException When the request cannot be executed due to cancellation or connectivity problems
      */
     suspend inline fun <reified T> getNextPage(httpClient: HttpClient): Page<T>? {
-        val nextLink = links.next ?: return null
+        val nextLink = links?.next ?: return null
 
         return try {
             val response = httpClient.get(nextLink.href)

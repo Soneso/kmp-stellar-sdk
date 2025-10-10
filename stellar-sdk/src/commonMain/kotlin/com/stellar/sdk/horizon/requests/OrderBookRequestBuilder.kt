@@ -54,6 +54,21 @@ class OrderBookRequestBuilder(
     }
 
     /**
+     * Sets the buying asset for the order book query.
+     *
+     * @param asset The asset being bought
+     * @return This request builder instance
+     * @see <a href="https://developers.stellar.org/api/aggregations/order-books/retrieve/">Retrieve an Order Book</a>
+     */
+    fun buyingAsset(asset: com.stellar.sdk.Asset): OrderBookRequestBuilder {
+        return when (asset) {
+            is com.stellar.sdk.AssetTypeNative -> buyingAsset("native")
+            is com.stellar.sdk.AssetTypeCreditAlphaNum4 -> buyingAsset("credit_alphanum4", asset.code, asset.issuer)
+            is com.stellar.sdk.AssetTypeCreditAlphaNum12 -> buyingAsset("credit_alphanum12", asset.code, asset.issuer)
+        }
+    }
+
+    /**
      * Sets the selling asset for the order book query.
      *
      * @param assetType The asset type (native, credit_alphanum4, credit_alphanum12)
@@ -65,6 +80,21 @@ class OrderBookRequestBuilder(
     fun sellingAsset(assetType: String, assetCode: String? = null, assetIssuer: String? = null): OrderBookRequestBuilder {
         setAssetTypeParameters("selling", assetType, assetCode, assetIssuer)
         return this
+    }
+
+    /**
+     * Sets the selling asset for the order book query.
+     *
+     * @param asset The asset being sold
+     * @return This request builder instance
+     * @see <a href="https://developers.stellar.org/api/aggregations/order-books/retrieve/">Retrieve an Order Book</a>
+     */
+    fun sellingAsset(asset: com.stellar.sdk.Asset): OrderBookRequestBuilder {
+        return when (asset) {
+            is com.stellar.sdk.AssetTypeNative -> sellingAsset("native")
+            is com.stellar.sdk.AssetTypeCreditAlphaNum4 -> sellingAsset("credit_alphanum4", asset.code, asset.issuer)
+            is com.stellar.sdk.AssetTypeCreditAlphaNum12 -> sellingAsset("credit_alphanum12", asset.code, asset.issuer)
+        }
     }
 
     /**

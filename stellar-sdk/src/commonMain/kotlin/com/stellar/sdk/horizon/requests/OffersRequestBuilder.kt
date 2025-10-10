@@ -102,6 +102,21 @@ class OffersRequestBuilder(
     }
 
     /**
+     * Returns all offers buying an asset.
+     *
+     * @param asset The asset being bought
+     * @return This request builder instance
+     * @see <a href="https://developers.stellar.org/api/resources/offers/list/">List All Offers</a>
+     */
+    fun forBuyingAsset(asset: com.stellar.sdk.Asset): OffersRequestBuilder {
+        return when (asset) {
+            is com.stellar.sdk.AssetTypeNative -> forBuyingAsset("native")
+            is com.stellar.sdk.AssetTypeCreditAlphaNum4 -> forBuyingAsset("credit_alphanum4", asset.code, asset.issuer)
+            is com.stellar.sdk.AssetTypeCreditAlphaNum12 -> forBuyingAsset("credit_alphanum12", asset.code, asset.issuer)
+        }
+    }
+
+    /**
      * Returns all offers selling an asset.
      *
      * @param assetType The asset type (native, credit_alphanum4, credit_alphanum12)

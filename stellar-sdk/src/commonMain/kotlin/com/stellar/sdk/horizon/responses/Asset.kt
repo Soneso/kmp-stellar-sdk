@@ -98,3 +98,28 @@ data class Asset(
         }
     }
 }
+
+/**
+ * Converts a Horizon API Asset to an SDK Asset.
+ *
+ * This extension function converts assets from Horizon responses (which use separate fields for type, code, and issuer)
+ * into SDK Asset objects (AssetTypeNative, AssetTypeCreditAlphaNum4, or AssetTypeCreditAlphaNum12).
+ *
+ * @return SDK Asset instance
+ * @throws IllegalArgumentException if the asset type is unknown
+ * @throws IllegalStateException if code or issuer is missing for credit assets
+ */
+fun Asset.toSdkAsset(): com.stellar.sdk.Asset {
+    return when (assetType) {
+        "native" -> com.stellar.sdk.AssetTypeNative
+        "credit_alphanum4" -> com.stellar.sdk.AssetTypeCreditAlphaNum4(
+            assetCode ?: throw IllegalStateException("assetCode is null for credit asset"),
+            assetIssuer ?: throw IllegalStateException("assetIssuer is null for credit asset")
+        )
+        "credit_alphanum12" -> com.stellar.sdk.AssetTypeCreditAlphaNum12(
+            assetCode ?: throw IllegalStateException("assetCode is null for credit asset"),
+            assetIssuer ?: throw IllegalStateException("assetIssuer is null for credit asset")
+        )
+        else -> throw IllegalArgumentException("Unknown asset type: $assetType")
+    }
+}
