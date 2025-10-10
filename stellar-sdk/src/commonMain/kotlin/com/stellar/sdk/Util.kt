@@ -4,22 +4,41 @@ import com.stellar.sdk.crypto.getSha256Crypto
 import kotlin.math.pow
 
 /**
- * Internal utility functions for the Stellar SDK.
+ * Utility functions for the Stellar SDK.
  *
- * Note: These utilities are for internal SDK use only and should not be used directly by
- * SDK consumers. The API may change without notice.
+ * Provides public utility functions for SDK version information and internal utilities
+ * for common operations used throughout the SDK.
  */
-internal object Util {
+object Util {
+    /**
+     * Returns the version of the Stellar SDK.
+     *
+     * This version string is used for client identification in HTTP headers
+     * (X-Client-Version) to help Stellar server operators track SDK usage
+     * and identify SDK-specific issues.
+     *
+     * Note: Currently hardcoded to match the version in build.gradle.kts.
+     * In future versions, this could be generated at build time from gradle.properties.
+     *
+     * @return The SDK version string (e.g., "0.1.0-SNAPSHOT")
+     */
+    fun getSdkVersion(): String {
+        return "0.1.0-SNAPSHOT"
+    }
+
     /**
      * Pads a byte array to the specified length with null bytes (0x00).
      * If the input array is already longer than or equal to the specified length,
      * only the first [length] bytes are returned.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param bytes The input byte array
      * @param length The desired length
      * @return A byte array of exactly [length] bytes
      */
-    fun paddedByteArray(bytes: ByteArray, length: Int): ByteArray {
+    internal fun paddedByteArray(bytes: ByteArray, length: Int): ByteArray {
         require(length >= 0) { "Length must be non-negative" }
         val result = ByteArray(length) { 0 }
         val copyLength = minOf(bytes.size, length)
@@ -31,11 +50,14 @@ internal object Util {
      * Pads a string to the specified length with null bytes (0x00).
      * The string is first converted to a byte array using UTF-8 encoding.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param string The input string
      * @param length The desired length
      * @return A byte array of exactly [length] bytes
      */
-    fun paddedByteArray(string: String, length: Int): ByteArray {
+    internal fun paddedByteArray(string: String, length: Int): ByteArray {
         return paddedByteArray(string.encodeToByteArray(), length)
     }
 
@@ -43,10 +65,13 @@ internal object Util {
      * Converts a null-padded byte array to a string, removing trailing null bytes.
      * The conversion uses UTF-8 encoding.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param bytes The null-padded byte array
      * @return The string with trailing null bytes removed
      */
-    fun paddedByteArrayToString(bytes: ByteArray): String {
+    internal fun paddedByteArrayToString(bytes: ByteArray): String {
         // Find the first null byte
         val nullIndex = bytes.indexOfFirst { it == 0.toByte() }
         val trimmedBytes = if (nullIndex >= 0) {
@@ -60,10 +85,13 @@ internal object Util {
     /**
      * Converts a byte array to a hexadecimal string.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param bytes The byte array to convert
      * @return A lowercase hexadecimal string representation
      */
-    fun bytesToHex(bytes: ByteArray): String {
+    internal fun bytesToHex(bytes: ByteArray): String {
         return bytes.joinToString("") { byte ->
             (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
         }
@@ -72,11 +100,14 @@ internal object Util {
     /**
      * Converts a hexadecimal string to a byte array.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param hex The hexadecimal string (case-insensitive)
      * @return A byte array
      * @throws IllegalArgumentException if the hex string has odd length or contains invalid characters
      */
-    fun hexToBytes(hex: String): ByteArray {
+    internal fun hexToBytes(hex: String): ByteArray {
         val cleanHex = hex.lowercase()
         require(cleanHex.length % 2 == 0) { "Hex string must have even length" }
 
@@ -90,10 +121,13 @@ internal object Util {
     /**
      * Returns SHA-256 hash of the input data.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param data The data to hash
      * @return The 32-byte SHA-256 hash
      */
-    fun hash(data: ByteArray): ByteArray {
+    internal fun hash(data: ByteArray): ByteArray {
         return getSha256Crypto().hash(data)
     }
 
@@ -109,6 +143,9 @@ internal object Util {
      * Stroops are the smallest unit of Stellar's native asset. One Lumen = 10^7 stroops.
      * The resulting string will have up to 7 decimal places.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param value The amount in stroops
      * @return The amount as a decimal string (e.g., "10.0000000" for 100000000 stroops)
      *
@@ -118,7 +155,7 @@ internal object Util {
      * toAmountString(15_000_000L)  // "1.5000000"
      * ```
      */
-    fun toAmountString(value: Long): String {
+    internal fun toAmountString(value: Long): String {
         val wholePart = value / ONE
         val fractionalPart = value % ONE
         return "$wholePart.${fractionalPart.toString().padStart(7, '0')}"
@@ -130,6 +167,9 @@ internal object Util {
      * The amount must have at most 7 decimal places (stroop precision).
      * One Lumen = 10^7 stroops.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param value The amount as a decimal string (e.g., "1.5", "10.0000000")
      * @return The amount in stroops
      * @throws IllegalArgumentException if the amount format is invalid or exceeds 7 decimal places
@@ -140,7 +180,7 @@ internal object Util {
      * toStroops("1.5")        // 15_000_000L
      * ```
      */
-    fun toStroops(value: String): Long {
+    internal fun toStroops(value: String): Long {
         require(value.isNotBlank()) { "Amount cannot be blank" }
 
         // Parse the decimal value
@@ -175,11 +215,14 @@ internal object Util {
     /**
      * Formats an amount string to have exactly 7 decimal places.
      *
+     * Note: This is an internal utility function and should not be used directly by
+     * SDK consumers. The API may change without notice.
+     *
      * @param value The amount string
      * @return The amount string with exactly 7 decimal places
      * @throws IllegalArgumentException if the scale exceeds 7 decimal places
      */
-    fun formatAmountScale(value: String): String {
+    internal fun formatAmountScale(value: String): String {
         require(value.isNotBlank()) { "Amount cannot be blank" }
 
         val parts = value.split(".")

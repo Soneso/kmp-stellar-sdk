@@ -147,6 +147,10 @@ class SorobanServer(
          * - JSON content negotiation with lenient parsing
          * - Request timeout of 60 seconds
          * - Connection timeout of 10 seconds
+         * - Client identification headers (X-Client-Name, X-Client-Version)
+         *
+         * Client identification headers help Stellar server operators track SDK usage
+         * and identify SDK-specific issues.
          *
          * @return Configured HttpClient instance
          */
@@ -163,6 +167,10 @@ class SorobanServer(
                 install(HttpTimeout) {
                     requestTimeoutMillis = SUBMIT_TRANSACTION_TIMEOUT
                     connectTimeoutMillis = CONNECT_TIMEOUT
+                }
+                install(DefaultRequest) {
+                    header("X-Client-Name", "kmp-stellar-sdk")
+                    header("X-Client-Version", com.stellar.sdk.Util.getSdkVersion())
                 }
             }
         }

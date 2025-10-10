@@ -45,6 +45,15 @@ class HorizonServer(
 
         /**
          * Creates a default HTTP client with standard timeout settings.
+         *
+         * The client is configured with:
+         * - JSON content negotiation with lenient parsing
+         * - Timeout settings (10s connect, 30s request/socket)
+         * - Retry configuration with exponential backoff
+         * - Client identification headers (X-Client-Name, X-Client-Version)
+         *
+         * Client identification headers help Stellar server operators track SDK usage
+         * and identify SDK-specific issues.
          */
         fun createDefaultHttpClient(): HttpClient = HttpClient {
             install(ContentNegotiation) {
@@ -59,10 +68,23 @@ class HorizonServer(
                 retryOnServerErrors(maxRetries = 3)
                 exponentialDelay()
             }
+            install(DefaultRequest) {
+                header("X-Client-Name", "kmp-stellar-sdk")
+                header("X-Client-Version", com.stellar.sdk.Util.getSdkVersion())
+            }
         }
 
         /**
          * Creates an HTTP client for submitting transactions with extended timeout.
+         *
+         * The client is configured with:
+         * - JSON content negotiation with lenient parsing
+         * - Extended timeout settings (10s connect, 65s request/socket for transaction submission)
+         * - Retry configuration with exponential backoff
+         * - Client identification headers (X-Client-Name, X-Client-Version)
+         *
+         * Client identification headers help Stellar server operators track SDK usage
+         * and identify SDK-specific issues.
          */
         fun createSubmitHttpClient(): HttpClient = HttpClient {
             install(ContentNegotiation) {
@@ -76,6 +98,10 @@ class HorizonServer(
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 3)
                 exponentialDelay()
+            }
+            install(DefaultRequest) {
+                header("X-Client-Name", "kmp-stellar-sdk")
+                header("X-Client-Version", com.stellar.sdk.Util.getSdkVersion())
             }
         }
     }
