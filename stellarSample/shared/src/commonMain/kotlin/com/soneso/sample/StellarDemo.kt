@@ -1,6 +1,6 @@
 package com.soneso.sample
 
-import com.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.KeyPair
 
 /**
  * Shared business logic demonstrating Stellar SDK usage across all platforms.

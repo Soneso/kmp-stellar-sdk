@@ -1,9 +1,9 @@
 package com.soneso.sample
 
-import com.stellar.sdk.*
-import com.stellar.sdk.rpc.*
-import com.stellar.sdk.scval.Scv
-import com.stellar.sdk.xdr.*
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
 
 
 
