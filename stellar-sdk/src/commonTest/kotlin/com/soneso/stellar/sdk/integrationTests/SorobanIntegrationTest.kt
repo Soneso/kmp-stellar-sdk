@@ -1,7 +1,12 @@
 package com.soneso.stellar.sdk.integrationTests
 
+import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.util.TestResourceUtil
+import com.soneso.stellar.sdk.xdr.HostFunctionXdr
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -17,6 +22,8 @@ import kotlin.time.Duration.Companion.seconds
  * - Network configuration queries
  * - Latest ledger information
  * - Transaction history queries with pagination
+ * - Contract upload and deployment
+ * - Contract information retrieval
  *
  * **Test Network**: All tests use Stellar testnet Soroban RPC server.
  *
@@ -36,6 +43,7 @@ import kotlin.time.Duration.Companion.seconds
  * - test network request
  * - test get latest ledger
  * - test server get transactions
+ * - test upload contract
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc">Soroban RPC Documentation</a>
  */
@@ -43,6 +51,7 @@ class SorobanIntegrationTest {
 
     private val testOn = "testnet"
     private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
+    private val network = Network.TESTNET
 
     /**
      * Test server health check endpoint.
@@ -288,5 +297,126 @@ class SorobanIntegrationTest {
             response.latestLedger >= response.oldestLedger,
             "Latest ledger should be >= oldest ledger"
         )
+    }
+
+    /**
+     * Tests uploading a Soroban contract WASM to the ledger.
+     *
+     * This test validates the complete contract upload workflow:
+     * 1. Creates and funds a test account via Friendbot
+     * 2. Loads the contract WASM file from test resources
+     * 3. Builds an UploadContractWasmHostFunction operation
+     * 4. Simulates the transaction to get resource estimates
+     * 5. Prepares the transaction with simulation results
+     * 6. Signs and submits the transaction to Soroban RPC
+     * 7. Polls for transaction completion
+     * 8. Extracts the WASM ID from the transaction result
+     * 9. Verifies the contract code can be loaded by WASM ID
+     * 10. Parses contract metadata (spec entries, meta entries)
+     *
+     * The test demonstrates:
+     * - Account creation with FriendBot
+     * - Transaction building for Soroban operations
+     * - Simulation and preparation workflow
+     * - Transaction submission and polling
+     * - Contract code retrieval and parsing
+     *
+     * This is a foundational test for Soroban contract deployment, as uploading
+     * the WASM is the first step before creating contract instances.
+     *
+     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Duration**: ~30-60 seconds (includes network delays and polling)
+     *
+     * @see SorobanServer.loadContractCodeForWasmId
+     * @see SorobanServer.loadContractInfoForWasmId
+     */
+    @Test
+    fun testUploadContract() = runTest(timeout = 120.seconds) {
+        // Given: Create and fund test account
+        val keyPair = KeyPair.random()
+        val accountId = keyPair.getAccountId()
+
+        // Fund account via FriendBot
+        FriendBot.fundTestnetAccount(accountId)
+        delay(5000) // Wait for account creation
+
+        // Load account for sequence number
+        val account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be loaded")
+
+        // Load contract WASM file
+        val contractCode = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+        assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
+
+        // When: Building upload contract transaction
+        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
+        val operation = InvokeHostFunctionOperation(
+            hostFunction = uploadFunction
+        )
+
+        val transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate transaction to obtain transaction data + resource fee
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.results, "Simulation results should not be null")
+        assertNotNull(simulateResponse.latestLedger, "Latest ledger should not be null")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+        assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
+
+        // Prepare transaction with simulation results
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPair)
+
+
+        // Then: Submit transaction to Soroban RPC
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Transaction should succeed"
+        )
+
+        // Extract WASM ID from transaction result
+        val wasmId = rpcTransactionResponse.getWasmId()
+        assertNotNull(wasmId, "WASM ID should be extracted from transaction result")
+        assertTrue(wasmId!!.isNotEmpty(), "WASM ID should not be empty")
+
+        // Verify contract code can be loaded by WASM ID
+        delay(3000) // Wait for ledger to settle
+
+        val contractCodeEntry = sorobanServer.loadContractCodeForWasmId(wasmId)
+        assertNotNull(contractCodeEntry, "Contract code entry should be loaded")
+        assertContentEquals(
+            contractCode,
+            contractCodeEntry!!.code,
+            "Loaded contract code should match uploaded code"
+        )
+
+        // Verify contract info can be parsed
+        val contractInfo = sorobanServer.loadContractInfoForWasmId(wasmId)
+        assertNotNull(contractInfo, "Contract info should be parsed")
+        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.metaEntries.isNotEmpty(), "Contract should have meta entries")
+        assertTrue(contractInfo.envInterfaceVersion > 0u, "Environment interface version should be positive")
     }
 }

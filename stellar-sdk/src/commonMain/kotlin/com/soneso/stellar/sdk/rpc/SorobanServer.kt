@@ -10,6 +10,8 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilderAccount
+import com.soneso.stellar.sdk.contract.SorobanContractInfo
+import com.soneso.stellar.sdk.contract.SorobanContractParser
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
@@ -894,6 +896,202 @@ class SorobanServer(
             latestLedger = response.latestLedger,
             balanceEntry = balanceEntry
         )
+    }
+
+    /**
+     * Loads the contract code entry (including WASM bytecode) for a given WASM ID.
+     *
+     * This method fetches the contract code from the ledger by its hash (WASM ID).
+     * The WASM ID is typically obtained from the transaction response after uploading
+     * a contract.
+     *
+     * ## Example
+     *
+     * ```kotlin
+     * val wasmId = "abc123..."  // Hex-encoded hash
+     * val codeEntry = server.loadContractCodeForWasmId(wasmId)
+     * codeEntry?.let {
+     *     println("Contract code size: ${it.code.dataValue.size} bytes")
+     * }
+     * ```
+     *
+     * @param wasmId The contract WASM ID as a hex-encoded hash string
+     * @return The contract code entry if found, null otherwise
+     * @throws SorobanRpcException If the RPC request fails
+     * @throws IllegalArgumentException If wasmId is not a valid hex string
+     *
+     * @see loadContractCodeForContractId
+     * @see loadContractInfoForWasmId
+     */
+    suspend fun loadContractCodeForWasmId(wasmId: String): ContractCodeEntryXdr? {
+        // Create ledger key for contract code
+        val ledgerKey = LedgerKeyXdr.ContractCode(
+            LedgerKeyContractCodeXdr(
+                hash = HashXdr(com.soneso.stellar.sdk.Util.hexToBytes(wasmId))
+            )
+        )
+
+        // Fetch ledger entry
+        val response = getLedgerEntries(listOf(ledgerKey))
+        val entries = response.entries
+
+        if (entries.isNullOrEmpty()) {
+            return null
+        }
+
+        // Parse contract code from XDR
+        val ledgerEntryData = LedgerEntryDataXdr.fromXdrBase64(entries[0].xdr)
+        return when (ledgerEntryData) {
+            is LedgerEntryDataXdr.ContractCode -> ledgerEntryData.value
+            else -> throw IllegalStateException("Expected ContractCode entry, got ${ledgerEntryData.discriminant}")
+        }
+    }
+
+    /**
+     * Loads the contract code entry (including WASM bytecode) for a given contract ID.
+     *
+     * This method:
+     * 1. Fetches the contract instance to get the WASM hash
+     * 2. Fetches the contract code using the WASM hash
+     *
+     * ## Example
+     *
+     * ```kotlin
+     * val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+     * val codeEntry = server.loadContractCodeForContractId(contractId)
+     * codeEntry?.let {
+     *     println("Contract code size: ${it.code.dataValue.size} bytes")
+     * }
+     * ```
+     *
+     * @param contractId The contract address (C... format)
+     * @return The contract code entry if found, null otherwise
+     * @throws SorobanRpcException If the RPC request fails
+     * @throws IllegalArgumentException If contractId is not a valid contract address
+     *
+     * @see loadContractCodeForWasmId
+     * @see loadContractInfoForContractId
+     */
+    suspend fun loadContractCodeForContractId(contractId: String): ContractCodeEntryXdr? {
+        // Create ledger key for contract instance
+        val ledgerKey = LedgerKeyXdr.ContractData(
+            LedgerKeyContractDataXdr(
+                contract = Address(contractId).toSCAddress(),
+                key = Scv.toLedgerKeyContractInstance(),
+                durability = ContractDataDurabilityXdr.PERSISTENT
+            )
+        )
+
+        // Fetch contract instance
+        val response = getLedgerEntries(listOf(ledgerKey))
+        val entries = response.entries
+
+        if (entries.isNullOrEmpty()) {
+            return null
+        }
+
+        // Parse contract data to get WASM hash
+        val ledgerEntryData = LedgerEntryDataXdr.fromXdrBase64(entries[0].xdr)
+        val contractData = when (ledgerEntryData) {
+            is LedgerEntryDataXdr.ContractData -> ledgerEntryData.value
+            else -> throw IllegalStateException("Expected ContractData entry, got ${ledgerEntryData.discriminant}")
+        }
+
+        // Extract WASM hash from contract instance
+        val instance = when (contractData.`val`) {
+            is SCValXdr.Instance -> contractData.`val`.value
+            else -> throw IllegalStateException("Expected Instance SCVal, got ${contractData.`val`.discriminant}")
+        }
+
+        val wasmHash = when (instance.executable) {
+            is ContractExecutableXdr.WasmHash -> instance.executable.value.value
+            else -> return null
+        }
+
+        // Convert hash to hex string
+        val wasmId = com.soneso.stellar.sdk.Util.bytesToHex(wasmHash)
+
+        // Load contract code by WASM ID
+        return loadContractCodeForWasmId(wasmId)
+    }
+
+    /**
+     * Loads contract information (Environment Meta, Contract Spec, Contract Meta) for a given WASM ID.
+     *
+     * This method:
+     * 1. Fetches the contract code using [loadContractCodeForWasmId]
+     * 2. Parses the WASM bytecode to extract contract metadata
+     *
+     * The returned information includes:
+     * - Environment interface version (protocol version)
+     * - Contract specification entries (functions, structs, events, etc.)
+     * - Contract metadata (key-value pairs for application/tooling use)
+     *
+     * ## Example
+     *
+     * ```kotlin
+     * val wasmId = "abc123..."  // From transaction response
+     * val contractInfo = server.loadContractInfoForWasmId(wasmId)
+     * contractInfo?.let {
+     *     println("Protocol version: ${it.envInterfaceVersion}")
+     *     println("Functions: ${it.specEntries.size}")
+     * }
+     * ```
+     *
+     * @param wasmId The contract WASM ID as a hex-encoded hash string
+     * @return The parsed contract information if found, null if the contract code doesn't exist
+     * @throws SorobanRpcException If the RPC request fails
+     * @throws com.soneso.stellar.sdk.contract.SorobanContractParserException If the WASM bytecode cannot be parsed
+     * @throws IllegalArgumentException If wasmId is not a valid hex string
+     *
+     * @see loadContractCodeForWasmId
+     * @see loadContractInfoForContractId
+     * @see SorobanContractInfo
+     */
+    suspend fun loadContractInfoForWasmId(wasmId: String): SorobanContractInfo? {
+        val contractCodeEntry = loadContractCodeForWasmId(wasmId) ?: return null
+        val byteCode = contractCodeEntry.code
+        return SorobanContractParser.parseContractByteCode(byteCode)
+    }
+
+    /**
+     * Loads contract information (Environment Meta, Contract Spec, Contract Meta) for a given contract ID.
+     *
+     * This method:
+     * 1. Fetches the contract instance and code using [loadContractCodeForContractId]
+     * 2. Parses the WASM bytecode to extract contract metadata
+     *
+     * The returned information includes:
+     * - Environment interface version (protocol version)
+     * - Contract specification entries (functions, structs, events, etc.)
+     * - Contract metadata (key-value pairs for application/tooling use)
+     *
+     * ## Example
+     *
+     * ```kotlin
+     * val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+     * val contractInfo = server.loadContractInfoForContractId(contractId)
+     * contractInfo?.let {
+     *     println("Protocol version: ${it.envInterfaceVersion}")
+     *     println("Spec entries: ${it.specEntries.size}")
+     *     println("Metadata: ${it.metaEntries}")
+     * }
+     * ```
+     *
+     * @param contractId The contract address (C... format)
+     * @return The parsed contract information if found, null if the contract doesn't exist
+     * @throws SorobanRpcException If the RPC request fails
+     * @throws com.soneso.stellar.sdk.contract.SorobanContractParserException If the WASM bytecode cannot be parsed
+     * @throws IllegalArgumentException If contractId is not a valid contract address
+     *
+     * @see loadContractCodeForContractId
+     * @see loadContractInfoForWasmId
+     * @see SorobanContractInfo
+     */
+    suspend fun loadContractInfoForContractId(contractId: String): SorobanContractInfo? {
+        val contractCodeEntry = loadContractCodeForContractId(contractId) ?: return null
+        val byteCode = contractCodeEntry.code
+        return SorobanContractParser.parseContractByteCode(byteCode)
     }
 
     /**

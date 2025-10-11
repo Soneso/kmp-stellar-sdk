@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.rpc.responses
 
+import com.soneso.stellar.sdk.xdr.SorobanTransactionMetaXdr
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
 import com.soneso.stellar.sdk.xdr.TransactionMetaXdr
 import com.soneso.stellar.sdk.xdr.TransactionResultXdr
@@ -92,24 +93,20 @@ data class GetTransactionResponse(
     fun getWasmId(): String? {
         val meta = parseResultMetaXdr() ?: return null
 
-        // Check if this is a V3 transaction meta (Soroban)
-        val v3Meta = when (meta) {
-            is TransactionMetaXdr.V3 -> meta.value
+        // Extract return value from soroban metadata (V3 uses SorobanTransactionMetaXdr, V4 uses SorobanTransactionMetaV2Xdr)
+        val returnValue = when (meta) {
+            is TransactionMetaXdr.V3 -> meta.value.sorobanMeta?.returnValue
+            is TransactionMetaXdr.V4 -> meta.value.sorobanMeta?.returnValue
             else -> return null
-        }
-
-        // Extract the return value from Soroban metadata
-        val sorobanMeta = v3Meta.sorobanMeta ?: return null
-        val returnValue = sorobanMeta.returnValue
+        } ?: return null
 
         // The WASM hash is returned as bytes
-        val scBytes = when (returnValue) {
-            is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes -> returnValue.value
-            else -> return null
+        return when (returnValue) {
+            is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes -> {
+                returnValue.value.value.joinToString("") { "%02x".format(it) }
+            }
+            else -> null
         }
-
-        // Convert to hex string (lowercase to match Java SDK)
-        return scBytes.value.joinToString("") { "%02x".format(it) }
     }
 
     /**
@@ -127,15 +124,12 @@ data class GetTransactionResponse(
     fun getCreatedContractId(): String? {
         val meta = parseResultMetaXdr() ?: return null
 
-        // Check if this is a V3 transaction meta (Soroban)
-        val v3Meta = when (meta) {
-            is TransactionMetaXdr.V3 -> meta.value
+        // Extract return value from soroban metadata (V3 uses SorobanTransactionMetaXdr, V4 uses SorobanTransactionMetaV2Xdr)
+        val returnValue = when (meta) {
+            is TransactionMetaXdr.V3 -> meta.value.sorobanMeta?.returnValue
+            is TransactionMetaXdr.V4 -> meta.value.sorobanMeta?.returnValue
             else -> return null
-        }
-
-        // Extract the return value from Soroban metadata
-        val sorobanMeta = v3Meta.sorobanMeta ?: return null
-        val returnValue = sorobanMeta.returnValue
+        } ?: return null
 
         // The contract ID is returned as an Address (SCAddress)
         val address = when (returnValue) {
