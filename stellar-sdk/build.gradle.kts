@@ -12,6 +12,13 @@ kotlin {
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
+
+            // Configure system properties for tests
+            systemProperty("javax.net.ssl.trustStore", System.getProperty("javax.net.ssl.trustStore", ""))
+            systemProperty("javax.net.ssl.trustStorePassword", System.getProperty("javax.net.ssl.trustStorePassword", ""))
+
+            // Enable TLS debugging if needed (uncomment for troubleshooting)
+            // systemProperty("javax.net.debug", "ssl,handshake")
         }
     }
 
@@ -124,6 +131,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit5"))
                 implementation("org.junit.jupiter:junit-jupiter:5.10.2")
+                // Add SLF4J implementation to fix logging warnings
+                implementation("org.slf4j:slf4j-simple:2.0.9")
             }
         }
 
