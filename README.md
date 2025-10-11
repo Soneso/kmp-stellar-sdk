@@ -76,20 +76,32 @@ This SDK uses production-ready, audited cryptographic libraries on all platforms
 - XDR serialization/deserialization
 
 #### Network Communication
-- Horizon REST API client
+- Horizon REST API client (comprehensive endpoint coverage)
 - Soroban RPC client
-- Health endpoint monitoring
 - Automatic retries and error handling
 
-### Planned Features
+#### Asset Management
+- Native asset (Lumens/XLM)
+- AlphaNum4 and AlphaNum12 issued assets
+- Asset creation and validation
+- Asset parsing from canonical strings
+- Contract ID derivation for Stellar Asset Contracts (SAC)
 
-- Additional transaction types
-- Asset management
-- Claimable balances
-- Liquidity pools
-- Path payments
-- Additional Horizon endpoints
-- Complete Soroban RPC coverage
+#### Advanced Transaction Types
+- Claimable balances (create, claim, clawback)
+- Liquidity pools (deposit, withdraw)
+- Path payments (strict send and strict receive)
+- Sponsorship operations
+- Account merge and clawback
+- Fee bump transactions
+
+#### Horizon API Coverage
+- Accounts, Assets, Claimable Balances, Effects
+- Ledgers, Liquidity Pools, Offers, Operations
+- Payments, Trades, Trade Aggregations
+- Order Books, Paths (strict send/receive)
+- Server-Sent Events (SSE) streaming
+- Fee statistics and health monitoring
 
 ## Installation
 
