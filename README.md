@@ -1,6 +1,6 @@
 # Stellar SDK for Kotlin Multiplatform
 
-**Status: ALPHA - Work In Progress**
+**Status: ALPHA (Experimental) - Work In Progress, do not use in production**
 
 **Built with:** [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
 
@@ -612,4 +612,4 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 
 ---
 
-**Note**: This SDK is under active development. APIs may change between releases. Use in production at your own risk until a stable 1.0 release.
+**Note**: This SDK is under active development. Do not use in production.
