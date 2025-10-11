@@ -15,7 +15,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.stellar"
+    group = "com.soneso.stellar"
     version = "0.1.0-SNAPSHOT"
 
     repositories {
