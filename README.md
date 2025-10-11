@@ -2,6 +2,8 @@
 
 **Status: ALPHA - Work In Progress**
 
+**Built with:** [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
+
 A Kotlin Multiplatform SDK for building applications on the Stellar network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
 **Version:** 0.1.0-SNAPSHOT
