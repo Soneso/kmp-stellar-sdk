@@ -319,6 +319,34 @@ class HorizonServer(
     }
 
     /**
+     * Returns a [HealthRequestBuilder] instance for querying server health status.
+     *
+     * The health endpoint provides information about the current operational status of the Horizon server.
+     * It returns three key indicators:
+     * - Database connectivity
+     * - Stellar Core availability
+     * - Stellar Core synchronization status
+     *
+     * The server is considered healthy when all three indicators are true.
+     *
+     * Example usage:
+     * ```kotlin
+     * val health = horizonServer.health().execute()
+     * if (health.isHealthy) {
+     *     println("Server is operational")
+     * } else {
+     *     println("Server is experiencing issues")
+     * }
+     * ```
+     *
+     * @return [HealthRequestBuilder] instance
+     * @see <a href="https://developers.stellar.org/docs/data/horizon/api-reference/structure/health">Health endpoint documentation</a>
+     */
+    fun health(): com.soneso.stellar.sdk.horizon.requests.HealthRequestBuilder {
+        return com.soneso.stellar.sdk.horizon.requests.HealthRequestBuilder(httpClient, serverUri)
+    }
+
+    /**
      * Submits a transaction to the Stellar network.
      *
      * This method submits a base64-encoded transaction envelope to Horizon and waits for it
