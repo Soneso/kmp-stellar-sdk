@@ -210,16 +210,30 @@ class SorobanServer(
         params: T?
     ): R {
         val requestId = generateRequestId()
-        val request = SorobanRpcRequest(
-            id = requestId,
-            method = method,
-            params = params
-        )
+
+        // Build JSON-RPC request manually to ensure correct serialization
+        val requestJson = buildString {
+            append("{")
+            append("\"jsonrpc\":\"2.0\",")
+            append("\"id\":\"$requestId\",")
+            append("\"method\":\"$method\"")
+            if (params != null) {
+                // Serialize params to JSON using reified type parameter
+                val json = Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                    encodeDefaults = false
+                }
+                val paramsJson = json.encodeToString(kotlinx.serialization.serializer<T>(), params)
+                append(",\"params\":$paramsJson")
+            }
+            append("}")
+        }
 
         try {
             val response: SorobanRpcResponse<R> = httpClient.post(serverUrl) {
                 contentType(ContentType.Application.Json)
-                setBody(request)
+                setBody(requestJson)
             }.body()
 
             // Check for RPC error
