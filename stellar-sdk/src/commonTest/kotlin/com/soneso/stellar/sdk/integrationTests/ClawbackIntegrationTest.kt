@@ -6,6 +6,8 @@ import com.soneso.stellar.sdk.horizon.responses.effects.ClaimableBalanceClawedBa
 import com.soneso.stellar.sdk.horizon.responses.effects.TrustlineFlagsUpdatedEffectResponse
 import com.soneso.stellar.sdk.xdr.AccountFlagsXdr
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 

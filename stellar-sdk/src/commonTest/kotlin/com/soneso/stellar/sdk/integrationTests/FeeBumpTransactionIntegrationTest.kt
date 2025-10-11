@@ -3,6 +3,8 @@ package com.soneso.stellar.sdk.integrationTests
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 

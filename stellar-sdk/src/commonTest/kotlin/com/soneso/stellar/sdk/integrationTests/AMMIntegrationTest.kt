@@ -1,18 +1,21 @@
 package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.LiquidityPool
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
+import com.soneso.stellar.sdk.horizon.responses.LiquidityPoolResponse
+import com.soneso.stellar.sdk.horizon.responses.Page
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.horizon.responses.operations.*
-import kotlinx.coroutines.*
+import com.soneso.stellar.sdk.horizon.responses.TradeResponse
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
-import org.junit.jupiter.api.MethodOrderer
-import org.junit.jupiter.api.TestMethodOrder
-import org.junit.jupiter.api.TestInstance
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * Comprehensive integration tests for AMM (Automated Market Maker) / Liquidity Pool operations.
+ * Comprehensive integration tests for AMM (Automated Market Maker) and Liquidity Pool operations.
  *
  * These tests verify the SDK's liquidity pool operations against a live Stellar testnet.
  * They cover:
@@ -20,42 +23,30 @@ import org.junit.jupiter.api.TestInstance
  * - Depositing assets into liquidity pools
  * - Withdrawing assets from liquidity pools
  * - Querying liquidity pool data, effects, operations, and trades
- * - Liquidity pool IDs (both hex format and strkey format)
+ * - Testing both hex and strkey pool ID formats
+ * - Path payments through liquidity pools
+ * - Trades queries
  *
  * ## Liquidity Pools
  *
- * Liquidity pools enable automated market making on Stellar. Users can:
- * - Deposit asset pairs to earn fees from trades
- * - Withdraw their share of pool assets
- * - Trade assets using the pool's liquidity
+ * Liquidity pools enable automated market makers (AMMs) on the Stellar network, allowing users
+ * to deposit asset pairs and earn fees from trades. Each pool contains two assets in a constant
+ * product market maker (x * y = k).
  *
- * ## Prerequisites
+ * ## Operations Tested
  *
- * These tests require:
- * - Stellar testnet connectivity
- * - FriendBot for account funding
- * - Patience (pools take time to create and settle)
+ * - **ChangeTrustOperation**: Create trustline to liquidity pool shares
+ * - **LiquidityPoolDepositOperation**: Deposit assets into a pool
+ * - **LiquidityPoolWithdrawOperation**: Withdraw assets from a pool
+ * - **PathPaymentStrictSendOperation**: Execute trades through pools
  *
- * ## Running Tests
+ * ## Test Network
  *
- * ```bash
- * ./gradlew :stellar-sdk:jvmTest --tests "AMMIntegrationTest"
- * ```
- *
- * **Note**: These tests are marked with `@Ignore` by default because they:
- * - Require live testnet connectivity
- * - Take 3-5 minutes to run
- * - May occasionally fail due to network conditions
- *
- * To run them, remove the `@Ignore` annotation.
+ * All tests use Stellar testnet. To switch to futurenet, change the `testOn` variable.
  *
  * @see <a href="https://developers.stellar.org/docs/learn/encyclopedia/sdex/liquidity-on-stellar-sdex-liquidity-pools">Liquidity Pools</a>
- * @see LiquidityPoolDepositOperation
- * @see LiquidityPoolWithdrawOperation
- * @see ChangeTrustOperation
+ * @see <a href="https://developers.stellar.org/api/resources/liquiditypools/">Liquidity Pools API</a>
  */
-@TestMethodOrder(MethodOrderer.MethodName::class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AMMIntegrationTest {
 
     private val testOn = "testnet" // or "futurenet"
@@ -70,7 +61,7 @@ class AMMIntegrationTest {
         Network.FUTURENET
     }
 
-    // Shared test account and assets
+    // Shared test data
     private lateinit var testAccountKeyPair: KeyPair
     private lateinit var assetAIssuerKeyPair: KeyPair
     private lateinit var assetBIssuerKeyPair: KeyPair
@@ -80,362 +71,328 @@ class AMMIntegrationTest {
     private var nativeLiquidityPoolId: String = ""
 
     /**
-     * Set up test accounts and assets before running tests.
+     * Set up test accounts and assets.
      *
-     * This creates and funds three accounts:
-     * - Test account (main account for operations)
-     * - Asset A issuer (issues "SDK" asset)
-     * - Asset B issuer (issues "FLUTTER" asset)
-     *
-     * It also establishes trustlines and sends initial asset amounts.
+     * This method:
+     * 1. Creates and funds three accounts (test account, asset A issuer, asset B issuer)
+     * 2. Creates trustlines from test account to both assets
+     * 3. Sends initial asset amounts to test account
+     * 4. Verifies operations and effects can be parsed
      */
     @BeforeTest
-    fun setup() = runTest(timeout = 90.seconds) {
-        withTimeout(120_000) {
-            // Create test accounts
-            testAccountKeyPair = KeyPair.random()
-            assetAIssuerKeyPair = KeyPair.random()
-            assetBIssuerKeyPair = KeyPair.random()
+    fun setUp() = runTest(timeout = 180.seconds) {
+        // Create keypairs
+        testAccountKeyPair = KeyPair.random()
+        assetAIssuerKeyPair = KeyPair.random()
+        assetBIssuerKeyPair = KeyPair.random()
 
-            val testAccountId = testAccountKeyPair.getAccountId()
-            val assetAIssuerId = assetAIssuerKeyPair.getAccountId()
-            val assetBIssuerId = assetBIssuerKeyPair.getAccountId()
+        val testAccountId = testAccountKeyPair.getAccountId()
+        val assetAIssuerId = assetAIssuerKeyPair.getAccountId()
+        val assetBIssuerId = assetBIssuerKeyPair.getAccountId()
 
-            // Fund accounts via FriendBot
-            if (testOn == "testnet") {
-                FriendBot.fundTestnetAccount(testAccountId)
-                FriendBot.fundTestnetAccount(assetAIssuerId)
-                FriendBot.fundTestnetAccount(assetBIssuerId)
-            } else {
-                FriendBot.fundFuturenetAccount(testAccountId)
-                FriendBot.fundFuturenetAccount(assetAIssuerId)
-                FriendBot.fundFuturenetAccount(assetBIssuerId)
-            }
-
-            delay(3000)
-
-            // Define custom assets
-            assetA = AssetTypeCreditAlphaNum4("SDK", assetAIssuerId)
-            assetB = AssetTypeCreditAlphaNum12("FLUTTER", assetBIssuerId)
-
-            // Create trustlines from test account to assets
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
-            var transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                network = network
-            )
-                .addOperation(ChangeTrustOperation(asset = assetA, limit = ChangeTrustOperation.MAX_LIMIT))
-                .addOperation(ChangeTrustOperation(asset = assetB, limit = ChangeTrustOperation.MAX_LIMIT))
-                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                .build()
-
-            transaction.sign(testAccountKeyPair)
-            var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
-            assertTrue(response.successful, "Trustline creation should succeed")
-
-            delay(3000)
-
-            // Send assets from issuers to test account
-            val assetAIssuerAccount = horizonServer.accounts().account(assetAIssuerId)
-            val paymentOp1 = PaymentOperation(
-                destination = testAccountId,
-                asset = assetA,
-                amount = "19999191"
-            )
-            paymentOp1.sourceAccount = assetAIssuerId
-
-            val paymentOp2 = PaymentOperation(
-                destination = testAccountId,
-                asset = assetB,
-                amount = "19999191"
-            )
-            paymentOp2.sourceAccount = assetBIssuerId
-
-            transaction = TransactionBuilder(
-                sourceAccount = Account(assetAIssuerId, assetAIssuerAccount.sequenceNumber),
-                network = network
-            )
-                .addOperation(paymentOp1)
-                .addOperation(paymentOp2)
-                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                .build()
-
-            transaction.sign(assetAIssuerKeyPair)
-            transaction.sign(assetBIssuerKeyPair)
-            response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
-            assertTrue(response.successful, "Asset payment should succeed")
-
-            delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(assetAIssuerId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(assetAIssuerId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+        // Fund accounts
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(testAccountId)
+            FriendBot.fundTestnetAccount(assetAIssuerId)
+            FriendBot.fundTestnetAccount(assetBIssuerId)
+        } else {
+            FriendBot.fundFuturenetAccount(testAccountId)
+            FriendBot.fundFuturenetAccount(assetAIssuerId)
+            FriendBot.fundFuturenetAccount(assetBIssuerId)
         }
+
+        delay(5000)
+
+        // Create assets
+        assetA = AssetTypeCreditAlphaNum4("SDK", assetAIssuerId)
+        assetB = AssetTypeCreditAlphaNum12("FLUTTER", assetBIssuerId)
+
+        // Create trustlines from test account to both assets
+        val testAccount = horizonServer.accounts().account(testAccountId)
+        var transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(ChangeTrustOperation(asset = assetA, limit = ChangeTrustOperation.MAX_LIMIT))
+            .addOperation(ChangeTrustOperation(asset = assetB, limit = ChangeTrustOperation.MAX_LIMIT))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(testAccountKeyPair)
+        var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "ChangeTrust operations should succeed")
+
+        delay(3000)
+
+        // Send assets from issuers to test account
+        val paymentOp1 = PaymentOperation(
+            destination = testAccountId,
+            asset = assetA,
+            amount = "19999191"
+        )
+        paymentOp1.sourceAccount = assetAIssuerId
+
+        val paymentOp2 = PaymentOperation(
+            destination = testAccountId,
+            asset = assetB,
+            amount = "19999191"
+        )
+        paymentOp2.sourceAccount = assetBIssuerId
+
+        val assetAIssuerAccount = horizonServer.accounts().account(assetAIssuerId)
+        transaction = TransactionBuilder(
+            sourceAccount = Account(assetAIssuerId, assetAIssuerAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(paymentOp1)
+            .addOperation(paymentOp2)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(assetAIssuerKeyPair)
+        transaction.sign(assetBIssuerKeyPair)
+        response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Payment operations should succeed")
+
+        delay(3000)
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(assetAIssuerId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(assetAIssuerId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
     }
 
     /**
      * Test creating a pool share trustline for non-native asset pair.
      *
      * This test:
-     * 1. Creates a LiquidityPool for assetA and assetB
-     * 2. Creates a trustline to the liquidity pool share
-     * 3. Makes the first deposit to create the pool on the network
-     * 4. Queries liquidity pools to find the created pool
-     * 5. Verifies operations and effects can be parsed
+     * 1. Creates a liquidity pool for assetA:assetB pair
+     * 2. Establishes a trustline to the pool shares
+     * 3. Queries the liquidity pool by reserve assets
+     * 4. Stores the pool ID for later tests
+     * 5. Tests converting pool ID between hex and strkey formats (if applicable)
+     * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testCreatePoolShareTrustlineNonNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+    fun testCreatePoolShareTrustlineNonNative() = runTest(timeout = 120.seconds) {
+        val testAccountId = testAccountKeyPair.getAccountId()
+        val testAccount = horizonServer.accounts().account(testAccountId)
 
-            // Create liquidity pool and get ID
-            val pool = com.soneso.stellar.sdk.LiquidityPool(assetA, assetB)
-            nonNativeLiquidityPoolId = pool.getLiquidityPoolId()
+        // Create liquidity pool for assetA:assetB
+        val liquidityPool = LiquidityPool(assetA, assetB)
 
-            println("Non-native liquidity pool ID: $nonNativeLiquidityPoolId")
+        val transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(ChangeTrustOperation(liquidityPool = liquidityPool, limit = ChangeTrustOperation.MAX_LIMIT))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
 
-            // Create trustline to the liquidity pool share AND make first deposit
-            // Both operations needed to create a new pool
-            val changeTrustOp = ChangeTrustOperation(
-                liquidityPool = pool,
-                limit = ChangeTrustOperation.MAX_LIMIT
+        transaction.sign(testAccountKeyPair)
+
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
+
+        val response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "ChangeTrust for pool share should succeed")
+
+        delay(3000)
+
+        // Query liquidity pool
+        val poolsPage = horizonServer.liquidityPools()
+            .forReserves(
+                "${assetA.code}:${assetA.issuer}",
+                "${assetB.code}:${assetB.issuer}"
             )
+            .limit(4)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            val depositOp = LiquidityPoolDepositOperation(
-                liquidityPoolId = nonNativeLiquidityPoolId,
-                maxAmountA = "100.0",
-                maxAmountB = "100.0",
-                minPrice = Price(1, 1),
-                maxPrice = Price(2, 1)
-            )
+        assertTrue(poolsPage.records.isNotEmpty(), "Should find liquidity pool")
+        nonNativeLiquidityPoolId = poolsPage.records.first().id
+        println("Non-native pool ID (hex): $nonNativeLiquidityPoolId")
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                network = network
-            )
-                .addOperation(changeTrustOp)
-                .addOperation(depositOp) // First deposit creates the pool
-                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                .build()
-
-            transaction.sign(testAccountKeyPair)
-
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
-
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Pool share trustline creation should succeed")
-
-            delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Verify pool ID format
-            assertEquals(64, nonNativeLiquidityPoolId.length, "Pool ID should be 64 hex characters")
+        // Test strkey encoding if pool ID is in hex format
+        if (!nonNativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nonNativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+            println("Non-native pool ID (strkey): $strKey")
+            assertTrue(strKey.startsWith("L"), "StrKey pool ID should start with L")
         }
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
     }
 
     /**
      * Test creating a pool share trustline for native asset pair.
      *
      * This test:
-     * 1. Creates a LiquidityPool for XLM (native) and assetB
-     * 2. Creates a trustline to the liquidity pool share
-     * 3. Makes the first deposit to create the pool on the network
-     * 4. Verifies operations and effects can be parsed
+     * 1. Creates a liquidity pool for XLM:assetB pair
+     * 2. Establishes a trustline to the pool shares
+     * 3. Queries the liquidity pool by reserve assets
+     * 4. Stores the pool ID for later tests
+     * 5. Tests converting pool ID between hex and strkey formats (if applicable)
+     * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testCreatePoolShareTrustlineNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+    fun testCreatePoolShareTrustlineNative() = runTest(timeout = 120.seconds) {
+        val testAccountId = testAccountKeyPair.getAccountId()
+        val testAccount = horizonServer.accounts().account(testAccountId)
 
-            // Create liquidity pool with native asset
-            val pool = com.soneso.stellar.sdk.LiquidityPool(AssetTypeNative, assetB)
-            nativeLiquidityPoolId = pool.getLiquidityPoolId()
+        // Create liquidity pool for native:assetB
+        val liquidityPool = LiquidityPool(AssetTypeNative, assetB)
 
-            println("Native liquidity pool ID: $nativeLiquidityPoolId")
+        val transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(ChangeTrustOperation(liquidityPool = liquidityPool, limit = ChangeTrustOperation.MAX_LIMIT))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
 
-            // Create trustline to the liquidity pool share AND make first deposit
-            // Both operations needed to create a new pool
-            val changeTrustOp = ChangeTrustOperation(
-                liquidityPool = pool,
-                limit = ChangeTrustOperation.MAX_LIMIT
-            )
+        transaction.sign(testAccountKeyPair)
 
-            val depositOp = LiquidityPoolDepositOperation(
-                liquidityPoolId = nativeLiquidityPoolId,
-                maxAmountA = "100.0",
-                maxAmountB = "100.0",
-                minPrice = Price(1, 1),
-                maxPrice = Price(2, 1)
-            )
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                network = network
-            )
-                .addOperation(changeTrustOp)
-                .addOperation(depositOp) // First deposit creates the pool
-                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                .build()
+        val response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "ChangeTrust for pool share should succeed")
 
-            transaction.sign(testAccountKeyPair)
+        delay(3000)
 
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
+        // Query liquidity pool
+        val poolsPage = horizonServer.liquidityPools()
+            .forReserves("native", "${assetB.code}:${assetB.issuer}")
+            .limit(4)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Native pool share trustline creation should succeed")
+        assertTrue(poolsPage.records.isNotEmpty(), "Should find liquidity pool")
+        nativeLiquidityPoolId = poolsPage.records.first().id
+        println("Native pool ID (hex): $nativeLiquidityPoolId")
 
-            delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Verify pool IDs are different
-            assertEquals(64, nativeLiquidityPoolId.length, "Pool ID should be 64 hex characters")
-            assertNotEquals(nonNativeLiquidityPoolId, nativeLiquidityPoolId, "Pool IDs should be different")
+        // Test strkey encoding if pool ID is in hex format
+        if (!nativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+            println("Native pool ID (strkey): $strKey")
+            assertTrue(strKey.startsWith("L"), "StrKey pool ID should start with L")
         }
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
     }
 
     /**
      * Test depositing assets into a non-native liquidity pool.
      *
      * This test:
-     * 1. Ensures the pool exists (creates it if needed)
-     * 2. Deposits 250 units of assetA and assetB into the pool
-     * 3. Verifies the transaction succeeds
-     * 4. Verifies operations and effects can be parsed
-     * 5. Tests both hex and strkey pool ID formats
+     * 1. Deposits 250 units of assetA and assetB into the non-native pool
+     * 2. Verifies the deposit transaction succeeds
+     * 3. Tests XDR encoding/decoding
+     * 4. If pool ID is hex, also tests deposit with strkey format
+     * 5. Verifies operations and effects can be parsed
      */
     @Test
-    fun testDepositNonNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
+    fun testDepositNonNative() = runTest(timeout = 120.seconds) {
+        // First create the pool trustline
+        testCreatePoolShareTrustlineNonNative()
 
-            // Ensure pool exists - create it if this test runs independently
-            if (nonNativeLiquidityPoolId.isEmpty()) {
-                val pool = com.soneso.stellar.sdk.LiquidityPool(assetA, assetB)
-                nonNativeLiquidityPoolId = pool.getLiquidityPoolId()
+        delay(3000)
 
-                // Create the pool (trustline + first deposit)
-                val sourceAccount = horizonServer.accounts().account(testAccountId)
-                val changeTrustOp = ChangeTrustOperation(
-                    liquidityPool = pool,
-                    limit = ChangeTrustOperation.MAX_LIMIT
-                )
-                val depositOp = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nonNativeLiquidityPoolId,
-                    maxAmountA = "100.0",
-                    maxAmountB = "100.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-                val tx = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(changeTrustOp)
-                    .addOperation(depositOp)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-                tx.sign(testAccountKeyPair)
-                horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
-                delay(3000)
-            }
+        val testAccountId = testAccountKeyPair.getAccountId()
+        var testAccount = horizonServer.accounts().account(testAccountId)
 
-            println("Depositing to pool: $nonNativeLiquidityPoolId")
+        println("Depositing to non-native pool ID: $nonNativeLiquidityPoolId")
 
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+        val depositOp = LiquidityPoolDepositOperation(
+            liquidityPoolId = nonNativeLiquidityPoolId,
+            maxAmountA = "250.0",
+            maxAmountB = "250.0",
+            minPrice = Price.fromString("1.0"),
+            maxPrice = Price.fromString("2.0")
+        )
 
-            // Create liquidity pool deposit operation
-            val depositOp = LiquidityPoolDepositOperation(
-                liquidityPoolId = nonNativeLiquidityPoolId,
-                maxAmountA = "250.0",
-                maxAmountB = "250.0",
-                minPrice = Price(1, 1), // 1.0
-                maxPrice = Price(2, 1)  // 2.0
+        var transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(depositOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(testAccountKeyPair)
+
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
+
+        var response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Liquidity pool deposit should succeed")
+
+        delay(3000)
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        // If pool ID is hex, also test with strkey format
+        if (!nonNativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nonNativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
+
+            val depositOpStrKey = LiquidityPoolDepositOperation(
+                liquidityPoolId = hexFromStrKey,
+                maxAmountA = "10.0",
+                maxAmountB = "10.0",
+                minPrice = Price.fromString("1.0"),
+                maxPrice = Price.fromString("2.0")
             )
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
+            testAccount = horizonServer.accounts().account(testAccountId)
+            transaction = TransactionBuilder(
+                sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
                 network = network
             )
-                .addOperation(depositOp)
+                .addOperation(depositOpStrKey)
                 .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
                 .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
                 .build()
 
             transaction.sign(testAccountKeyPair)
-
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
-
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Liquidity pool deposit should succeed")
+            response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+            assertTrue(response.successful, "Deposit with strkey-converted pool ID should succeed")
 
             delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Test with strkey format if pool ID doesn't start with 'L'
-            if (!nonNativeLiquidityPoolId.startsWith("L")) {
-                val strKey = StrKey.encodeLiquidityPool(Util.hexToBytes(nonNativeLiquidityPoolId))
-                println("Pool ID StrKey: $strKey")
-
-                // Do another small deposit using strkey format
-                val sourceAccount2 = horizonServer.accounts().account(testAccountId)
-                val depositOp2 = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nonNativeLiquidityPoolId, // SDK should handle both formats
-                    maxAmountA = "10.0",
-                    maxAmountB = "10.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-
-                val transaction2 = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount2.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(depositOp2)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-
-                transaction2.sign(testAccountKeyPair)
-                val response2 = horizonServer.submitTransaction(transaction2.toEnvelopeXdrBase64())
-                assertTrue(response2.successful, "Second deposit should succeed")
-            }
         }
     }
 
@@ -443,116 +400,92 @@ class AMMIntegrationTest {
      * Test depositing assets into a native liquidity pool.
      *
      * This test:
-     * 1. Ensures the pool exists (creates it if needed)
-     * 2. Deposits 250 XLM and 250 assetB into the pool
-     * 3. Verifies the transaction succeeds
-     * 4. Tests both hex and strkey pool ID formats
+     * 1. Deposits 250 units of XLM and assetB into the native pool
+     * 2. Verifies the deposit transaction succeeds
+     * 3. Tests XDR encoding/decoding
+     * 4. If pool ID is hex, also tests deposit with strkey format
+     * 5. Verifies operations and effects can be parsed
      */
     @Test
-    fun testDepositNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
+    fun testDepositNative() = runTest(timeout = 120.seconds) {
+        // First create the pool trustline
+        testCreatePoolShareTrustlineNative()
 
-            // Ensure pool exists - create it if this test runs independently
-            if (nativeLiquidityPoolId.isEmpty()) {
-                val pool = com.soneso.stellar.sdk.LiquidityPool(AssetTypeNative, assetB)
-                nativeLiquidityPoolId = pool.getLiquidityPoolId()
+        delay(3000)
 
-                // Create the pool (trustline + first deposit)
-                val sourceAccount = horizonServer.accounts().account(testAccountId)
-                val changeTrustOp = ChangeTrustOperation(
-                    liquidityPool = pool,
-                    limit = ChangeTrustOperation.MAX_LIMIT
-                )
-                val depositOp = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nativeLiquidityPoolId,
-                    maxAmountA = "100.0",
-                    maxAmountB = "100.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-                val tx = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(changeTrustOp)
-                    .addOperation(depositOp)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-                tx.sign(testAccountKeyPair)
-                horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
-                delay(3000)
-            }
+        val testAccountId = testAccountKeyPair.getAccountId()
+        var testAccount = horizonServer.accounts().account(testAccountId)
 
-            println("Depositing to native pool: $nativeLiquidityPoolId")
+        println("Depositing to native pool ID: $nativeLiquidityPoolId")
 
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+        val depositOp = LiquidityPoolDepositOperation(
+            liquidityPoolId = nativeLiquidityPoolId,
+            maxAmountA = "250.0",
+            maxAmountB = "250.0",
+            minPrice = Price.fromString("1.0"),
+            maxPrice = Price.fromString("2.0")
+        )
 
-            // Create liquidity pool deposit operation
-            val depositOp = LiquidityPoolDepositOperation(
-                liquidityPoolId = nativeLiquidityPoolId,
+        var transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(depositOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(testAccountKeyPair)
+
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
+
+        var response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Liquidity pool deposit should succeed")
+
+        delay(3000)
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        // If pool ID is hex, also test with strkey format
+        if (!nativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
+
+            val depositOpStrKey = LiquidityPoolDepositOperation(
+                liquidityPoolId = hexFromStrKey,
                 maxAmountA = "250.0",
                 maxAmountB = "250.0",
-                minPrice = Price(1, 1),
-                maxPrice = Price(2, 1)
+                minPrice = Price.fromString("1.0"),
+                maxPrice = Price.fromString("2.0")
             )
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
+            testAccount = horizonServer.accounts().account(testAccountId)
+            transaction = TransactionBuilder(
+                sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
                 network = network
             )
-                .addOperation(depositOp)
+                .addOperation(depositOpStrKey)
                 .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
                 .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
                 .build()
 
             transaction.sign(testAccountKeyPair)
-
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
-
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Native liquidity pool deposit should succeed")
+            response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+            assertTrue(response.successful, "Deposit with strkey-converted pool ID should succeed")
 
             delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Test with strkey format if applicable
-            if (!nativeLiquidityPoolId.startsWith("L")) {
-                val strKey = StrKey.encodeLiquidityPool(Util.hexToBytes(nativeLiquidityPoolId))
-                println("Native pool ID StrKey: $strKey")
-
-                val sourceAccount2 = horizonServer.accounts().account(testAccountId)
-                val depositOp2 = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nativeLiquidityPoolId,
-                    maxAmountA = "250.0",
-                    maxAmountB = "250.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-
-                val transaction2 = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount2.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(depositOp2)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-
-                transaction2.sign(testAccountKeyPair)
-                val response2 = horizonServer.submitTransaction(transaction2.toEnvelopeXdrBase64())
-                assertTrue(response2.successful, "Second native deposit should succeed")
-            }
         }
     }
 
@@ -560,115 +493,91 @@ class AMMIntegrationTest {
      * Test withdrawing assets from a non-native liquidity pool.
      *
      * This test:
-     * 1. Ensures the pool exists with deposits (creates it if needed)
-     * 2. Withdraws 100 pool shares
-     * 3. Specifies minimum amounts for both assets
-     * 4. Verifies the transaction succeeds
-     * 5. Tests both hex and strkey pool ID formats
+     * 1. Ensures deposits have been made to the pool
+     * 2. Withdraws 100 units of pool shares
+     * 3. Verifies the withdrawal transaction succeeds
+     * 4. Tests XDR encoding/decoding
+     * 5. If pool ID is hex, also tests withdrawal with strkey format
+     * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testWithdrawNonNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
+    fun testWithdrawNonNative() = runTest(timeout = 120.seconds) {
+        // First make a deposit
+        testDepositNonNative()
 
-            // Ensure pool exists with deposits - create it if this test runs independently
-            if (nonNativeLiquidityPoolId.isEmpty()) {
-                val pool = com.soneso.stellar.sdk.LiquidityPool(assetA, assetB)
-                nonNativeLiquidityPoolId = pool.getLiquidityPoolId()
+        delay(3000)
 
-                // Create the pool (trustline + first deposit)
-                val sourceAccount = horizonServer.accounts().account(testAccountId)
-                val changeTrustOp = ChangeTrustOperation(
-                    liquidityPool = pool,
-                    limit = ChangeTrustOperation.MAX_LIMIT
-                )
-                val depositOp = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nonNativeLiquidityPoolId,
-                    maxAmountA = "100.0",
-                    maxAmountB = "100.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-                val tx = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(changeTrustOp)
-                    .addOperation(depositOp)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-                tx.sign(testAccountKeyPair)
-                horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
-                delay(3000)
-            }
+        val testAccountId = testAccountKeyPair.getAccountId()
+        var testAccount = horizonServer.accounts().account(testAccountId)
 
-            println("Withdrawing from pool: $nonNativeLiquidityPoolId")
+        println("Withdrawing from non-native pool ID: $nonNativeLiquidityPoolId")
 
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+        val withdrawOp = LiquidityPoolWithdrawOperation(
+            liquidityPoolId = nonNativeLiquidityPoolId,
+            amount = "100",
+            minAmountA = "100",
+            minAmountB = "100"
+        )
 
-            // Create liquidity pool withdraw operation
-            val withdrawOp = LiquidityPoolWithdrawOperation(
-                liquidityPoolId = nonNativeLiquidityPoolId,
+        var transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(withdrawOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(testAccountKeyPair)
+
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
+
+        var response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Liquidity pool withdrawal should succeed")
+
+        delay(3000)
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        // If pool ID is hex, also test with strkey format
+        if (!nonNativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nonNativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
+
+            val withdrawOpStrKey = LiquidityPoolWithdrawOperation(
+                liquidityPoolId = hexFromStrKey,
                 amount = "100",
                 minAmountA = "100",
                 minAmountB = "100"
             )
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
+            testAccount = horizonServer.accounts().account(testAccountId)
+            transaction = TransactionBuilder(
+                sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
                 network = network
             )
-                .addOperation(withdrawOp)
+                .addOperation(withdrawOpStrKey)
                 .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
                 .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
                 .build()
 
             transaction.sign(testAccountKeyPair)
-
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
-
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Liquidity pool withdraw should succeed")
+            response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+            assertTrue(response.successful, "Withdrawal with strkey-converted pool ID should succeed")
 
             delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Test with strkey format if applicable
-            if (!nonNativeLiquidityPoolId.startsWith("L")) {
-                val strKey = StrKey.encodeLiquidityPool(Util.hexToBytes(nonNativeLiquidityPoolId))
-                println("Withdrawing using StrKey: $strKey")
-
-                val sourceAccount2 = horizonServer.accounts().account(testAccountId)
-                val withdrawOp2 = LiquidityPoolWithdrawOperation(
-                    liquidityPoolId = nonNativeLiquidityPoolId,
-                    amount = "100",
-                    minAmountA = "100",
-                    minAmountB = "100"
-                )
-
-                val transaction2 = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount2.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(withdrawOp2)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-
-                transaction2.sign(testAccountKeyPair)
-                val response2 = horizonServer.submitTransaction(transaction2.toEnvelopeXdrBase64())
-                assertTrue(response2.successful, "Second withdraw should succeed")
-            }
         }
     }
 
@@ -676,302 +585,376 @@ class AMMIntegrationTest {
      * Test withdrawing assets from a native liquidity pool.
      *
      * This test:
-     * 1. Ensures the pool exists with deposits (creates it if needed)
-     * 2. Withdraws 1 pool share
-     * 3. Specifies minimum amounts for XLM and assetB
-     * 4. Verifies the transaction succeeds
+     * 1. Ensures deposits have been made to the pool
+     * 2. Withdraws 1 unit of pool shares
+     * 3. Verifies the withdrawal transaction succeeds
+     * 4. Tests XDR encoding/decoding
+     * 5. If pool ID is hex, also tests withdrawal with strkey format
+     * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testWithdrawNative() = runTest(timeout = 90.seconds) {
-        withTimeout(90_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
+    fun testWithdrawNative() = runTest(timeout = 120.seconds) {
+        // First make a deposit
+        testDepositNative()
 
-            // Ensure pool exists with deposits - create it if this test runs independently
-            if (nativeLiquidityPoolId.isEmpty()) {
-                val pool = com.soneso.stellar.sdk.LiquidityPool(AssetTypeNative, assetB)
-                nativeLiquidityPoolId = pool.getLiquidityPoolId()
+        delay(3000)
 
-                // Create the pool (trustline + first deposit)
-                val sourceAccount = horizonServer.accounts().account(testAccountId)
-                val changeTrustOp = ChangeTrustOperation(
-                    liquidityPool = pool,
-                    limit = ChangeTrustOperation.MAX_LIMIT
-                )
-                val depositOp = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nativeLiquidityPoolId,
-                    maxAmountA = "100.0",
-                    maxAmountB = "100.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-                val tx = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(changeTrustOp)
-                    .addOperation(depositOp)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-                tx.sign(testAccountKeyPair)
-                horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
-                delay(3000)
-            }
+        val testAccountId = testAccountKeyPair.getAccountId()
+        var testAccount = horizonServer.accounts().account(testAccountId)
 
-            println("Withdrawing from native pool: $nativeLiquidityPoolId")
+        println("Withdrawing from native pool ID: $nativeLiquidityPoolId")
 
-            val sourceAccount = horizonServer.accounts().account(testAccountId)
+        val withdrawOp = LiquidityPoolWithdrawOperation(
+            liquidityPoolId = nativeLiquidityPoolId,
+            amount = "1",
+            minAmountA = "1",
+            minAmountB = "1"
+        )
 
-            // Create liquidity pool withdraw operation
-            val withdrawOp = LiquidityPoolWithdrawOperation(
-                liquidityPoolId = nativeLiquidityPoolId,
+        var transaction = TransactionBuilder(
+            sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(withdrawOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(testAccountKeyPair)
+
+        // Verify XDR encoding/decoding
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val decodedTx = AbstractTransaction.fromEnvelopeXdr(envelope, network)
+        assertEquals(envelope, decodedTx.toEnvelopeXdrBase64(), "XDR encoding should be reversible")
+
+        var response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Liquidity pool withdrawal should succeed")
+
+        delay(3000)
+
+        // Verify operations and effects can be parsed
+        val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        // If pool ID is hex, also test with strkey format
+        if (!nativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
+
+            val withdrawOpStrKey = LiquidityPoolWithdrawOperation(
+                liquidityPoolId = hexFromStrKey,
                 amount = "1",
                 minAmountA = "1",
                 minAmountB = "1"
             )
 
-            val transaction = TransactionBuilder(
-                sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
+            testAccount = horizonServer.accounts().account(testAccountId)
+            transaction = TransactionBuilder(
+                sourceAccount = Account(testAccountId, testAccount.sequenceNumber),
                 network = network
             )
-                .addOperation(withdrawOp)
+                .addOperation(withdrawOpStrKey)
                 .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
                 .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
                 .build()
 
             transaction.sign(testAccountKeyPair)
-
-            // Verify XDR encoding/decoding
-            val envelope = transaction.toEnvelopeXdrBase64()
-            val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network)
-            assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "XDR round-trip should match")
-
-            val response = horizonServer.submitTransaction(envelope)
-            assertTrue(response.successful, "Native liquidity pool withdraw should succeed")
+            response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+            assertTrue(response.successful, "Withdrawal with strkey-converted pool ID should succeed")
 
             delay(3000)
-
-            // Verify operations and effects can be parsed
-            val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
-            assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
-
-            val effectsPage = horizonServer.effects().forAccount(testAccountId).execute()
-            assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
-
-            // Test with strkey format if applicable
-            if (!nativeLiquidityPoolId.startsWith("L")) {
-                val strKey = StrKey.encodeLiquidityPool(Util.hexToBytes(nativeLiquidityPoolId))
-                println("Withdrawing using StrKey: $strKey")
-
-                val sourceAccount2 = horizonServer.accounts().account(testAccountId)
-                val withdrawOp2 = LiquidityPoolWithdrawOperation(
-                    liquidityPoolId = nativeLiquidityPoolId,
-                    amount = "1",
-                    minAmountA = "1",
-                    minAmountB = "1"
-                )
-
-                val transaction2 = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount2.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(withdrawOp2)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-
-                transaction2.sign(testAccountKeyPair)
-                val response2 = horizonServer.submitTransaction(transaction2.toEnvelopeXdrBase64())
-                assertTrue(response2.successful, "Second native withdraw should succeed")
-            }
         }
     }
 
     /**
-     * Test liquidity pool query endpoints.
+     * Test comprehensive liquidity pool queries.
      *
      * This test:
      * 1. Queries effects for the liquidity pool
-     * 2. Verifies effect types (created, deposited, withdrew)
+     * 2. Verifies effect types (trustline created, pool created, deposited, withdrew)
      * 3. Queries transactions for the pool
      * 4. Queries operations for the pool
-     * 5. Queries liquidity pools by reserve assets
-     * 6. Queries liquidity pool by ID
-     * 7. Queries trades for the liquidity pool
-     * 8. Tests the forAccount query parameter on liquidity pools endpoint
-     *
-     * This comprehensive test ensures all Horizon endpoints work correctly.
+     * 5. Verifies operation types match expected sequence
+     * 6. Queries all liquidity pools
+     * 7. Queries specific pool by ID (hex and strkey)
+     * 8. Queries pools by reserve assets
+     * 9. Creates new accounts and executes path payment through pool
+     * 10. Queries trades for the pool
+     * 11. Tests forAccount query parameter
+     * 12. Verifies all query results can be parsed correctly
      */
     @Test
-    fun testLiquidityPoolQueries() = runTest(timeout = 90.seconds) {
-        withTimeout(120_000) {
-            val testAccountId = testAccountKeyPair.getAccountId()
+    fun testLiquidityPoolQueries() = runTest(timeout = 180.seconds) {
+        // First execute deposit and withdrawal to have data
+        testWithdrawNonNative()
 
-            // Ensure we have a pool with deposits to query
-            if (nonNativeLiquidityPoolId.isEmpty()) {
-                val pool = com.soneso.stellar.sdk.LiquidityPool(assetA, assetB)
-                nonNativeLiquidityPoolId = pool.getLiquidityPoolId()
+        delay(5000)
 
-                // Create the pool (trustline + first deposit)
-                val sourceAccount = horizonServer.accounts().account(testAccountId)
-                val changeTrustOp = ChangeTrustOperation(
-                    liquidityPool = pool,
-                    limit = ChangeTrustOperation.MAX_LIMIT
-                )
-                val depositOp = LiquidityPoolDepositOperation(
-                    liquidityPoolId = nonNativeLiquidityPoolId,
-                    maxAmountA = "100.0",
-                    maxAmountB = "100.0",
-                    minPrice = Price(1, 1),
-                    maxPrice = Price(2, 1)
-                )
-                val tx = TransactionBuilder(
-                    sourceAccount = Account(testAccountId, sourceAccount.sequenceNumber),
-                    network = network
-                )
-                    .addOperation(changeTrustOp)
-                    .addOperation(depositOp)
-                    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-                    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-                    .build()
-                tx.sign(testAccountKeyPair)
-                horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
-                delay(3000)
-            }
+        // Query effects for liquidity pool
+        val effectsPage = horizonServer.effects()
+            .forLiquidityPool(nonNativeLiquidityPoolId)
+            .limit(6)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            println("Querying pool: $nonNativeLiquidityPoolId")
+        val effects = effectsPage.records
+        assertEquals(6, effects.size, "Should have 6 effects")
+        assertTrue(effects[0] is TrustlineCreatedEffectResponse, "First effect should be trustline created")
+        assertTrue(effects[1] is LiquidityPoolCreatedEffectResponse, "Second effect should be pool created")
+        assertTrue(effects[2] is LiquidityPoolDepositedEffectResponse, "Third effect should be deposit")
+        assertTrue(effects[3] is LiquidityPoolDepositedEffectResponse, "Fourth effect should be deposit")
+        assertTrue(effects[4] is LiquidityPoolWithdrewEffectResponse, "Fifth effect should be withdrawal")
+        assertTrue(effects[5] is LiquidityPoolWithdrewEffectResponse, "Sixth effect should be withdrawal")
 
-            // Query effects for liquidity pool
-            val effectsPage = horizonServer.effects()
-                .forLiquidityPool(nonNativeLiquidityPoolId)
-                .limit(6)
-                .order(RequestBuilder.Order.ASC)
-                .execute()
+        // Query transactions for liquidity pool
+        val transactionsPage = horizonServer.transactions()
+            .forLiquidityPool(nonNativeLiquidityPoolId)
+            .limit(1)
+            .order(RequestBuilder.Order.DESC)
+            .execute()
 
-            val effects = effectsPage.records
-            assertTrue(effects.size >= 2, "Should have at least 2 effects (created + deposited)")
+        assertEquals(1, transactionsPage.records.size, "Should have 1 transaction")
+        val transaction = transactionsPage.records.first()
 
-            // Verify effect types
-            var hasCreated = false
-            var hasDeposited = false
-            var hasWithdrew = false
+        // Query effects for transaction
+        val txEffectsPage = horizonServer.effects()
+            .forTransaction(transaction.hash)
+            .limit(3)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            for (effect in effects) {
-                when (effect) {
-                    is LiquidityPoolCreatedEffectResponse -> hasCreated = true
-                    is LiquidityPoolDepositedEffectResponse -> hasDeposited = true
-                    is LiquidityPoolWithdrewEffectResponse -> hasWithdrew = true
-                    else -> {} // Ignore other effect types
-                }
-            }
+        assertTrue(txEffectsPage.records.isNotEmpty(), "Should have effects for transaction")
 
-            assertTrue(hasCreated || hasDeposited, "Should have created or deposited effects")
+        // Query operations for liquidity pool
+        val operationsPage = horizonServer.operations()
+            .forLiquidityPool(nonNativeLiquidityPoolId)
+            .limit(5)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            // Query transactions for liquidity pool
-            val transactionsPage = horizonServer.transactions()
-                .forLiquidityPool(nonNativeLiquidityPoolId)
-                .limit(1)
-                .order(RequestBuilder.Order.DESC)
-                .execute()
+        val operations = operationsPage.records
+        assertEquals(5, operations.size, "Should have 5 operations")
+        assertTrue(operations[0] is ChangeTrustOperationResponse, "First operation should be ChangeTrust")
+        assertTrue(operations[1] is LiquidityPoolDepositOperationResponse, "Second operation should be deposit")
+        assertTrue(operations[2] is LiquidityPoolDepositOperationResponse, "Third operation should be deposit")
+        assertTrue(operations[3] is LiquidityPoolWithdrawOperationResponse, "Fourth operation should be withdrawal")
+        assertTrue(operations[4] is LiquidityPoolWithdrawOperationResponse, "Fifth operation should be withdrawal")
 
-            assertTrue(transactionsPage.records.isNotEmpty(), "Should have transactions")
+        // Query all liquidity pools
+        val allPoolsPage = horizonServer.liquidityPools()
+            .limit(4)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
 
-            // Query operations for liquidity pool
-            val operationsPage = horizonServer.operations()
-                .forLiquidityPool(nonNativeLiquidityPoolId)
-                .limit(5)
-                .order(RequestBuilder.Order.ASC)
-                .execute()
+        assertTrue(allPoolsPage.records.size >= 2, "Should have at least 2 pools")
 
-            val operations = operationsPage.records
-            assertTrue(operations.isNotEmpty(), "Should have operations")
+        // Query specific pool by ID
+        var pool = horizonServer.liquidityPools().liquidityPool(nonNativeLiquidityPoolId)
+        assertEquals(30, pool.feeBp, "Pool fee should be 30 basis points")
+        assertEquals(nonNativeLiquidityPoolId, pool.id, "Pool ID should match")
 
-            // Verify operation types
-            var hasChangeTrust = false
-            var hasDeposit = false
-            var hasWithdraw = false
+        // If pool ID is hex, also test with strkey
+        if (!nonNativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nonNativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
 
-            for (operation in operations) {
-                when (operation) {
-                    is ChangeTrustOperationResponse -> hasChangeTrust = true
-                    is LiquidityPoolDepositOperationResponse -> hasDeposit = true
-                    is LiquidityPoolWithdrawOperationResponse -> hasWithdraw = true
-                    else -> {} // Ignore other operation types
-                }
-            }
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
 
-            assertTrue(hasDeposit, "Should have deposit operations")
-
-            // Query all liquidity pools
-            val poolsPage = horizonServer.liquidityPools()
-                .limit(4)
-                .order(RequestBuilder.Order.ASC)
-                .execute()
-
-            val pools = poolsPage.records
-            assertTrue(pools.isNotEmpty(), "Should have liquidity pools")
-
-            // Query specific liquidity pool by ID
-            val liquidityPool = horizonServer.liquidityPools().liquidityPool(nonNativeLiquidityPoolId)
-            assertEquals(30, liquidityPool.feeBp, "Pool fee should be 30 (0.3%)")
-            assertTrue(liquidityPool.id.isNotEmpty(), "Pool ID should not be empty")
-
-            // Test with strkey format if applicable
-            if (!nonNativeLiquidityPoolId.startsWith("L")) {
-                val strKey = StrKey.encodeLiquidityPool(Util.hexToBytes(nonNativeLiquidityPoolId))
-                println("Querying with StrKey: $strKey")
-
-                // Note: The endpoint might expect hex format, so this may not work
-                // This is documented as a limitation
-            }
-
-            // Query liquidity pools by reserve assets
-            val poolsByAssetsPage = horizonServer.liquidityPools()
-                .forReserves(assetA.toString(), assetB.toString())
-                .limit(4)
-                .order(RequestBuilder.Order.ASC)
-                .execute()
-
-            val poolsByAssets = poolsByAssetsPage.records
-            assertTrue(poolsByAssets.isNotEmpty(), "Should find pools by reserve assets")
-
-            // Test forAccount query parameter
-            val poolsForAccountPage = horizonServer.liquidityPools()
-                .forAccount(testAccountId)
-                .limit(10)
-                .execute()
-
-            // The request should succeed even if there are no pools
-            // If there are pools, verify they contain our created pools
-            if (poolsForAccountPage.records.isNotEmpty()) {
-                val poolIds = poolsForAccountPage.records.map { it.id }
-                println("Pools for account: $poolIds")
-            }
+            pool = horizonServer.liquidityPools().liquidityPool(hexFromStrKey)
+            assertEquals(30, pool.feeBp, "Pool fee should be 30 basis points")
+            assertEquals(nonNativeLiquidityPoolId, pool.id, "Pool ID should match")
         }
+
+        // Query pools by reserve assets
+        val poolsByReservesPage = horizonServer.liquidityPools()
+            .forReserves(
+                "${assetA.code}:${assetA.issuer}",
+                "${assetB.code}:${assetB.issuer}"
+            )
+            .limit(4)
+            .order(RequestBuilder.Order.ASC)
+            .execute()
+
+        assertTrue(poolsByReservesPage.records.isNotEmpty(), "Should find pools by reserves")
+        assertEquals(nonNativeLiquidityPoolId, poolsByReservesPage.records.first().id, "Should find our pool")
+
+        // Create new accounts for path payment test
+        val accXKeyPair = KeyPair.random()
+        val accYKeyPair = KeyPair.random()
+        val accXId = accXKeyPair.getAccountId()
+        val accYId = accYKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accXId)
+            FriendBot.fundTestnetAccount(accYId)
+        } else {
+            FriendBot.fundFuturenetAccount(accXId)
+            FriendBot.fundFuturenetAccount(accYId)
+        }
+
+        delay(5000)
+
+        // Create trustlines for new accounts
+        val changeTrustOp1 = ChangeTrustOperation(
+            asset = assetA,
+            limit = ChangeTrustOperation.MAX_LIMIT
+        )
+        changeTrustOp1.sourceAccount = accXId
+
+        val changeTrustOp2 = ChangeTrustOperation(
+            asset = assetB,
+            limit = ChangeTrustOperation.MAX_LIMIT
+        )
+        changeTrustOp2.sourceAccount = accYId
+
+        val accX = horizonServer.accounts().account(accXId)
+        var tx = TransactionBuilder(
+            sourceAccount = Account(accXId, accX.sequenceNumber),
+            network = network
+        )
+            .addOperation(changeTrustOp1)
+            .addOperation(changeTrustOp2)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        tx.sign(accXKeyPair)
+        tx.sign(accYKeyPair)
+        var response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "ChangeTrust operations should succeed")
+
+        delay(3000)
+
+        // Send assetA to accX
+        val paymentOp = PaymentOperation(
+            destination = accXId,
+            asset = assetA,
+            amount = "19999191"
+        )
+        paymentOp.sourceAccount = assetAIssuerKeyPair.getAccountId()
+
+        val assetAIssuerAccount = horizonServer.accounts().account(assetAIssuerKeyPair.getAccountId())
+        tx = TransactionBuilder(
+            sourceAccount = Account(assetAIssuerKeyPair.getAccountId(), assetAIssuerAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(paymentOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        tx.sign(assetAIssuerKeyPair)
+        response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Payment operation should succeed")
+
+        delay(3000)
+
+        // Execute path payment strict send through liquidity pool
+        val pathPaymentOp = PathPaymentStrictSendOperation(
+            sendAsset = assetA,
+            sendAmount = "10",
+            destination = accYId,
+            destAsset = assetB,
+            destMin = "1"
+        )
+
+        val accXReloaded = horizonServer.accounts().account(accXId)
+        tx = TransactionBuilder(
+            sourceAccount = Account(accXId, accXReloaded.sequenceNumber),
+            network = network
+        )
+            .addOperation(pathPaymentOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        tx.sign(accXKeyPair)
+        response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Path payment should succeed")
+
+        delay(3000)
+
+        // Query trades for liquidity pool
+        var tradesPage = horizonServer.trades()
+            .forLiquidityPool(nonNativeLiquidityPoolId)
+            .execute()
+
+        assertTrue(tradesPage.records.isNotEmpty(), "Should have trades")
+        val trade = tradesPage.records.first()
+        assertNotNull(trade.baseLiquidityPoolId, "Trade should have pool ID")
+        assertEquals(nonNativeLiquidityPoolId, trade.baseLiquidityPoolId!!, "Trade should reference pool")
+
+        // If pool ID is hex, also test trades query with strkey
+        if (!nonNativeLiquidityPoolId.startsWith("L")) {
+            val poolIdBytes = Util.hexToBytes(nonNativeLiquidityPoolId)
+            val strKey = StrKey.encodeLiquidityPool(poolIdBytes)
+
+            // Decode strkey back to hex
+            val decodedBytes = StrKey.decodeLiquidityPool(strKey)
+            val hexFromStrKey = Util.bytesToHex(decodedBytes).lowercase()
+
+            tradesPage = horizonServer.trades()
+                .forLiquidityPool(hexFromStrKey)
+                .execute()
+
+            assertTrue(tradesPage.records.isNotEmpty(), "Should have trades with strkey")
+            assertNotNull(tradesPage.records.first().baseLiquidityPoolId, "Trade should have pool ID")
+            assertEquals(nonNativeLiquidityPoolId, tradesPage.records.first().baseLiquidityPoolId!!,
+                "Trade should reference pool")
+        }
+
+        // Verify operations and effects can be parsed for new accounts
+        val accXOperationsPage = horizonServer.operations().forAccount(accXId).execute()
+        assertTrue(accXOperationsPage.records.isNotEmpty(), "Should have operations")
+
+        val accXEffectsPage = horizonServer.effects().forAccount(accXId).execute()
+        assertTrue(accXEffectsPage.records.isNotEmpty(), "Should have effects")
     }
 
     /**
-     * Test parsing liquidity pool result XDR.
+     * Test forAccount query parameter for liquidity pools.
      *
-     * This test verifies that the SDK can correctly parse liquidity pool
-     * operation results from XDR, including error cases.
-     *
-     * **Note**: This test is currently commented out because the SDK doesn't have
-     * a decodeTransactionResultXdr method. This should be added in a future update.
+     * This test:
+     * 1. Creates pool trustlines for the test account
+     * 2. Queries liquidity pools using forAccount parameter
+     * 3. Verifies the response contains expected pools
      */
     @Test
-    fun testParseLiquidityPoolResultXdr() {
-        // Test vector from Flutter SDK
-        val resultXdrBase64 = "AAAAAAAAAGT/////AAAAAQAAAAAAAAAW/////AAAAAA="
+    fun testForAccountQueryParameter() = runTest(timeout = 120.seconds) {
+        // First create pool trustlines
+        testCreatePoolShareTrustlineNonNative()
+        testCreatePoolShareTrustlineNative()
 
-        // TODO: Implement TransactionResult XDR decoding in SDK
-        // val resultXdr = TransactionResultXdr.fromXdrBase64(resultXdrBase64)
-        // assertNotNull(resultXdr, "Should decode result XDR")
+        delay(3000)
 
-        // This XDR represents a failed liquidity pool deposit operation
-        // The test verifies we can parse the result correctly
+        val testAccountId = testAccountKeyPair.getAccountId()
 
-        // For now, just verify the XDR string is valid base64
-        assertTrue(resultXdrBase64.isNotEmpty(), "Result XDR should not be empty")
+        // Execute the request with forAccount filter
+        val poolsPage = horizonServer.liquidityPools()
+            .forAccount(testAccountId)
+            .limit(10)
+            .execute()
+
+        // The request should succeed and return pools for our account
+        assertTrue(poolsPage.records.isNotEmpty(), "Should have pools for account")
+
+        // Verify that the pools include our created pools
+        val poolIds = poolsPage.records.map { it.id }
+        val hasNonNativePool = poolIds.contains(nonNativeLiquidityPoolId)
+        val hasNativePool = poolIds.contains(nativeLiquidityPoolId)
+
+        assertTrue(
+            hasNonNativePool || hasNativePool,
+            "Should contain at least one of our pools"
+        )
     }
 }

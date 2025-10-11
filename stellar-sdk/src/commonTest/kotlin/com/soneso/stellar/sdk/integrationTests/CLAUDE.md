@@ -36,7 +36,7 @@ test('test name', () async {
 KMP tests use:
 ```kotlin
 @Test
-fun testName() = runBlocking { // or runTest for unit tests
+fun testName() = runTest(timeout = 60.seconds) {
     // Test code
 }
 ```
@@ -53,7 +53,7 @@ fun testName() = runBlocking { // or runTest for unit tests
 
 | Flutter | Kotlin |
 |---------|--------|
-| `async { }` | `runBlocking { }` or `suspend fun` |
+| `async { }` | `runTest { }` or `suspend fun` |
 | `await someFunction()` | `someFunction()` (in suspend context) |
 | `Future.delayed(Duration(seconds: 3))` | `delay(3000)` |
 | `Future<T>` | `suspend fun(): T` |
@@ -135,7 +135,7 @@ All operations are already implemented. Common mappings:
 | `subscription.cancel()` | `stream.close()` |
 | Stream listener callback | `EventListener<T>` interface with `onEvent()` and `onFailure()` |
 
-**Important**: For streaming tests, use `runBlocking` instead of `runTest` because streaming requires real-time execution.
+**Important**: All integration tests should use `runTest(timeout = X.seconds)` with appropriate timeout values.
 
 ## Common Patterns
 
@@ -244,9 +244,11 @@ All crypto operations and network calls are `suspend` functions:
 - `FriendBot.fundTestnetAccount()`
 
 ### 3. Test Execution Context
-- **Unit tests with mocks**: Use `runTest` (virtual time)
-- **Integration tests with real network**: Use `runBlocking` (real time)
-- **Streaming tests**: MUST use `runBlocking` (real-time events)
+- **All tests (unit and integration)**: Use `runTest(timeout = X.seconds)`
+- **Simple tests**: Use `timeout = 60.seconds`
+- **Complex tests with multiple operations**: Use `timeout = 120.seconds`
+- **Streaming tests or setup methods**: Use `timeout = 180.seconds`
+- Never use `withTimeout()` inside `runTest()` - only use the timeout parameter
 
 ### 4. Network Configuration
 ```kotlin
@@ -347,7 +349,7 @@ class FeatureIntegrationTest {
      * 3. Step 3
      */
     @Test
-    fun testSomething() = runBlocking {
+    fun testSomething() = runTest(timeout = 60.seconds) {
         // Test implementation
     }
 }
@@ -388,22 +390,25 @@ try {
 ```
 
 ### 5. Timeouts
-Set appropriate timeouts:
+Set appropriate timeouts using the `timeout` parameter of `runTest`:
 ```kotlin
 @Test
-fun testSimpleOperation() = runBlocking {
-    withTimeout(30_000) { // 30 seconds
-        // Test code
-    }
+fun testSimpleOperation() = runTest(timeout = 60.seconds) {
+    // Test code
 }
 
 @Test
-fun testStreamingOperation() = runBlocking {
-    withTimeout(90_000) { // 90 seconds for streaming
-        // Test code
-    }
+fun testComplexOperation() = runTest(timeout = 120.seconds) {
+    // Test code with multiple network calls
+}
+
+@Test
+fun testStreamingOperation() = runTest(timeout = 180.seconds) {
+    // Test code with streaming or long-running operations
 }
 ```
+
+**Never nest `withTimeout()` inside `runTest()`** - this causes timeout conflicts.
 
 ## Debugging Tips
 
@@ -437,7 +442,7 @@ When porting a new integration test:
 - [ ] Identify all operations used
 - [ ] Verify KMP SDK has all required operations
 - [ ] Create test file in `integrationTests/` folder
-- [ ] Use `runBlocking` for real network tests
+- [ ] Use `runTest(timeout = X.seconds)` for all tests
 - [ ] Add FriendBot funding with delays
 - [ ] Convert async/await to suspend functions
 - [ ] Update type mappings (BigInt → Long, etc.)
@@ -446,6 +451,7 @@ When porting a new integration test:
 - [ ] Test operations and effects parsing
 - [ ] Add descriptive test documentation
 - [ ] Do NOT add @Ignore annotation
+- [ ] Never use `withTimeout()` inside `runTest()`
 - [ ] Run test to verify it passes
 - [ ] Update `INTEGRATION_TESTS_README.md` with new test
 
