@@ -13,14 +13,17 @@ The Flutter Stellar SDK (`/Users/chris/projects/Stellar/stellar_flutter_sdk/test
 - **Location**: `/Users/chris/projects/Stellar/stellar_flutter_sdk/test/`
 - **Common test files**:
   - `account_test.dart` - Account operations ✅ PORTED
+  - `sponsorship_test.dart` - Sponsorship operations ✅ PORTED
+  - `payment_test.dart` - Payment operations ✅ PORTED
+  - `fee_bump_transaction_test.dart` - Fee bump transactions ✅ PORTED
+  - `claimable_balances_test.dart` - Claimable balances ✅ PORTED
+  - `clawback_test.dart` - Clawback operations ✅ PORTED
   - `transaction_test.dart` - Transaction operations
   - `operations_test.dart` - Stellar operations
-  - `payment_test.dart` - Payment operations
   - `assets_test.dart` - Asset operations
   - `effects_test.dart` - Effects queries
   - `ledger_test.dart` - Ledger queries
   - `offers_test.dart` - Offers and trading
-  - `claimable_balances_test.dart` - Claimable balances
   - `liquidity_pools_test.dart` - Liquidity pools
   - `soroban_test.dart` - Soroban/smart contracts
 
@@ -472,6 +475,33 @@ When porting a new integration test:
    - Muxed accounts
    - Account data endpoint
    - Transaction streaming
+
+2. **SponsorshipIntegrationTest.kt** (1 test) - Based on `sponsorship_test.dart`
+   - BeginSponsoringFutureReserves operation
+   - EndSponsoringFutureReserves operation
+   - RevokeSponsorship operations (account, data, trustline, signer)
+   - Comprehensive sponsorship lifecycle testing
+   - Operations and effects parsing
+
+3. **PaymentsIntegrationTest.kt** (6 tests) - Based on `payment_test.dart`
+   - Native (XLM) payments
+   - Non-native asset payments
+   - Muxed accounts in payments
+   - Transaction preconditions
+   - Custom max operation fees
+
+4. **FeeBumpTransactionIntegrationTest.kt** (2 tests) - Based on `fee_bump_transaction_test.dart`
+   - Fee bump transactions with regular accounts
+   - Fee bump transactions with muxed accounts
+   - Inner transaction preservation
+
+5. **ClaimableBalanceIntegrationTest.kt** (tests) - Based on `claimable_balances_test.dart`
+   - Create and claim claimable balances
+   - Claimable balance queries
+
+6. **ClawbackIntegrationTest.kt** (tests) - Based on `clawback_test.dart`
+   - Clawback operations
+   - Clawback claimable balance operations
 
 ### Tests To Port
 
