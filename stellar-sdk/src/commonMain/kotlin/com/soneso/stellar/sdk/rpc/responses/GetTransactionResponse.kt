@@ -76,6 +76,82 @@ data class GetTransactionResponse(
     fun parseResultMetaXdr(): TransactionMetaXdr? {
         return resultMetaXdr?.let { TransactionMetaXdr.fromXdrBase64(it) }
     }
+
+    /**
+     * Extracts the WASM hash (ID) from an upload contract WASM transaction.
+     *
+     * This helper function parses the transaction metadata and extracts the WASM hash
+     * from the return value of a successful WASM upload operation.
+     *
+     * @return The WASM hash as a hex string (lowercase), or null if:
+     *         - The transaction is not a successful upload operation
+     *         - The resultMetaXdr is null
+     *         - The return value is not a bytes value
+     * @throws IllegalArgumentException if the XDR cannot be parsed
+     */
+    fun getWasmId(): String? {
+        val meta = parseResultMetaXdr() ?: return null
+
+        // Check if this is a V3 transaction meta (Soroban)
+        val v3Meta = when (meta) {
+            is TransactionMetaXdr.V3 -> meta.value
+            else -> return null
+        }
+
+        // Extract the return value from Soroban metadata
+        val sorobanMeta = v3Meta.sorobanMeta ?: return null
+        val returnValue = sorobanMeta.returnValue
+
+        // The WASM hash is returned as bytes
+        val scBytes = when (returnValue) {
+            is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes -> returnValue.value
+            else -> return null
+        }
+
+        // Convert to hex string (lowercase to match Java SDK)
+        return scBytes.value.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Extracts the created contract ID from a deploy contract transaction.
+     *
+     * This helper function parses the transaction metadata and extracts the contract ID
+     * from the return value of a successful contract deployment operation.
+     *
+     * @return The contract ID as a strkey-encoded string (starting with "C"), or null if:
+     *         - The transaction is not a successful deployment operation
+     *         - The resultMetaXdr is null
+     *         - The return value is not a contract address
+     * @throws IllegalArgumentException if the XDR cannot be parsed or contract address is invalid
+     */
+    fun getCreatedContractId(): String? {
+        val meta = parseResultMetaXdr() ?: return null
+
+        // Check if this is a V3 transaction meta (Soroban)
+        val v3Meta = when (meta) {
+            is TransactionMetaXdr.V3 -> meta.value
+            else -> return null
+        }
+
+        // Extract the return value from Soroban metadata
+        val sorobanMeta = v3Meta.sorobanMeta ?: return null
+        val returnValue = sorobanMeta.returnValue
+
+        // The contract ID is returned as an Address (SCAddress)
+        val address = when (returnValue) {
+            is com.soneso.stellar.sdk.xdr.SCValXdr.Address -> returnValue.value
+            else -> return null
+        }
+
+        // Extract the contract hash from the address
+        val contractId = when (address) {
+            is com.soneso.stellar.sdk.xdr.SCAddressXdr.ContractId -> address.value
+            else -> return null
+        }
+
+        // Encode to strkey format (C...)
+        return com.soneso.stellar.sdk.StrKey.encodeContract(contractId.value.value)
+    }
 }
 
 /**

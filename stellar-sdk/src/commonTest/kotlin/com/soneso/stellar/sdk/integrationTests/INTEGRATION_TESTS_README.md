@@ -82,60 +82,27 @@ FriendBot.fundFuturenetAccount(keypair.getAccountId())
 2. **FriendBot**: Testnet/futurenet must be accessible
 3. **Time**: Tests take longer than unit tests (3-10 seconds each)
 
-### All Tests Ignored by Default
+### Running Tests
 
-All integration tests are marked with `@Ignore` by default because they:
-- Require network access
-- Depend on external services (FriendBot, Horizon)
-- Take longer to execute
-- Can fail due to network issues
-
-### Option 1: Run Specific Test (Recommended)
-
-Remove `@Ignore` from ONE test at a time:
-
-```kotlin
-@Test
-// @Ignore("Integration test - requires testnet access")  // <- Comment this out
-fun testBumpSequence() = runTest { ... }
-```
-
-Then run:
-```bash
-# JVM
-./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest.testBumpSequence"
-
-# macOS
-./gradlew :stellar-sdk:macosArm64Test --tests "AccountIntegrationTest.testBumpSequence"
-
-# iOS Simulator
-./gradlew :stellar-sdk:iosSimulatorArm64Test --tests "AccountIntegrationTest.testBumpSequence"
-```
-
-### Option 2: Run All Tests in a File
-
-Remove `@Ignore` from ALL tests in the file, then:
+Integration tests automatically fund accounts via Friendbot and run without manual intervention. To run:
 
 ```bash
-# JVM
+# Run specific test class
 ./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest"
 
-# macOS
-./gradlew :stellar-sdk:macosArm64Test --tests "AccountIntegrationTest"
+# Run specific test method
+./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest.testBumpSequence"
 
-# Note: JS tests may need to be run individually (see CLAUDE.md for JS testing notes)
-```
-
-### Option 3: Run All Integration Tests
-
-Remove `@Ignore` from all tests in `integrationTests/` directory:
-
-```bash
-# JVM - Run all tests in package
+# Run all integration tests
 ./gradlew :stellar-sdk:jvmTest --tests "com.stellar.sdk.integrationTests.*"
 
-# macOS
-./gradlew :stellar-sdk:macosArm64Test --tests "com.stellar.sdk.integrationTests.*"
+# Run on macOS
+./gradlew :stellar-sdk:macosArm64Test --tests "AccountIntegrationTest"
+
+# Run on iOS Simulator
+./gradlew :stellar-sdk:iosSimulatorArm64Test --tests "AccountIntegrationTest"
+
+# Note: JS tests may need to be run individually (see CLAUDE.md for JS testing notes)
 ```
 
 ## Test Networks
@@ -389,12 +356,6 @@ jobs:
         with:
           java-version: '17'
 
-      - name: Remove @Ignore annotations
-        run: |
-          # Remove @Ignore from integration tests
-          find stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/integrationTests \
-            -name "*.kt" -exec sed -i 's/@Ignore/\/\/ @Ignore/g' {} +
-
       - name: Run integration tests
         run: ./gradlew :stellar-sdk:jvmTest --tests "com.stellar.sdk.integrationTests.*"
         timeout-minutes: 30
@@ -432,12 +393,12 @@ integration-tests:
 
 When adding new integration tests:
 
-1. **Add `@Ignore` annotation** by default
-2. **Document the test** in this README
-3. **Use descriptive names** that explain what's being tested
-4. **Add proper delays** after network operations
-5. **Handle errors gracefully** with meaningful assertions
-6. **Follow existing patterns** for consistency
+1. **Document the test** in this README
+2. **Use descriptive names** that explain what's being tested
+3. **Add proper delays** after network operations
+4. **Handle errors gracefully** with meaningful assertions
+5. **Follow existing patterns** for consistency
+6. **Use FriendBot for automatic account funding**
 7. **Test on multiple platforms** (JVM, JS, Native)
 
 ## Resources

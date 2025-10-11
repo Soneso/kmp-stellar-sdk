@@ -1600,6 +1600,86 @@ data class InvokeHostFunctionOperation(
                 auth = emptyList()
             )
         }
+
+        /**
+         * Creates an InvokeHostFunctionOperation for uploading contract WASM code.
+         *
+         * This operation installs contract code on the ledger and returns a WASM hash that can be
+         * used to deploy contract instances.
+         *
+         * @param wasmBytes The contract WASM code as a byte array
+         * @return An InvokeHostFunctionOperation for uploading the WASM
+         *
+         * ## Example
+         * ```kotlin
+         * val wasmBytes = File("contract.wasm").readBytes()
+         * val uploadOp = InvokeHostFunctionOperation.uploadContractWasm(wasmBytes)
+         * ```
+         */
+        fun uploadContractWasm(wasmBytes: ByteArray): InvokeHostFunctionOperation {
+            val hostFunction = HostFunctionXdr.Wasm(wasmBytes)
+            return InvokeHostFunctionOperation(
+                hostFunction = hostFunction,
+                auth = emptyList()
+            )
+        }
+
+        /**
+         * Creates an InvokeHostFunctionOperation for creating/deploying a contract.
+         *
+         * This operation deploys a contract instance from previously uploaded WASM code.
+         *
+         * @param wasmId The 32-byte hash of the uploaded WASM code (hex-encoded)
+         * @param address The address to use for deriving the contract ID
+         * @param salt Optional 32-byte salt for contract ID derivation (random if null)
+         * @return An InvokeHostFunctionOperation for creating the contract
+         *
+         * ## Example
+         * ```kotlin
+         * val wasmId = "abc123..."  // 64-character hex string
+         * val deployer = Address(deployerAccountId)
+         * val createOp = InvokeHostFunctionOperation.createContract(wasmId, deployer)
+         * ```
+         */
+        fun createContract(
+            wasmId: String,
+            address: Address,
+            salt: ByteArray? = null
+        ): InvokeHostFunctionOperation {
+            // Generate random salt if not provided
+            val actualSalt = salt ?: ByteArray(32).also {
+                // Use kotlin.random for consistent behavior across platforms
+                for (i in it.indices) {
+                    it[i] = kotlin.random.Random.nextBytes(1)[0]
+                }
+            }
+
+            require(actualSalt.size == 32) { "Salt must be 32 bytes, got ${actualSalt.size}" }
+            require(wasmId.length == 64) { "WASM ID must be 64 hex characters, got ${wasmId.length}" }
+
+            val wasmIdBytes = Util.hexToBytes(wasmId)
+
+            // Create the contract preimage
+            val fromAddress = ContractIDPreimageFromAddressXdr(
+                address = address.toSCAddress(),
+                salt = Uint256Xdr(actualSalt)
+            )
+
+            val preimage = ContractIDPreimageXdr.FromAddress(fromAddress)
+
+            // Create the contract args (using V2)
+            val createContractArgs = CreateContractArgsV2Xdr(
+                contractIdPreimage = preimage,
+                executable = ContractExecutableXdr.WasmHash(HashXdr(wasmIdBytes)),
+                constructorArgs = emptyList()  // No constructor arguments
+            )
+
+            val hostFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
+            return InvokeHostFunctionOperation(
+                hostFunction = hostFunction,
+                auth = emptyList()
+            )
+        }
     }
 }
 

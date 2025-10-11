@@ -4,6 +4,8 @@
 
 This directory contains comprehensive integration tests for **ContractClient** and **AssembledTransaction** that validate the complete contract invocation workflow against a live Stellar Testnet.
 
+**Note:** Integration tests always require network access and automatically fund test accounts via Friendbot. They are not marked with `@Ignore` and will run whenever tests are executed.
+
 ## Test Coverage
 
 ### Scenarios Tested
@@ -71,14 +73,7 @@ Ensure your environment can reach this endpoint.
 
 ### 2. Test Account Funding
 
-The tests generate a random keypair and require funding via Friendbot:
-
-```bash
-# The test will print the account ID, then fund it:
-curl "https://friendbot.stellar.org?addr=YOUR_ACCOUNT_ID"
-```
-
-**Note:** Each test run generates a new keypair, so you'll need to fund it before running tests.
+The tests automatically generate random keypairs and fund them via Friendbot. No manual funding is required.
 
 ### 3. Contract Deployment
 
@@ -109,34 +104,9 @@ To deploy your own contract:
 
 ## Running the Tests
 
-### Step 1: Remove @Ignore Annotation
+Integration tests require live network access and use Friendbot to automatically fund test accounts.
 
-By default, integration tests are ignored to prevent CI failures:
-
-```kotlin
-@Ignore // Remove this annotation to run integration tests
-class ContractClientIntegrationTest {
-```
-
-**Remove the `@Ignore` line** to enable tests.
-
-### Step 2: Fund Test Account
-
-Run the test once to see the generated account ID:
-
-```bash
-./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest" --info
-```
-
-Look for output like:
-```
-Test account: GABC123...
-Fund this account via: https://friendbot.stellar.org?addr=GABC123...
-```
-
-Fund the account using the provided URL.
-
-### Step 3: Run Tests
+### Run Tests
 
 ```bash
 # Run all integration tests
@@ -149,9 +119,9 @@ Fund the account using the provided URL.
 ./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest" --info
 ```
 
-### Step 4: Review Results
+### Review Results
 
-Tests will print detailed output:
+Tests will automatically fund accounts via Friendbot and print detailed output:
 ```
 === ContractClient Integration Test Setup ===
 Test account: GABC123...
@@ -236,18 +206,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Fund Test Account
-        run: |
-          # Generate keypair and fund via Friendbot
-          # (Implementation depends on your setup)
-
       - name: Run Integration Tests
         run: |
           ./gradlew :stellar-sdk:jvmTest \
-            --tests "ContractClientIntegrationTest" \
-            -PenableIntegrationTests=true
-        env:
-          TESTNET_ACCOUNT_SECRET: ${{ secrets.TESTNET_ACCOUNT_SECRET }}
+            --tests "ContractClientIntegrationTest"
 ```
 
 ### GitLab CI Example
@@ -500,10 +462,7 @@ The `testStreamTransactionsForAccount` test demonstrates SSE (Server-Sent Events
 
 ### 1. Test Account Funding
 
-Each test run requires a new funded account. Consider:
-- Reusing accounts across test runs
-- Implementing automatic Friendbot integration
-- Using a funded account pool
+Each test run generates a new keypair and automatically funds it via Friendbot. Tests may fail if Friendbot is unavailable or rate-limited.
 
 ### 2. Contract Deployment
 
@@ -538,27 +497,22 @@ The streaming test (`testStreamTransactionsForAccount`) requires:
 
 Potential improvements to integration tests:
 
-1. **Automated Account Funding**
-   - Integrate Friendbot calls into test setup
-   - Maintain account balance checks
-   - Auto-refund after tests
-
-2. **Contract Deployment Automation**
+1. **Contract Deployment Automation**
    - Deploy fresh contract per test run
    - Clean up after tests complete
    - Use contract deployment fixtures
 
-3. **Parallel Test Execution**
+2. **Parallel Test Execution**
    - Use separate accounts per test
    - Eliminate state conflicts
    - Reduce total test time
 
-4. **Network Mocking Option**
+3. **Network Mocking Option**
    - Provide mock network mode for CI
    - Record/replay network interactions
    - Faster feedback in development
 
-5. **Enhanced Error Reporting**
+4. **Enhanced Error Reporting**
    - Capture full transaction XDR
    - Log detailed simulation responses
    - Include network diagnostics
