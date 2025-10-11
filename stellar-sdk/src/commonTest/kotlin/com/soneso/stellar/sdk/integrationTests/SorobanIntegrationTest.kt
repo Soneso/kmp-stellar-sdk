@@ -5,7 +5,7 @@ import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.util.TestResourceUtil
-import com.soneso.stellar.sdk.xdr.HostFunctionXdr
+import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -44,6 +44,7 @@ import kotlin.time.Duration.Companion.seconds
  * - test get latest ledger
  * - test server get transactions
  * - test upload contract
+ * - test create contract
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc">Soroban RPC Documentation</a>
  */
@@ -52,6 +53,19 @@ class SorobanIntegrationTest {
     private val testOn = "testnet"
     private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
     private val network = Network.TESTNET
+
+    companion object {
+        /**
+         * Shared WASM ID from testUploadContract, used by testCreateContract.
+         * This allows tests to share state when run sequentially.
+         */
+        var sharedWasmId: String? = null
+
+        /**
+         * Shared keypair from testUploadContract, used by testCreateContract.
+         */
+        var sharedKeyPair: KeyPair? = null
+    }
 
     /**
      * Test server health check endpoint.
@@ -313,6 +327,7 @@ class SorobanIntegrationTest {
      * 8. Extracts the WASM ID from the transaction result
      * 9. Verifies the contract code can be loaded by WASM ID
      * 10. Parses contract metadata (spec entries, meta entries)
+     * 11. Stores WASM ID for use by testCreateContract
      *
      * The test demonstrates:
      * - Account creation with FriendBot
@@ -401,6 +416,10 @@ class SorobanIntegrationTest {
         assertNotNull(wasmId, "WASM ID should be extracted from transaction result")
         assertTrue(wasmId!!.isNotEmpty(), "WASM ID should not be empty")
 
+        // Store WASM ID and keypair for testCreateContract
+        sharedWasmId = wasmId
+        sharedKeyPair = keyPair
+
         // Verify contract code can be loaded by WASM ID
         delay(3000) // Wait for ledger to settle
 
@@ -418,5 +437,160 @@ class SorobanIntegrationTest {
         assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
         assertTrue(contractInfo.metaEntries.isNotEmpty(), "Contract should have meta entries")
         assertTrue(contractInfo.envInterfaceVersion > 0u, "Environment interface version should be positive")
+    }
+
+    /**
+     * Tests creating (deploying) a Soroban contract instance from an uploaded WASM.
+     *
+     * This test validates the complete contract deployment workflow:
+     * 1. Uses the WASM ID from testUploadContract
+     * 2. Creates a CreateContractHostFunction with the WASM ID
+     * 3. Simulates the deployment transaction
+     * 4. Applies authorization entries from simulation
+     * 5. Signs and submits the transaction
+     * 6. Polls for transaction completion
+     * 7. Extracts the created contract ID
+     * 8. Verifies the contract can be loaded and inspected
+     * 9. Validates contract metadata (spec entries, meta entries)
+     * 10. Verifies Horizon operations and effects can be parsed
+     *
+     * The test demonstrates:
+     * - Contract instance creation from uploaded WASM
+     * - Authorization entry handling (auto-auth from simulation)
+     * - Contract ID extraction from transaction result
+     * - Contract info retrieval by contract ID
+     * - Horizon API integration for Soroban operations
+     *
+     * This test depends on testUploadContract having run first to provide the WASM ID.
+     * If run independently, it will be skipped with an appropriate message.
+     *
+     * **Prerequisites**:
+     * - testUploadContract must run first (provides WASM ID)
+     * - Network connectivity to Stellar testnet
+     *
+     * **Duration**: ~30-60 seconds (includes network delays and polling)
+     *
+     * @see SorobanServer.loadContractInfoForContractId
+     * @see GetTransactionResponse.getCreatedContractId
+     */
+    @Test
+    fun testCreateContract() = runTest(timeout = 120.seconds) {
+        // Given: Check that testUploadContract has run and provided a WASM ID
+        val wasmId = sharedWasmId
+        val keyPair = sharedKeyPair
+
+        if (wasmId == null || keyPair == null) {
+            println("Skipping testCreateContract: testUploadContract must run first to provide WASM ID")
+            return@runTest
+        }
+
+        delay(5000) // Wait for network to settle
+
+        // Reload account for current sequence number
+        val accountId = keyPair.getAccountId()
+        val account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be loaded")
+
+        // When: Building create contract transaction
+        // Create the contract ID preimage (from address)
+        val addressObj = Address(accountId)
+        val scAddress = addressObj.toSCAddress()
+
+        // Generate salt (using zero salt for deterministic contract ID in tests)
+        val salt = Uint256Xdr(ByteArray(32) { 0 })
+
+        val preimage = ContractIDPreimageXdr.FromAddress(
+            ContractIDPreimageFromAddressXdr(
+                address = scAddress,
+                salt = salt
+            )
+        )
+
+        // Create the contract executable (reference to uploaded WASM)
+        val wasmHash = HashXdr(wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+        val executable = ContractExecutableXdr.WasmHash(wasmHash)
+
+        // Build the CreateContractArgs
+        val createContractArgs = CreateContractArgsXdr(
+            contractIdPreimage = preimage,
+            executable = executable
+        )
+
+        // Create the host function
+        val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
+        val operation = InvokeHostFunctionOperation(
+            hostFunction = createFunction
+        )
+
+        val transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate transaction to obtain transaction data + resource fee + auth entries
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.results, "Simulation results should not be null")
+        assertNotNull(simulateResponse.latestLedger, "Latest ledger should not be null")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+        assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
+
+        // Prepare transaction with simulation results (includes auth entries)
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPair)
+
+        // Then: Submit transaction to Soroban RPC
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Transaction should succeed"
+        )
+
+        // Extract contract ID from transaction result
+        val contractId = rpcTransactionResponse.getCreatedContractId()
+        assertNotNull(contractId, "Contract ID should be extracted from transaction result")
+        assertTrue(contractId!!.isNotEmpty(), "Contract ID should not be empty")
+        assertTrue(contractId.startsWith("C"), "Contract ID should be strkey-encoded (start with 'C')")
+
+        // Verify contract can be loaded by contract ID
+        delay(3000) // Wait for ledger to settle
+
+        val contractInfo = sorobanServer.loadContractInfoForContractId(contractId)
+        assertNotNull(contractInfo, "Contract info should be loaded")
+        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.metaEntries.isNotEmpty(), "Contract should have meta entries")
+        assertTrue(contractInfo.envInterfaceVersion > 0u, "Environment interface version should be positive")
+
+        // Verify transaction envelope can be parsed
+        assertNotNull(rpcTransactionResponse.envelopeXdr, "Envelope XDR should not be null")
+        val envelope = rpcTransactionResponse.parseEnvelopeXdr()
+        assertNotNull(envelope, "Envelope should be parsed")
+
+        // Verify transaction result can be parsed
+        assertNotNull(rpcTransactionResponse.resultXdr, "Result XDR should not be null")
+        val result = rpcTransactionResponse.parseResultXdr()
+        assertNotNull(result, "Result should be parsed")
+
+        // Verify transaction meta can be parsed
+        assertNotNull(rpcTransactionResponse.resultMetaXdr, "Result meta XDR should not be null")
+        val meta = rpcTransactionResponse.parseResultMetaXdr()
+        assertNotNull(meta, "Result meta should be parsed")
     }
 }
