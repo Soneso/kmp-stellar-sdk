@@ -4,6 +4,7 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.delay
@@ -23,6 +24,7 @@ import kotlin.time.Duration.Companion.seconds
  * - Latest ledger information
  * - Transaction history queries with pagination
  * - Contract upload and deployment
+ * - Contract invocation
  * - Contract information retrieval
  *
  * **Test Network**: All tests use Stellar testnet Soroban RPC server.
@@ -45,6 +47,7 @@ import kotlin.time.Duration.Companion.seconds
  * - test server get transactions
  * - test upload contract
  * - test create contract
+ * - test invoke contract
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc">Soroban RPC Documentation</a>
  */
@@ -62,9 +65,15 @@ class SorobanIntegrationTest {
         var sharedWasmId: String? = null
 
         /**
-         * Shared keypair from testUploadContract, used by testCreateContract.
+         * Shared keypair from testUploadContract, used by testCreateContract and testInvokeContract.
          */
         var sharedKeyPair: KeyPair? = null
+
+        /**
+         * Shared contract ID from testCreateContract, used by testInvokeContract.
+         * This is the deployed contract instance that can be invoked.
+         */
+        var sharedContractId: String? = null
     }
 
     /**
@@ -453,6 +462,7 @@ class SorobanIntegrationTest {
      * 8. Verifies the contract can be loaded and inspected
      * 9. Validates contract metadata (spec entries, meta entries)
      * 10. Verifies Horizon operations and effects can be parsed
+     * 11. Stores contract ID for use by testInvokeContract
      *
      * The test demonstrates:
      * - Contract instance creation from uploaded WASM
@@ -569,6 +579,9 @@ class SorobanIntegrationTest {
         assertTrue(contractId!!.isNotEmpty(), "Contract ID should not be empty")
         assertTrue(contractId.startsWith("C"), "Contract ID should be strkey-encoded (start with 'C')")
 
+        // Store contract ID for testInvokeContract
+        sharedContractId = contractId
+
         // Verify contract can be loaded by contract ID
         delay(3000) // Wait for ledger to settle
 
@@ -592,5 +605,151 @@ class SorobanIntegrationTest {
         assertNotNull(rpcTransactionResponse.resultMetaXdr, "Result meta XDR should not be null")
         val meta = rpcTransactionResponse.parseResultMetaXdr()
         assertNotNull(meta, "Result meta should be parsed")
+    }
+
+    /**
+     * Tests invoking a function on a deployed Soroban contract.
+     *
+     * This test validates the complete contract invocation workflow:
+     * 1. Uses the contract ID from testCreateContract
+     * 2. Prepares function arguments (symbol "friend" for hello contract)
+     * 3. Builds an InvokeContractHostFunction operation
+     * 4. Simulates the invocation transaction
+     * 5. Prepares the transaction with simulation results
+     * 6. Signs and submits the transaction
+     * 7. Polls for transaction completion
+     * 8. Extracts and validates the return value from the contract
+     * 9. Verifies the result matches expected output (["Hello", "friend"])
+     * 10. Validates transaction XDR encoding/decoding
+     *
+     * The test demonstrates:
+     * - Contract function invocation with parameters
+     * - SCVal argument construction using Scv helper
+     * - Transaction simulation and resource estimation
+     * - Return value extraction and parsing
+     * - Result validation against expected contract behavior
+     *
+     * This test depends on testCreateContract having run first to provide the contract ID.
+     * If run independently, it will be skipped with an appropriate message.
+     *
+     * The hello world contract has a "hello" function that takes a symbol parameter
+     * and returns a vector with two symbols: ["Hello", <parameter>].
+     *
+     * **Prerequisites**:
+     * - testCreateContract must run first (provides contract ID)
+     * - Network connectivity to Stellar testnet
+     *
+     * **Duration**: ~30-60 seconds (includes network delays and polling)
+     *
+     * **Reference**: Ported from Flutter SDK's test invoke contract
+     * (soroban_test.dart lines 521-634)
+     *
+     * @see InvokeHostFunctionOperation
+     * @see Scv.toSymbol
+     * @see GetTransactionResponse.getResultValue
+     */
+    @Test
+    fun testInvokeContract() = runTest(timeout = 120.seconds) {
+        // Given: Check that testCreateContract has run and provided a contract ID
+        val contractId = sharedContractId
+        val keyPair = sharedKeyPair
+
+        if (contractId == null || keyPair == null) {
+            println("Skipping testInvokeContract: testCreateContract must run first to provide contract ID")
+            return@runTest
+        }
+
+        delay(5000) // Wait for network to settle
+
+        // Load account for sequence number
+        val accountId = keyPair.getAccountId()
+        val account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be loaded")
+
+        // When: Building invoke contract transaction
+        // Prepare argument - the hello function takes a symbol parameter
+        val arg = Scv.toSymbol("friend")
+
+        // Build the invoke contract host function
+        val functionName = "hello"
+        val contractAddress = Address(contractId)
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = contractAddress.toSCAddress(),
+            functionName = SCSymbolXdr(functionName),
+            args = listOf(arg)
+        )
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+        val operation = InvokeHostFunctionOperation(
+            hostFunction = hostFunction
+        )
+
+        // Create transaction for invoking the contract
+        val transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate transaction to obtain transaction data + resource fee
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.results, "Simulation results should not be null")
+        assertNotNull(simulateResponse.latestLedger, "Latest ledger should not be null")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+        assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
+
+        // Prepare transaction with simulation results
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPair)
+
+        // Verify transaction XDR encoding and decoding round-trip
+        val transactionEnvelopeXdr = preparedTransaction.toEnvelopeXdrBase64()
+        assertEquals(
+            transactionEnvelopeXdr,
+            AbstractTransaction.fromEnvelopeXdr(transactionEnvelopeXdr, network).toEnvelopeXdrBase64(),
+            "Transaction XDR should round-trip correctly"
+        )
+
+        // Then: Send the transaction
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Transaction should succeed"
+        )
+
+        // Extract and validate the result value
+        val resVal = rpcTransactionResponse.getResultValue()
+        assertNotNull(resVal, "Result value should not be null")
+
+        // The hello contract returns a vec with two symbols: ["Hello", <parameter>]
+        assertTrue(resVal is SCValXdr.Vec, "Result should be a vector")
+        val vec = (resVal as SCValXdr.Vec).value?.value
+        assertNotNull(vec, "Vector should not be null")
+        assertEquals(2, vec.size, "Vector should have 2 elements")
+
+        // Verify the two symbols in the result
+        assertTrue(vec[0] is SCValXdr.Sym, "First element should be a symbol")
+        assertEquals("Hello", (vec[0] as SCValXdr.Sym).value.value, "First element should be 'Hello'")
+
+        assertTrue(vec[1] is SCValXdr.Sym, "Second element should be a symbol")
+        assertEquals("friend", (vec[1] as SCValXdr.Sym).value.value, "Second element should be 'friend'")
+
+        println("Contract invocation result: [${(vec[0] as SCValXdr.Sym).value.value}, ${(vec[1] as SCValXdr.Sym).value.value}]")
     }
 }

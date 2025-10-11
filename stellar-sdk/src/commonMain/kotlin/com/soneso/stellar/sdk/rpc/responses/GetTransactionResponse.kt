@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.rpc.responses
 
+import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanTransactionMetaXdr
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
 import com.soneso.stellar.sdk.xdr.TransactionMetaXdr
@@ -79,6 +80,41 @@ data class GetTransactionResponse(
     }
 
     /**
+     * Extracts the return value from a successful Soroban contract invocation.
+     *
+     * This helper function parses the transaction metadata and extracts the SCVal
+     * return value from a successful contract execution.
+     *
+     * @return The return value as an SCVal, or null if:
+     *         - The transaction was not successful
+     *         - The resultMetaXdr is null
+     *         - No return value is present
+     * @throws IllegalArgumentException if the XDR cannot be parsed
+     *
+     * ## Example Usage
+     * ```kotlin
+     * val response = sorobanServer.getTransaction(txHash)
+     * val resultValue = response.getResultValue()
+     *
+     * // For a vector return value
+     * if (resultValue is SCValXdr.Vec) {
+     *     val vec = resultValue.value?.value
+     *     // Process vector elements
+     * }
+     * ```
+     */
+    fun getResultValue(): SCValXdr? {
+        val meta = parseResultMetaXdr() ?: return null
+
+        // Extract return value from soroban metadata (V3 uses SorobanTransactionMetaXdr, V4 uses SorobanTransactionMetaV2Xdr)
+        return when (meta) {
+            is TransactionMetaXdr.V3 -> meta.value.sorobanMeta?.returnValue
+            is TransactionMetaXdr.V4 -> meta.value.sorobanMeta?.returnValue
+            else -> null
+        }
+    }
+
+    /**
      * Extracts the WASM hash (ID) from an upload contract WASM transaction.
      *
      * This helper function parses the transaction metadata and extracts the WASM hash
@@ -91,14 +127,7 @@ data class GetTransactionResponse(
      * @throws IllegalArgumentException if the XDR cannot be parsed
      */
     fun getWasmId(): String? {
-        val meta = parseResultMetaXdr() ?: return null
-
-        // Extract return value from soroban metadata (V3 uses SorobanTransactionMetaXdr, V4 uses SorobanTransactionMetaV2Xdr)
-        val returnValue = when (meta) {
-            is TransactionMetaXdr.V3 -> meta.value.sorobanMeta?.returnValue
-            is TransactionMetaXdr.V4 -> meta.value.sorobanMeta?.returnValue
-            else -> return null
-        } ?: return null
+        val returnValue = getResultValue() ?: return null
 
         // The WASM hash is returned as bytes
         return when (returnValue) {
@@ -122,14 +151,7 @@ data class GetTransactionResponse(
      * @throws IllegalArgumentException if the XDR cannot be parsed or contract address is invalid
      */
     fun getCreatedContractId(): String? {
-        val meta = parseResultMetaXdr() ?: return null
-
-        // Extract return value from soroban metadata (V3 uses SorobanTransactionMetaXdr, V4 uses SorobanTransactionMetaV2Xdr)
-        val returnValue = when (meta) {
-            is TransactionMetaXdr.V3 -> meta.value.sorobanMeta?.returnValue
-            is TransactionMetaXdr.V4 -> meta.value.sorobanMeta?.returnValue
-            else -> return null
-        } ?: return null
+        val returnValue = getResultValue() ?: return null
 
         // The contract ID is returned as an Address (SCAddress)
         val address = when (returnValue) {
