@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.rpc.responses
 
 import com.soneso.stellar.sdk.xdr.ContractEventXdr
 import com.soneso.stellar.sdk.xdr.DiagnosticEventXdr
+import com.soneso.stellar.sdk.xdr.TransactionEventXdr
 import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.Serializable
 
@@ -58,17 +59,19 @@ data class Events(
 
     /**
      * Parses the [transactionEventsXdr] field from a list of base64-encoded XDR strings
-     * to a list of typed ContractEvent objects.
+     * to a list of typed TransactionEvent objects.
      *
      * Transaction events are associated with the transaction as a whole rather than
-     * individual contract invocations.
+     * individual contract invocations. Each TransactionEvent contains:
+     * - stage: The stage at which the event occurred (e.g., during execution or finalization)
+     * - event: The actual ContractEvent data
      *
-     * @return A list of parsed ContractEvent XDR objects, or null if no transaction events exist.
+     * @return A list of parsed TransactionEvent XDR objects, or null if no transaction events exist.
      * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded.
      */
-    fun parseTransactionEventsXdr(): List<ContractEventXdr>? {
+    fun parseTransactionEventsXdr(): List<TransactionEventXdr>? {
         return transactionEventsXdr?.map { xdr ->
-            ContractEventXdr.fromXdrBase64(xdr)
+            TransactionEventXdr.fromXdrBase64(xdr)
         }
     }
 

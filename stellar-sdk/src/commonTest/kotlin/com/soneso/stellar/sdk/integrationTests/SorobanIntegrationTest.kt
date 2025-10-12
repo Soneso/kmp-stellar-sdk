@@ -1002,14 +1002,21 @@ class SorobanIntegrationTest {
                 assertNotNull(diagnosticEvents, "Diagnostic events should parse")
                 println("Parsed ${diagnosticEvents!!.size} diagnostic events")
             }
-            // Note: Skipping transaction events parsing due to XDR format issue
-            // 
-            //             // Parse transaction events (system-level events)
-            //             events.transactionEventsXdr?.let { txEventsXdrs ->
-            //                 val txEvents = events.parseTransactionEventsXdr()
-            //                 assertNotNull(txEvents, "Transaction events should parse")
-            //                 println("Parsed ${txEvents!!.size} transaction events")
-            //             }
+
+            // Parse transaction events (system-level events)
+            events.transactionEventsXdr?.let { txEventsXdrs ->
+                assertTrue(txEventsXdrs.isNotEmpty(), "Should have transaction events")
+                val txEvents = events.parseTransactionEventsXdr()
+                assertNotNull(txEvents, "Transaction events should parse")
+                println("Parsed ${txEvents!!.size} transaction events")
+
+                // Validate transaction event structure (contains stage + event)
+                txEvents.forEach { txEvent ->
+                    assertNotNull(txEvent.stage, "Transaction event should have stage")
+                    assertNotNull(txEvent.event, "Transaction event should have contract event")
+                    println("Transaction event at stage: ${txEvent.stage}")
+                }
+            }
 
             // Parse contract events (application-level events)
             events.contractEventsXdr?.let { contractEventsXdrs ->

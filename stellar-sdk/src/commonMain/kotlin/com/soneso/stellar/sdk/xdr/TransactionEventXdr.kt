@@ -3,6 +3,8 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlin.io.encoding.Base64
+
 /**
  * XDR Source:
  * struct TransactionEvent {
@@ -22,6 +24,13 @@ data class TransactionEventXdr(
       val stage = TransactionEventStageXdr.decode(reader)
       val event = ContractEventXdr.decode(reader)
       return TransactionEventXdr(stage, event)
+    }
+
+    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    fun fromXdrBase64(base64: String): TransactionEventXdr {
+      val bytes = Base64.decode(base64)
+      val reader = XdrReader(bytes)
+      return decode(reader)
     }
   }
 
