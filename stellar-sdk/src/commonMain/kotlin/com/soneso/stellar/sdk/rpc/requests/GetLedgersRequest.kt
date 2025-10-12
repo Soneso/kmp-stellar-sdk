@@ -5,20 +5,29 @@ import kotlinx.serialization.Serializable
 /**
  * Request for JSON-RPC method getLedgers.
  *
- * Fetches a list of ledgers starting from a specified ledger sequence.
+ * Fetches a list of ledgers starting from a specified ledger sequence or using cursor-based pagination.
  *
- * @property startLedger Ledger sequence number to start fetching ledgers from (inclusive).
+ * @property startLedger Ledger sequence number to start fetching ledgers from (inclusive). Optional when using cursor-based pagination.
  * @property pagination Optional pagination configuration for limiting and controlling result sets.
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference/methods/getLedgers">getLedgers documentation</a>
  */
 @Serializable
 data class GetLedgersRequest(
-    val startLedger: Long,
+    val startLedger: Long? = null,
     val pagination: Pagination? = null
 ) {
     init {
-        require(startLedger > 0) { "startLedger must be positive" }
+        // When using cursor-based pagination, startLedger should be omitted (null)
+        // When not using cursor, startLedger is required
+        if (pagination?.cursor == null && startLedger == null) {
+            throw IllegalArgumentException("startLedger must be provided when not using cursor-based pagination")
+        }
+
+        startLedger?.let {
+            require(it > 0) { "startLedger must be positive" }
+        }
+
         pagination?.let {
             it.limit?.let { limit ->
                 require(limit > 0) { "pagination.limit must be positive" }

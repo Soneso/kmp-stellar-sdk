@@ -5,6 +5,7 @@ import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.requests.GetEventsRequest
 import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
+import com.soneso.stellar.sdk.rpc.requests.GetLedgersRequest
 
 import com.soneso.stellar.sdk.rpc.responses.EventFilterType
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
@@ -31,6 +32,9 @@ import kotlin.time.Duration.Companion.seconds
  * - Contract invocation
  * - Contract information retrieval
  * - Contract events emission and querying
+ * - Ledger entries retrieval
+ * - Stellar Asset Contract (SAC) deployment
+ * - Footprint restoration (state restoration)
  *
  * **Test Network**: All tests use Stellar testnet Soroban RPC server.
  *
@@ -54,6 +58,10 @@ import kotlin.time.Duration.Companion.seconds
  * - test create contract
  * - test invoke contract
  * - test events
+ * - test get ledger entries
+ * - test deploy SAC with source account
+ * - test SAC with asset
+ * - test restore footprint
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc">Soroban RPC Documentation</a>
  */
@@ -77,10 +85,22 @@ class SorobanIntegrationTest {
         var sharedKeyPair: KeyPair? = null
 
         /**
-         * Shared contract ID from testCreateContract, used by testInvokeContract.
+         * Shared contract ID from testCreateContract, used by testInvokeContract and testGetLedgerEntries.
          * This is the deployed contract instance that can be invoked.
          */
         var sharedContractId: String? = null
+
+        /**
+         * Shared contract code (WASM bytes) from testUploadContract, used by testGetLedgerEntries.
+         * This is used to validate that loaded contract code matches the uploaded code.
+         */
+        var sharedContractCode: ByteArray? = null
+
+        /**
+         * Shared footprint from testCreateContract, used by testGetLedgerEntries.
+         * Contains ledger keys for contract code and contract data.
+         */
+        var sharedFootprint: LedgerFootprintXdr? = null
     }
 
     /**
@@ -328,6 +348,373 @@ class SorobanIntegrationTest {
             "Latest ledger should be >= oldest ledger"
         )
     }
+    /**
+     * Test basic getLedgers request with limit.
+     *
+     * This test verifies:
+     * 1. Server returns ledgers for a specified start ledger
+     * 2. Pagination limit is respected
+     * 3. Response includes all required fields (cursor, timestamps, etc.)
+     * 4. Ledger info structure is complete (hash, sequence, XDR data)
+     *
+     * The getLedgers RPC method is essential for retrieving historical ledger data
+     * with pagination support. This test validates the basic request/response flow.
+     *
+     * **Reference**: Ported from Flutter SDK's "test basic getLedgers request with limit"
+     * (soroban_test.dart lines 1047-1105)
+     */
+    @Test
+    fun testBasicGetLedgersWithLimit() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 100) currentLedger - 100 else 1
+
+        // When: Request ledgers with limit of 5
+        val pagination = GetLedgersRequest.Pagination(limit = 5)
+        val request = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination
+        )
+        val response = sorobanServer.getLedgers(request)
+
+        // Then: Validate response structure
+        assertNotNull(response.ledgers, "Ledgers list should not be null")
+        assertTrue(response.ledgers.isNotEmpty(), "Should return at least one ledger")
+        assertTrue(response.ledgers.size <= 5, "Should not exceed requested limit of 5")
+        assertNotNull(response.cursor, "Cursor should not be null")
+        assertTrue(response.latestLedger > 0, "Latest ledger should be greater than 0")
+        assertTrue(response.oldestLedger > 0, "Oldest ledger should be greater than 0")
+        assertNotNull(response.latestLedgerCloseTime, "Latest ledger close time should not be null")
+        assertNotNull(response.oldestLedgerCloseTime, "Oldest ledger close time should not be null")
+
+        // Verify ledger info structure
+        val firstLedger = response.ledgers.first()
+        assertTrue(firstLedger.hash.isNotEmpty(), "Ledger hash should not be empty")
+        assertTrue(firstLedger.sequence >= startLedger, "Ledger sequence should be >= start ledger")
+        assertTrue(firstLedger.ledgerCloseTime > 0, "Ledger close time should be positive")
+        assertTrue(firstLedger.headerXdr.isNotEmpty(), "Header XDR should not be empty")
+        assertTrue(firstLedger.metadataXdr.isNotEmpty(), "Metadata XDR should not be empty")
+    }
+
+    /**
+     * Test getLedgers pagination with cursor.
+     *
+     * This test verifies:
+     * 1. Cursor-based pagination works correctly
+     * 2. Second page can be requested using cursor from first page
+     * 3. StartLedger is omitted when using cursor (as per RPC spec)
+     * 4. Second page respects its own limit
+     *
+     * Cursor-based pagination is the recommended way to iterate through large
+     * sets of ledgers without repeating data or missing entries.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers pagination with cursor"
+     * (soroban_test.dart lines 1107-1149)
+     */
+    @Test
+    fun testGetLedgersPaginationWithCursor() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 100) currentLedger - 100 else 1
+
+        // When: First request to get a cursor
+        val firstPagination = GetLedgersRequest.Pagination(limit = 5)
+        val firstRequest = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = firstPagination
+        )
+        val firstResponse = sorobanServer.getLedgers(firstRequest)
+
+        assertNotNull(firstResponse.cursor, "First response cursor should not be null")
+
+        val cursor = firstResponse.cursor
+
+        // When: Second request using cursor (startLedger must be omitted when using cursor)
+        val secondPagination = GetLedgersRequest.Pagination(cursor = cursor, limit = 3)
+        val secondRequest = GetLedgersRequest(
+            pagination = secondPagination
+        )
+        val secondResponse = sorobanServer.getLedgers(secondRequest)
+
+        // Then: Validate the second response structure
+        assertNotNull(secondResponse.ledgers, "Second response ledgers should not be null")
+        if (secondResponse.ledgers.isNotEmpty()) {
+            assertTrue(
+                secondResponse.ledgers.size <= 3,
+                "Second page should not exceed requested limit of 3"
+            )
+        }
+        assertTrue(secondResponse.latestLedger > 0, "Latest ledger should be greater than 0")
+    }
+
+    /**
+     * Test getLedgers verifies ledger sequence ordering.
+     *
+     * This test verifies:
+     * 1. Ledgers are returned in ascending sequence order
+     * 2. No gaps in sequence numbers (consecutive)
+     * 3. Multiple ledgers can be retrieved and ordered correctly
+     *
+     * Ledger ordering is critical for applications that need to process
+     * ledgers sequentially or verify blockchain continuity.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers verifies ledger sequence ordering"
+     * (soroban_test.dart lines 1151-1179)
+     */
+    @Test
+    fun testGetLedgersSequenceOrdering() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 50) currentLedger - 50 else 1
+
+        // When: Request multiple ledgers
+        val pagination = GetLedgersRequest.Pagination(limit = 10)
+        val request = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination
+        )
+        val response = sorobanServer.getLedgers(request)
+
+        // Then: Verify ledgers are in ascending order
+        assertNotNull(response.ledgers, "Ledgers should not be null")
+        assertTrue(response.ledgers.size > 1, "Should have multiple ledgers to test ordering")
+
+        for (i in 1 until response.ledgers.size) {
+            assertTrue(
+                response.ledgers[i].sequence > response.ledgers[i - 1].sequence,
+                "Ledgers should be in ascending sequence order"
+            )
+        }
+    }
+
+    /**
+     * Test getLedgers without pagination options.
+     *
+     * This test verifies:
+     * 1. getLedgers works without explicit pagination options
+     * 2. Server uses default limit when pagination is omitted
+     * 3. Response still includes cursor for subsequent requests
+     * 4. At least one ledger is returned
+     *
+     * This validates that pagination is truly optional and the API
+     * provides sensible defaults for simple queries.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers without pagination options"
+     * (soroban_test.dart lines 1181-1206)
+     */
+    @Test
+    fun testGetLedgersWithoutPagination() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 100) currentLedger - 100 else 1
+
+        // When: Request without pagination options (should use default limit)
+        val request = GetLedgersRequest(startLedger = startLedger)
+        val response = sorobanServer.getLedgers(request)
+
+        // Then: Validate response
+        assertNotNull(response.ledgers, "Ledgers should not be null")
+        assertTrue(response.ledgers.isNotEmpty(), "Should return at least one ledger without pagination")
+        assertNotNull(response.cursor, "Cursor should not be null in unpaginated response")
+    }
+
+    /**
+     * Test getLedgers with different limits.
+     *
+     * This test verifies:
+     * 1. Limit of 1 returns exactly 1 ledger
+     * 2. Limit of 10 returns up to 10 ledgers
+     * 3. Response respects the specified limit in all cases
+     *
+     * This validates that the pagination limit parameter works correctly
+     * for various values, which is important for batching and rate limiting.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers with different limits"
+     * (soroban_test.dart lines 1208-1244)
+     */
+    @Test
+    fun testGetLedgersWithDifferentLimits() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 100) currentLedger - 100 else 1
+
+        // When: Test with limit of 1
+        val pagination1 = GetLedgersRequest.Pagination(limit = 1)
+        val request1 = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination1
+        )
+        val response1 = sorobanServer.getLedgers(request1)
+
+        // Then: Should return exactly 1 ledger
+        assertNotNull(response1.ledgers, "Ledgers should not be null")
+        assertEquals(1, response1.ledgers.size, "Should return exactly 1 ledger")
+
+        // When: Test with limit of 10
+        val pagination10 = GetLedgersRequest.Pagination(limit = 10)
+        val request10 = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination10
+        )
+        val response10 = sorobanServer.getLedgers(request10)
+
+        // Then: Should return up to 10 ledgers
+        assertNotNull(response10.ledgers, "Ledgers should not be null")
+        assertTrue(response10.ledgers.isNotEmpty(), "Should return at least one ledger")
+        assertTrue(response10.ledgers.size <= 10, "Should not exceed limit of 10")
+    }
+
+    /**
+     * Test getLedgers validates all response fields.
+     *
+     * This test verifies:
+     * 1. All top-level response fields are present and valid
+     * 2. All ledger info fields are present and valid for each ledger
+     * 3. Response structure is complete and consistent
+     *
+     * This comprehensive validation ensures that the response data structure
+     * matches the expected schema and all fields are properly populated.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers validates all response fields"
+     * (soroban_test.dart lines 1246-1286)
+     */
+    @Test
+    fun testGetLedgersValidatesAllFields() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine a valid start point
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val currentLedger = latestLedgerResponse.sequence
+        val startLedger = if (currentLedger > 50) currentLedger - 50 else 1
+
+        // When: Request ledgers
+        val pagination = GetLedgersRequest.Pagination(limit = 3)
+        val request = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination
+        )
+        val response = sorobanServer.getLedgers(request)
+
+        // Then: Validate all top-level response fields
+        assertNotNull(response.ledgers, "Ledgers should not be null")
+        assertNotNull(response.latestLedger, "Latest ledger should not be null")
+        assertNotNull(response.latestLedgerCloseTime, "Latest ledger close time should not be null")
+        assertNotNull(response.oldestLedger, "Oldest ledger should not be null")
+        assertNotNull(response.oldestLedgerCloseTime, "Oldest ledger close time should not be null")
+        assertNotNull(response.cursor, "Cursor should not be null")
+
+        // Validate ledger info fields for each ledger
+        response.ledgers.forEach { ledger ->
+            assertTrue(ledger.hash.isNotEmpty(), "Each ledger should have a hash")
+            assertTrue(ledger.sequence > 0, "Each ledger should have a valid sequence")
+            assertTrue(ledger.ledgerCloseTime > 0, "Each ledger should have a close time")
+            assertTrue(ledger.headerXdr.isNotEmpty(), "Each ledger should have headerXdr")
+            assertTrue(ledger.metadataXdr.isNotEmpty(), "Each ledger should have metadataXdr")
+        }
+    }
+
+    /**
+     * Test getLedgers error handling with invalid start ledger.
+     *
+     * This test verifies:
+     * 1. Server handles invalid start ledger gracefully
+     * 2. Error response or exception is provided for future ledgers
+     * 3. API validates input parameters
+     *
+     * Error handling is critical for robust applications that need to
+     * handle edge cases and invalid user input gracefully.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers error handling with invalid start ledger"
+     * (soroban_test.dart lines 1288-1313)
+     */
+    @Test
+    fun testGetLedgersErrorHandlingInvalidStartLedger() = runTest(timeout = 60.seconds) {
+        // Given: Get latest ledger to determine boundaries
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        // When: Try with a start ledger far in the future (invalid)
+        val invalidStartLedger = latestLedgerResponse.sequence + 1000000
+
+        val pagination = GetLedgersRequest.Pagination(limit = 5)
+        val request = GetLedgersRequest(
+            startLedger = invalidStartLedger,
+            pagination = pagination
+        )
+
+        // Then: Should handle error gracefully (either exception or error in response)
+        try {
+            val response = sorobanServer.getLedgers(request)
+            // If we get a response without exception, it should have empty ledgers
+            // or we should handle it appropriately based on the server's behavior
+            assertTrue(
+                response.ledgers.isEmpty(),
+                "Should have empty ledgers for invalid start ledger"
+            )
+        } catch (e: Exception) {
+            // It's acceptable to throw an exception for invalid start ledger
+            assertNotNull(e, "Should throw exception for invalid start ledger")
+        }
+    }
+
+    /**
+     * Test getLedgers with recent ledger.
+     *
+     * This test verifies:
+     * 1. getLedgers works with very recent ledger as start point
+     * 2. Recent ledger data is available and accessible
+     * 3. First ledger sequence matches or exceeds start ledger
+     *
+     * This validates that the API can handle requests for the most recent
+     * blockchain data, which is important for real-time applications.
+     *
+     * **Reference**: Ported from Flutter SDK's "test getLedgers with recent ledger"
+     * (soroban_test.dart lines 1315-1345)
+     */
+    @Test
+    fun testGetLedgersWithRecentLedger() = runTest(timeout = 60.seconds) {
+        // Given: Get the most recent ledger
+        val latestLedgerResponse = sorobanServer.getLatestLedger()
+        assertNotNull(latestLedgerResponse.sequence, "Latest ledger sequence should not be null")
+
+        val latestLedger = latestLedgerResponse.sequence
+
+        // When: Request starting from a very recent ledger
+        val startLedger = if (latestLedger > 10) latestLedger - 10 else 1
+
+        val pagination = GetLedgersRequest.Pagination(limit = 5)
+        val request = GetLedgersRequest(
+            startLedger = startLedger,
+            pagination = pagination
+        )
+        val response = sorobanServer.getLedgers(request)
+
+        // Then: Validate response
+        assertNotNull(response.ledgers, "Ledgers should not be null")
+        assertTrue(response.ledgers.isNotEmpty(), "Should return at least one recent ledger")
+
+        // Verify the first ledger sequence is at or after the start
+        assertTrue(
+            response.ledgers.first().sequence >= startLedger,
+            "First ledger should be at or after start ledger"
+        )
+    }
+
 
     /**
      * Tests uploading a Soroban contract WASM to the ledger.
@@ -343,7 +730,7 @@ class SorobanIntegrationTest {
      * 8. Extracts the WASM ID from the transaction result
      * 9. Verifies the contract code can be loaded by WASM ID
      * 10. Parses contract metadata (spec entries, meta entries)
-     * 11. Stores WASM ID for use by testCreateContract
+     * 11. Stores WASM ID, contract code for use by testCreateContract and testGetLedgerEntries
      *
      * The test demonstrates:
      * - Account creation with FriendBot
@@ -432,9 +819,10 @@ class SorobanIntegrationTest {
         assertNotNull(wasmId, "WASM ID should be extracted from transaction result")
         assertTrue(wasmId!!.isNotEmpty(), "WASM ID should not be empty")
 
-        // Store WASM ID and keypair for testCreateContract
+        // Store WASM ID, keypair, and contract code for later tests
         sharedWasmId = wasmId
         sharedKeyPair = keyPair
+        sharedContractCode = contractCode
 
         // Verify contract code can be loaded by WASM ID
         delay(3000) // Wait for ledger to settle
@@ -469,7 +857,7 @@ class SorobanIntegrationTest {
      * 8. Verifies the contract can be loaded and inspected
      * 9. Validates contract metadata (spec entries, meta entries)
      * 10. Verifies Horizon operations and effects can be parsed
-     * 11. Stores contract ID for use by testInvokeContract
+     * 11. Stores contract ID and footprint for use by testInvokeContract and testGetLedgerEntries
      *
      * The test demonstrates:
      * - Contract instance creation from uploaded WASM
@@ -477,6 +865,7 @@ class SorobanIntegrationTest {
      * - Contract ID extraction from transaction result
      * - Contract info retrieval by contract ID
      * - Horizon API integration for Soroban operations
+     * - Footprint extraction for ledger key queries
      *
      * This test depends on testUploadContract having run first to provide the WASM ID.
      * If run independently, it will be skipped with an appropriate message.
@@ -556,6 +945,11 @@ class SorobanIntegrationTest {
         assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
         assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
 
+        // Extract and store the footprint for testGetLedgerEntries
+        val transactionData = simulateResponse.parseTransactionData()
+        assertNotNull(transactionData, "Transaction data should be parsed")
+        sharedFootprint = transactionData!!.resources.footprint
+
         // Prepare transaction with simulation results (includes auth entries)
         val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
 
@@ -586,7 +980,7 @@ class SorobanIntegrationTest {
         assertTrue(contractId!!.isNotEmpty(), "Contract ID should not be empty")
         assertTrue(contractId.startsWith("C"), "Contract ID should be strkey-encoded (start with 'C')")
 
-        // Store contract ID for testInvokeContract
+        // Store contract ID for testInvokeContract and testGetLedgerEntries
         sharedContractId = contractId
 
         // Verify contract can be loaded by contract ID
@@ -758,6 +1152,94 @@ class SorobanIntegrationTest {
         assertEquals("friend", (vec[1] as SCValXdr.Sym).value.value, "Second element should be 'friend'")
 
         println("Contract invocation result: [${(vec[0] as SCValXdr.Sym).value.value}, ${(vec[1] as SCValXdr.Sym).value.value}]")
+    }
+
+    /**
+     * Tests retrieving ledger entries using the footprint from contract creation.
+     *
+     * This test validates ledger entry retrieval and contract code loading:
+     * 1. Uses the footprint from testCreateContract to extract ledger keys
+     * 2. Retrieves contract code ledger entry using the extracted key
+     * 3. Retrieves contract data ledger entry using the extracted key
+     * 4. Loads contract code by WASM ID and validates it matches uploaded code
+     * 5. Loads contract code by contract ID and validates it matches uploaded code
+     *
+     * The test demonstrates:
+     * - Extracting ledger keys from footprints (CONTRACT_CODE, CONTRACT_DATA)
+     * - Using getLedgerEntries RPC method with specific keys
+     * - Validating ledger entry responses
+     * - Loading and verifying contract code through multiple methods
+     *
+     * This test depends on testCreateContract having run first to provide the footprint,
+     * and testUploadContract for the WASM ID and contract code.
+     * If run independently, it will be skipped with an appropriate message.
+     *
+     * **Prerequisites**:
+     * - testUploadContract must run first (provides WASM ID and contract code)
+     * - testCreateContract must run first (provides footprint and contract ID)
+     * - Network connectivity to Stellar testnet
+     *
+     * **Duration**: ~10-20 seconds (includes network delays)
+     *
+     * **Reference**: Ported from Flutter SDK's test get ledger entries
+     * (soroban_test.dart lines 781-813)
+     *
+     * @see SorobanServer.getLedgerEntries
+     * @see SorobanServer.loadContractCodeForWasmId
+     * @see SorobanServer.loadContractCodeForContractId
+     */
+    @Test
+    fun testGetLedgerEntries() = runTest(timeout = 60.seconds) {
+        // Given: Check that testCreateContract and testUploadContract have run
+        val footprint = sharedFootprint
+        val wasmId = sharedWasmId
+        val contractId = sharedContractId
+        val contractCode = sharedContractCode
+
+        if (footprint == null || wasmId == null || contractId == null || contractCode == null) {
+            println("Skipping testGetLedgerEntries: testUploadContract and testCreateContract must run first")
+            return@runTest
+        }
+
+        // When: Extract contract code ledger key from footprint
+        val contractCodeKey = footprint.findFirstKeyOfType(LedgerEntryTypeXdr.CONTRACT_CODE)
+        assertNotNull(contractCodeKey, "Contract code ledger key should be found in footprint")
+
+        // When: Extract contract data ledger key from footprint
+        val contractDataKey = footprint.findFirstKeyOfType(LedgerEntryTypeXdr.CONTRACT_DATA)
+        assertNotNull(contractDataKey, "Contract data ledger key should be found in footprint")
+
+        // Then: Retrieve contract code entry using getLedgerEntries
+        val contractCodeEntries = sorobanServer.getLedgerEntries(listOf(contractCodeKey!!))
+        assertNotNull(contractCodeEntries.latestLedger, "Latest ledger should not be null")
+        assertNotNull(contractCodeEntries.entries, "Contract code entries should not be null")
+        assertEquals(1, contractCodeEntries.entries.size, "Should have exactly 1 contract code entry")
+
+        // Then: Retrieve contract data entry using getLedgerEntries
+        val contractDataEntries = sorobanServer.getLedgerEntries(listOf(contractDataKey!!))
+        assertNotNull(contractDataEntries.latestLedger, "Latest ledger should not be null")
+        assertNotNull(contractDataEntries.entries, "Contract data entries should not be null")
+        assertEquals(1, contractDataEntries.entries.size, "Should have exactly 1 contract data entry")
+
+        // Verify contract code can be loaded by WASM ID and matches uploaded code
+        val cCodeEntryByWasmId = sorobanServer.loadContractCodeForWasmId(wasmId)
+        assertNotNull(cCodeEntryByWasmId, "Contract code entry should be loaded by WASM ID")
+        assertContentEquals(
+            contractCode,
+            cCodeEntryByWasmId!!.code,
+            "Contract code loaded by WASM ID should match uploaded code"
+        )
+
+        // Verify contract code can be loaded by contract ID and matches uploaded code
+        val cCodeEntryByContractId = sorobanServer.loadContractCodeForContractId(contractId)
+        assertNotNull(cCodeEntryByContractId, "Contract code entry should be loaded by contract ID")
+        assertContentEquals(
+            contractCode,
+            cCodeEntryByContractId!!.code,
+            "Contract code loaded by contract ID should match uploaded code"
+        )
+
+        println("Ledger entries test completed successfully")
     }
 
     /**
@@ -940,7 +1422,7 @@ class SorobanIntegrationTest {
         // Step 5: Query emitted events using getEvents RPC
         // Try without topic filter first to see if any events exist
         println("Querying events for contract: $eventsContractId starting from ledger: $startLedger")
-        
+
         // Query a broader ledger range in case of off-by-one issues
         val queryStartLedger = maxOf(1L, startLedger - 5)
 
@@ -961,12 +1443,12 @@ class SorobanIntegrationTest {
 
         // Then: Validate events response
         assertNotNull(eventsResponse.events, "Events list should not be null")
-        
+
         println("Query returned ${eventsResponse.events.size} events")
         eventsResponse.events.forEach { evt ->
             println("Event: ledger=${evt.ledger}, contractId=${evt.contractId}, topics=${evt.topic.size}")
         }
-        
+
         assertTrue(eventsResponse.events.isNotEmpty(), "Should have at least one event")
         assertTrue(eventsResponse.latestLedger > 0, "Latest ledger should be positive")
 
@@ -1037,4 +1519,538 @@ class SorobanIntegrationTest {
 
         println("Events test completed successfully")
     }
+
+    /**
+     * Tests deploying a Stellar Asset Contract (SAC) using a source account.
+     *
+     * This test validates the SAC deployment workflow with account-based contract ID:
+     * 1. Creates and funds a test account via Friendbot
+     * 2. Builds a CreateContract operation with CONTRACT_ID_PREIMAGE_FROM_ADDRESS
+     * 3. Uses CONTRACT_EXECUTABLE_STELLAR_ASSET (native asset contract)
+     * 4. Simulates the transaction to get resource estimates and auth entries
+     * 5. Signs and submits the transaction to Soroban RPC
+     * 6. Polls for transaction completion
+     * 7. Verifies operations and effects can be parsed via Horizon
+     *
+     * The test demonstrates:
+     * - SAC deployment with account-based contract ID (from address + salt)
+     * - Using the STELLAR_ASSET executable type
+     * - Authorization handling for SAC deployment
+     * - Cross-referencing between Soroban RPC and Horizon
+     *
+     * Stellar Asset Contracts (SACs) are special contracts that wrap Stellar assets,
+     * allowing them to be used in Soroban smart contracts. This test deploys a SAC
+     * that represents the native asset (XLM).
+     *
+     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Duration**: ~30-60 seconds (includes network delays and polling)
+     *
+     * **Reference**: Ported from Flutter SDK's test deploy SAC with source account
+     * (soroban_test.dart lines 815-898)
+     *
+     * @see ContractIDPreimageXdr.FromAddress
+     * @see ContractExecutableXdr.Void (STELLAR_ASSET)
+     * @see InvokeHostFunctionOperation
+     */
+    @Test
+    fun testDeploySACWithSourceAccount() = runTest(timeout = 120.seconds) {
+        // Given: Create and fund test account
+        val keyPair = KeyPair.random()
+        val accountId = keyPair.getAccountId()
+
+        // Fund account via FriendBot
+        FriendBot.fundTestnetAccount(accountId)
+        delay(5000) // Wait for account creation
+
+        // Load account for sequence number
+        val account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be loaded")
+
+        // When: Building deploy SAC with source account transaction
+        // Create the contract ID preimage (from address)
+        val addressObj = Address(accountId)
+        val scAddress = addressObj.toSCAddress()
+
+        // Generate salt for deterministic contract ID
+        val salt = Uint256Xdr(ByteArray(32) { 0 })
+
+        val preimage = ContractIDPreimageXdr.FromAddress(
+            ContractIDPreimageFromAddressXdr(
+                address = scAddress,
+                salt = salt
+            )
+        )
+
+        // Use STELLAR_ASSET executable (native asset contract)
+        val executable = ContractExecutableXdr.Void
+
+        // Build the CreateContractArgs
+        val createContractArgs = CreateContractArgsXdr(
+            contractIdPreimage = preimage,
+            executable = executable
+        )
+
+        // Create the host function
+        val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
+        val operation = InvokeHostFunctionOperation(
+            hostFunction = createFunction
+        )
+
+        val transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate transaction to obtain transaction data + resource fee + auth entries
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.results, "Simulation results should not be null")
+        assertNotNull(simulateResponse.latestLedger, "Latest ledger should not be null")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+        assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
+
+        // Prepare transaction with simulation results (includes auth entries)
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPair)
+
+        // Verify transaction XDR encoding and decoding round-trip
+        val transactionEnvelopeXdr = preparedTransaction.toEnvelopeXdrBase64()
+        assertEquals(
+            transactionEnvelopeXdr,
+            AbstractTransaction.fromEnvelopeXdr(transactionEnvelopeXdr, network).toEnvelopeXdrBase64(),
+            "Transaction XDR should round-trip correctly"
+        )
+
+        // Then: Submit transaction to Soroban RPC
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Transaction should succeed"
+        )
+
+        // Wait for Horizon to process the transaction
+        delay(5000)
+
+        // Verify transaction meta can be parsed
+        assertNotNull(rpcTransactionResponse.resultMetaXdr, "Result meta XDR should not be null")
+        val meta = rpcTransactionResponse.parseResultMetaXdr()
+        assertNotNull(meta, "Result meta should be parsed")
+
+        // Verify operations and effects can be parsed via Horizon
+        val operationsPage = horizonServer.operations().forAccount(accountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(accountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        println("SAC deployed with source account successfully")
+    }
+
+    /**
+     * Tests deploying a Stellar Asset Contract (SAC) for a custom asset.
+     *
+     * This test validates the SAC deployment workflow for non-native assets:
+     * 1. Creates and funds two test accounts (A = trustor, B = issuer)
+     * 2. Creates a custom asset (Fsdk issued by account B)
+     * 3. Establishes a trustline from account A to the asset
+     * 4. Makes a payment of the asset to establish holdings
+     * 5. Deploys a SAC for the custom asset using CONTRACT_ID_PREIMAGE_FROM_ASSET
+     * 6. Uses CONTRACT_EXECUTABLE_STELLAR_ASSET for the asset contract
+     * 7. Simulates and submits the SAC deployment transaction
+     * 8. Polls for transaction completion
+     * 9. Verifies operations and effects can be parsed via Horizon
+     *
+     * The test demonstrates:
+     * - SAC deployment with asset-based contract ID (from asset)
+     * - Trustline establishment before SAC deployment
+     * - Asset payment workflow
+     * - Using the STELLAR_ASSET executable type for custom assets
+     * - Authorization handling for SAC deployment
+     * - Cross-referencing between Soroban RPC and Horizon
+     *
+     * Stellar Asset Contracts (SACs) enable custom Stellar assets to be used
+     * in Soroban smart contracts. This test deploys a SAC for a custom
+     * AlphaNum4 asset (Fsdk).
+     *
+     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Duration**: ~60-90 seconds (includes multiple transactions with polling)
+     *
+     * **Reference**: Ported from Flutter SDK's test SAC with asset
+     * (soroban_test.dart lines 900-1003)
+     *
+     * @see ContractIDPreimageXdr.FromAsset
+     * @see ContractExecutableXdr.Void (STELLAR_ASSET)
+     * @see ChangeTrustOperation
+     * @see PaymentOperation
+     * @see InvokeHostFunctionOperation
+     */
+    @Test
+    fun testSACWithAsset() = runTest(timeout = 150.seconds) {
+        // Given: Create and fund two test accounts
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val keyPairB = KeyPair.random()
+        val accountBId = keyPairB.getAccountId()
+
+        // Fund accounts via FriendBot
+        FriendBot.fundTestnetAccount(accountAId)
+        FriendBot.fundTestnetAccount(accountBId)
+        delay(5000) // Wait for account creation
+
+        // Create custom asset (Fsdk issued by account B)
+        val assetFsdk = AssetTypeCreditAlphaNum4("FSDK", accountBId)
+
+        // Step 1: Prepare trustline and payment
+        val accountB = sorobanServer.getAccount(accountBId)
+        assertNotNull(accountB, "Account B should be loaded")
+
+        // Build transaction with ChangeTrust and Payment operations
+        val changeTrustOp = ChangeTrustOperation(
+            asset = assetFsdk,
+            limit = "1000000"
+        )
+        changeTrustOp.sourceAccount = accountAId
+
+        val paymentOp = PaymentOperation(
+            destination = accountAId,
+            asset = assetFsdk,
+            amount = "200"
+        )
+
+        var transaction = TransactionBuilder(
+            sourceAccount = accountB,
+            network = network
+        )
+            .addOperation(changeTrustOp)
+            .addOperation(paymentOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Sign with both keypairs (A for trustline, B for payment)
+        transaction.sign(keyPairA)
+        transaction.sign(keyPairB)
+
+        // Submit trustline and payment transaction
+        val trustlineResponse = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+        assertTrue(trustlineResponse.successful, "Trustline and payment transaction should succeed")
+
+        delay(5000) // Wait for transaction to settle
+
+        // Step 2: Deploy SAC for the custom asset
+        val accountBReloaded = sorobanServer.getAccount(accountBId)
+        assertNotNull(accountBReloaded, "Account B should be reloaded")
+
+        // When: Building deploy SAC with asset transaction
+        // Create the contract ID preimage (from asset)
+        val assetXdr = assetFsdk.toXdr()
+        val preimage = ContractIDPreimageXdr.FromAsset(assetXdr)
+
+        // Use STELLAR_ASSET executable (asset contract)
+        val executable = ContractExecutableXdr.Void
+
+        // Build the CreateContractArgs
+        val createContractArgs = CreateContractArgsXdr(
+            contractIdPreimage = preimage,
+            executable = executable
+        )
+
+        // Create the host function
+        val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
+        val operation = InvokeHostFunctionOperation(
+            hostFunction = createFunction
+        )
+
+        transaction = TransactionBuilder(
+            sourceAccount = accountBReloaded,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate transaction to obtain transaction data + resource fee
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.results, "Simulation results should not be null")
+        assertNotNull(simulateResponse.latestLedger, "Latest ledger should not be null")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+        assertNotNull(simulateResponse.minResourceFee, "Min resource fee should not be null")
+
+        // Prepare transaction with simulation results
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPairB)
+
+        // Verify transaction XDR encoding and decoding round-trip
+        val transactionEnvelopeXdr = preparedTransaction.toEnvelopeXdrBase64()
+        assertEquals(
+            transactionEnvelopeXdr,
+            AbstractTransaction.fromEnvelopeXdr(transactionEnvelopeXdr, network).toEnvelopeXdrBase64(),
+            "Transaction XDR should round-trip correctly"
+        )
+
+        // Then: Submit transaction to Soroban RPC
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Transaction should succeed"
+        )
+
+        // Wait for Horizon to process the transaction
+        delay(5000)
+
+        // Verify transaction meta can be parsed
+        assertNotNull(rpcTransactionResponse.resultMetaXdr, "Result meta XDR should not be null")
+        val meta = rpcTransactionResponse.parseResultMetaXdr()
+        assertNotNull(meta, "Result meta should be parsed")
+
+        // Verify operations and effects can be parsed via Horizon
+        val operationsPage = horizonServer.operations().forAccount(accountAId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Account A should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(accountAId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Account A should have effects")
+
+        println("SAC deployed with custom asset successfully")
+    }
+
+    /**
+     * Tests restoring archived contract footprint (state restoration).
+     *
+     * This test validates the Soroban state restoration workflow:
+     * 1. Loads a contract WASM file
+     * 2. Creates an upload contract transaction
+     * 3. Simulates to get the footprint (which ledger entries need restoration)
+     * 4. Modifies the footprint: moves all readOnly keys to readWrite, clears readOnly
+     * 5. Creates a RestoreFootprintOperation
+     * 6. Builds a transaction with the modified footprint
+     * 7. Simulates the restore transaction to get proper resource fee
+     * 8. Signs and submits the restore transaction
+     * 9. Polls for transaction success
+     * 10. Verifies operations and effects can be parsed via Horizon
+     *
+     * The test demonstrates:
+     * - Footprint manipulation for restoration (readOnly → readWrite)
+     * - RestoreFootprintOperation usage
+     * - State restoration workflow for archived contract data
+     * - Soroban transaction data handling
+     * - Resource fee estimation for restoration
+     *
+     * Soroban has TTL (time-to-live) for contract state. When entries expire and get
+     * archived, they need to be restored before they can be accessed again. This test
+     * validates the restoration workflow by attempting to restore the footprint of
+     * a contract upload operation.
+     *
+     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Duration**: ~30-60 seconds (includes network delays and polling)
+     *
+     * **Reference**: Ported from Flutter SDK's test restore footprint
+     * (soroban_test.dart lines 68-148 and 516-519)
+     *
+     * @see RestoreFootprintOperation
+     * @see SorobanTransactionDataXdr
+     * @see LedgerFootprintXdr
+     */
+    @Test
+    fun testRestoreFootprint() = runTest(timeout = 120.seconds) {
+        // Test with hello world contract
+        restoreContractFootprint("soroban_hello_world_contract.wasm")
+
+        // Test with events contract
+        restoreContractFootprint("soroban_events_contract.wasm")
+
+        println("Restore footprint test completed successfully")
+    }
+
+    /**
+     * Helper function to restore contract footprint for a given contract WASM file.
+     *
+     * This function:
+     * 1. Creates and funds a test account
+     * 2. Loads the specified contract WASM
+     * 3. Simulates an upload to get the footprint
+     * 4. Modifies footprint (readOnly → readWrite)
+     * 5. Creates and executes a restore transaction
+     *
+     * @param contractWasmFile The WASM file name in test resources
+     */
+    private suspend fun restoreContractFootprint(contractWasmFile: String) {
+        delay(5000) // Wait between tests
+
+        // Given: Create and fund test account
+        val keyPair = KeyPair.random()
+        val accountId = keyPair.getAccountId()
+
+        FriendBot.fundTestnetAccount(accountId)
+        delay(5000) // Wait for account creation
+
+        // Load account
+        var account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be loaded")
+
+        // Load contract WASM file
+        val contractCode = TestResourceUtil.readWasmFile(contractWasmFile)
+        assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
+
+        // When: Create upload transaction to get footprint
+        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
+        val uploadOperation = InvokeHostFunctionOperation(hostFunction = uploadFunction)
+
+        var transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(uploadOperation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        // Simulate first to obtain the transaction data + footprint
+        var simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Simulation should not have error")
+        assertNotNull(simulateResponse.transactionData, "Transaction data should not be null")
+
+        // Extract and modify the footprint: move readOnly to readWrite
+        val transactionData = simulateResponse.parseTransactionData()
+        assertNotNull(transactionData, "Transaction data should be parsed")
+
+        val originalFootprint = transactionData!!.resources.footprint
+        val modifiedFootprint = LedgerFootprintXdr(
+            readOnly = emptyList(), // Clear readOnly
+            readWrite = originalFootprint.readOnly + originalFootprint.readWrite // Combine all keys into readWrite
+        )
+
+        // Create modified transaction data with the new footprint
+        val modifiedTransactionData = SorobanTransactionDataXdr(
+            ext = transactionData.ext,
+            resources = SorobanResourcesXdr(
+                footprint = modifiedFootprint,
+                instructions = transactionData.resources.instructions,
+                diskReadBytes = transactionData.resources.diskReadBytes,
+                writeBytes = transactionData.resources.writeBytes
+            ),
+            resourceFee = transactionData.resourceFee
+        )
+
+        // Reload account for current sequence number
+        account = sorobanServer.getAccount(accountId)
+        assertNotNull(account, "Account should be reloaded")
+
+        // Then: Build restore transaction
+        val restoreOperation = RestoreFootprintOperation()
+        transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(restoreOperation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .setSorobanData(modifiedTransactionData)
+            .build()
+
+        // Simulate restore transaction to obtain proper resource fee
+        simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Restore simulation should not have error")
+        assertNotNull(simulateResponse.transactionData, "Restore simulation should return transaction data")
+        assertNotNull(simulateResponse.minResourceFee, "Restore simulation should return min resource fee")
+
+        // Prepare transaction with simulation results
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+
+        // Sign transaction
+        preparedTransaction.sign(keyPair)
+
+        // Verify transaction XDR encoding and decoding round-trip
+        val transactionEnvelopeXdr = preparedTransaction.toEnvelopeXdrBase64()
+        assertEquals(
+            transactionEnvelopeXdr,
+            AbstractTransaction.fromEnvelopeXdr(transactionEnvelopeXdr, network).toEnvelopeXdrBase64(),
+            "Transaction XDR should round-trip correctly"
+        )
+
+        // Send transaction to soroban RPC server
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash, "Transaction hash should not be null")
+        assertNotNull(sendResponse.status, "Transaction status should not be null")
+
+        // Poll for transaction completion
+        val rpcTransactionResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash!!,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(
+            GetTransactionStatus.SUCCESS,
+            rpcTransactionResponse.status,
+            "Restore transaction should succeed"
+        )
+
+        // Verify operations and effects can be parsed via Horizon
+        delay(3000) // Wait for Horizon to process
+
+        val operationsPage = horizonServer.operations().forAccount(accountId).execute()
+        assertTrue(operationsPage.records.isNotEmpty(), "Should have operations")
+
+        val effectsPage = horizonServer.effects().forAccount(accountId).execute()
+        assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+
+        println("Restored footprint for $contractWasmFile successfully")
+    }
+}
+
+/**
+ * Extension function to find the first ledger key of a specific type in a footprint.
+ *
+ * Searches through both readOnly and readWrite keys in the footprint
+ * and returns the first key matching the specified ledger entry type.
+ *
+ * @param type The type of ledger entry to find (e.g., CONTRACT_CODE, CONTRACT_DATA)
+ * @return The first matching ledger key, or null if not found
+ */
+private fun LedgerFootprintXdr.findFirstKeyOfType(type: LedgerEntryTypeXdr): LedgerKeyXdr? {
+    // Search in readOnly keys
+    for (key in readOnly) {
+        if (key.discriminant == type) {
+            return key
+        }
+    }
+    // Search in readWrite keys
+    for (key in readWrite) {
+        if (key.discriminant == type) {
+            return key
+        }
+    }
+    return null
 }

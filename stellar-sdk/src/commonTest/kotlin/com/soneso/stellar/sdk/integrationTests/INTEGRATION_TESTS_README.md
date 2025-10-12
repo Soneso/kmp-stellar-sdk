@@ -74,6 +74,69 @@ FriendBot.fundTestnetAccount(keypair.getAccountId())
 FriendBot.fundFuturenetAccount(keypair.getAccountId())
 ```
 
+### SorobanIntegrationTest.kt
+
+Comprehensive tests for Soroban RPC server operations against live testnet:
+
+| Test | Description | RPC Methods Tested |
+|------|-------------|-------------------|
+| `testServerHealth` | Server health check and ledger retention | getHealth |
+| `testServerVersionInfo` | RPC server version information | getVersionInfo |
+| `testServerFeeStats` | Fee statistics for Soroban operations | getFeeStats |
+| `testNetworkRequest` | Network configuration and passphrase | getNetwork |
+| `testGetLatestLedger` | Latest ledger information | getLatestLedger |
+| `testServerGetTransactions` | Transaction history queries with pagination | getTransactions |
+| `testBasicGetLedgersWithLimit` | Basic getLedgers request with pagination limit | getLedgers |
+| `testGetLedgersPaginationWithCursor` | Cursor-based pagination for ledgers | getLedgers |
+| `testGetLedgersSequenceOrdering` | Verifies ledgers are returned in ascending order | getLedgers |
+| `testGetLedgersWithoutPagination` | getLedgers with default pagination | getLedgers |
+| `testGetLedgersWithDifferentLimits` | Tests various pagination limits | getLedgers |
+| `testGetLedgersValidatesAllFields` | Comprehensive response field validation | getLedgers |
+| `testGetLedgersErrorHandlingInvalidStartLedger` | Error handling for invalid parameters | getLedgers |
+| `testGetLedgersWithRecentLedger` | Retrieves very recent ledger data | getLedgers |
+| `testUploadContract` | Upload Soroban contract WASM | simulateTransaction, sendTransaction |
+| `testCreateContract` | Deploy Soroban contract instance | simulateTransaction, sendTransaction |
+| `testInvokeContract` | Invoke Soroban contract function | simulateTransaction, sendTransaction |
+| `testGetLedgerEntries` | Retrieve ledger entries by key | getLedgerEntries |
+| `testEvents` | Contract events emission and querying | getEvents |
+| `testDeploySACWithSourceAccount` | Deploy Stellar Asset Contract (native) | simulateTransaction, sendTransaction |
+| `testSACWithAsset` | Deploy Stellar Asset Contract (custom asset) | simulateTransaction, sendTransaction |
+
+**GetLedgers Test Suite Details**:
+
+All `getLedgers` tests were ported from the Flutter Stellar SDK to ensure feature parity and validate the getLedgers RPC method:
+
+1. **testBasicGetLedgersWithLimit**: Tests basic ledger retrieval with pagination, validates response structure (cursor, timestamps, ledger info with hash/sequence/XDR)
+2. **testGetLedgersPaginationWithCursor**: Validates cursor-based pagination where startLedger is omitted when using cursor
+3. **testGetLedgersSequenceOrdering**: Ensures ledgers are returned in ascending sequence order for blockchain continuity
+4. **testGetLedgersWithoutPagination**: Tests that pagination is optional and server provides sensible defaults
+5. **testGetLedgersWithDifferentLimits**: Verifies pagination limit parameter works for various values (1, 10)
+6. **testGetLedgersValidatesAllFields**: Comprehensive validation of all response fields (top-level and ledger info)
+7. **testGetLedgersErrorHandlingInvalidStartLedger**: Tests graceful error handling for invalid start ledger (future ledger)
+8. **testGetLedgersWithRecentLedger**: Validates retrieval of very recent ledger data for real-time applications
+
+**Reference**: All getLedgers tests ported from Flutter SDK's `soroban_test.dart` (lines 1047-1345)
+
+**Soroban Contract Workflow Tests**:
+
+The contract tests demonstrate the complete Soroban smart contract lifecycle:
+
+- **Upload**: Load WASM from resources → simulate → sign → submit → poll → extract WASM ID
+- **Deploy**: Create contract from WASM ID → handle authorization → extract contract ID
+- **Invoke**: Call contract function → pass parameters → parse return values
+- **Events**: Query contract events by ID → validate topics and values
+- **Ledger Entries**: Retrieve contract code and data using ledger keys from footprint
+
+**Stellar Asset Contract (SAC) Tests**:
+
+- **Native Asset**: Deploy SAC for XLM using CONTRACT_ID_PREIMAGE_FROM_ADDRESS
+- **Custom Asset**: Create trustline → establish holdings → deploy SAC using CONTRACT_ID_PREIMAGE_FROM_ASSET
+
+**Test Duration**: ~90-120 seconds for full contract tests (includes network delays and polling)
+
+**Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
+
+
 ## Running Integration Tests
 
 ### Prerequisites
