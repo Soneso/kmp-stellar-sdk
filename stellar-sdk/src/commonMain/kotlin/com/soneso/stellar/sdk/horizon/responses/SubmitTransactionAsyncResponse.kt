@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.horizon.responses
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Represents the response from the "Submit a Transaction Asynchronously" endpoint of Horizon API.
@@ -12,6 +13,7 @@ import kotlinx.serialization.Serializable
  * @property hash The transaction hash
  * @property txStatus The status of the transaction submission
  * @property errorResultXdr The XDR-encoded TransactionResult (only present if status is ERROR)
+ * @property httpResponseCode The HTTP status code of the response (201, 409, 400, etc.)
  *
  * @see <a href="https://developers.stellar.org/docs/data/horizon/api-reference/submit-async-transaction">Submit Transaction Asynchronously</a>
  */
@@ -24,7 +26,10 @@ data class SubmitTransactionAsyncResponse(
     val txStatus: TransactionStatus,
 
     @SerialName("error_result_xdr")
-    val errorResultXdr: String? = null
+    val errorResultXdr: String? = null,
+
+    @Transient
+    var httpResponseCode: Int = 0
 ) : Response() {
 
     /**

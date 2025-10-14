@@ -441,12 +441,17 @@ class HorizonServer(
      * in Horizon, this endpoint relays the response from Stellar Core directly back to the user.
      * This is useful for fire-and-forget scenarios or when you want to poll for results separately.
      *
+     * The async endpoint has different HTTP status code semantics:
+     * - HTTP 201: Transaction submitted successfully (PENDING status)
+     * - HTTP 409: Duplicate transaction (DUPLICATE status)
+     * - HTTP 400: Either a validation error (ERROR status with error_result_xdr) or malformed request
+     *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check
      * @return [com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse] containing the submission status
      * @throws com.soneso.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when skipMemoRequiredCheck is false and a transaction is trying to submit an operation to an account which requires a memo
      * @throws com.soneso.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
-     * @throws com.soneso.stellar.sdk.horizon.exceptions.BadRequestException if the request fails due to a bad request (4xx)
+     * @throws com.soneso.stellar.sdk.horizon.exceptions.BadRequestException if the request is truly malformed (cannot be parsed as valid response)
      * @throws com.soneso.stellar.sdk.horizon.exceptions.BadResponseException if the request fails due to a bad response from the server (5xx)
      * @throws com.soneso.stellar.sdk.horizon.exceptions.TooManyRequestsException if the request fails due to too many requests sent to the server
      * @throws com.soneso.stellar.sdk.horizon.exceptions.RequestTimeoutException when Horizon returns a Timeout or connection timeout occurred
@@ -463,15 +468,111 @@ class HorizonServer(
             sep29Checker.checkMemoRequired(transactionEnvelopeXdr)
         }
 
-        return executePostRequest(
-            client = submitHttpClient,
-            url = URLBuilder(serverUri).apply {
+        // Custom HTTP handling for async transaction submission
+        // HTTP status codes have different semantics for this endpoint:
+        // - 201: PENDING (success)
+        // - 409: DUPLICATE (success, already submitted)
+        // - 400: Either ERROR (with valid JSON) or malformed (invalid JSON)
+        return try {
+            val response = submitHttpClient.post(URLBuilder(serverUri).apply {
                 appendPathSegments("transactions_async")
-            }.build(),
-            formParameters = io.ktor.http.parameters {
-                append("tx", transactionEnvelopeXdr)
+            }.build()) {
+                setBody(io.ktor.client.request.forms.FormDataContent(
+                    io.ktor.http.parameters {
+                        append("tx", transactionEnvelopeXdr)
+                    }
+                ))
             }
-        )
+
+            val statusCode = response.status.value
+
+            when (statusCode) {
+                // HTTP 201: PENDING - transaction accepted
+                in 200..299 -> {
+                    val result = response.body<com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse>()
+                    result.httpResponseCode = statusCode
+                    result
+                }
+                // HTTP 409: DUPLICATE - transaction already submitted
+                409 -> {
+                    val result = response.body<com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse>()
+                    result.httpResponseCode = statusCode
+                    result
+                }
+                // HTTP 400: Could be ERROR (valid JSON with error_result_xdr) or malformed
+                400 -> {
+                    // Try to parse as SubmitTransactionAsyncResponse
+                    try {
+                        val result = response.body<com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse>()
+                        result.httpResponseCode = statusCode
+                        result
+                    } catch (e: Exception) {
+                        // If parsing fails, it's truly malformed - throw exception
+                        val body = try {
+                            response.body<String>()
+                        } catch (ex: Exception) {
+                            ""
+                        }
+                        throw com.soneso.stellar.sdk.horizon.exceptions.BadRequestException(
+                            code = statusCode,
+                            body = body
+                        )
+                    }
+                }
+                // Other 4xx errors
+                in 400..499 -> {
+                    val body = try {
+                        response.body<String>()
+                    } catch (e: Exception) {
+                        ""
+                    }
+                    when (statusCode) {
+                        429 -> throw com.soneso.stellar.sdk.horizon.exceptions.TooManyRequestsException(
+                            code = statusCode,
+                            body = body
+                        )
+                        504 -> throw com.soneso.stellar.sdk.horizon.exceptions.RequestTimeoutException(
+                            code = statusCode,
+                            body = body
+                        )
+                        else -> throw com.soneso.stellar.sdk.horizon.exceptions.BadRequestException(
+                            code = statusCode,
+                            body = body
+                        )
+                    }
+                }
+                // 5xx errors
+                in 500..599 -> {
+                    val body = try {
+                        response.body<String>()
+                    } catch (e: Exception) {
+                        ""
+                    }
+                    throw com.soneso.stellar.sdk.horizon.exceptions.BadResponseException(
+                        code = statusCode,
+                        body = body
+                    )
+                }
+                // Unknown status codes
+                else -> {
+                    val body = try {
+                        response.body<String>()
+                    } catch (e: Exception) {
+                        ""
+                    }
+                    throw com.soneso.stellar.sdk.horizon.exceptions.UnknownResponseException(
+                        code = statusCode,
+                        body = body
+                    )
+                }
+            }
+        } catch (e: com.soneso.stellar.sdk.horizon.exceptions.NetworkException) {
+            throw e
+        } catch (e: com.soneso.stellar.sdk.horizon.exceptions.SdkException) {
+            throw e
+        } catch (e: Exception) {
+            throw com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException(e)
+        }
     }
 
     /**

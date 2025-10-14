@@ -350,6 +350,69 @@ The trust tests demonstrate complete trustline management:
 
 **Prerequisites**: Network connectivity to Stellar testnet Horizon server
 
+### TransactionAsyncIntegrationTest.kt
+
+Comprehensive tests for asynchronous transaction submission:
+
+| Test | Description | Status Tested |
+|------|-------------|---------------|
+| `testSubmitAsyncSuccess` | Successful async transaction submission | PENDING → ledger inclusion |
+| `testSubmitAsyncDuplicate` | Duplicate transaction detection | PENDING → DUPLICATE |
+| `testSubmitAsyncMalformed` | Malformed XDR handling | BadRequestException (400) |
+| `testSubmitAsyncError` | Transaction validation errors | ERROR status with errorResultXdr |
+
+**Async Transaction Workflow**:
+
+The async transaction endpoint differs from the synchronous endpoint:
+
+**Synchronous (`submitTransaction`)**:
+- Waits for transaction to be ingested into a ledger
+- Returns full transaction details after ledger close (~5-10 seconds)
+- Throws exception on any error
+
+**Asynchronous (`submitTransactionAsync`)**:
+- Returns immediately with submission status from Stellar Core
+- Does NOT wait for ledger ingestion (returns in milliseconds)
+- Returns status: PENDING, ERROR, DUPLICATE, TRY_AGAIN_LATER
+- Must poll separately for final result
+
+**Transaction Status Values**:
+- **PENDING**: Transaction passed initial validation and is queued
+- **DUPLICATE**: Identical transaction already submitted
+- **ERROR**: Transaction failed validation (includes errorResultXdr)
+- **TRY_AGAIN_LATER**: Server is busy, retry later
+
+**HTTP Status Code Semantics**:
+- **201**: Transaction submitted successfully (PENDING)
+- **409**: Duplicate transaction (DUPLICATE) - valid response, not an error
+- **400 with valid JSON**: Transaction error (ERROR status)
+- **400 with invalid JSON**: Malformed XDR (throws BadRequestException)
+- **503**: Server busy (TRY_AGAIN_LATER)
+
+**Key Features Tested**:
+- Immediate submission response (no waiting for ledger)
+- PENDING status for valid transactions
+- DUPLICATE detection for re-submissions
+- ERROR status for invalid transactions (bad sequence number)
+- Malformed XDR exception handling
+- Transaction polling and verification after async submission
+
+**SDK Implementation**:
+Fixed `HorizonServer.submitTransactionAsync()` to handle special async endpoint semantics:
+- Treats 201, 409 as success (not errors)
+- Parses 400 responses as ERROR status before throwing exception
+- Sets httpResponseCode field on responses
+
+**Note on testSubmitAsyncSuccess**:
+This test may occasionally time out when running full test suite due to testnet congestion.
+It passes reliably when run individually. This is a testnet timing issue, not a bug.
+
+**Reference**: Ported from Flutter SDK's `transaction_async_test.dart`
+
+**Test Duration**: ~30-90 seconds per test (includes ledger polling with retries)
+
+**Prerequisites**: Network connectivity to Stellar testnet Horizon server
+
 
 ## Running Integration Tests
 
