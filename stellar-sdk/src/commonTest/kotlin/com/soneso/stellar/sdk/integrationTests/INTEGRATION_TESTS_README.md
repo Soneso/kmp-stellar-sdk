@@ -291,6 +291,60 @@ The trading tests demonstrate complete offer management:
 
 **Prerequisites**: Network connectivity to Stellar testnet Horizon server
 
+### TrustIntegrationTest.kt
+
+Comprehensive tests for Stellar trustline operations:
+
+| Test | Description | Operations Tested |
+|------|-------------|-------------------|
+| `testChangeTrust` | Create, update, and delete trustlines | ChangeTrust, balance queries |
+| `testMaxTrustAmount` | Create trustline with maximum limit | ChangeTrust with MAX_LIMIT |
+| `testAllowTrust` | Trustline authorization workflows (IGNORED) | AllowTrust (deprecated) |
+
+**Trustline Workflow Tests**:
+
+The trust tests demonstrate complete trustline management:
+
+1. **ChangeTrust** (testChangeTrust):
+   - Create issuer and trustor accounts
+   - Create custom asset (ASTRO - AlphaNum12)
+   - Establish trustline with limit 10,000
+   - Verify trustline in account balances
+   - Update trustline limit to 40,000
+   - Verify updated limit
+   - Delete trustline (set limit to 0)
+   - Verify trustline removal
+
+2. **Maximum Trust Limit** (testMaxTrustAmount):
+   - Create custom asset (IOM - AlphaNum4)
+   - Establish trustline with `ChangeTrustOperation.MAX_LIMIT`
+   - Verify maximum limit (922337203685.4775807)
+   - Common for trading accounts and market makers
+
+3. **Authorization Workflows** (testAllowTrust - IGNORED):
+   - **Status**: Test is ignored because AllowTrust operation was deprecated in Stellar Protocol 17
+   - **Modern Replacement**: SetTrustlineFlagsOperation (not yet implemented in KMP SDK)
+   - **What it tests**: Issuer authorization (authorize/deauthorize), AUTH_REQUIRED flag, payment authorization
+
+**Key Features Tested**:
+- Trustline creation and deletion
+- Trustline limit updates
+- Maximum trust amount handling
+- Custom asset types (AlphaNum4, AlphaNum12)
+- Balance queries after trustline operations
+
+**Important Note - AllowTrust Deprecation**:
+- AllowTrust operation was deprecated in Stellar Protocol 17 (2021)
+- Current testnet/mainnet no longer support this operation
+- Modern replacement is SetTrustlineFlagsOperation (needs implementation)
+- testAllowTrust is included but ignored with documentation for future implementation
+
+**Reference**: Ported from Flutter SDK's `trust_test.dart`
+
+**Test Duration**: ~40 seconds for passing tests (testAllowTrust is skipped)
+
+**Prerequisites**: Network connectivity to Stellar testnet Horizon server
+
 
 ## Running Integration Tests
 
