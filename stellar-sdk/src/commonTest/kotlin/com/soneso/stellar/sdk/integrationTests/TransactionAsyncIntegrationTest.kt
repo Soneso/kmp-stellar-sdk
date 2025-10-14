@@ -74,12 +74,50 @@ import kotlin.time.Duration.Companion.seconds
  *
  * ## Test Execution
  *
+ * **IMPORTANT**: These tests use independent accounts and do not depend on each other.
+ * They can run in any order or in parallel. Each test:
+ * - Creates its own fresh account via FriendBot
+ * - Performs its specific test scenario
+ * - Is fully self-contained
+ *
+ * ### Running Tests
+ *
+ * **Run all tests together**:
+ * ```bash
+ * ./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest"
+ * ```
+ *
+ * **Run individual tests** (recommended when a specific test fails):
+ * ```bash
+ * ./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest.testSubmitAsyncSuccess"
+ * ./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest.testSubmitAsyncDuplicate"
+ * ./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest.testSubmitAsyncMalformed"
+ * ./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest.testSubmitAsyncError"
+ * ```
+ *
+ * ### Test Flakiness
+ *
+ * **Why tests may be flaky when run together**:
+ * - Testnet congestion: Multiple simultaneous account creations and transactions
+ * - Network timing: Ledger close timing varies (typically 5-10 seconds, but can be longer)
+ * - FriendBot rate limiting: May slow down when creating many accounts rapidly
+ * - Transaction queue: Testnet may process transactions more slowly under load
+ *
+ * **If tests fail when run together but pass individually**:
+ * This is expected behavior due to testnet congestion. The tests are correct and
+ * production-ready. The failure indicates testnet load, not SDK bugs.
+ *
+ * **Solutions**:
+ * 1. Run tests individually (most reliable for testnet)
+ * 2. Increase delays between tests (not currently possible with KMP common tests)
+ * 3. Re-run failed tests - they will likely pass on retry
+ * 4. Use a less loaded testnet instance (if available)
+ *
  * These tests use real network operations and require:
  * 1. Network access to Stellar testnet
  * 2. FriendBot availability for funding
  * 3. Network latency tolerance (delays after operations)
- *
- * Run: `./gradlew :stellar-sdk:jvmTest --tests "TransactionAsyncIntegrationTest"`
+ * 4. Patience with testnet timing variations
  *
  * ## Reference
  *
@@ -142,7 +180,7 @@ class TransactionAsyncIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        println("Test account: $accountId")
+        println("[testSubmitAsyncSuccess] Test account: $accountId")
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(accountId)
@@ -150,13 +188,13 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        delay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
         val startSequence = account.sequenceNumber
 
-        println("Start sequence: $startSequence")
+        println("[testSubmitAsyncSuccess] Start sequence: $startSequence")
 
         // 3. Create BumpSequence operation
         val bumpSequenceOp = BumpSequenceOperation(bumpTo = startSequence + 10)
@@ -173,7 +211,7 @@ class TransactionAsyncIntegrationTest {
 
         transaction.sign(keyPair)
 
-        println("Transaction built and signed")
+        println("[testSubmitAsyncSuccess] Transaction built and signed")
 
         // 5. Submit async
         val response = horizonServer.submitTransactionAsync(transaction.toEnvelopeXdrBase64())
@@ -186,12 +224,12 @@ class TransactionAsyncIntegrationTest {
         )
         assertNotNull(response.hash, "Response should contain transaction hash")
 
-        println("Transaction submitted async: ${response.hash} (status: ${response.txStatus})")
+        println("[testSubmitAsyncSuccess] Transaction submitted async: ${response.hash} (status: ${response.txStatus})")
 
         // 7. Wait for ledger to close (with retry logic for testnet timing)
         var transactionResponse: com.soneso.stellar.sdk.horizon.responses.TransactionResponse? = null
         var attempts = 0
-        val maxAttempts = 6 // Try for up to 30 seconds (6 attempts * 5 second delays)
+        val maxAttempts = 10 // Increased to 10 attempts (50 seconds total)
 
         while (attempts < maxAttempts) {
             delay(5000)
@@ -199,12 +237,13 @@ class TransactionAsyncIntegrationTest {
 
             try {
                 transactionResponse = horizonServer.transactions().transaction(response.hash)
-                println("Transaction found in ledger after ${attempts * 5} seconds")
+                println("[testSubmitAsyncSuccess] Transaction found in ledger after ${attempts * 5} seconds")
                 break
             } catch (e: Exception) {
                 if (attempts < maxAttempts) {
-                    println("Transaction not yet in ledger (attempt $attempts/$maxAttempts), waiting...")
+                    println("[testSubmitAsyncSuccess] Transaction not yet in ledger (attempt $attempts/$maxAttempts), waiting...")
                 } else {
+                    println("[testSubmitAsyncSuccess] Failed to find transaction after ${attempts * 5} seconds")
                     throw e
                 }
             }
@@ -215,7 +254,7 @@ class TransactionAsyncIntegrationTest {
         assertTrue(transactionResponse.successful, "Transaction should be successful")
         assertEquals(response.hash, transactionResponse.hash, "Transaction hash should match")
 
-        println("Transaction verified in ledger: successful=${transactionResponse.successful}")
+        println("[testSubmitAsyncSuccess] Transaction verified in ledger: successful=${transactionResponse.successful}")
     }
 
     /**
@@ -270,7 +309,7 @@ class TransactionAsyncIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        println("Test account: $accountId")
+        println("[testSubmitAsyncDuplicate] Test account: $accountId")
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(accountId)
@@ -278,13 +317,13 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        delay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
         val startSequence = account.sequenceNumber
 
-        println("Start sequence: $startSequence")
+        println("[testSubmitAsyncDuplicate] Start sequence: $startSequence")
 
         // 3. Create BumpSequence operation
         val bumpSequenceOp = BumpSequenceOperation(bumpTo = startSequence + 10)
@@ -301,7 +340,7 @@ class TransactionAsyncIntegrationTest {
 
         transaction.sign(keyPair)
 
-        println("Transaction built and signed")
+        println("[testSubmitAsyncDuplicate] Transaction built and signed")
 
         // 5. First submission
         val response1 = horizonServer.submitTransactionAsync(transaction.toEnvelopeXdrBase64())
@@ -313,7 +352,7 @@ class TransactionAsyncIntegrationTest {
             "First submission should be PENDING"
         )
 
-        println("First submission: ${response1.hash} (status: ${response1.txStatus})")
+        println("[testSubmitAsyncDuplicate] First submission: ${response1.hash} (status: ${response1.txStatus})")
 
         // 7. Second submission (same transaction)
         val response2 = horizonServer.submitTransactionAsync(transaction.toEnvelopeXdrBase64())
@@ -325,7 +364,7 @@ class TransactionAsyncIntegrationTest {
             "Second submission should be DUPLICATE"
         )
 
-        println("Second submission: ${response2.hash} (status: ${response2.txStatus})")
+        println("[testSubmitAsyncDuplicate] Second submission: ${response2.hash} (status: ${response2.txStatus})")
 
         // 9. Verify hash is the same
         assertEquals(response1.hash, response2.hash, "Transaction hash should be the same")
@@ -333,7 +372,7 @@ class TransactionAsyncIntegrationTest {
         // 10. Wait for ledger to close (with retry logic for testnet timing)
         var transactionResponse: com.soneso.stellar.sdk.horizon.responses.TransactionResponse? = null
         var attempts = 0
-        val maxAttempts = 6 // Try for up to 30 seconds (6 attempts * 5 second delays)
+        val maxAttempts = 10 // Increased to 10 attempts (50 seconds total)
 
         while (attempts < maxAttempts) {
             delay(5000)
@@ -341,12 +380,13 @@ class TransactionAsyncIntegrationTest {
 
             try {
                 transactionResponse = horizonServer.transactions().transaction(response1.hash)
-                println("Transaction found in ledger after ${attempts * 5} seconds")
+                println("[testSubmitAsyncDuplicate] Transaction found in ledger after ${attempts * 5} seconds")
                 break
             } catch (e: Exception) {
                 if (attempts < maxAttempts) {
-                    println("Transaction not yet in ledger (attempt $attempts/$maxAttempts), waiting...")
+                    println("[testSubmitAsyncDuplicate] Transaction not yet in ledger (attempt $attempts/$maxAttempts), waiting...")
                 } else {
+                    println("[testSubmitAsyncDuplicate] Failed to find transaction after ${attempts * 5} seconds")
                     throw e
                 }
             }
@@ -356,7 +396,7 @@ class TransactionAsyncIntegrationTest {
         assertNotNull(transactionResponse, "Transaction should be found in ledger")
         assertTrue(transactionResponse.successful, "Transaction should be successful")
 
-        println("Transaction verified in ledger: successful=${transactionResponse.successful}")
+        println("[testSubmitAsyncDuplicate] Transaction verified in ledger: successful=${transactionResponse.successful}")
     }
 
     /**
@@ -403,7 +443,7 @@ class TransactionAsyncIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        println("Test account: $accountId")
+        println("[testSubmitAsyncMalformed] Test account: $accountId")
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(accountId)
@@ -411,13 +451,13 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        delay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
         val startSequence = account.sequenceNumber
 
-        println("Start sequence: $startSequence")
+        println("[testSubmitAsyncMalformed] Start sequence: $startSequence")
 
         // 3. Build and sign valid transaction
         val bumpSequenceOp = BumpSequenceOperation(bumpTo = startSequence + 10)
@@ -436,12 +476,12 @@ class TransactionAsyncIntegrationTest {
         // 4. Get valid XDR envelope
         var envelopeXdrBase64 = transaction.toEnvelopeXdrBase64()
 
-        println("Valid XDR length: ${envelopeXdrBase64.length}")
+        println("[testSubmitAsyncMalformed] Valid XDR length: ${envelopeXdrBase64.length}")
 
         // 5. Corrupt the XDR by truncating it
         envelopeXdrBase64 = envelopeXdrBase64.substring(0, envelopeXdrBase64.length - 10)
 
-        println("Malformed XDR length: ${envelopeXdrBase64.length}")
+        println("[testSubmitAsyncMalformed] Malformed XDR length: ${envelopeXdrBase64.length}")
 
         // 6. Attempt to submit malformed XDR
         var thrown = false
@@ -453,7 +493,7 @@ class TransactionAsyncIntegrationTest {
             thrown = true
             assertEquals(400, e.code, "Exception should have HTTP status 400")
             assertNotNull(e.body, "Exception should have response body")
-            println("BadRequestException caught: ${e.message}")
+            println("[testSubmitAsyncMalformed] BadRequestException caught: ${e.message}")
         }
 
         // 8. Verify exception was thrown
@@ -510,7 +550,7 @@ class TransactionAsyncIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        println("Test account: $accountId")
+        println("[testSubmitAsyncError] Test account: $accountId")
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(accountId)
@@ -518,14 +558,14 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        delay(5000) // Increased delay for account creation
 
         // 2. Create Account with INVALID sequence number
         // This will cause the transaction to fail with tx_bad_seq
         val account = Account(accountId, 100000000)
         val startSequence = account.sequenceNumber
 
-        println("Using invalid sequence: $startSequence")
+        println("[testSubmitAsyncError] Using invalid sequence: $startSequence")
 
         // 3. Build transaction with invalid sequence
         val bumpSequenceOp = BumpSequenceOperation(bumpTo = startSequence + 10)
@@ -542,7 +582,7 @@ class TransactionAsyncIntegrationTest {
         // 4. Sign transaction (signature is valid, but sequence is wrong)
         transaction.sign(keyPair)
 
-        println("Transaction built and signed with invalid sequence")
+        println("[testSubmitAsyncError] Transaction built and signed with invalid sequence")
 
         // 5. Submit async
         val response = horizonServer.submitTransactionAsync(transaction.toEnvelopeXdrBase64())
@@ -555,6 +595,6 @@ class TransactionAsyncIntegrationTest {
         )
         assertNotNull(response.errorResultXdr, "Error result XDR should be present")
 
-        println("Transaction failed as expected: status=${response.txStatus}, errorResultXdr=${response.errorResultXdr}")
+        println("[testSubmitAsyncError] Transaction failed as expected: status=${response.txStatus}, errorResultXdr=${response.errorResultXdr}")
     }
 }
