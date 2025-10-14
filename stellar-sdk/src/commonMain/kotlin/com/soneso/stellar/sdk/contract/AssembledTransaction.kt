@@ -55,6 +55,38 @@ import kotlinx.coroutines.delay
  * val result = assembled.submit()    // Submit and wait
  * ```
  *
+ * ### Multi-Auth Workflow (Atomic Swaps, etc.)
+ * ```kotlin
+ * // Build transaction (e.g., atomic swap between Alice and Bob)
+ * val tx = atomicSwapClient.invoke<Unit>(
+ *     functionName = "swap",
+ *     parameters = listOf(alice, bob, tokenA, tokenB, amounts...),
+ *     source = invokerAccount,
+ *     signer = invokerKeyPair
+ * )
+ *
+ * // Check who needs to sign auth entries
+ * val whoElseNeedsToSign = tx.needsNonInvokerSigningBy()
+ * // Returns: ["GALICE...", "GBOB..."]
+ *
+ * // Sign auth entries for Alice
+ * tx.signAuthEntries(aliceKeyPair)
+ *
+ * // Sign auth entries for Bob (using delegate for remote signing)
+ * tx.signAuthEntries(
+ *     authEntriesSigner = KeyPair.fromAccountId(bobId),
+ *     authorizeEntryDelegate = { entry, network ->
+ *         // Send to remote server for signing
+ *         val entryXdr = entry.toXdrBase64()
+ *         val signedXdr = remoteSignService.sign(entryXdr)
+ *         SorobanAuthorizationEntryXdr.fromXdrBase64(signedXdr)
+ *     }
+ * )
+ *
+ * // Submit transaction
+ * val result = tx.signAndSubmit(invokerKeyPair)
+ * ```
+ *
  * @param T The type of the parsed result
  * @property server The SorobanServer for RPC calls
  * @property submitTimeout Polling timeout in seconds
@@ -70,9 +102,40 @@ class AssembledTransaction<T>(
     private var transactionBuilder: TransactionBuilder
 ) {
     /**
+     * The TransactionBuilder before simulation.
+     *
+     * You can modify this before calling simulate() if you set simulate=false
+     * in the ContractClient.invoke() call.
+     *
+     * Example:
+     * ```kotlin
+     * val tx = client.invoke<T>(
+     *     functionName = "method",
+     *     parameters = params,
+     *     source = account,
+     *     signer = keypair,
+     *     parseResultXdrFn = parser,
+     *     simulate = false // Don't auto-simulate
+     * )
+     * tx.raw?.addMemo(Memo.text("Hello!"))
+     * tx.simulate()
+     * ```
+     */
+    var raw: TransactionBuilder? = transactionBuilder
+        private set
+
+    /**
      * The built transaction after simulation (null before simulation).
      */
     var builtTransaction: Transaction? = null
+        private set
+
+    /**
+     * The signed transaction (separate from builtTransaction).
+     *
+     * Set after calling sign(). Null if not yet signed.
+     */
+    var signed: Transaction? = null
         private set
 
     /**
@@ -196,6 +259,7 @@ class AssembledTransaction<T>(
         }
 
         builtTransaction!!.sign(signer)
+        signed = builtTransaction  // Set signed property
         return this
     }
 
@@ -221,30 +285,217 @@ class AssembledTransaction<T>(
     }
 
     /**
-     * Signs the authorization entries in the transaction.
+     * Signs authorization entries in the transaction.
      *
-     * **Note**: Due to Kotlin's immutability model, this method currently has limitations.
-     * The recommended approach is to use Auth.authorizeEntry directly on auth entries
-     * before building the transaction, or to use the ContractClient's auto-auth feature.
+     * This method is used for multi-authorization workflows where the contract invocation
+     * requires authorization from specific accounts (other than the transaction invoker).
      *
-     * Used when the contract invocation requires authorization from specific accounts.
-     * The validUntilLedgerSequence defaults to current ledger + 100.
+     * ## Use Cases
      *
-     * @param authEntriesSigner The KeyPair to sign auth entries with
-     * @param validUntilLedgerSequence Ledger sequence until which signatures are valid (or null for default)
+     * 1. **Atomic Swaps**: Alice and Bob both need to authorize their token transfers
+     * 2. **Multi-Signature Operations**: Multiple parties must approve a contract action
+     * 3. **Remote Signing**: One party signs locally, another signs on a remote server
+     *
+     * ## Parameters
+     *
+     * - **authEntriesSigner**: The KeyPair to sign with. Can be public-key-only if using delegate.
+     * - **validUntilLedgerSequence**: Optional expiration ledger. Defaults to current + 100 (~8.3 minutes).
+     * - **authorizeEntryDelegate**: Optional function for custom/remote signing logic.
+     *
+     * ## Basic Usage (Local Signing)
+     *
+     * ```kotlin
+     * val tx = swapClient.invoke<Unit>(
+     *     functionName = "swap",
+     *     parameters = swapParams,
+     *     source = invokerAccount,
+     *     signer = invokerKeyPair
+     * )
+     *
+     * // Sign auth entries for Alice (has private key)
+     * tx.signAuthEntries(aliceKeyPair)
+     *
+     * // Sign auth entries for Bob (has private key)
+     * tx.signAuthEntries(bobKeyPair)
+     *
+     * // Submit the fully-signed transaction
+     * val result = tx.signAndSubmit(invokerKeyPair)
+     * ```
+     *
+     * ## Remote Signing (Delegate Pattern)
+     *
+     * ```kotlin
+     * // Bob's signing happens on a remote server
+     * val bobPublicOnly = KeyPair.fromAccountId(bobId)
+     * tx.signAuthEntries(
+     *     authEntriesSigner = bobPublicOnly,
+     *     authorizeEntryDelegate = { entry, network ->
+     *         // Send to remote server
+     *         val entryXdr = entry.toXdrBase64()
+     *         val signedXdr = httpClient.post("/sign", entryXdr)
+     *
+     *         // Return signed entry
+     *         SorobanAuthorizationEntryXdr.fromXdrBase64(signedXdr)
+     *     }
+     * )
+     * ```
+     *
+     * ## Custom Expiration
+     *
+     * ```kotlin
+     * // Get current ledger
+     * val latestLedger = server.getLatestLedger()
+     *
+     * // Set expiration to 1 hour from now (~720 ledgers)
+     * tx.signAuthEntries(
+     *     authEntriesSigner = aliceKeyPair,
+     *     validUntilLedgerSequence = latestLedger.sequence + 720
+     * )
+     * ```
+     *
+     * ## How It Works
+     *
+     * 1. The method finds all auth entries that match the signer's address
+     * 2. For each matching entry:
+     *    - Sets the expiration ledger
+     *    - Signs the entry using Auth.authorizeEntry() or the delegate
+     *    - Updates the signature in the entry
+     * 3. Rebuilds the transaction with the updated auth entries
+     *
+     * @param authEntriesSigner The KeyPair to sign auth entries with (must match address in entry)
+     * @param validUntilLedgerSequence Ledger sequence until which signatures are valid (null = current + 100)
+     * @param authorizeEntryDelegate Optional function for custom signing logic (enables remote signing)
      * @return This AssembledTransaction for chaining
      * @throws NotYetSimulatedException if not yet simulated
-     * @throws NotImplementedError This method is not yet fully implemented in the Kotlin SDK
+     * @throws IllegalStateException if no entries need signing or wrong signer
+     * @throws IllegalArgumentException if signer missing private key (when delegate not provided)
      */
     suspend fun signAuthEntries(
         authEntriesSigner: KeyPair,
-        validUntilLedgerSequence: Long? = null
+        validUntilLedgerSequence: Long? = null,
+        authorizeEntryDelegate: (suspend (SorobanAuthorizationEntryXdr, Network) -> SorobanAuthorizationEntryXdr)? = null
     ): AssembledTransaction<T> {
-        throw NotImplementedError(
-            "signAuthEntries is not yet implemented in the Kotlin SDK. " +
-            "Please use Auth.authorizeEntry directly before transaction simulation, " +
-            "or ensure your contract does not require separate auth entry signatures."
+        if (builtTransaction == null) {
+            throw NotYetSimulatedException("Transaction has not yet been simulated.", this)
+        }
+
+        val signerAddress = authEntriesSigner.getAccountId()
+
+        // Validate signer has entries to sign (unless using delegate)
+        if (authorizeEntryDelegate == null) {
+            val neededSigning = needsNonInvokerSigningBy(includeAlreadySigned = false)
+            if (neededSigning.isEmpty()) {
+                throw IllegalStateException(
+                    "No unsigned non-invoker auth entries; maybe you already signed?"
+                )
+            }
+            if (!neededSigning.contains(signerAddress)) {
+                throw IllegalStateException(
+                    "No auth entries for public key $signerAddress. " +
+                    "Addresses that need signing: $neededSigning"
+                )
+            }
+            if (!authEntriesSigner.canSign()) {
+                throw IllegalArgumentException(
+                    "You must provide a signer keypair containing the private key."
+                )
+            }
+        }
+
+        // Get or calculate expiration ledger (default: current + 100)
+        val expirationLedger = validUntilLedgerSequence ?: run {
+            val latestLedger = server.getLatestLedger()
+            latestLedger.sequence + 100
+        }
+
+        // Get the operation and its auth entries
+        val operation = builtTransaction!!.operations.first()
+        if (operation !is InvokeHostFunctionOperation) {
+            throw IllegalStateException("Expected InvokeHostFunctionOperation, got ${operation::class.simpleName}")
+        }
+
+        // Create mutable list of auth entries
+        val updatedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
+
+        // Iterate through auth entries and sign matching ones
+        for (entry in operation.auth) {
+            // Check if this entry uses address credentials
+            if (entry.credentials.discriminant != SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS) {
+                updatedAuthEntries.add(entry)
+                continue
+            }
+
+            val addressCreds = entry.credentials as? SorobanCredentialsXdr.Address
+            if (addressCreds == null) {
+                updatedAuthEntries.add(entry)
+                continue
+            }
+
+            // Get the address from the credentials
+            val entryAddress = Address.fromSCAddress(addressCreds.value.address).toString()
+
+            // Skip if this entry is for a different signer
+            if (entryAddress != signerAddress) {
+                updatedAuthEntries.add(entry)
+                continue
+            }
+
+            // Create updated address credentials with new expiration
+            val updatedAddressCreds = addressCreds.value.copy(
+                signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt())
+            )
+
+            // Create updated entry with new expiration
+            val entryToSign = entry.copy(
+                credentials = SorobanCredentialsXdr.Address(updatedAddressCreds)
+            )
+
+            // Sign the entry
+            val signedEntry = if (authorizeEntryDelegate != null) {
+                authorizeEntryDelegate(entryToSign, transactionBuilder.network)
+            } else {
+                Auth.authorizeEntry(entryToSign, authEntriesSigner, expirationLedger, transactionBuilder.network)
+            }
+
+            updatedAuthEntries.add(signedEntry)
+        }
+
+        // Rebuild the operation with updated auth entries
+        val updatedOperation = InvokeHostFunctionOperation(
+            hostFunction = operation.hostFunction,
+            auth = updatedAuthEntries
         )
+        updatedOperation.sourceAccount = operation.sourceAccount
+
+        // Rebuild the transaction with the updated operation
+        val currentTx = builtTransaction!!
+
+        // Create new transaction builder with same source account from original builder
+        val newBuilder = TransactionBuilder(
+            sourceAccount = transactionBuilder.sourceAccount,
+            network = transactionBuilder.network
+        )
+            .addOperation(updatedOperation)
+            .setBaseFee(currentTx.fee.toLong())
+
+        // Copy preconditions if they exist
+        if (currentTx.preconditions != null) {
+            newBuilder.addPreconditions(currentTx.preconditions!!)
+        }
+
+        // Copy soroban data if it exists
+        if (currentTx.sorobanData != null) {
+            newBuilder.setSorobanData(currentTx.sorobanData!!)
+        }
+
+        // Build the new transaction
+        builtTransaction = newBuilder.build()
+
+        // Important: Clear signed transaction since we modified builtTransaction
+        // The transaction will need to be signed again (with sign() or signAndSubmit())
+        signed = null
+
+        return this
     }
 
     /**
@@ -298,7 +549,7 @@ class AssembledTransaction<T>(
      */
     fun result(): T {
         val simData = getSimulationData()
-        val rawResult = SCValXdr.fromXdrBase64(simData.result.xdr!!)
+        val rawResult = simData.returnedValue
 
         return if (parseResultXdrFn != null) {
             parseResultXdrFn.invoke(rawResult)
@@ -322,7 +573,7 @@ class AssembledTransaction<T>(
      */
     fun isReadCall(): Boolean {
         val simData = getSimulationData()
-        val auths = simData.result.auth ?: emptyList()
+        val auths = simData.auth ?: emptyList()
         val writes = simData.transactionData.resources.footprint.readWrite
         return auths.isEmpty() && writes.isEmpty()
     }
@@ -359,6 +610,38 @@ class AssembledTransaction<T>(
     }
 
     /**
+     * Get structured simulation result data.
+     *
+     * Returns the auth entries, transaction data, and return value from simulation.
+     * This is useful when you need to inspect or manipulate simulation results.
+     *
+     * @return Structured simulation data
+     * @throws NotYetSimulatedException if not yet simulated
+     */
+    fun getSimulationData(): SimulateHostFunctionResult {
+        if (simulationResult != null && simulationTransactionData != null) {
+            return SimulateHostFunctionResult(
+                auth = simulationResult!!.parseAuth(),
+                transactionData = simulationTransactionData!!,
+                returnedValue = SCValXdr.fromXdrBase64(simulationResult!!.xdr!!)
+            )
+        }
+
+        if (simulation == null) {
+            throw NotYetSimulatedException("Transaction has not yet been simulated.", this)
+        }
+
+        simulationResult = simulation!!.results!!.first()
+        simulationTransactionData = SorobanTransactionDataXdr.fromXdrBase64(simulation!!.transactionData!!)
+
+        return SimulateHostFunctionResult(
+            auth = simulationResult!!.parseAuth(),
+            transactionData = simulationTransactionData!!,
+            returnedValue = SCValXdr.fromXdrBase64(simulationResult!!.xdr!!)
+        )
+    }
+
+    /**
      * Get the transaction envelope as base64-encoded XDR.
      *
      * @return The transaction envelope XDR string
@@ -389,7 +672,7 @@ class AssembledTransaction<T>(
             sourceAccount = transactionBuilder.sourceAccount,
             network = transactionBuilder.network
         )
-            .setBaseFee(100)
+            .setBaseFee(100L)
             .addOperation(RestoreFootprintOperation())
             .setSorobanData(
                 SorobanDataBuilder(simulation!!.restorePreamble!!.transactionData!!).build()
@@ -453,27 +736,48 @@ class AssembledTransaction<T>(
             )
         }
     }
-
-    private fun getSimulationData(): SimulationData {
-        if (simulationResult != null && simulationTransactionData != null) {
-            return SimulationData(simulationResult!!, simulationTransactionData!!)
-        }
-
-        if (simulation == null) {
-            throw NotYetSimulatedException("Transaction has not yet been simulated.", this)
-        }
-
-        simulationResult = simulation!!.results!!.first()
-        simulationTransactionData = SorobanTransactionDataXdr.fromXdrBase64(simulation!!.transactionData!!)
-
-        return SimulationData(simulationResult!!, simulationTransactionData!!)
-    }
-
-    private data class SimulationData(
-        val result: SimulateTransactionResponse.SimulateHostFunctionResult,
-        val transactionData: SorobanTransactionDataXdr
-    )
 }
+
+/**
+ * Result data from transaction simulation.
+ *
+ * Contains all the data returned by the Soroban RPC simulation, including:
+ * - Authorization entries that need signing
+ * - Transaction resource data (footprint, resource limits)
+ * - The return value from the contract function
+ *
+ * This is useful for:
+ * - Inspecting which accounts need to sign auth entries
+ * - Understanding resource consumption
+ * - Examining the simulated return value before submitting
+ *
+ * Example:
+ * ```kotlin
+ * val simData = tx.getSimulationData()
+ * println("Auth entries: ${simData.auth?.size}")
+ * println("Read footprint: ${simData.transactionData.resources.footprint.readOnly.size}")
+ * println("Return value: ${simData.returnedValue}")
+ * ```
+ */
+data class SimulateHostFunctionResult(
+    /**
+     * Authorization entries returned from simulation.
+     * Null if the contract function doesn't require authorization.
+     */
+    val auth: List<SorobanAuthorizationEntryXdr>?,
+
+    /**
+     * Transaction resource data including footprint and resource limits.
+     * This must be included in the transaction for execution.
+     */
+    val transactionData: SorobanTransactionDataXdr,
+
+    /**
+     * The return value from the simulated contract function call.
+     * This is the result you would get if the transaction were executed.
+     */
+    val returnedValue: SCValXdr
+)
 
 /**
  * Exponential backoff helper for polling operations.

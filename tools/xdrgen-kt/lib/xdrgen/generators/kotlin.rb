@@ -273,9 +273,15 @@ module Xdrgen
             out.puts
           end
 
-          # Void arms - collect by class name to handle duplicates
-          void_arms = union.arms.select(&:void?).group_by { |arm| arm.name.camelize }
-          void_arms.each do |arm_class_name, arms|
+          # Void arms - handle arms with multiple discriminant values
+          void_arms_by_class = union.arms.select(&:void?).group_by { |arm| arm.name.camelize }
+          void_arms_by_class.each do |arm_class_name, arms|
+            # For void arms, if an arm has multiple cases, we need a data class that accepts discriminant
+            # Otherwise, we can use a data object with a fixed discriminant
+
+            # Count total discriminant values across all arms with this class name
+            total_discriminants = arms.sum { |arm| arm.cases.length }
+
             # Extract and render comments for the first arm (they're grouped by name)
             comments = extract_union_arm_comment(union.text_value, arms.first)
             render_member_comment(out, comments)
@@ -283,23 +289,24 @@ module Xdrgen
             is_default = arms.first.is_a?(AST::Definitions::UnionDefaultArm)
 
             if is_default
+              # Default arm needs discriminant as constructor parameter
               out.puts "data class #{arm_class_name}("
               out.indent do
                 out.puts "override val discriminant: #{discriminant_type}"
               end
               out.puts ") : #{union_name}()"
-            elsif arms.length > 1
-              # Multiple void arms with same name - need a data class with discriminant parameter
+            elsif total_discriminants > 1
+              # Multiple discriminant values - need a data class with discriminant parameter
               out.puts "data class #{arm_class_name}("
               out.indent do
                 out.puts "override val discriminant: #{discriminant_type}"
               end
               out.puts ") : #{union_name}()"
             else
-              # Single void arm - use data object
+              # Single discriminant value - use data object with fixed discriminant
+              discriminant_value = format_discriminant_value(arms.first.cases.first, union)
               out.puts "data object #{arm_class_name} : #{union_name}() {"
               out.indent do
-                discriminant_value = arm_discriminant_value(arms.first, union.discriminant)
                 out.puts "override val discriminant: #{discriminant_type} = #{discriminant_value}"
               end
               out.puts "}"
@@ -316,47 +323,36 @@ module Xdrgen
               out.puts "val discriminant = #{decode_expression(union.discriminant, 'reader')}"
               out.puts "return when (discriminant) {"
               out.indent do
-                # Group void arms by class name to detect duplicates
-                void_arms_by_class = union.normal_arms.select(&:void?).group_by { |arm| arm.name.camelize }
+                # Build a map to detect void arms with multiple discriminants
+                void_arms_by_class = {}
+                union.normal_arms.select(&:void?).each do |arm|
+                  class_name = arm.name.camelize
+                  void_arms_by_class[class_name] ||= []
+                  void_arms_by_class[class_name] << arm
+                end
 
                 union.normal_arms.each do |arm|
                   arm_class_name = arm.name.camelize
-                  has_duplicate_void = arm.void? && void_arms_by_class[arm_class_name]&.length.to_i > 1
+
+                  # For void arms, check if this class has multiple discriminants
+                  has_multiple_discriminants = if arm.void?
+                    arm_list = void_arms_by_class[arm_class_name]
+                    # Count total cases across all arms with this name
+                    total_cases = arm_list.sum { |a| a.cases.length }
+                    total_cases > 1
+                  else
+                    false
+                  end
 
                   arm.cases.each do |c|
-                    if c.value.is_a?(AST::Identifier)
-                      # For enum discriminants, get the enum type name
-                      discriminant_type_name = name(union.discriminant_type)
-                      discriminant_value = "#{discriminant_type_name}.#{c.value.name}"
-                    else
-                      # Numeric literal - need to wrap in value class if discriminant is a typedef
-                      literal_value = c.value.value
-                      discriminant_type_name = kotlin_type_for(union.discriminant)
-
-                      if discriminant_type_name.end_with?('Xdr')
-                        # Wrap in value class constructor
-                        # Resolve to underlying type to determine literal suffix
-                        resolved_type = resolve_typedef_declaration(union.discriminant)
-                        wrapped_value = case resolved_type.type
-                        when AST::Typespecs::UnsignedInt
-                          "#{literal_value}u"
-                        when AST::Typespecs::UnsignedHyper
-                          "#{literal_value}uL"
-                        else
-                          literal_value.to_s
-                        end
-                        discriminant_value = "#{discriminant_type_name}(#{wrapped_value})"
-                      else
-                        discriminant_value = literal_value.to_s
-                      end
-                    end
+                    discriminant_value = format_discriminant_value(c, union)
 
                     if arm.void?
-                      if has_duplicate_void
-                        # Multiple void arms with same name need discriminant passed
+                      if has_multiple_discriminants
+                        # Multiple discriminants for same class - need to pass discriminant
                         out.puts "#{discriminant_value} -> #{arm_class_name}(discriminant)"
                       else
-                        # Single void arm is a data object
+                        # Single discriminant - use data object
                         out.puts "#{discriminant_value} -> #{arm_class_name}"
                       end
                     else
@@ -401,12 +397,14 @@ module Xdrgen
             encode_statement(union.discriminant, 'discriminant', 'writer', out)
             out.puts "when (this) {"
             out.indent do
-              union.arms.each do |arm|
-                arm_class_name = arm.name.camelize
+              # Group arms by class name to avoid duplicate 'is' checks
+              arms_by_class = union.arms.group_by { |arm| arm.name.camelize }
+              arms_by_class.each do |class_name, _|
+                arm = union.arms.find { |a| a.name.camelize == class_name }
                 if arm.void?
-                  out.puts "is #{arm_class_name} -> {}"
+                  out.puts "is #{class_name} -> {}"
                 else
-                  out.puts "is #{arm_class_name} -> {"
+                  out.puts "is #{class_name} -> {"
                   out.indent do
                     encode_statement(arm.declaration, 'value', 'writer', out)
                   end
@@ -421,6 +419,36 @@ module Xdrgen
         out.puts "}"
 
         out.close
+      end
+
+      # Helper method to format a discriminant value for use in when expressions
+      def format_discriminant_value(case_stmt, union)
+        if case_stmt.value.is_a?(AST::Identifier)
+          # For enum discriminants, get the enum type name
+          discriminant_type_name = name(union.discriminant_type)
+          "#{discriminant_type_name}.#{case_stmt.value.name}"
+        else
+          # Numeric literal - need to wrap in value class if discriminant is a typedef
+          literal_value = case_stmt.value.value
+          discriminant_type_name = kotlin_type_for(union.discriminant)
+
+          if discriminant_type_name.end_with?('Xdr')
+            # Wrap in value class constructor
+            # Resolve to underlying type to determine literal suffix
+            resolved_type = resolve_typedef_declaration(union.discriminant)
+            wrapped_value = case resolved_type.type
+            when AST::Typespecs::UnsignedInt
+              "#{literal_value}u"
+            when AST::Typespecs::UnsignedHyper
+              "#{literal_value}uL"
+            else
+              literal_value.to_s
+            end
+            "#{discriminant_type_name}(#{wrapped_value})"
+          else
+            literal_value.to_s
+          end
+        end
       end
 
       def render_primitive_extensions
@@ -917,34 +945,11 @@ module Xdrgen
         first_case = arm.cases.first
         return 'else' unless first_case
 
-        discriminant_type_name = kotlin_type_for(discriminant)
-
-        if first_case.value.is_a?(AST::Identifier)
-          # It's an enum value
-          "#{discriminant_type_name}.#{first_case.value.name}"
-        else
-          # It's a numeric literal - need to wrap in value class constructor
-          literal_value = first_case.value.value
-
-          # Check if discriminant is a typedef (ends with Xdr suffix we add)
-          if discriminant_type_name.end_with?('Xdr')
-            # Wrap in value class constructor
-            # Resolve to underlying type to determine literal suffix
-            resolved_type = resolve_typedef_declaration(discriminant)
-            wrapped_value = case resolved_type.type
-            when AST::Typespecs::UnsignedInt
-              "#{literal_value}u"
-            when AST::Typespecs::UnsignedHyper
-              "#{literal_value}uL"
-            else
-              literal_value.to_s
-            end
-            "#{discriminant_type_name}(#{wrapped_value})"
-          else
-            # Not a typedef, use raw literal
-            literal_value.to_s
-          end
-        end
+        # Create a simple struct for union context
+        # discriminant is already a declaration, .type gives us the typespec
+        disc_type = discriminant.type.respond_to?(:resolved_type) ? discriminant.type.resolved_type : discriminant.type
+        union_context = Struct.new(:discriminant, :discriminant_type).new(discriminant, disc_type)
+        format_discriminant_value(first_case, union_context)
       end
 
       def simple_typedef?(decl)

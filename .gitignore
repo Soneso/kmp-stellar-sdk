@@ -97,6 +97,7 @@ gradle.properties.local
 # Test outputs
 test-results/
 *.test
+*-output.txt
 .claude/
 
 # Agent-generated summary files
