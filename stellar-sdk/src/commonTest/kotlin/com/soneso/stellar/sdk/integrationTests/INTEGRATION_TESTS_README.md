@@ -299,7 +299,7 @@ Comprehensive tests for Stellar trustline operations:
 |------|-------------|-------------------|
 | `testChangeTrust` | Create, update, and delete trustlines | ChangeTrust, balance queries |
 | `testMaxTrustAmount` | Create trustline with maximum limit | ChangeTrust with MAX_LIMIT |
-| `testAllowTrust` | Trustline authorization workflows (IGNORED) | AllowTrust (deprecated) |
+| `testSetTrustlineFlags` | Trustline authorization workflows | SetTrustLineFlagsOperation, authorization flags |
 
 **Trustline Workflow Tests**:
 
@@ -321,10 +321,13 @@ The trust tests demonstrate complete trustline management:
    - Verify maximum limit (922337203685.4775807)
    - Common for trading accounts and market makers
 
-3. **Authorization Workflows** (testAllowTrust - IGNORED):
-   - **Status**: Test is ignored because AllowTrust operation was deprecated in Stellar Protocol 17
-   - **Modern Replacement**: SetTrustlineFlagsOperation (not yet implemented in KMP SDK)
-   - **What it tests**: Issuer authorization (authorize/deauthorize), AUTH_REQUIRED flag, payment authorization
+3. **Authorization Workflows** (testSetTrustlineFlags):
+   - Uses SetTrustLineFlagsOperation (Protocol 17+ replacement for deprecated AllowTrust)
+   - Issuer sets AUTH_REQUIRED and AUTH_REVOCABLE flags
+   - Authorizes/deauthorizes trustlines with AUTHORIZED_FLAG
+   - Tests AUTHORIZED_TO_MAINTAIN_LIABILITIES_FLAG (can maintain offers but not receive new funds)
+   - Validates payment authorization requirements
+   - Verifies offers are deleted when deauthorized
 
 **Key Features Tested**:
 - Trustline creation and deletion
@@ -333,15 +336,17 @@ The trust tests demonstrate complete trustline management:
 - Custom asset types (AlphaNum4, AlphaNum12)
 - Balance queries after trustline operations
 
-**Important Note - AllowTrust Deprecation**:
-- AllowTrust operation was deprecated in Stellar Protocol 17 (2021)
-- Current testnet/mainnet no longer support this operation
-- Modern replacement is SetTrustlineFlagsOperation (needs implementation)
-- testAllowTrust is included but ignored with documentation for future implementation
+**Important Note - SetTrustlineFlagsOperation**:
+- Uses SetTrustLineFlagsOperation (Protocol 17+) instead of deprecated AllowTrust
+- SetTrustLineFlagsOperation supports three flags:
+  * AUTHORIZED_FLAG (1) - Fully authorize trustline
+  * AUTHORIZED_TO_MAINTAIN_LIABILITIES_FLAG (2) - Maintain existing positions only
+  * TRUSTLINE_CLAWBACK_ENABLED_FLAG (4) - Enable clawback
+- Demonstrates complete authorization lifecycle with all flag states
 
 **Reference**: Ported from Flutter SDK's `trust_test.dart`
 
-**Test Duration**: ~40 seconds for passing tests (testAllowTrust is skipped)
+**Test Duration**: ~140 seconds for all 3 tests (testSetTrustlineFlags includes extensive authorization workflow)
 
 **Prerequisites**: Network connectivity to Stellar testnet Horizon server
 
