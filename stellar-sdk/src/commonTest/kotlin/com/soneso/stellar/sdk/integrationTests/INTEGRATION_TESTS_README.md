@@ -136,6 +136,48 @@ The contract tests demonstrate the complete Soroban smart contract lifecycle:
 
 **Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
 
+### SorobanAuthIntegrationTest.kt
+
+Comprehensive tests for Soroban authorization workflows against live testnet:
+
+| Test | Description | Key Features Tested |
+|------|-------------|---------------------|
+| `testUploadAuthContract` | Upload auth contract WASM | Contract upload, WASM ID extraction |
+| `testCreateAuthContract` | Deploy auth contract instance | Contract deployment, instance creation |
+| `testRestoreFootprint` | Restore archived ledger entries | State restoration, footprint manipulation |
+| `testInvokeAuthAccount` | Manual authorization signing (invoker ≠ submitter) | Auth.authorizeEntry(), two-phase signing, signature expiration |
+| `testInvokeAuthInvoker` | Auto-authorization (invoker == submitter) | prepareTransaction(), automatic auth |
+
+**Authorization Workflow Tests**:
+
+The auth tests demonstrate two critical Soroban authorization patterns:
+
+1. **Manual Authorization** (testInvokeAuthAccount):
+   - Invoker creates signature for authorization entry
+   - Submitter signs and submits transaction
+   - Two-phase signing: Auth entries → Transaction
+   - Uses `Auth.authorizeEntry()` with signature expiration ledgers
+   - Critical for multi-party authorization scenarios
+
+2. **Auto-Authorization** (testInvokeAuthInvoker):
+   - Invoker == submitter (same party)
+   - `prepareTransaction()` handles auth automatically
+   - Simplified workflow for single-party scenarios
+   - No manual auth entry signing required
+
+**Test Dependencies**:
+- testCreateAuthContract depends on testUploadAuthContract
+- testInvokeAuthAccount depends on testCreateAuthContract
+- testInvokeAuthInvoker depends on testCreateAuthContract
+- Tests use companion object for shared state (WASM ID, contract ID, keypairs)
+- When run standalone, dependent tests skip with message
+
+**Reference**: Ported from Flutter SDK's `soroban_test_auth.dart` (lines 232-494)
+
+**Test Duration**: ~25-30 seconds for full suite (includes network delays and polling)
+
+**Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
+
 
 ## Running Integration Tests
 
