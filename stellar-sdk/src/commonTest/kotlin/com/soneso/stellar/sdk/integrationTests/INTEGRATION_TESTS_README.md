@@ -178,6 +178,59 @@ The auth tests demonstrate two critical Soroban authorization patterns:
 
 **Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
 
+### SorobanAtomicSwapIntegrationTest.kt
+
+Comprehensive tests for Soroban atomic swap contract functionality demonstrating multi-party contract interactions:
+
+| Test | Description | Key Features Tested |
+|------|-------------|---------------------|
+| `testInstallContracts` | Upload token and swap contracts | Contract upload, WASM ID extraction, TTL extension |
+| `testCreateContracts` | Deploy contract instances | Contract deployment, instance creation |
+| `testRestoreFootprint` | Restore archived ledger entries | State restoration, footprint manipulation |
+| `testCreateTokens` | Initialize token contracts | Token initialization (name, symbol, decimals) |
+| `testMintTokens` | Mint tokens to test accounts | Token minting, balance queries |
+| `testAtomicSwap` | Execute multi-party atomic swap | Multi-party authorization, token exchange |
+
+**Atomic Swap Workflow**:
+
+The atomic swap tests demonstrate a complete multi-party smart contract workflow:
+
+1. **Setup Phase**:
+   - Three accounts created: Admin (submitter), Alice (TokenA holder), Bob (TokenB holder)
+   - Two token contracts deployed and initialized
+   - Tokens minted to respective parties
+
+2. **Swap Phase**:
+   - Alice wants to swap 1000 units of TokenA for at least 4500 units of TokenB
+   - Bob wants to swap 5000 units of TokenB for at least 950 units of TokenA
+   - Admin builds swap transaction with 8 parameters
+   - Transaction simulated to obtain authorization entries
+   - Authorization entries signed by Alice and Bob separately using `Auth.authorizeEntry()`
+   - Transaction rebuilt with signed auth entries
+   - Transaction signed by admin and submitted
+   - Swap executes atomically - both parties exchange tokens or transaction fails
+
+**Key Features Demonstrated**:
+- Multi-party authorization (Alice, Bob, Admin)
+- Two-phase signing: auth entries (parties) + transaction (submitter)
+- Token contract operations (initialize, mint, balance, transfer via swap)
+- Cross-contract calls (swap contract calling token contracts)
+- Contract lifecycle management (upload, deploy, invoke, restore, extend TTL)
+- Real-world DeFi use case (decentralized token exchange)
+
+**Test Dependencies**:
+- testCreateContracts depends on testInstallContracts
+- testCreateTokens depends on testCreateContracts
+- testMintTokens depends on testCreateTokens
+- testAtomicSwap depends on testMintTokens
+- testRestoreFootprint is independent
+
+**Reference**: Ported from Flutter SDK's `soroban_test_atomic_swap.dart` (lines 6-699)
+
+**Test Duration**: ~60-90 seconds for full suite (includes network delays, uploads, and multiple contract operations)
+
+**Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
+
 
 ## Running Integration Tests
 
