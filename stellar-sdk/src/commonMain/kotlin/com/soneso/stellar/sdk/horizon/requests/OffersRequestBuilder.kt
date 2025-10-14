@@ -84,6 +84,19 @@ class OffersRequestBuilder(
     }
 
     /**
+     * Returns all offers where the given account is the seller.
+     *
+     * This is an alias for forSeller() for compatibility with other SDKs.
+     *
+     * @param accountId Account ID of the offer creator
+     * @return This request builder instance
+     * @see <a href="https://developers.stellar.org/api/resources/offers/list/">List All Offers</a>
+     */
+    fun forAccount(accountId: String): OffersRequestBuilder {
+        return forSeller(accountId)
+    }
+
+    /**
      * Returns all offers buying an asset.
      *
      * @param assetType The asset type (native, credit_alphanum4, credit_alphanum12)
@@ -132,6 +145,21 @@ class OffersRequestBuilder(
     ): OffersRequestBuilder {
         setAssetParameter("selling", assetType, assetCode, assetIssuer)
         return this
+    }
+
+    /**
+     * Returns all offers selling an asset.
+     *
+     * @param asset The asset being sold
+     * @return This request builder instance
+     * @see <a href="https://developers.stellar.org/api/resources/offers/list/">List All Offers</a>
+     */
+    fun forSellingAsset(asset: com.soneso.stellar.sdk.Asset): OffersRequestBuilder {
+        return when (asset) {
+            is com.soneso.stellar.sdk.AssetTypeNative -> forSellingAsset("native")
+            is com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4 -> forSellingAsset("credit_alphanum4", asset.code, asset.issuer)
+            is com.soneso.stellar.sdk.AssetTypeCreditAlphaNum12 -> forSellingAsset("credit_alphanum12", asset.code, asset.issuer)
+        }
     }
 
     /**

@@ -765,8 +765,8 @@ class QueryIntegrationTest {
             val askPrice = orderBook1.asks.first().price.toDouble()
             assertEquals(buyingAmountDouble, (askAmount * askPrice).toInt().toDouble(), 0.5, "Ask amount should match")
 
-            val base = orderBook1.base.toSdkAsset()
-            val counter = orderBook1.counter.toSdkAsset()
+            val base = orderBook1.base
+            val counter = orderBook1.counter
 
             assertTrue(base is AssetTypeNative, "Base should be native")
             assertTrue(counter is AssetTypeCreditAlphaNum12, "Counter should be ASTRO")
@@ -791,8 +791,8 @@ class QueryIntegrationTest {
                 assertTrue((bidAmount * bidPrice).toInt() in 20..30, "Bid amount should be in expected range")
             }
 
-            val base2 = orderBook2.base.toSdkAsset()
-            val counter2 = orderBook2.counter.toSdkAsset()
+            val base2 = orderBook2.base
+            val counter2 = orderBook2.counter
 
             assertTrue(counter2 is AssetTypeNative, "Counter should be native when reversed")
             assertTrue(base2 is AssetTypeCreditAlphaNum12, "Base should be ASTRO when reversed")

@@ -10,8 +10,8 @@ import kotlinx.serialization.Serializable
  * It contains lists of bids (buy offers) and asks (sell offers), each with their amounts
  * and prices.
  *
- * @property base The base asset of the trading pair
- * @property counter The counter asset of the trading pair
+ * @property baseAsset The base asset of the trading pair (raw JSON object)
+ * @property counterAsset The counter asset of the trading pair (raw JSON object)
  * @property asks List of sell offers (asks) in the order book
  * @property bids List of buy offers (bids) in the order book
  *
@@ -20,10 +20,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class OrderBookResponse(
     @SerialName("base")
-    val base: Asset,
+    val baseAsset: Asset,
 
     @SerialName("counter")
-    val counter: Asset,
+    val counterAsset: Asset,
 
     @SerialName("asks")
     val asks: List<Row>,
@@ -31,6 +31,24 @@ data class OrderBookResponse(
     @SerialName("bids")
     val bids: List<Row>
 ) : Response() {
+
+    /**
+     * Returns the base asset as an SDK Asset object.
+     *
+     * This converts the Horizon response Asset into a proper SDK Asset type
+     * (AssetTypeNative, AssetTypeCreditAlphaNum4, or AssetTypeCreditAlphaNum12).
+     */
+    val base: com.soneso.stellar.sdk.Asset
+        get() = baseAsset.toSdkAsset()
+
+    /**
+     * Returns the counter asset as an SDK Asset object.
+     *
+     * This converts the Horizon response Asset into a proper SDK Asset type
+     * (AssetTypeNative, AssetTypeCreditAlphaNum4, or AssetTypeCreditAlphaNum12).
+     */
+    val counter: com.soneso.stellar.sdk.Asset
+        get() = counterAsset.toSdkAsset()
 
     /**
      * Represents a single price level in the order book.

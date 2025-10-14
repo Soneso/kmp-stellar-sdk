@@ -12,14 +12,8 @@ import kotlinx.serialization.Serializable
  * @property id Unique identifier for this offer
  * @property pagingToken A cursor value for use in pagination
  * @property seller Account ID of the account making this offer
- * @property selling The asset this offer wants to sell
- * @property sellingAssetType The type of asset being sold (native, credit_alphanum4, credit_alphanum12)
- * @property sellingAssetCode The code of the asset being sold (null for native)
- * @property sellingAssetIssuer The issuer of the asset being sold (null for native)
- * @property buying The asset this offer wants to buy
- * @property buyingAssetType The type of asset being bought (native, credit_alphanum4, credit_alphanum12)
- * @property buyingAssetCode The code of the asset being bought (null for native)
- * @property buyingAssetIssuer The issuer of the asset being bought (null for native)
+ * @property sellingAsset The asset this offer wants to sell (nested JSON object)
+ * @property buyingAsset The asset this offer wants to buy (nested JSON object)
  * @property amount The amount of selling being offered
  * @property priceR The precise representation of buy and sell price as a rational number
  * @property price The price to buy 1 unit of buying in terms of selling, as a string
@@ -41,23 +35,11 @@ data class OfferResponse(
     @SerialName("seller")
     val seller: String,
 
-    @SerialName("selling_asset_type")
-    val sellingAssetType: String? = null,
+    @SerialName("selling")
+    val sellingAsset: Asset,
 
-    @SerialName("selling_asset_code")
-    val sellingAssetCode: String? = null,
-
-    @SerialName("selling_asset_issuer")
-    val sellingAssetIssuer: String? = null,
-
-    @SerialName("buying_asset_type")
-    val buyingAssetType: String? = null,
-
-    @SerialName("buying_asset_code")
-    val buyingAssetCode: String? = null,
-
-    @SerialName("buying_asset_issuer")
-    val buyingAssetIssuer: String? = null,
+    @SerialName("buying")
+    val buyingAsset: Asset,
 
     @SerialName("amount")
     val amount: String,
@@ -84,44 +66,20 @@ data class OfferResponse(
     /**
      * Returns the buying asset as an SDK Asset object.
      *
-     * This converts the Horizon response fields (buyingAssetType, buyingAssetCode, buyingAssetIssuer)
+     * This converts the Horizon response Asset (which contains assetType, assetCode, and assetIssuer)
      * into a proper SDK Asset type (AssetTypeNative, AssetTypeCreditAlphaNum4, or AssetTypeCreditAlphaNum12).
      */
     val buying: com.soneso.stellar.sdk.Asset
-        get() = when (buyingAssetType) {
-            "native" -> com.soneso.stellar.sdk.AssetTypeNative
-            "credit_alphanum4" -> com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4(
-                buyingAssetCode ?: throw IllegalStateException("buyingAssetCode is null for credit asset"),
-                buyingAssetIssuer ?: throw IllegalStateException("buyingAssetIssuer is null for credit asset")
-            )
-            "credit_alphanum12" -> com.soneso.stellar.sdk.AssetTypeCreditAlphaNum12(
-                buyingAssetCode ?: throw IllegalStateException("buyingAssetCode is null for credit asset"),
-                buyingAssetIssuer ?: throw IllegalStateException("buyingAssetIssuer is null for credit asset")
-            )
-            null -> throw IllegalStateException("buyingAssetType is null")
-            else -> throw IllegalArgumentException("Unknown asset type: $buyingAssetType")
-        }
+        get() = buyingAsset.toSdkAsset()
 
     /**
      * Returns the selling asset as an SDK Asset object.
      *
-     * This converts the Horizon response fields (sellingAssetType, sellingAssetCode, sellingAssetIssuer)
+     * This converts the Horizon response Asset (which contains assetType, assetCode, and assetIssuer)
      * into a proper SDK Asset type (AssetTypeNative, AssetTypeCreditAlphaNum4, or AssetTypeCreditAlphaNum12).
      */
     val selling: com.soneso.stellar.sdk.Asset
-        get() = when (sellingAssetType) {
-            "native" -> com.soneso.stellar.sdk.AssetTypeNative
-            "credit_alphanum4" -> com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4(
-                sellingAssetCode ?: throw IllegalStateException("sellingAssetCode is null for credit asset"),
-                sellingAssetIssuer ?: throw IllegalStateException("sellingAssetIssuer is null for credit asset")
-            )
-            "credit_alphanum12" -> com.soneso.stellar.sdk.AssetTypeCreditAlphaNum12(
-                sellingAssetCode ?: throw IllegalStateException("sellingAssetCode is null for credit asset"),
-                sellingAssetIssuer ?: throw IllegalStateException("sellingAssetIssuer is null for credit asset")
-            )
-            null -> throw IllegalStateException("sellingAssetType is null")
-            else -> throw IllegalArgumentException("Unknown asset type: $sellingAssetType")
-        }
+        get() = sellingAsset.toSdkAsset()
 
     /**
      * HAL links connected to this offer.

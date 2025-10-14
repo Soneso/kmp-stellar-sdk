@@ -231,6 +231,66 @@ The atomic swap tests demonstrate a complete multi-party smart contract workflow
 
 **Prerequisites**: Network connectivity to Stellar testnet Soroban RPC server
 
+### TradingIntegrationTest.kt
+
+Comprehensive tests for Stellar trading operations including offers and order books:
+
+| Test | Description | Operations Tested |
+|------|-------------|-------------------|
+| `testManageBuyOffer` | Create, update, and delete buy offers | ManageBuyOffer, order book queries |
+| `testManageSellOffer` | Create, update, and delete sell offers | ManageSellOffer, offer queries |
+| `testCreatePassiveSellOffer` | Create and manage passive sell offers | CreatePassiveSellOffer, offer deletion |
+| `testOfferTradesEndpoint` | Query trades for specific offers | Offer trades endpoint, trade history |
+
+**Trading Workflow Tests**:
+
+The trading tests demonstrate complete offer management:
+
+1. **Buy Offers** (testManageBuyOffer):
+   - Create trustline for custom asset (IOM)
+   - Create buy offer for asset
+   - Verify offer in order book
+   - Update offer (change amount and price)
+   - Delete offer (set amount to 0)
+   - Verify offer removal
+
+2. **Sell Offers** (testManageSellOffer):
+   - Create sell offer for native asset (XLM)
+   - Query offers by account
+   - Verify offer details (buying/selling assets, price, amount)
+   - Delete offer via ManageSellOffer with amount 0
+
+3. **Passive Offers** (testCreatePassiveSellOffer):
+   - Create passive sell offer (doesn't immediately match existing offers)
+   - Query and verify passive offer
+   - Delete via DeletePassiveSellOffer operation
+
+4. **Trade History** (testOfferTradesEndpoint):
+   - Create two accounts and custom asset
+   - Create offers that match and execute trades
+   - Query trade history via `/offers/{offer_id}/trades`
+   - Verify trade details
+
+**Key Features Tested**:
+- Offer creation, modification, and deletion
+- Order book queries and validation
+- Trustline management for custom assets
+- Price and amount calculations
+- Trade execution and history
+- Offer queries by account and asset
+
+**SDK Enhancements**:
+- Fixed OfferResponse deserialization for nested asset JSON
+- Fixed OrderBookResponse deserialization for nested asset JSON
+- Added `forAccount()` convenience method to OffersRequestBuilder
+- Added `forSellingAsset()` method to OffersRequestBuilder
+
+**Reference**: Ported from Flutter SDK's `trading_test.dart`
+
+**Test Duration**: ~30-40 seconds per test (includes account creation, trustlines, and offer operations)
+
+**Prerequisites**: Network connectivity to Stellar testnet Horizon server
+
 
 ## Running Integration Tests
 
