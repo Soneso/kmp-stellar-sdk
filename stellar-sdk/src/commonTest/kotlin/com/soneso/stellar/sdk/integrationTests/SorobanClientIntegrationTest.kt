@@ -12,6 +12,7 @@ import com.soneso.stellar.sdk.xdr.*
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlin.random.Random
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -680,7 +681,7 @@ class SorobanClientIntegrationTest {
 
         val addressObj = Address(accountId)
         val scAddress = addressObj.toSCAddress()
-        val salt = Uint256Xdr(ByteArray(32) { (Math.random() * 256).toInt().toByte() })
+        val salt = Uint256Xdr(ByteArray(32) { Random.nextInt(256).toByte() })
 
         val preimage = ContractIDPreimageXdr.FromAddress(
             ContractIDPreimageFromAddressXdr(address = scAddress, salt = salt)

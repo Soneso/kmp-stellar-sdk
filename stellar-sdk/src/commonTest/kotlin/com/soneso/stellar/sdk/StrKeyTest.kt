@@ -639,6 +639,8 @@ class StrKeyTest {
     }
 
     private fun bytesToHex(bytes: ByteArray): String {
-        return bytes.joinToString("") { "%02x".format(it) }
+        return bytes.joinToString("") { byte ->
+            byte.toInt().and(0xFF).toString(16).padStart(2, '0')
+        }
     }
 }

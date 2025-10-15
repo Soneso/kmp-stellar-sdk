@@ -132,7 +132,9 @@ data class GetTransactionResponse(
         // The WASM hash is returned as bytes
         return when (returnValue) {
             is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes -> {
-                returnValue.value.value.joinToString("") { "%02x".format(it) }
+                returnValue.value.value.joinToString("") { byte ->
+                    byte.toInt().and(0xFF).toString(16).padStart(2, '0')
+                }
             }
             else -> null
         }

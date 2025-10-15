@@ -4,6 +4,7 @@
 
 package com.soneso.stellar.sdk.contract
 
+import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.*
 
@@ -24,7 +25,7 @@ class SorobanContractParserTest {
     @Test
     fun testTokenContractParsing() {
         // Load the token contract WASM file
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode, "Failed to load test WASM file")
         assertTrue(byteCode.size > 0, "WASM file is empty")
 
@@ -82,7 +83,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testFunctionEntryParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -117,7 +118,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testUdtStructParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -150,7 +151,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testUdtEnumParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -184,7 +185,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testUdtErrorEnumParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -218,7 +219,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testUdtUnionParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -252,7 +253,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testEventParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -284,7 +285,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testMetaEntryParsing() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -305,7 +306,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testSpecTypeInfoExtraction() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -362,7 +363,7 @@ class SorobanContractParserTest {
     fun testContractWithoutMetadata() {
         // Create a minimal contract bytecode with only env meta and spec
         // This tests the parser's ability to handle missing contractmetav0 section
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -377,7 +378,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testRoundTripEncoding() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -404,7 +405,7 @@ class SorobanContractParserTest {
      */
     @Test
     fun testSpecEntryCompleteness() {
-        val byteCode = loadTestResource("wasm/soroban_token_contract.wasm")
+        val byteCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         assertNotNull(byteCode)
 
         val contractInfo = SorobanContractParser.parseContractByteCode(byteCode)
@@ -425,19 +426,4 @@ class SorobanContractParserTest {
         }
     }
 
-    /**
-     * Helper function to load test resources.
-     * This is a common test pattern that should work across all platforms.
-     */
-    private fun loadTestResource(path: String): ByteArray {
-        // For JVM tests, we can use class loader
-        // For other platforms, this will need to be adapted
-        return try {
-            val resourceStream = this::class.java.classLoader.getResourceAsStream(path)
-            checkNotNull(resourceStream) { "Test resource not found: $path" }
-            resourceStream.readBytes()
-        } catch (e: Exception) {
-            fail("Failed to load test resource '$path': ${e.message}")
-        }
-    }
 }
