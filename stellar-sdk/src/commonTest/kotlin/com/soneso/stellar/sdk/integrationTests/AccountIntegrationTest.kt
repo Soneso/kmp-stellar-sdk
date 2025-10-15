@@ -796,6 +796,8 @@ class AccountIntegrationTest {
                 }
             )
 
+        delay(3000)
+
         try {
             // Submit first payment from B to A to trigger the stream
             val accountB = horizonServer.accounts().account(accountBId)
@@ -819,8 +821,11 @@ class AccountIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "First payment transaction should succeed")
 
-            // Wait for stream to receive all events (real-time delay)
-            delay(30000)
+            // Wait for stream to receive all events
+            // Use real delay (not virtual time) since SSE stream runs on Dispatchers.Default
+            withContext(Dispatchers.Default) {
+                delay(30000)
+            }
 
             // Verify count
             assertEquals(3, count, "Should receive 3 transaction events")

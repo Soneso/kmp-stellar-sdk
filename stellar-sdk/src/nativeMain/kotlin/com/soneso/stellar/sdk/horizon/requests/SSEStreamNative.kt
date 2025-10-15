@@ -13,6 +13,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.yield
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import platform.posix.gettimeofday
@@ -89,6 +90,9 @@ private suspend fun parseSSEStream(
         while (!channel.isClosedForRead) {
             coroutineContext.ensureActive()
 
+            // Yield to allow other coroutines to run (important for event processing)
+            yield()
+
             val line = try {
                 channel.readUTF8Line() ?: break
             } catch (e: Exception) {
@@ -105,6 +109,8 @@ private suspend fun parseSSEStream(
                         val data = currentData.toString().trimEnd()
                         onEvent(currentEventId, data)
                         currentData = StringBuilder()
+                        // Yield after processing event to allow listeners to react
+                        yield()
                     }
                 }
                 line.startsWith(":") -> {

@@ -367,3 +367,4 @@ When implementing features, use the Java Stellar SDK as a reference:
 - Located at: `/Users/chris/projects/Stellar/java-stellar-sdk`
 - Provides production-tested implementations of Stellar protocols
 - Use as a guide for API design and feature completeness
+- never mark tests with the ignore annotation
