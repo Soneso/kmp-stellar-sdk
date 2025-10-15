@@ -11,10 +11,10 @@ kotlin {
                 }
             }
             webpackTask {
-                outputFileName = "stellar-sample.js"
+                mainOutputFileName.set("stellar-sample.js")
             }
             runTask {
-                outputFileName = "stellar-sample.js"
+                mainOutputFileName.set("stellar-sample.js")
             }
         }
         binaries.executable()
