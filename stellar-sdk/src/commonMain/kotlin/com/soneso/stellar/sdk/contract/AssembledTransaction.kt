@@ -470,9 +470,17 @@ class AssembledTransaction<T>(
         // Rebuild the transaction with the updated operation
         val currentTx = builtTransaction!!
 
-        // Create new transaction builder with same source account from original builder
+        // IMPORTANT: Use the source account from the BUILT transaction, not the builder
+        // The built transaction has the correct (updated) sequence number from simulate()
+        // Note: We use sequenceNumber - 1 because TransactionBuilder increments it when building
+        val sourceAccountWithCorrectSeq = Account(
+            currentTx.sourceAccount,
+            currentTx.sequenceNumber - 1
+        )
+
+        // Create new transaction builder with correct sequence number
         val newBuilder = TransactionBuilder(
-            sourceAccount = transactionBuilder.sourceAccount,
+            sourceAccount = sourceAccountWithCorrectSeq,
             network = transactionBuilder.network
         )
             .addOperation(updatedOperation)
@@ -705,10 +713,26 @@ class AssembledTransaction<T>(
         if (sendTransactionResponse == null) {
             sendTransactionResponse = server.sendTransaction(builtTransaction!!)
             if (sendTransactionResponse!!.status != SendTransactionStatus.PENDING) {
-                throw SendTransactionFailedException(
-                    "Sending the transaction to the network failed!",
-                    this
-                )
+                val status = sendTransactionResponse!!.status
+                val errorMessage = buildString {
+                    append("Sending the transaction to the network failed! Status: $status")
+
+                    if (status == SendTransactionStatus.ERROR && sendTransactionResponse!!.errorResultXdr != null) {
+                        append("\nError Result XDR: ${sendTransactionResponse!!.errorResultXdr}")
+                        try {
+                            val txResult = sendTransactionResponse!!.parseErrorResultXdr()
+                            append("\nParsed Error: $txResult")
+                        } catch (e: Exception) {
+                            append("\n(Could not parse error XDR: ${e.message})")
+                        }
+                    }
+
+                    if (sendTransactionResponse!!.diagnosticEventsXdr != null && sendTransactionResponse!!.diagnosticEventsXdr!!.isNotEmpty()) {
+                        append("\nDiagnostic Events: ${sendTransactionResponse!!.diagnosticEventsXdr!!.joinToString(", ")}")
+                    }
+                }
+
+                throw SendTransactionFailedException(errorMessage, this)
             }
         }
 

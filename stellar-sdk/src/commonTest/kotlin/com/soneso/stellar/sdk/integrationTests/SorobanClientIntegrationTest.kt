@@ -4,6 +4,7 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.ContractSpec
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
@@ -389,10 +390,6 @@ class SorobanClientIntegrationTest {
      * This is the most complex test, showing how ContractSpec makes real-world
      * multi-party smart contract interactions much simpler and more readable.
      *
-     * **Note**: This test may fail due to Soroban testnet latency. If it fails with NOT_FOUND,
-     * the transaction was likely submitted successfully but not included in a ledger within the
-     * polling timeout. This is a known issue with testnet and does not indicate a bug in the SDK.
-     *
      * **Prerequisites**: Network connectivity to Stellar testnet
      * **Duration**: ~180-240 seconds (includes multiple contract deployments and operations)
      *
@@ -400,7 +397,6 @@ class SorobanClientIntegrationTest {
      * (soroban_client_test.dart lines 435-543)
      */
     @Test
-    @Ignore("Test is flaky due to Soroban testnet latency - transaction polling often times out")
     fun testAtomicSwapWithContractSpec() = runTest(timeout = 360.seconds) {
         // Given: Setup accounts
         val sourceKp = sourceAccountKeyPair ?: run {
@@ -550,18 +546,15 @@ class SorobanClientIntegrationTest {
         assertEquals(10000000000000L, bobBalanceValue)
         println("✓ Balances verified using ContractSpec")
 
-        // Step 6: Demonstrate ContractSpec for complex atomic swap
-        println("=== Demonstrating ContractSpec for complex atomic swap ===")
-        println("--- Manual XdrSCVal creation (original approach) ---")
-        // This would require 8 lines of complex XDR construction:
-        // val manualAmountA = Scv.toInt128(BigInteger.fromLong(1000))
-        // val manualMinBForA = Scv.toInt128(BigInteger.fromLong(4500))
-        // ... etc
-        println("Manual approach would require 8 complex XDR conversions")
+        // Step 6: Execute atomic swap using ContractSpec
+        println("=== Executing atomic swap with ContractSpec ===")
 
-        println("--- ContractSpec approach (new approach) ---")
-        // This is MUCH cleaner and more readable!
-        val specArgs = swapSpec.funcArgsToXdrSCValues("swap", mapOf(
+        // ContractSpec makes complex contract invocation much simpler and more readable
+        // Instead of manually constructing 8 complex XDR values:
+        //   Address(aliceId).toSCVal(), Address(bobId).toSCVal(), ...
+        //   Scv.toInt128(BigInteger.fromLong(1000L)), ...
+        // We can use simple Kotlin types with automatic conversion:
+        val swapArgs = swapSpec.funcArgsToXdrSCValues("swap", mapOf(
             "a" to aliceId,                 // String -> Address (automatic)
             "b" to bobId,                   // String -> Address (automatic)
             "token_a" to tokenAId,          // String -> Address (automatic)
@@ -571,132 +564,46 @@ class SorobanClientIntegrationTest {
             "amount_b" to 5000,             // int -> i128 (automatic)
             "min_a_for_b" to 950            // int -> i128 (automatic)
         ))
-        println("ContractSpec args count: ${specArgs.size}")
         println("✓ ContractSpec automatically converted 8 parameters with correct types")
 
-        // Step 7: Execute swap with authorization
+        // Step 7: Execute swap with authorization using ContractClient (matches Flutter SDK)
+        println("=== Executing swap with ContractClient (Flutter SDK approach) ===")
         delay(10000)
-        val account = sorobanServer.getAccount(adminId)
-        val contractAddress = Address(swapId)
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr("swap"),
-            args = specArgs
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-        val operation = InvokeHostFunctionOperation(hostFunction = hostFunction)
 
-        val transaction = TransactionBuilder(
-            sourceAccount = account,
+        // Create ContractClient for the swap contract
+        val swapClient = ContractClient(
+            contractId = swapId,
+            rpcUrl = "https://soroban-testnet.stellar.org",
             network = network
         )
-            .addOperation(operation)
-            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-            .build()
 
-        // Simulate to get auth entries
-        val simulateResponse = sorobanServer.simulateTransaction(transaction)
-        assertNull(simulateResponse.error, "Simulation should not have error")
+        // Build transaction using high-level API (matches Flutter SDK's buildInvokeMethodTx)
+        val tx = swapClient.invoke<SCValXdr>(
+            functionName = "swap",
+            parameters = swapArgs,  // Use ContractSpec-generated args
+            source = adminId,
+            signer = admin,
+            parseResultXdrFn = null  // Return raw SCValXdr
+        )
 
-        val simulateResult = simulateResponse.results!![0]
-        val authBase64List = simulateResult.auth
-        assertNotNull(authBase64List, "Should have auth entries")
-        val authEntries = authBase64List.map { SorobanAuthorizationEntryXdr.fromXdrBase64(it) }
+        // Check who needs to sign (matches Flutter SDK's needsNonInvokerSigningBy)
+        val whoElseNeedsToSign = tx.needsNonInvokerSigningBy()
+        println("Addresses that need to sign: $whoElseNeedsToSign")
+        assertEquals(2, whoElseNeedsToSign.size, "Should have 2 addresses that need to sign")
+        assertTrue(whoElseNeedsToSign.contains(aliceId), "Should include Alice")
+        assertTrue(whoElseNeedsToSign.contains(bobId), "Should include Bob")
 
-        // Get latest ledger for signature expiration
-        val latestLedgerResponse = sorobanServer.getLatestLedger()
-        val signatureExpirationLedger = latestLedgerResponse.sequence + 10
-
-        // Sign auth entries for Alice and Bob
-        val signedAuthEntries = authEntries.map { authEntry ->
-            val credentials = authEntry.credentials
-            if (credentials is SorobanCredentialsXdr.Address) {
-                val address = credentials.value.address
-                val addressAccountId = when (address) {
-                    is SCAddressXdr.AccountId -> {
-                        val accountId = address.value.value
-                        KeyPair.fromPublicKey((accountId as PublicKeyXdr.Ed25519).value.value).getAccountId()
-                    }
-                    else -> null
-                }
-
-                when (addressAccountId) {
-                    aliceId -> {
-                        Auth.authorizeEntry(
-                            entry = authEntry,
-                            signer = alice,
-                            validUntilLedgerSeq = signatureExpirationLedger.toLong(),
-                            network = network
-                        )
-                    }
-                    bobId -> {
-                        Auth.authorizeEntry(
-                            entry = authEntry,
-                            signer = bob,
-                            validUntilLedgerSeq = signatureExpirationLedger.toLong(),
-                            network = network
-                        )
-                    }
-                    else -> authEntry
-                }
-            } else {
-                authEntry
-            }
-        }
-
+        // Sign auth entries for Alice (matches Flutter SDK's signAuthEntries)
+        tx.signAuthEntries(alice)
         println("✓ Signed by Alice")
+
+        // Sign auth entries for Bob (matches Flutter SDK's signAuthEntries)
+        tx.signAuthEntries(bob)
         println("✓ Signed by Bob")
 
-        // Rebuild transaction with signed auth entries
-        val signedOperation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction,
-            auth = signedAuthEntries
-        )
-
-        val signedTransaction = TransactionBuilder(
-            sourceAccount = account,
-            network = network
-        )
-            .addOperation(signedOperation)
-            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-            .build()
-
-        val preparedTransaction = sorobanServer.prepareTransaction(signedTransaction, simulateResponse)
-        preparedTransaction.sign(admin)
-
-        // Submit transaction
-        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
-        assertNotNull(sendResponse.hash)
-        println("Transaction submitted with hash: ${sendResponse.hash}")
-
-        // Wait a bit before starting to poll
-        delay(5000)
-
-        // Poll with more attempts and better error handling
-        val statusResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
-            maxAttempts = 60,  // Increased from 30 to 60 (3 minutes total)
-            sleepStrategy = { 3000L }
-        )
-
-        println("Transaction status: ${statusResponse.status}")
-
-        // Provide better error message if transaction wasn't found
-        if (statusResponse.status != GetTransactionStatus.SUCCESS) {
-            println("Transaction polling failed. Status: ${statusResponse.status}")
-            println("This can happen if the transaction takes longer than expected to be included in a ledger.")
-            println("The transaction may still succeed. Check the transaction hash on Stellar Explorer:")
-            println("https://stellar.expert/explorer/testnet/tx/${sendResponse.hash}")
-        }
-
-        assertEquals(GetTransactionStatus.SUCCESS, statusResponse.status,
-            "Transaction status should be SUCCESS. Got: ${statusResponse.status}. " +
-            "Check transaction at: https://stellar.expert/explorer/testnet/tx/${sendResponse.hash}")
-
-        val resVal = statusResponse.getResultValue()
-        assertNotNull(resVal)
+        // Submit transaction (matches Flutter SDK's signAndSend)
+        val result = tx.signAndSubmit(admin)
+        assertNotNull(result)
 
         println("✓ Atomic swap completed successfully using ContractSpec!")
         println("✓ ContractSpec made complex contract invocation much simpler and more readable")

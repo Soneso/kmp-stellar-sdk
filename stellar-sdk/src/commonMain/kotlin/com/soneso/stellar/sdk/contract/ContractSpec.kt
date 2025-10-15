@@ -252,16 +252,15 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Handle 128-bit unsigned integer conversion
      */
     private fun handleU128Type(value: Any?): SCValXdr {
-        // Handle small integers
         val intVal = parseInteger(value, "u128")
         if (intVal < 0) {
             throw ContractSpecException.invalidType("Value $intVal out of range for u128")
         }
 
-        // Simple conversion for values that fit in long
-        val hi = 0UL
-        val lo = intVal.toULong()
-        return SCValXdr.U128(UInt128PartsXdr(Uint64Xdr(hi), Uint64Xdr(lo)))
+        // Use Scv.toUint128 for proper conversion
+        return com.soneso.stellar.sdk.scval.Scv.toUint128(
+            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
+        )
     }
 
     /**
@@ -270,10 +269,10 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     private fun handleI128Type(value: Any?): SCValXdr {
         val intVal = parseInteger(value, "i128")
 
-        // Sign extension for negative values
-        val hi = if (intVal < 0) -1L else 0L
-        val lo = intVal
-        return SCValXdr.I128(Int128PartsXdr(Int64Xdr(hi), Uint64Xdr(lo.toULong())))
+        // Use Scv.toInt128 for proper conversion
+        return com.soneso.stellar.sdk.scval.Scv.toInt128(
+            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
+        )
     }
 
     /**
@@ -285,19 +284,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
             throw ContractSpecException.invalidType("Value $intVal out of range for u256")
         }
 
-        // For small integers, we can represent them in the lower 64 bits
-        val hiHi = 0UL
-        val hiLo = 0UL
-        val loHi = 0UL
-        val loLo = intVal.toULong()
-
-        return SCValXdr.U256(
-            UInt256PartsXdr(
-                hiHi = Uint64Xdr(hiHi),
-                hiLo = Uint64Xdr(hiLo),
-                loHi = Uint64Xdr(loHi),
-                loLo = Uint64Xdr(loLo)
-            )
+        // Use Scv.toUint256 for proper conversion
+        return com.soneso.stellar.sdk.scval.Scv.toUint256(
+            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }
 
@@ -307,19 +296,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     private fun handleI256Type(value: Any?): SCValXdr {
         val intVal = parseInteger(value, "i256")
 
-        // Sign extension for negative values
-        val hiHi = if (intVal < 0) -1L else 0L
-        val hiLo = if (intVal < 0) -1L else 0L
-        val loHi = if (intVal < 0) -1L else 0L
-        val loLo = intVal
-
-        return SCValXdr.I256(
-            Int256PartsXdr(
-                hiHi = Int64Xdr(hiHi),
-                hiLo = Uint64Xdr(hiLo.toULong()),
-                loHi = Uint64Xdr(loHi.toULong()),
-                loLo = Uint64Xdr(loLo.toULong())
-            )
+        // Use Scv.toInt256 for proper conversion
+        return com.soneso.stellar.sdk.scval.Scv.toInt256(
+            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }
 

@@ -373,8 +373,8 @@ object Auth {
         // 6. Verify the signature
         verifySignature(preimage, signature)
 
-        // 7. Build the signature SCVal and update credentials
-        val signatureScVal = buildSignatureScVal(signature)
+        // 7. Build the signature SCVal by APPENDING to existing signatures
+        val signatureScVal = buildSignatureScVal(signature, updatedCredentials.signature)
         val signedCredentials = updatedCredentials.copy(signature = signatureScVal)
 
         // 8. Return the signed entry
@@ -432,19 +432,38 @@ object Auth {
      * - "public_key": Bytes (32-byte Ed25519 public key)
      * - "signature": Bytes (64-byte Ed25519 signature)
      *
+     * **Important**: This method APPENDS the new signature to any existing signatures
+     * in the credentials, matching the Flutter SDK behavior. This is critical for
+     * multi-party authorization scenarios (e.g., atomic swaps).
+     *
      * @see <a href="https://developers.stellar.org/docs/learn/encyclopedia/contract-development/contract-interactions/stellar-transaction#stellar-account-signatures">Stellar Account Signatures</a>
      * @param signature The signature containing public key and signature bytes
-     * @return An SCVal containing the signature structure
+     * @param existingSignature The existing signature SCVal from the credentials (may contain prior signatures)
+     * @return An SCVal containing the signature structure with all signatures (existing + new)
      */
-    private fun buildSignatureScVal(signature: Signature): SCValXdr {
+    private fun buildSignatureScVal(signature: Signature, existingSignature: SCValXdr): SCValXdr {
         val publicKeyBytes = KeyPair.fromAccountId(signature.publicKey).getPublicKey()
 
-        val sigMap = linkedMapOf(
+        // Build the new signature map
+        val newSigMap = linkedMapOf(
             Scv.toSymbol("public_key") to Scv.toBytes(publicKeyBytes),
             Scv.toSymbol("signature") to Scv.toBytes(signature.signature)
         )
 
-        return Scv.toVec(listOf(Scv.toMap(sigMap)))
+        // Collect existing signatures from the Vec (if any)
+        val existingSignatures = mutableListOf<SCValXdr>()
+        if (existingSignature is SCValXdr.Vec) {
+            val vec = existingSignature.value?.value
+            if (vec != null) {
+                existingSignatures.addAll(vec)
+            }
+        }
+
+        // Append the new signature to existing signatures
+        existingSignatures.add(Scv.toMap(newSigMap))
+
+        // Return a Vec containing all signatures
+        return Scv.toVec(existingSignatures)
     }
 
     /**

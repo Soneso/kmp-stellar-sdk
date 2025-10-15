@@ -579,17 +579,24 @@ class SorobanServer(
         var lastResponse: GetTransactionResponse? = null
 
         while (attempts < maxAttempts) {
-            val response = getTransaction(hash)
-            lastResponse = response
+            try {
+                val response = getTransaction(hash)
+                lastResponse = response
 
-            // Check if transaction reached final state
-            if (response.status != GetTransactionStatus.NOT_FOUND) {
-                return response
+                // Check if transaction reached final state
+                if (response.status != GetTransactionStatus.NOT_FOUND) {
+                    return response
+                }
+            } catch (e: Exception) {
+                // Ignore temporary RPC errors and keep polling (matches Flutter SDK behavior)
+                // This handles network glitches, rate limiting, and other transient issues
+                // without stopping the polling loop
             }
 
             attempts++
             if (attempts < maxAttempts) {
-                delay(sleepStrategy(attempts))
+                val sleepTime = sleepStrategy(attempts)
+                delay(sleepTime)
             }
         }
 
