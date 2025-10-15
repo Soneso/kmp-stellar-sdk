@@ -1,7 +1,6 @@
 package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.contract.ContractClient
@@ -9,7 +8,6 @@ import com.soneso.stellar.sdk.contract.ContractSpec
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -19,7 +17,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Integration tests for SorobanClient high-level API and ContractSpec functionality.
  *
- * These tests verify the SDK's high-level contract interaction APIs against a live Stellar testnet.
+ * These tests verify the SDK's high-level contract interaction APIs against a live Stellar network.
  * They cover:
  * - ContractSpec-based automatic type conversion
  * - Hello contract invocation with ContractSpec
@@ -27,20 +25,28 @@ import kotlin.time.Duration.Companion.seconds
  * - Atomic swap with ContractSpec (multi-party authorization)
  * - Comparison of manual XDR construction vs ContractSpec approach
  *
- * **Test Network**: All tests use Stellar testnet Soroban RPC server.
+ * **Test Network**: Tests support both Stellar testnet and futurenet Soroban RPC servers.
+ * Configure the network using the `testOn` variable (line 57).
  *
  * ## Running Tests
  *
- * These tests require network access to Soroban testnet RPC and Friendbot:
+ * These tests require network access to Soroban RPC (testnet or futurenet) and Friendbot:
  * ```bash
+ * # Run on JVM
  * ./gradlew :stellar-sdk:jvmTest --tests "SorobanClientIntegrationTest"
+ *
+ * # Run on macOS Native
+ * ./gradlew :stellar-sdk:macosArm64Test --tests "SorobanClientIntegrationTest"
+ *
+ * # Run on JavaScript Node.js (individual test classes)
+ * ./gradlew :stellar-sdk:jsNodeTest --tests "SorobanClientIntegrationTest"
  * ```
  *
- * ## Known Issues
+ * **Network Configuration**: Change `testOn` variable (line 57) to switch between networks:
+ * - `testOn = "testnet"` (default) - Uses Stellar testnet
+ * - `testOn = "futurenet"` - Uses Stellar futurenet
  *
- * - testAtomicSwapWithContractSpec may fail due to Soroban testnet latency (transaction NOT_FOUND)
- * - This is a known issue with complex multi-party transactions on testnet
- * - The transaction typically succeeds but polling times out before it's included in a ledger
+ * **Platform Support**: Tests run on all platforms (JVM, macOS Native, JavaScript Node)
  *
  * ## Ported From
  *
@@ -56,10 +62,17 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SorobanClientIntegrationTest {
 
-    private val testOn = "testnet"
-    private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
-    private val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-    private val network = Network.TESTNET
+    private val testOn = "testnet" // or "futurenet"
+    private val sorobanServer = if (testOn == "testnet") {
+        SorobanServer("https://soroban-testnet.stellar.org")
+    } else {
+        SorobanServer("https://rpc-futurenet.stellar.org")
+    }
+    private val network = if (testOn == "testnet") {
+        Network.TESTNET
+    } else {
+        Network.FUTURENET
+    }
 
     companion object {
         /**
@@ -148,7 +161,7 @@ class SorobanClientIntegrationTest {
      * The hello contract has a "hello" function that takes a symbol parameter (name)
      * and returns a vector with two symbols: ["Hello", <parameter>].
      *
-     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Prerequisites**: Network connectivity to Stellar testnet or futurenet (configurable via `testOn`)
      * **Duration**: ~60-90 seconds (includes upload, deploy, and invocation)
      *
      * **Reference**: Ported from Flutter SDK's test hello contract with ContractSpec
@@ -161,7 +174,11 @@ class SorobanClientIntegrationTest {
         val accountId = keyPair.getAccountId()
         sourceAccountKeyPair = keyPair
 
-        FriendBot.fundTestnetAccount(accountId)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountId)
+        } else {
+            FriendBot.fundFuturenetAccount(accountId)
+        }
         delay(5000) // Wait for account creation
 
         // Step 1: Upload hello contract
@@ -182,7 +199,7 @@ class SorobanClientIntegrationTest {
         delay(5000)
         val contractInfo = sorobanServer.loadContractInfoForContractId(contractId)
         assertNotNull(contractInfo, "Contract info should be loaded")
-        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.specEntries.isNotEmpty(), "Contract should have spec entries")
 
         // Create ContractSpec from spec entries
         val contractSpec = ContractSpec(contractInfo.specEntries)
@@ -195,7 +212,7 @@ class SorobanClientIntegrationTest {
 
         val helloFunc = contractSpec.getFunc("hello")
         assertNotNull(helloFunc, "Should find hello function")
-        assertEquals("hello", helloFunc!!.name.value, "Function name should be 'hello'")
+        assertEquals("hello", helloFunc.name.value, "Function name should be 'hello'")
         assertTrue(helloFunc.inputs.isNotEmpty(), "Hello function should have inputs")
         println("Found hello function with ${helloFunc.inputs.size} input(s)")
 
@@ -206,7 +223,7 @@ class SorobanClientIntegrationTest {
 
         // Validate manual result
         assertTrue(manualResult is SCValXdr.Vec, "Result should be a vector")
-        val manualVec = (manualResult as SCValXdr.Vec).value?.value
+        val manualVec = manualResult.value?.value
         assertNotNull(manualVec, "Vector should not be null")
         assertEquals(2, manualVec.size, "Vector should have 2 elements")
         assertTrue(manualVec[0] is SCValXdr.Sym, "First element should be a symbol")
@@ -230,7 +247,7 @@ class SorobanClientIntegrationTest {
 
         // Validate ContractSpec result
         assertTrue(specResult is SCValXdr.Vec, "Result should be a vector")
-        val specVec = (specResult as SCValXdr.Vec).value?.value
+        val specVec = specResult.value?.value
         assertNotNull(specVec, "Vector should not be null")
         assertEquals(2, specVec.size, "Vector should have 2 elements")
         assertTrue(specVec[0] is SCValXdr.Sym, "First element should be a symbol")
@@ -274,7 +291,7 @@ class SorobanClientIntegrationTest {
      * The auth contract has an "increment" function that requires authorization
      * from a specific user account and takes a u32 value to increment.
      *
-     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Prerequisites**: Network connectivity to Stellar testnet or futurenet (configurable via `testOn`)
      * **Duration**: ~60-90 seconds (includes deploy and invocations)
      *
      * **Reference**: Ported from Flutter SDK's test auth with ContractSpec
@@ -285,7 +302,11 @@ class SorobanClientIntegrationTest {
         // Given: Use existing account or create new one
         val keyPair = sourceAccountKeyPair ?: run {
             val kp = KeyPair.random()
-            FriendBot.fundTestnetAccount(kp.getAccountId())
+            if (testOn == "testnet") {
+                FriendBot.fundTestnetAccount(kp.getAccountId())
+            } else {
+                FriendBot.fundFuturenetAccount(kp.getAccountId())
+            }
             delay(5000)
             sourceAccountKeyPair = kp
             kp
@@ -315,7 +336,7 @@ class SorobanClientIntegrationTest {
         delay(5000)
         val contractInfo = sorobanServer.loadContractInfoForContractId(contractId)
         assertNotNull(contractInfo, "Contract info should be loaded")
-        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.specEntries.isNotEmpty(), "Contract should have spec entries")
 
         // Create ContractSpec from spec entries
         val contractSpec = ContractSpec(contractInfo.specEntries)
@@ -333,7 +354,7 @@ class SorobanClientIntegrationTest {
 
         // Validate manual result
         assertTrue(manualResult is SCValXdr.U32, "Result should be u32")
-        val manualValue = (manualResult as SCValXdr.U32).value.value
+        val manualValue = manualResult.value.value
         assertEquals(5u, manualValue)
         println("Manual result: $manualValue")
 
@@ -353,7 +374,7 @@ class SorobanClientIntegrationTest {
 
         // Validate ContractSpec result
         assertTrue(specResult is SCValXdr.U32, "Result should be u32")
-        val specValue = (specResult as SCValXdr.U32).value.value
+        val specValue = specResult.value.value
         assertEquals(12u, specValue) // 5 + 7
         println("ContractSpec result: $specValue")
 
@@ -391,7 +412,7 @@ class SorobanClientIntegrationTest {
      * This is the most complex test, showing how ContractSpec makes real-world
      * multi-party smart contract interactions much simpler and more readable.
      *
-     * **Prerequisites**: Network connectivity to Stellar testnet
+     * **Prerequisites**: Network connectivity to Stellar testnet or futurenet (configurable via `testOn`)
      * **Duration**: ~180-240 seconds (includes multiple contract deployments and operations)
      *
      * **Reference**: Ported from Flutter SDK's test atomic swap with ContractSpec
@@ -400,9 +421,13 @@ class SorobanClientIntegrationTest {
     @Test
     fun testAtomicSwapWithContractSpec() = runTest(timeout = 360.seconds) {
         // Given: Setup accounts
-        val sourceKp = sourceAccountKeyPair ?: run {
+        sourceAccountKeyPair ?: run {
             val kp = KeyPair.random()
-            FriendBot.fundTestnetAccount(kp.getAccountId())
+            if (testOn == "testnet") {
+                FriendBot.fundTestnetAccount(kp.getAccountId())
+            } else {
+                FriendBot.fundFuturenetAccount(kp.getAccountId())
+            }
             delay(5000)
             sourceAccountKeyPair = kp
             kp
@@ -411,7 +436,11 @@ class SorobanClientIntegrationTest {
         // Create admin, alice, bob accounts
         val admin = adminKeyPair ?: run {
             val kp = KeyPair.random()
-            FriendBot.fundTestnetAccount(kp.getAccountId())
+            if (testOn == "testnet") {
+                FriendBot.fundTestnetAccount(kp.getAccountId())
+            } else {
+                FriendBot.fundFuturenetAccount(kp.getAccountId())
+            }
             delay(5000)
             adminKeyPair = kp
             kp
@@ -419,7 +448,11 @@ class SorobanClientIntegrationTest {
 
         val alice = aliceKeyPair ?: run {
             val kp = KeyPair.random()
-            FriendBot.fundTestnetAccount(kp.getAccountId())
+            if (testOn == "testnet") {
+                FriendBot.fundTestnetAccount(kp.getAccountId())
+            } else {
+                FriendBot.fundFuturenetAccount(kp.getAccountId())
+            }
             delay(5000)
             aliceKeyPair = kp
             kp
@@ -427,7 +460,11 @@ class SorobanClientIntegrationTest {
 
         val bob = bobKeyPair ?: run {
             val kp = KeyPair.random()
-            FriendBot.fundTestnetAccount(kp.getAccountId())
+            if (testOn == "testnet") {
+                FriendBot.fundTestnetAccount(kp.getAccountId())
+            } else {
+                FriendBot.fundFuturenetAccount(kp.getAccountId())
+            }
             delay(5000)
             bobKeyPair = kp
             kp
@@ -459,7 +496,7 @@ class SorobanClientIntegrationTest {
         // Upload/deploy token contract for TokenB
         delay(5000)
         val tokenBId = tokenBContractId ?: run {
-            val tokenCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
+            TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
             val wasmId = tokenContractWasmId!!
             val cid = deployContractWithKeypair(wasmId, admin)
             tokenBContractId = cid
@@ -571,10 +608,16 @@ class SorobanClientIntegrationTest {
         println("=== Executing swap with ContractClient (Flutter SDK approach) ===")
         delay(10000)
 
-        // Create ContractClient for the swap contract
+        // Create ContractClient for the swap contract (use network-aware URL)
+        val rpcUrl = if (testOn == "testnet") {
+            "https://soroban-testnet.stellar.org"
+        } else {
+            "https://rpc-futurenet.stellar.org"
+        }
+
         val swapClient = ContractClient(
             contractId = swapId,
-            rpcUrl = "https://soroban-testnet.stellar.org",
+            rpcUrl = rpcUrl,
             network = network
         )
 
@@ -651,7 +694,7 @@ class SorobanClientIntegrationTest {
         assertNotNull(sendResponse.hash)
 
         val rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 60,  // Increased from 30 to 60
             sleepStrategy = { 3000L }
         )
@@ -660,7 +703,7 @@ class SorobanClientIntegrationTest {
 
         val wasmId = rpcResponse.getWasmId()
         assertNotNull(wasmId)
-        return wasmId!!
+        return wasmId
     }
 
     /**
@@ -717,7 +760,7 @@ class SorobanClientIntegrationTest {
         assertNotNull(sendResponse.hash)
 
         val rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 60,  // Increased from 30 to 60
             sleepStrategy = { 3000L }
         )
@@ -726,7 +769,7 @@ class SorobanClientIntegrationTest {
 
         val contractId = rpcResponse.getCreatedContractId()
         assertNotNull(contractId)
-        return contractId!!
+        return contractId
     }
 
     /**
@@ -782,7 +825,7 @@ class SorobanClientIntegrationTest {
         assertNotNull(sendResponse.hash)
 
         val rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 60,  // Increased from 30 to 60
             sleepStrategy = { 3000L }
         )
@@ -791,6 +834,6 @@ class SorobanClientIntegrationTest {
 
         val resVal = rpcResponse.getResultValue()
         assertNotNull(resVal)
-        return resVal!!
+        return resVal
     }
 }

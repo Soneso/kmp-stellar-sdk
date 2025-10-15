@@ -156,6 +156,11 @@ kotlin {
             kotlin.srcDir("src/nativeMain/kotlin")
         }
 
+        val nativeTest by creating {
+            dependsOn(commonTest)
+            kotlin.srcDir("src/nativeTest/kotlin")
+        }
+
         val iosMain by creating {
             dependsOn(nativeMain)
             dependencies {
@@ -164,7 +169,7 @@ kotlin {
         }
 
         val iosTest by creating {
-            dependsOn(commonTest)
+            dependsOn(nativeTest)
         }
 
         // Configure iOS targets to use shared source sets
@@ -185,7 +190,7 @@ kotlin {
         }
 
         val macosTest by creating {
-            dependsOn(commonTest)
+            dependsOn(nativeTest)
         }
 
         val macosX64Main by getting { dependsOn(macosMain) }
