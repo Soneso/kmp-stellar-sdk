@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     kotlin("android")
-    kotlin("plugin.compose") version "2.0.21"
+    kotlin("plugin.compose") version "2.2.0"
 }
 
 android {
@@ -27,9 +27,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions {
-        jvmTarget = "1.8"
-        freeCompilerArgs += listOf("-Xsuppress-version-warnings", "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+            freeCompilerArgs.add("-Xsuppress-version-warnings")
+            freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+        }
     }
 
     buildFeatures {
