@@ -5,8 +5,10 @@ plugins {
 
 kotlin {
     jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "11"
+            }
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -34,7 +36,7 @@ kotlin {
         nodejs {
             testTask {
                 useMocha {
-                    timeout = "600s"  // Increased for integration tests with multiple network calls and delays
+                    timeout = "10s"
                 }
             }
         }
