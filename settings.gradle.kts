@@ -1,6 +1,9 @@
 rootProject.name = "kmp-stellar-sdk"
 
 include(":stellar-sdk")
-include(":stellarSample:shared")
-include(":stellarSample:androidApp")
-include(":stellarSample:webApp")
+include(":demo:shared")
+include(":demo:androidApp")
+include(":demo:desktopApp")
+include(":demo:webApp")
+include(":demo:webJsApp")
+include(":demo:macosApp")
