@@ -53,13 +53,13 @@ struct ContentView: View {
                 Button("Generate Keypair") {
                     generateKeypair()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(BorderedButtonStyle())
                 .disabled(isLoading)
 
                 Button("Clear") {
                     keypairInfo = "Click 'Generate Keypair' to start"
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedButtonStyle())
             }
 
             Spacer()
@@ -84,7 +84,16 @@ struct ContentView: View {
 
                 // Get account ID and secret seed
                 let accountId = keypair.getAccountId()
-                let secretSeed = String(keypair.getSecretSeed() ?? [])
+                let secretSeedChars = keypair.getSecretSeed()
+                var secretSeed = ""
+                if let chars = secretSeedChars {
+                    for i in 0..<Int(chars.size) {
+                        let charValue = chars.get(index: Int32(i))
+                        if let scalar = UnicodeScalar(UInt32(charValue)) {
+                            secretSeed.append(Character(scalar))
+                        }
+                    }
+                }
                 let canSign = keypair.canSign()
                 let cryptoLib = KeyPair.Companion.shared.getCryptoLibraryName()
 

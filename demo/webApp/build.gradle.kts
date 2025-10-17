@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
@@ -7,21 +5,26 @@ plugins {
 }
 
 kotlin {
-    // Use wasmJs instead of js for Compose UI support (experimental)
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
+    js(IR) {
         browser {
             commonWebpackConfig {
-                outputFileName = "stellarDemo.js"
+                outputFileName = "stellarDemoJs.js"
+                devServer = devServer?.copy(
+                    port = 8081,
+                    open = false
+                )
             }
         }
         binaries.executable()
     }
 
     sourceSets {
-        val wasmJsMain by getting {
+        val jsMain by getting {
             dependencies {
                 implementation(project(":demo:shared"))
+                implementation(compose.ui)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
             }
         }
     }

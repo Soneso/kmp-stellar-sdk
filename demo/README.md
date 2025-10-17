@@ -12,8 +12,7 @@ This demo app follows the **Compose Multiplatform** architecture pattern:
   - iOS: SwiftUI wrapper around Compose
   - Desktop: JVM window wrapper
   - macOS Native: SwiftUI with KMP SDK (no Compose UI)
-  - Web (JS): Stable JavaScript with Compose (production-ready)
-  - Web (WASM): Experimental WebAssembly with Compose (cutting-edge)
+  - Web: Stable JavaScript with Compose (production-ready)
 
 ## Project Structure
 
@@ -26,15 +25,13 @@ demo/
 │   │   ├── desktopMain/   # Desktop-specific code
 │   │   ├── iosMain/       # iOS-specific code
 │   │   ├── jsMain/        # JavaScript-specific code
-│   │   ├── macosMain/     # macOS native-specific code
-│   │   └── wasmJsMain/    # WebAssembly-specific code
+│   │   └── macosMain/     # macOS native-specific code
 │   └── build.gradle.kts
 ├── androidApp/            # Android entry point
 ├── desktopApp/            # Desktop JVM entry point (works on macOS!)
 ├── iosApp/                # iOS SwiftUI entry point
 ├── macosApp/              # macOS native SwiftUI entry point
-├── webJsApp/              # Web JavaScript entry point (stable, production-ready)
-└── webApp/                # Web WASM entry point (experimental)
+└── webApp/                # Web JavaScript entry point (stable, production-ready)
 ```
 
 ## Building and Running
@@ -77,53 +74,32 @@ open StellarDemo.xcodeproj
 
 **Note**: See `demo/macosApp/README.md` for details. The native macOS app uses SwiftUI (not Compose) due to Compose Multiplatform limitations. For Compose UI on macOS, use the Desktop app.
 
-### Web (JavaScript - Stable) ✅
-**Recommended for production web applications**
+### Web ✅
+**Production-ready JavaScript web application**
 ```bash
 # Development server with hot reload
-./gradlew :demo:webJsApp:jsBrowserDevelopmentRun
+./gradlew :demo:webApp:jsBrowserDevelopmentRun
 # Opens at http://localhost:8081
 
 # Production build (optimized, ~955 KB)
-./gradlew :demo:webJsApp:jsBrowserProductionWebpack
+./gradlew :demo:webApp:jsBrowserProductionWebpack
 ```
 
 **Browser Support**: All modern browsers (Chrome 90+, Firefox 88+, Safari 15.4+, Edge 90+)
 
-See `demo/webJsApp/README.md` for detailed documentation.
+See `demo/webApp/README.md` for detailed documentation.
 
-### Web (WASM - Experimental) 🚧
-**For cutting-edge browsers only**
-```bash
-# Development server
-./gradlew :demo:webApp:wasmJsBrowserDevelopmentRun
-# Opens at http://localhost:8080
+## Web Application
 
-# Production build
-./gradlew :demo:webApp:wasmJsBrowserProductionWebpack
-```
+The web application uses stable Kotlin/JS with Compose Multiplatform, providing production-ready support for all modern browsers.
 
-**Browser Support**: Chrome 119+, Firefox 120+, Safari 17.4+ (limited compatibility)
-
-## Web Targets: JS vs WASM
-
-### Which Web Target Should I Use?
-
-| Feature | **JavaScript (webJsApp)** | **WASM (webApp)** |
-|---------|---------------------------|-------------------|
-| **Status** | ✅ **Stable & Production-Ready** | ⚠️ Experimental |
-| **Browser Support** | ✅ All modern browsers | ⚠️ Latest browsers only |
-| **Bundle Size** | ~955 KB (production) | ~1.2 MB |
-| **Startup Time** | Fast | Very Fast |
-| **Performance** | Good (60 FPS) | Excellent (120 FPS) |
-| **Compatibility** | Maximum | Limited |
-| **Mobile Browsers** | ✅ Full support | ⚠️ Limited support |
-| **Corporate/Enterprise** | ✅ Excellent | ⚠️ May not work |
-| **Recommended For** | Production apps | Experimental/Future |
-
-**Recommendation**:
-- **Use webJsApp (JS)** for production applications that need to work everywhere
-- **Use webApp (WASM)** for experimental projects or if you only target the latest browsers
+**Features**:
+- ✅ Stable & Production-Ready
+- ✅ All modern browsers (Chrome 90+, Firefox 88+, Safari 15.4+, Edge 90+)
+- ✅ Bundle Size: ~955 KB (production)
+- ✅ Fast startup time
+- ✅ Full mobile browser support
+- ✅ Enterprise-ready compatibility
 
 ## Features
 
@@ -133,7 +109,7 @@ See `demo/webJsApp/README.md` for detailed documentation.
 - ✅ Key Generation screen (placeholder)
 - ✅ Material 3 design system
 - ✅ Cross-platform architecture
-- ✅ Web support (both JS and WASM)
+- ✅ Web support (JavaScript)
 
 ### Planned
 - Key generation and management UI
@@ -152,7 +128,7 @@ See `demo/webJsApp/README.md` for detailed documentation.
 - **Voyager**: Navigation library
 - **Material 3**: Design system
 - **Stellar SDK**: Core SDK functionality
-- **Skiko**: Canvas-based rendering for web (JS + WASM)
+- **Skiko**: Canvas-based rendering for web (JavaScript)
 
 ## Platform Support Status
 
@@ -162,8 +138,7 @@ See `demo/webJsApp/README.md` for detailed documentation.
 | Desktop (JVM) | Compose | ✅ Ready | Works on macOS, Windows, Linux |
 | iOS | Compose | ✅ Ready | Requires Xcode |
 | macOS (Native) | SwiftUI | ✅ Ready | Alternative to Desktop |
-| **Web (JS)** | **Compose** | **✅ Ready** | **Production-ready, all browsers** |
-| Web (WASM) | Compose | 🚧 Experimental | Latest browsers only |
+| Web | Compose | ✅ Ready | Production-ready, all modern browsers |
 
 ## macOS: Two Options
 
@@ -180,24 +155,6 @@ See `demo/webJsApp/README.md` for detailed documentation.
 - ❌ **SwiftUI UI** - Can't use Compose UI (platform limitation)
 
 See `demo/macosApp/README.md` for detailed comparison and rationale.
-
-## Web: Two Options
-
-### Option 1: JavaScript (Stable) - **Recommended**
-- ✅ **Production-ready** - Stable Kotlin/JS
-- ✅ **Maximum compatibility** - All modern browsers
-- ✅ **Mobile support** - Full mobile browser support
-- ✅ **Enterprise-ready** - Works in corporate environments
-- Bundle: ~955 KB (production)
-
-### Option 2: WebAssembly (Experimental)
-- ⚠️ **Experimental** - Cutting-edge technology
-- ⚠️ **Limited browsers** - Latest browsers only
-- ⚠️ **Future-focused** - Not yet stable
-- ✅ **Best performance** - Faster than JS
-- Bundle: ~1.2 MB
-
-See `demo/webJsApp/README.md` for detailed web documentation.
 
 ## Adding New Demo Topics
 
@@ -217,9 +174,8 @@ DemoTopic(
 
 ## Development Notes
 
-- The web targets use Skiko-based canvas rendering for Compose UI
+- The web target uses Skiko-based canvas rendering for Compose UI
 - JavaScript target is stable and production-ready
-- WASM target is experimental and requires latest browsers
 - All platforms share the same UI code from `commonMain` (except macOS native)
 - Platform-specific code is minimal and only used for entry points
 - The app uses Material 3 design system for consistent UI across platforms
@@ -274,11 +230,8 @@ DemoTopic(
    # macOS Native (requires Xcode + libsodium)
    cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
 
-   # Web (JavaScript - Stable)
-   ./gradlew :demo:webJsApp:jsBrowserDevelopmentRun
-
-   # Web (WASM - Experimental)
-   ./gradlew :demo:webApp:wasmJsBrowserDevelopmentRun
+   # Web (JavaScript)
+   ./gradlew :demo:webApp:jsBrowserDevelopmentRun
    ```
 
 3. **Explore the code**:

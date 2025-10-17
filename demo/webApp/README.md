@@ -1,24 +1,18 @@
-# Stellar SDK Demo - Stable JavaScript (JS) Web App
+# Stellar SDK Demo - JavaScript Web App
 
-This is the **stable JavaScript (JS)** version of the Stellar SDK demo web app using Kotlin/JS with Compose Multiplatform.
+This is the **production-ready JavaScript** version of the Stellar SDK demo web app using Kotlin/JS with Compose Multiplatform.
 
 ## Overview
 
 This web app demonstrates the Stellar SDK's capabilities running in the browser using stable Kotlin/JS with Skiko-based canvas rendering.
 
-### JS vs WASM
-
-| Feature | JS (this module) | WASM (`webApp`) |
-|---------|-----------------|-----------------|
-| **Status** | ✅ Stable | ⚠️ Experimental |
-| **Browser Support** | All modern browsers | Chrome 119+, Firefox 120+, Safari 17.4+ |
-| **Bundle Size (prod)** | ~955 KB | ~1.2 MB |
-| **Startup Time** | Fast | Very Fast |
-| **Performance** | Good | Excellent |
-| **Compatibility** | Maximum | Limited |
-| **Use Case** | Production apps | Cutting-edge/future |
-
-**Recommendation**: Use this **JS version** for production applications that need maximum browser compatibility. Use WASM for experimental/future-focused projects.
+**Key Features**:
+- ✅ Stable and production-ready
+- ✅ All modern browsers (Chrome 90+, Firefox 88+, Safari 15.4+, Edge 90+)
+- ✅ Bundle Size: ~955 KB (production)
+- ✅ Fast startup time
+- ✅ Full mobile browser support
+- ✅ Enterprise-ready compatibility
 
 ## Architecture
 
@@ -32,15 +26,15 @@ This web app demonstrates the Stellar SDK's capabilities running in the browser 
 
 ### Development Build
 ```bash
-./gradlew :demo:webJsApp:jsBrowserDevelopmentWebpack
+./gradlew :demo:webApp:jsBrowserDevelopmentWebpack
 ```
-Output: `demo/webJsApp/build/kotlin-webpack/js/developmentExecutable/`
+Output: `demo/webApp/build/kotlin-webpack/js/developmentExecutable/`
 
 ### Production Build
 ```bash
-./gradlew :demo:webJsApp:jsBrowserProductionWebpack
+./gradlew :demo:webApp:jsBrowserProductionWebpack
 ```
-Output: `demo/webJsApp/build/kotlin-webpack/js/productionExecutable/`
+Output: `demo/webApp/build/kotlin-webpack/js/productionExecutable/`
 
 Production build is minified and optimized (~955 KB).
 
@@ -48,13 +42,13 @@ Production build is minified and optimized (~955 KB).
 
 ### Development Server (with hot reload)
 ```bash
-./gradlew :demo:webJsApp:jsBrowserDevelopmentRun
+./gradlew :demo:webApp:jsBrowserDevelopmentRun
 ```
 Opens at: http://localhost:8081
 
 ### Production Server (for testing)
 ```bash
-./gradlew :demo:webJsApp:jsBrowserProductionRun
+./gradlew :demo:webApp:jsBrowserProductionRun
 ```
 
 ## Browser Compatibility
@@ -88,12 +82,12 @@ The production build can be deployed to any static hosting service:
 
 1. Build production bundle:
    ```bash
-   ./gradlew :demo:webJsApp:jsBrowserProductionWebpack
+   ./gradlew :demo:webApp:jsBrowserProductionWebpack
    ```
 
 2. Copy output directory to hosting:
    ```bash
-   cp -r demo/webJsApp/build/kotlin-webpack/js/productionExecutable/ /path/to/hosting/
+   cp -r demo/webApp/build/kotlin-webpack/js/productionExecutable/ /path/to/hosting/
    ```
 
 3. Serve with any web server (nginx, Apache, Netlify, Vercel, GitHub Pages, etc.)
@@ -101,7 +95,7 @@ The production build can be deployed to any static hosting service:
 ### Example: Simple HTTP Server
 
 ```bash
-cd demo/webJsApp/build/kotlin-webpack/js/productionExecutable/
+cd demo/webApp/build/kotlin-webpack/js/productionExecutable/
 python3 -m http.server 8000
 ```
 Open: http://localhost:8000
@@ -127,7 +121,7 @@ Open: http://localhost:8000
 
 ### Project Structure
 ```
-webJsApp/
+webApp/
 ├── build.gradle.kts          # Kotlin/JS configuration
 ├── src/
 │   └── jsMain/
@@ -175,21 +169,15 @@ The Stellar SDK automatically initializes libsodium.js. If you see crypto errors
 2. Wait for initialization before calling crypto functions
 3. All SDK functions are `suspend` functions - use in coroutine scope
 
-## Comparison with WASM
+## Why JavaScript?
 
-### When to Use JS (this module)
-- ✅ Need maximum browser compatibility
-- ✅ Supporting older browsers
-- ✅ Production applications today
-- ✅ Mobile browsers (better support)
-- ✅ Corporate/enterprise environments
+This web app uses stable Kotlin/JS for maximum compatibility and production readiness:
 
-### When to Use WASM
-- ⚠️ Cutting-edge browsers only
-- ⚠️ Experimental/demo projects
-- ⚠️ Performance-critical applications
-- ⚠️ Future-focused development
-- ⚠️ Latest browser features required
+- ✅ **Maximum browser compatibility** - Works on all modern browsers
+- ✅ **Mobile browser support** - Full support on iOS and Android browsers
+- ✅ **Production-ready** - Stable and battle-tested
+- ✅ **Enterprise environments** - Works in corporate networks
+- ✅ **Proven technology** - Kotlin/JS is mature and well-supported
 
 ## Resources
 

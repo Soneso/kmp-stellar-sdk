@@ -46,6 +46,8 @@ kotlin {
         macosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
+            // Export stellar-sdk so it's accessible from Swift
+            export(project(":stellar-sdk"))
         }
     }
 
@@ -59,12 +61,12 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
 
-                // Navigation
-                implementation("cafe.adriel.voyager:voyager-navigator:1.0.0")
-                implementation("cafe.adriel.voyager:voyager-transitions:1.0.0")
+                // Navigation - using 1.1.0-beta02 for better JS/WASM support
+                implementation("cafe.adriel.voyager:voyager-navigator:1.1.0-beta02")
+                implementation("cafe.adriel.voyager:voyager-transitions:1.1.0-beta02")
 
                 // Stellar SDK
-                implementation(project(":stellar-sdk"))
+                api(project(":stellar-sdk"))
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")

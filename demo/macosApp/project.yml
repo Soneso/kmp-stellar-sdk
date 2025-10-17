@@ -23,20 +23,27 @@ targets:
         - $(inherited)
         - $(SRCROOT)/../../shared/build/bin/macosArm64/debugFramework
         - $(SRCROOT)/../../shared/build/bin/macosX64/debugFramework
+      LIBRARY_SEARCH_PATHS:
+        - $(inherited)
+        - /opt/homebrew/opt/libsodium/lib
+      HEADER_SEARCH_PATHS:
+        - $(inherited)
+        - /opt/homebrew/opt/libsodium/include
       OTHER_LDFLAGS:
         - $(inherited)
         - -framework shared
+        - -lsodium
       MACOSX_DEPLOYMENT_TARGET: 11.0
     dependencies:
       - framework: ../shared/build/bin/macosArm64/debugFramework/shared.framework
         embed: true
-    preBuildScripts:
-      - script: |
-          cd "$SRCROOT/../../.."
-          if [ "$(uname -m)" = "arm64" ]; then
-            ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
-          else
-            ./gradlew :demo:shared:linkDebugFrameworkMacosX64
-          fi
-        name: Build Kotlin Framework
-        basedOnDependencyAnalysis: false
+    # preBuildScripts:
+    #   - script: |
+    #       cd "$SRCROOT/../../.."
+    #       if [ "$(uname -m)" = "arm64" ]; then
+    #         ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
+    #       else
+    #         ./gradlew :demo:shared:linkDebugFrameworkMacosX64
+    #       fi
+    #     name: Build Kotlin Framework
+    #     basedOnDependencyAnalysis: false

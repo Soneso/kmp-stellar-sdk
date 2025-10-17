@@ -15,11 +15,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<real>1</real>
+	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<integer>1</integer>
 	<key>LSMinimumSystemVersion</key>
-	<real>11</real>
+	<string>11.0</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2025 Stellar Development Foundation</string>
 </dict>
