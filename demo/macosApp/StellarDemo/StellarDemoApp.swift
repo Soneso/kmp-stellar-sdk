@@ -239,7 +239,7 @@ struct DemoTopicCard<Destination: View>: View {
 struct KeyGenerationScreen: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var toastManager: ToastManager
-    @State private var keypairData: KeyPairData?
+    @State private var keypairData: GeneratedKeyPair?
     @State private var isGenerating = false
     @State private var showSecret = false
 

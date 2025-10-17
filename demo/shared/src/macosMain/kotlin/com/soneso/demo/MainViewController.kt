@@ -1,10 +1,10 @@
 package com.soneso.demo
 
 import androidx.compose.runtime.Composable
+import com.soneso.demo.stellar.GeneratedKeyPair
+import com.soneso.demo.stellar.KeyPairGenerationResult
+import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.stellar.sdk.KeyPair
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * Bridge between Swift UI and Kotlin business logic for native macOS app.
@@ -26,15 +26,20 @@ class MacOSBridge {
     /**
      * Generate a random Stellar keypair asynchronously.
      * Call this from Swift using async/await.
+     *
+     * Uses the centralized KeyPairGeneration business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * @return GeneratedKeyPair with publicKey and secretSeed
+     * @throws Exception if keypair generation fails
      */
-    suspend fun generateKeypair(): KeyPairData {
-        val keypair = KeyPair.random()
-        return KeyPairData(
-            accountId = keypair.getAccountId(),
-            secretSeed = keypair.getSecretSeed()?.concatToString() ?: "",
-            canSign = keypair.canSign(),
-            cryptoLibrary = KeyPair.getCryptoLibraryName()
-        )
+    suspend fun generateKeypair(): GeneratedKeyPair {
+        return when (val result = generateRandomKeyPair()) {
+            is KeyPairGenerationResult.Success -> result.keyPair
+            is KeyPairGenerationResult.Error -> {
+                throw Exception(result.message, result.exception)
+            }
+        }
     }
 
     /**
@@ -53,17 +58,6 @@ class MacOSBridge {
         return keypair.verify(data, signature)
     }
 }
-
-/**
- * Data class to pass keypair information to Swift.
- * Swift cannot directly access KeyPair due to memory management differences.
- */
-data class KeyPairData(
-    val accountId: String,
-    val secretSeed: String,
-    val canSign: Boolean,
-    val cryptoLibrary: String
-)
 
 /**
  * Provides access to the App composable for potential future Compose integration.
