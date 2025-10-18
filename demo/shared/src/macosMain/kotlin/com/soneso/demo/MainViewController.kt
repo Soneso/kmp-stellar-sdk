@@ -1,6 +1,8 @@
 package com.soneso.demo
 
+import com.soneso.demo.stellar.AccountFundingResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
+import com.soneso.demo.stellar.fundTestnetAccount
 import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.stellar.sdk.KeyPair
 
@@ -39,5 +41,18 @@ class MacOSBridge {
             }
         }
     }
-}
 
+    /**
+     * Fund a Stellar testnet account using the SDK's built-in FriendBot service.
+     * Call this from Swift using async/await.
+     *
+     * Uses the centralized AccountFunding business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * @param accountId The Stellar account ID to fund (must start with 'G')
+     * @return AccountFundingResult indicating success or failure
+     */
+    suspend fun fundAccount(accountId: String): AccountFundingResult {
+        return fundTestnetAccount(accountId)
+    }
+}

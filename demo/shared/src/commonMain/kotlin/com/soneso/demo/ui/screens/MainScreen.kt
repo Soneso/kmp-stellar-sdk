@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.*
@@ -36,6 +37,12 @@ class MainScreen : Screen {
                 description = "Generate and manage Stellar keypairs",
                 icon = Icons.Default.Key,
                 screen = KeyGenerationScreen()
+            ),
+            DemoTopic(
+                title = "Fund Testnet Account",
+                description = "Get test XLM from Friendbot for testnet development",
+                icon = Icons.Default.AccountBalance,
+                screen = FundAccountScreen()
             )
             // TODO: Add more demo topics here
             // Examples:
