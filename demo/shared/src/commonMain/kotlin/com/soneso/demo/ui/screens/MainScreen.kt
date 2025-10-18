@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,11 +44,16 @@ class MainScreen : Screen {
                 description = "Get test XLM from Friendbot for testnet development",
                 icon = Icons.Default.AccountBalance,
                 screen = FundAccountScreen()
+            ),
+            DemoTopic(
+                title = "Fetch Account Details",
+                description = "Retrieve comprehensive account information from Horizon",
+                icon = Icons.Default.Person,
+                screen = AccountDetailsScreen()
             )
             // TODO: Add more demo topics here
             // Examples:
             // - Transaction Signing
-            // - Account Operations
             // - Payment Operations
             // - Asset Management
             // - Smart Contract Interactions

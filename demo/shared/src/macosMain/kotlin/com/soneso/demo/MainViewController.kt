@@ -1,7 +1,9 @@
 package com.soneso.demo
 
+import com.soneso.demo.stellar.AccountDetailsResult
 import com.soneso.demo.stellar.AccountFundingResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
+import com.soneso.demo.stellar.fetchAccountDetails
 import com.soneso.demo.stellar.fundTestnetAccount
 import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.stellar.sdk.KeyPair
@@ -54,5 +56,20 @@ class MacOSBridge {
      */
     suspend fun fundAccount(accountId: String): AccountFundingResult {
         return fundTestnetAccount(accountId)
+    }
+
+    /**
+     * Fetch detailed account information from the Stellar network.
+     * Call this from Swift using async/await.
+     *
+     * Uses the centralized AccountDetails business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * @param accountId The Stellar account ID to fetch (must start with 'G')
+     * @param useTestnet If true, connects to testnet; otherwise connects to public network
+     * @return AccountDetailsResult with full account data or error details
+     */
+    suspend fun fetchAccountDetails(accountId: String, useTestnet: Boolean = true): AccountDetailsResult {
+        return com.soneso.demo.stellar.fetchAccountDetails(accountId, useTestnet)
     }
 }

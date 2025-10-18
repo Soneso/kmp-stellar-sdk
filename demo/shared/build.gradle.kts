@@ -1,7 +1,6 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
-    kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.compose")
 }
@@ -55,6 +54,11 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                // ============================================================
+                // UI Framework - Compose Multiplatform
+                // ============================================================
+                // Compose runtime, foundation, and Material 3 components for building
+                // cross-platform UI demonstrating SDK functionality
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
@@ -62,23 +66,32 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
 
-                // Navigation - using 1.1.0-beta02 for better JS/WASM support
+                // ============================================================
+                // Navigation
+                // ============================================================
+                // Voyager for multi-screen navigation across all platforms
+                // Using 1.1.0-beta02 for better JS/WASM support
                 implementation("cafe.adriel.voyager:voyager-navigator:1.1.0-beta02")
                 implementation("cafe.adriel.voyager:voyager-transitions:1.1.0-beta02")
 
+                // ============================================================
                 // Stellar SDK
+                // ============================================================
+                // The main SDK dependency - provides all Stellar functionality:
+                // - KeyPair generation and signing (cryptography)
+                // - FriendBot for testnet funding (HTTP client internally)
+                // - Transaction building and submission
+                // - All transitive dependencies (ktor, serialization, coroutines, etc.)
                 api(project(":stellar-sdk"))
 
+                // ============================================================
                 // Coroutines
+                // ============================================================
+                // Required for calling suspend functions from UI coroutineScopes
+                // (e.g., KeyPair.random(), FriendBot.fundTestnetAccount())
+                // Note: Also provided transitively by stellar-sdk, but explicitly
+                // declared here since it's used directly in UI layer
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-
-                // HTTP Client (inherited from stellar-sdk, but explicitly declared for clarity)
-                implementation("io.ktor:ktor-client-core:2.3.8")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-
-                // Serialization
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
             }
         }
 
@@ -89,29 +102,33 @@ kotlin {
             }
         }
 
+        // ============================================================
+        // Android Platform
+        // ============================================================
         val androidMain by getting {
             dependencies {
+                // Android-specific Compose integration
                 implementation("androidx.activity:activity-compose:1.8.2")
                 implementation("androidx.appcompat:appcompat:1.6.1")
-                // Platform-specific HTTP client
-                implementation("io.ktor:ktor-client-okhttp:2.3.8")
             }
         }
 
+        // ============================================================
+        // Desktop Platform (JVM)
+        // ============================================================
         val desktopMain by getting {
             dependencies {
+                // Desktop-specific Compose support
                 implementation(compose.desktop.common)
-                // Platform-specific HTTP client
-                implementation("io.ktor:ktor-client-cio:2.3.8")
             }
         }
 
+        // ============================================================
+        // iOS Platform
+        // ============================================================
         val iosMain by creating {
             dependsOn(commonMain)
-            dependencies {
-                // Platform-specific HTTP client
-                implementation("io.ktor:ktor-client-darwin:2.3.8")
-            }
+            // No additional dependencies needed - stellar-sdk provides everything
         }
 
         val iosX64Main by getting {
@@ -126,12 +143,12 @@ kotlin {
             dependsOn(iosMain)
         }
 
+        // ============================================================
+        // macOS Platform
+        // ============================================================
         val macosMain by creating {
             dependsOn(commonMain)
-            dependencies {
-                // Platform-specific HTTP client
-                implementation("io.ktor:ktor-client-darwin:2.3.8")
-            }
+            // No additional dependencies needed - stellar-sdk provides everything
         }
 
         val macosX64Main by getting {
@@ -142,16 +159,22 @@ kotlin {
             dependsOn(macosMain)
         }
 
+        // ============================================================
+        // JavaScript Platform (Browser)
+        // ============================================================
         val jsMain by getting {
             dependencies {
+                // HTML-based Compose for web
                 implementation(compose.html.core)
-                // Platform-specific HTTP client
-                implementation("io.ktor:ktor-client-js:2.3.8")
             }
         }
 
+        // ============================================================
+        // WebAssembly Platform
+        // ============================================================
         val wasmJsMain by getting {
             dependsOn(commonMain)
+            // No additional dependencies needed
         }
     }
 }
