@@ -1,7 +1,5 @@
 package com.soneso.demo
 
-import androidx.compose.runtime.Composable
-import com.soneso.demo.stellar.GeneratedKeyPair
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.stellar.sdk.KeyPair
@@ -30,10 +28,10 @@ class MacOSBridge {
      * Uses the centralized KeyPairGeneration business logic to maintain consistency
      * across all platform UIs (Compose, SwiftUI, Web).
      *
-     * @return GeneratedKeyPair with publicKey and secretSeed
+     * @return KeyPair instance from the Stellar SDK
      * @throws Exception if keypair generation fails
      */
-    suspend fun generateKeypair(): GeneratedKeyPair {
+    suspend fun generateKeypair(): KeyPair {
         return when (val result = generateRandomKeyPair()) {
             is KeyPairGenerationResult.Success -> result.keyPair
             is KeyPairGenerationResult.Error -> {
@@ -41,29 +39,5 @@ class MacOSBridge {
             }
         }
     }
-
-    /**
-     * Sign data with a keypair.
-     */
-    suspend fun signData(secretSeed: String, data: ByteArray): ByteArray {
-        val keypair = KeyPair.fromSecretSeed(secretSeed)
-        return keypair.sign(data)
-    }
-
-    /**
-     * Verify a signature.
-     */
-    suspend fun verifySignature(accountId: String, data: ByteArray, signature: ByteArray): Boolean {
-        val keypair = KeyPair.fromAccountId(accountId)
-        return keypair.verify(data, signature)
-    }
 }
 
-/**
- * Provides access to the App composable for potential future Compose integration.
- * Currently not used, but available if Compose Multiplatform adds native macOS support.
- */
-@Suppress("unused")
-fun getAppComposable(): @Composable () -> Unit = {
-    App()
-}

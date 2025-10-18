@@ -20,9 +20,9 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.demo.stellar.GeneratedKeyPair
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.generateRandomKeyPair
+import com.soneso.stellar.sdk.KeyPair
 import kotlinx.coroutines.launch
 
 class KeyGenerationScreen : Screen {
@@ -33,7 +33,7 @@ class KeyGenerationScreen : Screen {
         val coroutineScope = rememberCoroutineScope()
 
         // State for the generated keypair
-        var keypair by remember { mutableStateOf<GeneratedKeyPair?>(null) }
+        var keypair by remember { mutableStateOf<KeyPair?>(null) }
         var isGenerating by remember { mutableStateOf(false) }
         var showSecret by remember { mutableStateOf(false) }
         var snackbarMessage by remember { mutableStateOf<String?>(null) }
@@ -153,7 +153,7 @@ class KeyGenerationScreen : Screen {
                     // Public Key Card
                     KeyDisplayCard(
                         title = "Public Key (Account ID)",
-                        value = kp.accountId,
+                        value = kp.getAccountId(),
                         description = "This is your public address. Share this to receive payments.",
                         onCopy = {
                             snackbarMessage = "Public key copied to clipboard"
@@ -163,7 +163,7 @@ class KeyGenerationScreen : Screen {
                     // Secret Seed Card
                     SecretKeyDisplayCard(
                         title = "Secret Seed",
-                        value = kp.secretSeed,
+                        keypair = kp,
                         description = "NEVER share this! Anyone with this seed can access your account.",
                         isVisible = showSecret,
                         onToggleVisibility = { showSecret = !showSecret },
@@ -272,7 +272,7 @@ private fun KeyDisplayCard(
 @Composable
 private fun SecretKeyDisplayCard(
     title: String,
-    value: String,
+    keypair: KeyPair,
     description: String,
     isVisible: Boolean,
     onToggleVisibility: () -> Unit,
@@ -325,7 +325,11 @@ private fun SecretKeyDisplayCard(
 
             SelectionContainer {
                 Text(
-                    text = if (isVisible) value else "•".repeat(56),
+                    text = if (isVisible) {
+                        keypair.getSecretSeed()?.concatToString() ?: ""
+                    } else {
+                        "•".repeat(56)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,

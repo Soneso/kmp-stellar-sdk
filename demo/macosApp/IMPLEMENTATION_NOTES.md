@@ -57,35 +57,77 @@ listOf(
 // demo/shared/src/macosMain/kotlin/com/soneso/demo/MainViewController.kt
 package com.soneso.demo
 
-import androidx.compose.runtime.Composable
+import com.soneso.demo.stellar.KeyPairGenerationResult
+import com.soneso.demo.stellar.generateRandomKeyPair
+import com.soneso.stellar.sdk.KeyPair
 
-// Exports the composable for potential future use
-@Suppress("unused")
-fun getAppComposable(): @Composable () -> Unit = {
-    App()
-}
-```
-
-Note: This exports the `App` composable, but it's not currently used since we're rendering with SwiftUI. It's here for potential future Compose native macOS support.
-
-### Swift Implementation
-
-```swift
-// demo/macosApp/StellarDemo/StellarDemoApp.swift
-@main
-struct StellarDemoApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
+/**
+ * Bridge between Swift UI and Kotlin business logic for native macOS app.
+ *
+ * This approach allows:
+ * - Native macOS app with SwiftUI
+ * - Shared business logic from Kotlin
+ * - Access to the Stellar SDK
+ */
+class MacOSBridge {
+    /**
+     * Generate a random Stellar keypair asynchronously.
+     * Call this from Swift using async/await.
+     */
+    suspend fun generateKeypair(): KeyPair {
+        return when (val result = generateRandomKeyPair()) {
+            is KeyPairGenerationResult.Success -> result.keyPair
+            is KeyPairGenerationResult.Error -> {
+                throw Exception(result.message, result.exception)
+            }
         }
     }
 }
+```
 
-struct ContentView: View {
-    func generateKeypair() {
+Note: Instead of exporting Compose components (which can't be used on native macOS), we provide a bridge class that exposes business logic methods that SwiftUI can call directly.
+
+### Swift Implementation
+
+The Swift app includes an extension to handle CharArray-to-String conversion for secret seeds:
+
+```swift
+// demo/macosApp/StellarDemo/StellarDemoApp.swift
+
+// MARK: - Kotlin Interop Extensions
+extension KeyPair {
+    /// Convert Kotlin CharArray to Swift String
+    /// The secret seed is kept as CharArray in the SDK for better security,
+    /// so we only convert it to String in the UI layer when needed for display.
+    func getSecretSeedAsString() -> String? {
+        guard let charArray = getSecretSeed() else { return nil }
+        var characters: [Character] = []
+        for i in 0..<charArray.size {
+            let unicodeValue = UInt16(charArray.get(index: i))
+            if let scalar = UnicodeScalar(unicodeValue) {
+                characters.append(Character(scalar))
+            }
+        }
+        return String(characters)
+    }
+}
+```
+
+The app uses MacOSBridge to call Kotlin business logic:
+
+```swift
+struct KeyGenerationScreen: View {
+    private let bridge = MacOSBridge()
+
+    private func generateKeypair() {
         Task {
-            let keypair = try await KeyPair.Companion.shared.random()
-            // ... use keypair ...
+            do {
+                let keypair = try await bridge.generateKeypair()
+                // Use keypair.getAccountId() for public key
+                // Use keypair.getSecretSeedAsString() for secret seed display
+            } catch {
+                // Handle error
+            }
         }
     }
 }
@@ -115,13 +157,17 @@ preBuildScripts:
 - ✅ Added `macosX64()` and `macosArm64()` targets
 - ✅ Created `macosMain` source set
 - ✅ Added framework configuration
-- ✅ Created `MainViewController.kt` (exports App composable)
+- ✅ Created `MainViewController.kt` with `MacOSBridge` class for Swift interop
 
 ### 2. macOS App Module
 
 - ✅ Created `demo/macosApp/` directory structure
 - ✅ Created `project.yml` for xcodegen
 - ✅ Created `StellarDemoApp.swift` with SwiftUI implementation
+  - Material 3-inspired design matching other platform UIs
+  - KeyPair extension for CharArray-to-String conversion
+  - Toast notifications for user feedback
+  - Full key generation screen with show/hide secret functionality
 - ✅ Created `Info.plist` for macOS app configuration
 - ✅ Created `build.gradle.kts` with helper tasks
 - ✅ Created comprehensive `README.md`
@@ -152,7 +198,8 @@ The implementation was tested:
 |--------|---------|-----------|
 | UI Framework | Compose (via ComposeUIViewController) | SwiftUI (native) |
 | Wrapper | UIViewControllerRepresentable | Native SwiftUI App |
-| Framework API | ComposeUIViewController | Direct SDK calls |
+| Framework API | ComposeUIViewController | MacOSBridge class |
+| CharArray handling | In Kotlin via getSecretSeedString() | Swift extension getSecretSeedAsString() |
 | Deployment Target | iOS 14.0+ | macOS 11.0+ |
 | Dependencies | Swift Package Manager (Clibsodium) | Homebrew (libsodium) |
 

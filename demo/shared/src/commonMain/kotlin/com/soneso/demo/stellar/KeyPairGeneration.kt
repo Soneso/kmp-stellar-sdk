@@ -3,24 +3,13 @@ package com.soneso.demo.stellar
 import com.soneso.stellar.sdk.KeyPair
 
 /**
- * Data class representing a generated Stellar keypair with public and secret components.
- *
- * @property accountId The account ID (public key) starting with 'G'
- * @property secretSeed The secret seed starting with 'S' - keep this secure!
- */
-data class GeneratedKeyPair(
-    val accountId: String,
-    val secretSeed: String
-)
-
-/**
  * Result type for keypair generation operations.
  */
 sealed class KeyPairGenerationResult {
     /**
      * Successful keypair generation.
      */
-    data class Success(val keyPair: GeneratedKeyPair) : KeyPairGenerationResult()
+    data class Success(val keyPair: KeyPair) : KeyPairGenerationResult()
 
     /**
      * Failed keypair generation with error details.
@@ -42,16 +31,7 @@ sealed class KeyPairGenerationResult {
 suspend fun generateRandomKeyPair(): KeyPairGenerationResult {
     return try {
         val keyPair = KeyPair.random()
-        val accountId = keyPair.getAccountId()
-        val secretSeed = keyPair.getSecretSeed()?.concatToString()
-            ?: return KeyPairGenerationResult.Error("Failed to extract secret seed")
-
-        KeyPairGenerationResult.Success(
-            GeneratedKeyPair(
-                accountId = accountId,
-                secretSeed = secretSeed
-            )
-        )
+        KeyPairGenerationResult.Success(keyPair)
     } catch (e: Exception) {
         KeyPairGenerationResult.Error(
             message = "Failed to generate keypair: ${e.message}",

@@ -1,6 +1,25 @@
 import SwiftUI
 import shared
 
+// MARK: - Kotlin Interop Extensions
+
+extension KeyPair {
+    /// Convert Kotlin CharArray to Swift String
+    /// The secret seed is kept as CharArray in the SDK for better security,
+    /// so we only convert it to String in the UI layer when needed for display.
+    func getSecretSeedAsString() -> String? {
+        guard let charArray = getSecretSeed() else { return nil }
+        var characters: [Character] = []
+        for i in 0..<charArray.size {
+            let unicodeValue = UInt16(charArray.get(index: i))
+            if let scalar = UnicodeScalar(unicodeValue) {
+                characters.append(Character(scalar))
+            }
+        }
+        return String(characters)
+    }
+}
+
 // Native macOS app using SwiftUI that mirrors the Compose Multiplatform UI structure
 //
 // Note: This native macOS app uses SwiftUI instead of Compose Multiplatform because
@@ -239,7 +258,7 @@ struct DemoTopicCard<Destination: View>: View {
 struct KeyGenerationScreen: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var toastManager: ToastManager
-    @State private var keypairData: GeneratedKeyPair?
+    @State private var keypairData: KeyPair?
     @State private var isGenerating = false
     @State private var showSecret = false
 
@@ -290,14 +309,14 @@ struct KeyGenerationScreen: View {
                     // Public Key Card
                     KeyDisplayCard(
                         title: "Public Key (Account ID)",
-                        value: data.accountId,
+                        value: data.getAccountId(),
                         description: "This is your public address. Share this to receive payments.",
                         backgroundColor: Color.white,
                         textColor: Material3Colors.onSurface,
                         descriptionColor: Material3Colors.onSurfaceVariant,
                         iconColor: Material3Colors.primary,
                         onCopy: {
-                            copyToClipboard(data.accountId)
+                            copyToClipboard(data.getAccountId())
                             toastManager.show("Public key copied to clipboard")
                         }
                     )
@@ -305,11 +324,11 @@ struct KeyGenerationScreen: View {
                     // Secret Seed Card (matches Compose tertiaryContainer)
                     SecretKeyDisplayCard(
                         title: "Secret Seed",
-                        value: data.secretSeed,
+                        keypair: data,
                         description: "NEVER share this! Anyone with this seed can access your account.",
                         isVisible: $showSecret,
                         onCopy: {
-                            copyToClipboard(data.secretSeed)
+                            copyToClipboard(data.getSecretSeedAsString() ?? "")
                             toastManager.show("Secret seed copied to clipboard")
                         }
                     )
@@ -427,7 +446,7 @@ struct KeyDisplayCard: View {
 
 struct SecretKeyDisplayCard: View {
     let title: String
-    let value: String
+    let keypair: KeyPair
     let description: String
     @Binding var isVisible: Bool
     let onCopy: () -> Void
@@ -458,7 +477,7 @@ struct SecretKeyDisplayCard: View {
                 .help("Copy to clipboard")
             }
 
-            Text(isVisible ? value : String(repeating: "•", count: 56))
+            Text(isVisible ? (keypair.getSecretSeedAsString() ?? "") : String(repeating: "•", count: 56))
                 .font(.system(.body, design: .monospaced))
                 .foregroundStyle(Material3Colors.onTertiaryContainer)
                 .textSelection(.enabled)
