@@ -368,3 +368,4 @@ When implementing features, use the Java Stellar SDK as a reference:
 - Provides production-tested implementations of Stellar protocols
 - Use as a guide for API design and feature completeness
 - never mark tests with the ignore annotation
+- the main purpose of the demo app is to showcase sdk functionality for new developers who want to learn ho to use the sdk. when implementing business logic in the demo app use the sdk functionality available, do not implement functionality that is already available in the sdk

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
@@ -50,12 +51,17 @@ class MainScreen : Screen {
                 description = "Retrieve comprehensive account information from Horizon",
                 icon = Icons.Default.Person,
                 screen = AccountDetailsScreen()
+            ),
+            DemoTopic(
+                title = "Trust Asset",
+                description = "Establish a trustline to hold non-native assets",
+                icon = Icons.Default.AttachMoney,
+                screen = TrustAssetScreen()
             )
             // TODO: Add more demo topics here
             // Examples:
             // - Transaction Signing
             // - Payment Operations
-            // - Asset Management
             // - Smart Contract Interactions
         )
 

@@ -3,9 +3,11 @@ package com.soneso.demo
 import com.soneso.demo.stellar.AccountDetailsResult
 import com.soneso.demo.stellar.AccountFundingResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
+import com.soneso.demo.stellar.TrustAssetResult
 import com.soneso.demo.stellar.fetchAccountDetails
 import com.soneso.demo.stellar.fundTestnetAccount
 import com.soneso.demo.stellar.generateRandomKeyPair
+import com.soneso.demo.stellar.trustAsset
 import com.soneso.stellar.sdk.KeyPair
 
 /**
@@ -71,5 +73,38 @@ class MacOSBridge {
      */
     suspend fun fetchAccountDetails(accountId: String, useTestnet: Boolean = true): AccountDetailsResult {
         return com.soneso.demo.stellar.fetchAccountDetails(accountId, useTestnet)
+    }
+
+    /**
+     * Establish a trustline to a Stellar asset.
+     * Call this from Swift using async/await.
+     *
+     * Uses the centralized TrustAsset business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * @param accountId The account ID that will trust the asset (must start with 'G')
+     * @param assetCode The asset code to trust (1-12 alphanumeric characters)
+     * @param assetIssuer The issuer of the asset (must start with 'G')
+     * @param secretSeed The secret seed for signing the transaction (must start with 'S')
+     * @param limit The maximum amount of the asset to trust (defaults to maximum limit)
+     * @param useTestnet If true, connects to testnet; otherwise connects to public network
+     * @return TrustAssetResult indicating success with transaction hash or failure with error details
+     */
+    suspend fun trustAsset(
+        accountId: String,
+        assetCode: String,
+        assetIssuer: String,
+        secretSeed: String,
+        limit: String = com.soneso.stellar.sdk.ChangeTrustOperation.MAX_LIMIT,
+        useTestnet: Boolean = true
+    ): TrustAssetResult {
+        return com.soneso.demo.stellar.trustAsset(
+            accountId = accountId,
+            assetCode = assetCode,
+            assetIssuer = assetIssuer,
+            secretSeed = secretSeed,
+            limit = limit,
+            useTestnet = useTestnet
+        )
     }
 }
