@@ -7,8 +7,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,21 +16,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.demo.stellar.TrustAssetResult
-import com.soneso.demo.stellar.trustAsset
+import com.soneso.demo.stellar.SendPaymentResult
+import com.soneso.demo.stellar.sendPayment
 import com.soneso.demo.ui.theme.LightExtendedColors
-import com.soneso.stellar.sdk.ChangeTrustOperation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
-class TrustAssetScreen : Screen {
+class SendPaymentScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -38,13 +38,15 @@ class TrustAssetScreen : Screen {
         val coroutineScope = rememberCoroutineScope()
 
         // State management
-        var accountId by remember { mutableStateOf("") }
-        var assetCode by remember { mutableStateOf("SRT") }
-        var assetIssuer by remember { mutableStateOf("GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B") }
-        var trustLimit by remember { mutableStateOf("") }
+        var sourceAccountId by remember { mutableStateOf("") }
+        var destinationAccountId by remember { mutableStateOf("") }
+        var assetType by remember { mutableStateOf(AssetType.NATIVE) }
+        var assetCode by remember { mutableStateOf("") }
+        var assetIssuer by remember { mutableStateOf("") }
+        var amount by remember { mutableStateOf("") }
         var secretSeed by remember { mutableStateOf("") }
         var isLoading by remember { mutableStateOf(false) }
-        var trustResult by remember { mutableStateOf<TrustAssetResult?>(null) }
+        var paymentResult by remember { mutableStateOf<SendPaymentResult?>(null) }
         var validationErrors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
         val snackbarHostState = remember { SnackbarHostState() }
@@ -53,43 +55,55 @@ class TrustAssetScreen : Screen {
         fun validateInputs(): Map<String, String> {
             val errors = mutableMapOf<String, String>()
 
-            if (accountId.isBlank()) {
-                errors["accountId"] = "Account ID is required"
-            } else if (!accountId.startsWith('G')) {
-                errors["accountId"] = "Account ID must start with 'G'"
-            } else if (accountId.length != 56) {
-                errors["accountId"] = "Account ID must be 56 characters"
+            if (sourceAccountId.isBlank()) {
+                errors["sourceAccountId"] = "Source account ID is required"
+            } else if (!sourceAccountId.startsWith('G')) {
+                errors["sourceAccountId"] = "Source account ID must start with 'G'"
+            } else if (sourceAccountId.length != 56) {
+                errors["sourceAccountId"] = "Source account ID must be 56 characters"
             }
 
-            if (assetCode.isBlank()) {
-                errors["assetCode"] = "Asset code is required"
-            } else if (assetCode.length > 12) {
-                errors["assetCode"] = "Asset code cannot exceed 12 characters"
+            if (destinationAccountId.isBlank()) {
+                errors["destinationAccountId"] = "Destination account ID is required"
+            } else if (!destinationAccountId.startsWith('G')) {
+                errors["destinationAccountId"] = "Destination account ID must start with 'G'"
+            } else if (destinationAccountId.length != 56) {
+                errors["destinationAccountId"] = "Destination account ID must be 56 characters"
+            }
+
+            if (assetType == AssetType.ISSUED) {
+                if (assetCode.isBlank()) {
+                    errors["assetCode"] = "Asset code is required"
+                } else if (assetCode.length > 12) {
+                    errors["assetCode"] = "Asset code cannot exceed 12 characters"
+                } else {
+                    val invalidChars = assetCode.filter { char ->
+                        char !in 'A'..'Z' && char !in '0'..'9'
+                    }
+                    if (invalidChars.isNotEmpty()) {
+                        errors["assetCode"] = "Only uppercase letters and digits allowed"
+                    }
+                }
+
+                if (assetIssuer.isBlank()) {
+                    errors["assetIssuer"] = "Asset issuer is required"
+                } else if (!assetIssuer.startsWith('G')) {
+                    errors["assetIssuer"] = "Asset issuer must start with 'G'"
+                } else if (assetIssuer.length != 56) {
+                    errors["assetIssuer"] = "Asset issuer must be 56 characters"
+                }
+            }
+
+            if (amount.isBlank()) {
+                errors["amount"] = "Amount is required"
             } else {
-                val invalidChars = assetCode.filter { char ->
-                    char !in 'A'..'Z' && char !in '0'..'9'
-                }
-                if (invalidChars.isNotEmpty()) {
-                    errors["assetCode"] = "Only uppercase letters and digits allowed"
-                }
-            }
-
-            if (assetIssuer.isBlank()) {
-                errors["assetIssuer"] = "Asset issuer is required"
-            } else if (!assetIssuer.startsWith('G')) {
-                errors["assetIssuer"] = "Asset issuer must start with 'G'"
-            } else if (assetIssuer.length != 56) {
-                errors["assetIssuer"] = "Asset issuer must be 56 characters"
-            }
-
-            if (trustLimit.isNotBlank()) {
                 try {
-                    val limitValue = trustLimit.toDouble()
-                    if (limitValue < 0) {
-                        errors["trustLimit"] = "Trust limit cannot be negative"
+                    val amountValue = amount.toDouble()
+                    if (amountValue <= 0) {
+                        errors["amount"] = "Amount must be greater than 0"
                     }
                 } catch (e: NumberFormatException) {
-                    errors["trustLimit"] = "Invalid number format"
+                    errors["amount"] = "Invalid number format"
                 }
             }
 
@@ -104,8 +118,8 @@ class TrustAssetScreen : Screen {
             return errors
         }
 
-        // Function to submit trust asset transaction
-        fun submitTrustAsset() {
+        // Function to submit payment
+        fun submitPayment() {
             val errors = validateInputs()
             if (errors.isNotEmpty()) {
                 validationErrors = errors
@@ -114,28 +128,24 @@ class TrustAssetScreen : Screen {
 
             coroutineScope.launch {
                 isLoading = true
-                trustResult = null
+                paymentResult = null
                 validationErrors = emptyMap()
                 try {
-                    val limit = if (trustLimit.isBlank()) {
-                        ChangeTrustOperation.MAX_LIMIT
-                    } else {
-                        trustLimit
-                    }
                     // Add 60 second timeout to prevent indefinite hanging
-                    trustResult = withTimeout(60.seconds) {
-                        trustAsset(
-                            accountId = accountId,
-                            assetCode = assetCode,
-                            assetIssuer = assetIssuer,
+                    paymentResult = withTimeout(60.seconds) {
+                        sendPayment(
+                            sourceAccountId = sourceAccountId,
+                            destinationAccountId = destinationAccountId,
+                            assetCode = if (assetType == AssetType.NATIVE) "native" else assetCode,
+                            assetIssuer = if (assetType == AssetType.NATIVE) null else assetIssuer,
+                            amount = amount,
                             secretSeed = secretSeed,
-                            limit = limit,
                             useTestnet = true
                         )
                     }
                 } catch (e: Exception) {
                     // Catch timeout and other exceptions
-                    trustResult = TrustAssetResult.Error(
+                    paymentResult = SendPaymentResult.Error(
                         message = "Request timed out or failed: ${e.message ?: "Unknown error"}",
                         exception = e
                     )
@@ -148,7 +158,7 @@ class TrustAssetScreen : Screen {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Trust Asset") },
+                    title = { Text("Send a Payment") },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -186,13 +196,13 @@ class TrustAssetScreen : Screen {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Establish a trustline to an asset",
+                            text = "Send a payment on the Stellar network",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            text = "A trustline is required before an account can hold non-native assets (assets other than XLM). " +
-                                    "The trustline includes a limit that defines the maximum amount of the asset the account is willing to hold.",
+                            text = "Transfer XLM (native asset) or any issued asset to another Stellar account. " +
+                                    "The destination account must exist, and for issued assets, must have an established trustline.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -221,22 +231,22 @@ class TrustAssetScreen : Screen {
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "• Account must have at least 0.5 XLM for the trustline reserve",
+                                text = "• Destination account must exist on the network",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                             Text(
-                                text = "• Asset codes must be 1-12 uppercase alphanumeric characters",
+                                text = "• For issued assets, destination must have a trustline",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                             Text(
-                                text = "• Leave limit empty for maximum trust (recommended)",
+                                text = "• Transaction fee (0.00001 XLM) is in addition to the payment",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                             Text(
-                                text = "• Setting limit to '0' removes the trustline (requires zero asset balance)",
+                                text = "• Minimum payment amount is 0.0000001",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
@@ -244,11 +254,63 @@ class TrustAssetScreen : Screen {
                     }
                 }
 
-                // Example Asset Card
+                // Source Account ID Input
+                OutlinedTextField(
+                    value = sourceAccountId,
+                    onValueChange = {
+                        sourceAccountId = it.trim()
+                        validationErrors = validationErrors - "sourceAccountId"
+                        paymentResult = null
+                    },
+                    label = { Text("Source Account ID") },
+                    placeholder = { Text("G... (your account)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = validationErrors.containsKey("sourceAccountId"),
+                    supportingText = validationErrors["sourceAccountId"]?.let { error ->
+                        {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Next
+                    )
+                )
+
+                // Destination Account ID Input
+                OutlinedTextField(
+                    value = destinationAccountId,
+                    onValueChange = {
+                        destinationAccountId = it.trim()
+                        validationErrors = validationErrors - "destinationAccountId"
+                        paymentResult = null
+                    },
+                    label = { Text("Destination Account ID") },
+                    placeholder = { Text("G... (recipient's account)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = validationErrors.containsKey("destinationAccountId"),
+                    supportingText = validationErrors["destinationAccountId"]?.let { error ->
+                        {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Next
+                    )
+                )
+
+                // Asset Type Selection
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
                 ) {
                     Column(
@@ -256,96 +318,112 @@ class TrustAssetScreen : Screen {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Example Testnet Asset",
+                            text = "Asset Type",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            fontWeight = FontWeight.Bold
                         )
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "The asset code and issuer fields are pre-filled with SRT, a testnet asset provided by Stellar as part of the testnet anchor.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            RadioButton(
+                                selected = assetType == AssetType.NATIVE,
+                                onClick = {
+                                    assetType = AssetType.NATIVE
+                                    paymentResult = null
+                                }
                             )
-                            Text(
-                                text = "You can replace these values with your own asset if you want to trust a different asset.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Native (XLM)")
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = assetType == AssetType.ISSUED,
+                                onClick = {
+                                    assetType = AssetType.ISSUED
+                                    paymentResult = null
+                                }
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Issued Asset (e.g., USD, EUR)")
                         }
                     }
                 }
 
-                // Account ID Input
-                OutlinedTextField(
-                    value = accountId,
-                    onValueChange = {
-                        accountId = it.trim()
-                        validationErrors = validationErrors - "accountId"
-                        trustResult = null
-                    },
-                    label = { Text("Account ID") },
-                    placeholder = { Text("G...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("accountId"),
-                    supportingText = validationErrors["accountId"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
+                // Asset Code Input (only for issued assets)
+                if (assetType == AssetType.ISSUED) {
+                    OutlinedTextField(
+                        value = assetCode,
+                        onValueChange = {
+                            // Auto-uppercase for asset codes
+                            assetCode = it.uppercase().trim()
+                            validationErrors = validationErrors - "assetCode"
+                            paymentResult = null
+                        },
+                        label = { Text("Asset Code") },
+                        placeholder = { Text("USD, EUR, USDC, etc.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = validationErrors.containsKey("assetCode"),
+                        supportingText = validationErrors["assetCode"]?.let { error ->
+                            {
+                                Text(
+                                    text = error,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        )
                     )
-                )
 
-                // Asset Code Input
-                OutlinedTextField(
-                    value = assetCode,
-                    onValueChange = {
-                        // Auto-uppercase for asset codes
-                        assetCode = it.uppercase().trim()
-                        validationErrors = validationErrors - "assetCode"
-                        trustResult = null
-                    },
-                    label = { Text("Asset Code") },
-                    placeholder = { Text("USD, EUR, USDC, etc.") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("assetCode"),
-                    supportingText = validationErrors["assetCode"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
+                    // Asset Issuer Input
+                    OutlinedTextField(
+                        value = assetIssuer,
+                        onValueChange = {
+                            assetIssuer = it.trim()
+                            validationErrors = validationErrors - "assetIssuer"
+                            paymentResult = null
+                        },
+                        label = { Text("Asset Issuer") },
+                        placeholder = { Text("G... (issuer's account)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = validationErrors.containsKey("assetIssuer"),
+                        supportingText = validationErrors["assetIssuer"]?.let { error ->
+                            {
+                                Text(
+                                    text = error,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        )
                     )
-                )
+                }
 
-                // Asset Issuer Input
+                // Amount Input
                 OutlinedTextField(
-                    value = assetIssuer,
+                    value = amount,
                     onValueChange = {
-                        assetIssuer = it.trim()
-                        validationErrors = validationErrors - "assetIssuer"
-                        trustResult = null
+                        amount = it.trim()
+                        validationErrors = validationErrors - "amount"
+                        paymentResult = null
                     },
-                    label = { Text("Asset Issuer") },
-                    placeholder = { Text("G...") },
+                    label = { Text("Amount") },
+                    placeholder = { Text("10.0") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = validationErrors.containsKey("assetIssuer"),
-                    supportingText = validationErrors["assetIssuer"]?.let { error ->
+                    isError = validationErrors.containsKey("amount"),
+                    supportingText = validationErrors["amount"]?.let { error ->
                         {
                             Text(
                                 text = error,
@@ -354,32 +432,7 @@ class TrustAssetScreen : Screen {
                         }
                     },
                     keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    )
-                )
-
-                // Trust Limit Input (Optional)
-                OutlinedTextField(
-                    value = trustLimit,
-                    onValueChange = {
-                        trustLimit = it.trim()
-                        validationErrors = validationErrors - "trustLimit"
-                        trustResult = null
-                    },
-                    label = { Text("Trust Limit (Optional)") },
-                    placeholder = { Text("Leave empty for maximum") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("trustLimit"),
-                    supportingText = validationErrors["trustLimit"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal,
                         imeAction = ImeAction.Next
                     )
                 )
@@ -390,10 +443,10 @@ class TrustAssetScreen : Screen {
                     onValueChange = {
                         secretSeed = it.trim()
                         validationErrors = validationErrors - "secretSeed"
-                        trustResult = null
+                        paymentResult = null
                     },
-                    label = { Text("Secret Seed") },
-                    placeholder = { Text("S...") },
+                    label = { Text("Source Secret Seed") },
+                    placeholder = { Text("S... (for signing)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -410,18 +463,20 @@ class TrustAssetScreen : Screen {
                         imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
-                        onDone = { submitTrustAsset() }
+                        onDone = { submitPayment() }
                     )
                 )
 
                 // Submit button
                 Button(
-                    onClick = { submitTrustAsset() },
+                    onClick = { submitPayment() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isLoading && accountId.isNotBlank() && assetCode.isNotBlank() &&
-                            assetIssuer.isNotBlank() && secretSeed.isNotBlank()
+                    enabled = !isLoading && sourceAccountId.isNotBlank() &&
+                            destinationAccountId.isNotBlank() && amount.isNotBlank() &&
+                            secretSeed.isNotBlank() &&
+                            (assetType == AssetType.NATIVE || (assetCode.isNotBlank() && assetIssuer.isNotBlank()))
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
@@ -429,42 +484,43 @@ class TrustAssetScreen : Screen {
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Creating Trustline...")
+                        Text("Sending Payment...")
                     } else {
                         Icon(
-                            imageVector = Icons.Default.AttachMoney,
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = null
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Establish Trustline")
+                        Text("Send Payment")
                     }
                 }
 
                 // Result display
-                trustResult?.let { result ->
+                paymentResult?.let { result ->
                     when (result) {
-                        is TrustAssetResult.Success -> {
-                            TrustAssetSuccessCard(result)
+                        is SendPaymentResult.Success -> {
+                            SendPaymentSuccessCard(result)
                         }
-                        is TrustAssetResult.Error -> {
-                            TrustAssetErrorCard(result)
+                        is SendPaymentResult.Error -> {
+                            SendPaymentErrorCard(result)
                         }
                     }
                 }
 
                 // Placeholder when no action taken
-                if (trustResult == null && !isLoading &&
-                    (accountId.isBlank() || assetCode.isBlank() || assetIssuer.isBlank() || secretSeed.isBlank())
+                if (paymentResult == null && !isLoading &&
+                    (sourceAccountId.isBlank() || destinationAccountId.isBlank() ||
+                            amount.isBlank() || secretSeed.isBlank())
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Icon(
-                        imageVector = Icons.Default.AttachMoney,
+                        imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                     Text(
-                        text = "Fill in the required fields to establish a trustline to an asset",
+                        text = "Fill in the required fields to send a payment on the Stellar testnet",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -475,8 +531,16 @@ class TrustAssetScreen : Screen {
     }
 }
 
+/**
+ * Asset type enum for UI selection.
+ */
+enum class AssetType {
+    NATIVE,
+    ISSUED
+}
+
 @Composable
-private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
+private fun SendPaymentSuccessCard(success: SendPaymentResult.Success) {
     // Success header card
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -499,7 +563,7 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "Trustline Established",
+                    text = "Payment Sent Successfully",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = LightExtendedColors.onSuccessContainer
@@ -513,7 +577,7 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
         }
     }
 
-    // Transaction Details Card
+    // Payment Details Card
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -525,24 +589,23 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Transaction Details",
+                text = "Payment Details",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             HorizontalDivider()
 
-            TrustAssetDetailRow("Asset Code", success.assetCode)
-            TrustAssetDetailRow("Asset Issuer", success.assetIssuer, monospace = true)
-            TrustAssetDetailRow(
-                "Trust Limit",
-                if (success.limit == ChangeTrustOperation.MAX_LIMIT) {
-                    "Maximum (${success.limit})"
-                } else {
-                    success.limit
-                }
-            )
-            TrustAssetDetailRow("Transaction Hash", success.transactionHash, monospace = true)
+            PaymentDetailRow("From", success.source, monospace = true)
+            PaymentDetailRow("To", success.destination, monospace = true)
+            PaymentDetailRow("Amount", "${success.amount} ${success.assetCode}")
+
+            // Display asset issuer if present (for issued assets)
+            success.assetIssuer?.let { issuer ->
+                PaymentDetailRow("Asset Issuer", issuer, monospace = true)
+            }
+
+            PaymentDetailRow("Transaction Hash", success.transactionHash, monospace = true)
         }
     }
 
@@ -568,22 +631,22 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "• You can now receive ${success.assetCode} from the asset issuer",
+                    text = "• The payment has been successfully recorded on the Stellar ledger",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• Check your account balances to see the new trustline",
+                    text = "• The destination account now has the funds available",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• Use the 'Fetch Account Details' feature to view your trustlines",
+                    text = "• Use 'Fetch Account Details' to verify the updated balances",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• You can modify the trust limit or remove the trustline later",
+                    text = "• View the transaction on Stellar Expert or other block explorers",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -593,7 +656,7 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
 }
 
 @Composable
-private fun TrustAssetDetailRow(
+private fun PaymentDetailRow(
     label: String,
     value: String,
     monospace: Boolean = false
@@ -616,7 +679,7 @@ private fun TrustAssetDetailRow(
 }
 
 @Composable
-private fun TrustAssetErrorCard(error: TrustAssetResult.Error) {
+private fun SendPaymentErrorCard(error: SendPaymentResult.Error) {
     // Error card
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -629,7 +692,7 @@ private fun TrustAssetErrorCard(error: TrustAssetResult.Error) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Failed to Establish Trustline",
+                text = "Payment Failed",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -672,32 +735,32 @@ private fun TrustAssetErrorCard(error: TrustAssetResult.Error) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "• Verify all inputs are valid (account ID and issuer start with 'G', secret seed starts with 'S')",
+                    text = "• Verify all account IDs are valid and start with 'G'",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• Ensure the account has been funded (at least 0.5 XLM for reserve)",
+                    text = "• Ensure the destination account exists (or create it with CreateAccount)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• Check that the secret seed matches the account ID",
+                    text = "• Check that the source account has sufficient balance (including fees)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "• Verify the asset issuer account exists on the network",
+                    text = "• For issued assets, verify the destination has a trustline",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "• Verify the secret seed matches the source account",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
                     text = "• Ensure you have a stable internet connection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Asset codes must be uppercase letters and digits only",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )

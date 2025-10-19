@@ -8,7 +8,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -137,19 +136,6 @@ class FundAccountScreen : Screen {
                             Text(
                                 text = error,
                                 color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                // Paste functionality can be implemented based on platform
-                                snackbarMessage = "Paste from clipboard"
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentPaste,
-                                contentDescription = "Paste from clipboard"
                             )
                         }
                     },

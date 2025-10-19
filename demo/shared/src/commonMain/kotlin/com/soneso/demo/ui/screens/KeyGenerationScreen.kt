@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.stellar.sdk.KeyPair
@@ -156,7 +157,14 @@ class KeyGenerationScreen : Screen {
                         value = kp.getAccountId(),
                         description = "This is your public address. Share this to receive payments.",
                         onCopy = {
-                            snackbarMessage = "Public key copied to clipboard"
+                            coroutineScope.launch {
+                                val success = getClipboard().copyToClipboard(kp.getAccountId())
+                                snackbarMessage = if (success) {
+                                    "Public key copied to clipboard"
+                                } else {
+                                    "Failed to copy to clipboard"
+                                }
+                            }
                         }
                     )
 
@@ -168,7 +176,15 @@ class KeyGenerationScreen : Screen {
                         isVisible = showSecret,
                         onToggleVisibility = { showSecret = !showSecret },
                         onCopy = {
-                            snackbarMessage = "Secret seed copied to clipboard"
+                            coroutineScope.launch {
+                                val secretSeed = kp.getSecretSeed()?.concatToString() ?: ""
+                                val success = getClipboard().copyToClipboard(secretSeed)
+                                snackbarMessage = if (success) {
+                                    "Secret seed copied to clipboard"
+                                } else {
+                                    "Failed to copy to clipboard"
+                                }
+                            }
                         }
                     )
 

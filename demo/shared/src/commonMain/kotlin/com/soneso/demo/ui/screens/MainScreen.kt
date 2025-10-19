@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -57,11 +58,17 @@ class MainScreen : Screen {
                 description = "Establish a trustline to hold non-native assets",
                 icon = Icons.Default.AttachMoney,
                 screen = TrustAssetScreen()
+            ),
+            DemoTopic(
+                title = "Send a Payment",
+                description = "Transfer XLM or issued assets to another account",
+                icon = Icons.AutoMirrored.Filled.Send,
+                screen = SendPaymentScreen()
             )
             // TODO: Add more demo topics here
             // Examples:
             // - Transaction Signing
-            // - Payment Operations
+            // - Path Payments
             // - Smart Contract Interactions
         )
 
