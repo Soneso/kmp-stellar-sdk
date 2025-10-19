@@ -11,12 +11,30 @@ This is a Kotlin Multiplatform (KMP) project for building a Stellar SDK. The SDK
 
 ## Current State
 
-The KMP project structure is now set up with:
-- Gradle configuration for Kotlin Multiplatform
-- Platform targets: JVM, JS (Browser & Node.js), iOS (iosX64, iosArm64, iosSimulatorArm64), macOS (macosX64, macosArm64)
-- Source sets configured for common and platform-specific code
-- Production-ready cryptography on all platforms
-- Comprehensive dependencies for networking, serialization, and coroutines
+The SDK is in **alpha development** with comprehensive functionality implemented:
+
+### Platform Support
+- **JVM**: Android API 24+, Server applications (Java 11+)
+- **iOS**: iOS 14.0+ (iosX64, iosArm64, iosSimulatorArm64)
+- **macOS**: macOS 11.0+ (macosX64, macosArm64)
+- **JavaScript**: Browser (WebAssembly) and Node.js 14+
+
+### Core SDK Features (Implemented)
+- **Cryptography**: Ed25519 keypair generation, signing, verification
+- **StrKey Encoding**: G... (accounts), S... (seeds), M... (muxed), C... (contracts)
+- **Transaction Building**: All 27 Stellar operations, TransactionBuilder, FeeBumpTransaction
+- **Assets**: Native (XLM), AlphaNum4, AlphaNum12, SAC contract ID derivation
+- **Accounts**: Account management, muxed accounts, sequence numbers
+- **Horizon Client**: Full REST API coverage, SSE streaming, request builders
+- **Soroban RPC**: Contract calls, simulation, state restoration, polling
+- **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
+- **XDR**: Complete XDR type system and serialization
+
+### Demo Application
+- **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
+- **Architecture**: Compose Multiplatform with 95% code sharing
+- **Features**: 6 comprehensive demos (key generation, funding, account details, trustlines, payments, contracts)
+- **Location**: `demo/` directory with platform-specific apps
 
 ## Architecture Notes
 
@@ -216,34 +234,51 @@ The SDK includes comprehensive integration tests that validate against a live St
 
 **Duration**: 3-5 minutes for full suite (network latency dependent)
 
-### Sample Apps
+### Demo Apps
 
-The `stellarSample` directory demonstrates **proper KMP architecture** with shared business logic and platform-specific UIs:
+The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Multiplatform architecture:
 
-- **Shared module** (`stellarSample/shared`): Common Kotlin business logic (KeyPair operations, signing, verification)
-- **Android** (`stellarSample/androidApp`): Jetpack Compose UI
+- **Shared module** (`demo/shared`): Compose Multiplatform UI + business logic
+  - 6 feature screens (key generation, funding, account details, trust asset, payments, contracts)
+  - Platform-specific code only for clipboard access
+  - Demonstrates real SDK usage patterns
+
+- **Android** (`demo/androidApp`): Jetpack Compose entry point
   ```bash
-  ./gradlew :stellarSample:androidApp:installDebug
+  ./gradlew :demo:androidApp:installDebug
   ```
-- **iOS** (`stellarSample/iosApp`): SwiftUI
+
+- **iOS** (`demo/iosApp`): SwiftUI wrapper around Compose
   ```bash
-  ./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64
-  cd stellarSample/iosApp && xcodegen generate && open StellarSample.xcodeproj
+  ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
+  cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
   ```
-- **macOS** (`stellarSample/macosApp`): SwiftUI (requires `brew install libsodium`)
+
+- **macOS** (`demo/macosApp`): Native SwiftUI implementation (not Compose)
   ```bash
-  ./gradlew :stellarSample:shared:linkDebugFrameworkMacosArm64
-  cd stellarSample/macosApp && xcodegen generate && open StellarSampleMac.xcodeproj
+  brew install libsodium  # Required
+  ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
+  cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
   ```
-- **Web** (`stellarSample/webApp`): Kotlin/JS with HTML
+
+- **Desktop** (`demo/desktopApp`): JVM Compose (recommended for macOS)
+  ```bash
+  ./gradlew :demo:desktopApp:run
+  ```
+
+- **Web** (`demo/webApp`): Kotlin/JS with Compose
   ```bash
   # Development mode
-  ./gradlew :stellarSample:webApp:jsBrowserDevelopmentRun
-  # Production build
-  ./gradlew :stellarSample:webApp:jsBrowserProductionWebpack
+  ./gradlew :demo:webApp:jsBrowserDevelopmentRun
+  # Production build (955 KB, 220 KB gzipped)
+  ./gradlew :demo:webApp:jsBrowserProductionWebpack
   ```
 
-**Architecture**: ~500 lines of shared business logic written once, runs on all platforms with platform-native UIs (200 lines each). See `stellarSample/README.md` for architecture details and code examples.
+**Key Features**:
+- 95% code sharing (Compose UI + business logic in commonMain)
+- Real Stellar testnet integration
+- Demonstrates: KeyPair, Horizon, Soroban, transactions, assets
+- See `demo/README.md` and `demo/CLAUDE.md` for architecture details
 
 ### Native Development
 - **Build iOS framework**: `./gradlew :stellar-sdk:linkDebugFrameworkIosSimulatorArm64`
@@ -266,11 +301,13 @@ The `stellarSample` directory demonstrates **proper KMP architecture** with shar
   - `macosMain`: macOS-specific implementations (useful for local development)
   - `macosTest`: macOS-specific tests
 
-- **stellarSample**: KMP sample application demonstrating shared business logic
-  - `shared`: Shared Kotlin module with StellarDemo class and tests
-  - `androidApp`: Android app with Jetpack Compose UI
-  - `iosApp`: iOS app with SwiftUI (Xcode project)
-  - `webApp`: Web app with Kotlin/JS and HTML
+- **demo**: Comprehensive KMP demo application
+  - `shared`: Compose Multiplatform UI + business logic (6 feature screens)
+  - `androidApp`: Android entry point (Jetpack Compose)
+  - `iosApp`: iOS entry point (SwiftUI wrapper for Compose)
+  - `macosApp`: macOS native SwiftUI app (17 Swift files, not Compose)
+  - `desktopApp`: Desktop JVM app (Compose)
+  - `webApp`: Web app (Kotlin/JS with Compose)
 
 ## Dependencies
 
@@ -298,50 +335,197 @@ The `stellarSample` directory demonstrates **proper KMP architecture** with shar
 
 ## Implemented Features
 
-### KeyPair (`com.stellar.sdk.KeyPair`)
+### Core Cryptography
+
+#### KeyPair (`com.soneso.stellar.sdk.KeyPair`)
 - ✅ Generate random keypairs with cryptographically secure randomness
 - ✅ Create from secret seed (String, CharArray, or ByteArray)
 - ✅ Create from account ID (public key only)
 - ✅ Create from raw public key bytes
-- ✅ Sign data with Ed25519
+- ✅ Sign data with Ed25519 (64-byte signatures)
 - ✅ Verify Ed25519 signatures
-- ✅ Export to strkey format (G... for accounts, S... for seeds)
+- ✅ Export to strkey format (G... accounts, S... seeds)
 - ✅ Comprehensive input validation and error handling
 - ✅ Thread-safe, immutable design
-- ✅ **Async API**: Crypto operations use `suspend` functions for proper JavaScript support
+- ✅ **Async API**: Crypto operations use `suspend` functions
 
-### StrKey (`com.stellar.sdk.StrKey`)
+#### StrKey (`com.soneso.stellar.sdk.StrKey`)
 - ✅ Encode/decode Ed25519 public keys (G...)
 - ✅ Encode/decode Ed25519 secret seeds (S...)
+- ✅ Encode/decode muxed accounts (M...)
+- ✅ Encode/decode contracts (C...)
 - ✅ CRC16-XModem checksum validation
 - ✅ Version byte validation
-- ✅ Base32 encoding (platform-specific)
+- ✅ Base32 encoding (platform-specific: Apache Commons on JVM, pure Kotlin on JS/Native)
 
-### Auth (`com.stellar.sdk.Auth`)
-- ✅ Sign Soroban authorization entries for smart contract invocations
-- ✅ Build new authorization entries from scratch
-- ✅ Support for custom Signer interface (hardware wallets, multi-sig)
-- ✅ Network replay protection (network ID included in signatures)
-- ✅ Signature verification after signing
-- ✅ Immutable design (clones entries to avoid mutation)
-- ✅ **Async API**: All methods use `suspend` functions for proper JavaScript support
-- ✅ **Cross-platform compatible**: Signatures identical across JVM, JS, and Native
-- ✅ **Java SDK compatible**: Same test vectors, identical behavior
+### Transactions & Operations
 
-### ContractClient & AssembledTransaction (`com.stellar.sdk.contract.*`)
-- ✅ High-level API for Soroban smart contract interactions
-- ✅ Full transaction lifecycle management (simulate → sign → submit → parse)
-- ✅ Type-safe generic results with custom parser support
+#### Transaction Building
+- ✅ TransactionBuilder with fluent API
+- ✅ FeeBumpTransactionBuilder for fee bumps
+- ✅ All 27 Stellar operations implemented
+- ✅ Memo support (none, text, ID, hash, return)
+- ✅ Time bounds and ledger bounds
+- ✅ Transaction preconditions (min sequence, sequence age/gap, extra signers)
+- ✅ Multi-signature support
+- ✅ Soroban transaction data (resource limits, footprint)
+- ✅ XDR serialization/deserialization
+
+#### Operations (All 27)
+**Account Operations**:
+- ✅ CreateAccount, AccountMerge, BumpSequence, SetOptions, ManageData
+
+**Payment Operations**:
+- ✅ Payment, PathPaymentStrictReceive, PathPaymentStrictSend
+
+**Asset Operations**:
+- ✅ ChangeTrust, AllowTrust, SetTrustLineFlags
+
+**Trading Operations**:
+- ✅ ManageSellOffer, ManageBuyOffer, CreatePassiveSellOffer
+
+**Claimable Balance Operations**:
+- ✅ CreateClaimableBalance, ClaimClaimableBalance, ClawbackClaimableBalance
+
+**Liquidity Pool Operations**:
+- ✅ LiquidityPoolDeposit, LiquidityPoolWithdraw
+
+**Sponsorship Operations**:
+- ✅ BeginSponsoringFutureReserves, EndSponsoringFutureReserves, RevokeSponsorship
+
+**Clawback Operations**:
+- ✅ Clawback
+
+**Soroban Operations**:
+- ✅ InvokeHostFunction, ExtendFootprintTTL, RestoreFootprint
+
+**Deprecated**:
+- ✅ Inflation (protocol 12 deprecated)
+
+### Assets & Accounts
+
+#### Assets (`com.soneso.stellar.sdk.Asset`)
+- ✅ AssetTypeNative (XLM/Lumens)
+- ✅ AssetTypeCreditAlphaNum4 (1-4 char codes)
+- ✅ AssetTypeCreditAlphaNum12 (5-12 char codes)
+- ✅ Asset parsing from canonical strings ("CODE:ISSUER")
+- ✅ Asset validation (code format, issuer validation)
+- ✅ Contract ID derivation for Stellar Asset Contracts (SAC)
+- ✅ Asset comparison and sorting
+
+#### Accounts
+- ✅ Account management with sequence numbers
+- ✅ Muxed accounts (M... addresses with IDs)
+- ✅ TransactionBuilderAccount interface
+- ✅ Automatic sequence number incrementing
+
+### Horizon API Client
+
+#### HorizonServer (`com.soneso.stellar.sdk.horizon.HorizonServer`)
+- ✅ Comprehensive REST API coverage
+- ✅ Request builders for all endpoints
+- ✅ Server-Sent Events (SSE) streaming
+- ✅ Automatic retries and error handling
+- ✅ Transaction submission (sync and async)
+
+#### Endpoints
+- ✅ Accounts: Details, data entries, balances
+- ✅ Assets: List, search, filter
+- ✅ Claimable Balances: Query, filter by sponsor/claimant/asset
+- ✅ Effects: All effect types (60+), filtering, streaming
+- ✅ Ledgers: List, details, operations, transactions
+- ✅ Liquidity Pools: List, details, operations, trades
+- ✅ Offers: List by account, order books
+- ✅ Operations: All operation types (27), filtering, streaming
+- ✅ Payments: Payment filtering, streaming
+- ✅ Trades: Trade history, filtering, aggregations
+- ✅ Transactions: Submit, query, filter
+- ✅ Paths: Strict send, strict receive path finding
+- ✅ Fee Stats: Network fee statistics
+- ✅ Health: Server health monitoring
+- ✅ Root: Server information
+
+#### Special Features
+- ✅ SEP-29: Account memo validation (AccountRequiresMemoException)
+- ✅ Cursor-based pagination
+- ✅ Order (asc/desc) support
+- ✅ Limit parameter support
+
+### Soroban Smart Contracts
+
+#### High-Level API
+- ✅ ContractClient: Simple contract interaction
+- ✅ AssembledTransaction: Full transaction lifecycle
+- ✅ Type-safe generic results with custom parsers
 - ✅ Automatic simulation and resource estimation
 - ✅ Read-only vs write call detection
-- ✅ Authorization handling (auto-auth and custom auth)
-- ✅ Automatic state restoration when needed
-- ✅ Transaction status polling with exponential backoff
-- ✅ Comprehensive error handling with 10 exception types
-- ✅ **Developer-friendly**: Reduces contract calls from ~20 lines to 2-3 lines
-- ✅ **Async API**: All methods use `suspend` functions
-- ✅ **Cross-platform compatible**: Works on JVM, JS, iOS, macOS
-- ✅ **Production-ready**: Full feature parity with Java SDK
+
+#### Authorization
+- ✅ Sign Soroban authorization entries (`Auth` class)
+- ✅ Build authorization entries from scratch
+- ✅ Custom Signer interface support
+- ✅ Network replay protection
+- ✅ Signature verification
+- ✅ Auto-authorization for invoker
+- ✅ Custom authorization handling
+
+#### Contract Operations
+- ✅ Contract invocation (InvokeHostFunctionOperation)
+- ✅ Contract deployment
+- ✅ WASM upload
+- ✅ State restoration when expired
+- ✅ Footprint TTL extension
+- ✅ Transaction polling with exponential backoff
+
+#### RPC Client (`com.soneso.stellar.sdk.rpc.SorobanServer`)
+- ✅ Full Soroban RPC API coverage
+- ✅ Transaction simulation
+- ✅ Event queries and filtering
+- ✅ Ledger and contract data retrieval
+- ✅ Network information queries
+- ✅ Health monitoring
+
+#### Contract Spec & Parsing
+- ✅ ContractSpec parsing from XDR
+- ✅ WASM analysis and metadata extraction
+- ✅ Function signature detection
+- ✅ Type parsing and validation
+
+#### Exception Handling (10 types)
+- ✅ ContractException (base)
+- ✅ SimulationFailedException
+- ✅ SendTransactionFailedException
+- ✅ TransactionFailedException
+- ✅ TransactionStillPendingException
+- ✅ ExpiredStateException
+- ✅ RestorationFailureException
+- ✅ NotYetSimulatedException
+- ✅ NeedsMoreSignaturesException
+- ✅ NoSignatureNeededException
+
+### Utility Features
+
+#### Network
+- ✅ Network.PUBLIC (mainnet)
+- ✅ Network.TESTNET
+- ✅ Custom network support
+- ✅ Network passphrase handling
+
+#### FriendBot
+- ✅ Testnet account funding
+- ✅ Error handling for already-funded accounts
+
+#### XDR System
+- ✅ Complete XDR type system (470+ types)
+- ✅ XDR serialization/deserialization
+- ✅ Type-safe XDR unions and enums
+- ✅ XDR validation
+
+#### Scval (Smart Contract Values)
+- ✅ Type conversions to/from SCValXdr
+- ✅ Support for all Soroban types
+- ✅ Address, symbol, bytes, numbers, vectors, maps
+- ✅ Type validation and error handling
 
 ## Testing
 

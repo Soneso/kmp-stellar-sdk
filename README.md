@@ -2,21 +2,28 @@
 
 **Status: ALPHA - Work In Progress, do not use in production**
 
-**Built with:** [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
-
-A Kotlin Multiplatform SDK for building applications on the Stellar network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
+A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
 **Version:** 0.1.0-SNAPSHOT
 
 ## Platform Support
 
-| Platform | Status | Crypto Library |
-|----------|--------|----------------|
-| JVM (Android, Server) | Supported | BouncyCastle |
-| iOS | Supported | libsodium (native) |
-| macOS | Supported | libsodium (native) |
-| JavaScript (Browser) | Supported | libsodium.js (WebAssembly) |
-| JavaScript (Node.js) | Supported | libsodium.js (WebAssembly) |
+| Platform | Status | Crypto Library | Notes |
+|----------|--------|----------------|-------|
+| JVM (Android, Server) | Supported | BouncyCastle | Production-ready |
+| iOS | Supported | libsodium (native) | iOS 14.0+ |
+| macOS | Supported | libsodium (native) | macOS 11.0+ |
+| JavaScript (Browser) | Supported | libsodium.js (WebAssembly) | Modern browsers |
+| JavaScript (Node.js) | Supported | libsodium.js (WebAssembly) | Node.js 14+ |
+
+## Quick Links
+
+- [Getting Started](docs/getting-started.md) - Installation and basic usage
+- [Features Guide](docs/features.md) - Complete features list with examples
+- [Platform Guide](docs/platforms.md) - Platform-specific setup and notes
+- [Testing Guide](docs/testing.md) - Running tests across platforms
+- [Demo App](demo/README.md) - Multi-platform sample application
+- [Development Guide](CLAUDE.md) - Architecture and development guidelines
 
 ## What Is This?
 
@@ -32,78 +39,110 @@ This SDK uses production-ready, audited cryptographic libraries on all platforms
 
 ## Current Implementation Status
 
-### Implemented Features
+### Core Features
 
-#### KeyPair Management
-- Generate random keypairs with cryptographically secure randomness
-- Create keypairs from secret seeds (String, CharArray, or ByteArray)
-- Create public-only keypairs from account IDs
-- Sign data with Ed25519
-- Verify Ed25519 signatures
-- Export to Stellar strkey format (G... accounts, S... seeds)
-- Comprehensive input validation and error handling
-- Thread-safe, immutable design
+#### Cryptography & Key Management
+- Ed25519 keypair generation with cryptographically secure randomness
+- Sign and verify operations
+- KeyPair creation from secret seeds (String, CharArray, ByteArray) or account IDs
+- StrKey encoding/decoding (G... accounts, S... seeds, M... muxed accounts, C... contracts)
+- Production cryptography: BouncyCastle (JVM), libsodium (Native), libsodium.js (JS)
 
-#### StrKey Encoding
-- Encode/decode Ed25519 public keys (G... addresses)
-- Encode/decode Ed25519 secret seeds (S... seeds)
-- CRC16-XModem checksum validation
-- Version byte validation
-- Platform-specific Base32 implementations
+#### Transaction Building
+- Transaction and FeeBumpTransaction support
+- TransactionBuilder with fluent API
+- All 27 Stellar operations implemented
+- Memo support (text, ID, hash, return hash)
+- Time bounds, ledger bounds, and preconditions
+- Multi-signature support
+- XDR serialization/deserialization
 
-#### Soroban Authorization
-- Sign authorization entries for smart contract invocations
-- Build authorization entries from scratch
-- Custom signer interface support (hardware wallets, multi-sig)
-- Network replay protection (network ID in signatures)
-- Signature verification
-- Immutable design (clones entries to avoid mutation)
+#### Assets & Accounts
+- Native asset (Lumens/XLM)
+- Issued assets (AlphaNum4, AlphaNum12)
+- Asset creation, validation, and parsing
+- Contract ID derivation for Stellar Asset Contracts (SAC)
+- Account management and sequence number handling
+- Muxed accounts (M... addresses)
 
-#### Smart Contract Interaction
-- High-level ContractClient API for contract calls
+#### Horizon API Client
+- Comprehensive REST API coverage
+- Request builders for all endpoints
+- Server-Sent Events (SSE) streaming
+- Automatic retries and error handling
+- Endpoints: Accounts, Assets, Claimable Balances, Effects, Ledgers, Liquidity Pools, Offers, Operations, Payments, Trades, Transactions
+- Fee statistics and health monitoring
+- SEP-29 account memo validation
+
+#### Soroban Smart Contracts
+- High-level ContractClient API
 - AssembledTransaction for full transaction lifecycle
 - Type-safe generic results with custom parsers
 - Automatic simulation and resource estimation
 - Read-only vs write call detection
-- Authorization handling (auto-auth and custom)
+- Authorization handling (auto-auth and custom auth)
 - Automatic state restoration when needed
 - Transaction polling with exponential backoff
-- Comprehensive error handling (10+ exception types)
+- Contract spec parsing and WASM analysis
 
-#### Transaction Support
-- Transaction building and signing
-- Fee bump transactions
-- Multi-signature support
-- Decorator signatures
-- XDR serialization/deserialization
+#### Soroban RPC Client
+- Full RPC API coverage
+- Transaction simulation
+- Event queries and filtering
+- Ledger and contract data retrieval
+- Network information queries
+- Health monitoring
 
-#### Network Communication
-- Horizon REST API client (comprehensive endpoint coverage)
-- Soroban RPC client
-- Automatic retries and error handling
+### Implemented Operations
 
-#### Asset Management
-- Native asset (Lumens/XLM)
-- AlphaNum4 and AlphaNum12 issued assets
-- Asset creation and validation
-- Asset parsing from canonical strings
-- Contract ID derivation for Stellar Asset Contracts (SAC)
+All 27 Stellar operations are implemented:
 
-#### Advanced Transaction Types
-- Claimable balances (create, claim, clawback)
-- Liquidity pools (deposit, withdraw)
-- Path payments (strict send and strict receive)
-- Sponsorship operations
-- Account merge and clawback
-- Fee bump transactions
+**Account Operations**
+- CreateAccount
+- AccountMerge
+- BumpSequence
+- SetOptions
+- ManageData
 
-#### Horizon API Coverage
-- Accounts, Assets, Claimable Balances, Effects
-- Ledgers, Liquidity Pools, Offers, Operations
-- Payments, Trades, Trade Aggregations
-- Order Books, Paths (strict send/receive)
-- Server-Sent Events (SSE) streaming
-- Fee statistics and health monitoring
+**Payment Operations**
+- Payment
+- PathPaymentStrictReceive
+- PathPaymentStrictSend
+
+**Asset Operations**
+- ChangeTrust
+- AllowTrust
+- SetTrustLineFlags
+
+**Trading Operations**
+- ManageSellOffer
+- ManageBuyOffer
+- CreatePassiveSellOffer
+
+**Claimable Balance Operations**
+- CreateClaimableBalance
+- ClaimClaimableBalance
+- ClawbackClaimableBalance
+
+**Liquidity Pool Operations**
+- LiquidityPoolDeposit
+- LiquidityPoolWithdraw
+
+**Sponsorship Operations**
+- BeginSponsoringFutureReserves
+- EndSponsoringFutureReserves
+- RevokeSponsorship
+
+**Clawback Operations**
+- Clawback
+
+**Soroban Operations**
+- InvokeHostFunction
+- ExtendFootprintTTL
+- RestoreFootprint
+
+**Deprecated Operations**
+- Inflation (deprecated in protocol 12)
 
 ## Installation
 
@@ -125,7 +164,7 @@ dependencies {
 
 #### iOS/macOS
 Add libsodium via Swift Package Manager. In Xcode:
-1. File -> Add Package Dependencies
+1. File → Add Package Dependencies
 2. Search for: `https://github.com/jedisct1/swift-sodium`
 3. Select the Clibsodium package
 
@@ -135,8 +174,6 @@ dependencies: [
     .package(url: "https://github.com/jedisct1/swift-sodium", from: "0.9.1")
 ]
 ```
-
-**Note:** The SDK framework includes static libsodium, but your app needs the Clibsodium headers for compilation.
 
 #### JavaScript
 No additional setup required. The SDK automatically bundles and initializes libsodium.js.
@@ -154,20 +191,12 @@ All cryptographic operations use Kotlin's `suspend` functions for proper async s
 import com.soneso.stellar.sdk.KeyPair
 import kotlinx.coroutines.runBlocking
 
-// In a coroutine context
 suspend fun example() {
     // Generate a random keypair
     val keypair = KeyPair.random()
 
     println("Account ID: ${keypair.getAccountId()}")
     println("Secret Seed: ${keypair.getSecretSeed()?.concatToString()}")
-    println("Can Sign: ${keypair.canSign()}")
-}
-
-// Or use runBlocking for quick tests
-fun main() = runBlocking {
-    val keypair = KeyPair.random()
-    println(keypair.getAccountId())
 }
 ```
 
@@ -183,182 +212,119 @@ suspend fun fromSeed() {
 }
 ```
 
-### Create Public-Only KeyPair
+### Build and Sign a Transaction
 
 ```kotlin
-fun fromAccountId() {
-    val accountId = "GCZHXL5HXQX5ABDM26LHYRCQZ5OJFHLOPLZX47WEBP3V2PF5AVFK2A5D"
-    val keypair = KeyPair.fromAccountId(accountId)
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.HorizonServer
 
-    println("Can Sign: ${keypair.canSign()}") // false
-    println("Account ID: ${keypair.getAccountId()}")
+suspend fun sendPayment() {
+    val server = HorizonServer("https://horizon-testnet.stellar.org")
+    val sourceKeypair = KeyPair.fromSecretSeed("SXXX...")
+    val sourceAccount = server.accounts().account(sourceKeypair.getAccountId())
+
+    val destination = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
+
+    val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
+        .addOperation(
+            PaymentOperation(
+                destination = destination,
+                asset = AssetTypeNative,
+                amount = "10.0"
+            )
+        )
+        .addMemo(MemoText("Test payment"))
+        .setTimeout(300)
+        .setBaseFee(100)
+        .build()
+
+    transaction.sign(sourceKeypair)
+
+    val response = server.submitTransaction(transaction)
+    println("Transaction successful: ${response.hash}")
 }
 ```
 
-### Sign and Verify Data
-
-```kotlin
-suspend fun signAndVerify() {
-    val keypair = KeyPair.random()
-    val message = "Hello Stellar!"
-    val data = message.encodeToByteArray()
-
-    // Sign the data
-    val signature = keypair.sign(data)
-    println("Signature (${signature.size} bytes): ${signature.toHexString()}")
-
-    // Verify with the same keypair
-    val isValid = keypair.verify(data, signature)
-    println("Signature valid: $isValid") // true
-
-    // Create public-only keypair and verify
-    val publicKeypair = KeyPair.fromAccountId(keypair.getAccountId())
-    val stillValid = publicKeypair.verify(data, signature)
-    println("Still valid with public key only: $stillValid") // true
-}
-```
-
-### Platform-Specific Integration
-
-#### Android (Jetpack Compose)
-
-```kotlin
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            StellarApp()
-        }
-    }
-}
-
-@Composable
-fun StellarApp() {
-    val scope = rememberCoroutineScope()
-    var accountId by remember { mutableStateOf("") }
-
-    Column {
-        Button(onClick = {
-            scope.launch {
-                val keypair = KeyPair.random()
-                accountId = keypair.getAccountId()
-            }
-        }) {
-            Text("Generate KeyPair")
-        }
-
-        if (accountId.isNotEmpty()) {
-            Text("Account: $accountId")
-        }
-    }
-}
-```
-
-#### iOS (SwiftUI)
-
-```swift
-import SwiftUI
-import stellar_sdk
-
-class StellarViewModel: ObservableObject {
-    @Published var accountId: String = ""
-
-    func generateKeyPair() {
-        Task {
-            let keypair = try await KeyPair.companion.random()
-            DispatchQueue.main.async {
-                self.accountId = keypair.getAccountId()
-            }
-        }
-    }
-}
-
-struct ContentView: View {
-    @StateObject private var viewModel = StellarViewModel()
-
-    var body: some View {
-        VStack {
-            Button("Generate KeyPair") {
-                viewModel.generateKeyPair()
-            }
-
-            if !viewModel.accountId.isEmpty {
-                Text("Account: \(viewModel.accountId)")
-            }
-        }
-    }
-}
-```
-
-#### JavaScript (Browser)
-
-```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
-import kotlinx.browser.document
-import kotlinx.browser.window
-
-fun main() {
-    val scope = MainScope()
-
-    document.getElementById("generateBtn")?.addEventListener("click", {
-        scope.launch {
-            val keypair = KeyPair.random()
-            document.getElementById("accountId")?.textContent = keypair.getAccountId()
-        }
-    })
-}
-```
-
-#### JavaScript (Node.js)
-
-```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import kotlinx.coroutines.runBlocking
-
-fun main() = runBlocking {
-    println("Generating Stellar keypair...")
-
-    val keypair = KeyPair.random()
-    println("Account ID: ${keypair.getAccountId()}")
-    println("Secret Seed: ${keypair.getSecretSeed()?.concatToString()}")
-    println("Crypto Library: ${KeyPair.getCryptoLibraryName()}")
-}
-```
-
-### Smart Contract Interaction
+### Interact with Soroban Smart Contracts
 
 ```kotlin
 import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun callContract() {
-    val server = SorobanServer("https://soroban-testnet.stellar.org")
-    val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
-
     val client = ContractClient(
-        contractId = contractId,
-        sorobanServer = server,
+        contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        rpcUrl = "https://soroban-testnet.stellar.org:443",
         network = Network.TESTNET
     )
 
-    // Call a read-only method
-    val result = client.invoke(
-        method = "get_count",
-        parameters = emptyList()
-    )
-
-    // For write operations, sign and submit
-    val sourceKeypair = KeyPair.fromSecretSeed("SXXX...")
-    val writeResult = client.invoke(
-        method = "increment",
+    // Read-only call
+    val count = client.invoke<Long>(
+        functionName = "get_count",
         parameters = emptyList(),
-        source = sourceKeypair
-    ).sign(sourceKeypair).send()
+        source = accountId,
+        signer = null,
+        parseResultXdrFn = { Scv.fromUInt32(it).toLong() }
+    ).result()
+
+    println("Current count: $count")
+
+    client.close()
 }
 ```
+
+For more examples, see the [Getting Started Guide](docs/getting-started.md) and explore the [Demo App](demo/README.md).
+
+## Demo Application
+
+The [demo app](demo/README.md) showcases SDK usage across all platforms with 6 comprehensive features:
+
+1. **Key Generation** - Generate and manage Ed25519 keypairs
+2. **Fund Testnet Account** - Get free test XLM from Friendbot
+3. **Fetch Account Details** - Retrieve account information from Horizon
+4. **Trust Asset** - Establish trustlines for issued assets
+5. **Send Payment** - Transfer XLM and issued assets
+6. **Fetch Smart Contract Details** - Parse and inspect Soroban contracts
+
+Run the demo:
+
+```bash
+# Android
+./gradlew :demo:androidApp:installDebug
+
+# iOS (requires Xcode)
+./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
+cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
+
+# Desktop (macOS/Windows/Linux)
+./gradlew :demo:desktopApp:run
+
+# Web
+./gradlew :demo:webApp:jsBrowserDevelopmentRun
+```
+
+## Documentation
+
+### SDK Documentation
+- [Getting Started](docs/getting-started.md) - Installation, setup, and first steps
+- [Features Guide](docs/features.md) - Complete features list with code examples
+- [Platform Guide](docs/platforms.md) - Platform-specific setup and requirements
+- [Testing Guide](docs/testing.md) - Running and writing tests
+- [Architecture Guide](CLAUDE.md) - Technical implementation details
+
+### Demo App
+- [Demo App Overview](demo/README.md) - Multi-platform sample application
+- [Android Demo](demo/androidApp/README.md)
+- [iOS Demo](demo/iosApp/README.md)
+- [macOS Demo](demo/macosApp/README.md)
+- [Desktop Demo](demo/desktopApp/README.md)
+- [Web Demo](demo/webApp/README.md)
+
+### External Resources
+- [Stellar Documentation](https://developers.stellar.org/)
+- [Horizon API Reference](https://developers.stellar.org/api/horizon)
+- [Soroban Documentation](https://soroban.stellar.org/)
+- [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) (reference implementation)
 
 ## Cryptography
 
@@ -391,33 +357,19 @@ This SDK uses **production-ready, audited cryptographic libraries** exclusively:
 4. **Input Validation**: All inputs validated before crypto operations
 5. **Error Handling**: Comprehensive validation with clear error messages
 
-### Async API Design
-
-The SDK uses Kotlin's `suspend` functions for crypto operations:
-
-- **JavaScript**: Required for async libsodium initialization
-- **JVM/Native**: Zero overhead - suspend functions that don't suspend compile to regular functions
-- **Consistent API**: Same async pattern works correctly on all platforms
-- **Coroutine-friendly**: Natural integration with Kotlin coroutines ecosystem
-
 ## Testing
 
 The SDK includes comprehensive test coverage across all platforms.
-
-### Run Tests
 
 ```bash
 # All tests
 ./gradlew test
 
-# JVM tests only
+# JVM tests
 ./gradlew :stellar-sdk:jvmTest
 
-# Run a specific test class
+# Specific test class
 ./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest"
-
-# Run a specific test method
-./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest.testRandomKeyPair"
 
 # JavaScript tests (Node.js)
 ./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"
@@ -430,144 +382,7 @@ The SDK includes comprehensive test coverage across all platforms.
 ./gradlew :stellar-sdk:iosSimulatorArm64Test
 ```
 
-**Note**: JavaScript tests work perfectly when run individually or with filters. Running all JS tests together is not currently supported due to Kotlin/JS bundling limitations.
-
-### Integration Tests
-
-The SDK includes integration tests against live Stellar Testnet:
-
-- Location: `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/contract/ContractClientIntegrationTest.kt`
-- Documentation: See `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/contract/INTEGRATION_TESTS_README.md`
-- Status: `@Ignore`d by default (require testnet funding)
-
-To run integration tests:
-1. Remove the `@Ignore` annotation
-2. Ensure testnet connectivity to `https://soroban-testnet.stellar.org:443`
-3. Run: `./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest"`
-
-## Sample Applications
-
-The `stellarSample` directory contains a complete Kotlin Multiplatform sample app demonstrating best practices:
-
-- **shared**: Common Kotlin business logic (KeyPair operations, signing, verification)
-- **androidApp**: Android app with Jetpack Compose UI
-- **iosApp**: iOS app with SwiftUI
-- **macosApp**: macOS app with SwiftUI
-- **webApp**: Web app with Kotlin/JS and HTML
-
-**Architecture**: 500 lines of shared business logic written once, runs on all platforms with platform-native UIs.
-
-### Run the Sample Apps
-
-```bash
-# Android
-./gradlew :stellarSample:androidApp:installDebug
-
-# iOS
-./gradlew :stellarSample:shared:linkDebugFrameworkIosSimulatorArm64
-cd stellarSample/iosApp && xcodegen generate && open StellarSample.xcodeproj
-
-# macOS (requires brew install libsodium)
-./gradlew :stellarSample:shared:linkDebugFrameworkMacosArm64
-cd stellarSample/macosApp && xcodegen generate && open StellarSampleMac.xcodeproj
-
-# Web (development mode)
-./gradlew :stellarSample:webApp:jsBrowserDevelopmentRun
-
-# Web (production build)
-./gradlew :stellarSample:webApp:jsBrowserProductionWebpack
-```
-
-See `stellarSample/README.md` for detailed architecture documentation and code examples.
-
-## Building
-
-```bash
-# Build all modules and run tests
-./gradlew build
-
-# Clean build
-./gradlew clean build
-
-# Assemble artifacts without tests
-./gradlew assemble
-
-# Build and test (same as build)
-./gradlew check
-```
-
-### Native Development
-
-```bash
-# Build iOS framework
-./gradlew :stellar-sdk:linkDebugFrameworkIosSimulatorArm64
-
-# Build libsodium XCFramework (for framework distribution)
-./build-libsodium-xcframework.sh
-
-# Build SDK XCFramework (for framework distribution)
-./build-xcframework.sh
-```
-
-## Project Structure
-
-```
-kmp-stellar-sdk/
-├── stellar-sdk/                 # Main SDK library
-│   ├── src/
-│   │   ├── commonMain/          # Shared Kotlin code
-│   │   ├── commonTest/          # Shared tests
-│   │   ├── jvmMain/             # JVM-specific (BouncyCastle)
-│   │   ├── jvmTest/             # JVM tests
-│   │   ├── jsMain/              # JS-specific (libsodium.js)
-│   │   ├── jsTest/              # JS tests
-│   │   ├── nativeMain/          # Native shared code
-│   │   ├── iosMain/             # iOS-specific
-│   │   ├── iosTest/             # iOS tests
-│   │   ├── macosMain/           # macOS-specific
-│   │   └── macosTest/           # macOS tests
-│   └── build.gradle.kts
-│
-├── stellarSample/               # Sample KMP application
-│   ├── shared/                  # Shared business logic
-│   ├── androidApp/              # Android UI
-│   ├── iosApp/                  # iOS UI
-│   ├── macosApp/                # macOS UI
-│   └── webApp/                  # Web UI
-│
-├── CLAUDE.md                    # Detailed technical documentation
-├── README.md                    # This file
-├── LICENSE                      # Apache 2.0 License
-└── build.gradle.kts             # Root build configuration
-```
-
-## Documentation
-
-- **CLAUDE.md**: Comprehensive technical documentation, architecture notes, and development guidelines
-- **stellarSample/README.md**: Sample app architecture and code examples
-- **stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/contract/INTEGRATION_TESTS_README.md**: Integration test setup
-
-## Dependencies
-
-### Common
-- kotlinx-serialization (1.6.3): JSON serialization
-- kotlinx-coroutines (1.8.0): Async operations
-- kotlinx-datetime (0.5.0): Date/time handling
-- ktor-client (2.3.8): HTTP client
-- bignum (0.3.9): BigInteger support
-
-### JVM
-- ktor-client-cio: JVM HTTP engine
-- BouncyCastle (1.78): Ed25519 cryptography
-- Apache Commons Codec (1.16.1): Base32 encoding
-
-### JavaScript
-- ktor-client-js: JS HTTP engine
-- libsodium-wrappers (0.7.13): Ed25519 cryptography
-
-### Native (iOS/macOS)
-- ktor-client-darwin: Darwin HTTP engine
-- libsodium: Ed25519 cryptography (via C interop)
+For detailed testing information, see the [Testing Guide](docs/testing.md).
 
 ## Requirements
 
@@ -575,8 +390,8 @@ kmp-stellar-sdk/
 - **Gradle**: 8.0+
 - **JVM**: Java 11+
 - **Android**: API 24+ (Android 7.0)
-- **iOS**: iOS 15+
-- **macOS**: macOS 12+
+- **iOS**: iOS 14+
+- **macOS**: macOS 11+
 - **Web**: Modern browsers with WebAssembly support
 
 ## Reference Implementation
@@ -591,7 +406,7 @@ For development:
 1. Clone the repository
 2. Open in IntelliJ IDEA or Android Studio
 3. Run tests: `./gradlew test`
-4. See `CLAUDE.md` for detailed development guidelines
+4. See [CLAUDE.md](CLAUDE.md) for detailed development guidelines
 
 ## License
 
@@ -603,6 +418,7 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 - Cryptography powered by [BouncyCastle](https://www.bouncycastle.org/), [libsodium](https://libsodium.org/), and [libsodium.js](https://github.com/jedisct1/libsodium.js)
 - Network communication via [Ktor](https://ktor.io/)
 - Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk)
+- Built with [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
 
 ## Support
 

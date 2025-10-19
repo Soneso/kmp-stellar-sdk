@@ -19,8 +19,8 @@ Welcome to the comprehensive documentation for the Stellar SDK for Kotlin Multip
   - [macOS](platforms/macos.md)
 
 ### Development
-- **[Sample Apps Guide](sample-apps.md)** - Learn from complete example applications
-- **[Testing Guide](testing.md)** - Running tests and writing test code
+- **[Demo Apps Guide](sample-apps.md)** - Learn from complete example applications
+- **[Soroban RPC Usage](SOROBAN_RPC_USAGE.md)** - Using Soroban smart contracts
 - **[Migration Guide](migration.md)** - Migrating from Java Stellar SDK
 
 ### Advanced Topics
@@ -67,12 +67,12 @@ This SDK provides a complete implementation of the Stellar protocol with:
 **Mobile Development**
 - [Android Setup](platforms/jvm.md#android-setup)
 - [iOS Setup](platforms/ios.md)
-- [Sample Mobile Apps](sample-apps.md#mobile-apps)
+- [Demo Mobile Apps](sample-apps.md#android)
 
 **Web Development**
 - [Browser Setup](platforms/javascript.md#browser-setup)
 - [Node.js Setup](platforms/javascript.md#nodejs-setup)
-- [Web Sample App](sample-apps.md#web-app)
+- [Demo Web App](sample-apps.md#web-javascript)
 
 **Server Development**
 - [JVM Server Setup](platforms/jvm.md#server-setup)
@@ -82,12 +82,12 @@ This SDK provides a complete implementation of the Stellar protocol with:
 
 ### Core Features ✅
 - Ed25519 keypair generation and management
-- StrKey encoding/decoding (G... and S... addresses)
+- StrKey encoding/decoding (G..., S..., C..., M... addresses)
 - Transaction building and signing
 - Fee bump transactions
 - Multi-signature support
-- All Stellar operations (60+ types)
-- Complete XDR serialization
+- All 27 Stellar operations
+- Complete XDR serialization/deserialization
 
 ### Horizon API ✅
 - Accounts, Assets, Claimable Balances
