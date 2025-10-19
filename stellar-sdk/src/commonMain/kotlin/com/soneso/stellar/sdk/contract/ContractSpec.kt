@@ -59,6 +59,76 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     }
 
     /**
+     * Returns all UDT struct specifications from the contract spec.
+     *
+     * @return List of struct specifications
+     */
+    fun udtStructs(): List<SCSpecUDTStructV0Xdr> {
+        return entries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtStructV0 -> entry.value
+                else -> null
+            }
+        }
+    }
+
+    /**
+     * Returns all UDT union specifications from the contract spec.
+     *
+     * @return List of union specifications
+     */
+    fun udtUnions(): List<SCSpecUDTUnionV0Xdr> {
+        return entries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtUnionV0 -> entry.value
+                else -> null
+            }
+        }
+    }
+
+    /**
+     * Returns all UDT enum specifications from the contract spec.
+     *
+     * @return List of enum specifications
+     */
+    fun udtEnums(): List<SCSpecUDTEnumV0Xdr> {
+        return entries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtEnumV0 -> entry.value
+                else -> null
+            }
+        }
+    }
+
+    /**
+     * Returns all UDT error enum specifications from the contract spec.
+     *
+     * @return List of error enum specifications
+     */
+    fun udtErrorEnums(): List<SCSpecUDTErrorEnumV0Xdr> {
+        return entries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtErrorEnumV0 -> entry.value
+                else -> null
+            }
+        }
+    }
+
+    /**
+     * Returns all event specifications from the contract spec.
+     *
+     * @return List of event specifications
+     */
+    fun events(): List<SCSpecEventV0Xdr> {
+        return entries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.EventV0 -> entry.value
+                else -> null
+            }
+        }
+    }
+
+    /**
      * Finds a specific function specification by name.
      *
      * @param name The function name to search for
@@ -70,7 +140,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
 
     /**
      * Finds any spec entry by name.
-     * Searches across functions, structs, unions, enums, and error enums.
+     * Searches across functions, structs, unions, enums, error enums, and events.
      *
      * @param name The entry name to search for
      * @return The spec entry, or null if not found
@@ -83,6 +153,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 is SCSpecEntryXdr.UdtUnionV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtEnumV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtErrorEnumV0 -> entry.value.name == name
+                is SCSpecEntryXdr.EventV0 -> entry.value.name.value == name
                 else -> false
             }
         }

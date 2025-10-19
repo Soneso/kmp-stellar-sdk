@@ -481,24 +481,42 @@ class SorobanClientIntegrationTest {
         // Step 1: Upload and deploy contracts
         delay(5000)
 
-        // Upload/deploy token contract for TokenA
+        // Upload/deploy token contract for TokenA with constructor args
         val tokenAId = tokenAContractId ?: run {
             val tokenCode = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
             val wasmId = tokenContractWasmId ?: installContractWithKeypair(tokenCode, admin)
             tokenContractWasmId = wasmId
             delay(5000)
-            val cid = deployContractWithKeypair(wasmId, admin)
+
+            // Deploy with constructor args (admin, decimals, name, symbol)
+            val adminAddress = Address(adminId)
+            val constructorArgs = listOf(
+                adminAddress.toSCVal(),
+                Scv.toUint32(8u), // decimals
+                Scv.toString("TokenA"), // name
+                Scv.toString("TokenA")  // symbol
+            )
+            val cid = deployContractWithConstructor(wasmId, admin, constructorArgs)
             tokenAContractId = cid
             println("Deployed TokenA: $cid")
             cid
         }
 
-        // Upload/deploy token contract for TokenB
+        // Upload/deploy token contract for TokenB with constructor args
         delay(5000)
         val tokenBId = tokenBContractId ?: run {
             TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
             val wasmId = tokenContractWasmId!!
-            val cid = deployContractWithKeypair(wasmId, admin)
+
+            // Deploy with constructor args (admin, decimals, name, symbol)
+            val adminAddress = Address(adminId)
+            val constructorArgs = listOf(
+                adminAddress.toSCVal(),
+                Scv.toUint32(8u), // decimals
+                Scv.toString("TokenB"), // name
+                Scv.toString("TokenB")  // symbol
+            )
+            val cid = deployContractWithConstructor(wasmId, admin, constructorArgs)
             tokenBContractId = cid
             println("Deployed TokenB: $cid")
             cid
@@ -528,27 +546,9 @@ class SorobanClientIntegrationTest {
         val swapInfo = sorobanServer.loadContractInfoForContractId(swapId)
         val swapSpec = ContractSpec(swapInfo!!.specEntries)
 
-        // Step 3: Initialize tokens using ContractSpec
-        println("=== Creating tokens with ContractSpec ===")
-
-        val initArgsA = tokenASpec.funcArgsToXdrSCValues("initialize", mapOf(
-            "admin" to adminId,     // String -> Address (automatic)
-            "decimal" to 0,         // int -> u32 (automatic)
-            "name" to "TokenA",     // String -> String (direct)
-            "symbol" to "TokenA"    // String -> String (direct)
-        ))
-        invokeContractWithKeypair(tokenAId, "initialize", initArgsA, admin)
-        delay(5000)
-
-        val initArgsB = tokenBSpec.funcArgsToXdrSCValues("initialize", mapOf(
-            "admin" to adminId,
-            "decimal" to 0,
-            "name" to "TokenB",
-            "symbol" to "TokenB"
-        ))
-        invokeContractWithKeypair(tokenBId, "initialize", initArgsB, admin)
-        delay(5000)
-        println("✓ Tokens created using ContractSpec")
+        // Note: Tokens are now initialized in the constructor during deployment
+        // No separate initialization step is needed
+        println("✓ Tokens already initialized via constructor during deployment")
 
         // Step 4: Mint tokens using ContractSpec
         println("=== Minting tokens with ContractSpec ===")
@@ -739,6 +739,66 @@ class SorobanClientIntegrationTest {
         )
 
         val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
+        val operation = InvokeHostFunctionOperation(hostFunction = createFunction)
+
+        val transaction = TransactionBuilder(
+            sourceAccount = account,
+            network = network
+        )
+            .addOperation(operation)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        assertNull(simulateResponse.error, "Deploy simulation should not have error")
+
+        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
+        preparedTransaction.sign(keyPair)
+
+        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
+        assertNotNull(sendResponse.hash)
+
+        val rpcResponse = sorobanServer.pollTransaction(
+            hash = sendResponse.hash,
+            maxAttempts = 60,  // Increased from 30 to 60
+            sleepStrategy = { 3000L }
+        )
+
+        assertEquals(GetTransactionStatus.SUCCESS, rpcResponse.status)
+
+        val contractId = rpcResponse.getCreatedContractId()
+        assertNotNull(contractId)
+        return contractId
+    }
+
+    /**
+     * Helper function to deploy a contract from WASM ID with constructor arguments.
+     */
+    private suspend fun deployContractWithConstructor(wasmId: String, keyPair: KeyPair, constructorArgs: List<SCValXdr>): String {
+        delay(5000)
+
+        val accountId = keyPair.getAccountId()
+        val account = sorobanServer.getAccount(accountId)
+
+        val addressObj = Address(accountId)
+        val scAddress = addressObj.toSCAddress()
+        val salt = Uint256Xdr(ByteArray(32) { Random.nextInt(256).toByte() })
+
+        val preimage = ContractIDPreimageXdr.FromAddress(
+            ContractIDPreimageFromAddressXdr(address = scAddress, salt = salt)
+        )
+
+        val wasmHash = HashXdr(wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+        val executable = ContractExecutableXdr.WasmHash(wasmHash)
+
+        val createContractArgs = CreateContractArgsV2Xdr(
+            contractIdPreimage = preimage,
+            executable = executable,
+            constructorArgs = constructorArgs
+        )
+
+        val createFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
         val operation = InvokeHostFunctionOperation(hostFunction = createFunction)
 
         val transaction = TransactionBuilder(

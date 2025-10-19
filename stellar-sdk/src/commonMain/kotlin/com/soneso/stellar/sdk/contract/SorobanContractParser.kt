@@ -338,4 +338,108 @@ data class SorobanContractInfo(
     val envInterfaceVersion: ULong,
     val specEntries: List<SCSpecEntryXdr>,
     val metaEntries: Map<String, String>
-)
+) {
+    /**
+     * Returns the list of supported SEP (Stellar Ecosystem Proposal) numbers from the contract metadata.
+     *
+     * This property parses the "sep" meta entry which contains comma-separated SEP numbers
+     * (e.g., "1, 10, 24"). The values are parsed, trimmed, deduplicated, and returned as a list.
+     *
+     * Example:
+     * ```kotlin
+     * val contractInfo = SorobanContractParser.parseContractByteCode(wasmBytes)
+     * val seps = contractInfo.supportedSeps // e.g., ["1", "10", "24"]
+     * ```
+     *
+     * @return List of SEP numbers as strings, or empty list if no "sep" meta entry exists
+     */
+    val supportedSeps: List<String>
+        get() {
+            val sepValue = metaEntries["sep"] ?: return emptyList()
+            if (sepValue.isBlank()) return emptyList()
+
+            return sepValue
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+        }
+
+    /**
+     * Returns all function specifications from the contract spec entries.
+     *
+     * @return List of function specifications
+     */
+    val funcs: List<SCSpecFunctionV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.FunctionV0 -> entry.value
+                else -> null
+            }
+        }
+
+    /**
+     * Returns all UDT struct specifications from the contract spec entries.
+     *
+     * @return List of struct specifications
+     */
+    val udtStructs: List<SCSpecUDTStructV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtStructV0 -> entry.value
+                else -> null
+            }
+        }
+
+    /**
+     * Returns all UDT union specifications from the contract spec entries.
+     *
+     * @return List of union specifications
+     */
+    val udtUnions: List<SCSpecUDTUnionV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtUnionV0 -> entry.value
+                else -> null
+            }
+        }
+
+    /**
+     * Returns all UDT enum specifications from the contract spec entries.
+     *
+     * @return List of enum specifications
+     */
+    val udtEnums: List<SCSpecUDTEnumV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtEnumV0 -> entry.value
+                else -> null
+            }
+        }
+
+    /**
+     * Returns all UDT error enum specifications from the contract spec entries.
+     *
+     * @return List of error enum specifications
+     */
+    val udtErrorEnums: List<SCSpecUDTErrorEnumV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtErrorEnumV0 -> entry.value
+                else -> null
+            }
+        }
+
+    /**
+     * Returns all event specifications from the contract spec entries.
+     *
+     * @return List of event specifications
+     */
+    val events: List<SCSpecEventV0Xdr>
+        get() = specEntries.mapNotNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.EventV0 -> entry.value
+                else -> null
+            }
+        }
+}
