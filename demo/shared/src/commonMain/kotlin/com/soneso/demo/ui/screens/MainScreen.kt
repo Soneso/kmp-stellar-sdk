@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -64,12 +65,18 @@ class MainScreen : Screen {
                 description = "Transfer XLM or issued assets to another account",
                 icon = Icons.AutoMirrored.Filled.Send,
                 screen = SendPaymentScreen()
+            ),
+            DemoTopic(
+                title = "Fetch Smart Contract Details",
+                description = "Parse contract WASM to view metadata and specification",
+                icon = Icons.Default.Code,
+                screen = ContractDetailsScreen()
             )
             // TODO: Add more demo topics here
             // Examples:
             // - Transaction Signing
             // - Path Payments
-            // - Smart Contract Interactions
+            // - More Smart Contract Interactions
         )
 
         Scaffold(

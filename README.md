@@ -1,6 +1,6 @@
 # Stellar SDK for Kotlin Multiplatform
 
-**Status: ALPHA (Experimental) - Work In Progress, do not use in production**
+**Status: ALPHA - Work In Progress, do not use in production**
 
 **Built with:** [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
 

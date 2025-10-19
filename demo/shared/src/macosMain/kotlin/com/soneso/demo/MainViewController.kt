@@ -2,10 +2,12 @@ package com.soneso.demo
 
 import com.soneso.demo.stellar.AccountDetailsResult
 import com.soneso.demo.stellar.AccountFundingResult
+import com.soneso.demo.stellar.ContractDetailsResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.SendPaymentResult
 import com.soneso.demo.stellar.TrustAssetResult
 import com.soneso.demo.stellar.fetchAccountDetails
+import com.soneso.demo.stellar.fetchContractDetails
 import com.soneso.demo.stellar.fundTestnetAccount
 import com.soneso.demo.stellar.generateRandomKeyPair
 import com.soneso.demo.stellar.sendPayment
@@ -144,5 +146,25 @@ class MacOSBridge {
             secretSeed = secretSeed,
             useTestnet = useTestnet
         )
+    }
+
+    /**
+     * Fetch and parse smart contract details from the Stellar network using Soroban RPC.
+     * Call this from Swift using async/await.
+     *
+     * Uses the centralized ContractDetails business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * This retrieves the contract's WASM bytecode from the network and parses it to extract:
+     * - Environment interface version (protocol version)
+     * - Contract specification entries (functions, structs, unions, enums, events)
+     * - Contract metadata (key-value pairs for application/tooling use)
+     *
+     * @param contractId The Stellar contract ID to fetch (must start with 'C')
+     * @param useTestnet If true, connects to testnet; otherwise connects to mainnet
+     * @return ContractDetailsResult with parsed contract info or error details
+     */
+    suspend fun fetchContractDetails(contractId: String, useTestnet: Boolean = true): ContractDetailsResult {
+        return com.soneso.demo.stellar.fetchContractDetails(contractId, useTestnet)
     }
 }
