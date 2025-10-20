@@ -37,8 +37,9 @@ Add libsodium dependency in Xcode:
 
 1. File → Add Package Dependencies
 2. Search for: `https://github.com/jedisct1/swift-sodium`
-3. Select **Clibsodium** package (not swift-sodium)
-4. Add to your app target
+3. Add the **swift-sodium** package
+4. When prompted, select the **Clibsodium** product (not Sodium)
+5. Add to your app target
 
 Or in `Package.swift`:
 

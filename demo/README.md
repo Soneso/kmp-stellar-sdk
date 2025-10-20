@@ -4,7 +4,7 @@ A comprehensive Kotlin Multiplatform demo application showcasing the Stellar SDK
 
 ## Overview
 
-This demo app demonstrates real-world usage of the Stellar SDK, including key generation, account management, payments, trustlines, and smart contract interactions. The app follows a modern KMP architecture with shared business logic and platform-specific UIs.
+This demo app demonstrates real-world usage of the Stellar SDK, including key generation, account management, payments, trustlines, and smart contract interactions. The demo's primary purpose is to showcase SDK functionality for developers learning how to use the SDK. The app follows a modern KMP architecture with shared business logic and platform-specific UIs.
 
 ## Architecture
 
@@ -35,7 +35,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 **Key Points**:
 - **Shared Module**: Contains 100% of the UI code (Compose) and business logic (Stellar SDK integration)
 - **Platform Apps**: Minimal entry point code (5-20 lines) to launch the shared UI
-- **macOS Exception**: Uses native SwiftUI instead of Compose (see macosApp/README.md for details)
+- **macOS Exception**: The macOS app uses native SwiftUI (not Compose) - see macosApp/README.md for details
 - **Code Reuse**: ~95% code sharing across Android, Desktop, iOS, and Web
 
 ## Features
@@ -90,6 +90,7 @@ The demo app includes 7 comprehensive feature demonstrations:
 - Two-step deployment (install WASM + deploy from WASM ID)
 - Platform-specific WASM file loading
 - Support for 5 example contracts (hello_world, token, atomic_swap, auth, events)
+- Located in `shared/src/commonMain/resources/wasm/`
 - Demonstrates: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Project Structure
@@ -99,21 +100,23 @@ demo/
 ├── shared/                          # Shared Compose Multiplatform module
 │   ├── src/
 │   │   ├── commonMain/kotlin/       # Shared code (UI + business logic)
-│   │   │   ├── ui/screens/          # All 6 demo screens
+│   │   │   ├── ui/screens/          # All 7 demo screens
 │   │   │   │   ├── MainScreen.kt
 │   │   │   │   ├── KeyGenerationScreen.kt
 │   │   │   │   ├── FundAccountScreen.kt
 │   │   │   │   ├── AccountDetailsScreen.kt
 │   │   │   │   ├── TrustAssetScreen.kt
 │   │   │   │   ├── SendPaymentScreen.kt
-│   │   │   │   └── ContractDetailsScreen.kt
+│   │   │   │   ├── ContractDetailsScreen.kt
+│   │   │   │   └── DeployContractScreen.kt
 │   │   │   ├── stellar/             # Stellar SDK integration
 │   │   │   │   ├── KeyPairGeneration.kt
 │   │   │   │   ├── AccountFunding.kt
 │   │   │   │   ├── AccountDetails.kt
 │   │   │   │   ├── TrustAsset.kt
 │   │   │   │   ├── SendPayment.kt
-│   │   │   │   └── ContractDetails.kt
+│   │   │   │   ├── ContractDetails.kt
+│   │   │   │   └── DeployContract.kt
 │   │   │   └── App.kt               # Main app entry
 │   │   ├── androidMain/             # Android-specific (clipboard)
 │   │   ├── desktopMain/             # Desktop-specific (clipboard)
@@ -128,10 +131,8 @@ demo/
 │   ├── StellarDemo/StellarDemoApp.swift
 │   └── project.yml
 ├── macosApp/                        # macOS native entry point (SwiftUI)
-│   ├── StellarDemo/                 # 17 Swift files
-│   │   ├── Views/                   # 7 SwiftUI views
-│   │   ├── Components/              # 6 reusable components
-│   │   └── Utilities/               # 3 utility files
+│   ├── StellarDemo/                 # 1 Swift file (StellarDemoApp.swift - 28 lines)
+│   │                                # Planned architecture includes Views/, Components/, Utilities/ - see macosApp/README.md
 │   └── project.yml
 ├── desktopApp/                      # Desktop JVM entry point
 │   ├── src/jvmMain/kotlin/.../Main.kt
@@ -158,7 +159,10 @@ demo/
 - **macOS**: Required for iOS development
 - **Xcode**: 15.0+
 - **xcodegen**: Install via `brew install xcodegen`
-- **CocoaPods** or **Swift Package Manager**: For libsodium dependency
+- **Swift Package Manager**: For libsodium dependency
+  - Add the swift-sodium package from https://github.com/jedisct1/swift-sodium
+  - The package provides both Clibsodium (C library) and Sodium (Swift wrapper) products
+  - The KMP SDK uses the Clibsodium product
 
 ### macOS Native
 - **Xcode**: 15.0+
@@ -179,7 +183,6 @@ demo/
 
 ```bash
 # From project root
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 # Build APK
 ./gradlew :demo:androidApp:assembleDebug
@@ -195,9 +198,10 @@ cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 ### iOS
 
+**Prerequisites**: Add libsodium via Swift Package Manager before building. See [iosApp/README.md](iosApp/README.md#swift-package-manager) for detailed libsodium setup instructions.
+
 ```bash
 # From project root
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 # Build the Kotlin framework
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
@@ -209,15 +213,15 @@ open StellarDemo.xcodeproj
 ```
 
 **In Xcode**:
-1. Select "StellarDemo" scheme
-2. Choose iOS Simulator (iPhone 15 Pro recommended)
-3. Click Run (⌘R)
+1. Add libsodium package if not already added (File → Add Packages... → `https://github.com/jedisct1/swift-sodium`)
+2. Select "StellarDemo" scheme
+3. Choose iOS Simulator (iPhone 15 Pro recommended)
+4. Click Run (⌘R)
 
 ### macOS Native
 
 ```bash
 # From project root
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 # Install libsodium (required)
 brew install libsodium
@@ -244,7 +248,6 @@ open StellarDemo.xcodeproj
 
 ```bash
 # From project root
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 # Run the desktop app
 ./gradlew :demo:desktopApp:run
@@ -261,7 +264,6 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
 
 ```bash
 # From project root
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
 # Development server (with hot reload)
 ./gradlew :demo:webApp:jsBrowserDevelopmentRun
@@ -314,7 +316,7 @@ cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 ### Cryptography (from Stellar SDK)
 - **JVM**: BouncyCastle (Ed25519)
 - **iOS/macOS Native**: libsodium via C interop
-- **JavaScript**: libsodium-wrappers-sumo (WASM, includes SHA-256)
+- **JavaScript**: libsodium-wrappers-sumo 0.7.13 (WASM, includes SHA-256)
 
 ## Platform Support
 
@@ -361,7 +363,7 @@ cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
    )
    ```
 
-4. **Test on all platforms**:
+4. **Test all 7 demo features**:
    ```bash
    ./gradlew :demo:androidApp:installDebug
    ./gradlew :demo:desktopApp:run
@@ -374,7 +376,7 @@ cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 The demo minimizes platform-specific code. Only used for:
 - **Clipboard access**: Each platform has its own implementation in `platform/Clipboard.*.kt`
 - **Entry points**: Minimal code to launch Compose UI
-- **macOS native**: Full SwiftUI reimplementation (17 files)
+- **macOS native**: Currently 1 Swift file (planned SwiftUI architecture in macosApp/README.md)
 
 ### Testing
 
@@ -479,7 +481,7 @@ You have two options for running on macOS:
 - ✅ True native macOS app
 - ✅ Smaller bundle (no JVM)
 - ✅ Native SwiftUI integration
-- ❌ Separate SwiftUI codebase (17 files)
+- ❌ Separate SwiftUI codebase (currently minimal, see macosApp/README.md)
 - ❌ macOS-only (not cross-platform)
 
 ```bash

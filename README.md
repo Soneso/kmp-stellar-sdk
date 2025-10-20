@@ -548,7 +548,7 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 - Built with [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
 - Cryptography powered by [BouncyCastle](https://www.bouncycastle.org/), [libsodium](https://libsodium.org/), and [libsodium.js](https://github.com/jedisct1/libsodium.js)
 - Network communication via [Ktor](https://ktor.io/)
-- Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk)
+- Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) and the [Flutter Stellar SDK](https://github.com/Soneso/stellar_flutter_sdk)
 - Built with [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
 
 ## Support
