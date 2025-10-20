@@ -143,7 +143,7 @@ fun setupUI(scope: CoroutineScope) {
     "start": "node stellar-app.js"
   },
   "dependencies": {
-    "libsodium-wrappers": "0.7.13"
+    "libsodium-wrappers-sumo": "0.7.13"
   }
 }
 ```
@@ -215,7 +215,7 @@ The JavaScript platform uses libsodium.js (WebAssembly):
 
 ```kotlin
 // Internal implementation (in jsMain)
-@JsModule("libsodium-wrappers")
+@JsModule("libsodium-wrappers-sumo")
 @JsNonModule
 external object sodium {
     fun ready(): Promise<Unit>

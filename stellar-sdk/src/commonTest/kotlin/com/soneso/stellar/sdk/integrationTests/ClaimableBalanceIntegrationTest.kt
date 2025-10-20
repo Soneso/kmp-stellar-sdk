@@ -7,7 +7,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Comprehensive integration tests for Claimable Balance operations.

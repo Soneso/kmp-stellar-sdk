@@ -90,7 +90,7 @@ For production apps, use Swift Package Manager as with iOS.
 
 #### JavaScript/Web
 
-No additional setup required. The SDK bundles libsodium-wrappers automatically.
+No additional setup required. The SDK bundles libsodium-wrappers-sumo automatically (sumo build includes SHA-256 support required for transaction hashing).
 
 For Kotlin/JS projects:
 

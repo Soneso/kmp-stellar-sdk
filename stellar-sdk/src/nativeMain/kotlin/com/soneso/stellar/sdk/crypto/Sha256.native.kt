@@ -26,7 +26,7 @@ internal class Sha256CryptoNative : Sha256Crypto {
         }
     }
 
-    override fun hash(data: ByteArray): ByteArray {
+    override suspend fun hash(data: ByteArray): ByteArray {
         require(data.isNotEmpty()) { "Data must not be empty" }
 
         return memScoped {

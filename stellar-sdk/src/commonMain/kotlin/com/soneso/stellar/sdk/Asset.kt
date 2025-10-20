@@ -79,7 +79,7 @@ sealed class Asset : Comparable<Asset> {
      *
      * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract</a>
      */
-    fun getContractId(network: Network): String {
+    suspend fun getContractId(network: Network): String {
         // Build the HashIDPreimage for CONTRACT_ID
         val preimage = HashIDPreimageXdr.ContractID(
             HashIDPreimageContractIDXdr(

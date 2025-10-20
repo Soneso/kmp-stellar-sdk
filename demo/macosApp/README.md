@@ -1,6 +1,6 @@
 # Stellar SDK Demo - macOS Native App
 
-Native macOS application demonstrating the Stellar SDK with **SwiftUI** and complete integration with all 6 demo features.
+Native macOS application demonstrating the Stellar SDK with **SwiftUI** and complete integration with all 7 demo features.
 
 ## Overview
 
@@ -10,6 +10,7 @@ This is a **native macOS app** built with SwiftUI (not Compose), showcasing the 
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
 - **Smart Contracts**: Fetch and parse Soroban contract details
+- **Contract Deployment**: Upload and deploy WASM contracts to testnet
 
 The app demonstrates how to integrate the Kotlin Multiplatform Stellar SDK into a pure SwiftUI macOS application.
 
@@ -130,8 +131,6 @@ brew list libsodium
 From project root:
 
 ```bash
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
-
 # For Apple Silicon (M1/M2/M3)
 ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
 
@@ -161,9 +160,8 @@ This creates `StellarDemo.xcodeproj` from `project.yml`.
 open StellarDemo.xcodeproj
 ```
 
-**Or use the all-in-one Gradle task**:
+**Or use the all-in-one Gradle task** (from project root):
 ```bash
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 ./gradlew :demo:macosApp:openXcode
 ```
 
@@ -178,7 +176,7 @@ In Xcode:
 
 ## Features
 
-All 6 demo features are fully implemented in SwiftUI:
+All 7 demo features are fully implemented in SwiftUI:
 
 ### 1. Key Generation
 - **View**: `KeyGenerationView.swift`
@@ -227,6 +225,13 @@ All 6 demo features are fully implemented in SwiftUI:
 - Display contract specification (functions, types)
 - View contract code hash
 - Uses: Soroban RPC integration from Stellar SDK
+
+### 7. Deploy Smart Contract
+- **View**: `DeployContractView.swift`
+- Upload and deploy WASM contracts
+- Platform-specific resource loading from bundle
+- One-step and two-step deployment
+- Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Design System
 
@@ -414,8 +419,7 @@ continue                    # Continue execution
 
 **Framework not found**:
 ```bash
-# Rebuild the framework
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
+# Rebuild the framework (from project root)
 ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
 
 # Regenerate Xcode project

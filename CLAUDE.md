@@ -33,7 +33,7 @@ The SDK is in **alpha development** with comprehensive functionality implemented
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
 - **Architecture**: Compose Multiplatform with 95% code sharing
-- **Features**: 6 comprehensive demos (key generation, funding, account details, trustlines, payments, contracts)
+- **Features**: 7 comprehensive demos (key generation, funding, account details, trustlines, payments, contracts, deploy contract)
 - **Location**: `demo/` directory with platform-specific apps
 
 ## Architecture Notes
@@ -61,7 +61,9 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
   - No Homebrew installation required for iOS apps
 
 #### JavaScript Platforms (Browser & Node.js)
-- **Library**: libsodium-wrappers (0.7.13 via npm)
+- **Library**: libsodium-wrappers-sumo (0.7.13 via npm)
+  - Sumo build required for SHA-256 support (crypto_hash_sha256)
+  - Standard build does not include SHA-256 functions
   - Same audited C library compiled to WebAssembly
   - Universal compatibility (all browsers, Node.js)
   - **Automatic initialization**: SDK handles libsodium initialization internally
@@ -239,7 +241,7 @@ The SDK includes comprehensive integration tests that validate against a live St
 The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Multiplatform architecture:
 
 - **Shared module** (`demo/shared`): Compose Multiplatform UI + business logic
-  - 6 feature screens (key generation, funding, account details, trust asset, payments, contracts)
+  - 7 feature screens (key generation, funding, account details, trust asset, payments, contracts, deploy contract)
   - Platform-specific code only for clipboard access
   - Demonstrates real SDK usage patterns
 
@@ -302,7 +304,7 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
   - `macosTest`: macOS-specific tests
 
 - **demo**: Comprehensive KMP demo application
-  - `shared`: Compose Multiplatform UI + business logic (6 feature screens)
+  - `shared`: Compose Multiplatform UI + business logic (7 feature screens)
   - `androidApp`: Android entry point (Jetpack Compose)
   - `iosApp`: iOS entry point (SwiftUI wrapper for Compose)
   - `macosApp`: macOS native SwiftUI app (17 Swift files, not Compose)
@@ -323,7 +325,9 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 ### JavaScript (Browser & Node.js)
 - **ktor-client-js**: HTTP client for JavaScript
-- **libsodium-wrappers** (0.7.13 via npm): Ed25519 cryptography with automatic async initialization
+- **libsodium-wrappers-sumo** (0.7.13 via npm): Ed25519 cryptography and SHA-256 with automatic async initialization
+  - Sumo build required for SHA-256 support (crypto_hash_sha256)
+  - Standard build does not include SHA-256 functions
 - **kotlinx-coroutines-core**: Required for async crypto operations
 
 ### Native (iOS/macOS)

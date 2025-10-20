@@ -574,6 +574,7 @@ class ContractClient private constructor(
             rpcUrl: String
         ): String {
             val server = SorobanServer(rpcUrl)
+
             val account = server.getAccount(source)
 
             val uploadFunction = HostFunctionXdr.Wasm(wasmBytes)

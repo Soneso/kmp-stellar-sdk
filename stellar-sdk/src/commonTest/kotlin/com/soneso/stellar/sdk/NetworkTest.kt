@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class NetworkTest {
@@ -11,7 +12,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testNetworkId() {
+    fun testNetworkId() = runTest {
         val network = Network.PUBLIC
         val networkId = network.networkId()
 
@@ -24,7 +25,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testPublicNetwork() {
+    fun testPublicNetwork() = runTest {
         assertEquals("Public Global Stellar Network ; September 2015", Network.PUBLIC.networkPassphrase)
 
         // Verify network ID is deterministic
@@ -35,7 +36,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testTestnetNetwork() {
+    fun testTestnetNetwork() = runTest {
         assertEquals("Test SDF Network ; September 2015", Network.TESTNET.networkPassphrase)
 
         // Verify network ID is deterministic
@@ -61,7 +62,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testCustomNetwork() {
+    fun testCustomNetwork() = runTest {
         val custom = Network("My Custom Network")
         assertEquals("My Custom Network", custom.networkPassphrase)
 
@@ -99,7 +100,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testDifferentPassphrasesProduceDifferentIds() {
+    fun testDifferentPassphrasesProduceDifferentIds() = runTest {
         val network1 = Network("Network 1")
         val network2 = Network("Network 2")
 
@@ -107,7 +108,7 @@ class NetworkTest {
     }
 
     @Test
-    fun testNetworkIdIsDeterministic() {
+    fun testNetworkIdIsDeterministic() = runTest {
         // Test that the same passphrase always produces the same hash
         val passphrase = "Test Passphrase"
         val network1 = Network(passphrase)

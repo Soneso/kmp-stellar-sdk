@@ -137,7 +137,10 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-js:2.3.8")
-                implementation(npm("libsodium-wrappers", "0.7.13"))
+                // Use libsodium-wrappers-sumo instead of standard build
+                // The sumo build includes all functions including crypto_hash_sha256
+                // which is needed for SHA-256 hashing (used in contract deployment)
+                implementation(npm("libsodium-wrappers-sumo", "0.7.13"))
             }
         }
 

@@ -3,9 +3,12 @@ package com.soneso.demo
 import com.soneso.demo.stellar.AccountDetailsResult
 import com.soneso.demo.stellar.AccountFundingResult
 import com.soneso.demo.stellar.ContractDetailsResult
+import com.soneso.demo.stellar.ContractMetadata
+import com.soneso.demo.stellar.DeployContractResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.SendPaymentResult
 import com.soneso.demo.stellar.TrustAssetResult
+import com.soneso.demo.stellar.deployContract
 import com.soneso.demo.stellar.fetchAccountDetails
 import com.soneso.demo.stellar.fetchContractDetails
 import com.soneso.demo.stellar.fundTestnetAccount
@@ -166,5 +169,42 @@ class MacOSBridge {
      */
     suspend fun fetchContractDetails(contractId: String, useTestnet: Boolean = true): ContractDetailsResult {
         return com.soneso.demo.stellar.fetchContractDetails(contractId, useTestnet)
+    }
+
+    /**
+     * Deploy a Soroban smart contract to the Stellar network.
+     * Call this from Swift using async/await.
+     *
+     * Uses the centralized DeployContract business logic to maintain consistency
+     * across all platform UIs (Compose, SwiftUI, Web).
+     *
+     * This demonstrates the SDK's high-level ContractClient.deploy() API which handles:
+     * - WASM bytecode upload
+     * - Contract instance deployment
+     * - Constructor invocation (if required)
+     * - Transaction simulation and resource estimation
+     * - Transaction signing and submission
+     *
+     * @param contractMetadata Contract metadata including WASM filename and constructor parameters
+     * @param constructorArgs Constructor arguments as a Map (key = param name, value = param value)
+     * @param sourceAccountId The source account ID that will pay for deployment (must start with 'G')
+     * @param secretKey The source account's secret key for signing (must start with 'S')
+     * @param useTestnet If true, deploys to testnet; otherwise to mainnet
+     * @return DeployContractResult indicating success with contract ID or failure with error details
+     */
+    suspend fun deployContract(
+        contractMetadata: ContractMetadata,
+        constructorArgs: Map<String, Any?>,
+        sourceAccountId: String,
+        secretKey: String,
+        useTestnet: Boolean = true
+    ): DeployContractResult {
+        return com.soneso.demo.stellar.deployContract(
+            contractMetadata = contractMetadata,
+            constructorArgs = constructorArgs,
+            sourceAccountId = sourceAccountId,
+            secretKey = secretKey,
+            useTestnet = useTestnet
+        )
     }
 }

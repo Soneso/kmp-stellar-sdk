@@ -77,9 +77,8 @@ class QueryIntegrationTest {
      * 6. Verifies accounts appear in forAsset query with pagination
      */
     @Test
-    fun testQueryAccounts() = runTest(timeout = 90.seconds) {
-        withTimeout(120_000) {
-            // Create and fund main account
+    fun testQueryAccounts() = runTest(timeout = 120.seconds) {
+        // Create and fund main account
             val accountKeyPair = KeyPair.random()
             val accountId = accountKeyPair.getAccountId()
 
@@ -241,7 +240,6 @@ class QueryIntegrationTest {
                 .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
                 .execute()
             assertEquals(2, accountsForAssetLimited.records.size, "Should have exactly 2 records with limit")
-        }
     }
 
     /**
@@ -254,9 +252,8 @@ class QueryIntegrationTest {
      * 4. Verifies asset statistics (accounts, balances, claimable balances)
      */
     @Test
-    fun testQueryAssets() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            // Query assets by code
+    fun testQueryAssets() = runTest(timeout = 60.seconds) {
+        // Query assets by code
             val assetsPage = horizonServer.assets()
                 .forAssetCode("ASTRO")
                 .limit(5)
@@ -296,7 +293,6 @@ class QueryIntegrationTest {
                     println("Balances unauthorized: ${asset.balances.unauthorized}")
                 }
             }
-        }
     }
 
     /**
@@ -311,9 +307,8 @@ class QueryIntegrationTest {
      * 6. Verifies pagination and ordering
      */
     @Test
-    fun testQueryEffects() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            // Get an account with effects
+    fun testQueryEffects() = runTest(timeout = 60.seconds) {
+        // Get an account with effects
             val assetsPage = horizonServer.assets()
                 .forAssetCode("USDC")
                 .limit(5)
@@ -413,7 +408,6 @@ class QueryIntegrationTest {
                     assertNotNull(effectsForOperation.records, "Effects query should return a list")
                 }
             }
-        }
     }
 
     /**
@@ -424,9 +418,8 @@ class QueryIntegrationTest {
      * verifies the query mechanism works but doesn't assert on specific results.
      */
     @Test
-    fun testQueryOperationsForClaimableBalance() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            // Try to query operations with a claimable balance ID
+    fun testQueryOperationsForClaimableBalance() = runTest(timeout = 60.seconds) {
+        // Try to query operations with a claimable balance ID
             // The ID may not exist, which is fine - we're testing the endpoint works
             try {
                 val operationsPage1 = horizonServer.operations()
@@ -470,7 +463,6 @@ class QueryIntegrationTest {
                     "Expected 400/404 error for non-existent claimable balance"
                 )
             }
-        }
     }
 
     /**
@@ -481,9 +473,8 @@ class QueryIntegrationTest {
      * verifies the query mechanism works but doesn't assert on specific results.
      */
     @Test
-    fun testQueryTransactionsForClaimableBalance() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            // Try to query transactions with a claimable balance ID
+    fun testQueryTransactionsForClaimableBalance() = runTest(timeout = 60.seconds) {
+        // Try to query transactions with a claimable balance ID
             // The ID may not exist, which is fine - we're testing the endpoint works
             try {
                 val transactionsPage1 = horizonServer.transactions()
@@ -526,7 +517,6 @@ class QueryIntegrationTest {
                     "Expected 400/404 error for non-existent claimable balance"
                 )
             }
-        }
     }
 
     /**
@@ -538,9 +528,8 @@ class QueryIntegrationTest {
      * 3. Verifies both return the same ledger
      */
     @Test
-    fun testQueryLedgers() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            // Query latest ledger
+    fun testQueryLedgers() = runTest(timeout = 60.seconds) {
+        // Query latest ledger
             val ledgersPage = horizonServer.ledgers()
                 .limit(1)
                 .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
@@ -557,7 +546,6 @@ class QueryIntegrationTest {
             val ledger2 = horizonServer.ledgers().ledger(ledger.sequence)
 
             assertEquals(ledger.sequence, ledger2.sequence, "Ledger sequences should match")
-        }
     }
 
     /**
@@ -568,9 +556,8 @@ class QueryIntegrationTest {
      * 2. Verifies all fee stat fields are present and valid
      */
     @Test
-    fun testQueryFeeStats() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            val feeStats = horizonServer.feeStats().execute()
+    fun testQueryFeeStats() = runTest(timeout = 60.seconds) {
+        val feeStats = horizonServer.feeStats().execute()
 
             // Verify all required fields are present
             assertTrue(feeStats.lastLedger > 0, "lastLedger should be positive")
@@ -610,7 +597,6 @@ class QueryIntegrationTest {
             assertTrue(feeStats.maxFee.p99 >= 0, "maxFee.p99 should be non-negative")
 
             println("Fee stats retrieved successfully")
-        }
     }
 
     /**
@@ -626,9 +612,8 @@ class QueryIntegrationTest {
      * 7. Verifies offer details and order book structure
      */
     @Test
-    fun testQueryOffersAndOrderBook() = runTest(timeout = 90.seconds) {
-        withTimeout(120_000) {
-            // Create and fund buyer account
+    fun testQueryOffersAndOrderBook() = runTest(timeout = 120.seconds) {
+        // Create and fund buyer account
             val buyerKeyPair = KeyPair.random()
             val buyerAccountId = buyerKeyPair.getAccountId()
 
@@ -800,7 +785,6 @@ class QueryIntegrationTest {
             val base12 = base2 as AssetTypeCreditAlphaNum12
             assertEquals(assetCode, base12.code, "Base code should be ASTRO")
             assertEquals(issuerAccountId, base12.issuer, "Base issuer should match")
-        }
     }
 
     /**
@@ -820,9 +804,8 @@ class QueryIntegrationTest {
      * 11. Tests streaming trades
      */
     @Test
-    fun testQueryStrictSendReceivePathsAndTrades() = runTest(timeout = 90.seconds) {
-        withTimeout(180_000) {
-            // Create and fund account A
+    fun testQueryStrictSendReceivePathsAndTrades() = runTest(timeout = 180.seconds) {
+        // Create and fund account A
             val keyPairA = KeyPair.random()
             val accountAId = keyPairA.getAccountId()
 
@@ -1285,7 +1268,6 @@ class QueryIntegrationTest {
             } finally {
                 stream.close()
             }
-        }
     }
 
     /**
@@ -1296,16 +1278,14 @@ class QueryIntegrationTest {
      * 2. Verifies protocol version is returned
      */
     @Test
-    fun testQueryRoot() = runTest(timeout = 90.seconds) {
-        withTimeout(60_000) {
-            val root = horizonServer.root().execute()
+    fun testQueryRoot() = runTest(timeout = 60.seconds) {
+        val root = horizonServer.root().execute()
 
-            assertNotNull(root.stellarCoreVersion, "Core version should be present")
-            assertTrue(root.currentProtocolVersion > 10, "Protocol version should be > 10")
+        assertNotNull(root.stellarCoreVersion, "Core version should be present")
+        assertTrue(root.currentProtocolVersion > 10, "Protocol version should be > 10")
 
-            println("Root endpoint query successful")
-            println("Core version: ${root.stellarCoreVersion}")
-            println("Protocol version: ${root.currentProtocolVersion}")
-        }
+        println("Root endpoint query successful")
+        println("Core version: ${root.stellarCoreVersion}")
+        println("Protocol version: ${root.currentProtocolVersion}")
     }
 }

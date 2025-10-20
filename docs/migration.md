@@ -840,7 +840,7 @@ kotlin {
 ### JavaScript/Browser
 
 **Crypto Provider**:
-- libsodium-wrappers (WebAssembly)
+- libsodium-wrappers-sumo (WebAssembly, includes SHA-256)
 - Automatic async initialization
 
 **Bundling**:
@@ -883,7 +883,7 @@ async function signMessage(keypair, message) {
 {
   "dependencies": {
     "stellar-sdk-kmp": "^1.0.0",
-    "libsodium-wrappers": "^0.7.13"
+    "libsodium-wrappers-sumo": "^0.7.13"
   }
 }
 ```

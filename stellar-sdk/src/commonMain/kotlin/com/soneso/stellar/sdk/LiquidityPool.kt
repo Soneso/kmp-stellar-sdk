@@ -59,7 +59,7 @@ data class LiquidityPool(
      *
      * @return The liquidity pool ID as a hex string (lowercase)
      */
-    fun getLiquidityPoolId(): String {
+    suspend fun getLiquidityPoolId(): String {
         val writer = XdrWriter()
         toXdr().encode(writer)
         val xdrBytes = writer.toByteArray()

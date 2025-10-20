@@ -18,7 +18,7 @@ data class Network(val networkPassphrase: String) {
      *
      * @return The 32-byte network ID
      */
-    fun networkId(): ByteArray {
+    suspend fun networkId(): ByteArray {
         return Util.hash(networkPassphrase.encodeToByteArray())
     }
 

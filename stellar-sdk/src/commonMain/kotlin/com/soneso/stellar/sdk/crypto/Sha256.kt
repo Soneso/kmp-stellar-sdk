@@ -33,10 +33,14 @@ interface Sha256Crypto {
     /**
      * Computes the SHA-256 hash of the input data.
      *
+     * On JavaScript platforms, this function is suspend to allow proper
+     * libsodium initialization. On JVM and Native platforms, the suspend
+     * keyword has zero overhead.
+     *
      * @param data The data to hash
      * @return The 32-byte SHA-256 hash
      */
-    fun hash(data: ByteArray): ByteArray
+    suspend fun hash(data: ByteArray): ByteArray
 }
 
 /**

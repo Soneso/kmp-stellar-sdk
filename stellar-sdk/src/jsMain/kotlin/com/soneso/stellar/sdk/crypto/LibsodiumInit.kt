@@ -97,9 +97,9 @@ internal object LibsodiumInit {
     private fun initializeLibsodium(): Promise<Unit> {
         return Promise { resolve, reject ->
             try {
-                // Import libsodium-wrappers using dynamic import
+                // Import libsodium-wrappers-sumo (includes SHA-256 and all other functions)
                 // This works with webpack bundling automatically
-                val sodium = js("require('libsodium-wrappers')")
+                val sodium = js("require('libsodium-wrappers-sumo')")
 
                 // Wait for sodium.ready promise
                 val readyPromise = js("sodium.ready").unsafeCast<Promise<Unit>>()

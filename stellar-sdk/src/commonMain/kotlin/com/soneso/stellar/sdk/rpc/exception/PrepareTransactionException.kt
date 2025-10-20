@@ -42,25 +42,4 @@ package com.soneso.stellar.sdk.rpc.exception
 class PrepareTransactionException(
     override val message: String,
     val simulationError: String? = null
-) : Exception(message) {
-
-    /**
-     * Creates a PrepareTransactionException with just an error message.
-     *
-     * @param message The error message describing the failure
-     */
-    constructor(message: String) : this(message, null)
-
-    /**
-     * Returns a string representation of this exception including message and simulation error.
-     */
-    override fun toString(): String {
-        return buildString {
-            append("PrepareTransactionException(message='$message'")
-            if (simulationError != null) {
-                append(", simulationError='$simulationError'")
-            }
-            append(")")
-        }
-    }
-}
+) : Exception(message)

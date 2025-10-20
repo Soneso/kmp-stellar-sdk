@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 /**
@@ -11,7 +12,7 @@ class AssetContractIdTest {
     private val testIssuer2 = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 
     @Test
-    fun testGetContractIdNativeAsset() {
+    fun testGetContractIdNativeAsset() = runTest {
         // Test native asset contract ID on public network
         val native = AssetTypeNative
         val contractId = native.getContractId(Network.PUBLIC)
@@ -26,7 +27,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdIssuedAssetAlphaNum4() {
+    fun testGetContractIdIssuedAssetAlphaNum4() = runTest {
         // Test issued asset contract ID with known test vector from Java SDK
         // USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN on PUBLIC network
         val usdc = AssetTypeCreditAlphaNum4("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
@@ -45,7 +46,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdIssuedAssetAlphaNum12() {
+    fun testGetContractIdIssuedAssetAlphaNum12() = runTest {
         // Test issued asset with AlphaNum12 code
         val longAsset = AssetTypeCreditAlphaNum12("TESTASSET", testIssuer)
         val contractId = longAsset.getContractId(Network.PUBLIC)
@@ -60,7 +61,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdDifferentNetworks() {
+    fun testGetContractIdDifferentNetworks() = runTest {
         // Same asset on different networks should have different contract IDs
         val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
 
@@ -80,7 +81,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdDifferentAssets() {
+    fun testGetContractIdDifferentAssets() = runTest {
         // Different assets should have different contract IDs
         val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
         val eur = AssetTypeCreditAlphaNum4("EUR", testIssuer)
@@ -102,7 +103,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdNativeVsIssued() {
+    fun testGetContractIdNativeVsIssued() = runTest {
         // Native and issued assets should have different contract IDs
         val native = AssetTypeNative
         val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
@@ -114,7 +115,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdCustomNetwork() {
+    fun testGetContractIdCustomNetwork() = runTest {
         // Test with custom network passphrase
         val customNetwork = Network("Custom Test Network ; 2025")
         val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
@@ -130,7 +131,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdRoundTrip() {
+    fun testGetContractIdRoundTrip() = runTest {
         // Test that contract IDs can be decoded and are 32 bytes
         val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
         val contractId = usd.getContractId(Network.PUBLIC)
@@ -147,7 +148,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdTestnetNetwork() {
+    fun testGetContractIdTestnetNetwork() = runTest {
         // Test with TESTNET to ensure it produces valid contract IDs
         val asset = AssetTypeCreditAlphaNum4("TEST", testIssuer)
         val contractId = asset.getContractId(Network.TESTNET)
@@ -157,7 +158,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdWithShortCode() {
+    fun testGetContractIdWithShortCode() = runTest {
         // Test with single-character asset code
         val asset = AssetTypeCreditAlphaNum4("X", testIssuer)
         val contractId = asset.getContractId(Network.PUBLIC)
@@ -167,7 +168,7 @@ class AssetContractIdTest {
     }
 
     @Test
-    fun testGetContractIdWithLongCode() {
+    fun testGetContractIdWithLongCode() = runTest {
         // Test with maximum-length AlphaNum12 code
         val asset = AssetTypeCreditAlphaNum12("ABCDEFGHIJKL", testIssuer)
         val contractId = asset.getContractId(Network.PUBLIC)

@@ -54,7 +54,7 @@ class AuthTest {
         )
     }
 
-    private fun createExpectedPreimage(
+    private suspend fun createExpectedPreimage(
         network: Network,
         nonce: Long,
         invocation: SorobanAuthorizedInvocationXdr,

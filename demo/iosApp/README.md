@@ -10,6 +10,7 @@ This iOS app showcases the Stellar SDK's capabilities on iOS, featuring:
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
 - **Smart Contracts**: Fetch and parse Soroban contract details
+- **Contract Deployment**: Upload and deploy WASM contracts to testnet
 
 The app uses 100% shared Compose UI from the `demo:shared` module, wrapped in a minimal SwiftUI container.
 
@@ -71,8 +72,6 @@ The app uses 100% shared Compose UI from the `demo:shared` module, wrapped in a 
 From project root:
 
 ```bash
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
-
 # For iOS Simulator (Apple Silicon Mac)
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
 
@@ -224,6 +223,11 @@ All features are implemented in the shared Kotlin module:
 - View contract metadata
 - Display function specifications
 
+### 7. Deploy Smart Contract
+- Upload and deploy WASM contracts from iOS
+- Platform-specific resource loading from bundle
+- One-step and two-step deployment support
+
 ## Technology Stack
 
 ### iOS Layer
@@ -239,8 +243,10 @@ All features are implemented in the shared Kotlin module:
 
 ### Cryptography
 - **libsodium**: Ed25519 cryptography (via Swift Package Manager)
-  - Package: `Clibsodium`
+  - Package: `swift-sodium` (provides both `Clibsodium` and `Sodium` products)
   - Source: jedisct1/swift-sodium
+  - **Clibsodium**: C library used by Kotlin/Native code
+  - **Sodium**: Swift wrapper (optional, for Swift code)
 
 ## Dependencies
 
@@ -251,6 +257,11 @@ Add libsodium to your project:
 1. **File → Add Packages...**
 2. **Search**: `https://github.com/jedisct1/swift-sodium.git`
 3. **Add Package**: "Up to Next Major Version" from 0.9.1
+4. **Products**: Both `Clibsodium` and `Sodium` will be added automatically (you cannot choose individual products)
+
+**Note**: The `swift-sodium` package provides two products:
+- **Clibsodium**: Required by the Kotlin/Native framework
+- **Sodium**: Swift wrapper (not used by this demo, but included automatically)
 
 Or add to `Package.swift`:
 ```swift
@@ -373,8 +384,7 @@ xcrun simctl spawn booted log stream --predicate 'processImagePath contains "Ste
 
 **Framework not found**:
 ```bash
-# Rebuild the framework
-cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
+# Rebuild the framework (from project root)
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Regenerate Xcode project

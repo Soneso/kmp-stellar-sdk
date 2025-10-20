@@ -71,6 +71,14 @@ struct MainScreen: View {
                         icon: "curlybraces",
                         destination: ContractDetailsScreen(toastManager: toastManager)
                     )
+
+                    // Deploy Smart Contract topic
+                    DemoTopicCard(
+                        title: "Deploy Smart Contract",
+                        description: "Deploy Soroban contracts with one-step SDK API",
+                        icon: "arrow.up.doc.fill",
+                        destination: DeployContractView(toastManager: toastManager)
+                    )
                 }
             }
             .padding(16)

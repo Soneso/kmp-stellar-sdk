@@ -24,14 +24,14 @@ import com.soneso.stellar.sdk.horizon.exceptions.NetworkException
  * - `-32003` - Ledger entry not found
  * - `-32004` - Contract invocation failed
  *
- * @property code The error code as defined in JSON-RPC 2.0 specification (inherited from NetworkException, non-null)
+ * @property errorCode The JSON-RPC error code
  * @property data Optional additional error data provided by the server
  *
  * @see <a href="https://www.jsonrpc.org/specification#error_object">JSON-RPC 2.0 Specification - Error object</a>
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference">Soroban RPC API Reference</a>
  */
 class SorobanRpcException(
-    errorCode: Int,
+    val errorCode: Int,
     override val message: String,
     val data: String? = null
 ) : NetworkException(
@@ -39,25 +39,4 @@ class SorobanRpcException(
     cause = null,
     code = errorCode,
     body = data
-) {
-    /**
-     * Creates a SorobanRpcException with code and message only.
-     *
-     * @param errorCode The JSON-RPC error code
-     * @param message The error message
-     */
-    constructor(errorCode: Int, message: String) : this(errorCode, message, null)
-
-    /**
-     * Returns a string representation of this exception including code, message, and data.
-     */
-    override fun toString(): String {
-        return buildString {
-            append("SorobanRpcException(code=$code, message='$message'")
-            if (data != null) {
-                append(", data='$data'")
-            }
-            append(")")
-        }
-    }
-}
+)

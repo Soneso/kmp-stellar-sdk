@@ -141,7 +141,7 @@ class Transaction internal constructor(
      *
      * @return The signature base bytes
      */
-    override fun signatureBase(): ByteArray {
+    override suspend fun signatureBase(): ByteArray {
         val taggedTransaction = TransactionSignaturePayloadTaggedTransactionXdr.Tx(
             value = toV1Xdr()
         )
@@ -239,15 +239,30 @@ class Transaction internal constructor(
 
         other as Transaction
 
-        return signatureBase().contentEquals(other.signatureBase())
+        if (sourceAccount != other.sourceAccount) return false
+        if (fee != other.fee) return false
+        if (sequenceNumber != other.sequenceNumber) return false
+        if (operations != other.operations) return false
+        if (memo != other.memo) return false
+        if (preconditions != other.preconditions) return false
+        if (network != other.network) return false
+
+        return true
     }
 
     override fun hashCode(): Int {
-        return signatureBase().contentHashCode()
+        var result = sourceAccount.hashCode()
+        result = 31 * result + fee.hashCode()
+        result = 31 * result + sequenceNumber.hashCode()
+        result = 31 * result + operations.hashCode()
+        result = 31 * result + memo.hashCode()
+        result = 31 * result + preconditions.hashCode()
+        result = 31 * result + network.hashCode()
+        return result
     }
 
     override fun toString(): String {
-        return "Transaction(hash=${hashHex()}, sourceAccount=$sourceAccount, fee=$fee, " +
+        return "Transaction(sourceAccount=$sourceAccount, fee=$fee, " +
                 "sequenceNumber=$sequenceNumber, operations=${operations.size}, " +
                 "signatures=${signatures.size})"
     }

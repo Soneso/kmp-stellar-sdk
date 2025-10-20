@@ -5,6 +5,10 @@ options:
     iOS: 14.0
 settings:
   ENABLE_USER_SCRIPT_SANDBOXING: NO
+packages:
+  swift-sodium:
+    url: https://github.com/jedisct1/swift-sodium
+    from: 0.9.1
 targets:
   StellarDemo:
     type: application
@@ -14,7 +18,7 @@ targets:
     info:
       path: StellarDemo/Info.plist
       properties:
-        CFBundleShortVersionString: 1.0
+        CFBundleShortVersionString: "1.0"
         CFBundleVersion: 1
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
@@ -32,9 +36,25 @@ targets:
     dependencies:
       - framework: ../shared/build/bin/iosSimulatorArm64/debugFramework/shared.framework
         embed: true
+      - package: swift-sodium
+        product: Clibsodium
     preBuildScripts:
       - script: |
-          cd "$SRCROOT/../../.."
+          cd "$SRCROOT/../.."
           ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
         name: Build Kotlin Framework
+        basedOnDependencyAnalysis: false
+      - script: |
+          # Copy WASM resources from shared module to app bundle
+          WASM_SOURCE_DIR="$SRCROOT/../shared/src/commonMain/resources/wasm"
+          WASM_DEST_DIR="$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/wasm"
+
+          if [ -d "$WASM_SOURCE_DIR" ]; then
+            echo "Copying WASM resources from $WASM_SOURCE_DIR to $WASM_DEST_DIR"
+            mkdir -p "$WASM_DEST_DIR"
+            cp -v "$WASM_SOURCE_DIR"/*.wasm "$WASM_DEST_DIR/" || true
+          else
+            echo "Warning: WASM source directory not found at $WASM_SOURCE_DIR"
+          fi
+        name: Copy WASM Resources
         basedOnDependencyAnalysis: false

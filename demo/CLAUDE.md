@@ -52,7 +52,7 @@ Platform Apps (minimal entry points)
 
 ## Current Features
 
-The demo includes **6 comprehensive features**:
+The demo includes **7 comprehensive features**:
 
 ### 1. Key Generation
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
@@ -89,6 +89,13 @@ The demo includes **6 comprehensive features**:
 - **UI**: `ui/screens/ContractDetailsScreen.kt`
 - **Logic**: `stellar/ContractDetails.kt`
 - **Demonstrates**: Soroban RPC, contract WASM parsing, metadata display
+
+### 7. Deploy Smart Contract
+- **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
+- **UI**: `ui/screens/DeployContractScreen.kt`
+- **Logic**: `stellar/DeployContract.kt`
+- **Resources**: `resources/wasm/` (5 example WASM files)
+- **Demonstrates**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`, platform-specific resource loading
 
 ## Adding New Demo Features
 

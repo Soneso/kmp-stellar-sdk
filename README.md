@@ -406,7 +406,7 @@ For more examples, see the [Getting Started Guide](docs/getting-started.md) and 
 
 ## Demo Application
 
-The [demo app](demo/README.md) showcases SDK usage across all platforms with 6 comprehensive features:
+The [demo app](demo/README.md) showcases SDK usage across all platforms with 7 comprehensive features:
 
 1. **Key Generation** - Generate and manage Ed25519 keypairs
 2. **Fund Testnet Account** - Get free test XLM from Friendbot
@@ -414,6 +414,7 @@ The [demo app](demo/README.md) showcases SDK usage across all platforms with 6 c
 4. **Trust Asset** - Establish trustlines for issued assets
 5. **Send Payment** - Transfer XLM and issued assets
 6. **Fetch Smart Contract Details** - Parse and inspect Soroban contracts
+7. **Deploy Smart Contract** - Deploy Soroban WASM contracts to testnet
 
 Run the demo:
 
@@ -472,7 +473,8 @@ This SDK uses **production-ready, audited cryptographic libraries** exclusively:
 - **Random**: `randombytes_buf()` using system CSPRNG
 
 ### JavaScript Platforms (Browser & Node.js)
-- **Library**: libsodium-wrappers (0.7.13 via npm)
+- **Library**: libsodium-wrappers-sumo (0.7.13 via npm)
+- **Why Sumo**: Required for SHA-256 (crypto_hash_sha256) - not in standard build
 - **Algorithm**: Ed25519 via `crypto_sign_*` functions
 - **Features**: Same audited C library compiled to WebAssembly
 - **Random**: `crypto.getRandomValues()` for key generation

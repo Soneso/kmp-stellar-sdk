@@ -11,7 +11,7 @@ import java.security.MessageDigest
 internal class Sha256CryptoJvm : Sha256Crypto {
     override val libraryName: String = "Java Security API (MessageDigest SHA-256)"
 
-    override fun hash(data: ByteArray): ByteArray {
+    override suspend fun hash(data: ByteArray): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(data)
     }

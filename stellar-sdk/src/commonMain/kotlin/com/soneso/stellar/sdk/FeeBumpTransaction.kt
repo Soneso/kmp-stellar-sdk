@@ -121,7 +121,7 @@ class FeeBumpTransaction private constructor(
      *
      * @return The bytes to sign
      */
-    override fun signatureBase(): ByteArray {
+    override suspend fun signatureBase(): ByteArray {
         val taggedTransaction = TransactionSignaturePayloadTaggedTransactionXdr.FeeBump(
             toXdr()
         )
@@ -148,11 +148,20 @@ class FeeBumpTransaction private constructor(
 
         other as FeeBumpTransaction
 
-        return signatureBase().contentEquals(other.signatureBase())
+        if (feeSource != other.feeSource) return false
+        if (fee != other.fee) return false
+        if (innerTransaction != other.innerTransaction) return false
+        if (network != other.network) return false
+
+        return true
     }
 
     override fun hashCode(): Int {
-        return signatureBase().contentHashCode()
+        var result = feeSource.hashCode()
+        result = 31 * result + fee.hashCode()
+        result = 31 * result + innerTransaction.hashCode()
+        result = 31 * result + network.hashCode()
+        return result
     }
 
     companion object {

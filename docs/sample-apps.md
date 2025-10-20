@@ -16,7 +16,7 @@ This guide explores the demo applications included with the Stellar KMP SDK, sho
 
 The `demo` directory contains comprehensive Kotlin Multiplatform applications demonstrating:
 
-- **Complete SDK feature coverage** across 6 major use cases
+- **Complete SDK feature coverage** across 7 major use cases
 - **Compose Multiplatform UI** with 95% code sharing
 - **Real Stellar network integration** with testnet
 - **Production-ready patterns** for async operations and error handling
@@ -142,7 +142,7 @@ demo/shared (Compose + Business Logic)
 
 ## Demo Features
 
-The demo app showcases 6 comprehensive SDK features:
+The demo app showcases 7 comprehensive SDK features:
 
 ### 1. Key Generation
 - Generate random Ed25519 keypairs
@@ -185,6 +185,14 @@ The demo app showcases 6 comprehensive SDK features:
 - View contract code hash and metadata
 - Soroban smart contract integration
 - **SDK Features**: Contract WASM parsing, Soroban RPC
+
+### 7. Deploy Smart Contract
+- Upload and deploy WASM contracts to testnet
+- One-step deployment: `ContractClient.deploy()` with constructor args
+- Two-step deployment: `install()` + `deployFromWasmId()` for WASM reuse
+- Platform-specific WASM file loading (8 platforms)
+- Support for 5 example contracts
+- **SDK Features**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Code Examples
 

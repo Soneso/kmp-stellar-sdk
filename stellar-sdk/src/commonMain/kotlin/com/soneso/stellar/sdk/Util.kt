@@ -127,7 +127,7 @@ object Util {
      * @param data The data to hash
      * @return The 32-byte SHA-256 hash
      */
-    internal fun hash(data: ByteArray): ByteArray {
+    internal suspend fun hash(data: ByteArray): ByteArray {
         return getSha256Crypto().hash(data)
     }
 

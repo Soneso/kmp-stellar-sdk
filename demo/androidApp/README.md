@@ -10,6 +10,7 @@ This Android app showcases the Stellar SDK's capabilities on Android, featuring:
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
 - **Smart Contracts**: Fetch and parse Soroban contract details
+- **Contract Deployment**: Upload and deploy WASM contracts to testnet
 
 The app uses 100% shared Compose UI from the `demo:shared` module, with only minimal Android-specific entry point code.
 
@@ -198,6 +199,11 @@ All features are implemented in the shared module. The Android app provides:
 - Parse WASM contracts
 - View contract metadata
 - Display function specifications
+
+### 7. Deploy Smart Contract
+- Upload WASM contracts
+- Deploy with constructor arguments
+- Platform-specific resource loading
 
 ## Technology Stack
 

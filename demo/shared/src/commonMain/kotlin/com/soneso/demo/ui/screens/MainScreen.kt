@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
@@ -71,12 +72,13 @@ class MainScreen : Screen {
                 description = "Parse contract WASM to view metadata and specification",
                 icon = Icons.Default.Code,
                 screen = ContractDetailsScreen()
+            ),
+            DemoTopic(
+                title = "Deploy a Smart Contract",
+                description = "Upload and deploy Soroban contracts with constructor support",
+                icon = Icons.Default.CloudUpload,
+                screen = DeployContractScreen()
             )
-            // TODO: Add more demo topics here
-            // Examples:
-            // - Transaction Signing
-            // - Path Payments
-            // - More Smart Contract Interactions
         )
 
         Scaffold(

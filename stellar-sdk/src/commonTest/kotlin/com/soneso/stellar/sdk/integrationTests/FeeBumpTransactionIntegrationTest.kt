@@ -6,7 +6,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Comprehensive integration tests for FeeBumpTransaction operations.
@@ -168,7 +167,7 @@ class FeeBumpTransactionIntegrationTest {
 
             assertNotNull(transaction.feeBumpTransaction, "Transaction should have feeBumpTransaction field")
             assertTrue(
-                transaction.feeBumpTransaction!!.signatures.isNotEmpty(),
+                transaction.feeBumpTransaction.signatures.isNotEmpty(),
                 "Fee bump transaction should have signatures"
             )
             assertEquals(
@@ -334,7 +333,7 @@ class FeeBumpTransactionIntegrationTest {
 
             assertNotNull(transaction.feeBumpTransaction, "Transaction should have feeBumpTransaction field")
             assertTrue(
-                transaction.feeBumpTransaction!!.signatures.isNotEmpty(),
+                transaction.feeBumpTransaction.signatures.isNotEmpty(),
                 "Fee bump transaction should have signatures"
             )
             assertEquals(

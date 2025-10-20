@@ -40,7 +40,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 
 ## Features
 
-The demo app includes 6 comprehensive feature demonstrations:
+The demo app includes 7 comprehensive feature demonstrations:
 
 ### 1. Key Generation
 - Generate random Stellar Ed25519 keypairs
@@ -83,6 +83,14 @@ The demo app includes 6 comprehensive feature demonstrations:
 - View contract code hash and metadata
 - Soroban smart contract integration
 - Demonstrates: Contract WASM parsing, Soroban RPC
+
+### 7. Deploy Smart Contract
+- Upload and deploy WASM contracts to testnet
+- One-step deployment with constructor arguments
+- Two-step deployment (install WASM + deploy from WASM ID)
+- Platform-specific WASM file loading
+- Support for 5 example contracts (hello_world, token, atomic_swap, auth, events)
+- Demonstrates: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Project Structure
 
@@ -307,7 +315,7 @@ cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 ### Cryptography (from Stellar SDK)
 - **JVM**: BouncyCastle (Ed25519)
 - **iOS/macOS Native**: libsodium via C interop
-- **JavaScript**: libsodium-wrappers (WASM)
+- **JavaScript**: libsodium-wrappers-sumo (WASM, includes SHA-256)
 
 ## Platform Support
 

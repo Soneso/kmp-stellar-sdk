@@ -2,12 +2,8 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
-import com.soneso.stellar.sdk.horizon.requests.EventListener
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
-import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
-import com.soneso.stellar.sdk.horizon.responses.operations.CreateAccountOperationResponse
-import com.soneso.stellar.sdk.horizon.responses.PathResponse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -242,7 +238,7 @@ class PaymentsIntegrationTest {
         val trx = horizonServer.transactions().transaction(hash)
         assertNotNull(trx.preconditions, "Preconditions should not be null")
 
-        val conds = trx.preconditions!!
+        val conds = trx.preconditions
         // Note: TimeBounds with 0 values means no time bounds, may not be returned by Horizon
         // assertEquals("0", conds.timeBounds?.minTime, "Min time should match")
         // assertEquals("0", conds.timeBounds?.maxTime, "Max time should match")

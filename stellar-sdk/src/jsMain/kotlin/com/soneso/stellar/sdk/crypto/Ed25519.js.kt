@@ -9,7 +9,7 @@ import org.khronos.webgl.Uint8Array
  *
  * This implementation uses libsodium.js for Ed25519 operations:
  *
- * - **Library**: libsodium-wrappers (0.7.13 via npm)
+ * - **Library**: libsodium-wrappers-sumo (0.7.13 via npm)
  * - **Algorithm**: Ed25519 via `crypto_sign_*` functions
  * - **Security**: Audited C library compiled to WebAssembly
  * - **Compatibility**: Works in all browsers and Node.js
@@ -28,7 +28,7 @@ import org.khronos.webgl.Uint8Array
  */
 internal class JsEd25519Crypto : Ed25519Crypto {
 
-    override val libraryName: String = "libsodium.js"
+    override val libraryName: String = "libsodium-wrappers-sumo"
 
     companion object {
         private const val SEED_BYTES = 32

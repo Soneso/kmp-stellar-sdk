@@ -68,7 +68,7 @@ abstract class AbstractTransaction(
      *
      * @return The signature base bytes
      */
-    abstract fun signatureBase(): ByteArray
+    abstract suspend fun signatureBase(): ByteArray
 
     /**
      * Returns the transaction hash (SHA-256 of signature base).
@@ -78,7 +78,7 @@ abstract class AbstractTransaction(
      *
      * @return The 32-byte SHA-256 hash
      */
-    fun hash(): ByteArray {
+    suspend fun hash(): ByteArray {
         return Util.hash(signatureBase())
     }
 
@@ -89,7 +89,7 @@ abstract class AbstractTransaction(
      *
      * @return The transaction hash as a 64-character hex string
      */
-    fun hashHex(): String {
+    suspend fun hashHex(): String {
         return Util.bytesToHex(hash()).lowercase()
     }
 
@@ -144,7 +144,7 @@ abstract class AbstractTransaction(
      *
      * @param preimage The preimage bytes whose hash equals the signer's hash
      */
-    fun signHashX(preimage: ByteArray) {
+    suspend fun signHashX(preimage: ByteArray) {
         val hash = Util.hash(preimage)
         val hint = hash.copyOfRange(hash.size - 4, hash.size)
         signatures.add(DecoratedSignature(hint, preimage))
@@ -222,7 +222,7 @@ abstract class AbstractTransaction(
          * @param network The network for this transaction
          * @return The signature base bytes
          */
-        internal fun getTransactionSignatureBase(
+        internal suspend fun getTransactionSignatureBase(
             taggedTransaction: TransactionSignaturePayloadTaggedTransactionXdr,
             network: Network
         ): ByteArray {

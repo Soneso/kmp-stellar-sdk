@@ -180,7 +180,7 @@ fun main() {
 
 ## Features
 
-All 6 features work identically in the browser:
+All 7 features work identically in the browser:
 
 ### 1. Key Generation
 - Generate random Stellar keypairs using browser's crypto API
@@ -214,6 +214,13 @@ All 6 features work identically in the browser:
 - Parse WASM contracts
 - View contract metadata and specification
 - Uses: Soroban RPC integration
+
+### 7. Deploy Smart Contract
+- Upload and deploy WASM contracts in the browser
+- One-step deployment with constructor arguments
+- Two-step deployment for WASM reuse
+- Browser-based WASM file loading
+- Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Technology Stack
 

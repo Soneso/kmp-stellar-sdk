@@ -167,7 +167,7 @@ compose {
 
 ## Features
 
-All 6 features from the shared module work identically on desktop:
+All 7 features from the shared module work identically on desktop:
 
 ### 1. Key Generation
 - Generate random Stellar keypairs
@@ -201,6 +201,12 @@ All 6 features from the shared module work identically on desktop:
 - Parse WASM contracts
 - View contract metadata and specification
 - Uses: Soroban RPC integration
+
+### 7. Deploy Smart Contract
+- Upload and deploy WASM contracts
+- One-step or two-step deployment
+- Platform-specific resource loading
+- Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Technology Stack
 

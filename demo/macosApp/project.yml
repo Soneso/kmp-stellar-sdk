@@ -37,7 +37,21 @@ targets:
     dependencies:
       - framework: ../shared/build/bin/macosArm64/debugFramework/shared.framework
         embed: true
-    # preBuildScripts:
+    preBuildScripts:
+      - script: |
+          # Copy WASM resources from shared module to app bundle
+          WASM_SOURCE_DIR="$SRCROOT/../shared/src/commonMain/resources/wasm"
+          WASM_DEST_DIR="$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/Contents/Resources/wasm"
+
+          if [ -d "$WASM_SOURCE_DIR" ]; then
+            echo "Copying WASM resources from $WASM_SOURCE_DIR to $WASM_DEST_DIR"
+            mkdir -p "$WASM_DEST_DIR"
+            cp -v "$WASM_SOURCE_DIR"/*.wasm "$WASM_DEST_DIR/" || true
+          else
+            echo "Warning: WASM source directory not found at $WASM_SOURCE_DIR"
+          fi
+        name: Copy WASM Resources
+        basedOnDependencyAnalysis: false
     #   - script: |
     #       cd "$SRCROOT/../../.."
     #       if [ "$(uname -m)" = "arm64" ]; then
