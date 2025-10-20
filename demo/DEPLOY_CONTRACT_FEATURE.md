@@ -99,10 +99,6 @@ Uses Foundation Bundle APIs:
 NSBundle.mainBundle.pathForResource(resourceName, "wasm")
 ```
 
-#### WASM/JS
-**Location**: `demo/shared/src/wasmJsMain/kotlin/com/soneso/demo/stellar/DeployContract.wasmJs.kt`
-
-Currently throws informative error (WASM resource bundling is complex).
 
 ### 4. UI Screen
 
@@ -220,7 +216,6 @@ Displayed on error:
 - **iOS**: ✅ Full support (requires WASM files in bundle)
 - **macOS**: ✅ Full support (requires WASM files in bundle)
 - **JavaScript**: ✅ Node.js support
-- **WASM/JS**: ⚠️ Not yet implemented
 
 ## Testing
 

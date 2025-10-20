@@ -23,11 +23,6 @@ kotlin {
         binaries.executable()
     }
 
-    wasmJs {
-        browser()
-        binaries.executable()
-    }
-
     listOf(
         iosX64(),
         iosArm64(),
@@ -167,14 +162,6 @@ kotlin {
                 // HTML-based Compose for web
                 implementation(compose.html.core)
             }
-        }
-
-        // ============================================================
-        // WebAssembly Platform
-        // ============================================================
-        val wasmJsMain by getting {
-            dependsOn(commonMain)
-            // No additional dependencies needed
         }
     }
 }

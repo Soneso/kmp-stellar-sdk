@@ -119,8 +119,7 @@ demo/
 │   │   ├── desktopMain/             # Desktop-specific (clipboard)
 │   │   ├── iosMain/                 # iOS-specific (UIViewController)
 │   │   ├── macosMain/               # macOS-specific (clipboard)
-│   │   ├── jsMain/                  # JS-specific (clipboard)
-│   │   └── wasmJsMain/              # WASM-specific (clipboard)
+│   │   └── jsMain/                  # JS-specific (clipboard)
 │   └── build.gradle.kts
 ├── androidApp/                      # Android entry point
 │   ├── src/main/java/.../MainActivity.kt
