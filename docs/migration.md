@@ -741,11 +741,11 @@ val client = ContractClient.deploy(
 **New Two-Step Deployment** (for WASM reuse):
 ```kotlin
 // Step 1: Install WASM once
-val wasmHash = ContractClient.install(wasmBytes, source, signer, network, rpcUrl)
+val wasmId = ContractClient.install(wasmBytes, source, signer, network, rpcUrl)
 
 // Step 2: Deploy multiple instances
-val client1 = ContractClient.deployFromWasmHash(wasmHash, args1, source, signer, network, rpcUrl)
-val client2 = ContractClient.deployFromWasmHash(wasmHash, args2, source, signer, network, rpcUrl)
+val client1 = ContractClient.deployFromWasmId(wasmId, args1, source, signer, network, rpcUrl)
+val client2 = ContractClient.deployFromWasmId(wasmId, args2, source, signer, network, rpcUrl)
 ```
 
 ### 6. Stream/Observable APIs

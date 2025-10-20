@@ -1406,11 +1406,11 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String
-        ): ByteArray
+        ): String
 
         // Deploy from WASM hash (two-step deployment, part 2)
-        suspend fun deployFromWasmHash(
-            wasmHash: ByteArray,
+        suspend fun deployFromWasmId(
+            wasmId: String,
             constructorArgs: List<SCValXdr> = emptyList(),
             source: String,
             signer: KeyPair,

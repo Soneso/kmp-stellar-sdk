@@ -461,7 +461,7 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
   - **Type conversion helpers**: `funcArgsToXdrSCValues()`, `nativeToXdrSCVal()`
 - ✅ Smart contract deployment:
   - **One-step**: `deploy()` with Map-based constructor args
-  - **Two-step**: `install()` + `deployFromWasmHash()` for WASM reuse
+  - **Two-step**: `install()` + `deployFromWasmId()` for WASM reuse
 - ✅ AssembledTransaction: Full transaction lifecycle
 - ✅ Type-safe generic results with custom parsers
 - ✅ Automatic simulation and resource estimation

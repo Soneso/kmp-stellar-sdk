@@ -172,7 +172,7 @@ suspend fun deployMultipleContracts() {
     val sourceKeypair = KeyPair.fromSecretSeed("YOUR_SECRET_KEY")
 
     // Step 1: Install WASM once
-    val wasmHash = ContractClient.install(
+    val wasmId = ContractClient.install(
         wasmBytes = File("token.wasm").readBytes(),
         source = sourceKeypair.getAccountId(),
         signer = sourceKeypair,
@@ -181,8 +181,8 @@ suspend fun deployMultipleContracts() {
     )
 
     // Step 2: Deploy multiple instances from same WASM (saves fees)
-    val token1 = ContractClient.deployFromWasmHash(
-        wasmHash = wasmHash,
+    val token1 = ContractClient.deployFromWasmId(
+        wasmId = wasmId,
         constructorArgs = listOf(  // Note: XDR args for advanced API
             Scv.toString("Token1"),
             Scv.toString("TK1"),
@@ -194,8 +194,8 @@ suspend fun deployMultipleContracts() {
         rpcUrl = "https://soroban-testnet.stellar.org"
     )
 
-    val token2 = ContractClient.deployFromWasmHash(
-        wasmHash = wasmHash,
+    val token2 = ContractClient.deployFromWasmId(
+        wasmId = wasmId,
         constructorArgs = listOf(
             Scv.toString("Token2"),
             Scv.toString("TK2"),

@@ -83,7 +83,7 @@ This SDK uses production-ready, audited cryptographic libraries on all platforms
   - `withoutSpec()`: Manual XDR mode for advanced users
 - Smart contract deployment:
   - `deploy()`: One-step WASM upload and deployment with constructor args
-  - `install()` + `deployFromWasmHash()`: Two-step for WASM reuse
+  - `install()` + `deployFromWasmId()`: Two-step for WASM reuse
 - AssembledTransaction for full transaction lifecycle
 - Type-safe generic results with custom parsers
 - Automatic simulation and resource estimation
@@ -344,7 +344,7 @@ suspend fun deployMultipleContracts() {
     val wasmBytes = File("token.wasm").readBytes()
 
     // Step 1: Install WASM once
-    val wasmHash = ContractClient.install(
+    val wasmId = ContractClient.install(
         wasmBytes = wasmBytes,
         source = sourceAccount,
         signer = keypair,
@@ -353,8 +353,8 @@ suspend fun deployMultipleContracts() {
     )
 
     // Step 2: Deploy multiple instances (saves fees)
-    val token1 = ContractClient.deployFromWasmHash(
-        wasmHash = wasmHash,
+    val token1 = ContractClient.deployFromWasmId(
+        wasmId = wasmId,
         constructorArgs = listOf(
             Scv.toAddress(adminAddress),
             Scv.toString("Token1"),
@@ -366,8 +366,8 @@ suspend fun deployMultipleContracts() {
         rpcUrl = "https://soroban-testnet.stellar.org:443"
     )
 
-    val token2 = ContractClient.deployFromWasmHash(
-        wasmHash = wasmHash,
+    val token2 = ContractClient.deployFromWasmId(
+        wasmId = wasmId,
         constructorArgs = listOf(
             Scv.toAddress(adminAddress),
             Scv.toString("Token2"),

@@ -377,7 +377,7 @@ class ContractClient private constructor(
          * 3. Load contract spec
          * 4. Return ready-to-use client
          *
-         * For advanced scenarios requiring WASM reuse, see [install] and [deployFromWasmHash].
+         * For advanced scenarios requiring WASM reuse, see [install] and [deployFromWasmId].
          *
          * @param wasmBytes The contract WASM code
          * @param constructorArgs Constructor arguments as native Kotlin types
@@ -418,7 +418,7 @@ class ContractClient private constructor(
             loadSpec: Boolean = true
         ): ContractClient {
             // Step 1: Upload WASM
-            val wasmHash = installInternal(
+            val wasmId = installInternal(
                 wasmBytes = wasmBytes,
                 source = source,
                 signer = signer,
@@ -426,9 +426,9 @@ class ContractClient private constructor(
                 rpcUrl = rpcUrl
             )
 
-            // Step 2: Deploy from WASM hash
-            return deployFromWasmHashInternal(
-                wasmHash = wasmHash,
+            // Step 2: Deploy from WASM ID
+            return deployFromWasmIdInternal(
+                wasmId = wasmId,
                 constructorArgs = constructorArgs,
                 source = source,
                 signer = signer,
@@ -444,35 +444,36 @@ class ContractClient private constructor(
          *
          * This is a **power-user method** for two-step deployment when you need to:
          * - Reuse the same WASM for multiple contract instances
-         * - Inspect the WASM hash before deployment
+         * - Inspect the WASM ID before deployment
          * - Separate upload and deployment transactions
          *
          * Most developers should use the one-step [deploy] method instead.
          *
-         * Returns the WASM hash which can be used with [deployFromWasmHash].
-         * Includes duplicate detection - if WASM already installed, returns existing hash.
+         * Returns the WASM ID (hash) as a hex string which can be used with [deployFromWasmId].
+         * Includes duplicate detection - if WASM already installed, returns existing ID.
          *
          * @param wasmBytes The compiled contract WASM code
          * @param source Source account for the transaction
          * @param signer KeyPair for signing
          * @param network Network to upload to
          * @param rpcUrl RPC server URL
-         * @return WASM hash as ByteArray
+         * @return WASM ID as hex string (ready to use)
          *
          * @sample
          * ```kotlin
          * // Step 1: Install WASM once
-         * val wasmHash = ContractClient.install(
+         * val wasmId = ContractClient.install(
          *     wasmBytes = File("token.wasm").readBytes(),
          *     source = sourceAccount,
          *     signer = keypair,
          *     network = Network.TESTNET,
          *     rpcUrl = "https://soroban-testnet.stellar.org:443"
          * )
+         * println("WASM ID: $wasmId")  // Ready to use!
          *
          * // Step 2: Deploy multiple instances from same WASM
-         * val client1 = ContractClient.deployFromWasmHash(wasmHash, ...)
-         * val client2 = ContractClient.deployFromWasmHash(wasmHash, ...)
+         * val client1 = ContractClient.deployFromWasmId(wasmId = wasmId, ...)
+         * val client2 = ContractClient.deployFromWasmId(wasmId = wasmId, ...)
          * ```
          */
         suspend fun install(
@@ -481,12 +482,12 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String
-        ): ByteArray {
+        ): String {
             return installInternal(wasmBytes, source, signer, network, rpcUrl)
         }
 
         /**
-         * Deploy a contract from an existing WASM hash (ADVANCED - Step 2 of 2).
+         * Deploy a contract from an existing WASM ID (ADVANCED - Step 2 of 2).
          *
          * This is a **power-user method** for deploying contracts from a previously
          * uploaded WASM. Use this to deploy multiple contract instances from the
@@ -494,7 +495,7 @@ class ContractClient private constructor(
          *
          * Most developers should use the one-step [deploy] method instead.
          *
-         * @param wasmHash WASM hash from [install]
+         * @param wasmId WASM ID (hex string) from [install]
          * @param constructorArgs Constructor arguments as List<SCValXdr> (XDR)
          * @param source Source account
          * @param signer KeyPair for signing
@@ -507,8 +508,8 @@ class ContractClient private constructor(
          * @sample
          * ```kotlin
          * // After installing WASM...
-         * val client = ContractClient.deployFromWasmHash(
-         *     wasmHash = previouslyInstalledWasmHash,
+         * val client = ContractClient.deployFromWasmId(
+         *     wasmId = "a1b2c3...",  // Hex string from install()
          *     constructorArgs = listOf(
          *         Scv.toString("MyToken"),
          *         Scv.toString("MTK"),
@@ -521,8 +522,8 @@ class ContractClient private constructor(
          * )
          * ```
          */
-        suspend fun deployFromWasmHash(
-            wasmHash: ByteArray,
+        suspend fun deployFromWasmId(
+            wasmId: String,
             constructorArgs: List<SCValXdr> = emptyList(),
             source: String,
             signer: KeyPair,
@@ -531,6 +532,17 @@ class ContractClient private constructor(
             salt: ByteArray = Random.Default.nextBytes(32),
             loadSpec: Boolean = true
         ): ContractClient {
+            // Validate hex string format
+            require(wasmId.matches(Regex("^[0-9a-fA-F]+$"))) {
+                "Invalid WASM ID format: must be a hex string (got: $wasmId)"
+            }
+            require(wasmId.length % 2 == 0) {
+                "Invalid WASM ID format: hex string must have even length (got: ${wasmId.length})"
+            }
+
+            // Convert hex string to ByteArray
+            val wasmHash = hexStringToByteArray(wasmId)
+
             // Deploy contract
             val contractId = deployContractInternal(
                 wasmHash = wasmHash,
@@ -552,6 +564,7 @@ class ContractClient private constructor(
 
         /**
          * Internal helper to install WASM code.
+         * Returns WASM ID as hex string.
          */
         private suspend fun installInternal(
             wasmBytes: ByteArray,
@@ -559,7 +572,7 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String
-        ): ByteArray {
+        ): String {
             val server = SorobanServer(rpcUrl)
             val account = server.getAccount(source)
 
@@ -600,14 +613,15 @@ class ContractClient private constructor(
             val wasmId = rpcResponse.getWasmId()
                 ?: throw IllegalStateException("Failed to extract WASM ID from transaction response")
 
-            return extractWasmHashFromResponse(wasmId)
+            // Return the hex string directly (already in hex format from getWasmId())
+            return wasmId
         }
 
         /**
-         * Internal helper to deploy from WASM hash with Map arguments.
+         * Internal helper to deploy from WASM ID with Map arguments.
          */
-        private suspend fun deployFromWasmHashInternal(
-            wasmHash: ByteArray,
+        private suspend fun deployFromWasmIdInternal(
+            wasmId: String,
             constructorArgs: Map<String, Any?>,
             source: String,
             signer: KeyPair,
@@ -618,7 +632,6 @@ class ContractClient private constructor(
         ): ContractClient {
             // First load the spec from WASM to convert constructor args
             val server = SorobanServer(rpcUrl)
-            val wasmId = wasmHash.joinToString("") { "%02x".format(it) }
 
             val constructorXdr = if (constructorArgs.isNotEmpty()) {
                 val contractInfo = server.loadContractInfoForWasmId(wasmId)
@@ -638,6 +651,9 @@ class ContractClient private constructor(
             } else {
                 emptyList()
             }
+
+            // Convert hex string to ByteArray for deployment
+            val wasmHash = hexStringToByteArray(wasmId)
 
             // Deploy contract
             val contractId = deployContractInternal(
@@ -745,10 +761,13 @@ class ContractClient private constructor(
         }
 
         /**
-         * Extract WASM hash bytes from hex string response.
+         * Convert hex string to ByteArray.
          */
-        private fun extractWasmHashFromResponse(wasmId: String): ByteArray {
-            return wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        private fun hexStringToByteArray(hex: String): ByteArray {
+            require(hex.length % 2 == 0) { "Hex string must have even length" }
+            return hex.chunked(2)
+                .map { it.toInt(16).toByte() }
+                .toByteArray()
         }
     }
 }

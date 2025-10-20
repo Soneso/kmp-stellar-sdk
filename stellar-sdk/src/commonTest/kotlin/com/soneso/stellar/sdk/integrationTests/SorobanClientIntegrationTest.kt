@@ -109,7 +109,7 @@ class SorobanClientIntegrationTest {
         assertTrue(methodNames.contains("hello"), "Should have hello method")
 
         // Step 4: Invoke contract with high-level API
-        val result = client.invoke<List<String>>(
+        val result = client.invoke(
             functionName = "hello",
             arguments = mapOf("to" to "John"),  // String → Symbol (automatic conversion)
             source = sourceAccountId,
@@ -182,7 +182,7 @@ class SorobanClientIntegrationTest {
         assertTrue(methodNames.contains("increment"), "Should have increment method")
 
         // Step 4: Test same-invoker scenario (no auth required)
-        val result1 = client.invoke<UInt>(
+        val result1 = client.invoke(
             functionName = "increment",
             arguments = mapOf(
                 "user" to sourceAccountId,  // String → Address (automatic)
@@ -211,7 +211,7 @@ class SorobanClientIntegrationTest {
         // Step 6: Attempt without auth should fail
         var thrown = false
         try {
-            client.invoke<UInt>(
+            client.invoke(
                 functionName = "increment",
                 arguments = mapOf(
                     "user" to invokerAccountId,  // Different user
@@ -239,7 +239,7 @@ class SorobanClientIntegrationTest {
             )
         )
 
-        val assembled = client.invokeWithXdr<UInt>(
+        val assembled = client.invokeWithXdr(
             functionName = "increment",
             parameters = args,
             source = sourceAccountId,
@@ -392,7 +392,7 @@ class SorobanClientIntegrationTest {
 
         // Step 6: Verify balances
         delay(5000)
-        val aliceBalance = tokenAClient.invoke<Long>(
+        val aliceBalance = tokenAClient.invoke(
             functionName = "balance",
             arguments = mapOf("id" to aliceId),
             source = adminId,
@@ -405,7 +405,7 @@ class SorobanClientIntegrationTest {
         assertEquals(10000000000000L, aliceBalance, "Alice should have 10000000000000 TokenA")
         println("✓ Alice balance: $aliceBalance TokenA")
 
-        val bobBalance = tokenBClient.invoke<Long>(
+        val bobBalance = tokenBClient.invoke(
             functionName = "balance",
             arguments = mapOf("id" to bobId),
             source = adminId,
@@ -522,13 +522,13 @@ class SorobanClientIntegrationTest {
             )
         )
 
-        val assembled = client.invokeWithXdr<UInt>(
+        val assembled = client.invokeWithXdr(
             functionName = "increment",
             parameters = args,
             source = sourceAccountId,
             signer = sourceKeyPair,
             parseResultXdrFn = { xdr ->
-                (xdr as SCValXdr.U32).value.value.toUInt()
+                (xdr as SCValXdr.U32).value.value
             }
         )
 
@@ -571,7 +571,7 @@ class SorobanClientIntegrationTest {
      *
      * This test demonstrates:
      * 1. WASM upload with install()
-     * 2. Multiple contract deployments from same WASM with deployFromWasmHash()
+     * 2. Multiple contract deployments from same WASM with deployFromWasmId()
      * 3. Fee and time savings from WASM reuse
      * 4. Manual XDR constructor arguments
      *
@@ -598,19 +598,19 @@ class SorobanClientIntegrationTest {
 
         // Step 2: Install WASM once
         val tokenContractWasm = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
-        val wasmHash = ContractClient.install(
+        val wasmId = ContractClient.install(
             wasmBytes = tokenContractWasm,
             source = sourceAccountId,
             signer = sourceKeyPair,
             network = network,
             rpcUrl = rpcUrl
         )
-        println("Installed WASM hash: ${wasmHash.joinToString("") { it.toInt().and(0xFF).toString(16).padStart(2, '0') }}")
+        println("Installed WASM ID: $wasmId")
 
         // Step 3: Deploy first instance with constructor
         delay(5000)
-        val token1 = ContractClient.deployFromWasmHash(
-            wasmHash = wasmHash,
+        val token1 = ContractClient.deployFromWasmId(
+            wasmId = wasmId,
             constructorArgs = listOf(
                 Scv.toAddress(Address(sourceAccountId).toSCAddress()),  // admin (SCAddressXdr)
                 Scv.toUint32(7u),                                       // decimal
@@ -626,8 +626,8 @@ class SorobanClientIntegrationTest {
 
         // Step 4: Deploy second instance with different constructor args
         delay(5000)
-        val token2 = ContractClient.deployFromWasmHash(
-            wasmHash = wasmHash,
+        val token2 = ContractClient.deployFromWasmId(
+            wasmId = wasmId,
             constructorArgs = listOf(
                 Scv.toAddress(Address(sourceAccountId).toSCAddress()),
                 Scv.toUint32(7u),
@@ -646,7 +646,7 @@ class SorobanClientIntegrationTest {
 
         // Verify Token1 name
         delay(5000)
-        val token1Name = token1.invoke<String>(
+        val token1Name = token1.invoke(
             functionName = "name",
             arguments = emptyMap(),
             source = sourceAccountId,
@@ -660,7 +660,7 @@ class SorobanClientIntegrationTest {
 
         // Verify Token2 name
         delay(5000)
-        val token2Name = token2.invoke<String>(
+        val token2Name = token2.invoke(
             functionName = "name",
             arguments = emptyMap(),
             source = sourceAccountId,
