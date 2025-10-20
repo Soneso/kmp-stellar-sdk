@@ -67,10 +67,25 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SorobanIntegrationTest {
 
-    private val testOn = "testnet"
-    private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
-    private val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-    private val network = Network.TESTNET
+    private val testOn = "testnet" // "testnet" or "futurenet"
+
+    private val sorobanServer = if (testOn == "testnet") {
+        SorobanServer("https://soroban-testnet.stellar.org")
+    } else {
+        SorobanServer("https://rpc-futurenet.stellar.org")
+    }
+
+    private val horizonServer = if (testOn == "testnet") {
+        HorizonServer("https://horizon-testnet.stellar.org")
+    } else {
+        HorizonServer("https://horizon-futurenet.stellar.org")
+    }
+
+    private val network = if (testOn == "testnet") {
+        Network.TESTNET
+    } else {
+        Network.FUTURENET
+    }
 
     companion object {
         /**
@@ -220,8 +235,8 @@ class SorobanIntegrationTest {
      *
      * This test verifies:
      * 1. Server returns network information
-     * 2. Network passphrase matches expected testnet value
-     * 3. Friendbot URL is correct for testnet
+     * 2. Network passphrase matches expected value based on testOn
+     * 3. Friendbot URL is correct for the selected network
      * 4. Response is not an error response
      *
      * Network information is essential for verifying connectivity to the
@@ -232,17 +247,30 @@ class SorobanIntegrationTest {
         // When: Getting network information
         val networkResponse = sorobanServer.getNetwork()
 
-        // Then: Network information is valid and matches testnet
-        assertEquals(
-            "https://friendbot.stellar.org/",
-            networkResponse.friendbotUrl,
-            "Friendbot URL should match testnet"
-        )
-        assertEquals(
-            "Test SDF Network ; September 2015",
-            networkResponse.passphrase,
-            "Network passphrase should match testnet"
-        )
+        // Then: Network information is valid and matches selected network
+        if (testOn == "testnet") {
+            assertEquals(
+                "https://friendbot.stellar.org/",
+                networkResponse.friendbotUrl,
+                "Friendbot URL should match testnet"
+            )
+            assertEquals(
+                "Test SDF Network ; September 2015",
+                networkResponse.passphrase,
+                "Network passphrase should match testnet"
+            )
+        } else if (testOn == "futurenet") {
+            assertEquals(
+                "https://friendbot-futurenet.stellar.org/",
+                networkResponse.friendbotUrl,
+                "Friendbot URL should match futurenet"
+            )
+            assertEquals(
+                "Test SDF Future Network ; October 2022",
+                networkResponse.passphrase,
+                "Network passphrase should match futurenet"
+            )
+        }
 
         // Additional validation
         assertNotNull(networkResponse.protocolVersion, "Protocol version should not be null")
@@ -722,7 +750,7 @@ class SorobanIntegrationTest {
      * This test validates the complete contract upload workflow:
      * 1. Creates and funds a test account via Friendbot
      * 2. Loads the contract WASM file from test resources
-     * 3. Builds an UploadContractWasmHostFunction operation
+     * 3. Uses InvokeHostFunctionOperation.uploadContractWasm() helper method
      * 4. Simulates the transaction to get resource estimates
      * 5. Prepares the transaction with simulation results
      * 6. Signs and submits the transaction to Soroban RPC
@@ -734,7 +762,7 @@ class SorobanIntegrationTest {
      *
      * The test demonstrates:
      * - Account creation with FriendBot
-     * - Transaction building for Soroban operations
+     * - Transaction building for Soroban operations using helper methods
      * - Simulation and preparation workflow
      * - Transaction submission and polling
      * - Contract code retrieval and parsing
@@ -747,6 +775,7 @@ class SorobanIntegrationTest {
      *
      * @see SorobanServer.loadContractCodeForWasmId
      * @see SorobanServer.loadContractInfoForWasmId
+     * @see InvokeHostFunctionOperation.uploadContractWasm
      */
     @Test
     fun testUploadContract() = runTest(timeout = 120.seconds) {
@@ -754,8 +783,12 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot
-        FriendBot.fundTestnetAccount(accountId)
+        // Fund account via FriendBot (network-dependent)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(accountId)
+        }
         delay(5000) // Wait for account creation
 
         // Load account for sequence number
@@ -766,11 +799,8 @@ class SorobanIntegrationTest {
         val contractCode = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
         assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
 
-        // When: Building upload contract transaction
-        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = uploadFunction
-        )
+        // When: Building upload contract transaction using helper method
+        val operation = InvokeHostFunctionOperation.uploadContractWasm(contractCode)
 
         val transaction = TransactionBuilder(
             sourceAccount = account,
@@ -803,7 +833,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -817,7 +847,7 @@ class SorobanIntegrationTest {
         // Extract WASM ID from transaction result
         val wasmId = rpcTransactionResponse.getWasmId()
         assertNotNull(wasmId, "WASM ID should be extracted from transaction result")
-        assertTrue(wasmId!!.isNotEmpty(), "WASM ID should not be empty")
+        assertTrue(wasmId.isNotEmpty(), "WASM ID should not be empty")
 
         // Store WASM ID, keypair, and contract code for later tests
         sharedWasmId = wasmId
@@ -831,14 +861,14 @@ class SorobanIntegrationTest {
         assertNotNull(contractCodeEntry, "Contract code entry should be loaded")
         assertContentEquals(
             contractCode,
-            contractCodeEntry!!.code,
+            contractCodeEntry.code,
             "Loaded contract code should match uploaded code"
         )
 
         // Verify contract info can be parsed
         val contractInfo = sorobanServer.loadContractInfoForWasmId(wasmId)
         assertNotNull(contractInfo, "Contract info should be parsed")
-        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.specEntries.isNotEmpty(), "Contract should have spec entries")
         assertTrue(contractInfo.metaEntries.isNotEmpty(), "Contract should have meta entries")
         assertTrue(contractInfo.envInterfaceVersion > 0u, "Environment interface version should be positive")
     }
@@ -848,7 +878,7 @@ class SorobanIntegrationTest {
      *
      * This test validates the complete contract deployment workflow:
      * 1. Uses the WASM ID from testUploadContract
-     * 2. Creates a CreateContractHostFunction with the WASM ID
+     * 2. Uses InvokeHostFunctionOperation.createContract() helper method
      * 3. Simulates the deployment transaction
      * 4. Applies authorization entries from simulation
      * 5. Signs and submits the transaction
@@ -860,7 +890,7 @@ class SorobanIntegrationTest {
      * 11. Stores contract ID and footprint for use by testInvokeContract and testGetLedgerEntries
      *
      * The test demonstrates:
-     * - Contract instance creation from uploaded WASM
+     * - Contract instance creation from uploaded WASM using helper methods
      * - Authorization entry handling (auto-auth from simulation)
      * - Contract ID extraction from transaction result
      * - Contract info retrieval by contract ID
@@ -877,7 +907,8 @@ class SorobanIntegrationTest {
      * **Duration**: ~30-60 seconds (includes network delays and polling)
      *
      * @see SorobanServer.loadContractInfoForContractId
-     * @see GetTransactionResponse.getCreatedContractId
+     * @see com.soneso.stellar.sdk.rpc.responses.GetTransactionResponse.getCreatedContractId
+     * @see InvokeHostFunctionOperation.createContract
      */
     @Test
     fun testCreateContract() = runTest(timeout = 120.seconds) {
@@ -897,35 +928,15 @@ class SorobanIntegrationTest {
         val account = sorobanServer.getAccount(accountId)
         assertNotNull(account, "Account should be loaded")
 
-        // When: Building create contract transaction
-        // Create the contract ID preimage (from address)
-        val addressObj = Address(accountId)
-        val scAddress = addressObj.toSCAddress()
+        // When: Building create contract transaction using helper method
+        // Generate deterministic salt (using zero salt for tests)
+        val salt = ByteArray(32) { 0 }
+        val address = Address(accountId)
 
-        // Generate salt (using zero salt for deterministic contract ID in tests)
-        val salt = Uint256Xdr(ByteArray(32) { 0 })
-
-        val preimage = ContractIDPreimageXdr.FromAddress(
-            ContractIDPreimageFromAddressXdr(
-                address = scAddress,
-                salt = salt
-            )
-        )
-
-        // Create the contract executable (reference to uploaded WASM)
-        val wasmHash = HashXdr(wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
-        val executable = ContractExecutableXdr.WasmHash(wasmHash)
-
-        // Build the CreateContractArgs
-        val createContractArgs = CreateContractArgsXdr(
-            contractIdPreimage = preimage,
-            executable = executable
-        )
-
-        // Create the host function
-        val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = createFunction
+        val operation = InvokeHostFunctionOperation.createContract(
+            wasmId = wasmId,
+            address = address,
+            salt = salt
         )
 
         val transaction = TransactionBuilder(
@@ -948,7 +959,7 @@ class SorobanIntegrationTest {
         // Extract and store the footprint for testGetLedgerEntries
         val transactionData = simulateResponse.parseTransactionData()
         assertNotNull(transactionData, "Transaction data should be parsed")
-        sharedFootprint = transactionData!!.resources.footprint
+        sharedFootprint = transactionData.resources.footprint
 
         // Prepare transaction with simulation results (includes auth entries)
         val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
@@ -963,7 +974,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -977,7 +988,7 @@ class SorobanIntegrationTest {
         // Extract contract ID from transaction result
         val contractId = rpcTransactionResponse.getCreatedContractId()
         assertNotNull(contractId, "Contract ID should be extracted from transaction result")
-        assertTrue(contractId!!.isNotEmpty(), "Contract ID should not be empty")
+        assertTrue(contractId.isNotEmpty(), "Contract ID should not be empty")
         assertTrue(contractId.startsWith("C"), "Contract ID should be strkey-encoded (start with 'C')")
 
         // Store contract ID for testInvokeContract and testGetLedgerEntries
@@ -988,7 +999,7 @@ class SorobanIntegrationTest {
 
         val contractInfo = sorobanServer.loadContractInfoForContractId(contractId)
         assertNotNull(contractInfo, "Contract info should be loaded")
-        assertTrue(contractInfo!!.specEntries.isNotEmpty(), "Contract should have spec entries")
+        assertTrue(contractInfo.specEntries.isNotEmpty(), "Contract should have spec entries")
         assertTrue(contractInfo.metaEntries.isNotEmpty(), "Contract should have meta entries")
         assertTrue(contractInfo.envInterfaceVersion > 0u, "Environment interface version should be positive")
 
@@ -1014,7 +1025,7 @@ class SorobanIntegrationTest {
      * This test validates the complete contract invocation workflow:
      * 1. Uses the contract ID from testCreateContract
      * 2. Prepares function arguments (symbol "friend" for hello contract)
-     * 3. Builds an InvokeContractHostFunction operation
+     * 3. Uses InvokeHostFunctionOperation.invokeContractFunction() helper method
      * 4. Simulates the invocation transaction
      * 5. Prepares the transaction with simulation results
      * 6. Signs and submits the transaction
@@ -1024,7 +1035,7 @@ class SorobanIntegrationTest {
      * 10. Validates transaction XDR encoding/decoding
      *
      * The test demonstrates:
-     * - Contract function invocation with parameters
+     * - Contract function invocation with parameters using helper methods
      * - SCVal argument construction using Scv helper
      * - Transaction simulation and resource estimation
      * - Return value extraction and parsing
@@ -1045,9 +1056,9 @@ class SorobanIntegrationTest {
      * **Reference**: Ported from Flutter SDK's test invoke contract
      * (soroban_test.dart lines 521-634)
      *
-     * @see InvokeHostFunctionOperation
+     * @see InvokeHostFunctionOperation.invokeContractFunction
      * @see Scv.toSymbol
-     * @see GetTransactionResponse.getResultValue
+     * @see com.soneso.stellar.sdk.rpc.responses.GetTransactionResponse.getResultValue
      */
     @Test
     fun testInvokeContract() = runTest(timeout = 120.seconds) {
@@ -1067,21 +1078,14 @@ class SorobanIntegrationTest {
         val account = sorobanServer.getAccount(accountId)
         assertNotNull(account, "Account should be loaded")
 
-        // When: Building invoke contract transaction
+        // When: Building invoke contract transaction using helper method
         // Prepare argument - the hello function takes a symbol parameter
         val arg = Scv.toSymbol("friend")
 
-        // Build the invoke contract host function
-        val functionName = "hello"
-        val contractAddress = Address(contractId)
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr(functionName),
-            args = listOf(arg)
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction
+        val operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = contractId,
+            functionName = "hello",
+            parameters = listOf(arg)
         )
 
         // Create transaction for invoking the contract
@@ -1123,7 +1127,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1140,7 +1144,7 @@ class SorobanIntegrationTest {
 
         // The hello contract returns a vec with two symbols: ["Hello", <parameter>]
         assertTrue(resVal is SCValXdr.Vec, "Result should be a vector")
-        val vec = (resVal as SCValXdr.Vec).value?.value
+        val vec = resVal.value?.value
         assertNotNull(vec, "Vector should not be null")
         assertEquals(2, vec.size, "Vector should have 2 elements")
 
@@ -1210,13 +1214,13 @@ class SorobanIntegrationTest {
         assertNotNull(contractDataKey, "Contract data ledger key should be found in footprint")
 
         // Then: Retrieve contract code entry using getLedgerEntries
-        val contractCodeEntries = sorobanServer.getLedgerEntries(listOf(contractCodeKey!!))
+        val contractCodeEntries = sorobanServer.getLedgerEntries(listOf(contractCodeKey))
         assertNotNull(contractCodeEntries.latestLedger, "Latest ledger should not be null")
         assertNotNull(contractCodeEntries.entries, "Contract code entries should not be null")
         assertEquals(1, contractCodeEntries.entries.size, "Should have exactly 1 contract code entry")
 
         // Then: Retrieve contract data entry using getLedgerEntries
-        val contractDataEntries = sorobanServer.getLedgerEntries(listOf(contractDataKey!!))
+        val contractDataEntries = sorobanServer.getLedgerEntries(listOf(contractDataKey))
         assertNotNull(contractDataEntries.latestLedger, "Latest ledger should not be null")
         assertNotNull(contractDataEntries.entries, "Contract data entries should not be null")
         assertEquals(1, contractDataEntries.entries.size, "Should have exactly 1 contract data entry")
@@ -1226,7 +1230,7 @@ class SorobanIntegrationTest {
         assertNotNull(cCodeEntryByWasmId, "Contract code entry should be loaded by WASM ID")
         assertContentEquals(
             contractCode,
-            cCodeEntryByWasmId!!.code,
+            cCodeEntryByWasmId.code,
             "Contract code loaded by WASM ID should match uploaded code"
         )
 
@@ -1235,7 +1239,7 @@ class SorobanIntegrationTest {
         assertNotNull(cCodeEntryByContractId, "Contract code entry should be loaded by contract ID")
         assertContentEquals(
             contractCode,
-            cCodeEntryByContractId!!.code,
+            cCodeEntryByContractId.code,
             "Contract code loaded by contract ID should match uploaded code"
         )
 
@@ -1247,16 +1251,16 @@ class SorobanIntegrationTest {
      *
      * This test validates the complete events workflow for Soroban smart contracts:
      * 1. Creates a new test account (independent from shared test state)
-     * 2. Uploads the events contract WASM to the ledger
-     * 3. Deploys an instance of the events contract
-     * 4. Invokes the "increment" function which emits contract events
+     * 2. Uploads the events contract WASM to the ledger using helper method
+     * 3. Deploys an instance of the events contract using helper method
+     * 4. Invokes the "increment" function which emits contract events using helper method
      * 5. Retrieves the transaction from Horizon to get the ledger number
      * 6. Queries the emitted events using getEvents RPC endpoint
      * 7. Validates event structure, topics, and contract ID filtering
      * 8. Verifies event XDR parsing (diagnostic, transaction, and contract events)
      *
      * The test demonstrates:
-     * - Complete contract lifecycle: upload → deploy → invoke
+     * - Complete contract lifecycle: upload → deploy → invoke using helper methods
      * - Contract event emission during invocation
      * - Event filtering by contract ID and topics
      * - Event pagination with limits
@@ -1276,8 +1280,11 @@ class SorobanIntegrationTest {
      *
      * @see SorobanServer.getEvents
      * @see GetEventsRequest
-     * @see EventFilter
-     * @see Events.parseContractEventsXdr
+     * @see com.soneso.stellar.sdk.rpc.requests.GetEventsRequest.EventFilter
+     * @see com.soneso.stellar.sdk.rpc.responses.Events.parseContractEventsXdr
+     * @see InvokeHostFunctionOperation.uploadContractWasm
+     * @see InvokeHostFunctionOperation.createContract
+     * @see InvokeHostFunctionOperation.invokeContractFunction
      */
     @Test
     fun testEvents() = runTest(timeout = 180.seconds) {
@@ -1285,19 +1292,22 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot
-        FriendBot.fundTestnetAccount(accountId)
+        // Fund account via FriendBot (network-dependent)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(accountId)
+        }
         delay(5000) // Wait for account creation
 
-        // Step 1: Upload events contract WASM
+        // Step 1: Upload events contract WASM using helper method
         var account = sorobanServer.getAccount(accountId)
         assertNotNull(account, "Account should be loaded")
 
         val contractCode = TestResourceUtil.readWasmFile("soroban_events_contract.wasm")
         assertTrue(contractCode.isNotEmpty(), "Events contract code should not be empty")
 
-        var uploadFunction = HostFunctionXdr.Wasm(contractCode)
-        var operation = InvokeHostFunctionOperation(hostFunction = uploadFunction)
+        var operation = InvokeHostFunctionOperation.uploadContractWasm(contractCode)
         var transaction = TransactionBuilder(sourceAccount = account, network = network)
             .addOperation(operation)
             .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
@@ -1315,7 +1325,7 @@ class SorobanIntegrationTest {
         assertNotNull(sendResponse.hash, "Upload transaction hash should not be null")
 
         var rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1326,24 +1336,18 @@ class SorobanIntegrationTest {
 
         delay(5000) // Wait for ledger to settle
 
-        // Step 2: Deploy events contract instance
+        // Step 2: Deploy events contract instance using helper method
         account = sorobanServer.getAccount(accountId)
         assertNotNull(account, "Account should be reloaded")
 
-        val addressObj = Address(accountId)
-        val scAddress = addressObj.toSCAddress()
-        val salt = Uint256Xdr(ByteArray(32) { 1 }) // Different salt than hello contract
+        val address = Address(accountId)
+        val salt = ByteArray(32) { 1 } // Different salt than hello contract
 
-        val preimage = ContractIDPreimageXdr.FromAddress(
-            ContractIDPreimageFromAddressXdr(address = scAddress, salt = salt)
+        operation = InvokeHostFunctionOperation.createContract(
+            wasmId = eventsContractWasmId,
+            address = address,
+            salt = salt
         )
-
-        val wasmHash = HashXdr(eventsContractWasmId!!.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
-        val executable = ContractExecutableXdr.WasmHash(wasmHash)
-        val createContractArgs = CreateContractArgsXdr(contractIdPreimage = preimage, executable = executable)
-
-        val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
-        operation = InvokeHostFunctionOperation(hostFunction = createFunction)
         transaction = TransactionBuilder(sourceAccount = account, network = network)
             .addOperation(operation)
             .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
@@ -1361,7 +1365,7 @@ class SorobanIntegrationTest {
         assertNotNull(sendResponse.hash, "Deploy transaction hash should not be null")
 
         rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1369,23 +1373,19 @@ class SorobanIntegrationTest {
 
         val eventsContractId = rpcResponse.getCreatedContractId()
         assertNotNull(eventsContractId, "Events contract ID should be extracted")
-        assertTrue(eventsContractId!!.startsWith("C"), "Contract ID should be strkey-encoded")
+        assertTrue(eventsContractId.startsWith("C"), "Contract ID should be strkey-encoded")
 
         delay(5000) // Wait for ledger to settle
 
-        // Step 3: Invoke increment function (emits events)
+        // Step 3: Invoke increment function (emits events) using helper method
         account = sorobanServer.getAccount(accountId)
         assertNotNull(account, "Account should be reloaded")
 
-        val functionName = "increment"
-        val contractAddress = Address(eventsContractId)
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr(functionName),
-            args = emptyList() // increment takes no arguments
+        operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = eventsContractId,
+            functionName = "increment",
+            parameters = emptyList() // increment takes no arguments
         )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-        operation = InvokeHostFunctionOperation(hostFunction = hostFunction)
 
         transaction = TransactionBuilder(sourceAccount = account, network = network)
             .addOperation(operation)
@@ -1404,7 +1404,7 @@ class SorobanIntegrationTest {
         assertNotNull(sendResponse.hash, "Invoke transaction hash should not be null")
 
         rpcResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1413,7 +1413,7 @@ class SorobanIntegrationTest {
         delay(5000) // Wait for events to be indexed
 
         // Step 4: Query events from Horizon to get ledger number
-        val horizonTransaction = horizonServer.transactions().transaction(sendResponse.hash!!)
+        val horizonTransaction = horizonServer.transactions().transaction(sendResponse.hash)
         assertNotNull(horizonTransaction, "Horizon transaction should be found")
         val startLedger = horizonTransaction.ledger
 
@@ -1475,14 +1475,14 @@ class SorobanIntegrationTest {
         // Step 6: Validate transaction events XDR parsing from GetTransactionResponse
         // This validates that events can be parsed from transaction results
         if (rpcResponse.events != null) {
-            val events = rpcResponse.events!!
+            val events = rpcResponse.events
 
             // Parse diagnostic events (debugging info)
             events.diagnosticEventsXdr?.let { diagnosticXdrs ->
                 assertTrue(diagnosticXdrs.isNotEmpty(), "Should have diagnostic events")
                 val diagnosticEvents = events.parseDiagnosticEventsXdr()
                 assertNotNull(diagnosticEvents, "Diagnostic events should parse")
-                println("Parsed ${diagnosticEvents!!.size} diagnostic events")
+                println("Parsed ${diagnosticEvents.size} diagnostic events")
             }
 
             // Parse transaction events (system-level events)
@@ -1490,7 +1490,7 @@ class SorobanIntegrationTest {
                 assertTrue(txEventsXdrs.isNotEmpty(), "Should have transaction events")
                 val txEvents = events.parseTransactionEventsXdr()
                 assertNotNull(txEvents, "Transaction events should parse")
-                println("Parsed ${txEvents!!.size} transaction events")
+                println("Parsed ${txEvents.size} transaction events")
 
                 // Validate transaction event structure (contains stage + event)
                 txEvents.forEach { txEvent ->
@@ -1507,7 +1507,7 @@ class SorobanIntegrationTest {
                 assertNotNull(contractEvents, "Contract events should parse")
 
                 // Contract events are nested: outer list = operations, inner list = events per operation
-                contractEvents!!.forEach { operationEvents ->
+                contractEvents.forEach { operationEvents ->
                     operationEvents.forEach { contractEvent ->
                         // Validate contract event structure
                         assertNotNull(contractEvent, "Contract event should not be null")
@@ -1558,8 +1558,12 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot
-        FriendBot.fundTestnetAccount(accountId)
+        // Fund account via FriendBot (network-dependent)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(accountId)
+        }
         delay(5000) // Wait for account creation
 
         // Load account for sequence number
@@ -1634,7 +1638,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1709,9 +1713,14 @@ class SorobanIntegrationTest {
         val keyPairB = KeyPair.random()
         val accountBId = keyPairB.getAccountId()
 
-        // Fund accounts via FriendBot
-        FriendBot.fundTestnetAccount(accountAId)
-        FriendBot.fundTestnetAccount(accountBId)
+        // Fund accounts via FriendBot (network-dependent)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountAId)
+            FriendBot.fundTestnetAccount(accountBId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(accountAId)
+            FriendBot.fundFuturenetAccount(accountBId)
+        }
         delay(5000) // Wait for account creation
 
         // Create custom asset (Fsdk issued by account B)
@@ -1816,7 +1825,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )
@@ -1850,7 +1859,7 @@ class SorobanIntegrationTest {
      *
      * This test validates the Soroban state restoration workflow:
      * 1. Loads a contract WASM file
-     * 2. Creates an upload contract transaction
+     * 2. Creates an upload contract transaction using helper method
      * 3. Simulates to get the footprint (which ledger entries need restoration)
      * 4. Modifies the footprint: moves all readOnly keys to readWrite, clears readOnly
      * 5. Creates a RestoreFootprintOperation
@@ -1881,6 +1890,7 @@ class SorobanIntegrationTest {
      * @see RestoreFootprintOperation
      * @see SorobanTransactionDataXdr
      * @see LedgerFootprintXdr
+     * @see InvokeHostFunctionOperation.uploadContractWasm
      */
     @Test
     fun testRestoreFootprint() = runTest(timeout = 120.seconds) {
@@ -1899,7 +1909,7 @@ class SorobanIntegrationTest {
      * This function:
      * 1. Creates and funds a test account
      * 2. Loads the specified contract WASM
-     * 3. Simulates an upload to get the footprint
+     * 3. Simulates an upload to get the footprint using helper method
      * 4. Modifies footprint (readOnly → readWrite)
      * 5. Creates and executes a restore transaction
      *
@@ -1912,7 +1922,12 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        FriendBot.fundTestnetAccount(accountId)
+        // Fund account via FriendBot (network-dependent)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(accountId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(accountId)
+        }
         delay(5000) // Wait for account creation
 
         // Load account
@@ -1923,9 +1938,8 @@ class SorobanIntegrationTest {
         val contractCode = TestResourceUtil.readWasmFile(contractWasmFile)
         assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
 
-        // When: Create upload transaction to get footprint
-        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
-        val uploadOperation = InvokeHostFunctionOperation(hostFunction = uploadFunction)
+        // When: Create upload transaction to get footprint using helper method
+        val uploadOperation = InvokeHostFunctionOperation.uploadContractWasm(contractCode)
 
         var transaction = TransactionBuilder(
             sourceAccount = account,
@@ -1945,7 +1959,7 @@ class SorobanIntegrationTest {
         val transactionData = simulateResponse.parseTransactionData()
         assertNotNull(transactionData, "Transaction data should be parsed")
 
-        val originalFootprint = transactionData!!.resources.footprint
+        val originalFootprint = transactionData.resources.footprint
         val modifiedFootprint = LedgerFootprintXdr(
             readOnly = emptyList(), // Clear readOnly
             readWrite = originalFootprint.readOnly + originalFootprint.readWrite // Combine all keys into readWrite
@@ -2006,7 +2020,7 @@ class SorobanIntegrationTest {
 
         // Poll for transaction completion
         val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash!!,
+            hash = sendResponse.hash,
             maxAttempts = 30,
             sleepStrategy = { 3000L }
         )

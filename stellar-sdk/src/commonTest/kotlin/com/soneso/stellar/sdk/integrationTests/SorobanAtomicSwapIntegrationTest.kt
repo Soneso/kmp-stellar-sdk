@@ -72,10 +72,28 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SorobanAtomicSwapIntegrationTest {
 
-    private val testOn = "testnet"
-    private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
-    private val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-    private val network = Network.TESTNET
+    private val testOn = "testnet" // "testnet" or "futurenet"
+
+    private val sorobanServer = if (testOn == "testnet") {
+        SorobanServer("https://soroban-testnet.stellar.org")
+    } else {
+        SorobanServer("https://rpc-futurenet.stellar.org")
+    }
+
+    private val horizonServer = if (testOn == "testnet") {
+        HorizonServer("https://horizon-testnet.stellar.org")
+    } else {
+        HorizonServer("https://horizon-futurenet.stellar.org")
+    }
+
+    private val network = if (testOn == "testnet") {
+        Network.TESTNET
+    } else {
+        Network.FUTURENET
+    }
+
+
+
 
     companion object {
         /**
@@ -129,20 +147,20 @@ class SorobanAtomicSwapIntegrationTest {
      *
      * This test validates the complete contract upload workflow:
      * 1. Creates and funds three test accounts: admin, alice, bob
-     * 2. Uploads TokenA contract WASM
+     * 2. Uploads TokenA contract WASM using SDK helper method
      * 3. Extends TokenA contract code footprint TTL
      * 4. Loads and validates TokenA contract metadata
-     * 5. Uploads TokenB contract WASM
+     * 5. Uploads TokenB contract WASM using SDK helper method
      * 6. Extends TokenB contract code footprint TTL
      * 7. Loads and validates TokenB contract metadata
-     * 8. Uploads atomic swap contract WASM
+     * 8. Uploads atomic swap contract WASM using SDK helper method
      * 9. Extends swap contract code footprint TTL
      * 10. Loads and validates swap contract metadata
      * 11. Stores WASM IDs and keypairs for subsequent tests
      *
      * The test demonstrates:
      * - Account creation and funding for multiple parties
-     * - Uploading multiple contract WASMs
+     * - Uploading multiple contract WASMs using SDK helper methods
      * - Extracting WASM IDs from transaction results
      * - Extending contract code TTL for testing
      * - Loading and validating contract metadata
@@ -164,9 +182,21 @@ class SorobanAtomicSwapIntegrationTest {
         val bobId = bob.getAccountId()
 
         // Fund all accounts via FriendBot
-        FriendBot.fundTestnetAccount(adminId)
-        FriendBot.fundTestnetAccount(aliceId)
-        FriendBot.fundTestnetAccount(bobId)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(adminId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(adminId)
+        }
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(aliceId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(aliceId)
+        }
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(bobId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(bobId)
+        }
         delay(5000) // Wait for account creation
 
         // Store keypairs for later tests
@@ -178,7 +208,7 @@ class SorobanAtomicSwapIntegrationTest {
         println("Alice: $aliceId")
         println("Bob: $bobId")
 
-        // When: Upload TokenA contract
+        // When: Upload TokenA contract using SDK helper method
         delay(5000)
         val tokenAWasmId = installContract("soroban_token_contract.wasm")
         tokenAContractWasmId = tokenAWasmId
@@ -194,7 +224,7 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenAInfo.specEntries.isNotEmpty(), "TokenA should have spec entries")
         assertTrue(tokenAInfo.metaEntries.isNotEmpty(), "TokenA should have meta entries")
 
-        // When: Upload TokenB contract
+        // When: Upload TokenB contract using SDK helper method
         delay(5000)
         val tokenBWasmId = installContract("soroban_token_contract.wasm")
         tokenBContractWasmId = tokenBWasmId
@@ -210,7 +240,7 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenBInfo.specEntries.isNotEmpty(), "TokenB should have spec entries")
         assertTrue(tokenBInfo.metaEntries.isNotEmpty(), "TokenB should have meta entries")
 
-        // When: Upload atomic swap contract
+        // When: Upload atomic swap contract using SDK helper method
         delay(5000)
         val swapWasmId = installContract("soroban_atomic_swap_contract.wasm")
         swapContractWasmId = swapWasmId
@@ -235,16 +265,16 @@ class SorobanAtomicSwapIntegrationTest {
      *
      * This test validates the contract deployment workflow:
      * 1. Uses WASM IDs from testInstallContracts
-     * 2. Deploys TokenA contract instance with constructor args (admin, decimals, name, symbol)
+     * 2. Deploys TokenA contract instance with constructor args (admin, decimals, name, symbol) using SDK helper method
      * 3. Verifies TokenA contract info can be loaded
-     * 4. Deploys TokenB contract instance with constructor args
+     * 4. Deploys TokenB contract instance with constructor args using SDK helper method
      * 5. Verifies TokenB contract info can be loaded
-     * 6. Deploys atomic swap contract instance (no constructor args)
+     * 6. Deploys atomic swap contract instance (no constructor args) using SDK helper method
      * 7. Verifies swap contract info can be loaded
      * 8. Stores contract IDs for subsequent tests
      *
      * The test demonstrates:
-     * - Contract instance creation from uploaded WASMs with constructor args
+     * - Contract instance creation from uploaded WASMs with constructor args using SDK helper method
      * - Authorization entry handling (auto-auth from simulation)
      * - Contract ID extraction from transaction results
      * - Contract info retrieval by contract ID
@@ -280,7 +310,7 @@ class SorobanAtomicSwapIntegrationTest {
         val adminId = admin.getAccountId()
         val adminAddress = Address(adminId)
 
-        // When: Deploy TokenA contract with constructor args
+        // When: Deploy TokenA contract with constructor args using SDK helper method
         // New token contract is initialized in constructor, not via separate initialize call
         val tokenAConstructorArgs = listOf(
             adminAddress.toSCVal(),
@@ -300,7 +330,7 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenAInfo.specEntries.isNotEmpty(), "TokenA should have spec entries")
         assertTrue(tokenAInfo.metaEntries.isNotEmpty(), "TokenA should have meta entries")
 
-        // When: Deploy TokenB contract with constructor args
+        // When: Deploy TokenB contract with constructor args using SDK helper method
         val tokenBConstructorArgs = listOf(
             adminAddress.toSCVal(),
             Scv.toUint32(8u), // decimals
@@ -319,7 +349,7 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenBInfo.specEntries.isNotEmpty(), "TokenB should have spec entries")
         assertTrue(tokenBInfo.metaEntries.isNotEmpty(), "TokenB should have meta entries")
 
-        // When: Deploy atomic swap contract (no constructor args)
+        // When: Deploy atomic swap contract (no constructor args) using SDK helper method
         delay(5000)
         val swapId = createContract(swapWasmId)
         swapContractId = swapId
@@ -360,7 +390,11 @@ class SorobanAtomicSwapIntegrationTest {
         // Create and fund test account for restore operations
         val restoreAdmin = KeyPair.random()
         val restoreAdminId = restoreAdmin.getAccountId()
-        FriendBot.fundTestnetAccount(restoreAdminId)
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(restoreAdminId)
+        } else if (testOn == "futurenet") {
+            FriendBot.fundFuturenetAccount(restoreAdminId)
+        }
         delay(5000) // Wait for account creation
 
         // Temporarily set adminKeyPair for restore operations
@@ -387,15 +421,15 @@ class SorobanAtomicSwapIntegrationTest {
      *
      * This test validates the token minting workflow:
      * 1. Uses contract IDs from testCreateContracts (tokens are now initialized in constructor)
-     * 2. Mints 10,000,000,000,000 units of TokenA to Alice
-     * 3. Queries Alice's TokenA balance
-     * 4. Mints 10,000,000,000,000 units of TokenB to Bob
-     * 5. Queries Bob's TokenB balance
+     * 2. Mints 10,000,000,000,000 units of TokenA to Alice using SDK helper method
+     * 3. Queries Alice's TokenA balance using SDK helper method
+     * 4. Mints 10,000,000,000,000 units of TokenB to Bob using SDK helper method
+     * 5. Queries Bob's TokenB balance using SDK helper method
      * 6. Verifies balances match expected amounts
      *
      * The test demonstrates:
-     * - Invoking token contract mint function
-     * - Querying token balances
+     * - Invoking token contract mint function using SDK helper methods
+     * - Querying token balances using SDK helper methods
      * - Validating i128 return values
      *
      * **NOTE**: Tokens are now initialized in the constructor during deployment (testCreateContracts),
@@ -457,7 +491,7 @@ class SorobanAtomicSwapIntegrationTest {
      * 1. Uses contract IDs from testCreateContracts
      * 2. Alice wants to swap 1000 TokenA for at least 4500 TokenB
      * 3. Bob wants to swap 5000 TokenB for at least 950 TokenA
-     * 4. Admin submits the swap transaction
+     * 4. Admin submits the swap transaction using SDK helper method
      * 5. Gets latest ledger for signature expiration
      * 6. Signs authorization entries for Alice
      * 7. Signs authorization entries for Bob
@@ -467,8 +501,8 @@ class SorobanAtomicSwapIntegrationTest {
      * 11. Validates swap execution succeeded
      *
      * The test demonstrates:
-     * - Multi-party contract invocation
-     * - Building InvokeContract with multiple parameters
+     * - Multi-party contract invocation using SDK helper methods
+     * - Building InvokeContract with multiple parameters using SDK helper methods
      * - Authorization signing for both parties using Auth.authorizeEntry()
      * - Signature expiration ledger handling
      * - Transaction reconstruction with signed auth entries
@@ -541,16 +575,11 @@ class SorobanAtomicSwapIntegrationTest {
         val account = sorobanServer.getAccount(swapSubmitterAccountId)
         assertNotNull(account, "Admin account should be loaded")
 
-        // When: Building atomic swap transaction
-        val contractAddress = Address(atomicSwapContractId)
-        val invokeContractArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr(swapFunctionName),
-            args = invokeArgs
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeContractArgs)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction
+        // When: Building atomic swap transaction using SDK helper method
+        val operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = atomicSwapContractId,
+            functionName = swapFunctionName,
+            parameters = invokeArgs
         )
 
         val transaction = TransactionBuilder(
@@ -585,8 +614,7 @@ class SorobanAtomicSwapIntegrationTest {
         val signedAuthEntries = authEntries.map { authEntry ->
             val credentials = authEntry.credentials
             if (credentials is SorobanCredentialsXdr.Address) {
-                val address = credentials.value.address
-                val addressAccountId = when (address) {
+                val addressAccountId = when (val address = credentials.value.address) {
                     is SCAddressXdr.AccountId -> {
                         val accountId = address.value.value
                         KeyPair.fromPublicKey((accountId as PublicKeyXdr.Ed25519).value.value).getAccountId()
@@ -599,7 +627,7 @@ class SorobanAtomicSwapIntegrationTest {
                         Auth.authorizeEntry(
                             entry = authEntry,
                             signer = aliceKp,
-                            validUntilLedgerSeq = signatureExpirationLedger.toLong(),
+                            validUntilLedgerSeq = signatureExpirationLedger,
                             network = network
                         )
                     }
@@ -607,7 +635,7 @@ class SorobanAtomicSwapIntegrationTest {
                         Auth.authorizeEntry(
                             entry = authEntry,
                             signer = bobKp,
-                            validUntilLedgerSeq = signatureExpirationLedger.toLong(),
+                            validUntilLedgerSeq = signatureExpirationLedger,
                             network = network
                         )
                     }
@@ -620,7 +648,7 @@ class SorobanAtomicSwapIntegrationTest {
 
         // Rebuild the operation with signed auth entries
         val signedOperation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction,
+            hostFunction = operation.hostFunction,
             auth = signedAuthEntries
         )
 
@@ -698,11 +726,9 @@ class SorobanAtomicSwapIntegrationTest {
         val contractCode = TestResourceUtil.readWasmFile(contractCodePath)
         assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
 
-        // Upload contract
-        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = uploadFunction
-        )
+        // Upload contract using SDK helper method
+        val operation = InvokeHostFunctionOperation.uploadContractWasm(contractCode)
+
         val transaction = TransactionBuilder(
             sourceAccount = account,
             network = network
@@ -774,43 +800,17 @@ class SorobanAtomicSwapIntegrationTest {
         val account = sorobanServer.getAccount(adminId)
         assertNotNull(account, "Admin account should be loaded")
 
-        // Build the operation for creating the contract
+        // Build the operation for creating the contract using SDK helper method
         val addressObj = Address(adminId)
-        val scAddress = addressObj.toSCAddress()
 
         // Generate salt (random for each contract)
-        val salt = Uint256Xdr(ByteArray(32) { Random.nextInt(256).toByte() })
+        val salt = ByteArray(32) { Random.nextInt(256).toByte() }
 
-        val preimage = ContractIDPreimageXdr.FromAddress(
-            ContractIDPreimageFromAddressXdr(
-                address = scAddress,
-                salt = salt
-            )
-        )
-
-        val wasmHash = HashXdr(wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
-        val executable = ContractExecutableXdr.WasmHash(wasmHash)
-
-        val createContractArgs = CreateContractArgsXdr(
-            contractIdPreimage = preimage,
-            executable = executable
-        )
-
-        // Use CreateContractV2 if constructor args are provided (for contracts with constructors)
-        val createFunction = if (constructorArgs != null) {
-            HostFunctionXdr.CreateContractV2(
-                CreateContractArgsV2Xdr(
-                    contractIdPreimage = preimage,
-                    executable = executable,
-                    constructorArgs = constructorArgs
-                )
-            )
-        } else {
-            HostFunctionXdr.CreateContract(createContractArgs)
-        }
-
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = createFunction
+        val operation = InvokeHostFunctionOperation.createContract(
+            wasmId = wasmId,
+            address = addressObj,
+            constructorArgs = constructorArgs,
+            salt = salt
         )
 
         val transaction = TransactionBuilder(
@@ -884,15 +884,11 @@ class SorobanAtomicSwapIntegrationTest {
 
         val args = listOf(toAddress.toSCVal(), amountVal)
 
-        val contractAddress = Address(contractId)
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr(functionName),
-            args = args
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction
+        // Invoke contract function using SDK helper method
+        val operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = contractId,
+            functionName = functionName,
+            parameters = args
         )
 
         val transaction = TransactionBuilder(
@@ -966,15 +962,11 @@ class SorobanAtomicSwapIntegrationTest {
 
         val args = listOf(address.toSCVal())
 
-        val contractAddress = Address(contractId)
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress.toSCAddress(),
-            functionName = SCSymbolXdr(functionName),
-            args = args
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-        val operation = InvokeHostFunctionOperation(
-            hostFunction = hostFunction
+        // Invoke contract function using SDK helper method
+        val operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = contractId,
+            functionName = functionName,
+            parameters = args
         )
 
         val transaction = TransactionBuilder(
@@ -1052,9 +1044,8 @@ class SorobanAtomicSwapIntegrationTest {
         val contractCode = TestResourceUtil.readWasmFile(contractCodePath)
         assertTrue(contractCode.isNotEmpty(), "Contract code should not be empty")
 
-        // Create upload transaction to get footprint
-        val uploadFunction = HostFunctionXdr.Wasm(contractCode)
-        val uploadOperation = InvokeHostFunctionOperation(hostFunction = uploadFunction)
+        // Create upload transaction to get footprint using SDK helper method
+        val uploadOperation = InvokeHostFunctionOperation.uploadContractWasm(contractCode)
 
         var transaction = TransactionBuilder(
             sourceAccount = account,

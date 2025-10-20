@@ -1627,23 +1627,42 @@ data class InvokeHostFunctionOperation(
         /**
          * Creates an InvokeHostFunctionOperation for creating/deploying a contract.
          *
-         * This operation deploys a contract instance from previously uploaded WASM code.
+         * This operation deploys a contract instance from previously uploaded WASM code,
+         * optionally passing constructor arguments to initialize the contract.
          *
-         * @param wasmId The 32-byte hash of the uploaded WASM code (hex-encoded)
+         * @param wasmId The 32-byte hash of the uploaded WASM code (hex-encoded, 64 characters)
          * @param address The address to use for deriving the contract ID
+         * @param constructorArgs Optional constructor arguments for contracts that require initialization
          * @param salt Optional 32-byte salt for contract ID derivation (random if null)
          * @return An InvokeHostFunctionOperation for creating the contract
          *
          * ## Example
          * ```kotlin
-         * val wasmId = "abc123..."  // 64-character hex string
-         * val deployer = Address(deployerAccountId)
-         * val createOp = InvokeHostFunctionOperation.createContract(wasmId, deployer)
+         * // Deploy contract without constructor arguments
+         * val createOp = InvokeHostFunctionOperation.createContract(
+         *     wasmId = "abc123...",  // 64-character hex string
+         *     address = Address(deployerAccountId)
+         * )
+         *
+         * // Deploy contract with constructor arguments (e.g., token contract)
+         * val createTokenOp = InvokeHostFunctionOperation.createContract(
+         *     wasmId = "def456...",
+         *     address = Address(deployerAccountId),
+         *     constructorArgs = listOf(
+         *         Address(adminId).toSCVal(),
+         *         Scv.toUint32(8u), // decimals
+         *         Scv.toString("TokenName"),
+         *         Scv.toString("TOKEN")
+         *     )
+         * )
          * ```
+         *
+         * @see <a href="https://developers.stellar.org/docs/smart-contracts/guides/transactions/deploy-contract">Deploy a Contract</a>
          */
         fun createContract(
             wasmId: String,
             address: Address,
+            constructorArgs: List<SCValXdr>? = null,
             salt: ByteArray? = null
         ): InvokeHostFunctionOperation {
             // Generate random salt if not provided
@@ -1666,15 +1685,24 @@ data class InvokeHostFunctionOperation(
             )
 
             val preimage = ContractIDPreimageXdr.FromAddress(fromAddress)
+            val executable = ContractExecutableXdr.WasmHash(HashXdr(wasmIdBytes))
 
-            // Create the contract args (using V2)
-            val createContractArgs = CreateContractArgsV2Xdr(
-                contractIdPreimage = preimage,
-                executable = ContractExecutableXdr.WasmHash(HashXdr(wasmIdBytes)),
-                constructorArgs = emptyList()  // No constructor arguments
-            )
+            // Use CreateContractV2 if constructor args are provided, otherwise use CreateContract
+            val hostFunction = if (constructorArgs != null && constructorArgs.isNotEmpty()) {
+                val createContractArgs = CreateContractArgsV2Xdr(
+                    contractIdPreimage = preimage,
+                    executable = executable,
+                    constructorArgs = constructorArgs
+                )
+                HostFunctionXdr.CreateContractV2(createContractArgs)
+            } else {
+                val createContractArgs = CreateContractArgsXdr(
+                    contractIdPreimage = preimage,
+                    executable = executable
+                )
+                HostFunctionXdr.CreateContract(createContractArgs)
+            }
 
-            val hostFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
             return InvokeHostFunctionOperation(
                 hostFunction = hostFunction,
                 auth = emptyList()

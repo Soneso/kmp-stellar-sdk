@@ -3,7 +3,6 @@ package com.soneso.stellar.sdk.integrationTests
 import com.soneso.stellar.sdk.contract.ContractSpec
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.contract.SorobanContractParser
-import com.soneso.stellar.sdk.contract.SorobanTestParser
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
@@ -45,6 +44,268 @@ import kotlin.time.Duration.Companion.seconds
 class SorobanParserIntegrationTest {
 
     /**
+     * Helper method to get type information from a spec type definition.
+     *
+     * This method recursively processes SCSpecTypeDef unions to produce
+     * human-readable type descriptions for contract functions, structs, and events.
+     *
+     * Ported from Flutter SDK's _getSpecTypeInfo() helper method.
+     */
+    private fun getSpecTypeInfo(specType: SCSpecTypeDefXdr): String {
+        return when (specType.discriminant) {
+            SCSpecTypeXdr.SC_SPEC_TYPE_VAL -> "val"
+            SCSpecTypeXdr.SC_SPEC_TYPE_BOOL -> "bool"
+            SCSpecTypeXdr.SC_SPEC_TYPE_VOID -> "void"
+            SCSpecTypeXdr.SC_SPEC_TYPE_ERROR -> "error"
+            SCSpecTypeXdr.SC_SPEC_TYPE_U32 -> "u32"
+            SCSpecTypeXdr.SC_SPEC_TYPE_I32 -> "i32"
+            SCSpecTypeXdr.SC_SPEC_TYPE_U64 -> "u64"
+            SCSpecTypeXdr.SC_SPEC_TYPE_I64 -> "i64"
+            SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT -> "timepoint"
+            SCSpecTypeXdr.SC_SPEC_TYPE_DURATION -> "duration"
+            SCSpecTypeXdr.SC_SPEC_TYPE_U128 -> "u128"
+            SCSpecTypeXdr.SC_SPEC_TYPE_I128 -> "i128"
+            SCSpecTypeXdr.SC_SPEC_TYPE_U256 -> "u256"
+            SCSpecTypeXdr.SC_SPEC_TYPE_I256 -> "i256"
+            SCSpecTypeXdr.SC_SPEC_TYPE_BYTES -> "bytes"
+            SCSpecTypeXdr.SC_SPEC_TYPE_STRING -> "string"
+            SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL -> "symbol"
+            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS -> "address"
+            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS -> "muxed address"
+            SCSpecTypeXdr.SC_SPEC_TYPE_OPTION -> {
+                val option = (specType as SCSpecTypeDefXdr.Option).value
+                val valueType = getSpecTypeInfo(option.valueType)
+                "option (value type: $valueType)"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_RESULT -> {
+                val result = (specType as SCSpecTypeDefXdr.Result).value
+                val okType = getSpecTypeInfo(result.okType)
+                val errorType = getSpecTypeInfo(result.errorType)
+                "result (ok type: $okType , error type: $errorType)"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_VEC -> {
+                val vec = (specType as SCSpecTypeDefXdr.Vec).value
+                val elementType = getSpecTypeInfo(vec.elementType)
+                "vec (element type: $elementType)"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_MAP -> {
+                val map = (specType as SCSpecTypeDefXdr.Map).value
+                val keyType = getSpecTypeInfo(map.keyType)
+                val valueType = getSpecTypeInfo(map.valueType)
+                "map (key type: $keyType , value type: $valueType)"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_TUPLE -> {
+                val tuple = (specType as SCSpecTypeDefXdr.Tuple).value
+                val valueTypesStr = tuple.valueTypes.joinToString(",", "[", "]") { getSpecTypeInfo(it) }
+                "tuple (value types: $valueTypesStr)"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_BYTES_N -> {
+                val bytesN = (specType as SCSpecTypeDefXdr.BytesN).value
+                "bytesN (n: ${bytesN.n.value})"
+            }
+            SCSpecTypeXdr.SC_SPEC_TYPE_UDT -> {
+                val udt = (specType as SCSpecTypeDefXdr.Udt).value
+                "udt (name: ${udt.name})"
+            }
+        }
+    }
+
+    /**
+     * Helper method to format and print a contract function specification.
+     *
+     * Ported from Flutter SDK's _printFunction() helper method.
+     */
+    private fun printFunction(function: SCSpecFunctionV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("Function: ${function.name.value}\n")
+
+        function.inputs.forEachIndexed { index, input ->
+            builder.append("input[$index] name: ${input.name}\n")
+            builder.append("input[$index] type: ${getSpecTypeInfo(input.type)}\n")
+            if (input.doc.isNotEmpty()) {
+                builder.append("input[$index] doc: ${input.doc}\n")
+            }
+        }
+
+        function.outputs.forEachIndexed { index, output ->
+            builder.append("output[$index] type: ${getSpecTypeInfo(output)}\n")
+        }
+
+        if (function.doc.isNotEmpty()) {
+            builder.append("doc : ${function.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
+     * Helper method to format and print a UDT struct specification.
+     *
+     * Ported from Flutter SDK's _printUdtStruct() helper method.
+     */
+    private fun printUdtStruct(udtStruct: SCSpecUDTStructV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("UDT Struct: ${udtStruct.name}\n")
+
+        if (udtStruct.lib.isNotEmpty()) {
+            builder.append("lib : ${udtStruct.lib}\n")
+        }
+
+        udtStruct.fields.forEachIndexed { index, field ->
+            builder.append("field[$index] name: ${field.name}\n")
+            builder.append("field[$index] type: ${getSpecTypeInfo(field.type)}\n")
+            if (field.doc.isNotEmpty()) {
+                builder.append("field[$index] doc: ${field.doc}\n")
+            }
+        }
+
+        if (udtStruct.doc.isNotEmpty()) {
+            builder.append("doc : ${udtStruct.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
+     * Helper method to format and print a UDT union specification.
+     *
+     * Ported from Flutter SDK's _printUdtUnion() helper method.
+     */
+    private fun printUdtUnion(udtUnion: SCSpecUDTUnionV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("UDT Union: ${udtUnion.name}\n")
+
+        if (udtUnion.lib.isNotEmpty()) {
+            builder.append("lib : ${udtUnion.lib}\n")
+        }
+
+        udtUnion.cases.forEachIndexed { index, uCase ->
+            when (uCase) {
+                is SCSpecUDTUnionCaseV0Xdr.VoidCase -> {
+                    builder.append("case[$index] is voidV0\n")
+                    builder.append("case[$index] name: ${uCase.value.name}\n")
+                    if (uCase.value.doc.isNotEmpty()) {
+                        builder.append("case[$index] doc: ${uCase.value.doc}\n")
+                    }
+                }
+                is SCSpecUDTUnionCaseV0Xdr.TupleCase -> {
+                    builder.append("case[$index] is tupleV0\n")
+                    builder.append("case[$index] name: ${uCase.value.name}\n")
+                    val valueTypesStr = uCase.value.type.joinToString(",", "[", "]") { getSpecTypeInfo(it) }
+                    builder.append("case[$index] types: $valueTypesStr\n")
+                    if (uCase.value.doc.isNotEmpty()) {
+                        builder.append("case[$index] doc: ${uCase.value.doc}\n")
+                    }
+                }
+            }
+        }
+
+        if (udtUnion.doc.isNotEmpty()) {
+            builder.append("doc : ${udtUnion.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
+     * Helper method to format and print a UDT enum specification.
+     *
+     * Ported from Flutter SDK's _printUdtEnum() helper method.
+     */
+    private fun printUdtEnum(udtEnum: SCSpecUDTEnumV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("UDT Enum : ${udtEnum.name}\n")
+
+        if (udtEnum.lib.isNotEmpty()) {
+            builder.append("lib : ${udtEnum.lib}\n")
+        }
+
+        udtEnum.cases.forEachIndexed { index, uCase ->
+            builder.append("case[$index] name: ${uCase.name}\n")
+            builder.append("case[$index] value: ${uCase.value}\n")
+            if (uCase.doc.isNotEmpty()) {
+                builder.append("case[$index] doc: ${uCase.doc}\n")
+            }
+        }
+
+        if (udtEnum.doc.isNotEmpty()) {
+            builder.append("doc : ${udtEnum.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
+     * Helper method to format and print a UDT error enum specification.
+     *
+     * Ported from Flutter SDK's _printUdtErrorEnum() helper method.
+     */
+    private fun printUdtErrorEnum(udtErrorEnum: SCSpecUDTErrorEnumV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("UDT Error Enum : ${udtErrorEnum.name}\n")
+
+        if (udtErrorEnum.lib.isNotEmpty()) {
+            builder.append("lib : ${udtErrorEnum.lib}\n")
+        }
+
+        udtErrorEnum.cases.forEachIndexed { index, uCase ->
+            builder.append("case[$index] name: ${uCase.name}\n")
+            builder.append("case[$index] value: ${uCase.value}\n")
+            if (uCase.doc.isNotEmpty()) {
+                builder.append("case[$index] doc: ${uCase.doc}\n")
+            }
+        }
+
+        if (udtErrorEnum.doc.isNotEmpty()) {
+            builder.append("doc : ${udtErrorEnum.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
+     * Helper method to format and print an event specification.
+     *
+     * Ported from Flutter SDK's _printEvent() helper method.
+     */
+    private fun printEvent(event: SCSpecEventV0Xdr): String {
+        val builder = StringBuilder()
+        builder.append("Event: ${event.name.value}\n")
+        builder.append("lib: ${event.lib}\n")
+
+        event.prefixTopics.forEachIndexed { index, prefixTopic ->
+            builder.append("prefixTopic[$index] name: ${prefixTopic.value}\n")
+        }
+
+        event.params.forEachIndexed { index, param ->
+            builder.append("param[$index] name: ${param.name}\n")
+            if (param.doc.isNotEmpty()) {
+                builder.append("param[$index] doc : ${param.doc}\n")
+            }
+            builder.append("param[$index] type: ${getSpecTypeInfo(param.type)}\n")
+
+            val locationStr = when (param.location) {
+                SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_DATA -> "data"
+                SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST -> "topic list"
+            }
+            builder.append("param[$index] location: $locationStr\n")
+        }
+
+        val dataFormatStr = when (event.dataFormat) {
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE -> "single value"
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_MAP -> "map"
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_VEC -> "vec"
+        }
+        builder.append("data format: $dataFormatStr\n")
+
+        if (event.doc.isNotEmpty()) {
+            builder.append("doc : ${event.doc}\n")
+        }
+
+        return builder.toString().trimEnd()
+    }
+
+    /**
      * Tests basic contract parsing functionality.
      *
      * This test validates:
@@ -52,7 +313,7 @@ class SorobanParserIntegrationTest {
      * 2. Extracting environment interface version
      * 3. Extracting meta entries (contract metadata)
      * 4. Extracting spec entries (functions, structs, unions, events)
-     * 5. Printing contract information using SorobanTestParser
+     * 5. Printing contract information using helper methods
      *
      * The test demonstrates complete contract parsing workflow and validates
      * that all major components can be extracted and displayed.
@@ -99,45 +360,42 @@ class SorobanParserIntegrationTest {
                         is SCSpecEntryXdr.FunctionV0 -> specEntry.value
                         else -> null
                     }
-                    function?.let { println(SorobanTestParser.printFunction(it)) }
+                    function?.let { println(printFunction(it)) }
                 }
                 SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_STRUCT_V0 -> {
                     val udtStruct = when (specEntry) {
                         is SCSpecEntryXdr.UdtStructV0 -> specEntry.value
                         else -> null
                     }
-                    udtStruct?.let { println(SorobanTestParser.printUdtStruct(it)) }
+                    udtStruct?.let { println(printUdtStruct(it)) }
                 }
                 SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_UNION_V0 -> {
                     val udtUnion = when (specEntry) {
                         is SCSpecEntryXdr.UdtUnionV0 -> specEntry.value
                         else -> null
                     }
-                    udtUnion?.let { println(SorobanTestParser.printUdtUnion(it)) }
+                    udtUnion?.let { println(printUdtUnion(it)) }
                 }
                 SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_ENUM_V0 -> {
                     val udtEnum = when (specEntry) {
                         is SCSpecEntryXdr.UdtEnumV0 -> specEntry.value
                         else -> null
                     }
-                    udtEnum?.let { println(SorobanTestParser.printUdtEnum(it)) }
+                    udtEnum?.let { println(printUdtEnum(it)) }
                 }
                 SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_ERROR_ENUM_V0 -> {
                     val udtErrorEnum = when (specEntry) {
                         is SCSpecEntryXdr.UdtErrorEnumV0 -> specEntry.value
                         else -> null
                     }
-                    udtErrorEnum?.let { println(SorobanTestParser.printUdtErrorEnum(it)) }
+                    udtErrorEnum?.let { println(printUdtErrorEnum(it)) }
                 }
                 SCSpecEntryKindXdr.SC_SPEC_ENTRY_EVENT_V0 -> {
                     val event = when (specEntry) {
                         is SCSpecEntryXdr.EventV0 -> specEntry.value
                         else -> null
                     }
-                    event?.let { println(SorobanTestParser.printEvent(it)) }
-                }
-                else -> {
-                    println("specEntry [$index] -> kind(${specEntry.discriminant.value}): unknown")
+                    event?.let { println(printEvent(it)) }
                 }
             }
             println("")
@@ -404,11 +662,6 @@ class SorobanParserIntegrationTest {
         val functions = contractSpec.funcs()
         assertEquals(13, functions.size, "ContractSpec funcs() should return exactly 13 functions")
 
-        // Validate that all returned items are SCSpecFunctionV0Xdr instances
-        functions.forEach { func ->
-            assertTrue(func is SCSpecFunctionV0Xdr, "Each function should be an instance of SCSpecFunctionV0Xdr")
-        }
-
         // Validate specific function names exist
         val functionNames = functions.map { it.name.value }
         assertTrue(functionNames.contains("__constructor"), "Functions should include __constructor")
@@ -429,11 +682,6 @@ class SorobanParserIntegrationTest {
         val structs = contractSpec.udtStructs()
         assertEquals(3, structs.size, "ContractSpec udtStructs() should return exactly 3 structs")
 
-        // Validate that all returned items are SCSpecUDTStructV0Xdr instances
-        structs.forEach { struct ->
-            assertTrue(struct is SCSpecUDTStructV0Xdr, "Each struct should be an instance of SCSpecUDTStructV0Xdr")
-        }
-
         // Validate specific struct names exist
         val structNames = structs.map { it.name }
         assertTrue(structNames.contains("AllowanceDataKey"), "Structs should include AllowanceDataKey")
@@ -451,10 +699,6 @@ class SorobanParserIntegrationTest {
         val unions = contractSpec.udtUnions()
         assertEquals(1, unions.size, "ContractSpec udtUnions() should return exactly 1 union")
 
-        // Validate that all returned items are SCSpecUDTUnionV0Xdr instances
-        unions.forEach { union ->
-            assertTrue(union is SCSpecUDTUnionV0Xdr, "Each union should be an instance of SCSpecUDTUnionV0Xdr")
-        }
 
         // Validate specific union names exist
         val unionNames = unions.map { it.name }
@@ -469,28 +713,13 @@ class SorobanParserIntegrationTest {
         val enums = contractSpec.udtEnums()
         assertEquals(0, enums.size, "ContractSpec udtEnums() should return 0 enums for this contract")
 
-        // Validate that all returned items are SCSpecUDTEnumV0Xdr instances (even if empty)
-        enums.forEach { enumItem ->
-            assertTrue(enumItem is SCSpecUDTEnumV0Xdr, "Each enum should be an instance of SCSpecUDTEnumV0Xdr")
-        }
-
         // Test udtErrorEnums() method - should return 0 error enums
         val errorEnums = contractSpec.udtErrorEnums()
         assertEquals(0, errorEnums.size, "ContractSpec udtErrorEnums() should return 0 error enums for this contract")
 
-        // Validate that all returned items are SCSpecUDTErrorEnumV0Xdr instances (even if empty)
-        errorEnums.forEach { errorEnum ->
-            assertTrue(errorEnum is SCSpecUDTErrorEnumV0Xdr, "Each error enum should be an instance of SCSpecUDTErrorEnumV0Xdr")
-        }
-
         // Test events() method - should return 8 events
         val events = contractSpec.events()
         assertEquals(8, events.size, "ContractSpec events() should return exactly 8 events")
-
-        // Validate that all returned items are SCSpecEventV0Xdr instances
-        events.forEach { event ->
-            assertTrue(event is SCSpecEventV0Xdr, "Each event should be an instance of SCSpecEventV0Xdr")
-        }
 
         // Validate specific event names exist
         val eventNames = events.map { it.name.value }
@@ -513,7 +742,6 @@ class SorobanParserIntegrationTest {
         // Validate that ContractSpec can find specific functions by name using getFunc()
         val balanceFunc = contractSpec.getFunc("balance")
         assertNotNull(balanceFunc, "ContractSpec getFunc() should find balance function")
-        assertTrue(balanceFunc is SCSpecFunctionV0Xdr, "getFunc() should return SCSpecFunctionV0Xdr instance")
         assertEquals("balance", balanceFunc.name.value, "Found function should have correct name")
         assertEquals(1, balanceFunc.inputs.size, "balance function should have 1 input parameter")
 
