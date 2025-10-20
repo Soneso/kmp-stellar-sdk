@@ -220,16 +220,16 @@ The SDK includes comprehensive integration tests that validate against a live St
 
 - **Location**: `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/ContractClientIntegrationTest.kt`
 - **Documentation**: See `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/INTEGRATION_TESTS_README.md` for detailed setup
-- **Status**: Integration tests are `@Ignore`d by default (require testnet account funding)
+- **Status**: Integration tests are NOT ignored and always run with testnet connectivity (accounts are automatically funded by Friendbot)
 - **Coverage**: ContractClient, AssembledTransaction, authorization, state restoration, error handling, polling, custom result parsing
-- **Run tests**: Remove `@Ignore` annotation, then run:
+- **Run tests**:
   ```bash
   ./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest"
   ```
 
 **Prerequisites**:
 - Testnet connectivity to `https://soroban-testnet.stellar.org:443`
-- Funded test account via Friendbot
+- Test accounts are automatically funded via Friendbot
 - Pre-deployed contract (contract ID provided in tests)
 
 **Duration**: 3-5 minutes for full suite (network latency dependent)
@@ -454,11 +454,19 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 ### Soroban Smart Contracts
 
 #### High-Level API
-- ✅ ContractClient: Simple contract interaction
+- ✅ ContractClient: Dual-mode contract interaction
+  - **Factory methods**: `fromNetwork()` loads spec, `withoutSpec()` for manual mode
+  - **Beginner API**: `invoke()` with Map<String, Any?> arguments and auto-execution
+  - **Power API**: `invokeWithXdr()` with List<SCValXdr> for manual control
+  - **Type conversion helpers**: `funcArgsToXdrSCValues()`, `nativeToXdrSCVal()`
+- ✅ Smart contract deployment:
+  - **One-step**: `deploy()` with Map-based constructor args
+  - **Two-step**: `install()` + `deployFromWasmHash()` for WASM reuse
 - ✅ AssembledTransaction: Full transaction lifecycle
 - ✅ Type-safe generic results with custom parsers
 - ✅ Automatic simulation and resource estimation
-- ✅ Read-only vs write call detection
+- ✅ Auto-execution: Read calls return results, write calls auto-sign and submit
+- ✅ Read-only vs write call detection via auth entries
 
 #### Authorization
 - ✅ Sign Soroban authorization entries (`Auth` class)

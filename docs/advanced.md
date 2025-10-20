@@ -852,15 +852,15 @@ class SorobanAuthorizationManager {
         contractClient: ContractClient,
         contractId: String,
         method: String,
-        parameters: List<ScVal>,
+        parameters: List<SCValXdr>,
         authorizers: List<Authorizer>
     ): AssembledTransaction<*> {
-        // Initial simulation
-        var assembled = contractClient.invoke(
-            contractAddress = contractId,
-            method = method,
+        // Initial simulation using advanced API for manual control
+        var assembled = contractClient.invokeWithXdr(
+            functionName = method,
             parameters = parameters,
-            sourceAccount = authorizers.first().accountId
+            source = authorizers.first().accountId,
+            signer = null
         )
 
         // Simulate to get auth requirements
@@ -2152,19 +2152,22 @@ class CustomContractClient(
      */
     class TokenContractClient(
         private val contractId: String,
-        private val client: ContractClient
+        private val rpcUrl: String,
+        private val network: Network
     ) {
         // Cache metadata
         private var cachedMetadata: TokenMetadata? = null
         private var metadataExpiry: Instant? = null
+        private val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
 
         suspend fun getBalance(account: String): BigDecimal {
-            val result = client.invoke(
-                contractAddress = contractId,
-                method = "balance",
-                parameters = listOf(Address.fromString(account).toScVal()),
-                resultParser = { ScInt.fromScVal(it).value }
-            ).simulateAndParse()
+            val result = client.invoke<Long>(
+                functionName = "balance",
+                arguments = mapOf("account" to account),
+                source = account,
+                signer = null,
+                parseResultXdrFn = { ScInt.fromScVal(it).value }
+            )
 
             val metadata = getCachedMetadata()
             return BigDecimal(result).movePointLeft(metadata.decimals)
@@ -2179,34 +2182,48 @@ class CustomContractClient(
             val metadata = getCachedMetadata()
             val rawAmount = amount.movePointRight(metadata.decimals).toLong()
 
-            val params = mutableListOf(
-                Address.fromString(from.getAccountId()).toScVal(),
-                Address.fromString(to).toScVal(),
-                ScInt(rawAmount).toScVal()
-            )
-
-            memo?.let {
-                params.add(ScString(it).toScVal())
+            val arguments = if (memo != null) {
+                mapOf(
+                    "from" to from.getAccountId(),
+                    "to" to to,
+                    "amount" to rawAmount,
+                    "memo" to memo
+                )
+            } else {
+                mapOf(
+                    "from" to from.getAccountId(),
+                    "to" to to,
+                    "amount" to rawAmount
+                )
             }
 
-            val assembled = client.invoke(
-                contractAddress = contractId,
-                method = if (memo != null) "transfer_with_memo" else "transfer",
-                parameters = params,
-                sourceAccount = from.getAccountId()
+            // Using new invoke API with native types
+            client.invoke<Unit>(
+                functionName = if (memo != null) "transfer_with_memo" else "transfer",
+                arguments = arguments,
+                source = from.getAccountId(),
+                signer = from
             )
 
-            assembled.simulate()
-            assembled.sign(from)
-            val result = assembled.submit()
+            // For manual control over the transaction lifecycle, use invokeWithXdr
+            val assembled = client.invokeWithXdr(
+                functionName = "transfer",
+                parameters = listOf(
+                    Scv.toAddress(from.getAccountId()),
+                    Scv.toAddress(to),
+                    Scv.toInt128(rawAmount)
+                ),
+                source = from.getAccountId(),
+                signer = from
+            )
 
             return TransferResult(
-                transactionHash = result.hash,
+                transactionHash = assembled.transaction?.hash()?.toHexString() ?: "",
                 from = from.getAccountId(),
                 to = to,
                 amount = amount,
-                fee = assembled.transaction.fee,
-                ledger = result.ledger
+                fee = assembled.transaction?.fee ?: 0,
+                ledger = assembled.submitResult?.ledger ?: 0
             )
         }
 
@@ -2226,19 +2243,35 @@ class CustomContractClient(
         }
 
         private suspend fun fetchMetadata(): TokenMetadata {
-            val results = client.invokeMultiple(
-                contractAddress = contractId,
-                calls = listOf(
-                    "name" to emptyList(),
-                    "symbol" to emptyList(),
-                    "decimals" to emptyList()
-                )
+            // Fetch metadata using individual calls
+            val name = client.invoke<String>(
+                functionName = "name",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null,
+                parseResultXdrFn = { Scv.fromString(it) }
+            )
+
+            val symbol = client.invoke<String>(
+                functionName = "symbol",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null,
+                parseResultXdrFn = { Scv.fromString(it) }
+            )
+
+            val decimals = client.invoke<Int>(
+                functionName = "decimals",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null,
+                parseResultXdrFn = { Scv.fromU32(it).toInt() }
             )
 
             return TokenMetadata(
-                name = ScString.fromScVal(results[0]).value,
-                symbol = ScString.fromScVal(results[1]).value,
-                decimals = ScU32.fromScVal(results[2]).value
+                name = name,
+                symbol = symbol,
+                decimals = decimals
             )
         }
     }
@@ -2248,20 +2281,35 @@ class CustomContractClient(
      */
     suspend fun batchInvoke(
         calls: List<ContractCall>
-    ): List<Result<ScVal>> = coroutineScope {
+    ): List<Result<Any?>> = coroutineScope {
         calls.map { call ->
             async {
                 runCatching {
-                    client.invoke(
-                        contractAddress = call.contractId,
-                        method = call.method,
-                        parameters = call.parameters,
-                        sourceAccount = call.sourceAccount
-                    ).simulateAndParse()
+                    val client = ContractClient.fromNetwork(
+                        contractId = call.contractId,
+                        rpcUrl = sorobanServer.serverUrl,
+                        network = network
+                    )
+
+                    client.invoke<Any>(
+                        functionName = call.method,
+                        arguments = call.arguments,
+                        source = call.sourceAccount,
+                        signer = null,
+                        parseResultXdrFn = call.parseResultFn
+                    )
                 }
             }
         }.awaitAll()
     }
+
+    data class ContractCall(
+        val contractId: String,
+        val method: String,
+        val arguments: Map<String, Any?>,
+        val sourceAccount: String,
+        val parseResultFn: ((SCValXdr) -> Any)?
+    )
 }
 ```
 

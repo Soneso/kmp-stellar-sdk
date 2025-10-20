@@ -2,156 +2,305 @@ package com.soneso.stellar.sdk.contract
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.xdr.*
+import kotlin.random.Random
 
 /**
  * A client to interact with Soroban smart contracts.
  *
- * This client wraps [SorobanServer] and [TransactionBuilder] to make it easier
- * to interact with Soroban smart contracts. For more fine-grained control, use
- * them directly.
- *
- * ## Basic Usage
+ * ## Beginner-Friendly Usage (Recommended)
  *
  * ```kotlin
- * val client = ContractClient(
- *     contractId = "CABC...",
- *     rpcUrl = "https://soroban-testnet.stellar.org:443",
- *     network = Network.TESTNET
- * )
+ * // Load spec from network
+ * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
  *
- * // Read-only call (no signing needed)
+ * // Invoke with native types - simple!
  * val balance = client.invoke<Long>(
  *     functionName = "balance",
- *     parameters = listOf(Scv.toAddress(accountId)),
- *     source = accountId,
+ *     arguments = mapOf("account" to "GABC..."),
+ *     source = sourceAccount,
  *     signer = null,
  *     parseResultXdrFn = { Scv.fromInt128(it).toLong() }
- * ).result()
+ * )
+ * ```
  *
- * // Write call (requires signing)
- * val result = client.invoke<Unit>(
- *     functionName = "transfer",
- *     parameters = listOf(
- *         Scv.toAddress(from),
- *         Scv.toAddress(to),
- *         Scv.toInt128(amount)
- *     ),
- *     source = accountId,
- *     signer = keypair,
- *     parseResultXdrFn = null // Void return
- * ).signAndSubmit(keypair)
+ * ## Power User Options
  *
- * // Close when done
- * client.close()
+ * ```kotlin
+ * // Manual type conversion
+ * val args = client.funcArgsToXdrSCValues("transfer", mapOf(...))
+ * val assembled = client.invokeWithXdr("transfer", args, source, keypair)
+ *
+ * // Full manual control
+ * assembled.simulate()
+ * val result = assembled.signAndSubmit(keypair)
  * ```
  *
  * @property contractId The contract ID to interact with (C... address)
+ * @property rpcUrl The RPC server URL
  * @property network The network to interact with
  * @property server The SorobanServer instance for RPC calls
  */
-class ContractClient(
+class ContractClient private constructor(
     val contractId: String,
-    rpcUrl: String,
-    val network: Network
+    val rpcUrl: String,
+    val network: Network,
+    private val contractSpec: ContractSpec?
 ) {
     val server: SorobanServer = SorobanServer(rpcUrl)
 
     /**
-     * Build an [AssembledTransaction] to invoke a function on the contract.
+     * Get the contract specification (if loaded).
+     */
+    fun getContractSpec(): ContractSpec? = contractSpec
+
+    /**
+     * Get available method names from contract spec.
+     * Returns empty set if spec not loaded.
+     */
+    fun getMethodNames(): Set<String> {
+        return contractSpec?.funcs()?.map { it.name.value }?.toSet() ?: emptySet()
+    }
+
+    /**
+     * Invoke a contract function with automatic type conversion (RECOMMENDED).
      *
-     * This is a convenience method with default timeout values.
+     * This is the **primary method** for contract interaction. It provides:
+     * - Automatic type conversion from native Kotlin types to XDR
+     * - Method validation against contract spec
+     * - Auto read/write detection - reads return immediately, writes are signed/submitted
+     * - Direct result return - no manual .result() or .signAndSubmit() needed
      *
-     * @param functionName The name of the function to invoke
-     * @param parameters The parameters to pass to the function (as SCValXdr)
-     * @param source The source account for the transaction (G... or M... address)
-     * @param signer The KeyPair to sign with (or null for read-only calls)
-     * @param parseResultXdrFn Function to parse the result XDR (or null for raw SCValXdr)
-     * @param baseFee The base fee for the transaction (default 100)
-     * @return An AssembledTransaction ready for signing/submitting
+     * Requires contract spec (use [fromNetwork] or [deploy]).
+     *
+     * @param functionName The contract function to invoke
+     * @param arguments Function arguments as Map<String, Any> (native Kotlin types)
+     * @param source The source account (G... or M... address)
+     * @param signer KeyPair for signing (null for read-only calls)
+     * @param parseResultXdrFn Optional function to parse result XDR
+     * @param options Invocation options
+     * @return The parsed result value directly
      */
     suspend fun <T> invoke(
         functionName: String,
-        parameters: List<SCValXdr>,
+        arguments: Map<String, Any?>,
         source: String,
         signer: KeyPair?,
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
-        baseFee: Int = 100
-    ): AssembledTransaction<T> {
-        return invoke(
+        options: ClientOptions = ClientOptions(
+            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
+            contractId = contractId,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+    ): T {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "invoke() requires ContractSpec for automatic type conversion. " +
+                "Use ContractClient.fromNetwork() to load spec automatically."
+            )
+
+        // Validate method exists
+        val func = spec.getFunc(functionName)
+            ?: throw IllegalArgumentException(
+                "Method '$functionName' not found in contract spec. " +
+                "Available methods: ${spec.funcs().map { it.name.value }.joinToString(", ")}"
+            )
+
+        // Convert arguments using ContractSpec
+        val parameters = try {
+            spec.funcArgsToXdrSCValues(functionName, arguments)
+        } catch (e: Exception) {
+            throw IllegalArgumentException(
+                "Failed to convert arguments for '$functionName': ${e.message}",
+                e
+            )
+        }
+
+        // Build and simulate transaction
+        val assembled = buildTransaction(
             functionName = functionName,
             parameters = parameters,
             source = source,
             signer = signer,
             parseResultXdrFn = parseResultXdrFn,
-            baseFee = baseFee,
-            transactionTimeout = 300,
-            submitTimeout = 30,
-            simulate = true,
-            restore = true
+            options = options
         )
+
+        if (options.simulate) {
+            assembled.simulate(restore = options.restore)
+        }
+
+        // Auto-detect read/write and execute
+        return if (options.autoSubmit) {
+            if (assembled.isReadCall()) {
+                assembled.result()
+            } else {
+                if (signer == null) {
+                    throw IllegalArgumentException(
+                        "Signer required for write call to '$functionName'"
+                    )
+                }
+                assembled.signAndSubmit(signer, force = false)
+            }
+        } else {
+            assembled.result()
+        }
     }
 
     /**
-     * Build an [AssembledTransaction] to invoke a function on the contract.
+     * Convert function arguments from native Kotlin types to XDR.
      *
-     * Full control version with all configuration options.
+     * This is a **power-user helper** that exposes the type conversion logic.
+     * Use this when you want control over conversion timing or need to inspect
+     * the XDR before invoking.
      *
-     * @param functionName The name of the function to invoke
-     * @param parameters The parameters to pass to the function (as SCValXdr)
-     * @param source The source account for the transaction (G... or M... address)
-     * @param signer The KeyPair to sign with (or null for read-only calls)
-     * @param parseResultXdrFn Function to parse the result XDR (or null for raw SCValXdr)
-     * @param baseFee The base fee for the transaction (default 100)
-     * @param transactionTimeout Transaction validity timeout in seconds (default 300)
-     * @param submitTimeout Polling timeout when submitting in seconds (default 30)
-     * @param simulate Whether to simulate the transaction (default true)
-     * @param restore Whether to auto-restore contract state if needed (default true)
-     * @return An AssembledTransaction ready for signing/submitting
+     * Requires contract spec (use [fromNetwork]).
+     *
+     * @param functionName The function name
+     * @param arguments Map of argument names to native Kotlin values
+     * @return List of SCValXdr ready to pass to invokeWithXdr
+     * @throws IllegalStateException if contract spec not loaded
+     *
+     * @sample
+     * ```kotlin
+     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     *
+     * // Manual conversion for inspection/reuse
+     * val args = client.funcArgsToXdrSCValues("transfer", mapOf(
+     *     "from" to "GABC...",
+     *     "to" to "GXYZ...",
+     *     "amount" to 1000
+     * ))
+     *
+     * // Inspect XDR
+     * println("Converted args: $args")
+     * ```
      */
-    suspend fun <T> invoke(
+    fun funcArgsToXdrSCValues(
+        functionName: String,
+        arguments: Map<String, Any?>
+    ): List<SCValXdr> {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "funcArgsToXdrSCValues requires ContractSpec. " +
+                "Use ContractClient.fromNetwork()."
+            )
+
+        return spec.funcArgsToXdrSCValues(functionName, arguments)
+    }
+
+    /**
+     * Convert a single native value to XDR based on type definition.
+     *
+     * This is a **power-user helper** for manual type conversion.
+     *
+     * @param value The native Kotlin value
+     * @param typeDef The XDR type definition
+     * @return Converted SCValXdr
+     */
+    fun nativeToXdrSCVal(value: Any?, typeDef: SCSpecTypeDefXdr): SCValXdr {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "nativeToXdrSCVal requires ContractSpec. " +
+                "Use ContractClient.fromNetwork()."
+            )
+
+        return spec.nativeToXdrSCVal(value, typeDef)
+    }
+
+    /**
+     * Invoke a contract function with manual XDR construction (ADVANCED).
+     *
+     * This is the **advanced method** for when you need full control over
+     * XDR construction and transaction execution.
+     *
+     * Returns an [AssembledTransaction] that you control manually.
+     * Most developers should use [invoke] instead.
+     *
+     * @param functionName The contract function to invoke
+     * @param parameters Function parameters as XDR (List<SCValXdr>)
+     * @param source The source account
+     * @param signer KeyPair for signing (can be null)
+     * @param parseResultXdrFn Optional result parser
+     * @param options Invocation options
+     * @return AssembledTransaction for manual control
+     */
+    suspend fun <T> invokeWithXdr(
+        functionName: String,
+        parameters: List<SCValXdr>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)? = null,
+        options: ClientOptions = ClientOptions(
+            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
+            contractId = contractId,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+    ): AssembledTransaction<T> {
+        // Validate method name if spec available
+        if (contractSpec != null) {
+            val func = contractSpec.getFunc(functionName)
+            if (func == null) {
+                val available = contractSpec.funcs().map { it.name.value }
+                throw IllegalArgumentException(
+                    "Method '$functionName' not found in contract spec. " +
+                    "Available methods: ${available.joinToString(", ")}"
+                )
+            }
+        }
+
+        val assembled = buildTransaction(
+            functionName = functionName,
+            parameters = parameters,
+            source = source,
+            signer = signer,
+            parseResultXdrFn = parseResultXdrFn,
+            options = options
+        )
+
+        if (options.simulate) {
+            assembled.simulate(restore = options.restore)
+        }
+
+        return assembled
+    }
+
+    /**
+     * Internal helper to build transaction.
+     */
+    private suspend fun <T> buildTransaction(
         functionName: String,
         parameters: List<SCValXdr>,
         source: String,
         signer: KeyPair?,
         parseResultXdrFn: ((SCValXdr) -> T)?,
-        baseFee: Int = 100,
-        transactionTimeout: Long = 300,
-        submitTimeout: Int = 30,
-        simulate: Boolean = true,
-        restore: Boolean = true
+        options: ClientOptions
     ): AssembledTransaction<T> {
-        // Build InvokeHostFunctionOperation
         val operation = InvokeHostFunctionOperation.invokeContractFunction(
             contractAddress = contractId,
             functionName = functionName,
             parameters = parameters
         )
 
-        // Create transaction builder with placeholder account (sequence will be updated in simulate)
+        val sourceAccount = server.getAccount(source)
         val builder = TransactionBuilder(
-            sourceAccount = Account(source, 0L),
+            sourceAccount = sourceAccount,
             network = network
         )
             .addOperation(operation)
-            .setTimeout(transactionTimeout)
-            .setBaseFee(baseFee.toLong())
+            .setTimeout(options.transactionTimeout)
+            .setBaseFee(options.baseFee.toLong())
 
-        // Create assembled transaction
-        val assembled = AssembledTransaction(
+        return AssembledTransaction(
             server = server,
-            submitTimeout = submitTimeout,
+            submitTimeout = options.submitTimeout,
             transactionSigner = signer,
             parseResultXdrFn = parseResultXdrFn,
             transactionBuilder = builder
         )
-
-        // Simulate if requested
-        if (simulate) {
-            assembled.simulate(restore)
-        }
-
-        return assembled
     }
 
     /**
@@ -159,5 +308,447 @@ class ContractClient(
      */
     fun close() {
         server.close()
+    }
+
+    companion object {
+        /**
+         * Create a ContractClient with contract spec loaded from the network (RECOMMENDED).
+         *
+         * This is the **primary way** to create a ContractClient. It loads the
+         * contract specification from the network, enabling:
+         * - Automatic type conversion (native Kotlin types → XDR)
+         * - Method name validation
+         * - Contract introspection
+         *
+         * If the contract spec cannot be loaded, returns a client without spec
+         * (falls back to manual XDR mode).
+         *
+         * @param contractId The contract ID (C... address)
+         * @param rpcUrl The RPC server URL
+         * @param network The network (TESTNET/PUBLIC)
+         * @return ContractClient with contract spec if available
+         */
+        suspend fun fromNetwork(
+            contractId: String,
+            rpcUrl: String,
+            network: Network
+        ): ContractClient {
+            val server = SorobanServer(rpcUrl)
+
+            val contractSpec = try {
+                val contractInfo = server.loadContractInfoForContractId(contractId)
+                if (contractInfo?.specEntries?.isNotEmpty() == true) {
+                    ContractSpec(contractInfo.specEntries)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+
+            return ContractClient(contractId, rpcUrl, network, contractSpec)
+        }
+
+        /**
+         * Create a ContractClient without loading contract spec (ADVANCED).
+         *
+         * Use this for advanced scenarios where you want full manual control.
+         * Most developers should use [fromNetwork] instead.
+         *
+         * @param contractId The contract ID (C... address)
+         * @param rpcUrl The RPC server URL
+         * @param network The network (TESTNET/PUBLIC)
+         * @return ContractClient without contract spec
+         */
+        fun withoutSpec(
+            contractId: String,
+            rpcUrl: String,
+            network: Network
+        ): ContractClient {
+            return ContractClient(contractId, rpcUrl, network, null)
+        }
+
+        /**
+         * Deploy a contract in one step (RECOMMENDED).
+         *
+         * This is the **primary deployment method** that handles everything:
+         * 1. Upload WASM (with duplicate detection)
+         * 2. Deploy contract with optional constructor
+         * 3. Load contract spec
+         * 4. Return ready-to-use client
+         *
+         * For advanced scenarios requiring WASM reuse, see [install] and [deployFromWasmHash].
+         *
+         * @param wasmBytes The contract WASM code
+         * @param constructorArgs Constructor arguments as native Kotlin types
+         * @param source Source account for transactions
+         * @param signer KeyPair for signing
+         * @param network Network to deploy to
+         * @param rpcUrl RPC server URL
+         * @param salt Salt for contract ID generation (default: random)
+         * @param loadSpec Whether to load spec after deployment (default: true)
+         * @return ContractClient for the deployed contract
+         *
+         * @sample
+         * ```kotlin
+         * val client = ContractClient.deploy(
+         *     wasmBytes = File("token.wasm").readBytes(),
+         *     constructorArgs = mapOf(
+         *         "name" to "MyToken",
+         *         "symbol" to "MTK",
+         *         "decimals" to 7
+         *     ),
+         *     source = sourceAccount,
+         *     signer = keypair,
+         *     network = Network.TESTNET,
+         *     rpcUrl = "https://soroban-testnet.stellar.org:443"
+         * )
+         * // Ready to use!
+         * val balance = client.invoke("balance", mapOf("account" to account), source, null)
+         * ```
+         */
+        suspend fun deploy(
+            wasmBytes: ByteArray,
+            constructorArgs: Map<String, Any?> = emptyMap(),
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray = Random.Default.nextBytes(32),
+            loadSpec: Boolean = true
+        ): ContractClient {
+            // Step 1: Upload WASM
+            val wasmHash = installInternal(
+                wasmBytes = wasmBytes,
+                source = source,
+                signer = signer,
+                network = network,
+                rpcUrl = rpcUrl
+            )
+
+            // Step 2: Deploy from WASM hash
+            return deployFromWasmHashInternal(
+                wasmHash = wasmHash,
+                constructorArgs = constructorArgs,
+                source = source,
+                signer = signer,
+                network = network,
+                rpcUrl = rpcUrl,
+                salt = salt,
+                loadSpec = loadSpec
+            )
+        }
+
+        /**
+         * Upload contract WASM code (ADVANCED - Step 1 of 2).
+         *
+         * This is a **power-user method** for two-step deployment when you need to:
+         * - Reuse the same WASM for multiple contract instances
+         * - Inspect the WASM hash before deployment
+         * - Separate upload and deployment transactions
+         *
+         * Most developers should use the one-step [deploy] method instead.
+         *
+         * Returns the WASM hash which can be used with [deployFromWasmHash].
+         * Includes duplicate detection - if WASM already installed, returns existing hash.
+         *
+         * @param wasmBytes The compiled contract WASM code
+         * @param source Source account for the transaction
+         * @param signer KeyPair for signing
+         * @param network Network to upload to
+         * @param rpcUrl RPC server URL
+         * @return WASM hash as ByteArray
+         *
+         * @sample
+         * ```kotlin
+         * // Step 1: Install WASM once
+         * val wasmHash = ContractClient.install(
+         *     wasmBytes = File("token.wasm").readBytes(),
+         *     source = sourceAccount,
+         *     signer = keypair,
+         *     network = Network.TESTNET,
+         *     rpcUrl = "https://soroban-testnet.stellar.org:443"
+         * )
+         *
+         * // Step 2: Deploy multiple instances from same WASM
+         * val client1 = ContractClient.deployFromWasmHash(wasmHash, ...)
+         * val client2 = ContractClient.deployFromWasmHash(wasmHash, ...)
+         * ```
+         */
+        suspend fun install(
+            wasmBytes: ByteArray,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String
+        ): ByteArray {
+            return installInternal(wasmBytes, source, signer, network, rpcUrl)
+        }
+
+        /**
+         * Deploy a contract from an existing WASM hash (ADVANCED - Step 2 of 2).
+         *
+         * This is a **power-user method** for deploying contracts from a previously
+         * uploaded WASM. Use this to deploy multiple contract instances from the
+         * same WASM code (saves fees and time).
+         *
+         * Most developers should use the one-step [deploy] method instead.
+         *
+         * @param wasmHash WASM hash from [install]
+         * @param constructorArgs Constructor arguments as List<SCValXdr> (XDR)
+         * @param source Source account
+         * @param signer KeyPair for signing
+         * @param network Network to deploy to
+         * @param rpcUrl RPC server URL
+         * @param salt Salt for contract ID generation (default: random)
+         * @param loadSpec Whether to load spec after deployment (default: true)
+         * @return ContractClient for the deployed contract
+         *
+         * @sample
+         * ```kotlin
+         * // After installing WASM...
+         * val client = ContractClient.deployFromWasmHash(
+         *     wasmHash = previouslyInstalledWasmHash,
+         *     constructorArgs = listOf(
+         *         Scv.toString("MyToken"),
+         *         Scv.toString("MTK"),
+         *         Scv.toInt32(7)
+         *     ),
+         *     source = sourceAccount,
+         *     signer = keypair,
+         *     network = Network.TESTNET,
+         *     rpcUrl = "https://soroban-testnet.stellar.org:443"
+         * )
+         * ```
+         */
+        suspend fun deployFromWasmHash(
+            wasmHash: ByteArray,
+            constructorArgs: List<SCValXdr> = emptyList(),
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray = Random.Default.nextBytes(32),
+            loadSpec: Boolean = true
+        ): ContractClient {
+            // Deploy contract
+            val contractId = deployContractInternal(
+                wasmHash = wasmHash,
+                constructorParams = constructorArgs,
+                source = source,
+                signer = signer,
+                network = network,
+                rpcUrl = rpcUrl,
+                salt = salt
+            )
+
+            // Return client with or without spec
+            return if (loadSpec) {
+                fromNetwork(contractId, rpcUrl, network)
+            } else {
+                ContractClient(contractId, rpcUrl, network, null)
+            }
+        }
+
+        /**
+         * Internal helper to install WASM code.
+         */
+        private suspend fun installInternal(
+            wasmBytes: ByteArray,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String
+        ): ByteArray {
+            val server = SorobanServer(rpcUrl)
+            val account = server.getAccount(source)
+
+            val uploadFunction = HostFunctionXdr.Wasm(wasmBytes)
+            val operation = InvokeHostFunctionOperation(hostFunction = uploadFunction)
+            val transaction = TransactionBuilder(
+                sourceAccount = account,
+                network = network
+            )
+                .addOperation(operation)
+                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+                .build()
+
+            val simulateResponse = server.simulateTransaction(transaction)
+            if (simulateResponse.error != null) {
+                throw IllegalStateException("WASM upload simulation failed: ${simulateResponse.error}")
+            }
+
+            val preparedTransaction = server.prepareTransaction(transaction, simulateResponse)
+            preparedTransaction.sign(signer)
+
+            val sendResponse = server.sendTransaction(preparedTransaction)
+            if (sendResponse.hash == null) {
+                throw IllegalStateException("Failed to send WASM upload transaction")
+            }
+
+            val rpcResponse = server.pollTransaction(
+                hash = sendResponse.hash,
+                maxAttempts = 60,
+                sleepStrategy = { 3000L }
+            )
+
+            if (rpcResponse.status != GetTransactionStatus.SUCCESS) {
+                throw IllegalStateException("WASM upload transaction failed with status: ${rpcResponse.status}")
+            }
+
+            val wasmId = rpcResponse.getWasmId()
+                ?: throw IllegalStateException("Failed to extract WASM ID from transaction response")
+
+            return extractWasmHashFromResponse(wasmId)
+        }
+
+        /**
+         * Internal helper to deploy from WASM hash with Map arguments.
+         */
+        private suspend fun deployFromWasmHashInternal(
+            wasmHash: ByteArray,
+            constructorArgs: Map<String, Any?>,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray,
+            loadSpec: Boolean
+        ): ContractClient {
+            // First load the spec from WASM to convert constructor args
+            val server = SorobanServer(rpcUrl)
+            val wasmId = wasmHash.joinToString("") { "%02x".format(it) }
+
+            val constructorXdr = if (constructorArgs.isNotEmpty()) {
+                val contractInfo = server.loadContractInfoForWasmId(wasmId)
+                if (contractInfo?.specEntries?.isNotEmpty() == true) {
+                    val spec = ContractSpec(contractInfo.specEntries)
+                    // Look for constructor function (usually named "__constructor")
+                    val constructorFunc = spec.getFunc("__constructor")
+                    if (constructorFunc != null) {
+                        spec.funcArgsToXdrSCValues("__constructor", constructorArgs)
+                    } else {
+                        // If no constructor function, assume direct parameter mapping
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
+            // Deploy contract
+            val contractId = deployContractInternal(
+                wasmHash = wasmHash,
+                constructorParams = constructorXdr,
+                source = source,
+                signer = signer,
+                network = network,
+                rpcUrl = rpcUrl,
+                salt = salt
+            )
+
+            // Return client with or without spec
+            return if (loadSpec) {
+                fromNetwork(contractId, rpcUrl, network)
+            } else {
+                ContractClient(contractId, rpcUrl, network, null)
+            }
+        }
+
+        /**
+         * Internal helper to deploy contract from WASM hash.
+         */
+        private suspend fun deployContractInternal(
+            wasmHash: ByteArray,
+            constructorParams: List<SCValXdr>,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray
+        ): String {
+            val server = SorobanServer(rpcUrl)
+            val account = server.getAccount(source)
+
+            val addressObj = Address(source)
+            val scAddress = addressObj.toSCAddress()
+            val saltXdr = Uint256Xdr(salt)
+
+            val preimage = ContractIDPreimageXdr.FromAddress(
+                ContractIDPreimageFromAddressXdr(address = scAddress, salt = saltXdr)
+            )
+
+            val wasmHashXdr = HashXdr(wasmHash)
+            val executable = ContractExecutableXdr.WasmHash(wasmHashXdr)
+
+            val operation: InvokeHostFunctionOperation
+            val transaction: Transaction
+
+            if (constructorParams.isNotEmpty()) {
+                // Use CreateContractV2 for contracts with constructors
+                val createContractArgs = CreateContractArgsV2Xdr(
+                    contractIdPreimage = preimage,
+                    executable = executable,
+                    constructorArgs = constructorParams
+                )
+
+                val createFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
+                operation = InvokeHostFunctionOperation(hostFunction = createFunction)
+            } else {
+                // Use CreateContract for contracts without constructors
+                val createContractArgs = CreateContractArgsXdr(
+                    contractIdPreimage = preimage,
+                    executable = executable
+                )
+
+                val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
+                operation = InvokeHostFunctionOperation(hostFunction = createFunction)
+            }
+
+            transaction = TransactionBuilder(
+                sourceAccount = account,
+                network = network
+            )
+                .addOperation(operation)
+                .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+                .build()
+
+            val simulateResponse = server.simulateTransaction(transaction)
+            if (simulateResponse.error != null) {
+                throw IllegalStateException("Contract deployment simulation failed: ${simulateResponse.error}")
+            }
+
+            val preparedTransaction = server.prepareTransaction(transaction, simulateResponse)
+            preparedTransaction.sign(signer)
+
+            val sendResponse = server.sendTransaction(preparedTransaction)
+            if (sendResponse.hash == null) {
+                throw IllegalStateException("Failed to send contract deployment transaction")
+            }
+
+            val rpcResponse = server.pollTransaction(
+                hash = sendResponse.hash,
+                maxAttempts = 60,
+                sleepStrategy = { 3000L }
+            )
+
+            if (rpcResponse.status != GetTransactionStatus.SUCCESS) {
+                throw IllegalStateException("Contract deployment transaction failed with status: ${rpcResponse.status}")
+            }
+
+            return rpcResponse.getCreatedContractId()
+                ?: throw IllegalStateException("Failed to extract contract ID from transaction response")
+        }
+
+        /**
+         * Extract WASM hash bytes from hex string response.
+         */
+        private fun extractWasmHashFromResponse(wasmId: String): ByteArray {
+            return wasmId.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        }
     }
 }

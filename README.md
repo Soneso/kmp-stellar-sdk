@@ -75,11 +75,20 @@ This SDK uses production-ready, audited cryptographic libraries on all platforms
 - SEP-29 account memo validation
 
 #### Soroban Smart Contracts
-- High-level ContractClient API
+- High-level ContractClient API with dual-mode design:
+  - **Beginner-friendly**: Map-based invoke() with native Kotlin types
+  - **Power-user**: XDR-based invokeWithXdr() for full control
+- Factory methods for client creation:
+  - `fromNetwork()`: Loads contract spec for automatic type conversion
+  - `withoutSpec()`: Manual XDR mode for advanced users
+- Smart contract deployment:
+  - `deploy()`: One-step WASM upload and deployment with constructor args
+  - `install()` + `deployFromWasmHash()`: Two-step for WASM reuse
 - AssembledTransaction for full transaction lifecycle
 - Type-safe generic results with custom parsers
 - Automatic simulation and resource estimation
-- Read-only vs write call detection
+- Auto-execution: Read calls return results, write calls auto-sign and submit
+- Read-only vs write call detection via auth entries
 - Authorization handling (auto-auth and custom auth)
 - Automatic state restoration when needed
 - Transaction polling with exponential backoff
@@ -252,24 +261,144 @@ import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun callContract() {
-    val client = ContractClient(
+    // Load contract spec from network for automatic type conversion
+    val client = ContractClient.fromNetwork(
         contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
         rpcUrl = "https://soroban-testnet.stellar.org:443",
         network = Network.TESTNET
     )
 
-    // Read-only call
+    // Read-only call with simplified Map-based API
     val count = client.invoke<Long>(
         functionName = "get_count",
-        parameters = emptyList(),
+        arguments = emptyMap(),  // Native Kotlin types
         source = accountId,
-        signer = null,
+        signer = null,  // No signer needed for read calls
         parseResultXdrFn = { Scv.fromUInt32(it).toLong() }
-    ).result()
+    )
+    // Automatically executes and returns result directly
 
     println("Current count: $count")
 
     client.close()
+}
+
+// Example with arguments - token balance query
+suspend fun getTokenBalance() {
+    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
+
+    val balance = client.invoke<Long>(
+        functionName = "balance",
+        arguments = mapOf("account" to accountAddress),  // Simple Map with native types
+        source = sourceAccount,
+        signer = null,
+        parseResultXdrFn = { Scv.fromInt128(it).toLong() }
+    )
+
+    println("Balance: $balance")
+}
+
+// Example write operation - auto signs and submits
+suspend fun transferTokens() {
+    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
+
+    client.invoke<Unit>(
+        functionName = "transfer",
+        arguments = mapOf(
+            "from" to fromAddress,
+            "to" to toAddress,
+            "amount" to 1000
+        ),
+        source = sourceAccount,
+        signer = keypair,  // Required for write operations
+        parseResultXdrFn = null
+    )
+    // Automatically signs, submits, and polls for completion
+}
+
+// Deploy a new smart contract
+suspend fun deployContract() {
+    val wasmBytes = File("token.wasm").readBytes()
+
+    // One-step deployment with constructor arguments
+    val client = ContractClient.deploy(
+        wasmBytes = wasmBytes,
+        constructorArgs = mapOf(
+            "admin" to adminAddress,
+            "name" to "MyToken",
+            "symbol" to "MTK",
+            "decimals" to 7
+        ),
+        source = sourceAccount,
+        signer = keypair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org:443"
+    )
+
+    println("Contract deployed at: ${client.contractId}")
+    // Client is ready to use with loaded spec
+}
+
+// Advanced: Deploy multiple contracts from same WASM
+suspend fun deployMultipleContracts() {
+    val wasmBytes = File("token.wasm").readBytes()
+
+    // Step 1: Install WASM once
+    val wasmHash = ContractClient.install(
+        wasmBytes = wasmBytes,
+        source = sourceAccount,
+        signer = keypair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org:443"
+    )
+
+    // Step 2: Deploy multiple instances (saves fees)
+    val token1 = ContractClient.deployFromWasmHash(
+        wasmHash = wasmHash,
+        constructorArgs = listOf(
+            Scv.toAddress(adminAddress),
+            Scv.toString("Token1"),
+            Scv.toString("TK1")
+        ),
+        source = sourceAccount,
+        signer = keypair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org:443"
+    )
+
+    val token2 = ContractClient.deployFromWasmHash(
+        wasmHash = wasmHash,
+        constructorArgs = listOf(
+            Scv.toAddress(adminAddress),
+            Scv.toString("Token2"),
+            Scv.toString("TK2")
+        ),
+        source = sourceAccount,
+        signer = keypair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org:443"
+    )
+}
+
+// Power user: Manual XDR control
+suspend fun advancedContractCall() {
+    val client = ContractClient.withoutSpec(contractId, rpcUrl, Network.TESTNET)
+
+    // Build XDR manually
+    val assembled = client.invokeWithXdr(
+        functionName = "transfer",
+        parameters = listOf(
+            Scv.toAddress(fromAddress),
+            Scv.toAddress(toAddress),
+            Scv.toInt128(1000)
+        ),
+        source = sourceAccount,
+        signer = keypair
+    )
+
+    // Manual lifecycle control
+    assembled.simulate()
+    val result = assembled.signAndSubmit(keypair)
 }
 ```
 

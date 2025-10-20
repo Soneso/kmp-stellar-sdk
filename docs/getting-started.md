@@ -391,23 +391,28 @@ testServer.close()
 
 ```kotlin
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.contract.ContractClient
 
-// Connect to Soroban testnet
-val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
-
-// Simulate a transaction
-val simulationResult = sorobanServer.simulateTransaction(transaction)
-
-// Get contract data
-val contractData = sorobanServer.getContractData(
+// High-level contract interaction (recommended)
+val client = ContractClient.fromNetwork(
     contractId = "CCXX...",
-    key = Scv.toSymbol("balance"),
-    durability = ContractDataDurability.PERSISTENT
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    network = Network.TESTNET
 )
 
-// Close when done
-sorobanServer.close()
+// Invoke contract method with native types
+val balance = client.invoke<Long>(
+    functionName = "balance",
+    arguments = mapOf("account" to "GABC..."),
+    source = "GABC...",
+    signer = null,
+    parseResultXdrFn = { Scv.fromInt128(it).toLong() }
+)
+
+// For advanced usage, see the Soroban RPC Usage Guide
 ```
+
+For detailed smart contract operations, deployment, and advanced patterns, see the [Soroban RPC Usage Guide](SOROBAN_RPC_USAGE.md).
 
 ## Platform-Specific Examples
 

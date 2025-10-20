@@ -484,16 +484,14 @@ class AssembledTransaction<T>(
             network = transactionBuilder.network
         )
             .addOperation(updatedOperation)
-            .setBaseFee(currentTx.fee.toLong())
+            .setBaseFee(currentTx.fee)
 
-        // Copy preconditions if they exist
-        if (currentTx.preconditions != null) {
-            newBuilder.addPreconditions(currentTx.preconditions!!)
-        }
+        // Copy preconditions
+        newBuilder.addPreconditions(currentTx.preconditions)
 
         // Copy soroban data if it exists
         if (currentTx.sorobanData != null) {
-            newBuilder.setSorobanData(currentTx.sorobanData!!)
+            newBuilder.setSorobanData(currentTx.sorobanData)
         }
 
         // Build the new transaction
@@ -683,7 +681,7 @@ class AssembledTransaction<T>(
             .setBaseFee(100L)
             .addOperation(RestoreFootprintOperation())
             .setSorobanData(
-                SorobanDataBuilder(simulation!!.restorePreamble!!.transactionData!!).build()
+                SorobanDataBuilder(simulation!!.restorePreamble!!.transactionData).build()
             )
             .addPreconditions(
                 TransactionPreconditions(

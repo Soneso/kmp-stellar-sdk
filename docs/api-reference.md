@@ -1337,31 +1337,89 @@ val events = sorobanServer.getEvents(
 
 ### ContractClient
 
-High-level client for smart contract interaction.
+High-level client for smart contract interaction with beginner-friendly and power-user APIs.
 
 ```kotlin
 package com.soneso.stellar.sdk.contract
 
-class ContractClient(
+class ContractClient private constructor(
     val contractId: String,
-    rpcUrl: String,
-    val network: Network
+    val rpcUrl: String,
+    val network: Network,
+    private val contractSpec: ContractSpec?
 ) {
     val server: SorobanServer
 
-    // Invoke contract function
+    companion object {
+        // Factory method - loads spec from network
+        suspend fun fromNetwork(
+            contractId: String,
+            rpcUrl: String,
+            network: Network
+        ): ContractClient
+
+        // Factory method - manual XDR mode (no spec)
+        fun withoutSpec(
+            contractId: String,
+            rpcUrl: String,
+            network: Network
+        ): ContractClient
+    }
+
+    // Primary API - invoke with native types (requires spec)
     suspend fun <T> invoke(
+        functionName: String,
+        arguments: Map<String, Any?>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)? = null,
+        options: ClientOptions = ClientOptions()
+    ): T
+
+    // Advanced API - invoke with manual XDR
+    suspend fun <T> invokeWithXdr(
         functionName: String,
         parameters: List<SCValXdr>,
         source: String,
         signer: KeyPair?,
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
-        baseFee: Int = 100,
-        transactionTimeout: Long = 300,
-        submitTimeout: Int = 30,
-        simulate: Boolean = true,
-        restore: Boolean = true
+        options: ClientOptions = ClientOptions()
     ): AssembledTransaction<T>
+
+    // Deploy contract (one-step)
+    companion object {
+        suspend fun deploy(
+            wasmBytes: ByteArray,
+            constructorArgs: Map<String, Any?> = emptyMap(),
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray = Random.Default.nextBytes(32),
+            loadSpec: Boolean = true
+        ): ContractClient
+
+        // Install WASM (two-step deployment, part 1)
+        suspend fun install(
+            wasmBytes: ByteArray,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String
+        ): ByteArray
+
+        // Deploy from WASM hash (two-step deployment, part 2)
+        suspend fun deployFromWasmHash(
+            wasmHash: ByteArray,
+            constructorArgs: List<SCValXdr> = emptyList(),
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray = Random.Default.nextBytes(32),
+            loadSpec: Boolean = true
+        ): ContractClient
+    }
 
     // Close connection
     fun close()
@@ -1371,27 +1429,49 @@ class ContractClient(
 **Examples:**
 
 ```kotlin
-val client = ContractClient(
+// Create client with spec for beginner-friendly API
+val client = ContractClient.fromNetwork(
     contractId = "CCREATE...",
     rpcUrl = "https://soroban-testnet.stellar.org",
     network = Network.TESTNET
 )
 
-// Read-only call (no signing)
+// Read-only call with native types (auto-executes)
 val balance = client.invoke<Long>(
     functionName = "balance",
-    parameters = listOf(Scv.toAddress("GABC...")),
+    arguments = mapOf("account" to "GABC..."),  // Native types!
     source = "GABC...",
-    signer = null,
+    signer = null,  // No signer needed for read
     parseResultXdrFn = { scval ->
         Scv.fromInt128(scval).toLong()
     }
-).result()
+)
 
 println("Balance: $balance")
 
-// Write operation (requires signing)
-val transferResult = client.invoke<Unit>(
+// Write operation with native types (auto-signs and submits)
+client.invoke<Unit>(
+    functionName = "transfer",
+    arguments = mapOf(
+        "from" to "GFROM...",
+        "to" to "GTO...",
+        "amount" to 1000L
+    ),
+    source = sourceAccount.getAccountId(),
+    signer = sourceAccount,  // Required for write
+    parseResultXdrFn = null  // Void return
+)
+
+println("Transfer complete!")
+
+// Power user: Manual XDR control
+val clientManual = ContractClient.withoutSpec(
+    contractId = "CCREATE...",
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    network = Network.TESTNET
+)
+
+val assembled = clientManual.invokeWithXdr(
     functionName = "transfer",
     parameters = listOf(
         Scv.toAddress("GFROM..."),
@@ -1400,12 +1480,24 @@ val transferResult = client.invoke<Unit>(
     ),
     source = sourceAccount.getAccountId(),
     signer = sourceAccount,
-    parseResultXdrFn = null  // Void return
+    parseResultXdrFn = null
 )
     .signAuthEntries(sourceAccount)
     .signAndSubmit(sourceAccount)
 
-println("Transfer complete: ${transferResult.result()}")
+// Deploy new contract
+val newClient = ContractClient.deploy(
+    wasmBytes = File("token.wasm").readBytes(),
+    constructorArgs = mapOf(
+        "name" to "MyToken",
+        "symbol" to "MTK",
+        "decimals" to 7
+    ),
+    source = deployer.getAccountId(),
+    signer = deployer,
+    network = Network.TESTNET,
+    rpcUrl = "https://soroban-testnet.stellar.org"
+)
 
 client.close()
 ```

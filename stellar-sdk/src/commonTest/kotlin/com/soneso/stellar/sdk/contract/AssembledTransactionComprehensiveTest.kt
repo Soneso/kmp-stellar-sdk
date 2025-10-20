@@ -261,7 +261,7 @@ class AssembledTransactionComprehensiveTest {
     // ==================== SignAuthEntries Tests ====================
 
     @Test
-    fun testSignAuthEntriesThrowsNotImplementedError() = runTest {
+    fun testSignAuthEntriesThrowsNotYetSimulatedExceptionBeforeSimulation() = runTest {
         val assembled = AssembledTransaction<SCValXdr>(
             server = server,
             submitTimeout = 30,
@@ -270,16 +270,17 @@ class AssembledTransactionComprehensiveTest {
             transactionBuilder = builder
         )
 
-        val exception = assertFailsWith<NotImplementedError> {
+        // signAuthEntries should throw NotYetSimulatedException when called before simulation
+        val exception = assertFailsWith<NotYetSimulatedException> {
             assembled.signAuthEntries(keypair)
         }
 
-        assertTrue(exception.message!!.contains("not yet implemented"))
-        assertTrue(exception.message!!.contains("Auth.authorizeEntry"))
+        assertSame(assembled, exception.assembledTransaction)
+        assertTrue(exception.message!!.contains("not yet been simulated"))
     }
 
     @Test
-    fun testSignAuthEntriesWithValidUntilLedger() = runTest {
+    fun testSignAuthEntriesWithValidUntilLedgerThrowsNotYetSimulatedException() = runTest {
         val assembled = AssembledTransaction<SCValXdr>(
             server = server,
             submitTimeout = 30,
@@ -288,9 +289,13 @@ class AssembledTransactionComprehensiveTest {
             transactionBuilder = builder
         )
 
-        assertFailsWith<NotImplementedError> {
+        // signAuthEntries with validUntilLedger should also throw NotYetSimulatedException when called before simulation
+        val exception = assertFailsWith<NotYetSimulatedException> {
             assembled.signAuthEntries(keypair, validUntilLedgerSequence = 10000L)
         }
+
+        assertSame(assembled, exception.assembledTransaction)
+        assertTrue(exception.message!!.contains("not yet been simulated"))
     }
 
     // ==================== Result Parser Tests ====================
@@ -568,7 +573,7 @@ class AssembledTransactionComprehensiveTest {
     }
 
     @Test
-    fun testNotImplementedErrorHasHelpfulMessage() = runTest {
+    fun testSignAuthEntriesExceptionHasHelpfulMessage() = runTest {
         val assembled = AssembledTransaction<SCValXdr>(
             server = server,
             submitTimeout = 30,
@@ -577,13 +582,13 @@ class AssembledTransactionComprehensiveTest {
             transactionBuilder = builder
         )
 
-        val exception = assertFailsWith<NotImplementedError> {
+        // Test that the exception message from signAuthEntries is helpful
+        val exception = assertFailsWith<NotYetSimulatedException> {
             assembled.signAuthEntries(keypair)
         }
 
         assertNotNull(exception.message)
-        assertTrue(exception.message!!.contains("not yet implemented"))
-        assertTrue(exception.message!!.contains("Kotlin SDK"))
+        assertTrue(exception.message!!.contains("not yet been simulated"))
     }
 
     // ==================== Edge Cases ====================

@@ -383,6 +383,9 @@ class PaymentService(
 
 ### Example 3: Soroban Smart Contract Interaction
 
+**Note: ContractClient API Changed**
+The KMP SDK introduces significant improvements to the ContractClient API with breaking changes from early alpha versions. See the Breaking Changes section below for details.
+
 **Java SDK**:
 ```java
 // Java - Soroban contract client
@@ -439,54 +442,66 @@ public class TokenContract {
 
 **KMP SDK**:
 ```kotlin
-// Kotlin - Soroban contract client
+// Kotlin - Soroban contract client (new API)
 class TokenContract(
-    private val server: SorobanServer,
+    private val rpcUrl: String,
+    private val network: Network,
     private val contractId: String
 ) {
-    private val client = ContractClient(server)
+    // Create client with spec for easy native type usage
+    private val client = runBlocking {
+        ContractClient.fromNetwork(contractId, rpcUrl, network)
+    }
 
     suspend fun getBalance(account: String): Long {
-        val params = listOf(
-            Address.fromString(account).toScVal()
-        )
-
-        val assembled = client.invoke(
-            contractAddress = contractId,
-            method = "balance",
-            parameters = params,
-            sourceAccount = null,  // read-only
-            resultParser = { result ->
-                ScInt.fromScVal(result).value
+        // Simple invoke with native types - auto-executes
+        return client.invoke<Long>(
+            functionName = "balance",
+            arguments = mapOf("account" to account),  // Native types!
+            source = account,
+            signer = null,  // read-only
+            parseResultXdrFn = { result ->
+                Scv.fromInt128(result).toLong()
             }
         )
-
-        return assembled.simulateAndParse()
     }
 
     suspend fun transfer(
         source: KeyPair,
         to: String,
         amount: Long
-    ): TransactionResult {
-        val params = listOf(
-            Address.fromString(source.getAccountId()).toScVal(),
-            Address.fromString(to).toScVal(),
-            ScInt(amount).toScVal()
+    ): Unit {
+        // Write operation - auto-signs and submits
+        client.invoke<Unit>(
+            functionName = "transfer",
+            arguments = mapOf(
+                "from" to source.getAccountId(),
+                "to" to to,
+                "amount" to amount
+            ),
+            source = source.getAccountId(),
+            signer = source  // Auto-signs and submits
         )
+    }
 
-        val assembled = client.invoke(
-            contractAddress = contractId,
-            method = "transfer",
-            parameters = params,
-            sourceAccount = source.getAccountId(),
-            resultParser = { _ -> 1 }  // Simple parser
+    // Alternative: Power-user API for manual control
+    suspend fun transferWithManualControl(
+        source: KeyPair,
+        to: String,
+        amount: Long
+    ): AssembledTransaction<Unit> {
+        // Use invokeWithXdr for full control
+        return client.invokeWithXdr(
+            functionName = "transfer",
+            parameters = listOf(
+                Scv.toAddress(source.getAccountId()),
+                Scv.toAddress(to),
+                Scv.toInt128(amount)
+            ),
+            source = source.getAccountId(),
+            signer = source
         )
-
-        // Simulate, sign, and submit
-        assembled.simulate()
-        assembled.sign(source)
-        return assembled.submit()
+        // Manually control lifecycle: simulate(), sign(), submit()
     }
 }
 ```
@@ -650,7 +665,90 @@ val tx = Transaction(
 )
 ```
 
-### 5. Stream/Observable APIs
+### 5. ContractClient API Changes (Alpha Breaking Change)
+
+**Impact**: High for Soroban smart contract applications
+**Migration Required**: Yes
+
+The ContractClient API has been significantly improved with breaking changes:
+
+#### Constructor Changes
+**Old**:
+```kotlin
+val client = ContractClient(contractId, rpcUrl, network)
+```
+
+**New**:
+```kotlin
+// Recommended - loads spec for native type support
+val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+
+// Advanced - manual XDR mode
+val client = ContractClient.withoutSpec(contractId, rpcUrl, network)
+```
+
+#### Invoke Method Changes
+**Old API** (returns AssembledTransaction):
+```kotlin
+val assembled = client.invoke(
+    functionName = "balance",
+    parameters = listOf(Scv.toAddress(account)),  // Manual XDR
+    source = source,
+    signer = null
+)
+val result = assembled.result()  // Manual execution
+```
+
+**New Primary API** (auto-executes, returns result):
+```kotlin
+val result = client.invoke<Long>(
+    functionName = "balance",
+    arguments = mapOf("account" to account),  // Native types!
+    source = source,
+    signer = null
+)
+// Auto-converts types, auto-executes, returns result directly
+```
+
+**New Advanced API** (manual control):
+```kotlin
+val assembled = client.invokeWithXdr(
+    functionName = "balance",
+    parameters = listOf(Scv.toAddress(account)),  // Manual XDR
+    source = source,
+    signer = null
+)
+// Returns AssembledTransaction for manual control
+```
+
+#### Deployment Methods
+**New One-Step Deployment**:
+```kotlin
+val client = ContractClient.deploy(
+    wasmBytes = wasmBytes,
+    constructorArgs = mapOf(  // Native types
+        "name" to "MyToken",
+        "symbol" to "MTK",
+        "decimals" to 7
+    ),
+    source = deployer.getAccountId(),
+    signer = deployer,
+    network = Network.TESTNET,
+    rpcUrl = rpcUrl
+)
+```
+
+**New Two-Step Deployment** (for WASM reuse):
+```kotlin
+// Step 1: Install WASM once
+val wasmHash = ContractClient.install(wasmBytes, source, signer, network, rpcUrl)
+
+// Step 2: Deploy multiple instances
+val client1 = ContractClient.deployFromWasmHash(wasmHash, args1, source, signer, network, rpcUrl)
+val client2 = ContractClient.deployFromWasmHash(wasmHash, args2, source, signer, network, rpcUrl)
+```
+
+### 6. Stream/Observable APIs
 
 **Impact**: High for streaming apps
 **Migration Required**: Yes

@@ -308,9 +308,14 @@ Soroban RPC client:
 
 #### `com.soneso.stellar.sdk.contract`
 Smart contract interaction:
-- `ContractClient` - High-level client
-- `AssembledTransaction` - Transaction lifecycle
-- `exception/` - Contract-specific exceptions
+- `ContractClient` - High-level client with dual API patterns
+  - Simple Map-based invoke for beginners (auto-converts native types)
+  - Advanced XDR-based invokeWithXdr for power users
+  - One-step and two-step deployment capabilities
+- `AssembledTransaction` - Transaction lifecycle management
+- `ClientOptions` - Configuration for contract operations
+- `ContractSpec` - Type conversion between native and XDR
+- `exception/` - Contract-specific exceptions (10 types)
 
 #### `com.soneso.stellar.sdk.xdr`
 XDR serialization:

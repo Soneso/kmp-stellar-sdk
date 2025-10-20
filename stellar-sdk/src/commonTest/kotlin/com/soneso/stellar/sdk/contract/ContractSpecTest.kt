@@ -356,11 +356,11 @@ class ContractSpecTest {
 
         val trueVal = spec.nativeToXdrSCVal(true, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL))
         assertTrue(trueVal is SCValXdr.B)
-        assertEquals(true, (trueVal as SCValXdr.B).value)
+        assertEquals(true, trueVal.value)
 
         val falseVal = spec.nativeToXdrSCVal(false, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL))
         assertTrue(falseVal is SCValXdr.B)
-        assertEquals(false, (falseVal as SCValXdr.B).value)
+        assertEquals(false, falseVal.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal("not a boolean", createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL))
@@ -382,7 +382,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(42, typeDef)
         assertTrue(result is SCValXdr.U32)
-        assertEquals(42u, (result as SCValXdr.U32).value.value)
+        assertEquals(42u, result.value.value)
 
         // Test range validation
         assertFailsWith<ContractSpecException> {
@@ -401,11 +401,11 @@ class ContractSpecTest {
 
         val positive = spec.nativeToXdrSCVal(42, typeDef)
         assertTrue(positive is SCValXdr.I32)
-        assertEquals(42, (positive as SCValXdr.I32).value.value)
+        assertEquals(42, positive.value.value)
 
         val negative = spec.nativeToXdrSCVal(-42, typeDef)
         assertTrue(negative is SCValXdr.I32)
-        assertEquals(-42, (negative as SCValXdr.I32).value.value)
+        assertEquals(-42, negative.value.value)
     }
 
     @Test
@@ -415,7 +415,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(result is SCValXdr.U64)
-        assertEquals(1234567890UL, (result as SCValXdr.U64).value.value)
+        assertEquals(1234567890UL, result.value.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
@@ -429,11 +429,11 @@ class ContractSpecTest {
 
         val positive = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(positive is SCValXdr.I64)
-        assertEquals(1234567890L, (positive as SCValXdr.I64).value.value)
+        assertEquals(1234567890L, positive.value.value)
 
         val negative = spec.nativeToXdrSCVal(-1234567890L, typeDef)
         assertTrue(negative is SCValXdr.I64)
-        assertEquals(-1234567890L, (negative as SCValXdr.I64).value.value)
+        assertEquals(-1234567890L, negative.value.value)
     }
 
     @Test
@@ -443,7 +443,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(result is SCValXdr.U128)
-        val parts = (result as SCValXdr.U128).value
+        val parts = result.value
         assertEquals(0UL, parts.hi.value)
         assertEquals(1000UL, parts.lo.value)
 
@@ -459,13 +459,13 @@ class ContractSpecTest {
 
         val positive = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(positive is SCValXdr.I128)
-        var parts = (positive as SCValXdr.I128).value
+        var parts = positive.value
         assertEquals(0L, parts.hi.value)
         assertEquals(1000UL, parts.lo.value)
 
         val negative = spec.nativeToXdrSCVal(-1000, typeDef)
         assertTrue(negative is SCValXdr.I128)
-        parts = (negative as SCValXdr.I128).value
+        parts = negative.value
         assertEquals(-1L, parts.hi.value) // Sign extension
     }
 
@@ -476,7 +476,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(result is SCValXdr.U256)
-        val parts = (result as SCValXdr.U256).value
+        val parts = result.value
         assertEquals(0UL, parts.hiHi.value)
         assertEquals(0UL, parts.hiLo.value)
         assertEquals(0UL, parts.loHi.value)
@@ -494,13 +494,13 @@ class ContractSpecTest {
 
         val positive = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(positive is SCValXdr.I256)
-        var parts = (positive as SCValXdr.I256).value
+        var parts = positive.value
         assertEquals(0L, parts.hiHi.value)
         assertEquals(1000UL, parts.loLo.value)
 
         val negative = spec.nativeToXdrSCVal(-1000, typeDef)
         assertTrue(negative is SCValXdr.I256)
-        parts = (negative as SCValXdr.I256).value
+        parts = negative.value
         assertEquals(-1L, parts.hiHi.value) // Sign extension
         assertEquals(-1L, parts.hiLo.value.toLong())
         assertEquals(-1L, parts.loHi.value.toLong())
@@ -513,7 +513,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal("Hello, World!", typeDef)
         assertTrue(result is SCValXdr.Str)
-        assertEquals("Hello, World!", (result as SCValXdr.Str).value.value)
+        assertEquals("Hello, World!", result.value.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(123, typeDef)
@@ -527,7 +527,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal("my_symbol", typeDef)
         assertTrue(result is SCValXdr.Sym)
-        assertEquals("my_symbol", (result as SCValXdr.Sym).value.value)
+        assertEquals("my_symbol", result.value.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(123, typeDef)
@@ -543,18 +543,18 @@ class ContractSpecTest {
         val bytes = byteArrayOf(1, 2, 3, 4, 5)
         val result1 = spec.nativeToXdrSCVal(bytes, typeDef)
         assertTrue(result1 is SCValXdr.Bytes)
-        assertContentEquals(bytes, (result1 as SCValXdr.Bytes).value.value)
+        assertContentEquals(bytes, result1.value.value)
 
         // From hex string
         val result2 = spec.nativeToXdrSCVal("0x0102030405", typeDef)
         assertTrue(result2 is SCValXdr.Bytes)
-        assertContentEquals(bytes, (result2 as SCValXdr.Bytes).value.value)
+        assertContentEquals(bytes, result2.value.value)
 
         // From List<Byte>
         val byteList = listOf<Byte>(1, 2, 3, 4, 5)
         val result3 = spec.nativeToXdrSCVal(byteList, typeDef)
         assertTrue(result3 is SCValXdr.Bytes)
-        assertContentEquals(bytes, (result3 as SCValXdr.Bytes).value.value)
+        assertContentEquals(bytes, result3.value.value)
     }
 
     @Test
@@ -564,7 +564,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(result is SCValXdr.Timepoint)
-        assertEquals(1234567890UL, (result as SCValXdr.Timepoint).value.value.value)
+        assertEquals(1234567890UL, result.value.value.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
@@ -578,7 +578,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(3600L, typeDef)
         assertTrue(result is SCValXdr.Duration)
-        assertEquals(3600UL, (result as SCValXdr.Duration).value.value.value)
+        assertEquals(3600UL, result.value.value.value)
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
@@ -641,7 +641,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(42, optionTypeDef)
         assertTrue(result is SCValXdr.U32)
-        assertEquals(42u, (result as SCValXdr.U32).value.value)
+        assertEquals(42u, result.value.value)
     }
 
     @Test
@@ -666,7 +666,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(list, vecTypeDef)
 
         assertTrue(result is SCValXdr.Vec)
-        val vec = (result as SCValXdr.Vec).value
+        val vec = result.value
         assertNotNull(vec)
         assertEquals(5, vec.value.size)
         assertTrue(vec.value.all { it is SCValXdr.U32 })
@@ -686,7 +686,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(map, mapTypeDef)
 
         assertTrue(result is SCValXdr.Map)
-        val scMap = (result as SCValXdr.Map).value
+        val scMap = result.value
         assertNotNull(scMap)
         assertEquals(2, scMap.value.size)
     }
@@ -707,7 +707,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(tuple, tupleTypeDef)
 
         assertTrue(result is SCValXdr.Vec)
-        val vec = (result as SCValXdr.Vec).value
+        val vec = result.value
         assertNotNull(vec)
         assertEquals(2, vec.value.size)
         assertTrue(vec.value[0] is SCValXdr.U32)
@@ -742,7 +742,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(bytes, bytesNTypeDef)
 
         assertTrue(result is SCValXdr.Bytes)
-        assertEquals(32, (result as SCValXdr.Bytes).value.value.size)
+        assertEquals(32, result.value.value.size)
     }
 
     @Test
@@ -769,7 +769,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal("Active", enumTypeDef)
         assertTrue(result is SCValXdr.U32)
-        assertEquals(1u, (result as SCValXdr.U32).value.value)
+        assertEquals(1u, result.value.value)
     }
 
     @Test
@@ -782,7 +782,7 @@ class ContractSpecTest {
 
         val result = spec.nativeToXdrSCVal(2, enumTypeDef)
         assertTrue(result is SCValXdr.U32)
-        assertEquals(2u, (result as SCValXdr.U32).value.value)
+        assertEquals(2u, result.value.value)
     }
 
     @Test
@@ -813,7 +813,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(person, structTypeDef)
 
         assertTrue(result is SCValXdr.Map)
-        val map = (result as SCValXdr.Map).value
+        val map = result.value
         assertNotNull(map)
         assertEquals(2, map.value.size)
     }
@@ -846,7 +846,7 @@ class ContractSpecTest {
         val result = spec.nativeToXdrSCVal(unionVal, unionTypeDef)
 
         assertTrue(result is SCValXdr.Vec)
-        val vec = (result as SCValXdr.Vec).value
+        val vec = result.value
         assertNotNull(vec)
         assertEquals(1, vec.value.size) // Just the tag
         assertTrue(vec.value[0] is SCValXdr.Sym)
