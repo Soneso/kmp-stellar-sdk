@@ -64,14 +64,14 @@ class SorobanClientIntegrationTest {
      *
      * This test demonstrates:
      * 1. One-step contract deployment with deploy()
-     * 2. Simple contract invocation with native types (String → Symbol)
+     * 2. Simple contract invocation with native types (String → SCValXdr.Str)
      * 3. Custom result parsing from XDR
      * 4. Automatic read-only call detection and execution
      *
-     * The hello contract has a "hello" function that takes a symbol parameter
-     * and returns a vector with two symbols: ["Hello", <parameter>].
+     * The hello contract has a "hello" function that takes a string parameter
+     * and returns a vector with two string: ["Hello", <parameter>].
      *
-     * **Ported From**: Flutter SDK's `test hello contract` (lines 109-129)
+     * **Ported From**: Flutter SDK's `test hello contract`
      *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~60-90 seconds (includes upload, deploy, and invocation)
@@ -111,15 +111,15 @@ class SorobanClientIntegrationTest {
         // Step 4: Invoke contract with high-level API
         val result = client.invoke(
             functionName = "hello",
-            arguments = mapOf("to" to "John"),  // String → Symbol (automatic conversion)
+            arguments = mapOf("to" to "John"),  // String → SCValXdr.Str (automatic conversion)
             source = sourceAccountId,
             signer = null,  // Read-only call
             parseResultXdrFn = { xdr ->
-                // Parse Vec<Symbol> result
+                // Parse Vec<String> result
                 val vec = (xdr as SCValXdr.Vec).value?.value
                     ?: throw IllegalStateException("Expected Vec result")
                 vec.map { element ->
-                    (element as SCValXdr.Sym).value.value
+                    (element as SCValXdr.Str).value.value
                 }
             }
         )

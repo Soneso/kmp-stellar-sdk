@@ -450,7 +450,7 @@ struct DeployContractView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.3))
 
-            Text("Select a contract type to begin deployment")
+            Text("Select a demo contract to begin deployment")
                 .font(.system(size: 14))
                 .foregroundStyle(Material3Colors.onSurfaceVariant)
                 .multilineTextAlignment(.center)

@@ -124,7 +124,7 @@ class ContractDetailsScreen : Screen {
                     }
                 }
 
-                // Example Contract Card
+                // Demo Contract Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(

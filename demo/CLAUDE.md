@@ -94,7 +94,7 @@ The demo includes **7 comprehensive features**:
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/DeployContractScreen.kt`
 - **Logic**: `stellar/DeployContract.kt`
-- **Resources**: `resources/wasm/` (5 example WASM files)
+- **Resources**: `resources/wasm/` (4 example WASM files)
 - **Demonstrates**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`, platform-specific resource loading
 
 ## Adding New Demo Features

@@ -1024,7 +1024,7 @@ class SorobanIntegrationTest {
      *
      * This test validates the complete contract invocation workflow:
      * 1. Uses the contract ID from testCreateContract
-     * 2. Prepares function arguments (symbol "friend" for hello contract)
+     * 2. Prepares function arguments (string "friend" for hello contract)
      * 3. Uses InvokeHostFunctionOperation.invokeContractFunction() helper method
      * 4. Simulates the invocation transaction
      * 5. Prepares the transaction with simulation results
@@ -1044,8 +1044,8 @@ class SorobanIntegrationTest {
      * This test depends on testCreateContract having run first to provide the contract ID.
      * If run independently, it will be skipped with an appropriate message.
      *
-     * The hello world contract has a "hello" function that takes a symbol parameter
-     * and returns a vector with two symbols: ["Hello", <parameter>].
+     * The hello world contract has a "hello" function that takes a string parameter
+     * and returns a vector with two strings: ["Hello", <parameter>].
      *
      * **Prerequisites**:
      * - testCreateContract must run first (provides contract ID)
@@ -1054,7 +1054,7 @@ class SorobanIntegrationTest {
      * **Duration**: ~30-60 seconds (includes network delays and polling)
      *
      * **Reference**: Ported from Flutter SDK's test invoke contract
-     * (soroban_test.dart lines 521-634)
+     * (soroban_test.dart)
      *
      * @see InvokeHostFunctionOperation.invokeContractFunction
      * @see Scv.toSymbol
@@ -1080,7 +1080,7 @@ class SorobanIntegrationTest {
 
         // When: Building invoke contract transaction using helper method
         // Prepare argument - the hello function takes a symbol parameter
-        val arg = Scv.toSymbol("friend")
+        val arg = Scv.toString("friend")
 
         val operation = InvokeHostFunctionOperation.invokeContractFunction(
             contractAddress = contractId,
@@ -1142,20 +1142,20 @@ class SorobanIntegrationTest {
         val resVal = rpcTransactionResponse.getResultValue()
         assertNotNull(resVal, "Result value should not be null")
 
-        // The hello contract returns a vec with two symbols: ["Hello", <parameter>]
+        // The hello contract returns a vec with two strings: ["Hello", <parameter>]
         assertTrue(resVal is SCValXdr.Vec, "Result should be a vector")
         val vec = resVal.value?.value
         assertNotNull(vec, "Vector should not be null")
         assertEquals(2, vec.size, "Vector should have 2 elements")
 
-        // Verify the two symbols in the result
-        assertTrue(vec[0] is SCValXdr.Sym, "First element should be a symbol")
-        assertEquals("Hello", (vec[0] as SCValXdr.Sym).value.value, "First element should be 'Hello'")
+        // Verify the two strings in the result
+        assertTrue(vec[0] is SCValXdr.Str, "First element should be a string")
+        assertEquals("Hello", (vec[0] as SCValXdr.Str).value.value, "First element should be 'Hello'")
 
-        assertTrue(vec[1] is SCValXdr.Sym, "Second element should be a symbol")
-        assertEquals("friend", (vec[1] as SCValXdr.Sym).value.value, "Second element should be 'friend'")
+        assertTrue(vec[1] is SCValXdr.Str, "Second element should be a string")
+        assertEquals("friend", (vec[1] as SCValXdr.Str).value.value, "Second element should be 'friend'")
 
-        println("Contract invocation result: [${(vec[0] as SCValXdr.Sym).value.value}, ${(vec[1] as SCValXdr.Sym).value.value}]")
+        println("Contract invocation result: [${(vec[0] as SCValXdr.Str).value.value}, ${(vec[1] as SCValXdr.Sym).value.value}]")
     }
 
     /**

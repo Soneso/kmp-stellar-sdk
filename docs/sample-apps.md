@@ -191,7 +191,7 @@ The demo app showcases 7 comprehensive SDK features:
 - One-step deployment: `ContractClient.deploy()` with constructor args
 - Two-step deployment: `install()` + `deployFromWasmId()` for WASM reuse
 - Platform-specific WASM file loading (8 platforms)
-- Support for 5 example contracts
+- Support for 5 demo contracts
 - **SDK Features**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
 ## Code Examples

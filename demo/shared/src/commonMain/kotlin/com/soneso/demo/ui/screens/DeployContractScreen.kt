@@ -104,33 +104,26 @@ class DeployContractScreen : Screen {
 
         // Function to deploy contract
         fun deployContract() {
-            println("[UI] Deploy button clicked!")
-
             val errors = validateInputs()
             if (errors.isNotEmpty()) {
-                println("[UI] Validation errors: ${errors.keys.joinToString()}")
                 validationErrors = errors
                 return
             }
 
             val contract = selectedContract
             if (contract == null) {
-                println("[UI] No contract selected")
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar("Please select a contract to deploy")
                 }
                 return
             }
 
-            println("[UI] Launching coroutine for deployment...")
             coroutineScope.launch {
-                println("[UI] Inside coroutine - setting isDeploying = true")
                 isDeploying = true
                 deploymentResult = null
                 validationErrors = emptyMap()
 
                 try {
-                    println("[UI] About to call deployContract from stellar package...")
                     // Build constructor arguments map with proper types
                     val constructorArgs = if (contract.hasConstructor) {
                         contract.constructorParams.associate { param ->
@@ -154,14 +147,7 @@ class DeployContractScreen : Screen {
                         secretKey = secretKey,
                         useTestnet = true
                     )
-                    println("[UI] deployContract returned successfully!")
-                    println("[UI] Result: $deploymentResult")
-                } catch (e: Exception) {
-                    println("[UI] Exception caught: ${e.message}")
-                    e.printStackTrace()
-                    throw e
                 } finally {
-                    println("[UI] In finally block - setting isDeploying = false")
                     isDeploying = false
                 }
             }
@@ -250,7 +236,7 @@ class DeployContractScreen : Screen {
                                 value = selectedContract?.name ?: "",
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Contract Type") },
+                                label = { Text("Demo Contract") },
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                                 },
@@ -521,7 +507,7 @@ class DeployContractScreen : Screen {
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                     Text(
-                        text = "Select a contract type to begin deployment",
+                        text = "Select a demo contract to begin deployment",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center

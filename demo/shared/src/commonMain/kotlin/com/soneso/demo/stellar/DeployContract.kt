@@ -5,17 +5,9 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 
 /**
- * Debug logging function that works across all platforms.
- * In Kotlin/JS, println() maps to console.log() automatically.
- */
-internal fun debugLog(message: String) {
-    println(message)
-}
-
-/**
  * Contract metadata for the deployment UI.
  *
- * Contains all information needed to display and deploy a specific contract type.
+ * Contains all information needed to display and deploy a demo contract.
  *
  * @property id Unique identifier for the contract (matches WASM filename without extension)
  * @property name Human-readable contract name for display
@@ -84,6 +76,13 @@ val AVAILABLE_CONTRACTS = listOf(
         hasConstructor = false
     ),
     ContractMetadata(
+        id = "auth",
+        name = "Auth Contract",
+        description = "Shows authorization patterns with signature verification and access control",
+        wasmFilename = "soroban_auth_contract.wasm",
+        hasConstructor = false
+    ),
+    ContractMetadata(
         id = "token",
         name = "Token Contract",
         description = "Full-featured Stellar Asset Contract (SAC) compatible token with mint, transfer, and balance functions",
@@ -115,20 +114,6 @@ val AVAILABLE_CONTRACTS = listOf(
                 placeholder = "MYTKN"
             )
         )
-    ),
-    ContractMetadata(
-        id = "events",
-        name = "Events Contract",
-        description = "Demonstrates Soroban event emission for off-chain monitoring and logging",
-        wasmFilename = "soroban_events_contract.wasm",
-        hasConstructor = false
-    ),
-    ContractMetadata(
-        id = "auth",
-        name = "Auth Contract",
-        description = "Shows authorization patterns with signature verification and access control",
-        wasmFilename = "soroban_auth_contract.wasm",
-        hasConstructor = false
     ),
     ContractMetadata(
         id = "atomic_swap",
@@ -259,11 +244,7 @@ suspend fun deployContract(
     useTestnet: Boolean = true
 ): DeployContractResult {
     return try {
-        println("[DEPLOY] Starting deployment for contract: ${contractMetadata.name}")
-        println("[DEPLOY] Constructor args: ${constructorArgs.keys.joinToString(", ")}")
-
         // Step 1: Validate inputs
-        println("[DEPLOY] Step 1: Validating inputs...")
         if (sourceAccountId.isBlank()) {
             return DeployContractResult.Error(
                 message = "Source account ID cannot be empty"
@@ -295,7 +276,6 @@ suspend fun deployContract(
         }
 
         // Step 2: Validate constructor arguments
-        println("[DEPLOY] Step 2: Validating constructor arguments...")
         if (contractMetadata.hasConstructor) {
             val requiredParams = contractMetadata.constructorParams.map { it.name }.toSet()
             val providedParams = constructorArgs.keys
@@ -344,7 +324,6 @@ suspend fun deployContract(
         }
 
         // Step 3: Load WASM bytecode from resources
-        println("[DEPLOY] Step 3: Loading WASM file: ${contractMetadata.wasmFilename}")
         val wasmBytes = try {
             loadWasmResource(contractMetadata.wasmFilename)
         } catch (e: Exception) {
@@ -359,10 +338,8 @@ suspend fun deployContract(
                 message = "WASM file '${contractMetadata.wasmFilename}' is empty"
             )
         }
-        println("[DEPLOY] WASM loaded successfully: ${wasmBytes.size} bytes")
 
         // Step 4: Create KeyPair from secret seed
-        println("[DEPLOY] Step 4: Creating KeyPair from secret seed...")
         val sourceKeyPair = try {
             KeyPair.fromSecretSeed(secretKey)
         } catch (e: Exception) {
@@ -371,18 +348,14 @@ suspend fun deployContract(
                 exception = e
             )
         }
-        println("[DEPLOY] KeyPair created successfully")
 
         // Step 5: Determine network and RPC URL
-        println("[DEPLOY] Step 5: Setting up network configuration...")
         val network = if (useTestnet) Network.TESTNET else Network.PUBLIC
         val rpcUrl = if (useTestnet) {
             "https://soroban-testnet.stellar.org:443"
         } else {
             "https://soroban-mainnet.stellar.org:443"
         }
-        println("[DEPLOY] Network: ${if (useTestnet) "TESTNET" else "MAINNET"}")
-        println("[DEPLOY] RPC URL: $rpcUrl")
 
         // Step 6: Deploy contract using SDK's high-level API
         // This is the key demonstration of ContractClient.deploy()
@@ -393,8 +366,6 @@ suspend fun deployContract(
         // - Transaction simulation
         // - Resource estimation
         // - Transaction signing and submission
-        println("[DEPLOY] Step 6: Calling ContractClient.deploy()...")
-        println("[DEPLOY] This will upload WASM, deploy contract, and invoke constructor if needed")
         val client = ContractClient.deploy(
             wasmBytes = wasmBytes,
             constructorArgs = constructorArgs,  // SDK converts Map<String, Any?> to XDR automatically
@@ -403,47 +374,32 @@ suspend fun deployContract(
             network = network,
             rpcUrl = rpcUrl
         )
-        println("[DEPLOY] ContractClient.deploy() completed successfully!")
-        println("[DEPLOY] Contract ID: ${client.contractId}")
 
         // Step 7: Return success with deployed contract ID
-        println("[DEPLOY] Step 7: Returning success result")
         DeployContractResult.Success(
             contractId = client.contractId
         )
 
     } catch (e: com.soneso.stellar.sdk.contract.exception.ContractException) {
         // Soroban contract-specific errors
-        println("[DEPLOY] ERROR: ContractException caught")
-        println("[DEPLOY] Error message: ${e.message}")
-        e.printStackTrace()
         DeployContractResult.Error(
             message = "Contract deployment failed: ${e.message ?: "Unknown contract error"}",
             exception = e
         )
     } catch (e: com.soneso.stellar.sdk.rpc.exception.SorobanRpcException) {
         // RPC communication errors
-        println("[DEPLOY] ERROR: SorobanRpcException caught")
-        println("[DEPLOY] Error message: ${e.message}")
-        e.printStackTrace()
         DeployContractResult.Error(
             message = "RPC error: ${e.message ?: "Failed to communicate with Soroban RPC"}",
             exception = e
         )
     } catch (e: IllegalArgumentException) {
         // Validation errors
-        println("[DEPLOY] ERROR: IllegalArgumentException caught")
-        println("[DEPLOY] Error message: ${e.message}")
-        e.printStackTrace()
         DeployContractResult.Error(
             message = "Invalid input: ${e.message}",
             exception = e
         )
     } catch (e: Exception) {
         // Unexpected errors
-        println("[DEPLOY] ERROR: Unexpected exception caught: ${e::class.simpleName}")
-        println("[DEPLOY] Error message: ${e.message}")
-        e.printStackTrace()
         DeployContractResult.Error(
             message = "Unexpected error: ${e.message ?: "Unknown error occurred"}",
             exception = e
