@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -85,6 +86,12 @@ class MainScreen : Screen {
                 description = "Invoke a deployed contract using the beginner-friendly API",
                 icon = Icons.Default.PlayArrow,
                 screen = InvokeHelloWorldContractScreen()
+            ),
+            DemoTopic(
+                title = "Invoke Auth Contract",
+                description = "Dynamic authorization handling: same-invoker vs different-invoker scenarios",
+                icon = Icons.Default.VerifiedUser,
+                screen = InvokeAuthContractScreen()
             )
         )
 

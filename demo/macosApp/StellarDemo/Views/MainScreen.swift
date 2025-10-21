@@ -87,6 +87,14 @@ struct MainScreen: View {
                         icon: "play.circle.fill",
                         destination: InvokeHelloWorldContractScreen(toastManager: toastManager)
                     )
+
+                    // Invoke Auth Contract topic
+                    DemoTopicCard(
+                        title: "Invoke Auth Contract",
+                        description: "Dynamic authorization handling: same-invoker vs different-invoker scenarios",
+                        icon: "checkmark.shield.fill",
+                        destination: InvokeAuthContractScreen(toastManager: toastManager)
+                    )
                 }
             }
             .padding(16)

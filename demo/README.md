@@ -40,7 +40,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 
 ## Features
 
-The demo app includes 8 comprehensive feature demonstrations:
+The demo app includes 9 comprehensive feature demonstrations:
 
 ### 1. Key Generation
 - Generate random Stellar Ed25519 keypairs
@@ -101,6 +101,14 @@ The demo app includes 8 comprehensive feature demonstrations:
 - Real-time contract function invocation on testnet
 - Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `funcResToNative()`
 
+### 9. Invoke Auth Contract
+- Dynamic Soroban authorization handling with same-invoker and different-invoker scenarios
+- Automatic authorization detection using `needsNonInvokerSigningBy()`
+- Manual authorization signing with `signAuthEntries()` when needed
+- Production-ready pattern for conditional authorization
+- Educational UI showing which authorization scenario was detected
+- Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`
+
 ## Project Structure
 
 ```
@@ -108,7 +116,7 @@ demo/
 ├── shared/                          # Shared Compose Multiplatform module
 │   ├── src/
 │   │   ├── commonMain/kotlin/       # Shared code (UI + business logic)
-│   │   │   ├── ui/screens/          # All 7 demo screens
+│   │   │   ├── ui/screens/          # All 9 demo screens
 │   │   │   │   ├── MainScreen.kt
 │   │   │   │   ├── KeyGenerationScreen.kt
 │   │   │   │   ├── FundAccountScreen.kt
@@ -116,7 +124,9 @@ demo/
 │   │   │   │   ├── TrustAssetScreen.kt
 │   │   │   │   ├── SendPaymentScreen.kt
 │   │   │   │   ├── ContractDetailsScreen.kt
-│   │   │   │   └── DeployContractScreen.kt
+│   │   │   │   ├── DeployContractScreen.kt
+│   │   │   │   ├── InvokeHelloWorldContractScreen.kt
+│   │   │   │   └── InvokeAuthContractScreen.kt
 │   │   │   ├── stellar/             # Stellar SDK integration
 │   │   │   │   ├── KeyPairGeneration.kt
 │   │   │   │   ├── AccountFunding.kt
@@ -124,7 +134,9 @@ demo/
 │   │   │   │   ├── TrustAsset.kt
 │   │   │   │   ├── SendPayment.kt
 │   │   │   │   ├── ContractDetails.kt
-│   │   │   │   └── DeployContract.kt
+│   │   │   │   ├── DeployContract.kt
+│   │   │   │   ├── InvokeHelloWorldContract.kt
+│   │   │   │   └── InvokeAuthContract.kt
 │   │   │   └── App.kt               # Main app entry
 │   │   ├── androidMain/             # Android-specific (clipboard)
 │   │   ├── desktopMain/             # Desktop-specific (clipboard)
@@ -371,7 +383,7 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
    )
    ```
 
-4. **Test all 7 demo features**:
+4. **Test all 9 demo features**:
    ```bash
    ./gradlew :demo:androidApp:installDebug
    ./gradlew :demo:desktopApp:run
