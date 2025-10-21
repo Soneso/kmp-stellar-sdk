@@ -60,11 +60,30 @@ kotlin {
         (this as ProcessResources).duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 
+    // Fix Gradle 9.0.0 task dependency validation for JS binary compilation
+    // When both library() and executable() binaries are configured, we need explicit dependencies
+    // to avoid implicit dependency warnings between the compile sync and distribution tasks
+    tasks.named("jsBrowserProductionLibraryDistribution") {
+        dependsOn("jsProductionExecutableCompileSync")
+    }
+    tasks.named("jsNodeProductionLibraryDistribution") {
+        dependsOn("jsProductionExecutableCompileSync")
+    }
+    tasks.named("jsBrowserProductionWebpack") {
+        dependsOn("jsProductionLibraryCompileSync")
+    }
+
 
     // iOS targets
     val iosX64 = iosX64()
     val iosArm64 = iosArm64()
     val iosSimulatorArm64 = iosSimulatorArm64()
+
+    // Skip iosX64 tests - libsodium.a only has ARM64, not x86_64
+    // x86_64 simulators are rare now with Apple Silicon
+    tasks.matching { it.name.contains("iosX64Test") }.configureEach {
+        enabled = false
+    }
 
     // macOS targets (useful for development)
     macosX64()
@@ -100,7 +119,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 implementation("io.ktor:ktor-client-core:2.3.8")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")

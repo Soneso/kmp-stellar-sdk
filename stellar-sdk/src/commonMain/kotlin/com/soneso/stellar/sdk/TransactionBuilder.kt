@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk
 
 import com.soneso.stellar.sdk.xdr.SorobanTransactionDataXdr
+import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
@@ -288,8 +289,9 @@ class TransactionBuilder(
          *
          * @return Current time in milliseconds since epoch
          */
+        @OptIn(kotlin.time.ExperimentalTime::class)
         internal fun currentTimeMillis(): Long {
-            return kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+            return Clock.System.now().toEpochMilliseconds()
         }
     }
 }

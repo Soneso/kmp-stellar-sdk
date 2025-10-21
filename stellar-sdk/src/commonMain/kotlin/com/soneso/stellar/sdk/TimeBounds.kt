@@ -3,7 +3,7 @@ package com.soneso.stellar.sdk
 import com.soneso.stellar.sdk.xdr.TimePointXdr
 import com.soneso.stellar.sdk.xdr.TimeBoundsXdr
 import com.soneso.stellar.sdk.xdr.Uint64Xdr
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
@@ -53,6 +53,7 @@ data class TimeBounds(
          * @param timeout Timeout duration from now
          * @return TimeBounds with minTime=0 and maxTime=now+timeout
          */
+        @OptIn(kotlin.time.ExperimentalTime::class)
         fun expiresAfter(timeout: Duration): TimeBounds {
             val now = Clock.System.now().epochSeconds
             val endTime = now + timeout.inWholeSeconds
@@ -65,6 +66,7 @@ data class TimeBounds(
          * @param timeoutSeconds Timeout in seconds
          * @return TimeBounds with minTime=0 and maxTime=now+timeoutSeconds
          */
+        @OptIn(kotlin.time.ExperimentalTime::class)
         fun expiresAfter(timeoutSeconds: Long): TimeBounds {
             val now = Clock.System.now().epochSeconds
             val endTime = now + timeoutSeconds

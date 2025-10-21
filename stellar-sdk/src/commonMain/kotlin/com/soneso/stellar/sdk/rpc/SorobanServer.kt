@@ -242,7 +242,7 @@ class SorobanServer(
             if (response.error != null) {
                 throw SorobanRpcException(
                     errorCode = response.error.code,
-                    message = response.error.message,
+                    errorMessage = response.error.message,
                     data = response.error.data
                 )
             }

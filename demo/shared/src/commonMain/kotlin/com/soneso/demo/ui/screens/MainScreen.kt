@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -78,6 +79,12 @@ class MainScreen : Screen {
                 description = "Upload and deploy Soroban contracts with constructor support",
                 icon = Icons.Default.CloudUpload,
                 screen = DeployContractScreen()
+            ),
+            DemoTopic(
+                title = "Invoke Hello World Contract",
+                description = "Invoke a deployed contract using the beginner-friendly API",
+                icon = Icons.Default.PlayArrow,
+                screen = InvokeHelloWorldContractScreen()
             )
         )
 

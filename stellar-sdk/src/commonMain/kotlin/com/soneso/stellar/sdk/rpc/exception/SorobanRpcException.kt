@@ -32,11 +32,13 @@ import com.soneso.stellar.sdk.horizon.exceptions.NetworkException
  */
 class SorobanRpcException(
     val errorCode: Int,
-    override val message: String,
+    errorMessage: String,
     val data: String? = null
 ) : NetworkException(
-    message = "Soroban RPC error ($errorCode): $message",
+    message = "Soroban RPC error ($errorCode): $errorMessage",
     cause = null,
     code = errorCode,
     body = data
-)
+) {
+    override val message: String = "Soroban RPC error ($errorCode): $errorMessage"
+}

@@ -79,6 +79,14 @@ struct MainScreen: View {
                         icon: "arrow.up.doc.fill",
                         destination: DeployContractView(toastManager: toastManager)
                     )
+
+                    // Invoke Hello World Contract topic
+                    DemoTopicCard(
+                        title: "Invoke Hello World Contract",
+                        description: "Call contract functions with beginner-friendly API",
+                        icon: "play.circle.fill",
+                        destination: InvokeHelloWorldContractScreen(toastManager: toastManager)
+                    )
                 }
             }
             .padding(16)
