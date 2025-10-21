@@ -2243,8 +2243,33 @@ class CustomContractClient(
         }
 
         private suspend fun fetchMetadata(): TokenMetadata {
-            // Fetch metadata using individual calls
-            val name = client.invoke<String>(
+            // Option 1: Fetch metadata using funcResToNative (cleaner with spec)
+            val nameXdr = client.invoke<SCValXdr>(
+                functionName = "name",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null
+            )
+            val name = client.funcResToNative("name", nameXdr) as String
+
+            val symbolXdr = client.invoke<SCValXdr>(
+                functionName = "symbol",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null
+            )
+            val symbol = client.funcResToNative("symbol", symbolXdr) as String
+
+            val decimalsXdr = client.invoke<SCValXdr>(
+                functionName = "decimals",
+                arguments = emptyMap(),
+                source = contractId,
+                signer = null
+            )
+            val decimals = client.funcResToNative("decimals", decimalsXdr) as UInt
+
+            // Option 2: Using parseResultXdrFn (when custom parsing needed)
+            val nameAlt = client.invoke<String>(
                 functionName = "name",
                 arguments = emptyMap(),
                 source = contractId,
@@ -2252,26 +2277,10 @@ class CustomContractClient(
                 parseResultXdrFn = { Scv.fromString(it) }
             )
 
-            val symbol = client.invoke<String>(
-                functionName = "symbol",
-                arguments = emptyMap(),
-                source = contractId,
-                signer = null,
-                parseResultXdrFn = { Scv.fromString(it) }
-            )
-
-            val decimals = client.invoke<Int>(
-                functionName = "decimals",
-                arguments = emptyMap(),
-                source = contractId,
-                signer = null,
-                parseResultXdrFn = { Scv.fromU32(it).toInt() }
-            )
-
             return TokenMetadata(
                 name = name,
                 symbol = symbol,
-                decimals = decimals
+                decimals = decimals.toInt()
             )
         }
     }

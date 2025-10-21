@@ -462,7 +462,10 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
   - **Factory methods**: `fromNetwork()` loads spec, `withoutSpec()` for manual mode
   - **Beginner API**: `invoke()` with Map<String, Any?> arguments and auto-execution
   - **Power API**: `invokeWithXdr()` with List<SCValXdr> for manual control
-  - **Type conversion helpers**: `funcArgsToXdrSCValues()`, `nativeToXdrSCVal()`
+  - **Type conversion helpers**:
+    - `funcArgsToXdrSCValues()` - Convert native types to XDR arguments
+    - `funcResToNative()` - Convert XDR results to native types (inverse of nativeToXdrSCVal)
+    - Automatic type mapping based on contract spec
 - ✅ Smart contract deployment:
   - **One-step**: `deploy()` with Map-based constructor args
   - **Two-step**: `install()` + `deployFromWasmId()` for WASM reuse

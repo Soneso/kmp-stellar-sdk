@@ -40,7 +40,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 
 ## Features
 
-The demo app includes 7 comprehensive feature demonstrations:
+The demo app includes 8 comprehensive feature demonstrations:
 
 ### 1. Key Generation
 - Generate random Stellar Ed25519 keypairs
@@ -92,6 +92,14 @@ The demo app includes 7 comprehensive feature demonstrations:
 - Support for 4 demo contracts (hello_world, token, atomic_swap, auth)
 - Located in `shared/src/commonMain/resources/wasm/`
 - Demonstrates: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+
+### 8. Invoke Hello World Contract
+- Invoke deployed smart contracts with the "hello" function
+- Demonstrate spec-based type conversion and automatic result parsing
+- Use ContractClient to load contract specifications from the network
+- Showcase funcResToNative for parsing XDR results to native types
+- Real-time contract function invocation on testnet
+- Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `funcResToNative()`
 
 ## Project Structure
 

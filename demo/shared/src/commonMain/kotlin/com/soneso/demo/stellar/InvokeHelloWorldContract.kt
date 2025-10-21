@@ -41,7 +41,7 @@ sealed class InvokeHelloWorldResult {
  * - Initialize ContractClient from the network using a contract ID
  * - Use the beginner-friendly invoke() API with Map-based arguments
  * - Handle automatic type conversion from Kotlin types to Soroban XDR types
- * - Parse XDR results using custom result parsing functions
+ * - Parse results using the contract spec with funcResToNative()
  *
  * ## ContractClient API - Beginner Mode
  *
@@ -65,19 +65,20 @@ sealed class InvokeHelloWorldResult {
  *    - Read-only calls (signer = null): SDK simulates and returns result immediately
  *    - Write calls (signer provided): SDK simulates, signs, submits, and polls for result
  *
- * 4. **Result Parsing**: The result is parsed from XDR using a custom parsing function.
- *    The hello contract returns `Vec<String>` (a vector of strings), so we need to:
- *    - Cast the XDR to `SCValXdr.Vec`
- *    - Extract the vector elements
- *    - Map each element to a String
- *    - Join them to form the greeting
+ * 4. **Result Parsing with funcResToNative()**: The SDK provides automatic result parsing
+ *    using the contract specification. Instead of manually casting XDR types, we use
+ *    `funcResToNative()` which:
+ *    - Uses the contract spec to determine the expected return type
+ *    - Automatically converts XDR to native Kotlin types
+ *    - Handles complex types (vectors, maps, structs) automatically
+ *    - Provides cleaner, more maintainable code
  *
- * ## XDR Type Handling
+ * ## Automatic Result Parsing (New Approach)
  *
- * The hello contract returns a `Vec<String>` in XDR format. The SDK does not automatically
- * convert this to a Kotlin String, so we must provide a custom parser:
+ * The hello contract returns a `Vec<String>` in XDR format. Instead of manually parsing:
  *
  * ```kotlin
+ * // Old approach - manual parsing (verbose and error-prone)
  * parseResultXdrFn = { xdr ->
  *     val vec = (xdr as SCValXdr.Vec).value?.value
  *         ?: throw IllegalStateException("Expected Vec result")
@@ -87,11 +88,39 @@ sealed class InvokeHelloWorldResult {
  * }
  * ```
  *
- * This parser:
- * 1. Casts the XDR to `SCValXdr.Vec` (vector type)
- * 2. Extracts the inner list of elements
- * 3. Maps each element (expected to be `SCValXdr.Str`) to a Kotlin String
- * 4. Joins the strings with a space to form "Hello <name>"
+ * We now use `funcResToNative()` for automatic conversion:
+ *
+ * ```kotlin
+ * // New approach - spec-based parsing (clean and type-safe)
+ * val resultXdr = client.invoke<SCValXdr>(...)  // Get raw XDR
+ * val result = client.funcResToNative("hello", resultXdr) as? List<*>  // Auto-convert
+ * val greetings = result?.map { it.toString() } ?: emptyList()
+ * ```
+ *
+ * **Benefits of funcResToNative()**:
+ * - Uses contract specification for accurate type mapping
+ * - Reduces boilerplate parsing code
+ * - Less error-prone (no manual XDR casting)
+ * - Easier to maintain and understand
+ * - Consistent with SDK best practices
+ *
+ * ## Type Conversion Examples
+ *
+ * The SDK automatically handles type conversion for input arguments:
+ * - `String` → `SCValXdr.Str` or `SCValXdr.Symbol` (based on contract spec)
+ * - `Int` → `SCValXdr.U32`, `SCValXdr.I32`, etc. (based on contract spec)
+ * - `Boolean` → `SCValXdr.Bool`
+ * - `String` (G... format) → `SCAddressXdr` (Stellar address)
+ * - `ByteArray` → `SCValXdr.Bytes`
+ * - `List<T>` → `SCValXdr.Vec`
+ * - `Map<K, V>` → `SCValXdr.Map`
+ *
+ * And for output with `funcResToNative()`:
+ * - `SCValXdr.Str` → `String`
+ * - `SCValXdr.U32` → `UInt` or `Long`
+ * - `SCValXdr.Vec` → `List<*>`
+ * - `SCValXdr.Bool` → `Boolean`
+ * - `SCValXdr.Map` → `Map<*, *>`
  *
  * ## Usage Example
  *
@@ -115,25 +144,6 @@ sealed class InvokeHelloWorldResult {
  * }
  * ```
  *
- * ## Type Conversion Examples
- *
- * The SDK automatically handles type conversion for input arguments:
- * - `String` → `SCValXdr.Str` or `SCValXdr.Symbol` (based on contract spec)
- * - `Int` → `SCValXdr.U32`, `SCValXdr.I32`, etc. (based on contract spec)
- * - `Boolean` → `SCValXdr.Bool`
- * - `String` (G... format) → `SCAddressXdr` (Stellar address)
- * - `ByteArray` → `SCValXdr.Bytes`
- * - `List<T>` → `SCValXdr.Vec`
- * - `Map<K, V>` → `SCValXdr.Map`
- *
- * ## Return Type Parsing
- *
- * For output, the contract returns XDR types that need custom parsing:
- * - `SCValXdr.Str` → Extract `.value.value` to get String
- * - `SCValXdr.U32` → Extract `.value.value` to get UInt
- * - `SCValXdr.Vec` → Extract `.value?.value` to get List<SCValXdr>
- * - `SCValXdr.Bool` → Extract `.value.value` to get Boolean
- *
  * @param contractId The deployed contract ID (C... format, 56 characters)
  * @param to The name to greet (parameter for the hello function)
  * @param submitterAccountId The account ID that will submit the transaction (G... format)
@@ -143,6 +153,7 @@ sealed class InvokeHelloWorldResult {
  *
  * @see ContractClient.fromNetwork
  * @see ContractClient.invoke
+ * @see ContractClient.funcResToNative
  * @see <a href="https://developers.stellar.org/docs/smart-contracts/guides/dapps/initialization">Contract Invocation Guide</a>
  */
 suspend fun invokeHelloWorldContract(
@@ -228,7 +239,7 @@ suspend fun invokeHelloWorldContract(
 
         // Step 4: Initialize ContractClient from the network
         // This loads the contract specification (WASM metadata) from the network,
-        // which enables automatic type conversion in the invoke() method
+        // which enables automatic type conversion in both invoke() and funcResToNative()
         val client = try {
             ContractClient.fromNetwork(
                 contractId = contractId,
@@ -242,38 +253,34 @@ suspend fun invokeHelloWorldContract(
             )
         }
 
-        // Step 5: Invoke the "hello" function using the beginner API with custom XDR parsing
+        // Step 5: Invoke the "hello" function using the beginner API with automatic result parsing
         // The SDK will:
         // 1. Convert the Map arguments to XDR types based on the contract spec
         // 2. Build and simulate the transaction
         // 3. Sign the transaction with the provided signer
         // 4. Submit the transaction to the network
         // 5. Poll for the transaction result
-        // 6. Parse the result XDR using our custom parsing function
+        // 6. Return the raw XDR result
         //
-        // The hello contract returns Vec<String> (["Hello", <name>]) in XDR format,
-        // so we need a custom parser to extract and join the strings
+        // We then use funcResToNative() to parse the result automatically using the contract spec.
+        // This is cleaner than manually parsing XDR types.
         val greeting = try {
-            client.invoke(
+            // Get the raw XDR result from contract invocation
+            val resultXdr = client.invoke<SCValXdr>(
                 functionName = "hello",
                 arguments = mapOf("to" to to),  // Map-based arguments - SDK handles conversion
                 source = submitterAccountId,
-                signer = signerKeyPair,
-                parseResultXdrFn = { xdr ->
-                    // Parse Vec<String> result from XDR
-                    // The contract returns a vector with two elements: ["Hello", <name>]
-                    val vec = (xdr as SCValXdr.Vec).value?.value
-                        ?: throw IllegalStateException("Expected Vec result")
-
-                    // Map each XDR string element to a Kotlin String
-                    val strings = vec.map { element ->
-                        (element as SCValXdr.Str).value.value
-                    }
-
-                    // Join the strings to form "Hello <name>"
-                    strings.joinToString(" ")
-                }
+                signer = signerKeyPair
             )
+
+            // Use funcResToNative() for automatic result parsing based on contract spec
+            // The hello contract returns Vec<String> (["Hello", <name>])
+            // funcResToNative() automatically converts this to a Kotlin List<String>
+            val result = client.funcResToNative("hello", resultXdr) as? List<*>
+                ?: throw IllegalStateException("Expected List result from contract")
+
+            // Convert each element to String and join to form "Hello <name>"
+            result.map { it.toString() }.joinToString(" ")
         } catch (e: Exception) {
             return InvokeHelloWorldResult.Error(
                 message = "Failed to invoke contract function: ${e.message}",

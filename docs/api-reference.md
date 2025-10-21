@@ -1349,6 +1349,7 @@ class ContractClient private constructor(
     private val contractSpec: ContractSpec?
 ) {
     val server: SorobanServer
+    val spec: ContractSpec?  // Access to loaded contract spec
 
     companion object {
         // Factory method - loads spec from network
@@ -1385,6 +1386,46 @@ class ContractClient private constructor(
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
         options: ClientOptions = ClientOptions()
     ): AssembledTransaction<T>
+
+    // Type conversion helpers
+
+    /**
+     * Converts native Kotlin types to XDR SCVal arguments for a function.
+     * Uses contract spec to determine correct XDR types.
+     *
+     * @param functionName Contract function name
+     * @param arguments Map of parameter names to native values
+     * @return List of XDR SCVal values ready for contract invocation
+     */
+    fun funcArgsToXdrSCValues(
+        functionName: String,
+        arguments: Map<String, Any?>
+    ): List<SCValXdr>
+
+    /**
+     * Converts function result from XDR to native Kotlin type.
+     * Uses contract spec to determine expected return type.
+     *
+     * @param functionName Contract function name
+     * @param scVal Result XDR value from contract
+     * @return Native Kotlin value (type based on contract spec)
+     */
+    fun funcResToNative(
+        functionName: String,
+        scVal: SCValXdr
+    ): Any?
+
+    /**
+     * Converts function result from base64 XDR to native Kotlin type.
+     *
+     * @param functionName Contract function name
+     * @param base64Xdr Base64-encoded XDR string
+     * @return Native Kotlin value (type based on contract spec)
+     */
+    fun funcResToNative(
+        functionName: String,
+        base64Xdr: String
+    ): Any?
 
     // Deploy contract (one-step)
     companion object {
@@ -1499,7 +1540,138 @@ val newClient = ContractClient.deploy(
     rpcUrl = "https://soroban-testnet.stellar.org"
 )
 
+// Type conversion helpers
+val xdrArgs = client.funcArgsToXdrSCValues(
+    functionName = "transfer",
+    arguments = mapOf(
+        "from" to "GABC...",
+        "to" to "GDEF...",
+        "amount" to 1000L
+    )
+)
+
+// Manual result parsing (cleaner than parseResultXdrFn)
+val resultXdr = client.invoke<SCValXdr>(
+    functionName = "balance",
+    arguments = mapOf("account" to "GABC..."),
+    source = "GABC...",
+    signer = null
+)
+val balance = client.funcResToNative("balance", resultXdr) as BigInteger
+
+// Parse from base64 XDR string
+val base64Result = "AAAABgAAAAEAAAAA..." // From RPC
+val parsedBalance = client.funcResToNative("balance", base64Result) as BigInteger
+
 client.close()
+```
+
+#### Type Conversion: XDR ↔ Native
+
+The `funcResToNative` method automatically converts XDR types to native Kotlin types based on the contract spec:
+
+| XDR Type | Native Kotlin Type | Example Value |
+|----------|-------------------|---------------|
+| `SCV_BOOL` | `Boolean` | `true` |
+| `SCV_U32` | `UInt` | `42u` |
+| `SCV_I32` | `Int` | `42` |
+| `SCV_U64` | `ULong` | `1000000UL` |
+| `SCV_I64` | `Long` | `1000000L` |
+| `SCV_U128` | `BigInteger` | `BigInteger("123456789")` |
+| `SCV_I128` | `BigInteger` | `BigInteger("123456789")` |
+| `SCV_U256` | `BigInteger` | `BigInteger("999...")` |
+| `SCV_I256` | `BigInteger` | `BigInteger("999...")` |
+| `SCV_BYTES` | `ByteArray` | `byteArrayOf(1, 2, 3)` |
+| `SCV_STRING` | `String` | `"hello"` |
+| `SCV_SYMBOL` | `String` | `"symbol"` |
+| `SCV_VEC` | `List<Any?>` | `listOf(1, 2, 3)` |
+| `SCV_MAP` | `Map<*, *>` | `mapOf("key" to "value")` |
+| `SCV_ADDRESS` | `String` | `"GABC..."` |
+| `SCV_CONTRACT_INSTANCE` | `String` | `"CCONT..."` |
+| `SCV_LEDGER_KEY_CONTRACT_INSTANCE` | Special | Contract instance key |
+| `SCV_LEDGER_KEY_NONCE` | `Long` | `12345L` |
+| `SCV_TIMEPOINT` | `ULong` | `1234567890UL` |
+| `SCV_DURATION` | `ULong` | `3600UL` |
+| `SCV_VOID` | `null` | `null` |
+
+**Usage Examples:**
+
+```kotlin
+// Example 1: Token balance (i128)
+val balanceXdr = client.invoke<SCValXdr>(
+    functionName = "balance",
+    arguments = mapOf("id" to accountAddress),
+    source = accountAddress,
+    signer = null
+)
+val balance: BigInteger = client.funcResToNative("balance", balanceXdr) as BigInteger
+println("Balance: $balance stroops")
+
+// Example 2: Boolean flag
+val flagXdr = client.invoke<SCValXdr>(
+    functionName = "is_authorized",
+    arguments = mapOf("account" to accountAddress),
+    source = accountAddress,
+    signer = null
+)
+val isAuthorized: Boolean = client.funcResToNative("is_authorized", flagXdr) as Boolean
+
+// Example 3: String metadata
+val nameXdr = client.invoke<SCValXdr>(
+    functionName = "name",
+    arguments = emptyMap(),
+    source = accountAddress,
+    signer = null
+)
+val tokenName: String = client.funcResToNative("name", nameXdr) as String
+
+// Example 4: Complex types (Vec, Map)
+val holdersXdr = client.invoke<SCValXdr>(
+    functionName = "get_holders",
+    arguments = emptyMap(),
+    source = accountAddress,
+    signer = null
+)
+val holders: List<Any?> = client.funcResToNative("get_holders", holdersXdr) as List<Any?>
+
+// Example 5: Void return (no result)
+val voidXdr = client.invoke<SCValXdr>(
+    functionName = "burn",
+    arguments = mapOf("amount" to 1000),
+    source = accountAddress,
+    signer = keypair
+)
+val result = client.funcResToNative("burn", voidXdr)  // null for void
+```
+
+**Comparison: parseResultXdrFn vs funcResToNative**
+
+```kotlin
+// Approach 1: Using parseResultXdrFn (inline, explicit)
+val balance1 = client.invoke<Long>(
+    functionName = "balance",
+    arguments = mapOf("account" to accountAddress),
+    source = accountAddress,
+    signer = null,
+    parseResultXdrFn = { xdr ->
+        // Manual XDR parsing - you control the logic
+        (xdr as SCValXdr.I128).value.lo.value.toLong()
+    }
+)
+
+// Approach 2: Using funcResToNative (cleaner, automatic)
+val balanceXdr = client.invoke<SCValXdr>(
+    functionName = "balance",
+    arguments = mapOf("account" to accountAddress),
+    source = accountAddress,
+    signer = null
+)
+val balance2 = client.funcResToNative("balance", balanceXdr) as BigInteger
+// Uses contract spec to automatically determine correct type conversion
+
+// When to use each:
+// - parseResultXdrFn: Custom parsing logic, no spec, explicit control
+// - funcResToNative: Have spec, want automatic type conversion, cleaner code
 ```
 
 ### AssembledTransaction

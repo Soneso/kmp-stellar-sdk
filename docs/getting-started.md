@@ -410,10 +410,23 @@ val balance = client.invoke<Long>(
     parseResultXdrFn = { Scv.fromInt128(it).toLong() }
 )
 
+// Alternative: Using automatic type conversion (when spec is loaded)
+val balanceXdr = client.invoke<SCValXdr>(
+    functionName = "balance",
+    arguments = mapOf("account" to "GABC..."),
+    source = "GABC...",
+    signer = null
+)
+val balanceNative = client.funcResToNative("balance", balanceXdr) as BigInteger
+
 // For advanced usage, see the Soroban RPC Usage Guide
 ```
 
-For detailed smart contract operations, deployment, and advanced patterns, see the [Soroban RPC Usage Guide](SOROBAN_RPC_USAGE.md).
+**Helper Methods:**
+- `funcArgsToXdrSCValues()` - Convert native arguments to XDR
+- `funcResToNative()` - Convert XDR results back to native types (requires loaded spec)
+
+For detailed smart contract operations, deployment, and advanced patterns, see the [Soroban RPC Usage Guide](soroban-rpc-usage.md).
 
 ## Platform-Specific Examples
 

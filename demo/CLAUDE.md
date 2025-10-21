@@ -88,7 +88,7 @@ The demo includes **7 comprehensive features**:
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/ContractDetailsScreen.kt`
 - **Logic**: `stellar/ContractDetails.kt`
-- **Demonstrates**: Soroban RPC, contract WASM parsing, metadata display
+- **Demonstrates**: Soroban RPC, contract WASM parsing, metadata display, `funcResToNative()` usage for automatic result parsing
 
 ### 7. Deploy Smart Contract
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`

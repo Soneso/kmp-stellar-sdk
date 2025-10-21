@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.contract
 
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
 import com.soneso.stellar.sdk.xdr.*
@@ -852,6 +853,399 @@ class ContractSpecTest {
         assertTrue(vec.value[0] is SCValXdr.Sym)
     }
 
+    // ========== funcResToNative Tests ==========
+
+    @Test
+    fun testFuncResToNativeVoidReturn() {
+        val entries = listOf(
+            createFunctionEntryWithOutputs("test_void", emptyList(), emptyList())
+        )
+        val spec = ContractSpec(entries)
+
+        val voidVal = SCValXdr.Void(SCValTypeXdr.SCV_VOID)
+        val result = spec.funcResToNative("test_void", voidVal)
+        assertNull(result)
+    }
+
+    @Test
+    fun testFuncResToNativeVoidReturnThrowsOnNonVoid() {
+        val entries = listOf(
+            createFunctionEntryWithOutputs("test_void", emptyList(), emptyList())
+        )
+        val spec = ContractSpec(entries)
+
+        val nonVoidVal = SCValXdr.U32(Uint32Xdr(42u))
+        assertFailsWith<ContractSpecException> {
+            spec.funcResToNative("test_void", nonVoidVal)
+        }
+    }
+
+    @Test
+    fun testFuncResToNativeSingleOutput() {
+        val entries = listOf(
+            createFunctionEntryWithOutputs(
+                "get_balance",
+                emptyList(),
+                listOf(SCSpecTypeXdr.SC_SPEC_TYPE_I128)
+            )
+        )
+        val spec = ContractSpec(entries)
+
+        val balanceVal = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000000UL)))
+        val result = spec.funcResToNative("get_balance", balanceVal)
+
+        assertNotNull(result)
+        assertTrue(result is BigInteger)
+        assertEquals(BigInteger.fromLong(1000000L), result)
+    }
+
+    @Test
+    fun testFuncResToNativeMultipleOutputsNotSupported() {
+        val entries = listOf(
+            createFunctionEntryWithOutputs(
+                "multi_return",
+                emptyList(),
+                listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32, SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+
+        val result = SCValXdr.U32(Uint32Xdr(42u))
+        val exception = assertFailsWith<ContractSpecException> {
+            spec.funcResToNative("multi_return", result)
+        }
+        assertTrue(exception.message!!.contains("Multiple outputs not supported"))
+    }
+
+    @Test
+    fun testFuncResToNativeWithBase64() {
+        val entries = listOf(
+            createFunctionEntryWithOutputs(
+                "get_value",
+                emptyList(),
+                listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+
+        // Create a U32 value and encode to base64
+        val u32Val = SCValXdr.U32(Uint32Xdr(42u))
+        val base64 = u32Val.toXdrBase64()
+
+        val result = spec.funcResToNative("get_value", base64)
+        assertNotNull(result)
+        assertEquals(42u, result)
+    }
+
+    // ========== scValToNative Tests ==========
+
+    @Test
+    fun testScValToNativePrimitives() {
+        val spec = ContractSpec(emptyList())
+
+        // Bool
+        val boolVal = SCValXdr.B(true)
+        val boolResult = spec.scValToNative(boolVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL))
+        assertEquals(true, boolResult)
+
+        // U32
+        val u32Val = SCValXdr.U32(Uint32Xdr(42u))
+        val u32Result = spec.scValToNative(u32Val, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+        assertEquals(42u, u32Result)
+
+        // I32
+        val i32Val = SCValXdr.I32(Int32Xdr(-42))
+        val i32Result = spec.scValToNative(i32Val, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I32))
+        assertEquals(-42, i32Result)
+
+        // String
+        val stringVal = SCValXdr.Str(SCStringXdr("hello"))
+        val stringResult = spec.scValToNative(stringVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_STRING))
+        assertEquals("hello", stringResult)
+
+        // Symbol
+        val symbolVal = SCValXdr.Sym(SCSymbolXdr("my_symbol"))
+        val symbolResult = spec.scValToNative(symbolVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL))
+        assertEquals("my_symbol", symbolResult)
+
+        // Bytes
+        val bytesVal = SCValXdr.Bytes(SCBytesXdr(byteArrayOf(1, 2, 3)))
+        val bytesResult = spec.scValToNative(bytesVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES))
+        assertTrue(bytesResult is ByteArray)
+        assertContentEquals(byteArrayOf(1, 2, 3), bytesResult as ByteArray)
+    }
+
+    @Test
+    fun testScValToNativeBigIntegers() {
+        val spec = ContractSpec(emptyList())
+
+        // I128
+        val i128Val = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000UL)))
+        val i128Result = spec.scValToNative(i128Val, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I128))
+        assertTrue(i128Result is BigInteger)
+        assertEquals(BigInteger.fromLong(1000L), i128Result)
+
+        // U128
+        val u128Val = SCValXdr.U128(UInt128PartsXdr(Uint64Xdr(0UL), Uint64Xdr(2000UL)))
+        val u128Result = spec.scValToNative(u128Val, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U128))
+        assertTrue(u128Result is BigInteger)
+        assertEquals(BigInteger.fromLong(2000L), u128Result)
+    }
+
+    @Test
+    fun testScValToNativeAddress() {
+        val spec = ContractSpec(emptyList())
+        val accountId = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H"
+
+        val address = Address(accountId)
+        val addressVal = address.toSCVal()
+        val result = spec.scValToNative(addressVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS))
+
+        assertTrue(result is String)
+        assertEquals(accountId, result)
+    }
+
+    @Test
+    fun testScValToNativeVec() {
+        val spec = ContractSpec(emptyList())
+        val vecTypeDef = SCSpecTypeDefXdr.Vec(
+            SCSpecTypeVecXdr(createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+        )
+
+        val vecVal = SCValXdr.Vec(SCVecXdr(listOf(
+            SCValXdr.U32(Uint32Xdr(1u)),
+            SCValXdr.U32(Uint32Xdr(2u)),
+            SCValXdr.U32(Uint32Xdr(3u))
+        )))
+
+        val result = spec.scValToNative(vecVal, vecTypeDef)
+        assertTrue(result is List<*>)
+        val list = result as List<*>
+        assertEquals(3, list.size)
+        assertEquals(1u, list[0])
+        assertEquals(2u, list[1])
+        assertEquals(3u, list[2])
+    }
+
+    @Test
+    fun testScValToNativeMap() {
+        val spec = ContractSpec(emptyList())
+        val mapTypeDef = SCSpecTypeDefXdr.Map(
+            SCSpecTypeMapXdr(
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL),
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+
+        val mapVal = SCValXdr.Map(SCMapXdr(listOf(
+            SCMapEntryXdr(
+                SCValXdr.Sym(SCSymbolXdr("key1")),
+                SCValXdr.U32(Uint32Xdr(100u))
+            ),
+            SCMapEntryXdr(
+                SCValXdr.Sym(SCSymbolXdr("key2")),
+                SCValXdr.U32(Uint32Xdr(200u))
+            )
+        )))
+
+        val result = spec.scValToNative(mapVal, mapTypeDef)
+        assertTrue(result is List<*>)
+        val list = result as List<*>
+        assertEquals(2, list.size)
+
+        val pair1 = list[0] as Pair<*, *>
+        assertEquals("key1", pair1.first)
+        assertEquals(100u, pair1.second)
+
+        val pair2 = list[1] as Pair<*, *>
+        assertEquals("key2", pair2.first)
+        assertEquals(200u, pair2.second)
+    }
+
+    @Test
+    fun testScValToNativeTuple() {
+        val spec = ContractSpec(emptyList())
+        val tupleTypeDef = SCSpecTypeDefXdr.Tuple(
+            SCSpecTypeTupleXdr(listOf(
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32),
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+            ))
+        )
+
+        val tupleVal = SCValXdr.Vec(SCVecXdr(listOf(
+            SCValXdr.U32(Uint32Xdr(42u)),
+            SCValXdr.Str(SCStringXdr("hello"))
+        )))
+
+        val result = spec.scValToNative(tupleVal, tupleTypeDef)
+        assertTrue(result is List<*>)
+        val list = result as List<*>
+        assertEquals(2, list.size)
+        assertEquals(42u, list[0])
+        assertEquals("hello", list[1])
+    }
+
+    @Test
+    fun testScValToNativeEnum() {
+        val entries = listOf(
+            createEnumEntry("Status", listOf("Pending", "Active", "Completed"))
+        )
+        val spec = ContractSpec(entries)
+        val enumTypeDef = createUdtTypeDef("Status")
+
+        val enumVal = SCValXdr.U32(Uint32Xdr(1u)) // Active
+        val result = spec.scValToNative(enumVal, enumTypeDef)
+
+        assertTrue(result is UInt)
+        assertEquals(1u, result)
+    }
+
+    @Test
+    fun testScValToNativeStruct() {
+        val entries = listOf(
+            createStructEntry("Person", listOf(
+                "name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL,
+                "age" to SCSpecTypeXdr.SC_SPEC_TYPE_U32
+            ))
+        )
+        val spec = ContractSpec(entries)
+        val structTypeDef = createUdtTypeDef("Person")
+
+        val structVal = SCValXdr.Map(SCMapXdr(listOf(
+            SCMapEntryXdr(
+                SCValXdr.Sym(SCSymbolXdr("name")),
+                SCValXdr.Sym(SCSymbolXdr("Alice"))
+            ),
+            SCMapEntryXdr(
+                SCValXdr.Sym(SCSymbolXdr("age")),
+                SCValXdr.U32(Uint32Xdr(30u))
+            )
+        )))
+
+        val result = spec.scValToNative(structVal, structTypeDef)
+        assertTrue(result is Map<*, *>)
+        val map = result as Map<*, *>
+        assertEquals("Alice", map["name"])
+        assertEquals(30u, map["age"])
+    }
+
+    @Test
+    fun testScValToNativeUnionVoidCase() {
+        val entries = listOf(
+            createUnionEntry("Result", listOf("Success" to 0))
+        )
+        val spec = ContractSpec(entries)
+        val unionTypeDef = createUdtTypeDef("Result")
+
+        val unionVal = SCValXdr.Vec(SCVecXdr(listOf(
+            SCValXdr.Sym(SCSymbolXdr("Success"))
+        )))
+
+        val result = spec.scValToNative(unionVal, unionTypeDef)
+        assertTrue(result is NativeUnionVal.VoidCase)
+        assertEquals("Success", result.tag)
+    }
+
+    @Test
+    fun testScValToNativeUnionTupleCase() {
+        val entries = listOf(
+            createUnionEntryWithTupleCase(
+                "Result",
+                "Error" to listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32, SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val unionTypeDef = createUdtTypeDef("Result")
+
+        val unionVal = SCValXdr.Vec(SCVecXdr(listOf(
+            SCValXdr.Sym(SCSymbolXdr("Error")),
+            SCValXdr.U32(Uint32Xdr(404u)),
+            SCValXdr.Str(SCStringXdr("Not Found"))
+        )))
+
+        val result = spec.scValToNative(unionVal, unionTypeDef)
+        assertTrue(result is NativeUnionVal.TupleCase)
+        assertEquals("Error", result.tag)
+        assertEquals(2, result.values.size)
+        assertEquals(404u, result.values[0])
+        assertEquals("Not Found", result.values[1])
+    }
+
+    // ========== Round-Trip Conversion Tests ==========
+
+    @Test
+    fun testRoundTripPrimitives() {
+        val spec = ContractSpec(emptyList())
+
+        // Boolean
+        val boolTypeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL)
+        val boolScVal = spec.nativeToXdrSCVal(true, boolTypeDef)
+        val boolResult = spec.scValToNative(boolScVal, boolTypeDef)
+        assertEquals(true, boolResult)
+
+        // U32
+        val u32TypeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+        val u32ScVal = spec.nativeToXdrSCVal(42, u32TypeDef)
+        val u32Result = spec.scValToNative(u32ScVal, u32TypeDef)
+        assertEquals(42u, u32Result)
+
+        // String
+        val stringTypeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+        val stringScVal = spec.nativeToXdrSCVal("hello", stringTypeDef)
+        val stringResult = spec.scValToNative(stringScVal, stringTypeDef)
+        assertEquals("hello", stringResult)
+    }
+
+    @Test
+    fun testRoundTripVec() {
+        val spec = ContractSpec(emptyList())
+        val vecTypeDef = SCSpecTypeDefXdr.Vec(
+            SCSpecTypeVecXdr(createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+        )
+
+        val original = listOf(1, 2, 3, 4, 5)
+        val scVal = spec.nativeToXdrSCVal(original, vecTypeDef)
+        val result = spec.scValToNative(scVal, vecTypeDef)
+
+        assertTrue(result is List<*>)
+        val list = result as List<*>
+        assertEquals(5, list.size)
+        assertEquals(listOf(1u, 2u, 3u, 4u, 5u), list)
+    }
+
+    @Test
+    fun testRoundTripStruct() {
+        val entries = listOf(
+            createStructEntry("Person", listOf(
+                "name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL,
+                "age" to SCSpecTypeXdr.SC_SPEC_TYPE_U32
+            ))
+        )
+        val spec = ContractSpec(entries)
+        val structTypeDef = createUdtTypeDef("Person")
+
+        val original = mapOf("name" to "Alice", "age" to 30)
+        val scVal = spec.nativeToXdrSCVal(original, structTypeDef)
+        val result = spec.scValToNative(scVal, structTypeDef)
+
+        assertTrue(result is Map<*, *>)
+        val map = result as Map<*, *>
+        assertEquals("Alice", map["name"])
+        assertEquals(30u, map["age"])
+    }
+
+    @Test
+    fun testRoundTripAddress() {
+        val spec = ContractSpec(emptyList())
+        val addressTypeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS)
+        val accountId = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H"
+
+        val scVal = spec.nativeToXdrSCVal(accountId, addressTypeDef)
+        val result = spec.scValToNative(scVal, addressTypeDef)
+
+        assertEquals(accountId, result)
+    }
+
     // ========== Helper Functions ==========
 
     private fun createFunctionEntry(
@@ -895,6 +1289,33 @@ class ContractSpecTest {
                 name = SCSymbolXdr(name),
                 inputs = inputList,
                 outputs = emptyList()
+            )
+        )
+    }
+
+    private fun createFunctionEntryWithOutputs(
+        name: String,
+        inputs: List<Pair<String, SCSpecTypeXdr>>,
+        outputs: List<SCSpecTypeXdr>
+    ): SCSpecEntryXdr {
+        val inputList = inputs.map { (inputName, inputType) ->
+            SCSpecFunctionInputV0Xdr(
+                doc = "",
+                name = inputName,
+                type = createTypeDef(inputType)
+            )
+        }
+
+        val outputList = outputs.map { outputType ->
+            createTypeDef(outputType)
+        }
+
+        return SCSpecEntryXdr.FunctionV0(
+            SCSpecFunctionV0Xdr(
+                doc = "",
+                name = SCSymbolXdr(name),
+                inputs = inputList,
+                outputs = outputList
             )
         )
     }
@@ -953,6 +1374,29 @@ class ContractSpecTest {
                 lib = "",
                 name = name,
                 cases = unionCases
+            )
+        )
+    }
+
+    private fun createUnionEntryWithTupleCase(
+        name: String,
+        tupleCase: Pair<String, List<SCSpecTypeXdr>>
+    ): SCSpecEntryXdr {
+        val (caseName, types) = tupleCase
+        val unionCase = SCSpecUDTUnionCaseV0Xdr.TupleCase(
+            SCSpecUDTUnionCaseTupleV0Xdr(
+                doc = "",
+                name = caseName,
+                type = types.map { createTypeDef(it) }
+            )
+        )
+
+        return SCSpecEntryXdr.UdtUnionV0(
+            SCSpecUDTUnionV0Xdr(
+                doc = "",
+                lib = "",
+                name = name,
+                cases = listOf(unionCase)
             )
         )
     }

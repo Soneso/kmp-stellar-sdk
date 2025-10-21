@@ -316,6 +316,23 @@ suspend fun transferTokens() {
     // Automatically signs, submits, and polls for completion
 }
 
+// Manual result parsing with funcResToNative (when spec is loaded)
+suspend fun getTokenBalanceWithManualParsing() {
+    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
+
+    // Get raw XDR result
+    val resultXdr = client.invoke<SCValXdr>(
+        functionName = "balance",
+        arguments = mapOf("account" to accountAddress),
+        source = sourceAccount,
+        signer = null
+    )
+
+    // Parse using contract spec (automatic type conversion)
+    val balance = client.funcResToNative("balance", resultXdr) as BigInteger
+    println("Parsed balance: $balance")
+}
+
 // Deploy a new smart contract
 suspend fun deployContract() {
     val wasmBytes = File("token.wasm").readBytes()
@@ -406,7 +423,7 @@ For more examples, see the [Getting Started Guide](docs/getting-started.md) and 
 
 ## Demo Application
 
-The [demo app](demo/README.md) showcases SDK usage across all platforms with 7 comprehensive features:
+The [demo app](demo/README.md) showcases SDK usage across all platforms with 8 comprehensive features:
 
 1. **Key Generation** - Generate and manage Ed25519 keypairs
 2. **Fund Testnet Account** - Get free test XLM from Friendbot
@@ -415,6 +432,7 @@ The [demo app](demo/README.md) showcases SDK usage across all platforms with 7 c
 5. **Send Payment** - Transfer XLM and issued assets
 6. **Fetch Smart Contract Details** - Parse and inspect Soroban contracts
 7. **Deploy Smart Contract** - Deploy Soroban WASM contracts to testnet
+8. **Invoke Hello World Contract** - Demonstrates smart contract invocation with automatic result parsing using funcResToNative
 
 Run the demo:
 

@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.contract
 
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.math.abs
 
@@ -190,6 +191,364 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     }
 
     /**
+     * Converts a contract function result from XDR to a native Kotlin value.
+     *
+     * This method takes the XDR result value returned from a contract function call and
+     * converts it back to a native Kotlin type based on the function's output specification.
+     *
+     * ## Usage
+     *
+     * ```kotlin
+     * // With SCValXdr
+     * val result = spec.funcResToNative("balance", resultScVal)
+     *
+     * // With base64-encoded XDR
+     * val result = spec.funcResToNative("balance", "AAAAAwAAAAQ=")
+     * ```
+     *
+     * @param functionName The function name
+     * @param scVal The result value as SCValXdr
+     * @return The converted native Kotlin value, or null for void results
+     * @throws ContractSpecException if the function is not found, has multiple outputs, or type conversion fails
+     */
+    fun funcResToNative(functionName: String, scVal: SCValXdr): Any? {
+        val func = getFunc(functionName)
+            ?: throw ContractSpecException.functionNotFound(functionName)
+
+        val outputs = func.outputs
+
+        // Handle void return (no outputs)
+        if (outputs.isEmpty()) {
+            if (scVal.discriminant != SCValTypeXdr.SCV_VOID) {
+                throw ContractSpecException.invalidType(
+                    "Expected void return, got ${scVal.discriminant}"
+                )
+            }
+            return null
+        }
+
+        // Multiple outputs not supported
+        if (outputs.size > 1) {
+            throw ContractSpecException.conversionFailed(
+                "Multiple outputs not supported (function $functionName has ${outputs.size} outputs)"
+            )
+        }
+
+        val output = outputs[0]
+
+        // Handle Result type outputs
+        if (output is SCSpecTypeDefXdr.Result) {
+            // For Result types, we convert the ok value
+            // Note: Error handling for Result types would be done at a higher level
+            return scValToNative(scVal, output.value.okType)
+        }
+
+        return scValToNative(scVal, output)
+    }
+
+    /**
+     * Converts a contract function result from base64-encoded XDR to a native Kotlin value.
+     *
+     * This is a convenience overload that first decodes the base64 XDR string before conversion.
+     *
+     * @param functionName The function name
+     * @param base64Xdr The result value as base64-encoded XDR string
+     * @return The converted native Kotlin value, or null for void results
+     * @throws ContractSpecException if the function is not found, has multiple outputs, or type conversion fails
+     */
+    fun funcResToNative(functionName: String, base64Xdr: String): Any? {
+        val scVal = SCValXdr.fromXdrBase64(base64Xdr)
+        return funcResToNative(functionName, scVal)
+    }
+
+    /**
+     * Converts an SCValXdr to a native Kotlin value based on the type specification.
+     *
+     * This is the core conversion method that handles all type mappings from Stellar XDR
+     * values to Kotlin native types. It's the inverse operation of [nativeToXdrSCVal].
+     *
+     * ## Type Mappings
+     *
+     * - **Void** → null
+     * - **Bool** → Boolean
+     * - **U32, I32** → Int/UInt
+     * - **U64, I64** → Long/ULong
+     * - **U128, I128, U256, I256** → BigInteger
+     * - **String, Symbol** → String
+     * - **Bytes** → ByteArray
+     * - **Address** → String (StrKey-encoded)
+     * - **Timepoint, Duration** → ULong
+     * - **Vec** → List<Any?>
+     * - **Map** → List<Pair<Any?, Any?>>
+     * - **Tuple** → List<Any?>
+     * - **UDT (struct)** → Map<String, Any?> or List<Any?> (depending on field names)
+     * - **UDT (union)** → NativeUnionVal
+     * - **UDT (enum)** → UInt
+     *
+     * @param scVal The XDR value to convert
+     * @param typeDef The type specification
+     * @return The converted native Kotlin value
+     * @throws ContractSpecException for invalid types or conversion failures
+     */
+    fun scValToNative(scVal: SCValXdr, typeDef: SCSpecTypeDefXdr): Any? {
+        // Handle UDT types first
+        if (typeDef is SCSpecTypeDefXdr.Udt) {
+            return scValUdtToNative(scVal, typeDef.value)
+        }
+
+        // Handle based on SCVal discriminant
+        return when (scVal.discriminant) {
+            SCValTypeXdr.SCV_VOID -> null
+
+            SCValTypeXdr.SCV_BOOL -> {
+                require(scVal is SCValXdr.B) { "Expected SCValXdr.B for SCV_BOOL" }
+                scVal.value
+            }
+
+            SCValTypeXdr.SCV_U32 -> {
+                require(scVal is SCValXdr.U32) { "Expected SCValXdr.U32 for SCV_U32" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_I32 -> {
+                require(scVal is SCValXdr.I32) { "Expected SCValXdr.I32 for SCV_I32" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_U64 -> {
+                require(scVal is SCValXdr.U64) { "Expected SCValXdr.U64 for SCV_U64" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_I64 -> {
+                require(scVal is SCValXdr.I64) { "Expected SCValXdr.I64 for SCV_I64" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_U128 -> {
+                require(scVal is SCValXdr.U128) { "Expected SCValXdr.U128 for SCV_U128" }
+                Scv.fromUint128(scVal)
+            }
+
+            SCValTypeXdr.SCV_I128 -> {
+                require(scVal is SCValXdr.I128) { "Expected SCValXdr.I128 for SCV_I128" }
+                Scv.fromInt128(scVal)
+            }
+
+            SCValTypeXdr.SCV_U256 -> {
+                require(scVal is SCValXdr.U256) { "Expected SCValXdr.U256 for SCV_U256" }
+                Scv.fromUint256(scVal)
+            }
+
+            SCValTypeXdr.SCV_I256 -> {
+                require(scVal is SCValXdr.I256) { "Expected SCValXdr.I256 for SCV_I256" }
+                Scv.fromInt256(scVal)
+            }
+
+            SCValTypeXdr.SCV_BYTES -> {
+                require(scVal is SCValXdr.Bytes) { "Expected SCValXdr.Bytes for SCV_BYTES" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_STRING -> {
+                require(scVal is SCValXdr.Str) { "Expected SCValXdr.Str for SCV_STRING" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_SYMBOL -> {
+                require(scVal is SCValXdr.Sym) { "Expected SCValXdr.Sym for SCV_SYMBOL" }
+                scVal.value.value
+            }
+
+            SCValTypeXdr.SCV_ADDRESS -> {
+                require(scVal is SCValXdr.Address) { "Expected SCValXdr.Address for SCV_ADDRESS" }
+                Address.fromSCVal(scVal).toString()
+            }
+
+            SCValTypeXdr.SCV_TIMEPOINT -> {
+                require(scVal is SCValXdr.Timepoint) { "Expected SCValXdr.Timepoint for SCV_TIMEPOINT" }
+                scVal.value.value.value
+            }
+
+            SCValTypeXdr.SCV_DURATION -> {
+                require(scVal is SCValXdr.Duration) { "Expected SCValXdr.Duration for SCV_DURATION" }
+                scVal.value.value.value
+            }
+
+            SCValTypeXdr.SCV_VEC -> {
+                require(scVal is SCValXdr.Vec) { "Expected SCValXdr.Vec for SCV_VEC" }
+                val vec = scVal.value?.value ?: emptyList()
+
+                when (typeDef) {
+                    is SCSpecTypeDefXdr.Vec -> {
+                        // Convert each element based on the vec's element type
+                        vec.map { element ->
+                            scValToNative(element, typeDef.value.elementType)
+                        }
+                    }
+                    is SCSpecTypeDefXdr.Tuple -> {
+                        // Convert each element based on the tuple's type definitions
+                        val valueTypes = typeDef.value.valueTypes
+                        vec.mapIndexed { index, element ->
+                            scValToNative(element, valueTypes[index])
+                        }
+                    }
+                    else -> {
+                        throw ContractSpecException.invalidType(
+                            "Type ${typeDef.discriminant} was not vec or tuple, but scVal is SCV_VEC"
+                        )
+                    }
+                }
+            }
+
+            SCValTypeXdr.SCV_MAP -> {
+                require(scVal is SCValXdr.Map) { "Expected SCValXdr.Map for SCV_MAP" }
+                val map = scVal.value?.value ?: emptyList()
+
+                when (typeDef) {
+                    is SCSpecTypeDefXdr.Map -> {
+                        // Convert to list of pairs (key, value)
+                        val keyType = typeDef.value.keyType
+                        val valueType = typeDef.value.valueType
+                        map.map { entry ->
+                            Pair(
+                                scValToNative(entry.key, keyType),
+                                scValToNative(entry.`val`, valueType)
+                            )
+                        }
+                    }
+                    else -> {
+                        throw ContractSpecException.invalidType(
+                            "Type ${typeDef.discriminant} was not map, but scVal is SCV_MAP"
+                        )
+                    }
+                }
+            }
+
+            else -> {
+                throw ContractSpecException.conversionFailed(
+                    "Failed to convert ${scVal.discriminant} to native type from type ${typeDef.discriminant}"
+                )
+            }
+        }
+    }
+
+    // ========== Private Helper Methods for scValToNative ==========
+
+    /**
+     * Converts a UDT (User-Defined Type) SCVal to native Kotlin value.
+     */
+    private fun scValUdtToNative(scVal: SCValXdr, udt: SCSpecTypeUDTXdr): Any? {
+        val entry = findEntry(udt.name)
+            ?: throw ContractSpecException.entryNotFound(udt.name)
+
+        return when (entry) {
+            is SCSpecEntryXdr.UdtEnumV0 -> enumToNative(scVal)
+            is SCSpecEntryXdr.UdtStructV0 -> structToNative(scVal, entry.value)
+            is SCSpecEntryXdr.UdtUnionV0 -> unionToNative(scVal, entry.value)
+            else -> {
+                throw ContractSpecException.invalidType(
+                    "Failed to parse UDT ${udt.name}: unsupported entry type ${entry.discriminant}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Converts an enum SCVal to native UInt value.
+     */
+    private fun enumToNative(scVal: SCValXdr): UInt {
+        require(scVal is SCValXdr.U32) {
+            "Enum must have a u32 value, got ${scVal.discriminant}"
+        }
+        return scVal.value.value
+    }
+
+    /**
+     * Converts a struct SCVal to native Map or List.
+     */
+    private fun structToNative(scVal: SCValXdr, structDef: SCSpecUDTStructV0Xdr): Any {
+        val fields = structDef.fields
+
+        // Determine if struct uses numeric field names (will be represented as Vec)
+        // or named fields (will be represented as Map)
+        if (fields.any { isNumericString(it.name) }) {
+            // Vec representation (numeric field names)
+            require(scVal is SCValXdr.Vec) {
+                "Expected SCV_VEC for struct with numeric fields, got ${scVal.discriminant}"
+            }
+            val vec = scVal.value?.value ?: emptyList()
+            return vec.mapIndexed { index, element ->
+                scValToNative(element, fields[index].type)
+            }
+        } else {
+            // Map representation (named fields)
+            require(scVal is SCValXdr.Map) {
+                "Expected SCV_MAP for struct with named fields, got ${scVal.discriminant}"
+            }
+            val map = scVal.value?.value ?: emptyList()
+            val result = mutableMapOf<String, Any?>()
+            map.forEachIndexed { index, entry ->
+                val field = fields[index]
+                val fieldName = field.name
+                result[fieldName] = scValToNative(entry.`val`, field.type)
+            }
+            return result
+        }
+    }
+
+    /**
+     * Converts a union SCVal to native NativeUnionVal.
+     */
+    private fun unionToNative(scVal: SCValXdr, unionDef: SCSpecUDTUnionV0Xdr): NativeUnionVal {
+        require(scVal is SCValXdr.Vec) {
+            "Union must be represented as SCV_VEC, got ${scVal.discriminant}"
+        }
+        val vec = scVal.value?.value ?: emptyList()
+
+        if (vec.isEmpty() && unionDef.cases.isNotEmpty()) {
+            throw ContractSpecException.invalidType(
+                "Union vec has length 0, but there are at least one case in the union"
+            )
+        }
+
+        // First element is the tag (symbol)
+        val tagScVal = vec[0]
+        require(tagScVal is SCValXdr.Sym) {
+            "Union tag must be a symbol, got ${tagScVal.discriminant}"
+        }
+        val tag = tagScVal.value.value
+
+        // Find the matching union case
+        val matchingCase = unionDef.cases.firstOrNull { unionCase ->
+            val caseName = when (unionCase) {
+                is SCSpecUDTUnionCaseV0Xdr.VoidCase -> unionCase.value.name
+                is SCSpecUDTUnionCaseV0Xdr.TupleCase -> unionCase.value.name
+            }
+            caseName == tag
+        } ?: throw ContractSpecException.invalidType(
+            "Failed to find union case '$tag' in union ${unionDef.name}"
+        )
+
+        // Convert based on case type
+        return when (matchingCase) {
+            is SCSpecUDTUnionCaseV0Xdr.VoidCase -> {
+                NativeUnionVal.VoidCase(tag)
+            }
+            is SCSpecUDTUnionCaseV0Xdr.TupleCase -> {
+                val tupleCase = matchingCase.value
+                val types = tupleCase.type
+                val values = types.mapIndexed { index, typeDef ->
+                    scValToNative(vec[index + 1], typeDef)
+                }
+                NativeUnionVal.TupleCase(tag, values)
+            }
+        }
+    }
+
+    // ========== Private Helper Methods for nativeToXdrSCVal ==========
+
+    /**
      * Converts a native Kotlin value to an SCValXdr based on the type specification.
      *
      * This is the core conversion method that handles all type mappings from Kotlin
@@ -224,8 +583,6 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
             is SCSpecTypeDefXdr.Udt -> handleUDTType(value, typeDef)
         }
     }
-
-    // ========== Private Helper Methods ==========
 
     /**
      * Handles basic value types (bool, numbers, strings, addresses, etc.)

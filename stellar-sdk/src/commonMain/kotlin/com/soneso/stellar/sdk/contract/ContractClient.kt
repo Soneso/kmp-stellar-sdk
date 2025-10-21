@@ -12,17 +12,28 @@ import kotlin.random.Random
  * ## Beginner-Friendly Usage (Recommended)
  *
  * ```kotlin
- * // Load spec from network
+ * // Load spec from network - enables automatic type conversion and result parsing!
  * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
  *
- * // Invoke with native types - simple!
- * val balance = client.invoke<Long>(
+ * // Invoke with native types - automatic argument conversion
+ * val balance = client.invoke(
  *     functionName = "balance",
  *     arguments = mapOf("account" to "GABC..."),
  *     source = sourceAccount,
  *     signer = null,
- *     parseResultXdrFn = { Scv.fromInt128(it).toLong() }
+ *     parseResultXdrFn = { xdr ->
+ *         (xdr as SCValXdr.I128).value.lo.value.toLong()
+ *     }
  * )
+ *
+ * // Or use manual result parsing with funcResToNative
+ * val resultXdr = client.invoke(
+ *     functionName = "balance",
+ *     arguments = mapOf("account" to "GABC..."),
+ *     source = sourceAccount,
+ *     signer = null
+ * )
+ * val balance = client.funcResToNative("balance", resultXdr) as BigInteger
  * ```
  *
  * ## Power User Options
@@ -36,6 +47,27 @@ import kotlin.random.Random
  * assembled.simulate()
  * val result = assembled.signAndSubmit(keypair)
  * ```
+ *
+ * ## Result Parsing
+ *
+ * ContractClient provides helper methods for manual result parsing:
+ * - `funcResToNative(functionName, scVal)` - Convert XDR result to native Kotlin types
+ * - `funcArgsToXdrSCValues(functionName, args)` - Convert native arguments to XDR
+ *
+ * Type mapping (Soroban → Kotlin):
+ * | Soroban Type | Kotlin Type |
+ * |--------------|-------------|
+ * | u32, i32     | UInt, Int   |
+ * | u64, i64     | ULong, Long |
+ * | u128, i128   | BigInteger  |
+ * | bool         | Boolean     |
+ * | symbol, string | String    |
+ * | address      | String      |
+ * | bytes        | ByteArray   |
+ * | vec<T>       | List<T>     |
+ * | map<K, V>    | Map<K, V>   |
+ * | option<T>    | T?          |
+ * | void         | null        |
  *
  * @property contractId The contract ID to interact with (C... address)
  * @property rpcUrl The RPC server URL
@@ -72,15 +104,59 @@ class ContractClient private constructor(
      * - Auto read/write detection - reads return immediately, writes are signed/submitted
      * - Direct result return - no manual .result() or .signAndSubmit() needed
      *
+     * ## Result Parsing Options
+     *
+     * You have two options for parsing results:
+     *
+     * **Option 1: Custom Parser (parseResultXdrFn)**
+     * ```kotlin
+     * val balance = client.invoke(
+     *     functionName = "balance",
+     *     arguments = mapOf("id" to accountId),
+     *     source = sourceAccount,
+     *     signer = null,
+     *     parseResultXdrFn = { xdr ->
+     *         (xdr as SCValXdr.I128).value.lo.value.toLong()
+     *     }
+     * )
+     * ```
+     *
+     * **Option 2: Manual Parsing with funcResToNative**
+     * ```kotlin
+     * val resultXdr = client.invoke(
+     *     functionName = "balance",
+     *     arguments = mapOf("id" to accountId),
+     *     source = sourceAccount,
+     *     signer = null
+     * )
+     * val balance = client.funcResToNative("balance", resultXdr) as BigInteger
+     * ```
+     *
+     * ## API Modes
+     *
+     * **Beginner API (this method)**:
+     * - Automatic argument conversion: Map<String, Any?> → XDR
+     * - Flexible result parsing: parseResultXdrFn or funcResToNative
+     * - Auto-execution (reads return results, writes auto-submit)
+     * - Requires contract spec (use [fromNetwork])
+     *
+     * **Power API ([invokeWithXdr])**:
+     * - Manual XDR construction: List<SCValXdr>
+     * - Manual result handling: Returns raw SCValXdr
+     * - Manual transaction control: Returns [AssembledTransaction]
+     * - Works with or without spec
+     *
      * Requires contract spec (use [fromNetwork] or [deploy]).
      *
      * @param functionName The contract function to invoke
      * @param arguments Function arguments as Map<String, Any> (native Kotlin types)
      * @param source The source account (G... or M... address)
      * @param signer KeyPair for signing (null for read-only calls)
-     * @param parseResultXdrFn Optional function to parse result XDR
+     * @param parseResultXdrFn Optional custom function to parse result XDR
      * @param options Invocation options
-     * @return The parsed result value directly
+     * @return The parsed result value (using parseResultXdrFn if provided, otherwise raw SCValXdr)
+     * @throws IllegalStateException if contract spec not loaded
+     * @throws IllegalArgumentException if method not found or invalid arguments
      */
     suspend fun <T> invoke(
         functionName: String,
@@ -211,13 +287,96 @@ class ContractClient private constructor(
     }
 
     /**
+     * Convert a contract function result from XDR to native Kotlin types.
+     *
+     * This is a **power-user helper** that exposes the result parsing logic.
+     * Use this when you want control over result parsing or need to parse
+     * results obtained outside of the standard invoke flow.
+     *
+     * Requires contract spec (use [fromNetwork]).
+     *
+     * @param functionName The function name
+     * @param scVal The result value as SCValXdr
+     * @return The converted native Kotlin value, or null for void results
+     * @throws IllegalStateException if contract spec not loaded
+     * @throws com.soneso.stellar.sdk.contract.exception.ContractSpecException if function not found or conversion fails
+     *
+     * @sample
+     * ```kotlin
+     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     *
+     * // Parse contract result to native type
+     * val resultXdr = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000000UL)))
+     * val balance = client.funcResToNative("balance", resultXdr) as BigInteger
+     * println("Balance: $balance")  // BigInteger(1000000)
+     * ```
+     */
+    fun funcResToNative(functionName: String, scVal: SCValXdr): Any? {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "funcResToNative requires ContractSpec. " +
+                "Use ContractClient.fromNetwork()."
+            )
+
+        return spec.funcResToNative(functionName, scVal)
+    }
+
+    /**
+     * Convert a contract function result from base64-encoded XDR to native Kotlin types.
+     *
+     * This is a **convenience overload** that first decodes the base64 XDR string
+     * before converting to native types.
+     *
+     * Requires contract spec (use [fromNetwork]).
+     *
+     * @param functionName The function name
+     * @param base64Xdr The result value as base64-encoded XDR string
+     * @return The converted native Kotlin value, or null for void results
+     * @throws IllegalStateException if contract spec not loaded
+     * @throws com.soneso.stellar.sdk.contract.exception.ContractSpecException if function not found or conversion fails
+     *
+     * @sample
+     * ```kotlin
+     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     *
+     * // Parse base64-encoded result
+     * val base64Result = "AAAAAwAAAAQ="  // Encoded SCVal
+     * val value = client.funcResToNative("get_value", base64Result) as UInt
+     * println("Value: $value")
+     * ```
+     */
+    fun funcResToNative(functionName: String, base64Xdr: String): Any? {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "funcResToNative requires ContractSpec. " +
+                "Use ContractClient.fromNetwork()."
+            )
+
+        return spec.funcResToNative(functionName, base64Xdr)
+    }
+
+    /**
      * Invoke a contract function with manual XDR construction (ADVANCED).
      *
      * This is the **advanced method** for when you need full control over
      * XDR construction and transaction execution.
      *
      * Returns an [AssembledTransaction] that you control manually.
-     * Most developers should use [invoke] instead.
+     * Results are **NOT** automatically parsed - you get raw SCValXdr.
+     *
+     * Most developers should use [invoke] instead for automatic type conversion.
+     *
+     * ## Beginner API vs Power API
+     *
+     * **Beginner API ([invoke])**:
+     * - Arguments: Map<String, Any?> (automatic conversion)
+     * - Results: Flexible (parseResultXdrFn or funcResToNative)
+     * - Execution: Automatic (reads return, writes auto-submit)
+     *
+     * **Power API (this method)**:
+     * - Arguments: List<SCValXdr> (manual XDR)
+     * - Results: Raw SCValXdr (manual parsing)
+     * - Execution: Manual via AssembledTransaction
      *
      * @param functionName The contract function to invoke
      * @param parameters Function parameters as XDR (List<SCValXdr>)
@@ -226,6 +385,23 @@ class ContractClient private constructor(
      * @param parseResultXdrFn Optional result parser
      * @param options Invocation options
      * @return AssembledTransaction for manual control
+     *
+     * @sample
+     * ```kotlin
+     * // Power API - Manual XDR construction
+     * val params = listOf(
+     *     Address(accountId).toSCVal(),
+     *     Scv.toInt128(BigInteger.fromInt(1000))
+     * )
+     * val assembled = client.invokeWithXdr("transfer", params, source, keypair)
+     *
+     * // Manual simulation and execution
+     * assembled.simulate()
+     * val resultXdr = assembled.signAndSubmit(keypair)
+     *
+     * // Manual result parsing
+     * val balance = client.funcResToNative("transfer", resultXdr) as BigInteger
+     * ```
      */
     suspend fun <T> invokeWithXdr(
         functionName: String,
@@ -319,6 +495,7 @@ class ContractClient private constructor(
          * - Automatic type conversion (native Kotlin types → XDR)
          * - Method name validation
          * - Contract introspection
+         * - Manual result parsing helpers (funcResToNative)
          *
          * If the contract spec cannot be loaded, returns a client without spec
          * (falls back to manual XDR mode).

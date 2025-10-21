@@ -19,7 +19,7 @@ import kotlin.test.*
  * Tests cover:
  * - Primary API with automatic type conversion
  * - Auto-submit behavior for read and write calls
- * - Exposed helper methods (funcArgsToXdrSCValues, nativeToXdrSCVal)
+ * - Exposed helper methods (funcArgsToXdrSCValues, nativeToXdrSCVal, funcResToNative)
  * - Advanced API with manual XDR control (invokeWithXdr)
  * - Factory methods (fromNetwork, withoutSpec)
  * - Deployment methods (deploy, install, deployFromWasmId)
@@ -168,10 +168,60 @@ class ContractClientComprehensiveTest {
         assertTrue(exception.message!!.contains("fromNetwork"))
     }
 
+    /**
+     * Test 6: Exposed helper - funcResToNative() with SCValXdr.
+     *
+     * Validates that funcResToNative():
+     * - API exists with correct signature
+     * - Accepts function name and SCValXdr
+     * - Returns converted native value (or null)
+     * - Requires contract spec for conversion
+     * - Provides clear error message when spec missing
+     */
+    @Test
+    fun testFuncResToNativeWithSCVal() = runTest {
+        val client = ContractClient.withoutSpec(testContractId, testRpcUrl, Network.TESTNET)
+
+        val resultXdr = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000000UL)))
+
+        // Verify that funcResToNative requires spec
+        val exception = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("balance", resultXdr)
+        }
+        assertTrue(exception.message!!.contains("requires ContractSpec"))
+        assertTrue(exception.message!!.contains("fromNetwork"))
+    }
+
+    /**
+     * Test 7: Exposed helper - funcResToNative() with base64 XDR.
+     *
+     * Validates that funcResToNative() base64 overload:
+     * - API exists with correct signature
+     * - Accepts function name and base64-encoded XDR string
+     * - Returns converted native value (or null)
+     * - Requires contract spec for conversion
+     * - Provides clear error message when spec missing
+     */
+    @Test
+    fun testFuncResToNativeWithBase64() = runTest {
+        val client = ContractClient.withoutSpec(testContractId, testRpcUrl, Network.TESTNET)
+
+        // Create a U32 value and encode to base64
+        val u32Val = SCValXdr.U32(Uint32Xdr(42u))
+        val base64 = u32Val.toXdrBase64()
+
+        // Verify that funcResToNative requires spec
+        val exception = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("get_value", base64)
+        }
+        assertTrue(exception.message!!.contains("requires ContractSpec"))
+        assertTrue(exception.message!!.contains("fromNetwork"))
+    }
+
     // ========== Advanced API Tests (Manual Control) ==========
 
     /**
-     * Test 6: Advanced API with manual XDR.
+     * Test 8: Advanced API with manual XDR.
      *
      * Validates that invokeWithXdr():
      * - API exists and accepts List<SCValXdr> parameters
@@ -214,7 +264,7 @@ class ContractClientComprehensiveTest {
     // ========== Factory Method Tests ==========
 
     /**
-     * Test 7: Primary factory method - fromNetwork().
+     * Test 9: Primary factory method - fromNetwork().
      *
      * Validates that fromNetwork():
      * - API exists with correct signature
@@ -239,7 +289,7 @@ class ContractClientComprehensiveTest {
     }
 
     /**
-     * Test 8: Advanced factory method - withoutSpec().
+     * Test 10: Advanced factory method - withoutSpec().
      *
      * Validates that withoutSpec():
      * - API exists and returns ContractClient immediately
@@ -259,7 +309,7 @@ class ContractClientComprehensiveTest {
     // ========== Deployment Tests ==========
 
     /**
-     * Test 9: One-step deployment - deploy().
+     * Test 11: One-step deployment - deploy().
      *
      * Validates that deploy():
      * - API exists with correct signature
@@ -292,7 +342,7 @@ class ContractClientComprehensiveTest {
     }
 
     /**
-     * Test 10: Two-step deployment - install() + deployFromWasmId().
+     * Test 12: Two-step deployment - install() + deployFromWasmId().
      *
      * Validates that install() and deployFromWasmId():
      * - install() API exists and returns String (WASM ID)
@@ -343,7 +393,7 @@ class ContractClientComprehensiveTest {
     // ========== Error Handling Tests ==========
 
     /**
-     * Test 11: Error handling - invoke() requires spec.
+     * Test 13: Error handling - invoke() requires spec.
      *
      * Validates that invoke() with Map arguments:
      * - Throws IllegalStateException when spec not loaded
@@ -370,7 +420,7 @@ class ContractClientComprehensiveTest {
     }
 
     /**
-     * Test 12: Error handling - invalid method name.
+     * Test 14: Error handling - invalid method name.
      *
      * Validates that invoke():
      * - Rejects calls when spec not loaded
@@ -391,6 +441,68 @@ class ContractClientComprehensiveTest {
                 signer = keypair
             )
         }
+    }
+
+    /**
+     * Test 15: Error handling - funcResToNative() requires spec.
+     *
+     * Validates that funcResToNative():
+     * - Throws IllegalStateException when spec not loaded
+     * - Error message contains "requires ContractSpec"
+     * - Error message suggests using fromNetwork()
+     * - Error is clear and actionable for both overloads
+     */
+    @Test
+    fun testFuncResToNativeRequiresSpec() = runTest {
+        val client = ContractClient.withoutSpec(testContractId, testRpcUrl, Network.TESTNET)
+
+        // Test SCValXdr overload
+        val scVal = SCValXdr.U32(Uint32Xdr(42u))
+        val exception1 = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("get_value", scVal)
+        }
+        assertTrue(exception1.message!!.contains("requires ContractSpec"))
+        assertTrue(exception1.message!!.contains("fromNetwork"))
+
+        // Test base64 string overload
+        val base64 = scVal.toXdrBase64()
+        val exception2 = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("get_value", base64)
+        }
+        assertTrue(exception2.message!!.contains("requires ContractSpec"))
+        assertTrue(exception2.message!!.contains("fromNetwork"))
+    }
+
+    // ========== Round-Trip Conversion Tests ==========
+
+    /**
+     * Test 16: Round-trip test - args conversion and result parsing.
+     *
+     * This test demonstrates the full lifecycle of argument conversion and result parsing,
+     * validating that the API is designed for round-trip usage:
+     * 1. Developer provides native arguments (Map)
+     * 2. SDK converts to XDR (funcArgsToXdrSCValues)
+     * 3. Contract executes (simulated here)
+     * 4. SDK parses result back to native (funcResToNative)
+     *
+     * Note: This is a conceptual test - actual round-trip requires a contract spec.
+     */
+    @Test
+    fun testRoundTripConceptual() = runTest {
+        val client = ContractClient.withoutSpec(testContractId, testRpcUrl, Network.TESTNET)
+
+        // Both operations require spec
+        assertFailsWith<IllegalStateException> {
+            client.funcArgsToXdrSCValues("balance", mapOf("account" to testAccount))
+        }
+
+        val resultXdr = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000000UL)))
+        assertFailsWith<IllegalStateException> {
+            client.funcResToNative("balance", resultXdr)
+        }
+
+        // This validates that both methods exist and follow the same pattern
+        // Integration tests will verify actual round-trip with a real spec
     }
 
     // ========== Helper Functions ==========

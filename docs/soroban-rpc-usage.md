@@ -213,7 +213,7 @@ suspend fun deployMultipleContracts() {
 
 #### Advanced: Manual XDR Control
 
-For power users who need full control over XDR construction:
+For power users who need full control over XDR construction and result parsing:
 
 ```kotlin
 suspend fun advancedContractInvocation() {
@@ -275,6 +275,83 @@ suspend fun advancedContractInvocation() {
     println("Transaction result: $finalResult")
 }
 ```
+
+#### Result Parsing: Complete Round-Trip
+
+The SDK provides complementary helpers for full XDR round-trip conversion:
+
+```kotlin
+suspend fun demonstrateRoundTrip() {
+    val client = ContractClient.fromNetwork(
+        contractId = "CDZJ...",
+        rpcUrl = "https://soroban-testnet.stellar.org",
+        network = Network.TESTNET
+    )
+
+    // Native → XDR (arguments)
+    val nativeArgs = mapOf(
+        "from" to "GABC...",
+        "to" to "GDEF...",
+        "amount" to 1000
+    )
+    val xdrArgs = client.funcArgsToXdrSCValues("transfer", nativeArgs)
+
+    // Invoke with XDR
+    val assembled = client.invokeWithXdr(
+        functionName = "balance",
+        parameters = listOf(Scv.toAddress("GABC...")),
+        source = "GABC...",
+        signer = null
+    )
+    assembled.simulate()
+
+    // XDR → Native (result parsing)
+    val resultXdr = assembled.simulation?.results?.firstOrNull()?.xdr
+    val balance = client.funcResToNative("balance", resultXdr ?: "") as BigInteger
+    println("Parsed balance: $balance stroops")
+}
+
+// Compare parsing approaches
+suspend fun compareParsing() {
+    val client = ContractClient.fromNetwork(contractId, rpcUrl, Network.TESTNET)
+
+    // Approach 1: Inline parsing with parseResultXdrFn
+    val balance1 = client.invoke<Long>(
+        functionName = "balance",
+        arguments = mapOf("account" to "GABC..."),
+        source = "GABC...",
+        signer = null,
+        parseResultXdrFn = { xdr ->
+            (xdr as SCValXdr.I128).value.lo.value.toLong()
+        }
+    )
+
+    // Approach 2: Manual parsing with funcResToNative
+    val resultXdr = client.invoke<SCValXdr>(
+        functionName = "balance",
+        arguments = mapOf("account" to "GABC..."),
+        source = "GABC...",
+        signer = null
+    )
+    val balance2 = client.funcResToNative("balance", resultXdr) as BigInteger
+
+    // Approach 3: Base64 XDR string parsing
+    val base64Xdr = "AAAABgAAAAEAAAAA..." // From RPC response
+    val balance3 = client.funcResToNative("balance", base64Xdr) as BigInteger
+}
+```
+
+**When to use `funcResToNative()`:**
+- ✅ You have a contract spec loaded (`client.spec` is not null)
+- ✅ You want type-safe automatic conversion based on contract metadata
+- ✅ You're doing manual transaction lifecycle management
+- ✅ You want to avoid writing custom parsing logic
+
+**When to use `parseResultXdrFn`:**
+- ✅ You don't have a contract spec
+- ✅ You need custom parsing logic beyond standard type conversion
+- ✅ You want explicit control over result interpretation
+- ✅ You're using `withoutSpec()` client mode
 
 #### Low-Level API: InvokeHostFunctionOperation
 
