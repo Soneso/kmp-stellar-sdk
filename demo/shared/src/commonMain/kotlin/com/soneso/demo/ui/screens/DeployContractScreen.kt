@@ -586,24 +586,6 @@ private fun SuccessCard(result: DeployContractResult.Success, snackbarHostState:
                 }
             }
 
-            result.wasmId?.let { wasmId ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "WASM ID",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = LightExtendedColors.onSuccessContainer.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = wasmId,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = LightExtendedColors.onSuccessContainer
-                    )
-                }
-            }
-
             Text(
                 text = "You can now use this contract ID to interact with your deployed contract via the SDK's ContractClient.fromNetwork() method.",
                 style = MaterialTheme.typography.bodySmall,

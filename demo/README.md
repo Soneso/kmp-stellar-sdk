@@ -40,7 +40,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 
 ## Features
 
-The demo app includes 9 comprehensive feature demonstrations:
+The demo app includes 10 comprehensive feature demonstrations:
 
 ### 1. Key Generation
 - Generate random Stellar Ed25519 keypairs
@@ -77,14 +77,22 @@ The demo app includes 9 comprehensive feature demonstrations:
 - Real-time transaction submission
 - Demonstrates: `PaymentOperation`, transaction submission
 
-### 6. Fetch Smart Contract Details
+### 6. Fetch Transaction Details
+- Fetch and view transaction details from Horizon or Soroban RPC
+- Display operations, events, and smart contract data
+- Expandable operations and events with copy functionality
+- Human-readable SCVal formatting for contract data
+- Supports both Horizon and RPC APIs
+- Demonstrates: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
+
+### 7. Fetch Smart Contract Details
 - Parse WASM contracts to view metadata
 - Display contract specification (functions, types)
 - View contract code hash and metadata
 - Soroban smart contract integration
 - Demonstrates: Contract WASM parsing, Soroban RPC
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts to testnet
 - One-step deployment with constructor arguments
 - Two-step deployment (install WASM + deploy from WASM ID)
@@ -93,7 +101,7 @@ The demo app includes 9 comprehensive feature demonstrations:
 - Located in `shared/src/commonMain/resources/wasm/`
 - Demonstrates: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
 
-### 8. Invoke Hello World Contract
+### 9. Invoke Hello World Contract
 - Invoke deployed smart contracts with the "hello" function
 - Demonstrate spec-based type conversion and automatic result parsing
 - Use ContractClient to load contract specifications from the network
@@ -101,7 +109,7 @@ The demo app includes 9 comprehensive feature demonstrations:
 - Real-time contract function invocation on testnet
 - Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `funcResToNative()`
 
-### 9. Invoke Auth Contract
+### 10. Invoke Auth Contract
 - Dynamic Soroban authorization handling with same-invoker and different-invoker scenarios
 - Automatic authorization detection using `needsNonInvokerSigningBy()`
 - Manual authorization signing with `signAuthEntries()` when needed
@@ -116,13 +124,14 @@ demo/
 ├── shared/                          # Shared Compose Multiplatform module
 │   ├── src/
 │   │   ├── commonMain/kotlin/       # Shared code (UI + business logic)
-│   │   │   ├── ui/screens/          # All 9 demo screens
+│   │   │   ├── ui/screens/          # All 10 demo screens
 │   │   │   │   ├── MainScreen.kt
 │   │   │   │   ├── KeyGenerationScreen.kt
 │   │   │   │   ├── FundAccountScreen.kt
 │   │   │   │   ├── AccountDetailsScreen.kt
 │   │   │   │   ├── TrustAssetScreen.kt
 │   │   │   │   ├── SendPaymentScreen.kt
+│   │   │   │   ├── FetchTransactionScreen.kt
 │   │   │   │   ├── ContractDetailsScreen.kt
 │   │   │   │   ├── DeployContractScreen.kt
 │   │   │   │   ├── InvokeHelloWorldContractScreen.kt
@@ -133,6 +142,7 @@ demo/
 │   │   │   │   ├── AccountDetails.kt
 │   │   │   │   ├── TrustAsset.kt
 │   │   │   │   ├── SendPayment.kt
+│   │   │   │   ├── FetchTransaction.kt
 │   │   │   │   ├── ContractDetails.kt
 │   │   │   │   ├── DeployContract.kt
 │   │   │   │   ├── InvokeHelloWorldContract.kt
@@ -383,7 +393,7 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
    )
    ```
 
-4. **Test all 9 demo features**:
+4. **Test all 10 demo features**:
    ```bash
    ./gradlew :demo:androidApp:installDebug
    ./gradlew :demo:desktopApp:run

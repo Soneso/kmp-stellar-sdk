@@ -106,3 +106,7 @@ test-results/
 *_RESULTS.md
 *_COMPARISON.md
 *_PROGRESS.md
+*INVESTIGATION_REPORT.md
+
+# Backup files
+*.bak

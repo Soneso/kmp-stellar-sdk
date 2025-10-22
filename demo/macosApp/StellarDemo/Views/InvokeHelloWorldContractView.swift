@@ -296,41 +296,78 @@ struct InvokeHelloWorldContractScreen: View {
     }
 
     private func successCard(_ success: InvokeHelloWorldResult.Success) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
-                Text("Contract Invocation Successful")
-                    .font(.system(size: 16, weight: .bold))
+        VStack(spacing: 16) {
+            // Success header card
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Material3Colors.onSuccessContainer)
+
+                    Text("Contract Invocation Successful")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Material3Colors.onSuccessContainer)
+                }
+
+                Text("The hello function was successfully invoked")
+                    .font(.system(size: 14))
                     .foregroundStyle(Material3Colors.onSuccessContainer)
             }
-
-            Divider()
-
-            // Greeting response
-            VStack(alignment: .leading, spacing: 8) {
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.successContainer)
+            .cornerRadius(12)
+            // Greeting Response Card
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Greeting Response")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+
+                Divider()
 
                 Text(success.greeting)
                     .font(.system(size: 20, weight: .medium, design: .default))
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Material3Colors.onSuccessContainer.opacity(0.1))
+                    .background(Material3Colors.onSurfaceVariant.opacity(0.1))
                     .cornerRadius(8)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.surfaceVariant)
+            .cornerRadius(12)
 
-            Text("The contract function was successfully invoked using ContractClient.invoke() with automatic type conversion from Map arguments to Soroban XDR types.")
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onSuccessContainer)
+            // What's Next? Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What's Next?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• The contract function was successfully invoked using ContractClient.invoke()")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Automatic type conversion from Map arguments to Soroban XDR types")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Try invoking with different names to see various greetings")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• View the transaction on Stellar Expert or other block explorers")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+                }
+                .padding(.leading, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.secondaryContainer)
+            .cornerRadius(12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Material3Colors.successContainer)
-        .cornerRadius(12)
     }
 
     private func errorCard(_ error: InvokeHelloWorldResult.Error) -> some View {

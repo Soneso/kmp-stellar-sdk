@@ -399,7 +399,7 @@ suspend fun sendPayment(
                 assetCode = displayAssetCode,
                 assetIssuer = displayAssetIssuer,
                 amount = amount,
-                message = "Successfully sent $amount $displayAssetCode to ${shortenAccountId(destinationAccountId)}. Transaction hash: ${response.hash}"
+                message = "Successfully sent $amount $displayAssetCode to ${shortenAccountId(destinationAccountId)}"
             )
         } finally {
             // Clean up HTTP client resources

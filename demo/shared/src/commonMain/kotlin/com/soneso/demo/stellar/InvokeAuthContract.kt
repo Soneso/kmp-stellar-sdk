@@ -19,12 +19,14 @@ sealed class InvokeAuthContractResult {
      * @property scenario The detected authorization scenario (same-invoker or different-invoker)
      * @property contractId The contract ID that was invoked
      * @property whoNeedsToSign Set of account IDs that needed to sign (empty for same-invoker)
+     * @property transactionHash The hash of the invocation transaction
      */
     data class Success(
         val counterValue: UInt,
         val scenario: String,
         val contractId: String,
-        val whoNeedsToSign: Set<String>
+        val whoNeedsToSign: Set<String>,
+        val transactionHash: String
     ) : InvokeAuthContractResult()
 
     /**
@@ -50,6 +52,7 @@ sealed class InvokeAuthContractResult {
  * - Conditionally call `signAuthEntries()` only when needed (different-invoker scenario)
  * - Use `funcArgsToXdrSCValues()` to convert Map arguments to XDR
  * - Use `funcResToNative()` to parse results automatically
+ * - Extract transaction hash from sendTransactionResponse
  *
  * ## Soroban Authorization Patterns
  *
@@ -337,19 +340,26 @@ suspend fun invokeAuthContract(
             )
         }
 
-        // Step 9: Determine the scenario based on who needed to sign
+        // Step 9: Extract transaction hash from the sendTransactionResponse
+        val transactionHash = assembled.sendTransactionResponse?.hash
+            ?: return InvokeAuthContractResult.Failure(
+                message = "Transaction hash not available"
+            )
+
+        // Step 10: Determine the scenario based on who needed to sign
         val scenario = if (whoNeedsToSign.isEmpty()) {
             "Same-Invoker (Automatic Authorization)"
         } else {
             "Different-Invoker (Manual Authorization)"
         }
 
-        // Step 10: Return success with all details
+        // Step 11: Return success with all details
         InvokeAuthContractResult.Success(
             counterValue = counterValue,
             scenario = scenario,
             contractId = contractId,
-            whoNeedsToSign = whoNeedsToSign
+            whoNeedsToSign = whoNeedsToSign,
+            transactionHash = transactionHash
         )
 
     } catch (e: com.soneso.stellar.sdk.contract.exception.ContractException) {

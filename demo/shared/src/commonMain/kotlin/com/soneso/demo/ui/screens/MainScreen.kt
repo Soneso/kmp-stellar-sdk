@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
@@ -68,6 +69,12 @@ class MainScreen : Screen {
                 description = "Transfer XLM or issued assets to another account",
                 icon = Icons.AutoMirrored.Filled.Send,
                 screen = SendPaymentScreen()
+            ),
+            DemoTopic(
+                title = "Fetch Transaction Details",
+                description = "Retrieve transaction information from Horizon or Soroban RPC",
+                icon = Icons.Default.Receipt,
+                screen = FetchTransactionScreen()
             ),
             DemoTopic(
                 title = "Fetch Smart Contract Details",

@@ -1,6 +1,6 @@
 # Stellar SDK Demo - macOS Native App
 
-Native macOS application demonstrating the Stellar SDK with **SwiftUI** and complete integration with all 7 demo features.
+Native macOS application demonstrating the Stellar SDK with **SwiftUI** and complete integration with all 10 demo features.
 
 ## Overview
 
@@ -9,6 +9,7 @@ This is a **native macOS app** built with SwiftUI (not Compose), showcasing the 
 - **Account Management**: Fund testnet accounts and fetch account details
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
+- **Transaction Details**: View transaction operations and events
 - **Smart Contracts**: Fetch and parse Soroban contract details
 - **Contract Deployment**: Upload and deploy WASM contracts to testnet
 
@@ -66,13 +67,14 @@ The macOS app was recently refactored from a single file to a well-structured pr
 macosApp/
 ├── StellarDemo/
 │   ├── StellarDemoApp.swift       # App entry point
-│   ├── Views/                     # 7 SwiftUI views
+│   ├── Views/                     # 10 SwiftUI views
 │   │   ├── MainScreen.swift       # Main menu
 │   │   ├── KeyGenerationView.swift
 │   │   ├── FundAccountView.swift
 │   │   ├── AccountDetailsView.swift
 │   │   ├── TrustAssetView.swift
 │   │   ├── SendPaymentView.swift
+│   │   ├── FetchTransactionView.swift
 │   │   └── ContractDetailsView.swift
 │   ├── Components/                # 6 reusable components
 │   │   ├── DemoTopicCard.swift    # Card for main menu
@@ -176,7 +178,7 @@ In Xcode:
 
 ## Features
 
-All 7 demo features are fully implemented in SwiftUI:
+All 10 demo features are fully implemented in SwiftUI:
 
 ### 1. Key Generation
 - **View**: `KeyGenerationView.swift`
@@ -218,7 +220,15 @@ All 7 demo features are fully implemented in SwiftUI:
 - Amount validation and transaction signing
 - Uses: `PaymentOperation` from Stellar SDK
 
-### 6. Fetch Smart Contract Details
+### 6. Fetch Transaction Details
+- **View**: `FetchTransactionView.swift`
+- Fetch and display transaction details from Horizon or Soroban RPC
+- View operations, events, and smart contract data
+- Expandable sections with copy functionality
+- Human-readable SCVal formatting
+- Uses: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
+
+### 7. Fetch Smart Contract Details
 - **View**: `ContractDetailsView.swift`
 - **Component**: `ContractComponents.swift`
 - Parse WASM contracts to view metadata
@@ -226,12 +236,26 @@ All 7 demo features are fully implemented in SwiftUI:
 - View contract code hash
 - Uses: Soroban RPC integration from Stellar SDK
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - **View**: `DeployContractView.swift`
 - Upload and deploy WASM contracts
 - Platform-specific resource loading from bundle
 - One-step and two-step deployment
 - Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+
+### 9. Invoke Hello World Contract
+- **View**: `InvokeHelloWorldContractView.swift`
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion
+- Automatic type handling
+- Uses: `ContractClient.invoke()`, `funcArgsToXdrSCValues()`, `funcResToNative()`
+
+### 10. Invoke Auth Contract
+- **View**: `InvokeAuthContractView.swift`
+- Dynamic authorization handling
+- Same-invoker vs different-invoker scenarios
+- Conditional signing with `needsNonInvokerSigningBy()`
+- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Design System
 
@@ -356,7 +380,7 @@ To change networks, modify the SDK initialization in the Kotlin framework.
 
 1. **Build**: ⌘B
 2. **Run**: ⌘R
-3. **Test all features**: Navigate through all 6 demo screens
+3. **Test all features**: Navigate through all 10 demo screens
 
 ### Manual Testing Checklist
 

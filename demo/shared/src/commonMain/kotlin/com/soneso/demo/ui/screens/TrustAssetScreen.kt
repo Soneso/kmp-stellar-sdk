@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,10 +23,12 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.TrustAssetResult
 import com.soneso.demo.stellar.trustAsset
 import com.soneso.demo.ui.theme.LightExtendedColors
 import com.soneso.stellar.sdk.ChangeTrustOperation
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
@@ -444,7 +447,7 @@ class TrustAssetScreen : Screen {
                 trustResult?.let { result ->
                     when (result) {
                         is TrustAssetResult.Success -> {
-                            TrustAssetSuccessCard(result)
+                            TrustAssetSuccessCard(result, snackbarHostState, coroutineScope)
                         }
                         is TrustAssetResult.Error -> {
                             TrustAssetErrorCard(result)
@@ -476,7 +479,7 @@ class TrustAssetScreen : Screen {
 }
 
 @Composable
-private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
+private fun TrustAssetSuccessCard(success: TrustAssetResult.Success, snackbarHostState: SnackbarHostState, scope: CoroutineScope) {
     // Success header card
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -513,6 +516,53 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
         }
     }
 
+    // Transaction Hash Card
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Transaction Hash",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = success.transactionHash,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            IconButton(onClick = {
+                scope.launch {
+                    val clipboard = getClipboard()
+                    val copied = clipboard.copyToClipboard(success.transactionHash)
+                    snackbarHostState.showSnackbar(
+                        if (copied) "Transaction hash copied to clipboard"
+                        else "Failed to copy to clipboard"
+                    )
+                }
+            }) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy transaction hash",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+
     // Transaction Details Card
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -542,7 +592,6 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success) {
                     success.limit
                 }
             )
-            TrustAssetDetailRow("Transaction Hash", success.transactionHash, monospace = true)
         }
     }
 

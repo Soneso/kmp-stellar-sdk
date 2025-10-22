@@ -318,7 +318,7 @@ suspend fun trustAsset(
                 assetCode = assetCode,
                 assetIssuer = assetIssuer,
                 limit = limit,
-                message = "Trustline established successfully. Transaction hash: ${response.hash}"
+                message = "Trustline established successfully"
             )
         } finally {
             // Clean up HTTP client resources

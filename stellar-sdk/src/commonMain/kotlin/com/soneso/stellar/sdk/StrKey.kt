@@ -269,10 +269,30 @@ object StrKey {
 
     /**
      * Encodes raw bytes to strkey claimable balance ID (B...)
+     *
+     * Accepts both 32-byte and 33-byte inputs:
+     * - 32 bytes: Just the hash - automatically prepends V0 type discriminant (0x00)
+     * - 33 bytes: Type (1 byte) + hash (32 bytes) - used as-is
+     *
+     * This handles RPC responses that may return only the 32-byte hash without the type byte.
      */
     fun encodeClaimableBalance(data: ByteArray): String {
-        require(data.size == 33) { "Claimable balance ID must be 33 bytes" }
-        return encodeCheck(VersionByte.CLAIMABLE_BALANCE, data).concatToString()
+        val fullData = when (data.size) {
+            32 -> {
+                // Type is missing, prepend V0 type discriminant (0x00)
+                byteArrayOf(0x00) + data
+            }
+            33 -> {
+                // Already has type byte, use as-is
+                data
+            }
+            else -> {
+                throw IllegalArgumentException(
+                    "Claimable balance ID must be 32 bytes (hash only) or 33 bytes (type + hash), got ${data.size} bytes"
+                )
+            }
+        }
+        return encodeCheck(VersionByte.CLAIMABLE_BALANCE, fullData).concatToString()
     }
 
     /**

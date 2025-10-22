@@ -9,6 +9,7 @@ This is a **JVM desktop app** that runs on macOS, Windows, and Linux with 100% s
 - **Account Management**: Fund testnet accounts and fetch account details
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
+- **Transaction Details**: View transaction operations and events
 - **Smart Contracts**: Fetch and parse Soroban contract details
 
 The app demonstrates the full power of Compose Multiplatform, sharing the exact same UI code as Android, iOS, and Web.
@@ -167,7 +168,7 @@ compose {
 
 ## Features
 
-All 7 features from the shared module work identically on desktop:
+All 10 features from the shared module work identically on desktop:
 
 ### 1. Key Generation
 - Generate random Stellar keypairs
@@ -197,16 +198,35 @@ All 7 features from the shared module work identically on desktop:
 - Amount validation and signing
 - Uses: `PaymentOperation`
 
-### 6. Smart Contract Details
+### 6. Fetch Transaction Details
+- Fetch and view transaction details from Horizon or Soroban RPC
+- Display operations, events, and smart contract data
+- Expandable operations and events with copy functionality
+- Human-readable SCVal formatting for contract data
+- Uses: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
+
+### 7. Smart Contract Details
 - Parse WASM contracts
 - View contract metadata and specification
 - Uses: Soroban RPC integration
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts
 - One-step or two-step deployment
 - Platform-specific resource loading
 - Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+
+### 9. Invoke Hello World Contract
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion
+- Automatic type handling
+- Uses: `ContractClient.invoke()`, `funcArgsToXdrSCValues()`, `funcResToNative()`
+
+### 10. Invoke Auth Contract
+- Dynamic authorization handling
+- Same-invoker vs different-invoker scenarios
+- Conditional signing with `needsNonInvokerSigningBy()`
+- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Technology Stack
 

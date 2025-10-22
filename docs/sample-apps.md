@@ -16,7 +16,7 @@ This guide explores the demo applications included with the Stellar KMP SDK, sho
 
 The `demo` directory contains comprehensive Kotlin Multiplatform applications demonstrating:
 
-- **Complete SDK feature coverage** across 7 major use cases
+- **Complete SDK feature coverage** across 10 comprehensive use cases
 - **Compose Multiplatform UI** with 95% code sharing
 - **Real Stellar network integration** with testnet
 - **Production-ready patterns** for async operations and error handling
@@ -82,21 +82,29 @@ demo/
 ├── shared/                          # Shared Compose Multiplatform module
 │   ├── src/
 │   │   ├── commonMain/kotlin/       # Shared code (UI + business logic)
-│   │   │   ├── ui/screens/          # All 6 demo screens
+│   │   │   ├── ui/screens/          # All 10 demo screens
 │   │   │   │   ├── MainScreen.kt
 │   │   │   │   ├── KeyGenerationScreen.kt
 │   │   │   │   ├── FundAccountScreen.kt
 │   │   │   │   ├── AccountDetailsScreen.kt
 │   │   │   │   ├── TrustAssetScreen.kt
 │   │   │   │   ├── SendPaymentScreen.kt
-│   │   │   │   └── ContractDetailsScreen.kt
+│   │   │   │   ├── FetchTransactionScreen.kt
+│   │   │   │   ├── ContractDetailsScreen.kt
+│   │   │   │   ├── DeployContractScreen.kt
+│   │   │   │   ├── InvokeHelloWorldContractScreen.kt
+│   │   │   │   └── InvokeAuthContractScreen.kt
 │   │   │   ├── stellar/             # Stellar SDK integration
 │   │   │   │   ├── KeyPairGeneration.kt
 │   │   │   │   ├── AccountFunding.kt
 │   │   │   │   ├── AccountDetails.kt
 │   │   │   │   ├── TrustAsset.kt
 │   │   │   │   ├── SendPayment.kt
-│   │   │   │   └── ContractDetails.kt
+│   │   │   │   ├── FetchTransaction.kt
+│   │   │   │   ├── ContractDetails.kt
+│   │   │   │   ├── DeployContract.kt
+│   │   │   │   ├── InvokeHelloWorldContract.kt
+│   │   │   │   └── InvokeAuthContract.kt
 │   │   │   └── App.kt               # Main app entry
 │   │   ├── androidMain/             # Android-specific (clipboard)
 │   │   ├── desktopMain/             # Desktop-specific (clipboard)
@@ -142,7 +150,7 @@ demo/shared (Compose + Business Logic)
 
 ## Demo Features
 
-The demo app showcases 7 comprehensive SDK features:
+The demo app showcases 10 comprehensive SDK features:
 
 ### 1. Key Generation
 - Generate random Ed25519 keypairs
@@ -179,20 +187,41 @@ The demo app showcases 7 comprehensive SDK features:
 - Real-time transaction submission
 - **SDK Features**: `PaymentOperation`, transaction submission
 
-### 6. Fetch Smart Contract Details
+### 6. Fetch Transaction Details
+- Fetch and view transaction details from Horizon or Soroban RPC
+- Display operations, events, and smart contract data
+- Expandable operations and events with copy functionality
+- Human-readable SCVal formatting for contract data
+- Supports both Horizon and RPC APIs
+- **SDK Features**: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
+
+### 7. Fetch Smart Contract Details
 - Parse WASM contracts to view metadata
 - Display contract specification (functions, types)
 - View contract code hash and metadata
 - Soroban smart contract integration
 - **SDK Features**: Contract WASM parsing, Soroban RPC
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts to testnet
 - One-step deployment: `ContractClient.deploy()` with constructor args
 - Two-step deployment: `install()` + `deployFromWasmId()` for WASM reuse
 - Platform-specific WASM file loading (8 platforms)
 - Support for 5 demo contracts
 - **SDK Features**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+
+### 9. Invoke Hello World Contract
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion with automatic type handling
+- Beginner-friendly contract invocation API
+- **SDK Features**: `ContractClient.invoke()`, `funcArgsToXdrSCValues()`, `funcResToNative()`
+
+### 10. Invoke Auth Contract
+- Dynamic authorization handling for Soroban contracts
+- Same-invoker vs different-invoker scenario detection
+- Conditional authorization signing
+- Production-ready authorization patterns
+- **SDK Features**: `ContractClient.invokeWithXdr()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Code Examples
 
@@ -205,7 +234,11 @@ The demo app source code is located in the `demo/` directory. Key areas to explo
 - `AccountDetailsScreen.kt` - Horizon account queries
 - `TrustAssetScreen.kt` - Trustline management
 - `SendPaymentScreen.kt` - Payment transactions
+- `FetchTransactionScreen.kt` - Transaction details viewer
 - `ContractDetailsScreen.kt` - Soroban contract viewing
+- `DeployContractScreen.kt` - Contract deployment
+- `InvokeHelloWorldContractScreen.kt` - Hello World contract invocation
+- `InvokeAuthContractScreen.kt` - Authorization demo
 
 ### Business Logic (`demo/shared/src/commonMain/kotlin/com/soneso/demo/stellar/`)
 - `KeyPairGeneration.kt` - Keypair operations
@@ -213,7 +246,11 @@ The demo app source code is located in the `demo/` directory. Key areas to explo
 - `AccountDetails.kt` - Horizon queries
 - `TrustAsset.kt` - Trustline operations
 - `SendPayment.kt` - Payment operations
+- `FetchTransaction.kt` - Transaction fetching
 - `ContractDetails.kt` - Contract parsing
+- `DeployContract.kt` - Contract deployment
+- `InvokeHelloWorldContract.kt` - Hello World invocation
+- `InvokeAuthContract.kt` - Authorization handling
 
 ### Platform Entry Points
 - `androidApp/src/main/java/.../MainActivity.kt` (20 lines)

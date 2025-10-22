@@ -38,8 +38,8 @@ The demo app is a **Kotlin Multiplatform** application showcasing the Stellar SD
 
 ```
 demo/shared (Compose Multiplatform)
-├── UI Screens (9 screens, 1 per feature + main menu)
-├── Stellar Integration (9 feature modules using SDK)
+├── UI Screens (10 screens, 1 per feature + main menu)
+├── Stellar Integration (10 feature modules using SDK)
 └── Platform APIs (clipboard only)
 
 Platform Apps (minimal entry points)
@@ -52,7 +52,7 @@ Platform Apps (minimal entry points)
 
 ## Current Features
 
-The demo includes **9 comprehensive features**:
+The demo includes **10 comprehensive features**:
 
 ### 1. Key Generation
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
@@ -84,26 +84,32 @@ The demo includes **9 comprehensive features**:
 - **Logic**: `stellar/SendPayment.kt`
 - **Demonstrates**: `PaymentOperation`, transaction building, asset handling
 
-### 6. Fetch Smart Contract Details
+### 6. Fetch Transaction Details
+- **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
+- **UI**: `ui/screens/FetchTransactionScreen.kt`
+- **Logic**: `stellar/FetchTransaction.kt`
+- **Demonstrates**: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`, operation/event parsing, human-readable SCVal formatting
+
+### 7. Fetch Smart Contract Details
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/ContractDetailsScreen.kt`
 - **Logic**: `stellar/ContractDetails.kt`
 - **Demonstrates**: Soroban RPC, contract WASM parsing, metadata display, `funcResToNative()` usage for automatic result parsing
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/DeployContractScreen.kt`
 - **Logic**: `stellar/DeployContract.kt`
 - **Resources**: `resources/wasm/` (4 example WASM files)
 - **Demonstrates**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`, platform-specific resource loading
 
-### 8. Invoke Hello World Contract
+### 9. Invoke Hello World Contract
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/InvokeHelloWorldContractScreen.kt`
 - **Logic**: `stellar/InvokeHelloWorldContract.kt`
 - **Demonstrates**: `ContractClient.invoke()` with Map-based arguments, automatic type conversion, `funcResToNative()` for result parsing, beginner-friendly contract invocation API
 
-### 9. Invoke Auth Contract
+### 10. Invoke Auth Contract
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`
 - **UI**: `ui/screens/InvokeAuthContractScreen.kt`
 - **Logic**: `stellar/InvokeAuthContract.kt`
@@ -272,6 +278,7 @@ shared/src/commonMain/kotlin/com/soneso/demo/
 │   │   ├── AccountDetailsScreen.kt
 │   │   ├── TrustAssetScreen.kt
 │   │   ├── SendPaymentScreen.kt
+│   │   ├── FetchTransactionScreen.kt
 │   │   ├── ContractDetailsScreen.kt
 │   │   ├── DeployContractScreen.kt
 │   │   ├── InvokeHelloWorldContractScreen.kt
@@ -284,6 +291,7 @@ shared/src/commonMain/kotlin/com/soneso/demo/
 │   ├── AccountDetails.kt
 │   ├── TrustAsset.kt
 │   ├── SendPayment.kt
+│   ├── FetchTransaction.kt
 │   ├── ContractDetails.kt
 │   ├── DeployContract.kt
 │   ├── InvokeHelloWorldContract.kt

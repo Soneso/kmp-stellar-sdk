@@ -20,13 +20,28 @@ struct PaymentSuccessCards: View {
                         .foregroundStyle(Material3Colors.onSuccessContainer)
                 }
 
-                Text(success.message)
+                Text("Sent \(success.amount) \(success.assetCode) to destination account")
                     .font(.system(size: 14))
                     .foregroundStyle(Material3Colors.onSuccessContainer)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Material3Colors.successContainer)
+            .cornerRadius(12)
+
+            // Transaction Hash Card (Prominent)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Transaction Hash")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onPrimaryContainer)
+
+                Divider()
+
+                CopyableDetailRow(label: "Hash", value: success.transactionHash)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.primaryContainer)
             .cornerRadius(12)
 
             // Payment Details Card
@@ -37,15 +52,13 @@ struct PaymentSuccessCards: View {
 
                 Divider()
 
-                PaymentDetailRow(label: "From", value: success.source)
-                PaymentDetailRow(label: "To", value: success.destination)
+                PaymentCopyableRow(label: "From", value: success.source)
+                PaymentCopyableRow(label: "To", value: success.destination)
                 PaymentDetailRow(label: "Amount", value: "\(success.amount) \(success.assetCode)")
 
                 if let issuer = success.assetIssuer {
-                    PaymentDetailRow(label: "Asset Issuer", value: issuer)
+                    PaymentCopyableRow(label: "Asset Issuer", value: issuer)
                 }
-
-                PaymentDetailRow(label: "Transaction Hash", value: success.transactionHash)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
@@ -85,7 +98,7 @@ struct PaymentSuccessCards: View {
     }
 }
 
-// MARK: - Payment Detail Row
+// MARK: - Payment Detail Row (non-copyable)
 
 struct PaymentDetailRow: View {
     let label: String
@@ -101,6 +114,43 @@ struct PaymentDetailRow: View {
                 .font(.system(.body, design: .monospaced))
                 .foregroundStyle(Material3Colors.onSurfaceVariant)
                 .textSelection(.enabled)
+        }
+    }
+}
+
+// MARK: - Payment Copyable Row
+
+struct PaymentCopyableRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.7))
+
+            HStack(alignment: .top) {
+                Text(value)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Material3Colors.primary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+            }
         }
     }
 }

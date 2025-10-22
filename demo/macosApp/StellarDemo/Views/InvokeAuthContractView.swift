@@ -516,85 +516,151 @@ struct InvokeAuthContractScreen: View {
     }
 
     private func successCard(_ result: InvokeAuthContractResult.Success) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
-                Text("Contract Invocation Successful")
-                    .font(.system(size: 16, weight: .bold))
+        VStack(spacing: 16) {
+            // Success header card
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Material3Colors.onSuccessContainer)
+
+                    Text("Contract Invocation Successful")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Material3Colors.onSuccessContainer)
+                }
+
+                Text("The auth contract was successfully invoked")
+                    .font(.system(size: 14))
                     .foregroundStyle(Material3Colors.onSuccessContainer)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.successContainer)
+            .cornerRadius(12)
 
-            Divider()
+            // Transaction Hash Card (Prominent)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Transaction Hash")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onPrimaryContainer)
 
-            // Counter value (prominent)
-            VStack(alignment: .leading, spacing: 8) {
+                Divider()
+
+                CopyableDetailRow(label: "Hash", value: result.transactionHash)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.primaryContainer)
+            .cornerRadius(12)
+
+            // Counter Value Card
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Counter Value")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+
+                Divider()
 
                 Text("\(result.counterValue)")
                     .font(.system(size: 48, weight: .bold, design: .default))
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .background(Material3Colors.onSuccessContainer.opacity(0.1))
+                    .background(Material3Colors.onSurfaceVariant.opacity(0.1))
                     .cornerRadius(8)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.surfaceVariant)
+            .cornerRadius(12)
 
-            // Detected scenario
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Detected Scenario")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
+            // Authorization Details Card
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Authorization Details")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
 
-                Text(result.scenario)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Material3Colors.onSuccessContainer.opacity(0.1))
-                    .cornerRadius(8)
-            }
+                Divider()
 
-            // Who needed to sign
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Who Needed to Sign")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
+                // Detected scenario
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Detected Scenario")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.7))
 
-                if result.whoNeedsToSign.isEmpty {
-                    Text("None (automatic authorization)")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Material3Colors.onSuccessContainer)
+                    Text(result.scenario)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Material3Colors.onSurfaceVariant)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Material3Colors.onSuccessContainer.opacity(0.1))
+                        .background(Material3Colors.onSurfaceVariant.opacity(0.1))
                         .cornerRadius(8)
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(Array(result.whoNeedsToSign), id: \.self) { accountId in
-                            Text("• \(accountId)")
-                                .font(.system(size: 13, design: .monospaced))
-                                .foregroundStyle(Material3Colors.onSuccessContainer)
+                }
+
+                // Who needed to sign
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Who Needed to Sign")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.7))
+
+                    if result.whoNeedsToSign.isEmpty {
+                        Text("None (automatic authorization)")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Material3Colors.onSurfaceVariant)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Material3Colors.onSurfaceVariant.opacity(0.1))
+                            .cornerRadius(8)
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(result.whoNeedsToSign), id: \.self) { accountId in
+                                Text("• \(accountId)")
+                                    .font(.system(size: 13, design: .monospaced))
+                                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+                            }
                         }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Material3Colors.onSurfaceVariant.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Material3Colors.onSuccessContainer.opacity(0.1))
-                    .cornerRadius(8)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.surfaceVariant)
+            .cornerRadius(12)
 
-            Text("The SDK dynamically detected the authorization pattern and handled signing appropriately using needsNonInvokerSigningBy() and conditional signAuthEntries().")
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onSuccessContainer)
+            // What's Next? Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What's Next?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• The SDK dynamically detected the authorization pattern")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Handled signing appropriately using needsNonInvokerSigningBy()")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Conditional signAuthEntries() was applied only when needed")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• View the transaction on Stellar Expert or other block explorers")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+                }
+                .padding(.leading, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.secondaryContainer)
+            .cornerRadius(12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Material3Colors.successContainer)
-        .cornerRadius(12)
     }
 
     private func errorCard(_ error: String) -> some View {

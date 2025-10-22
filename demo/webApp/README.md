@@ -9,6 +9,7 @@ This is a **JavaScript web app** built with Kotlin/JS and Compose Multiplatform,
 - **Account Management**: Fund testnet accounts and fetch account details
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
+- **Transaction Details**: View transaction operations and events
 - **Smart Contracts**: Fetch and parse Soroban contract details
 
 The app uses 100% shared Compose UI code, running identically on the web as on Android, iOS, and Desktop.
@@ -180,7 +181,7 @@ fun main() {
 
 ## Features
 
-All 7 features work identically in the browser:
+All 10 features work identically in the browser:
 
 ### 1. Key Generation
 - Generate random Stellar keypairs using browser's crypto API
@@ -210,17 +211,36 @@ All 7 features work identically in the browser:
 - Amount validation and signing
 - Uses: `PaymentOperation`
 
-### 6. Smart Contract Details
+### 6. Fetch Transaction Details
+- Fetch and view transaction details from Horizon or Soroban RPC
+- Display operations, events, and smart contract data
+- Expandable operations and events with copy functionality
+- Human-readable SCVal formatting for contract data
+- Uses: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
+
+### 7. Smart Contract Details
 - Parse WASM contracts
 - View contract metadata and specification
 - Uses: Soroban RPC integration
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts in the browser
 - One-step deployment with constructor arguments
 - Two-step deployment for WASM reuse
 - Browser-based WASM file loading
 - Uses: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+
+### 9. Invoke Hello World Contract
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion
+- Automatic type handling
+- Uses: `ContractClient.invoke()`, `funcArgsToXdrSCValues()`, `funcResToNative()`
+
+### 10. Invoke Auth Contract
+- Dynamic authorization handling
+- Same-invoker vs different-invoker scenarios
+- Conditional signing with `needsNonInvokerSigningBy()`
+- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Technology Stack
 

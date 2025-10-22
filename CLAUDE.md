@@ -33,7 +33,7 @@ The SDK is in **alpha development** with comprehensive functionality implemented
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
 - **Architecture**: Compose Multiplatform with 95% code sharing
-- **Features**: 7 comprehensive demos (key generation, funding, account details, trustlines, payments, contracts, deploy contract)
+- **Features**: 10 comprehensive demos (key generation, funding, account details, trustlines, payments, fetch transaction, contracts, deploy contract, invoke hello world, invoke auth)
 - **Location**: `demo/` directory with platform-specific apps
 
 ## Architecture Notes

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,10 +25,12 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.InvokeAuthContractResult
 import com.soneso.demo.stellar.invokeAuthContract
 import com.soneso.demo.ui.theme.LightExtendedColors
 import com.soneso.stellar.sdk.KeyPair
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 class InvokeAuthContractScreen : Screen {
@@ -598,7 +601,7 @@ class InvokeAuthContractScreen : Screen {
                 result?.let { res ->
                     when (res) {
                         is InvokeAuthContractResult.Success -> {
-                            SuccessCard(res)
+                            SuccessCard(res, snackbarHostState, coroutineScope)
                         }
                         is InvokeAuthContractResult.Failure -> {
                             ErrorCard(res.message, res.exception)
@@ -628,7 +631,7 @@ class InvokeAuthContractScreen : Screen {
 }
 
 @Composable
-private fun SuccessCard(result: InvokeAuthContractResult.Success) {
+private fun SuccessCard(result: InvokeAuthContractResult.Success, snackbarHostState: SnackbarHostState, scope: CoroutineScope) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -746,6 +749,53 @@ private fun SuccessCard(result: InvokeAuthContractResult.Success) {
                 style = MaterialTheme.typography.bodySmall,
                 color = LightExtendedColors.onSuccessContainer
             )
+        }
+    }
+
+    // Transaction Hash Card
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Transaction Hash",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = result.transactionHash,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            IconButton(onClick = {
+                scope.launch {
+                    val clipboard = getClipboard()
+                    val copied = clipboard.copyToClipboard(result.transactionHash)
+                    snackbarHostState.showSnackbar(
+                        if (copied) "Transaction hash copied to clipboard"
+                        else "Failed to copy to clipboard"
+                    )
+                }
+            }) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy transaction hash",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }

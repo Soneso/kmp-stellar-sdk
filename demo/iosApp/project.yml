@@ -25,6 +25,7 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        CADisableMinimumFrameDurationOnPhone: true
     settings:
       FRAMEWORK_SEARCH_PATHS:
         - $(inherited)

@@ -327,60 +327,76 @@ struct DeployContractView: View {
     }
 
     private func successCard(_ success: DeployContractResult.Success) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
-                Text("Deployment Successful")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Material3Colors.onSuccessContainer)
-            }
-
-            Divider()
-
+        VStack(spacing: 16) {
+            // Success header card
             VStack(alignment: .leading, spacing: 8) {
-                Text("Contract ID")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
-
                 HStack(spacing: 8) {
-                    Text(success.contractId)
-                        .font(.system(size: 14, design: .monospaced))
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
                         .foregroundStyle(Material3Colors.onSuccessContainer)
 
-                    Spacer()
-
-                    Button(action: {
-                        copyToClipboard(success.contractId)
-                        toastManager.show("Contract ID copied to clipboard")
-                    }) {
-                        Image(systemName: "doc.on.doc")
-                            .foregroundStyle(Material3Colors.onSuccessContainer)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if let wasmId = success.wasmId {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("WASM ID")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Material3Colors.onSuccessContainer.opacity(0.7))
-
-                    Text(wasmId)
-                        .font(.system(size: 14, design: .monospaced))
+                    Text("Deployment Successful")
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Material3Colors.onSuccessContainer)
                 }
-            }
 
-            Text("You can now use this contract ID to interact with your deployed contract via the SDK's ContractClient.fromNetwork() method.")
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onSuccessContainer)
+                Text("Your smart contract has been deployed to the testnet")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Material3Colors.onSuccessContainer)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.successContainer)
+            .cornerRadius(12)
+            // Contract Details Card
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Contract Details")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+
+                Divider()
+
+                DeployContractCopyableRow(label: "Contract ID", value: success.contractId)
+
+                if let wasmId = success.wasmId {
+                    DeployContractCopyableRow(label: "WASM ID", value: wasmId)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.surfaceVariant)
+            .cornerRadius(12)
+
+            // What's Next? Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What's Next?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• You can now use this contract ID to interact with your deployed contract")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Use ContractClient.fromNetwork() to create a client instance")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• Try the 'Invoke Hello World Contract' or 'Invoke Auth Contract' demos")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+                    Text("• View the transaction on Stellar Expert or other block explorers")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+                }
+                .padding(.leading, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.secondaryContainer)
+            .cornerRadius(12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Material3Colors.successContainer)
-        .cornerRadius(12)
     }
 
     private func errorCard(_ error: DeployContractResult.Error) -> some View {
@@ -617,5 +633,42 @@ struct DeployContractView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+    }
+}
+
+// MARK: - Deploy Contract Copyable Row
+
+struct DeployContractCopyableRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.7))
+
+            HStack(alignment: .top) {
+                Text(value)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Material3Colors.primary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+            }
+        }
     }
 }

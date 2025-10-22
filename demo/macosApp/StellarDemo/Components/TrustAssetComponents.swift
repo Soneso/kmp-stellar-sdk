@@ -5,6 +5,7 @@ import shared
 
 struct TrustAssetSuccessCards: View {
     let success: TrustAssetResult.Success
+    @State private var showCopyConfirmation = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -20,13 +21,28 @@ struct TrustAssetSuccessCards: View {
                         .foregroundStyle(Material3Colors.onSuccessContainer)
                 }
 
-                Text("Trustline established successfully. Transaction hash: \(success.transactionHash)")
+                Text("Your account can now hold \(success.assetCode)")
                     .font(.system(size: 14))
                     .foregroundStyle(Material3Colors.onSuccessContainer)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Material3Colors.successContainer)
+            .cornerRadius(12)
+
+            // Transaction Hash Card (Prominent)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Transaction Hash")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Material3Colors.onPrimaryContainer)
+
+                Divider()
+
+                CopyableDetailRow(label: "Hash", value: success.transactionHash)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Material3Colors.primaryContainer)
             .cornerRadius(12)
 
             // Transaction Details Card
@@ -38,14 +54,13 @@ struct TrustAssetSuccessCards: View {
                 Divider()
 
                 TrustAssetDetailRow(label: "Asset Code", value: success.assetCode)
-                TrustAssetDetailRow(label: "Asset Issuer", value: success.assetIssuer, monospace: true)
+                TrustAssetCopyableRow(label: "Asset Issuer", value: success.assetIssuer)
                 TrustAssetDetailRow(
                     label: "Trust Limit",
                     value: success.limit == "922337203685.4775807"
                         ? "Maximum (\(success.limit))"
                         : success.limit
                 )
-                TrustAssetDetailRow(label: "Transaction Hash", value: success.transactionHash, monospace: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
@@ -85,7 +100,7 @@ struct TrustAssetSuccessCards: View {
     }
 }
 
-// MARK: - Trust Asset Detail Row
+// MARK: - Trust Asset Detail Row (non-copyable)
 
 struct TrustAssetDetailRow: View {
     let label: String
@@ -102,6 +117,43 @@ struct TrustAssetDetailRow: View {
                 .font(monospace ? .system(.body, design: .monospaced) : .system(.body))
                 .foregroundStyle(Material3Colors.onSurfaceVariant)
                 .textSelection(.enabled)
+        }
+    }
+}
+
+// MARK: - Trust Asset Copyable Row
+
+struct TrustAssetCopyableRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Material3Colors.onSurfaceVariant.opacity(0.7))
+
+            HStack(alignment: .top) {
+                Text(value)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Material3Colors.primary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+            }
         }
     }
 }

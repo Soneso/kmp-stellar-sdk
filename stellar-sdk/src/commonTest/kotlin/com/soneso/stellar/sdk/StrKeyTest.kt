@@ -465,13 +465,42 @@ class StrKeyTest {
         assertTrue(StrKey.isValidClaimableBalance(claimableBalanceId))
         assertFalse(StrKey.isValidClaimableBalance("BBAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"))
 
-        // Test with 32-byte input (discriminant will be prepended automatically in the test)
-        // Flutter SDK has a helper that adds discriminant, but for production code we require full 33 bytes
-        val asHex2 = "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
-        // Prepend 0x00 discriminant byte to make it 33 bytes
-        val asHex2WithDiscriminant = "00" + asHex2
-        val cId2 = StrKey.encodeClaimableBalance(hexToBytes(asHex2WithDiscriminant))
-        assertEquals(claimableBalanceId, cId2)
+        // Test with 32-byte input (hash only) - SDK should automatically prepend V0 discriminant (0x00)
+        val hashOnly = "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
+        val encoded32Byte = StrKey.encodeClaimableBalance(hexToBytes(hashOnly))
+        assertEquals(claimableBalanceId, encoded32Byte)
+
+        // Test with 33-byte input (type + hash) - SDK should use as-is
+        val fullBytes = "00" + hashOnly
+        val encoded33Byte = StrKey.encodeClaimableBalance(hexToBytes(fullBytes))
+        assertEquals(claimableBalanceId, encoded33Byte)
+
+        // Both 32-byte and 33-byte inputs should produce the same result
+        assertEquals(encoded32Byte, encoded33Byte)
+    }
+
+    @Test
+    fun testEncodeClaimableBalanceInvalidLength() {
+        // Test with invalid input sizes (not 32 or 33 bytes)
+        val tooShort = byteArrayOf(1, 2, 3)
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeClaimableBalance(tooShort)
+        }
+
+        val tooLong = ByteArray(34) { it.toByte() }
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeClaimableBalance(tooLong)
+        }
+
+        val empty = byteArrayOf()
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeClaimableBalance(empty)
+        }
+
+        val wrongSize = ByteArray(31) { it.toByte() }
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeClaimableBalance(wrongSize)
+        }
     }
 
     // Test invalid str keys (from Flutter SDK - comprehensive edge cases)

@@ -64,6 +64,14 @@ struct MainScreen: View {
                         destination: SendPaymentScreen(toastManager: toastManager)
                     )
 
+                    // Fetch Transaction Data topic
+                    DemoTopicCard(
+                        title: "Fetch Transaction Data",
+                        description: "Retrieve transaction details from Horizon or Soroban RPC",
+                        icon: "doc.text.magnifyingglass",
+                        destination: FetchTransactionScreen(toastManager: toastManager)
+                    )
+
                     // Fetch Smart Contract Details topic
                     DemoTopicCard(
                         title: "Fetch Smart Contract Details",

@@ -9,6 +9,7 @@ This iOS app showcases the Stellar SDK's capabilities on iOS, featuring:
 - **Account Management**: Fund testnet accounts and fetch account details
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
+- **Transaction Details**: View transaction operations and events
 - **Smart Contracts**: Fetch and parse Soroban contract details
 - **Contract Deployment**: Upload and deploy WASM contracts to testnet
 
@@ -191,7 +192,7 @@ targets:
 
 ## Features
 
-All features are implemented in the shared Kotlin module:
+All 10 features are implemented in the shared Kotlin module:
 
 ### 1. Key Generation
 - Generate Ed25519 keypairs with iOS's SecureRandom (via libsodium)
@@ -218,15 +219,31 @@ All features are implemented in the shared Kotlin module:
 - Amount validation
 - Transaction signing
 
-### 6. Smart Contract Details
+### 6. Fetch Transaction Details
+- Fetch and view transaction details from Horizon or Soroban RPC
+- Display operations, events, and smart contract data
+- Expandable operations and events with copy functionality
+- Human-readable SCVal formatting
+
+### 7. Smart Contract Details
 - Parse WASM contracts
 - View contract metadata
 - Display function specifications
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts from iOS
 - Platform-specific resource loading from bundle
 - One-step and two-step deployment support
+
+### 9. Invoke Hello World Contract
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion
+- Automatic type handling
+
+### 10. Invoke Auth Contract
+- Dynamic authorization handling
+- Same-invoker vs different-invoker scenarios
+- Conditional signing
 
 ## Technology Stack
 
@@ -309,6 +326,22 @@ UISupportedInterfaceOrientations:
   - UIInterfaceOrientationLandscapeRight
 ```
 
+### Compose Multiplatform Configuration
+
+The Info.plist must include `CADisableMinimumFrameDurationOnPhone` for Compose Multiplatform iOS apps:
+
+```xml
+<key>CADisableMinimumFrameDurationOnPhone</key>
+<true/>
+```
+
+This configuration is **required** by Compose Multiplatform's UIKit integration to disable CoreAnimation frame rate limiting. Without it, the app will crash with a `PlistSanityCheck` exception.
+
+The `project.yml` includes this configuration automatically:
+```yaml
+CADisableMinimumFrameDurationOnPhone: true
+```
+
 ## Network Configuration
 
 The app connects to Stellar testnet by default:
@@ -334,7 +367,7 @@ If needed, add to `Info.plist`:
 
 1. **Select simulator**: Product → Destination → iOS Simulator → iPhone 15 Pro
 2. **Run**: ⌘R
-3. **Test features**: All 6 demo features should work on simulator
+3. **Test features**: All 10 demo features should work on simulator
 
 ### Run on Device
 
@@ -436,6 +469,24 @@ killall Simulator
 - Check Xcode console for stack traces
 - Verify iOS version is 14.0+
 - Ensure framework architecture matches destination (simulator vs device)
+
+**App crashes immediately (PlistSanityCheck exception)**:
+This occurs when Info.plist is missing `CADisableMinimumFrameDurationOnPhone`:
+```bash
+# Solution: Regenerate project with proper configuration
+cd demo/iosApp
+xcodegen generate
+```
+The `project.yml` includes the required `CADisableMinimumFrameDurationOnPhone` configuration. See the "Compose Multiplatform Configuration" section above for details.
+
+**Crash logs location**:
+```bash
+# View recent crash logs
+ls -lt ~/Library/Logs/DiagnosticReports/ | grep StellarDemo | head -10
+
+# Read crash log
+cat ~/Library/Logs/DiagnosticReports/StellarDemo-*.ips
+```
 
 **Compose UI not rendering**:
 - Verify `MainViewController()` is called correctly
