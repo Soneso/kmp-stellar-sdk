@@ -22,7 +22,7 @@
 - Error: "Module not found: Error: Can't resolve '/Users/.../kmp-stellar-sdk-demo-webApp.js'"
 
 ### Root Cause (Identified)
-This was a **known issue with Kotlin/JS 2.2.0 + Webpack** when bundling large Compose Multiplatform projects with:
+This was a **known issue with Kotlin/JS 2.2.x + Webpack** when bundling large Compose Multiplatform projects with:
 - Large dependency graphs (69 JS modules in this project)
 - XDR types (470+ types generating significant code)
 - Compose HTML + Skiko WASM (8+ MB WASM file)
