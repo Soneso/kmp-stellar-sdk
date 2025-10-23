@@ -472,7 +472,6 @@ cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
 - [Stellar Documentation](https://developers.stellar.org/)
 - [Horizon API Reference](https://developers.stellar.org/api/horizon)
 - [Soroban Documentation](https://soroban.stellar.org/)
-- [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) (reference implementation)
 
 ## Cryptography
 
@@ -543,10 +542,6 @@ For detailed testing information, see the [Testing Guide](docs/testing.md).
 - **macOS**: macOS 11+
 - **Web**: Modern browsers with WebAssembly support
 
-## Reference Implementation
-
-This SDK uses the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) as a reference for API design and feature completeness. The goal is to provide a similar developer experience with the benefits of Kotlin Multiplatform.
-
 ## Contributing
 
 This project is currently in alpha development. Contribution guidelines will be provided as the project matures.
@@ -568,12 +563,6 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 - Network communication via [Ktor](https://ktor.io/)
 - Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) and the [Flutter Stellar SDK](https://github.com/Soneso/stellar_flutter_sdk)
 - Built with [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
-
-## Support
-
-- **Stellar Network**: [stellar.org](https://stellar.org)
-- **Stellar Developers**: [developers.stellar.org](https://developers.stellar.org)
-- **Discord**: [Stellar Developers Discord](https://discord.gg/stellardev)
 
 ---
 

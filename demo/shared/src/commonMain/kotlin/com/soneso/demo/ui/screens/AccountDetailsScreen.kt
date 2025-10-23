@@ -62,7 +62,7 @@ class AccountDetailsScreen : Screen {
                     isLoading = true
                     detailsResult = null
                     try {
-                        detailsResult = fetchAccountDetails(accountId, useTestnet = true)
+                        detailsResult = fetchAccountDetails(accountId)
                     } finally {
                         isLoading = false
                     }

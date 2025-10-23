@@ -8,18 +8,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.AccountFundingResult
 import com.soneso.demo.stellar.KeyPairGenerationResult
 import com.soneso.demo.stellar.fundTestnetAccount
@@ -36,6 +44,8 @@ class FundAccountScreen : Screen {
 
         // State management
         var accountId by remember { mutableStateOf("") }
+        var generatedSecretSeed by remember { mutableStateOf("") }
+        var secretSeedVisible by remember { mutableStateOf(false) }
         var isLoading by remember { mutableStateOf(false) }
         var isGeneratingKey by remember { mutableStateOf(false) }
         var fundingResult by remember { mutableStateOf<AccountFundingResult?>(null) }
@@ -163,6 +173,83 @@ class FundAccountScreen : Screen {
                     )
                 )
 
+                // Secret Seed Field (only shown when generated)
+                if (generatedSecretSeed.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = generatedSecretSeed,
+                        onValueChange = {},
+                        label = { Text("Secret Seed (Private Key)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        visualTransformation = if (secretSeedVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            Row {
+                                // Visibility toggle
+                                IconButton(onClick = { secretSeedVisible = !secretSeedVisible }) {
+                                    Icon(
+                                        imageVector = if (secretSeedVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (secretSeedVisible) "Hide secret seed" else "Show secret seed"
+                                    )
+                                }
+                                // Copy button
+                                IconButton(onClick = {
+                                    coroutineScope.launch {
+                                        try {
+                                            getClipboard().copyToClipboard(generatedSecretSeed)
+                                            snackbarHostState.showSnackbar("Secret seed copied to clipboard")
+                                        } catch (e: Exception) {
+                                            snackbarHostState.showSnackbar("Failed to copy: ${e.message}")
+                                        }
+                                    }
+                                }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy secret seed")
+                                }
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                            focusedLabelColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    )
+
+                    // Security Warning
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "WARNING:",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Keep your secret seed safe! Never share it with anyone. Anyone with access to your secret seed can control your account.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
                 // Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -177,6 +264,9 @@ class FundAccountScreen : Screen {
                                     when (val result = generateRandomKeyPair()) {
                                         is KeyPairGenerationResult.Success -> {
                                             accountId = result.keyPair.getAccountId()
+                                            // Extract secret seed from keypair
+                                            generatedSecretSeed = (result.keyPair.getSecretSeed() ?: CharArray(0)).concatToString()
+                                            secretSeedVisible = false // Hide by default for security
                                             validationError = null
                                             fundingResult = null
                                             snackbarMessage = "New keypair generated and filled"

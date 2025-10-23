@@ -11,7 +11,7 @@ import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
  */
 object TransactionUtil {
     /**
-     * Fetches the most recent transaction hash for a given account from Horizon.
+     * Fetches the most recent transaction hash for a given account from Horizon testnet.
      *
      * This function queries the Horizon API to retrieve the latest transaction
      * associated with the specified account.
@@ -20,8 +20,7 @@ object TransactionUtil {
      *
      * ```kotlin
      * val txHash = TransactionUtil.getLatestTransactionHash(
-     *     accountId = "GXYZ...",
-     *     useTestnet = true
+     *     accountId = "GXYZ..."
      * )
      * println("Latest transaction: $txHash")
      * ```
@@ -34,7 +33,6 @@ object TransactionUtil {
      * - Invalid account ID format (propagated from Horizon)
      *
      * @param accountId The account ID to query transactions for (G... format, 56 characters)
-     * @param useTestnet Whether to use testnet (true) or mainnet (false)
      * @return The transaction hash of the most recent transaction
      * @throws IllegalStateException if no transactions found for the account
      * @throws com.soneso.stellar.sdk.horizon.exception.HorizonException for Horizon API errors
@@ -42,12 +40,8 @@ object TransactionUtil {
      * @see HorizonServer.transactions
      * @see <a href="https://developers.stellar.org/api/horizon/resources/transactions">Horizon Transactions API</a>
      */
-    suspend fun getLatestTransactionHash(accountId: String, useTestnet: Boolean): String {
-        val horizonUrl = if (useTestnet) {
-            "https://horizon-testnet.stellar.org"
-        } else {
-            "https://horizon.stellar.org"
-        }
+    suspend fun getLatestTransactionHash(accountId: String): String {
+        val horizonUrl = "https://horizon-testnet.stellar.org"
 
         val horizon = HorizonServer(horizonUrl)
 

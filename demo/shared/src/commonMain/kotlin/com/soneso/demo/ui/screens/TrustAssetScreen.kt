@@ -133,7 +133,6 @@ class TrustAssetScreen : Screen {
                             assetIssuer = assetIssuer,
                             secretSeed = secretSeed,
                             limit = limit,
-                            useTestnet = true
                         )
                     }
                 } catch (e: Exception) {

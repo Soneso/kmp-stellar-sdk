@@ -110,3 +110,8 @@ test-results/
 
 # Backup files
 *.bak
+
+# Compatibility analysis tools and data
+tools/sdk-analysis/
+compatibility/horizon/data/
+compatibility/rpc/data/

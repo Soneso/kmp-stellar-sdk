@@ -387,7 +387,6 @@ struct TrustAssetScreen: View {
                     assetIssuer: assetIssuer,
                     secretSeed: secretSeed,
                     limit: limit,
-                    useTestnet: true
                 )
                 await MainActor.run {
                     trustResult = result

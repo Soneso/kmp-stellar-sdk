@@ -9,8 +9,10 @@ This Android app showcases the Stellar SDK's capabilities on Android, featuring:
 - **Account Management**: Fund testnet accounts and fetch account details
 - **Payments**: Send XLM and custom assets
 - **Trustlines**: Establish trust to hold issued assets
+- **Transaction Details**: Fetch and view transaction operations and events
 - **Smart Contracts**: Fetch and parse Soroban contract details
 - **Contract Deployment**: Upload and deploy WASM contracts to testnet
+- **Contract Invocation**: Invoke smart contracts with type conversion and authorization
 
 The app uses 100% shared Compose UI from the `demo:shared` module, with only minimal Android-specific entry point code.
 
@@ -195,15 +197,33 @@ All features are implemented in the shared module. The Android app provides:
 - Amount validation
 - Transaction signing
 
-### 6. Smart Contract Details
+### 6. Fetch Transaction Details
+- Retrieve transaction information from Horizon or Soroban RPC
+- Display operations and events
+- View smart contract call data
+- Human-readable SCVal formatting
+
+### 7. Smart Contract Details
 - Parse WASM contracts
 - View contract metadata
 - Display function specifications
 
-### 7. Deploy Smart Contract
+### 8. Deploy Smart Contract
 - Upload WASM contracts
 - Deploy with constructor arguments
 - Platform-specific resource loading
+
+### 9. Invoke Hello World Contract
+- Invoke deployed "Hello World" contract
+- Map-based argument conversion
+- Automatic type handling with funcResToNative()
+- Demonstrates beginner-friendly contract invocation
+
+### 10. Invoke Auth Contract
+- Dynamic authorization handling
+- Same-invoker vs different-invoker scenarios
+- Conditional signing with needsNonInvokerSigningBy()
+- Production-ready authorization patterns
 
 ## Technology Stack
 

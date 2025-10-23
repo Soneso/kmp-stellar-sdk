@@ -63,7 +63,7 @@ class ContractDetailsScreen : Screen {
                     isLoading = true
                     detailsResult = null
                     try {
-                        detailsResult = fetchContractDetails(contractId, useTestnet = true)
+                        detailsResult = fetchContractDetails(contractId)
                     } finally {
                         isLoading = false
                     }

@@ -507,7 +507,6 @@ struct InvokeHelloWorldContractScreen: View {
                     to: toParameter,
                     submitterAccountId: submitterAccountId,
                     secretKey: secretKey,
-                    useTestnet: true
                 )
 
                 await MainActor.run {

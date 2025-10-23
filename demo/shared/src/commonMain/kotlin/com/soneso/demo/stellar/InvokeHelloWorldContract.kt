@@ -4,6 +4,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for hello world contract invocation operations.
@@ -34,7 +35,7 @@ sealed class InvokeHelloWorldResult {
 }
 
 /**
- * Invokes the "hello" function on a deployed hello world contract using the SDK's ContractClient.
+ * Invokes the "hello" function on a deployed hello world contract on testnet using the SDK's ContractClient.
  *
  * This function demonstrates the high-level contract invocation API from the Stellar SDK.
  * It showcases how to:
@@ -129,8 +130,7 @@ sealed class InvokeHelloWorldResult {
  *     contractId = "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
  *     to = "Alice",
  *     submitterAccountId = "GXYZ...",
- *     secretKey = "SXYZ...",
- *     useTestnet = true
+ *     secretKey = "SXYZ..."
  * )
  *
  * when (result) {
@@ -148,7 +148,6 @@ sealed class InvokeHelloWorldResult {
  * @param to The name to greet (parameter for the hello function)
  * @param submitterAccountId The account ID that will submit the transaction (G... format)
  * @param secretKey The submitter's secret key for signing (S... format)
- * @param useTestnet If true, connects to testnet; otherwise connects to mainnet (default: true)
  * @return InvokeHelloWorldResult.Success with greeting if invocation succeeded, InvokeHelloWorldResult.Error if it failed
  *
  * @see ContractClient.fromNetwork
@@ -160,27 +159,12 @@ suspend fun invokeHelloWorldContract(
     contractId: String,
     to: String,
     submitterAccountId: String,
-    secretKey: String,
-    useTestnet: Boolean = true
+    secretKey: String
 ): InvokeHelloWorldResult {
     return try {
         // Step 1: Validate inputs
-        if (contractId.isBlank()) {
-            return InvokeHelloWorldResult.Error(
-                message = "Contract ID cannot be empty"
-            )
-        }
-
-        if (!contractId.startsWith('C')) {
-            return InvokeHelloWorldResult.Error(
-                message = "Contract ID must start with 'C' (got: ${contractId.take(1)})"
-            )
-        }
-
-        if (contractId.length != 56) {
-            return InvokeHelloWorldResult.Error(
-                message = "Contract ID must be exactly 56 characters long (got: ${contractId.length})"
-            )
+        StellarValidation.validateContractId(contractId)?.let { error ->
+            return InvokeHelloWorldResult.Error(message = error)
         }
 
         if (to.isBlank()) {
@@ -189,34 +173,12 @@ suspend fun invokeHelloWorldContract(
             )
         }
 
-        if (submitterAccountId.isBlank()) {
-            return InvokeHelloWorldResult.Error(
-                message = "Submitter account ID cannot be empty"
-            )
+        StellarValidation.validateAccountId(submitterAccountId)?.let { error ->
+            return InvokeHelloWorldResult.Error(message = error.replace("Account ID", "Submitter account ID"))
         }
 
-        if (!submitterAccountId.startsWith('G')) {
-            return InvokeHelloWorldResult.Error(
-                message = "Submitter account ID must start with 'G' (got: ${submitterAccountId.take(1)})"
-            )
-        }
-
-        if (submitterAccountId.length != 56) {
-            return InvokeHelloWorldResult.Error(
-                message = "Submitter account ID must be exactly 56 characters long (got: ${submitterAccountId.length})"
-            )
-        }
-
-        if (secretKey.isBlank()) {
-            return InvokeHelloWorldResult.Error(
-                message = "Secret key cannot be empty"
-            )
-        }
-
-        if (!secretKey.startsWith('S')) {
-            return InvokeHelloWorldResult.Error(
-                message = "Secret key must start with 'S' (got: ${secretKey.take(1)})"
-            )
+        StellarValidation.validateSecretSeed(secretKey)?.let { error ->
+            return InvokeHelloWorldResult.Error(message = error.replace("Secret seed", "Secret key"))
         }
 
         // Step 2: Create KeyPair from secret seed
@@ -229,13 +191,9 @@ suspend fun invokeHelloWorldContract(
             )
         }
 
-        // Step 3: Determine network and RPC URL
-        val network = if (useTestnet) Network.TESTNET else Network.PUBLIC
-        val rpcUrl = if (useTestnet) {
-            "https://soroban-testnet.stellar.org:443"
-        } else {
-            "https://soroban-mainnet.stellar.org:443"
-        }
+        // Step 3: Determine network and RPC URL for testnet
+        val network = Network.TESTNET
+        val rpcUrl = "https://soroban-testnet.stellar.org:443"
 
         // Step 4: Initialize ContractClient from the network
         // This loads the contract specification (WASM metadata) from the network,

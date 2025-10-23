@@ -2,6 +2,7 @@ package com.soneso.demo.stellar
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for trust asset operations.
@@ -37,7 +38,7 @@ sealed class TrustAssetResult {
 }
 
 /**
- * Establishes a trustline to an asset on the Stellar network.
+ * Establishes a trustline to an asset on the Stellar testnet.
  *
  * A trustline is required before an account can hold non-native assets (assets other than XLM).
  * This function creates a ChangeTrust operation that allows the account to hold up to a specified
@@ -84,7 +85,6 @@ sealed class TrustAssetResult {
  * @param assetIssuer The issuer of the asset (must start with 'G')
  * @param secretSeed The secret seed for signing the transaction (must start with 'S')
  * @param limit The maximum amount of the asset to trust (defaults to maximum limit)
- * @param useTestnet If true, connects to testnet; otherwise connects to public network (default: true)
  * @return TrustAssetResult.Success if the trustline was established, TrustAssetResult.Error if it failed
  *
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/stellar-data-structures/accounts#trustlines">Trustlines Documentation</a>
@@ -95,49 +95,16 @@ suspend fun trustAsset(
     assetCode: String,
     assetIssuer: String,
     secretSeed: String,
-    limit: String = ChangeTrustOperation.MAX_LIMIT,
-    useTestnet: Boolean = true
+    limit: String = ChangeTrustOperation.MAX_LIMIT
 ): TrustAssetResult {
     return try {
         // Validate input parameters
-        if (accountId.isBlank()) {
-            return TrustAssetResult.Error(
-                message = "Account ID cannot be empty"
-            )
+        StellarValidation.validateAccountId(accountId)?.let { error ->
+            return TrustAssetResult.Error(message = error)
         }
 
-        if (!accountId.startsWith('G')) {
-            return TrustAssetResult.Error(
-                message = "Account ID must start with 'G' (got: ${accountId.take(1)})"
-            )
-        }
-
-        if (accountId.length != 56) {
-            return TrustAssetResult.Error(
-                message = "Account ID must be exactly 56 characters long (got: ${accountId.length})"
-            )
-        }
-
-        if (assetCode.isBlank()) {
-            return TrustAssetResult.Error(
-                message = "Asset code cannot be empty"
-            )
-        }
-
-        if (assetCode.length > 12) {
-            return TrustAssetResult.Error(
-                message = "Asset code cannot exceed 12 characters (got: ${assetCode.length})"
-            )
-        }
-
-        // Validate asset code contains only alphanumeric characters
-        val invalidChars = assetCode.filter { char ->
-            char !in 'A'..'Z' && char !in '0'..'9'
-        }
-        if (invalidChars.isNotEmpty()) {
-            return TrustAssetResult.Error(
-                message = "Asset code must contain only uppercase letters and digits. Invalid characters: '$invalidChars'"
-            )
+        StellarValidation.validateAssetCode(assetCode)?.let { error ->
+            return TrustAssetResult.Error(message = error)
         }
 
         if (assetIssuer.isBlank()) {
@@ -146,34 +113,12 @@ suspend fun trustAsset(
             )
         }
 
-        if (!assetIssuer.startsWith('G')) {
-            return TrustAssetResult.Error(
-                message = "Asset issuer must start with 'G' (got: ${assetIssuer.take(1)})"
-            )
+        StellarValidation.validateAccountId(assetIssuer)?.let { error ->
+            return TrustAssetResult.Error(message = error.replace("Account ID", "Asset issuer"))
         }
 
-        if (assetIssuer.length != 56) {
-            return TrustAssetResult.Error(
-                message = "Asset issuer must be exactly 56 characters long (got: ${assetIssuer.length})"
-            )
-        }
-
-        if (secretSeed.isBlank()) {
-            return TrustAssetResult.Error(
-                message = "Secret seed cannot be empty"
-            )
-        }
-
-        if (!secretSeed.startsWith('S')) {
-            return TrustAssetResult.Error(
-                message = "Secret seed must start with 'S'"
-            )
-        }
-
-        if (secretSeed.length != 56) {
-            return TrustAssetResult.Error(
-                message = "Secret seed must be exactly 56 characters long (got: ${secretSeed.length})"
-            )
+        StellarValidation.validateSecretSeed(secretSeed)?.let { error ->
+            return TrustAssetResult.Error(message = error)
         }
 
         // Validate limit (basic validation - SDK will do more thorough validation)
@@ -191,15 +136,11 @@ suspend fun trustAsset(
             )
         }
 
-        // Connect to Horizon server
-        val horizonUrl = if (useTestnet) {
-            "https://horizon-testnet.stellar.org"
-        } else {
-            "https://horizon.stellar.org"
-        }
+        // Connect to Horizon testnet server
+        val horizonUrl = "https://horizon-testnet.stellar.org"
 
         val server = HorizonServer(horizonUrl)
-        val network = if (useTestnet) Network.TESTNET else Network.PUBLIC
+        val network = Network.TESTNET
 
         try {
             // Create keypair from secret seed

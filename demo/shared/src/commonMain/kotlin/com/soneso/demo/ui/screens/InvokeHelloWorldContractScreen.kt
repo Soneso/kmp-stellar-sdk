@@ -104,7 +104,6 @@ class InvokeHelloWorldContractScreen : Screen {
                         to = toParameter,
                         submitterAccountId = submitterAccountId,
                         secretKey = secretKey,
-                        useTestnet = true
                     )
                 } finally {
                     isInvoking = false

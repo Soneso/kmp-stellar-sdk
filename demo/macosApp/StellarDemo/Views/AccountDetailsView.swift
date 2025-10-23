@@ -224,7 +224,7 @@ struct AccountDetailsScreen: View {
 
         Task {
             do {
-                let result = try await bridge.fetchAccountDetails(accountId: accountId, useTestnet: true)
+                let result = try await bridge.fetchAccountDetails(accountId: accountId)
                 await MainActor.run {
                     detailsResult = result
                     isFetching = false

@@ -335,9 +335,9 @@ struct FetchTransactionScreen: View {
                 let useHorizon = selectedAPI == .horizon
 
                 if useHorizon {
-                    result = try await FetchTransactionKt.fetchTransactionFromHorizon(transactionHash: transactionHash, useTestnet: true)
+                    result = try await FetchTransactionKt.fetchTransactionFromHorizon(transactionHash: transactionHash)
                 } else {
-                    result = try await FetchTransactionKt.fetchTransactionFromRpc(transactionHash: transactionHash, useTestnet: true)
+                    result = try await FetchTransactionKt.fetchTransactionFromRpc(transactionHash: transactionHash)
                 }
                 await MainActor.run {
                     fetchResult = result

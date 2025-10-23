@@ -1,66 +1,53 @@
-# Tools
+# KMP Stellar SDK - Development Tools
 
-This directory contains tools for building and maintaining the Stellar KMP SDK.
+This directory contains development tools for the KMP Stellar SDK.
 
-## xdrgen-kt
+## Available Tools
 
-Kotlin Multiplatform code generator for Stellar XDR types.
+### xdrgen-kt - XDR Code Generation
 
-### Prerequisites
+**Location:** `tools/xdrgen-kt/`
 
-- Ruby 2.7+
-- Bundler gem: `gem install bundler` (usually pre-installed with Ruby)
+**Description:** Ruby-based tool for generating Kotlin XDR types from Stellar XDR specification files.
 
-### First-Time Setup
+**Prerequisites:**
+- Ruby (bundled dependencies included)
 
+**Usage:**
 ```bash
 cd tools/xdrgen-kt
-bundle install --path vendor/bundle
+./generate.rb /path/to/stellar-xdr/Stellar-*.x
 ```
 
-This installs all Ruby dependencies locally in `vendor/bundle` (which is gitignored).
+**Output:** Generates Kotlin XDR types in `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr/`
 
-### Usage
+**Features:**
+- Generates type-safe Kotlin classes from XDR specifications
+- Automatically excludes internal/overlay protocol files
+- Maintains compatibility with Stellar protocol updates
 
-Generate XDR types from Stellar protocol definitions:
+For detailed documentation, see the README.md in each tool's subdirectory.
 
-```bash
-cd tools/xdrgen-kt
-bundle exec ruby generate.rb /Users/chris/projects/Stellar/stellar-xdr/Stellar-*.x
+## Directory Structure
+
+```
+tools/
+├── README.md              # This file
+└── xdrgen-kt/             # XDR code generation tool
+    ├── generate.rb        # Main generator script
+    ├── Gemfile            # Ruby dependencies
+    └── lib/               # Custom Kotlin generator
 ```
 
-This will generate KMP-compatible XDR types directly into:
-`stellar-sdk/src/commonMain/kotlin/com/stellar/sdk/xdr/`
+## Contributing
 
-The XDR definition files (`.x` files) should be obtained from the [stellar-xdr](https://github.com/stellar/stellar-xdr) repository.
+When adding new tools to this directory:
 
-**Note:** The path to stellar-xdr is currently: `/Users/chris/projects/Stellar/stellar-xdr`
+1. Create a subdirectory for the tool (e.g., `tools/my-tool/`)
+2. Include a README.md in the tool's directory with detailed usage instructions
+3. Update this file to list the new tool
+4. Follow existing patterns for script organization and documentation
 
-### Generated Code
+## License
 
-The generator produces:
-- All Stellar protocol XDR types (accounts, transactions, operations, ledger entries, etc.)
-- Zero-cost inline value classes for type safety (using `@kotlin.jvm.JvmInline`)
-- Platform-agnostic multiplatform code compatible with JVM, JS, and Native
-- `XdrReader` and `XdrWriter` expect declarations (actual implementations are hand-written per platform in `jvmMain`, `jsMain`, and `nativeMain`)
-
-### Regenerating After Protocol Updates
-
-When Stellar protocol is updated:
-
-1. Pull latest changes from the stellar-xdr repository
-2. Run the generator with updated `.x` files:
-   ```bash
-   cd tools/xdrgen-kt
-   bundle exec ruby generate.rb /Users/chris/projects/Stellar/stellar-xdr/Stellar-*.x
-   ```
-3. Test all platforms: `cd ../.. && ./gradlew check`
-4. Review changes and commit the generated files
-
-### Technical Details
-
-- **Generator:** Modified version of [stellar/xdrgen](https://github.com/stellar/xdrgen) with KMP-specific enhancements
-- **Output format:** Kotlin with inline value classes instead of typealiases
-- **Union types:** Implemented as sealed classes with proper discriminant wrapping
-- **Typedef handling:** Chain resolution for correct type literal suffixes (u/uL)
-- **Platform compatibility:** All generated code is common (expect/actual only for XdrReader/XdrWriter)
+Apache-2.0

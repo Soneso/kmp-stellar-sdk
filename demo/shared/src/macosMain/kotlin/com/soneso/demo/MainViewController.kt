@@ -31,6 +31,8 @@ import com.soneso.stellar.sdk.KeyPair
  * - Native macOS app with SwiftUI
  * - Shared business logic from Kotlin
  * - Access to the Stellar SDK
+ *
+ * All functions connect to Stellar testnet.
  */
 class MacOSBridge {
 
@@ -68,22 +70,21 @@ class MacOSBridge {
     }
 
     /**
-     * Fetch detailed account information from the Stellar network.
+     * Fetch detailed account information from the Stellar testnet.
      * Call this from Swift using async/await.
      *
      * Uses the centralized AccountDetails business logic to maintain consistency
      * across all platform UIs (Compose, SwiftUI, Web).
      *
      * @param accountId The Stellar account ID to fetch (must start with 'G')
-     * @param useTestnet If true, connects to testnet; otherwise connects to public network
      * @return AccountDetailsResult with full account data or error details
      */
-    suspend fun fetchAccountDetails(accountId: String, useTestnet: Boolean = true): AccountDetailsResult {
-        return com.soneso.demo.stellar.fetchAccountDetails(accountId, useTestnet)
+    suspend fun fetchAccountDetails(accountId: String): AccountDetailsResult {
+        return com.soneso.demo.stellar.fetchAccountDetails(accountId)
     }
 
     /**
-     * Establish a trustline to a Stellar asset.
+     * Establish a trustline to a Stellar asset on testnet.
      * Call this from Swift using async/await.
      *
      * Uses the centralized TrustAsset business logic to maintain consistency
@@ -94,7 +95,6 @@ class MacOSBridge {
      * @param assetIssuer The issuer of the asset (must start with 'G')
      * @param secretSeed The secret seed for signing the transaction (must start with 'S')
      * @param limit The maximum amount of the asset to trust (defaults to maximum limit)
-     * @param useTestnet If true, connects to testnet; otherwise connects to public network
      * @return TrustAssetResult indicating success with transaction hash or failure with error details
      */
     suspend fun trustAsset(
@@ -102,21 +102,19 @@ class MacOSBridge {
         assetCode: String,
         assetIssuer: String,
         secretSeed: String,
-        limit: String = com.soneso.stellar.sdk.ChangeTrustOperation.MAX_LIMIT,
-        useTestnet: Boolean = true
+        limit: String = com.soneso.stellar.sdk.ChangeTrustOperation.MAX_LIMIT
     ): TrustAssetResult {
         return com.soneso.demo.stellar.trustAsset(
             accountId = accountId,
             assetCode = assetCode,
             assetIssuer = assetIssuer,
             secretSeed = secretSeed,
-            limit = limit,
-            useTestnet = useTestnet
+            limit = limit
         )
     }
 
     /**
-     * Send a payment on the Stellar network.
+     * Send a payment on the Stellar testnet.
      * Call this from Swift using async/await.
      *
      * Uses the centralized SendPayment business logic to maintain consistency
@@ -128,7 +126,6 @@ class MacOSBridge {
      * @param assetIssuer The issuer of the asset (required for issued assets, null for native XLM)
      * @param amount The amount to send (decimal string with up to 7 decimal places)
      * @param secretSeed The secret seed of the source account for signing (must start with 'S')
-     * @param useTestnet If true, connects to testnet; otherwise connects to public network
      * @return SendPaymentResult indicating success with transaction details or failure with error details
      */
     suspend fun sendPayment(
@@ -137,8 +134,7 @@ class MacOSBridge {
         assetCode: String,
         assetIssuer: String?,
         amount: String,
-        secretSeed: String,
-        useTestnet: Boolean = true
+        secretSeed: String
     ): SendPaymentResult {
         return com.soneso.demo.stellar.sendPayment(
             sourceAccountId = sourceAccountId,
@@ -146,13 +142,12 @@ class MacOSBridge {
             assetCode = assetCode,
             assetIssuer = assetIssuer,
             amount = amount,
-            secretSeed = secretSeed,
-            useTestnet = useTestnet
+            secretSeed = secretSeed
         )
     }
 
     /**
-     * Fetch and parse smart contract details from the Stellar network using Soroban RPC.
+     * Fetch and parse smart contract details from the Stellar testnet using Soroban RPC.
      * Call this from Swift using async/await.
      *
      * Uses the centralized ContractDetails business logic to maintain consistency
@@ -164,15 +159,14 @@ class MacOSBridge {
      * - Contract metadata (key-value pairs for application/tooling use)
      *
      * @param contractId The Stellar contract ID to fetch (must start with 'C')
-     * @param useTestnet If true, connects to testnet; otherwise connects to mainnet
      * @return ContractDetailsResult with parsed contract info or error details
      */
-    suspend fun fetchContractDetails(contractId: String, useTestnet: Boolean = true): ContractDetailsResult {
-        return com.soneso.demo.stellar.fetchContractDetails(contractId, useTestnet)
+    suspend fun fetchContractDetails(contractId: String): ContractDetailsResult {
+        return com.soneso.demo.stellar.fetchContractDetails(contractId)
     }
 
     /**
-     * Deploy a Soroban smart contract to the Stellar network.
+     * Deploy a Soroban smart contract to the Stellar testnet.
      * Call this from Swift using async/await.
      *
      * Uses the centralized DeployContract business logic to maintain consistency
@@ -189,22 +183,19 @@ class MacOSBridge {
      * @param constructorArgs Constructor arguments as a Map (key = param name, value = param value)
      * @param sourceAccountId The source account ID that will pay for deployment (must start with 'G')
      * @param secretKey The source account's secret key for signing (must start with 'S')
-     * @param useTestnet If true, deploys to testnet; otherwise to mainnet
      * @return DeployContractResult indicating success with contract ID or failure with error details
      */
     suspend fun deployContract(
         contractMetadata: ContractMetadata,
         constructorArgs: Map<String, Any?>,
         sourceAccountId: String,
-        secretKey: String,
-        useTestnet: Boolean = true
+        secretKey: String
     ): DeployContractResult {
         return com.soneso.demo.stellar.deployContract(
             contractMetadata = contractMetadata,
             constructorArgs = constructorArgs,
             sourceAccountId = sourceAccountId,
-            secretKey = secretKey,
-            useTestnet = useTestnet
+            secretKey = secretKey
         )
     }
 }

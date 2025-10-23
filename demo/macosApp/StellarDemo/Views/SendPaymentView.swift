@@ -495,7 +495,6 @@ struct SendPaymentScreen: View {
                     assetIssuer: assetIssuerValue,
                     amount: amount,
                     secretSeed: secretSeed,
-                    useTestnet: true
                 )
                 await MainActor.run {
                     paymentResult = result

@@ -2,6 +2,7 @@ package com.soneso.demo.stellar
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for payment operations.
@@ -41,7 +42,7 @@ sealed class SendPaymentResult {
 }
 
 /**
- * Sends a payment on the Stellar network.
+ * Sends a payment on the Stellar testnet.
  *
  * A payment operation transfers a specified amount of an asset from the source account
  * to the destination account. The destination account must exist and, for non-native assets,
@@ -104,7 +105,6 @@ sealed class SendPaymentResult {
  * @param assetIssuer The issuer of the asset (required for issued assets, null for native XLM)
  * @param amount The amount to send (decimal string with up to 7 decimal places)
  * @param secretSeed The secret seed of the source account for signing (must start with 'S')
- * @param useTestnet If true, connects to testnet; otherwise connects to public network (default: true)
  * @return SendPaymentResult.Success if the payment was sent, SendPaymentResult.Error if it failed
  *
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#payment">Payment Operation</a>
@@ -116,8 +116,7 @@ suspend fun sendPayment(
     assetCode: String,
     assetIssuer: String?,
     amount: String,
-    secretSeed: String,
-    useTestnet: Boolean = true
+    secretSeed: String
 ): SendPaymentResult {
     return try {
         // Validate source account ID
@@ -127,16 +126,8 @@ suspend fun sendPayment(
             )
         }
 
-        if (!sourceAccountId.startsWith('G')) {
-            return SendPaymentResult.Error(
-                message = "Source account ID must start with 'G' (got: ${sourceAccountId.take(1)})"
-            )
-        }
-
-        if (sourceAccountId.length != 56) {
-            return SendPaymentResult.Error(
-                message = "Source account ID must be exactly 56 characters long (got: ${sourceAccountId.length})"
-            )
+        StellarValidation.validateAccountId(sourceAccountId)?.let { error ->
+            return SendPaymentResult.Error(message = error.replace("Account ID", "Source account ID"))
         }
 
         // Validate destination account ID
@@ -146,16 +137,8 @@ suspend fun sendPayment(
             )
         }
 
-        if (!destinationAccountId.startsWith('G')) {
-            return SendPaymentResult.Error(
-                message = "Destination account ID must start with 'G' (got: ${destinationAccountId.take(1)})"
-            )
-        }
-
-        if (destinationAccountId.length != 56) {
-            return SendPaymentResult.Error(
-                message = "Destination account ID must be exactly 56 characters long (got: ${destinationAccountId.length})"
-            )
+        StellarValidation.validateAccountId(destinationAccountId)?.let { error ->
+            return SendPaymentResult.Error(message = error.replace("Account ID", "Destination account ID"))
         }
 
         // Validate asset code
@@ -169,20 +152,8 @@ suspend fun sendPayment(
                        assetCode.equals("XLM", ignoreCase = true)
 
         if (!isNative) {
-            if (assetCode.length > 12) {
-                return SendPaymentResult.Error(
-                    message = "Asset code cannot exceed 12 characters (got: ${assetCode.length})"
-                )
-            }
-
-            // Validate asset code contains only alphanumeric characters
-            val invalidChars = assetCode.filter { char ->
-                char !in 'A'..'Z' && char !in '0'..'9'
-            }
-            if (invalidChars.isNotEmpty()) {
-                return SendPaymentResult.Error(
-                    message = "Asset code must contain only uppercase letters and digits. Invalid characters: '$invalidChars'"
-                )
+            StellarValidation.validateAssetCode(assetCode)?.let { error ->
+                return SendPaymentResult.Error(message = error)
             }
 
             // Validate asset issuer for non-native assets
@@ -192,16 +163,8 @@ suspend fun sendPayment(
                 )
             }
 
-            if (!assetIssuer.startsWith('G')) {
-                return SendPaymentResult.Error(
-                    message = "Asset issuer must start with 'G' (got: ${assetIssuer.take(1)})"
-                )
-            }
-
-            if (assetIssuer.length != 56) {
-                return SendPaymentResult.Error(
-                    message = "Asset issuer must be exactly 56 characters long (got: ${assetIssuer.length})"
-                )
+            StellarValidation.validateAccountId(assetIssuer)?.let { error ->
+                return SendPaymentResult.Error(message = error.replace("Account ID", "Asset issuer"))
             }
         }
 
@@ -227,33 +190,15 @@ suspend fun sendPayment(
         }
 
         // Validate secret seed
-        if (secretSeed.isBlank()) {
-            return SendPaymentResult.Error(
-                message = "Secret seed cannot be empty"
-            )
+        StellarValidation.validateSecretSeed(secretSeed)?.let { error ->
+            return SendPaymentResult.Error(message = error)
         }
 
-        if (!secretSeed.startsWith('S')) {
-            return SendPaymentResult.Error(
-                message = "Secret seed must start with 'S'"
-            )
-        }
-
-        if (secretSeed.length != 56) {
-            return SendPaymentResult.Error(
-                message = "Secret seed must be exactly 56 characters long (got: ${secretSeed.length})"
-            )
-        }
-
-        // Connect to Horizon server
-        val horizonUrl = if (useTestnet) {
-            "https://horizon-testnet.stellar.org"
-        } else {
-            "https://horizon.stellar.org"
-        }
+        // Connect to Horizon testnet server
+        val horizonUrl = "https://horizon-testnet.stellar.org"
 
         val server = HorizonServer(horizonUrl)
-        val network = if (useTestnet) Network.TESTNET else Network.PUBLIC
+        val network = Network.TESTNET
 
         try {
             // Create keypair from secret seed

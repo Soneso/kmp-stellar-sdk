@@ -145,7 +145,6 @@ class DeployContractScreen : Screen {
                         constructorArgs = constructorArgs,
                         sourceAccountId = sourceAccountId,
                         secretKey = secretKey,
-                        useTestnet = true
                     )
                 } finally {
                     isDeploying = false

@@ -4,6 +4,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for authorization contract invocation operations.
@@ -167,58 +168,16 @@ suspend fun invokeAuthContract(
 ): InvokeAuthContractResult {
     return try {
         // Step 1: Validate inputs
-        if (contractId.isBlank()) {
-            return InvokeAuthContractResult.Failure(
-                message = "Contract ID cannot be empty"
-            )
+        StellarValidation.validateContractId(contractId)?.let { error ->
+            return InvokeAuthContractResult.Failure(message = error)
         }
 
-        if (!contractId.startsWith('C')) {
-            return InvokeAuthContractResult.Failure(
-                message = "Contract ID must start with 'C' (got: ${contractId.take(1)})"
-            )
+        StellarValidation.validateAccountId(userAccountId)?.let { error ->
+            return InvokeAuthContractResult.Failure(message = error.replace("Account ID", "User account ID"))
         }
 
-        if (contractId.length != 56) {
-            return InvokeAuthContractResult.Failure(
-                message = "Contract ID must be exactly 56 characters long (got: ${contractId.length})"
-            )
-        }
-
-        if (userAccountId.isBlank()) {
-            return InvokeAuthContractResult.Failure(
-                message = "User account ID cannot be empty"
-            )
-        }
-
-        if (!userAccountId.startsWith('G')) {
-            return InvokeAuthContractResult.Failure(
-                message = "User account ID must start with 'G' (got: ${userAccountId.take(1)})"
-            )
-        }
-
-        if (userAccountId.length != 56) {
-            return InvokeAuthContractResult.Failure(
-                message = "User account ID must be exactly 56 characters long (got: ${userAccountId.length})"
-            )
-        }
-
-        if (sourceAccountId.isBlank()) {
-            return InvokeAuthContractResult.Failure(
-                message = "Source account ID cannot be empty"
-            )
-        }
-
-        if (!sourceAccountId.startsWith('G')) {
-            return InvokeAuthContractResult.Failure(
-                message = "Source account ID must start with 'G' (got: ${sourceAccountId.take(1)})"
-            )
-        }
-
-        if (sourceAccountId.length != 56) {
-            return InvokeAuthContractResult.Failure(
-                message = "Source account ID must be exactly 56 characters long (got: ${sourceAccountId.length})"
-            )
+        StellarValidation.validateAccountId(sourceAccountId)?.let { error ->
+            return InvokeAuthContractResult.Failure(message = error.replace("Account ID", "Source account ID"))
         }
 
         if (value < 0) {

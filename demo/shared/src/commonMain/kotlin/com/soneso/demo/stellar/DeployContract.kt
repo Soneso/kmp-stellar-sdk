@@ -3,6 +3,7 @@ package com.soneso.demo.stellar
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Contract metadata for the deployment UI.
@@ -172,7 +173,7 @@ sealed class DeployContractResult {
 expect suspend fun loadWasmResource(wasmFilename: String): ByteArray
 
 /**
- * Deploys a Soroban smart contract to the Stellar network using the SDK's ContractClient.
+ * Deploys a Soroban smart contract to the Stellar testnet using the SDK's ContractClient.
  *
  * This function demonstrates the high-level contract deployment API from the Stellar SDK.
  * It supports both contracts with and without constructors, automatically handling:
@@ -196,8 +197,7 @@ expect suspend fun loadWasmResource(wasmFilename: String): ByteArray
  *     contractMetadata = helloWorldMetadata,
  *     constructorArgs = emptyMap(),
  *     sourceAccountId = "GXYZ...",
- *     secretKey = "SXYZ...",
- *     useTestnet = true
+ *     secretKey = "SXYZ..."
  * )
  * ```
  *
@@ -212,8 +212,7 @@ expect suspend fun loadWasmResource(wasmFilename: String): ByteArray
  *         "symbol" to "MYTKN"
  *     ),
  *     sourceAccountId = "GXYZ...",
- *     secretKey = "SXYZ...",
- *     useTestnet = true
+ *     secretKey = "SXYZ..."
  * )
  * ```
  *
@@ -231,7 +230,6 @@ expect suspend fun loadWasmResource(wasmFilename: String): ByteArray
  * @param constructorArgs Constructor arguments as a Map (key = param name, value = param value)
  * @param sourceAccountId The source account ID (G... format) that will pay for deployment
  * @param secretKey The source account's secret key (S... format) for signing
- * @param useTestnet If true, deploys to testnet; otherwise to mainnet (default: true)
  * @return DeployContractResult.Success with contract ID if successful, DeployContractResult.Error if failed
  *
  * @see ContractClient.deploy
@@ -241,39 +239,16 @@ suspend fun deployContract(
     contractMetadata: ContractMetadata,
     constructorArgs: Map<String, Any?>,
     sourceAccountId: String,
-    secretKey: String,
-    useTestnet: Boolean = true
+    secretKey: String
 ): DeployContractResult {
     return try {
         // Step 1: Validate inputs
-        if (sourceAccountId.isBlank()) {
-            return DeployContractResult.Error(
-                message = "Source account ID cannot be empty"
-            )
+        StellarValidation.validateAccountId(sourceAccountId)?.let { error ->
+            return DeployContractResult.Error(message = error.replace("Account ID", "Source account ID"))
         }
 
-        if (!sourceAccountId.startsWith('G')) {
-            return DeployContractResult.Error(
-                message = "Source account ID must start with 'G' (got: ${sourceAccountId.take(1)})"
-            )
-        }
-
-        if (sourceAccountId.length != 56) {
-            return DeployContractResult.Error(
-                message = "Source account ID must be exactly 56 characters long (got: ${sourceAccountId.length})"
-            )
-        }
-
-        if (secretKey.isBlank()) {
-            return DeployContractResult.Error(
-                message = "Secret key cannot be empty"
-            )
-        }
-
-        if (!secretKey.startsWith('S')) {
-            return DeployContractResult.Error(
-                message = "Secret key must start with 'S' (got: ${secretKey.take(1)})"
-            )
+        StellarValidation.validateSecretSeed(secretKey)?.let { error ->
+            return DeployContractResult.Error(message = error.replace("Secret seed", "Secret key"))
         }
 
         // Step 2: Validate constructor arguments
@@ -350,13 +325,9 @@ suspend fun deployContract(
             )
         }
 
-        // Step 5: Determine network and RPC URL
-        val network = if (useTestnet) Network.TESTNET else Network.PUBLIC
-        val rpcUrl = if (useTestnet) {
-            "https://soroban-testnet.stellar.org:443"
-        } else {
-            "https://soroban-mainnet.stellar.org:443"
-        }
+        // Step 5: Determine network and RPC URL for testnet
+        val network = Network.TESTNET
+        val rpcUrl = "https://soroban-testnet.stellar.org:443"
 
         // Step 6: Deploy contract using SDK's high-level API
         // This is the key demonstration of ContractClient.deploy()

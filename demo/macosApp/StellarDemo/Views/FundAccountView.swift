@@ -7,6 +7,8 @@ struct FundAccountScreen: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var toastManager: ToastManager
     @State private var accountId = ""
+    @State private var generatedKeypair: KeyPair?
+    @State private var secretSeedVisible = false
     @State private var isGenerating = false
     @State private var isFunding = false
     @State private var fundingResult: AccountFundingResult?
@@ -64,29 +66,130 @@ struct FundAccountScreen: View {
     }
 
     private var inputField: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Public Key")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Material3Colors.onSurfaceVariant)
+        VStack(alignment: .leading, spacing: 12) {
+            // Public Key Field
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Public Key")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Material3Colors.onSurfaceVariant)
 
-            TextField("G...", text: $accountId)
-                .textFieldStyle(.plain)
-                .font(.system(.body, design: .monospaced))
-                .padding(12)
-                .background(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(validationError != nil ? Material3Colors.onErrorContainer : Material3Colors.onSurfaceVariant.opacity(0.3), lineWidth: 1)
-                )
-                .onChange(of: accountId) { _ in
-                    validationError = nil
-                    fundingResult = nil
+                HStack(spacing: 8) {
+                    TextField("G...", text: $accountId)
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, design: .monospaced))
+                        .padding(12)
+                        .background(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(validationError != nil ? Material3Colors.onErrorContainer : Material3Colors.onSurfaceVariant.opacity(0.3), lineWidth: 1)
+                        )
+                        .onChange(of: accountId) { _ in
+                            validationError = nil
+                            fundingResult = nil
+                        }
+
+                    if !accountId.isEmpty {
+                        Button(action: {
+                            copyToClipboard(accountId)
+                            toastManager.show("Public key copied to clipboard")
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Material3Colors.primary)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy to clipboard")
+                    }
                 }
 
-            if let error = validationError {
-                Text(error)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Material3Colors.onErrorContainer)
+                if let error = validationError {
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Material3Colors.onErrorContainer)
+                }
+            }
+
+            // Secret Seed Field (only shown when a keypair was generated)
+            if let keypair = generatedKeypair {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Secret Seed (Private Key)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Material3Colors.onTertiaryContainer)
+
+                    HStack(spacing: 8) {
+                        if secretSeedVisible {
+                            TextField("", text: .constant(keypair.getSecretSeedAsString() ?? ""))
+                                .textFieldStyle(.plain)
+                                .font(.system(.body, design: .monospaced))
+                                .padding(12)
+                                .background(Material3Colors.tertiaryContainer)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Material3Colors.onTertiaryContainer.opacity(0.3), lineWidth: 1)
+                                )
+                                .disabled(true)
+                        } else {
+                            TextField("", text: .constant(String(repeating: "•", count: 56)))
+                                .textFieldStyle(.plain)
+                                .font(.system(.body, design: .monospaced))
+                                .padding(12)
+                                .background(Material3Colors.tertiaryContainer)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Material3Colors.onTertiaryContainer.opacity(0.3), lineWidth: 1)
+                                )
+                                .disabled(true)
+                        }
+
+                        // Visibility toggle button
+                        Button(action: {
+                            secretSeedVisible.toggle()
+                        }) {
+                            Image(systemName: secretSeedVisible ? "eye.slash.fill" : "eye.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Material3Colors.onTertiaryContainer)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .help(secretSeedVisible ? "Hide secret" : "Show secret")
+
+                        // Copy button
+                        Button(action: {
+                            if let secretSeed = keypair.getSecretSeedAsString() {
+                                copyToClipboard(secretSeed)
+                                toastManager.show("Secret seed copied to clipboard")
+                            }
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Material3Colors.onTertiaryContainer)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy to clipboard")
+                    }
+                }
+
+                // Security warning
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Material3Colors.onErrorContainer)
+                        Text("WARNING:")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Material3Colors.onErrorContainer)
+                    }
+
+                    Text("Keep your secret seed safe! Never share it with anyone. Anyone with access to your secret seed can control your account.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onErrorContainer)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Material3Colors.errorContainer.opacity(0.3))
+                .cornerRadius(8)
             }
         }
     }
@@ -268,7 +371,9 @@ struct FundAccountScreen: View {
             do {
                 let keypair = try await bridge.generateKeypair()
                 await MainActor.run {
+                    generatedKeypair = keypair
                     accountId = keypair.getAccountId()
+                    secretSeedVisible = false
                     validationError = nil
                     fundingResult = nil
                     isGenerating = false
@@ -318,6 +423,12 @@ struct FundAccountScreen: View {
             return "\(id.prefix(4))...\(id.suffix(4))"
         }
         return id
+    }
+
+    private func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 }
 

@@ -2,6 +2,8 @@
 
 Production-ready web application demonstrating the Stellar SDK with **Compose Multiplatform** running in the browser.
 
+> **✅ UPDATE (October 23, 2025)**: Production webpack build is now **WORKING**. The build completes in ~5 seconds and creates a 28 MB bundle (2.7 MB with gzip). See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for details on the webpack configuration fix.
+
 ## Overview
 
 This is a **JavaScript web app** built with Kotlin/JS and Compose Multiplatform, showcasing:
@@ -72,14 +74,17 @@ This uses **stable Kotlin/JS** for maximum compatibility:
 
 ## Building and Running
 
-### Development Mode (Hot Reload)
+### Development Mode (Hot Reload) - RECOMMENDED
 
 ```bash
 # From project root
 cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
-# Start development server
-./gradlew :demo:webApp:jsBrowserDevelopmentRun
+# Start development server (RECOMMENDED - this works reliably)
+./gradlew :demo:webApp:jsDevelopmentRun
+
+# Or use the recovery script if processes are stuck
+./demo/webApp/fix-and-run.sh
 
 # Opens at: http://localhost:8081
 ```
@@ -88,6 +93,7 @@ Features:
 - **Hot reload**: Code changes refresh automatically
 - **Source maps**: Debug Kotlin code in browser DevTools
 - **Fast iteration**: See changes in seconds
+- **Reliable**: Works consistently for rapid development
 
 ### Development Build (Manual)
 
@@ -99,15 +105,32 @@ Features:
 # Size: ~33.6 MB (unminified)
 ```
 
-### Production Build
+### Production Build - NOW WORKING ✅
+
+> **✅ FIXED (October 23, 2025)**: Production build now works by disabling problematic webpack optimizations. Build completes in ~5 seconds.
 
 ```bash
-# Build production bundle (minified, optimized)
+# Production build (NOW WORKING)
 ./gradlew :demo:webApp:jsBrowserProductionWebpack
 
-# Output: demo/webApp/build/kotlin-webpack/js/productionExecutable/
-# Size: ~955 KB (minified, ~220 KB gzipped)
+# Output location:
+# demo/webApp/build/kotlin-webpack/js/productionExecutable/
+
+# Bundle details:
+# - stellarDemoJs-kotlin-stdlib.js: 18 MB (2.4 MB gzipped)
+# - stellarDemoJs-vendors.js: 1 MB (325 KB gzipped)
+# - stellarDemoJs.js: 8.5 KB (2.4 KB gzipped)
+# - skiko.wasm: 8 MB
+# Total: 28 MB unminified (2.7 MB JS gzipped + 8 MB WASM)
 ```
+
+**What Changed**: Webpack configuration disables minification and module concatenation (which caused the hang) while enabling code splitting. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for technical details and [webpack.config.d/production-optimization.js](webpack.config.d/production-optimization.js) for the configuration.
+
+**Trade-offs**:
+- ✅ Build completes successfully
+- ✅ Code splitting (4 chunks for better caching)
+- ⚠️ No minification (bundle is larger but gzip helps significantly)
+- ✅ Acceptable for demo and internal tools
 
 ### Production Server (Testing)
 
@@ -305,8 +328,11 @@ Output directory: `demo/webApp/build/kotlin-webpack/js/productionExecutable/`
 
 Contains:
 - `index.html` - HTML entry point
-- `stellarDemoJs.js` - Bundled JavaScript (~955 KB)
-- `stellarDemoJs.js.map` - Source map (optional, for debugging)
+- `stellarDemoJs-kotlin-stdlib.js` - Kotlin stdlib (~18 MB)
+- `stellarDemoJs-vendors.js` - Dependencies (~1 MB)
+- `stellarDemoJs.js` - App code (~8.5 KB)
+- `skiko.wasm` - Rendering engine (8 MB)
+- Source maps (optional, for debugging)
 
 #### 2. Deploy to Hosting
 
@@ -398,9 +424,9 @@ npx http-server demo/webApp/build/kotlin-webpack/js/productionExecutable/ -p 800
 
 | Build Type | Size | Gzipped | Notes |
 |------------|------|---------|-------|
-| Development | ~33.6 MB | N/A | With source maps |
-| Production | ~955 KB | ~220 KB | Minified |
-| Production (no source map) | ~950 KB | ~215 KB | Smallest |
+| Development | ~63.5 MB | N/A | With source maps |
+| Production | ~28 MB | ~2.7 MB | Code splitting, no minification |
+| WASM File | 8 MB | N/A | Skiko rendering engine |
 
 ### Load Times (on 3G)
 
@@ -418,11 +444,12 @@ npx http-server demo/webApp/build/kotlin-webpack/js/productionExecutable/ -p 800
 
 ### Optimization Tips
 
-1. **Enable gzip**: Reduces bundle from 955 KB to ~220 KB
+1. **Enable gzip**: Reduces JS bundle from 28 MB to ~2.7 MB
 2. **Use CDN**: Faster delivery globally
 3. **Cache headers**: Browser caching for static assets
-4. **Code splitting**: Not needed for this small app
+4. **Code splitting**: Already enabled (4 separate chunks)
 5. **Preload**: Add `<link rel="preload">` for critical resources
+6. **Brotli compression**: Even better than gzip for further size reduction
 
 ## Configuration
 
@@ -562,10 +589,11 @@ org.gradle.daemon=true
 - If custom server: Add CORS headers
 
 **Slow loading**:
-- Use production build (~955 KB vs 33.6 MB)
-- Enable gzip compression
+- Use production build (28 MB unminified, 2.7 MB gzipped vs 63.5 MB development)
+- Enable gzip or Brotli compression
 - Use CDN for faster delivery
 - Check network throttling in DevTools
+- Consider serving WASM file from CDN
 
 ## Mobile Browser Support
 
@@ -652,7 +680,7 @@ add_header Referrer-Policy "strict-origin-when-cross-origin";
 | Feature | Web (JS) | Desktop (JVM) | macOS Native | Android | iOS |
 |---------|----------|---------------|--------------|---------|-----|
 | Deployment | Static hosting | Installer | App Store | Play Store | App Store |
-| Bundle Size | ~955 KB | ~35 MB | ~8 MB | ~12 MB | ~15 MB |
+| Bundle Size | ~28 MB (2.7 MB gzipped) | ~35 MB | ~8 MB | ~12 MB | ~15 MB |
 | Startup Time | 1-2s | 2-3s | <1s | 1-2s | 1-2s |
 | Updates | Instant | Manual | Manual | Auto | Auto |
 | Platform Access | Limited | Good | Excellent | Excellent | Excellent |

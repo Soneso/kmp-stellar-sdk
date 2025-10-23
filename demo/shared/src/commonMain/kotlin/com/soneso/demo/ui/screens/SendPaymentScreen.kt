@@ -143,7 +143,6 @@ class SendPaymentScreen : Screen {
                             assetIssuer = if (assetType == AssetType.NATIVE) null else assetIssuer,
                             amount = amount,
                             secretSeed = secretSeed,
-                            useTestnet = true
                         )
                     }
                 } catch (e: Exception) {

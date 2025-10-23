@@ -2,6 +2,7 @@ package com.soneso.demo.stellar
 
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for contract details fetching operations.
@@ -29,7 +30,7 @@ sealed class ContractDetailsResult {
 }
 
 /**
- * Fetches and parses smart contract details from the Stellar network using Soroban RPC.
+ * Fetches and parses smart contract details from the Stellar testnet using Soroban RPC.
  *
  * This function retrieves the contract's WASM bytecode from the network and parses it to extract:
  * - Environment interface version (protocol version)
@@ -56,42 +57,22 @@ sealed class ContractDetailsResult {
  * ```
  *
  * @param contractId The Stellar contract ID to fetch (must start with 'C')
- * @param useTestnet If true, connects to testnet; otherwise connects to mainnet (default: true)
  * @return ContractDetailsResult.Success with parsed contract info if fetch succeeded, ContractDetailsResult.Error if it failed
  *
  * @see <a href="https://developers.stellar.org/docs/tools/sdks/build-your-own">Soroban Contract Specification</a>
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference">Soroban RPC API Reference</a>
  */
 suspend fun fetchContractDetails(
-    contractId: String,
-    useTestnet: Boolean = true
+    contractId: String
 ): ContractDetailsResult {
     return try {
         // Validate contract ID format
-        if (contractId.isBlank()) {
-            return ContractDetailsResult.Error(
-                message = "Contract ID cannot be empty"
-            )
+        StellarValidation.validateContractId(contractId)?.let { error ->
+            return ContractDetailsResult.Error(message = error)
         }
 
-        if (!contractId.startsWith('C')) {
-            return ContractDetailsResult.Error(
-                message = "Contract ID must start with 'C' (got: ${contractId.take(1)})"
-            )
-        }
-
-        if (contractId.length != 56) {
-            return ContractDetailsResult.Error(
-                message = "Contract ID must be exactly 56 characters long (got: ${contractId.length})"
-            )
-        }
-
-        // Connect to Soroban RPC server
-        val rpcUrl = if (useTestnet) {
-            "https://soroban-testnet.stellar.org:443"
-        } else {
-            "https://soroban-mainnet.stellar.org:443"
-        }
+        // Connect to Soroban RPC testnet server
+        val rpcUrl = "https://soroban-testnet.stellar.org:443"
 
         val server = SorobanServer(rpcUrl)
 

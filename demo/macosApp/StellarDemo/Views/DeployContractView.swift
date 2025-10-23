@@ -557,7 +557,6 @@ struct DeployContractView: View {
                     constructorArgs: constructorArgs,
                     sourceAccountId: sourceAccountId,
                     secretKey: secretKey,
-                    useTestnet: true
                 )
 
                 await MainActor.run {

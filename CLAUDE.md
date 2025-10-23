@@ -270,10 +270,15 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 - **Web** (`demo/webApp`): Kotlin/JS with Compose
   ```bash
-  # Development mode
-  ./gradlew :demo:webApp:jsBrowserDevelopmentRun
-  # Production build (955 KB, 220 KB gzipped)
+  # Development mode (recommended for development)
+  ./gradlew :demo:webApp:jsDevelopmentRun
+
+  # Production build (NOW WORKING - fixed October 23, 2025)
   ./gradlew :demo:webApp:jsBrowserProductionWebpack
+  # Completes in ~5 seconds, creates 28 MB bundle (2.7 MB gzipped)
+
+  # Or use the fix script if processes are stuck
+  ./demo/webApp/fix-and-run.sh
   ```
 
 **Key Features**:

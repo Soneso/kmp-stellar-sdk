@@ -89,9 +89,9 @@ class FetchTransactionScreen : Screen {
                     fetchResult = null
                     try {
                         fetchResult = if (useHorizon) {
-                            fetchTransactionFromHorizon(transactionHash, useTestnet = true)
+                            fetchTransactionFromHorizon(transactionHash)
                         } else {
-                            fetchTransactionFromRpc(transactionHash, useTestnet = true)
+                            fetchTransactionFromRpc(transactionHash)
                         }
                     } finally {
                         isLoading = false

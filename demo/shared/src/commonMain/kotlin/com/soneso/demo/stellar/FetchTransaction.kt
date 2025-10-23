@@ -6,6 +6,7 @@ import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for transaction fetch operations.
@@ -48,7 +49,7 @@ sealed class FetchTransactionResult {
 }
 
 /**
- * Fetches transaction details from Horizon API.
+ * Fetches transaction details from Horizon testnet API.
  *
  * Horizon provides comprehensive transaction information including:
  * - Transaction metadata (hash, ledger, timestamps)
@@ -71,8 +72,7 @@ sealed class FetchTransactionResult {
  *
  * ```kotlin
  * val result = fetchTransactionFromHorizon(
- *     transactionHash = "abc123...",
- *     useTestnet = true
+ *     transactionHash = "abc123..."
  * )
  *
  * when (result) {
@@ -102,44 +102,22 @@ sealed class FetchTransactionResult {
  * SHA-256 hash of the transaction envelope XDR.
  *
  * @param transactionHash The transaction hash (64-character hex string)
- * @param useTestnet If true, connects to testnet; otherwise connects to public network (default: true)
  * @return FetchTransactionResult.HorizonSuccess if found, FetchTransactionResult.Error if not found or failed
  *
  * @see <a href="https://developers.stellar.org/api/resources/transactions/">Horizon Transactions API</a>
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/transactions/">Stellar Transactions</a>
  */
 suspend fun fetchTransactionFromHorizon(
-    transactionHash: String,
-    useTestnet: Boolean = true
+    transactionHash: String
 ): FetchTransactionResult {
     return try {
         // Validate transaction hash
-        if (transactionHash.isBlank()) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash cannot be empty"
-            )
+        StellarValidation.validateTransactionHash(transactionHash)?.let { error ->
+            return FetchTransactionResult.Error(message = error)
         }
 
-        // Transaction hashes are 64-character hexadecimal strings
-        if (transactionHash.length != 64) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash must be exactly 64 characters long (got: ${transactionHash.length})"
-            )
-        }
-
-        // Validate hex format
-        if (!transactionHash.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash must be a valid hexadecimal string (0-9, a-f, A-F)"
-            )
-        }
-
-        // Connect to Horizon server
-        val horizonUrl = if (useTestnet) {
-            "https://horizon-testnet.stellar.org"
-        } else {
-            "https://horizon.stellar.org"
-        }
+        // Connect to Horizon testnet server
+        val horizonUrl = "https://horizon-testnet.stellar.org"
 
         val server = HorizonServer(horizonUrl)
 
@@ -150,7 +128,7 @@ suspend fun fetchTransactionFromHorizon(
             } catch (e: com.soneso.stellar.sdk.horizon.exceptions.BadRequestException) {
                 if (e.code == 404) {
                     return FetchTransactionResult.Error(
-                        message = "Transaction not found. The transaction may not exist on the ${if (useTestnet) "testnet" else "public"} network, or the hash may be incorrect.",
+                        message = "Transaction not found. The transaction may not exist on testnet, or the hash may be incorrect.",
                         exception = e
                     )
                 } else {
@@ -203,7 +181,7 @@ suspend fun fetchTransactionFromHorizon(
 }
 
 /**
- * Fetches transaction details from Soroban RPC.
+ * Fetches transaction details from Soroban testnet RPC.
  *
  * Soroban RPC provides transaction information for smart contract operations:
  * - Transaction status (SUCCESS, FAILED, NOT_FOUND)
@@ -224,8 +202,7 @@ suspend fun fetchTransactionFromHorizon(
  *
  * ```kotlin
  * val result = fetchTransactionFromRpc(
- *     transactionHash = "abc123...",
- *     useTestnet = true
+ *     transactionHash = "abc123..."
  * )
  *
  * when (result) {
@@ -259,44 +236,22 @@ suspend fun fetchTransactionFromHorizon(
  * - NOT_FOUND: Transaction not found or still pending
  *
  * @param transactionHash The transaction hash (64-character hex string)
- * @param useTestnet If true, connects to testnet; otherwise connects to public network (default: true)
  * @return FetchTransactionResult.RpcSuccess if found, FetchTransactionResult.Error if not found or failed
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference/methods/getTransaction">Soroban RPC getTransaction</a>
  * @see <a href="https://developers.stellar.org/docs/smart-contracts">Stellar Smart Contracts</a>
  */
 suspend fun fetchTransactionFromRpc(
-    transactionHash: String,
-    useTestnet: Boolean = true
+    transactionHash: String
 ): FetchTransactionResult {
     return try {
         // Validate transaction hash
-        if (transactionHash.isBlank()) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash cannot be empty"
-            )
+        StellarValidation.validateTransactionHash(transactionHash)?.let { error ->
+            return FetchTransactionResult.Error(message = error)
         }
 
-        // Transaction hashes are 64-character hexadecimal strings
-        if (transactionHash.length != 64) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash must be exactly 64 characters long (got: ${transactionHash.length})"
-            )
-        }
-
-        // Validate hex format
-        if (!transactionHash.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-            return FetchTransactionResult.Error(
-                message = "Transaction hash must be a valid hexadecimal string (0-9, a-f, A-F)"
-            )
-        }
-
-        // Connect to Soroban RPC server
-        val rpcUrl = if (useTestnet) {
-            "https://soroban-testnet.stellar.org:443"
-        } else {
-            "https://soroban-mainnet.stellar.org:443"
-        }
+        // Connect to Soroban RPC testnet server
+        val rpcUrl = "https://soroban-testnet.stellar.org:443"
 
         val server = SorobanServer(rpcUrl)
 
@@ -320,7 +275,7 @@ suspend fun fetchTransactionFromRpc(
             when (transaction.status) {
                 GetTransactionStatus.NOT_FOUND -> {
                     return FetchTransactionResult.Error(
-                        message = "Transaction not found. The transaction may not exist on the ${if (useTestnet) "testnet" else "public"} network, may still be pending, or may be outside the retention window (ledgers ${transaction.oldestLedger} to ${transaction.latestLedger})."
+                        message = "Transaction not found. The transaction may not exist on testnet, may still be pending, or may be outside the retention window (ledgers ${transaction.oldestLedger} to ${transaction.latestLedger})."
                     )
                 }
                 GetTransactionStatus.SUCCESS,

@@ -181,7 +181,7 @@ struct ContractDetailsScreen: View {
         
         Task {
             do {
-                let result = try await bridge.fetchContractDetails(contractId: contractId, useTestnet: true)
+                let result = try await bridge.fetchContractDetails(contractId: contractId)
                 await MainActor.run {
                     detailsResult = result
                     isFetching = false

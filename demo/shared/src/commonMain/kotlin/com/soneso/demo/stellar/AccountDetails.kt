@@ -2,6 +2,7 @@ package com.soneso.demo.stellar
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.responses.AccountResponse
+import com.soneso.demo.util.StellarValidation
 
 /**
  * Result type for account details fetching operations.
@@ -29,7 +30,7 @@ sealed class AccountDetailsResult {
 }
 
 /**
- * Fetches detailed account information from the Stellar network using Horizon API.
+ * Fetches detailed account information from the Stellar testnet using Horizon API.
  *
  * This function retrieves comprehensive account data including:
  * - Account ID and sequence number
@@ -59,42 +60,22 @@ sealed class AccountDetailsResult {
  * ```
  *
  * @param accountId The Stellar account ID to fetch (must start with 'G')
- * @param useTestnet If true, connects to testnet; otherwise connects to public network (default: true)
  * @return AccountDetailsResult.Success with full account data if fetch succeeded, AccountDetailsResult.Error if it failed
  *
  * @see <a href="https://developers.stellar.org/docs/fundamentals-and-concepts/stellar-data-structures/accounts">Stellar Account Documentation</a>
  * @see <a href="https://developers.stellar.org/api/resources/accounts/object">Horizon Account Response</a>
  */
 suspend fun fetchAccountDetails(
-    accountId: String,
-    useTestnet: Boolean = true
+    accountId: String
 ): AccountDetailsResult {
     return try {
         // Validate account ID format
-        if (accountId.isBlank()) {
-            return AccountDetailsResult.Error(
-                message = "Account ID cannot be empty"
-            )
+        StellarValidation.validateAccountId(accountId)?.let { error ->
+            return AccountDetailsResult.Error(message = error)
         }
 
-        if (!accountId.startsWith('G')) {
-            return AccountDetailsResult.Error(
-                message = "Account ID must start with 'G' (got: ${accountId.take(1)})"
-            )
-        }
-
-        if (accountId.length != 56) {
-            return AccountDetailsResult.Error(
-                message = "Account ID must be exactly 56 characters long (got: ${accountId.length})"
-            )
-        }
-
-        // Connect to Horizon server
-        val horizonUrl = if (useTestnet) {
-            "https://horizon-testnet.stellar.org"
-        } else {
-            "https://horizon.stellar.org"
-        }
+        // Connect to Horizon testnet server
+        val horizonUrl = "https://horizon-testnet.stellar.org"
 
         val server = HorizonServer(horizonUrl)
 
