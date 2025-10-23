@@ -261,7 +261,12 @@ Run the demo:
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
 cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
 
-# Desktop (macOS/Windows/Linux)
+# macOS Native (requires Xcode + libsodium)
+brew install libsodium
+./gradlew :demo:shared:linkDebugFrameworkMacosArm64
+cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
+
+# Desktop (macOS/Windows/Linux - Compose)
 ./gradlew :demo:desktopApp:run
 
 # Web (Vite dev server with hot reload)
