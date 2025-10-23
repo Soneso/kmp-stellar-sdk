@@ -270,18 +270,24 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 - **Web** (`demo/webApp`): Kotlin/JS with Compose
   ```bash
-  # Development mode (recommended for development)
-  ./gradlew :demo:webApp:jsDevelopmentRun
+  # Development server with Vite (hot reload) - RECOMMENDED
+  ./gradlew :demo:webApp:viteDev
+  # Opens at http://localhost:8081
 
-  # Production build (NOW WORKING - fixed October 23, 2025)
-  ./gradlew :demo:webApp:jsBrowserProductionWebpack
-  # Completes in ~5 seconds, creates 28 MB bundle (2.7 MB gzipped)
+  # Production build (creates optimized bundle and copies to dist/)
+  ./gradlew :demo:webApp:productionDist
+  # Output: demo/webApp/dist/
 
-  # Or use the fix script if processes are stuck
-  ./demo/webApp/fix-and-run.sh
+  # Preview production build
+  ./gradlew :demo:webApp:vitePreview
+  # Opens at http://localhost:8082
   ```
 
 **Key Features**:
+- Vite dev server: Lightning-fast hot module replacement
+- Webpack production: Optimized bundles with code splitting
+- Build time: ~5 seconds for production
+- Bundle size: 28 MB unminified (2.7 MB gzipped)
 - 95% code sharing (Compose UI + business logic in commonMain)
 - Real Stellar testnet integration
 - Demonstrates: KeyPair, Horizon, Soroban, transactions, assets

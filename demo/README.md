@@ -292,29 +292,32 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
 
 ### Web (JavaScript)
 
+> **Vite Migration (October 23, 2025)**: Now using Vite for development server. Lightning-fast hot module replacement while webpack handles Kotlin/JS bundling.
+
 ```bash
 # From project root
 
-# Development server (with hot reload)
-./gradlew :demo:webApp:jsBrowserDevelopmentRun
+# Development server with Vite (hot reload) - RECOMMENDED
+./gradlew :demo:webApp:viteDev
 # Opens at http://localhost:8081
 
-# Production build (optimized, ~955 KB)
-./gradlew :demo:webApp:jsBrowserProductionWebpack
+# Production build (creates optimized bundle)
+./gradlew :demo:webApp:productionDist
+# Output: demo/webApp/dist/
 
-# Run production build
-./gradlew :demo:webApp:jsBrowserProductionRun
+# Preview production build
+./gradlew :demo:webApp:vitePreview
+# Opens at http://localhost:8082
 ```
 
 **Production Deployment**:
 ```bash
-# Build production bundle
-./gradlew :demo:webApp:jsBrowserProductionWebpack
+# Build for production
+./gradlew :demo:webApp:productionDist
 
-# Output is in:
-# demo/webApp/build/kotlin-webpack/js/productionExecutable/
-
-# Deploy to any static hosting (Netlify, Vercel, GitHub Pages, etc.)
+# Deploy the dist/ directory to any static hosting
+# - Netlify, Vercel, GitHub Pages, etc.
+# - Bundle size: 28 MB unminified (2.7 MB gzipped)
 ```
 
 ## Technology Stack

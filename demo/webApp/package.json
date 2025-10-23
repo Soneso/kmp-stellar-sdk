@@ -1,0 +1,18 @@
+{
+  "name": "stellar-demo-webapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11",
+    "terser": "^5.36.0"
+  },
+  "dependencies": {
+    "libsodium-wrappers-sumo": "0.7.13"
+  }
+}

@@ -251,8 +251,8 @@ val demoTopics = listOf(
 # Desktop (easiest for quick testing)
 ./gradlew :demo:desktopApp:run
 
-# Web
-./gradlew :demo:webApp:jsBrowserDevelopmentRun
+# Web (Vite dev server)
+./gradlew :demo:webApp:viteDev
 
 # iOS (requires Xcode)
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64
@@ -602,8 +602,11 @@ result?.let { res ->
 # Run Android
 ./gradlew :demo:androidApp:installDebug
 
-# Run web
-./gradlew :demo:webApp:jsBrowserDevelopmentRun
+# Run web (Vite dev server with webpack bundling)
+./gradlew :demo:webApp:viteDev
+
+# Build web production bundle
+./gradlew :demo:webApp:productionDist
 
 # Build iOS framework
 ./gradlew :demo:shared:linkDebugFrameworkIosSimulatorArm64

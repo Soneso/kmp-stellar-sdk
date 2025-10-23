@@ -2,7 +2,9 @@
 
 Production-ready web application demonstrating the Stellar SDK with **Compose Multiplatform** running in the browser.
 
-> **✅ UPDATE (October 23, 2025)**: Production webpack build is now **WORKING**. The build completes in ~5 seconds and creates a 28 MB bundle (2.7 MB with gzip). See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for details on the webpack configuration fix.
+> **✅ VITE MIGRATION (October 23, 2025)**: Now using Vite for development server. Vite provides lightning-fast HMR while webpack handles Kotlin/JS bundling. Development experience significantly improved with instant hot reload.
+>
+> **✅ PRODUCTION BUILD (October 23, 2025)**: Production webpack build works perfectly. Build completes in ~5 seconds and creates a 28 MB bundle (2.7 MB with gzip). See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for webpack configuration details.
 
 ## Overview
 
@@ -15,6 +17,14 @@ This is a **JavaScript web app** built with Kotlin/JS and Compose Multiplatform,
 - **Smart Contracts**: Fetch and parse Soroban contract details
 
 The app uses 100% shared Compose UI code, running identically on the web as on Android, iOS, and Desktop.
+
+## Build System
+
+**Bundler**: Webpack (for Kotlin/JS module bundling) + Vite (for development server)
+
+- **Webpack**: Bundles Kotlin/JS modules and all dependencies into executable JavaScript
+- **Vite**: Provides fast development server with hot module replacement (HMR)
+- **Why both?**: Kotlin/JS requires webpack for proper module bundling, but Vite offers superior dev server performance
 
 ## Architecture
 
@@ -74,47 +84,50 @@ This uses **stable Kotlin/JS** for maximum compatibility:
 
 ## Building and Running
 
-### Development Mode (Hot Reload) - RECOMMENDED
+### Development Mode with Vite (Hot Reload) - RECOMMENDED
+
+> **✅ MIGRATED TO VITE (October 23, 2025)**: Now using Vite for development server with webpack for bundling Kotlin/JS modules.
 
 ```bash
 # From project root
 cd /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk
 
-# Start development server (RECOMMENDED - this works reliably)
-./gradlew :demo:webApp:jsDevelopmentRun
-
-# Or use the recovery script if processes are stuck
-./demo/webApp/fix-and-run.sh
+# Start Vite development server (RECOMMENDED)
+./gradlew :demo:webApp:viteDev
 
 # Opens at: http://localhost:8081
 ```
 
 Features:
-- **Hot reload**: Code changes refresh automatically
+- **Vite dev server**: Lightning-fast hot module replacement
 - **Source maps**: Debug Kotlin code in browser DevTools
-- **Fast iteration**: See changes in seconds
-- **Reliable**: Works consistently for rapid development
+- **Fast iteration**: See changes instantly
+- **Webpack bundling**: Kotlin/JS modules bundled by webpack, served by Vite
 
 ### Development Build (Manual)
 
 ```bash
-# Build development bundle (unminified, with source maps)
+# Build development bundle with webpack (unminified, with source maps)
 ./gradlew :demo:webApp:jsBrowserDevelopmentWebpack
 
 # Output: demo/webApp/build/kotlin-webpack/js/developmentExecutable/
-# Size: ~33.6 MB (unminified)
+# Size: ~63 MB (unminified with source maps)
 ```
 
-### Production Build - NOW WORKING ✅
+### Production Build - WORKING ✅
 
-> **✅ FIXED (October 23, 2025)**: Production build now works by disabling problematic webpack optimizations. Build completes in ~5 seconds.
+> **✅ OPTIMIZED (October 23, 2025)**: Production build uses webpack with code splitting. Build completes in ~5 seconds.
 
 ```bash
-# Production build (NOW WORKING)
+# Production build with webpack
 ./gradlew :demo:webApp:jsBrowserProductionWebpack
 
-# Output location:
-# demo/webApp/build/kotlin-webpack/js/productionExecutable/
+# Or build and copy to dist/ for deployment
+./gradlew :demo:webApp:productionDist
+
+# Output locations:
+# - Webpack output: demo/webApp/build/kotlin-webpack/js/productionExecutable/
+# - Deployment dist: demo/webApp/dist/
 
 # Bundle details:
 # - stellarDemoJs-kotlin-stdlib.js: 18 MB (2.4 MB gzipped)

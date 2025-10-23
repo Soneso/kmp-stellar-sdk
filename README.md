@@ -449,8 +449,8 @@ cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
 # Desktop (macOS/Windows/Linux)
 ./gradlew :demo:desktopApp:run
 
-# Web
-./gradlew :demo:webApp:jsBrowserDevelopmentRun
+# Web (Vite dev server with hot reload)
+./gradlew :demo:webApp:viteDev
 ```
 
 ## Documentation
