@@ -39,121 +39,34 @@ The Stellar SDK for Kotlin Multiplatform enables you to:
 
 This SDK uses production-ready, audited cryptographic libraries on all platforms - no experimental or custom crypto implementations.
 
-## Current Implementation Status
+## What Can I Build?
 
-### Core Features
+With this SDK, you can create:
 
-#### Cryptography & Key Management
-- Ed25519 keypair generation with cryptographically secure randomness
-- Sign and verify operations
-- KeyPair creation from secret seeds (String, CharArray, ByteArray) or account IDs
-- StrKey encoding/decoding (G... accounts, S... seeds, M... muxed accounts, C... contracts)
-- Production cryptography: BouncyCastle (JVM), libsodium (Native), libsodium.js (JS)
+- **Wallets & Payment Apps** - Send/receive XLM and assets, manage accounts across platforms
+- **DEX Interfaces** - Build trading interfaces, liquidity pools, and order book managers
+- **Soroban DApps** - Deploy and interact with smart contracts from any platform
+- **Token Issuance Platforms** - Create and distribute custom assets with trustline management
+- **Cross-Border Payment Systems** - Leverage path payments for currency conversion
+- **Account Services** - Multi-signature support, account recovery, and sponsorship flows
+- **Mobile-First Apps** - iOS and Android apps sharing business logic with web and server
 
-#### Transaction Building
-- Transaction and FeeBumpTransaction support
-- TransactionBuilder with fluent API
-- All 27 Stellar operations implemented
-- Memo support (text, ID, hash, return hash)
-- Time bounds, ledger bounds, and preconditions
-- Multi-signature support
-- XDR serialization/deserialization
+See the [demo app](demo/README.md) for working examples of each feature category.
 
-#### Assets & Accounts
-- Native asset (Lumens/XLM)
-- Issued assets (AlphaNum4, AlphaNum12)
-- Asset creation, validation, and parsing
-- Contract ID derivation for Stellar Asset Contracts (SAC)
-- Account management and sequence number handling
-- Muxed accounts (M... addresses)
+## Features
 
-#### Horizon API Client
-- Comprehensive REST API coverage
-- Request builders for all endpoints
-- Server-Sent Events (SSE) streaming
-- Automatic retries and error handling
-- Endpoints: Accounts, Assets, Claimable Balances, Effects, Ledgers, Liquidity Pools, Offers, Operations, Payments, Trades, Transactions
-- Fee statistics and health monitoring
-- SEP-29 account memo validation
+The SDK provides comprehensive Stellar functionality:
 
-#### Soroban Smart Contracts
-- High-level ContractClient API with dual-mode design:
-  - **Beginner-friendly**: Map-based invoke() with native Kotlin types
-  - **Power-user**: XDR-based invokeWithXdr() for full control
-- Factory methods for client creation:
-  - `fromNetwork()`: Loads contract spec for automatic type conversion
-  - `withoutSpec()`: Manual XDR mode for advanced users
-- Smart contract deployment:
-  - `deploy()`: One-step WASM upload and deployment with constructor args
-  - `install()` + `deployFromWasmId()`: Two-step for WASM reuse
-- AssembledTransaction for full transaction lifecycle
-- Type-safe generic results with custom parsers
-- Automatic simulation and resource estimation
-- Auto-execution: Read calls return results, write calls auto-sign and submit
-- Read-only vs write call detection via auth entries
-- Authorization handling (auto-auth and custom auth)
-- Automatic state restoration when needed
-- Transaction polling with exponential backoff
-- Contract spec parsing and WASM analysis
+- **Cryptography** - Ed25519 keypairs, signing, verification with production-ready libraries (BouncyCastle, libsodium)
+- **Transaction Building** - TransactionBuilder with fluent API, all 27 Stellar operations, memos, time bounds, multi-signature support
+- **Assets & Accounts** - Native (XLM) and issued assets, trustlines, muxed accounts, SAC contract ID derivation
+- **Horizon API Client** - Full REST API coverage with request builders, SSE streaming, automatic retries, SEP-29 validation
+- **Soroban Smart Contracts** - High-level ContractClient with beginner-friendly Map-based API and power-user XDR mode
+- **Soroban RPC Client** - Transaction simulation, event queries, ledger data, contract deployment and invocation
+- **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
+- **Authorization** - Automatic and custom auth handling with signature verification
 
-#### Soroban RPC Client
-- Full RPC API coverage
-- Transaction simulation
-- Event queries and filtering
-- Ledger and contract data retrieval
-- Network information queries
-- Health monitoring
-
-### Implemented Operations
-
-All 27 Stellar operations are implemented:
-
-**Account Operations**
-- CreateAccount
-- AccountMerge
-- BumpSequence
-- SetOptions
-- ManageData
-
-**Payment Operations**
-- Payment
-- PathPaymentStrictReceive
-- PathPaymentStrictSend
-
-**Asset Operations**
-- ChangeTrust
-- AllowTrust
-- SetTrustLineFlags
-
-**Trading Operations**
-- ManageSellOffer
-- ManageBuyOffer
-- CreatePassiveSellOffer
-
-**Claimable Balance Operations**
-- CreateClaimableBalance
-- ClaimClaimableBalance
-- ClawbackClaimableBalance
-
-**Liquidity Pool Operations**
-- LiquidityPoolDeposit
-- LiquidityPoolWithdraw
-
-**Sponsorship Operations**
-- BeginSponsoringFutureReserves
-- EndSponsoringFutureReserves
-- RevokeSponsorship
-
-**Clawback Operations**
-- Clawback
-
-**Soroban Operations**
-- InvokeHostFunction
-- ExtendFootprintTTL
-- RestoreFootprint
-
-**Deprecated Operations**
-- Inflation (deprecated in protocol 12)
+See the [Features Guide](docs/features.md) for detailed documentation and examples.
 
 ## Installation
 
@@ -258,52 +171,32 @@ suspend fun sendPayment() {
 
 ### Interact with Soroban Smart Contracts
 
+The SDK provides a high-level ContractClient API with two modes:
+
+**Beginner-friendly mode** with automatic type conversion:
 ```kotlin
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun callContract() {
-    // Load contract spec from network for automatic type conversion
+    // Load contract spec from network
     val client = ContractClient.fromNetwork(
-        contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        contractId = "CDLZ...",
         rpcUrl = "https://soroban-testnet.stellar.org:443",
         network = Network.TESTNET
     )
 
-    // Read-only call with simplified Map-based API
-    val count = client.invoke<Long>(
-        functionName = "get_count",
-        arguments = emptyMap(),  // Native Kotlin types
-        source = accountId,
-        signer = null,  // No signer needed for read calls
-        parseResultXdrFn = { Scv.fromUInt32(it).toLong() }
-    )
-    // Automatically executes and returns result directly
-
-    println("Current count: $count")
-
-    client.close()
-}
-
-// Example with arguments - token balance query
-suspend fun getTokenBalance() {
-    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
-
+    // Query with Map-based arguments
     val balance = client.invoke<Long>(
         functionName = "balance",
-        arguments = mapOf("account" to accountAddress),  // Simple Map with native types
+        arguments = mapOf("account" to accountAddress),
         source = sourceAccount,
-        signer = null,
+        signer = null,  // No signer for read calls
         parseResultXdrFn = { Scv.fromInt128(it).toLong() }
     )
-
     println("Balance: $balance")
-}
 
-// Example write operation - auto signs and submits
-suspend fun transferTokens() {
-    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
-
+    // Write operation - auto signs and submits
     client.invoke<Unit>(
         functionName = "transfer",
         arguments = mapOf(
@@ -312,98 +205,19 @@ suspend fun transferTokens() {
             "amount" to 1000
         ),
         source = sourceAccount,
-        signer = keypair,  // Required for write operations
+        signer = keypair,  // Required for writes
         parseResultXdrFn = null
     )
-    // Automatically signs, submits, and polls for completion
+
+    client.close()
 }
+```
 
-// Manual result parsing with funcResToNative (when spec is loaded)
-suspend fun getTokenBalanceWithManualParsing() {
-    val client = ContractClient.fromNetwork(tokenContractId, rpcUrl, Network.TESTNET)
-
-    // Get raw XDR result
-    val resultXdr = client.invoke<SCValXdr>(
-        functionName = "balance",
-        arguments = mapOf("account" to accountAddress),
-        source = sourceAccount,
-        signer = null
-    )
-
-    // Parse using contract spec (automatic type conversion)
-    val balance = client.funcResToNative("balance", resultXdr) as BigInteger
-    println("Parsed balance: $balance")
-}
-
-// Deploy a new smart contract
-suspend fun deployContract() {
-    val wasmBytes = File("token.wasm").readBytes()
-
-    // One-step deployment with constructor arguments
-    val client = ContractClient.deploy(
-        wasmBytes = wasmBytes,
-        constructorArgs = mapOf(
-            "admin" to adminAddress,
-            "name" to "MyToken",
-            "symbol" to "MTK",
-            "decimals" to 7
-        ),
-        source = sourceAccount,
-        signer = keypair,
-        network = Network.TESTNET,
-        rpcUrl = "https://soroban-testnet.stellar.org:443"
-    )
-
-    println("Contract deployed at: ${client.contractId}")
-    // Client is ready to use with loaded spec
-}
-
-// Advanced: Deploy multiple contracts from same WASM
-suspend fun deployMultipleContracts() {
-    val wasmBytes = File("token.wasm").readBytes()
-
-    // Step 1: Install WASM once
-    val wasmId = ContractClient.install(
-        wasmBytes = wasmBytes,
-        source = sourceAccount,
-        signer = keypair,
-        network = Network.TESTNET,
-        rpcUrl = "https://soroban-testnet.stellar.org:443"
-    )
-
-    // Step 2: Deploy multiple instances (saves fees)
-    val token1 = ContractClient.deployFromWasmId(
-        wasmId = wasmId,
-        constructorArgs = listOf(
-            Scv.toAddress(adminAddress),
-            Scv.toString("Token1"),
-            Scv.toString("TK1")
-        ),
-        source = sourceAccount,
-        signer = keypair,
-        network = Network.TESTNET,
-        rpcUrl = "https://soroban-testnet.stellar.org:443"
-    )
-
-    val token2 = ContractClient.deployFromWasmId(
-        wasmId = wasmId,
-        constructorArgs = listOf(
-            Scv.toAddress(adminAddress),
-            Scv.toString("Token2"),
-            Scv.toString("TK2")
-        ),
-        source = sourceAccount,
-        signer = keypair,
-        network = Network.TESTNET,
-        rpcUrl = "https://soroban-testnet.stellar.org:443"
-    )
-}
-
-// Power user: Manual XDR control
+**Power user mode** with manual XDR control:
+```kotlin
 suspend fun advancedContractCall() {
     val client = ContractClient.withoutSpec(contractId, rpcUrl, Network.TESTNET)
 
-    // Build XDR manually
     val assembled = client.invokeWithXdr(
         functionName = "transfer",
         parameters = listOf(
@@ -415,26 +229,27 @@ suspend fun advancedContractCall() {
         signer = keypair
     )
 
-    // Manual lifecycle control
     assembled.simulate()
     val result = assembled.signAndSubmit(keypair)
 }
 ```
 
-For more examples, see the [Getting Started Guide](docs/getting-started.md) and explore the [Demo App](demo/README.md).
+For deployment examples, authorization patterns, and advanced usage, see the [Getting Started Guide](docs/getting-started.md) and [Demo App](demo/README.md).
 
 ## Demo Application
 
-The [demo app](demo/README.md) showcases SDK usage across all platforms with 8 comprehensive features:
+The [demo app](demo/README.md) showcases SDK usage across all platforms with 10 comprehensive features:
 
 1. **Key Generation** - Generate and manage Ed25519 keypairs
 2. **Fund Testnet Account** - Get free test XLM from Friendbot
 3. **Fetch Account Details** - Retrieve account information from Horizon
 4. **Trust Asset** - Establish trustlines for issued assets
 5. **Send Payment** - Transfer XLM and issued assets
-6. **Fetch Smart Contract Details** - Parse and inspect Soroban contracts
-7. **Deploy Smart Contract** - Deploy Soroban WASM contracts to testnet
-8. **Invoke Hello World Contract** - Demonstrates smart contract invocation with automatic result parsing using funcResToNative
+6. **Fetch Transaction Details** - View transaction operations and events from Horizon or Soroban RPC
+7. **Fetch Smart Contract Details** - Parse and inspect Soroban contracts
+8. **Deploy Smart Contract** - Deploy Soroban WASM contracts to testnet
+9. **Invoke Hello World Contract** - Simple contract invocation with automatic result parsing
+10. **Invoke Auth Contract** - Dynamic authorization handling for same-invoker and different-invoker scenarios
 
 Run the demo:
 
@@ -477,35 +292,13 @@ cd demo/iosApp && xcodegen generate && open StellarDemo.xcodeproj
 
 ## Cryptography
 
-This SDK uses **production-ready, audited cryptographic libraries** exclusively:
+This SDK uses **production-ready, audited cryptographic libraries** on all platforms:
 
-### JVM Platform
-- **Library**: BouncyCastle (org.bouncycastle:bcprov-jdk18on:1.78)
-- **Algorithm**: Ed25519 (RFC 8032 compliant)
-- **Features**: Mature, widely-audited, constant-time operations
-- **Security**: Registered as JCA security provider
+- **JVM**: BouncyCastle for Ed25519 operations
+- **iOS/macOS**: libsodium (native C interop)
+- **JavaScript**: libsodium-wrappers-sumo (WebAssembly)
 
-### Native Platforms (iOS/macOS)
-- **Library**: libsodium (via C interop)
-- **Algorithm**: Ed25519 via `crypto_sign_*` functions
-- **Features**: Audited, constant-time, memory-safe operations
-- **Random**: `randombytes_buf()` using system CSPRNG
-
-### JavaScript Platforms (Browser & Node.js)
-- **Library**: libsodium-wrappers-sumo (0.7.13 via npm)
-- **Why Sumo**: Required for SHA-256 (crypto_hash_sha256) - not in standard build
-- **Algorithm**: Ed25519 via `crypto_sign_*` functions
-- **Features**: Same audited C library compiled to WebAssembly
-- **Random**: `crypto.getRandomValues()` for key generation
-- **Initialization**: Automatic - SDK handles async initialization internally
-
-### Security Principles
-
-1. **No Experimental Crypto**: Only battle-tested, audited libraries
-2. **Constant-Time Operations**: Protection against timing attacks
-3. **Memory Safety**: Defensive copies, CharArray for secrets, proper cleanup
-4. **Input Validation**: All inputs validated before crypto operations
-5. **Error Handling**: Comprehensive validation with clear error messages
+All implementations provide constant-time operations, proper memory safety, and comprehensive input validation. No experimental or custom cryptography. See the [Platform Guide](docs/platforms.md) for detailed implementation information.
 
 ## Testing
 

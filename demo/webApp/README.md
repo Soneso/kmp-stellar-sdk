@@ -4,7 +4,7 @@ Production-ready web application demonstrating the Stellar SDK with **Compose Mu
 
 > **✅ VITE MIGRATION (October 23, 2025)**: Now using Vite for development server. Vite provides lightning-fast HMR while webpack handles Kotlin/JS bundling. Development experience significantly improved with instant hot reload.
 >
-> **✅ PRODUCTION BUILD (October 23, 2025)**: Production webpack build works perfectly. Build completes in ~5 seconds and creates a 28 MB bundle (2.7 MB with gzip). See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for webpack configuration details.
+> **✅ PRODUCTION BUILD (October 23, 2025)**: Production webpack build works perfectly. Build completes in ~5 seconds and creates a 28 MB bundle (2.7 MB with gzip).
 
 ## Overview
 
@@ -137,7 +137,7 @@ Features:
 # Total: 28 MB unminified (2.7 MB JS gzipped + 8 MB WASM)
 ```
 
-**What Changed**: Webpack configuration disables minification and module concatenation (which caused the hang) while enabling code splitting. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for technical details and [webpack.config.d/production-optimization.js](webpack.config.d/production-optimization.js) for the configuration.
+**What Changed**: Webpack configuration disables minification and module concatenation (which caused the hang) while enabling code splitting. See [webpack.config.d/production-optimization.js](webpack.config.d/production-optimization.js) for the configuration.
 
 **Trade-offs**:
 - ✅ Build completes successfully
