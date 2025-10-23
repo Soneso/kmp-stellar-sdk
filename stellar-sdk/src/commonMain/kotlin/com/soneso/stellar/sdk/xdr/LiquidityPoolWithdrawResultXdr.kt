@@ -44,7 +44,6 @@ sealed class LiquidityPoolWithdrawResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

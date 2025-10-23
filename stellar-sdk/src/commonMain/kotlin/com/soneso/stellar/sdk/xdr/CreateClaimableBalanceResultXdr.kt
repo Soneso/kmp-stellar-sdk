@@ -27,9 +27,9 @@ sealed class CreateClaimableBalanceResultXdr {
     override val discriminant: CreateClaimableBalanceResultCodeXdr = CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_SUCCESS
   }
 
-  data object Void : CreateClaimableBalanceResultXdr() {
-    override val discriminant: CreateClaimableBalanceResultCodeXdr = CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_MALFORMED
-  }
+  data class Void(
+    override val discriminant: CreateClaimableBalanceResultCodeXdr
+  ) : CreateClaimableBalanceResultXdr()
 
   companion object {
 
@@ -40,11 +40,11 @@ sealed class CreateClaimableBalanceResultXdr {
           val value = ClaimableBalanceIDXdr.decode(reader)
           BalanceID(value)
         }
-        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_MALFORMED -> Void
-        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_LOW_RESERVE -> Void
-        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NO_TRUST -> Void
-        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NOT_AUTHORIZED -> Void
-        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_UNDERFUNDED -> Void
+        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_MALFORMED -> Void(discriminant)
+        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_LOW_RESERVE -> Void(discriminant)
+        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NO_TRUST -> Void(discriminant)
+        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NOT_AUTHORIZED -> Void(discriminant)
+        CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_UNDERFUNDED -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown CreateClaimableBalanceResultXdr discriminant: $discriminant")
       }
     }

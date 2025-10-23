@@ -26,9 +26,9 @@ sealed class InvokeHostFunctionResultXdr {
     override val discriminant: InvokeHostFunctionResultCodeXdr = InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_SUCCESS
   }
 
-  data object Void : InvokeHostFunctionResultXdr() {
-    override val discriminant: InvokeHostFunctionResultCodeXdr = InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_MALFORMED
-  }
+  data class Void(
+    override val discriminant: InvokeHostFunctionResultCodeXdr
+  ) : InvokeHostFunctionResultXdr()
 
   companion object {
 
@@ -39,11 +39,11 @@ sealed class InvokeHostFunctionResultXdr {
           val value = HashXdr.decode(reader)
           Success(value)
         }
-        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_MALFORMED -> Void
-        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_TRAPPED -> Void
-        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_RESOURCE_LIMIT_EXCEEDED -> Void
-        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_ENTRY_ARCHIVED -> Void
-        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE -> Void
+        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_MALFORMED -> Void(discriminant)
+        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_TRAPPED -> Void(discriminant)
+        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_RESOURCE_LIMIT_EXCEEDED -> Void(discriminant)
+        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_ENTRY_ARCHIVED -> Void(discriminant)
+        InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown InvokeHostFunctionResultXdr discriminant: $discriminant")
       }
     }

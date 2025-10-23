@@ -48,9 +48,9 @@ sealed class TransactionResultResultXdr {
   }
 
   /** case txFEE_BUMP_INNER_FAILED: handled above */
-  data object Void : TransactionResultResultXdr() {
-    override val discriminant: TransactionResultCodeXdr = TransactionResultCodeXdr.txTOO_EARLY
-  }
+  data class Void(
+    override val discriminant: TransactionResultCodeXdr
+  ) : TransactionResultResultXdr()
 
   companion object {
 
@@ -73,21 +73,21 @@ sealed class TransactionResultResultXdr {
           val value = List(reader.readInt()) { OperationResultXdr.decode(reader) }
           Results(value)
         }
-        TransactionResultCodeXdr.txTOO_EARLY -> Void
-        TransactionResultCodeXdr.txTOO_LATE -> Void
-        TransactionResultCodeXdr.txMISSING_OPERATION -> Void
-        TransactionResultCodeXdr.txBAD_SEQ -> Void
-        TransactionResultCodeXdr.txBAD_AUTH -> Void
-        TransactionResultCodeXdr.txINSUFFICIENT_BALANCE -> Void
-        TransactionResultCodeXdr.txNO_ACCOUNT -> Void
-        TransactionResultCodeXdr.txINSUFFICIENT_FEE -> Void
-        TransactionResultCodeXdr.txBAD_AUTH_EXTRA -> Void
-        TransactionResultCodeXdr.txINTERNAL_ERROR -> Void
-        TransactionResultCodeXdr.txNOT_SUPPORTED -> Void
-        TransactionResultCodeXdr.txBAD_SPONSORSHIP -> Void
-        TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP -> Void
-        TransactionResultCodeXdr.txMALFORMED -> Void
-        TransactionResultCodeXdr.txSOROBAN_INVALID -> Void
+        TransactionResultCodeXdr.txTOO_EARLY -> Void(discriminant)
+        TransactionResultCodeXdr.txTOO_LATE -> Void(discriminant)
+        TransactionResultCodeXdr.txMISSING_OPERATION -> Void(discriminant)
+        TransactionResultCodeXdr.txBAD_SEQ -> Void(discriminant)
+        TransactionResultCodeXdr.txBAD_AUTH -> Void(discriminant)
+        TransactionResultCodeXdr.txINSUFFICIENT_BALANCE -> Void(discriminant)
+        TransactionResultCodeXdr.txNO_ACCOUNT -> Void(discriminant)
+        TransactionResultCodeXdr.txINSUFFICIENT_FEE -> Void(discriminant)
+        TransactionResultCodeXdr.txBAD_AUTH_EXTRA -> Void(discriminant)
+        TransactionResultCodeXdr.txINTERNAL_ERROR -> Void(discriminant)
+        TransactionResultCodeXdr.txNOT_SUPPORTED -> Void(discriminant)
+        TransactionResultCodeXdr.txBAD_SPONSORSHIP -> Void(discriminant)
+        TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP -> Void(discriminant)
+        TransactionResultCodeXdr.txMALFORMED -> Void(discriminant)
+        TransactionResultCodeXdr.txSOROBAN_INVALID -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown TransactionResultResultXdr discriminant: $discriminant")
       }
     }

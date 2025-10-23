@@ -42,7 +42,6 @@ sealed class CreateAccountResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

@@ -36,7 +36,6 @@ sealed class BumpSequenceResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

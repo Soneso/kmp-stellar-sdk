@@ -84,9 +84,9 @@ sealed class OperationResultXdr {
     override val discriminant: OperationResultCodeXdr = OperationResultCodeXdr.opINNER
   }
 
-  data object Void : OperationResultXdr() {
-    override val discriminant: OperationResultCodeXdr = OperationResultCodeXdr.opBAD_AUTH
-  }
+  data class Void(
+    override val discriminant: OperationResultCodeXdr
+  ) : OperationResultXdr()
 
   companion object {
 
@@ -97,12 +97,12 @@ sealed class OperationResultXdr {
           val value = OperationResultTrXdr.decode(reader)
           Tr(value)
         }
-        OperationResultCodeXdr.opBAD_AUTH -> Void
-        OperationResultCodeXdr.opNO_ACCOUNT -> Void
-        OperationResultCodeXdr.opNOT_SUPPORTED -> Void
-        OperationResultCodeXdr.opTOO_MANY_SUBENTRIES -> Void
-        OperationResultCodeXdr.opEXCEEDED_WORK_LIMIT -> Void
-        OperationResultCodeXdr.opTOO_MANY_SPONSORING -> Void
+        OperationResultCodeXdr.opBAD_AUTH -> Void(discriminant)
+        OperationResultCodeXdr.opNO_ACCOUNT -> Void(discriminant)
+        OperationResultCodeXdr.opNOT_SUPPORTED -> Void(discriminant)
+        OperationResultCodeXdr.opTOO_MANY_SUBENTRIES -> Void(discriminant)
+        OperationResultCodeXdr.opEXCEEDED_WORK_LIMIT -> Void(discriminant)
+        OperationResultCodeXdr.opTOO_MANY_SPONSORING -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown OperationResultXdr discriminant: $discriminant")
       }
     }

@@ -54,7 +54,6 @@ sealed class SetOptionsResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

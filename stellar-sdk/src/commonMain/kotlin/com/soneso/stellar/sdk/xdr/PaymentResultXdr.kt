@@ -52,7 +52,6 @@ sealed class PaymentResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

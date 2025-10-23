@@ -42,7 +42,6 @@ sealed class ClawbackResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

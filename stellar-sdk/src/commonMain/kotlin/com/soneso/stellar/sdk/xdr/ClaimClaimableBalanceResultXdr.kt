@@ -44,7 +44,6 @@ sealed class ClaimClaimableBalanceResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

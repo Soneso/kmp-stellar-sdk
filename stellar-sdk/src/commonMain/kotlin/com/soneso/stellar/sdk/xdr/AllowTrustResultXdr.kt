@@ -46,7 +46,6 @@ sealed class AllowTrustResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

@@ -28,9 +28,9 @@ sealed class AccountMergeResultXdr {
     override val discriminant: AccountMergeResultCodeXdr = AccountMergeResultCodeXdr.ACCOUNT_MERGE_SUCCESS
   }
 
-  data object Void : AccountMergeResultXdr() {
-    override val discriminant: AccountMergeResultCodeXdr = AccountMergeResultCodeXdr.ACCOUNT_MERGE_MALFORMED
-  }
+  data class Void(
+    override val discriminant: AccountMergeResultCodeXdr
+  ) : AccountMergeResultXdr()
 
   companion object {
 
@@ -41,13 +41,13 @@ sealed class AccountMergeResultXdr {
           val value = Int64Xdr.decode(reader)
           SourceAccountBalance(value)
         }
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_MALFORMED -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_NO_ACCOUNT -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_IMMUTABLE_SET -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_HAS_SUB_ENTRIES -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_SEQNUM_TOO_FAR -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_DEST_FULL -> Void
-        AccountMergeResultCodeXdr.ACCOUNT_MERGE_IS_SPONSOR -> Void
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_MALFORMED -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_NO_ACCOUNT -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_IMMUTABLE_SET -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_HAS_SUB_ENTRIES -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_SEQNUM_TOO_FAR -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_DEST_FULL -> Void(discriminant)
+        AccountMergeResultCodeXdr.ACCOUNT_MERGE_IS_SPONSOR -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown AccountMergeResultXdr discriminant: $discriminant")
       }
     }

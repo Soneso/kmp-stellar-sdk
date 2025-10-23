@@ -89,7 +89,6 @@ sealed class PathPaymentStrictReceiveResultXdr {
       is NoIssuer -> {
         value.encode(writer)
       }
-      is Void -> {}
     }
   }
 }

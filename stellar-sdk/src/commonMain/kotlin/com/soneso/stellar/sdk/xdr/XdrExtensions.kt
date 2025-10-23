@@ -334,3 +334,28 @@ fun LedgerCloseMetaXdr.Companion.fromXdrBase64(base64: String): LedgerCloseMetaX
     val reader = XdrReader(bytes)
     return decode(reader)
 }
+
+/**
+ * Encodes this XDR object to a base64 string.
+ *
+ * @return Base64-encoded XDR representation
+ */
+@OptIn(ExperimentalEncodingApi::class)
+fun TransactionEventXdr.toXdrBase64(): String {
+    val writer = XdrWriter()
+    encode(writer)
+    return Base64.encode(writer.toByteArray())
+}
+
+/**
+ * Decodes a TransactionEventXdr from a base64 string.
+ *
+ * @param base64 Base64-encoded XDR string
+ * @return Decoded TransactionEventXdr object
+ */
+@OptIn(ExperimentalEncodingApi::class)
+fun TransactionEventXdr.Companion.fromXdrBase64(base64: String): TransactionEventXdr {
+    val bytes = Base64.decode(base64)
+    val reader = XdrReader(bytes)
+    return decode(reader)
+}

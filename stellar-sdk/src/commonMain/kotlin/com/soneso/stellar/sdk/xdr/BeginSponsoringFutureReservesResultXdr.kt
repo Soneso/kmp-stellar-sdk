@@ -41,7 +41,6 @@ sealed class BeginSponsoringFutureReservesResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

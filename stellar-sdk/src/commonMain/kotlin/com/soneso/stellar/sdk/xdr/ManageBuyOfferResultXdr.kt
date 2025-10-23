@@ -33,9 +33,9 @@ sealed class ManageBuyOfferResultXdr {
     override val discriminant: ManageBuyOfferResultCodeXdr = ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SUCCESS
   }
 
-  data object Void : ManageBuyOfferResultXdr() {
-    override val discriminant: ManageBuyOfferResultCodeXdr = ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_MALFORMED
-  }
+  data class Void(
+    override val discriminant: ManageBuyOfferResultCodeXdr
+  ) : ManageBuyOfferResultXdr()
 
   companion object {
 
@@ -46,18 +46,18 @@ sealed class ManageBuyOfferResultXdr {
           val value = ManageOfferSuccessResultXdr.decode(reader)
           Success(value)
         }
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_MALFORMED -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NO_TRUST -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NO_TRUST -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NOT_AUTHORIZED -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NOT_AUTHORIZED -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_LINE_FULL -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_UNDERFUNDED -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_CROSS_SELF -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NO_ISSUER -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NO_ISSUER -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_NOT_FOUND -> Void
-        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_LOW_RESERVE -> Void
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_MALFORMED -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NO_TRUST -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NO_TRUST -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NOT_AUTHORIZED -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NOT_AUTHORIZED -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_LINE_FULL -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_UNDERFUNDED -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_CROSS_SELF -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_SELL_NO_ISSUER -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_BUY_NO_ISSUER -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_NOT_FOUND -> Void(discriminant)
+        ManageBuyOfferResultCodeXdr.MANAGE_BUY_OFFER_LOW_RESERVE -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown ManageBuyOfferResultXdr discriminant: $discriminant")
       }
     }

@@ -75,6 +75,7 @@ val AVAILABLE_CONTRACTS = listOf(
         wasmFilename = "soroban_hello_world_contract.wasm",
         hasConstructor = false
     ),
+
     ContractMetadata(
         id = "auth",
         name = "Auth Contract",

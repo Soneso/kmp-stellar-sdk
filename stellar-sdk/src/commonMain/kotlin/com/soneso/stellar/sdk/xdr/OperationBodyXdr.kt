@@ -384,7 +384,6 @@ sealed class OperationBodyXdr {
       is BeginSponsoringFutureReservesOp -> {
         value.encode(writer)
       }
-      is Void -> {}
       is RevokeSponsorshipOp -> {
         value.encode(writer)
       }

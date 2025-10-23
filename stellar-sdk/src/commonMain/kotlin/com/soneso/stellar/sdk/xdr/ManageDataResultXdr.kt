@@ -42,7 +42,6 @@ sealed class ManageDataResultXdr {
     discriminant.encode(writer)
     when (this) {
       is Void -> {}
-      is Void -> {}
     }
   }
 }

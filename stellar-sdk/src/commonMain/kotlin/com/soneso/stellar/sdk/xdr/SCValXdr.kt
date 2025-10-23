@@ -364,7 +364,6 @@ sealed class SCValXdr {
       is Instance -> {
         value.encode(writer)
       }
-      is Void -> {}
       is NonceKey -> {
         value.encode(writer)
       }
