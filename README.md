@@ -24,6 +24,8 @@ A comprehensive Kotlin Multiplatform SDK for building applications on the Stella
 - [Testing Guide](docs/testing.md) - Running tests across platforms
 - [Demo App](demo/README.md) - Multi-platform sample application
 - [Development Guide](CLAUDE.md) - Architecture and development guidelines
+- [Horizon API Compatibility](compatibility/horizon/HORIZON_COMPATIBILITY_MATRIX.md) - Supported Horizon endpoints
+- [Soroban RPC Compatibility](compatibility/rpc/RPC_COMPATIBILITY_MATRIX.md) - Supported Soroban RPC methods
 
 ## What Is This?
 
