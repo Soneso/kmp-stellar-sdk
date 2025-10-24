@@ -31,7 +31,58 @@ Key characteristics:
 
 ## Installation
 
-### Option 1: Swift Package Manager (Recommended)
+### Two Approaches Based on Your App Type
+
+The setup differs depending on whether you're building a **Compose Multiplatform** app (Kotlin UI) or a **Native SwiftUI/UIKit** app:
+
+#### Option A: Compose Multiplatform iOS (Recommended - 95% of cases)
+
+**Use Maven artifact - works perfectly for Kotlin-based UI:**
+
+```kotlin
+// shared/build.gradle.kts
+kotlin {
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+
+    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "shared"
+            isStatic = true
+            // DON'T export if UI is in Kotlin (Compose)
+            // Swift only launches the app, doesn't use SDK types
+        }
+    }
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                // Maven artifact works perfectly
+                implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+                implementation(compose.runtime)
+                implementation(compose.material3)
+            }
+        }
+    }
+}
+```
+
+**Why this works:** All SDK calls happen in Kotlin. Swift just launches the Compose UI. No need to export SDK types to Swift.
+
+#### Option B: Native SwiftUI/UIKit Apps
+
+**Requires SDK as Git submodule + libsodium:**
+
+##### 1. Add SDK as Submodule
+
+```bash
+# Add SDK as submodule
+git submodule add https://github.com/Soneso/stellar-kmp-sdk.git stellar-sdk
+git submodule update --init --recursive
+```
+
+##### 2: Swift Package Manager for libsodium
 
 Add libsodium dependency in Xcode:
 

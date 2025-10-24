@@ -1353,21 +1353,14 @@ class ContractClient private constructor(
 
     companion object {
         // Factory method - loads spec from network
-        suspend fun fromNetwork(
-            contractId: String,
-            rpcUrl: String,
-            network: Network
-        ): ContractClient
-
-        // Factory method - manual XDR mode (no spec)
-        fun withoutSpec(
+        suspend fun forContract(
             contractId: String,
             rpcUrl: String,
             network: Network
         ): ContractClient
     }
 
-    // Primary API - invoke with native types (requires spec)
+    // Primary API - invoke with native types and auto-execution (requires spec)
     suspend fun <T> invoke(
         functionName: String,
         arguments: Map<String, Any?>,
@@ -1377,12 +1370,12 @@ class ContractClient private constructor(
         options: ClientOptions = ClientOptions()
     ): T
 
-    // Advanced API - invoke with manual XDR
-    suspend fun <T> invokeWithXdr(
+    // Advanced API - build transaction with manual control (essential for multi-signature workflows)
+    suspend fun <T> buildInvoke(
         functionName: String,
-        parameters: List<SCValXdr>,
+        arguments: Map<String, Any?> = emptyMap(),
         source: String,
-        signer: KeyPair?,
+        signer: KeyPair? = null,
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
         options: ClientOptions = ClientOptions()
     ): AssembledTransaction<T>
@@ -1470,8 +1463,8 @@ class ContractClient private constructor(
 **Examples:**
 
 ```kotlin
-// Create client with spec for beginner-friendly API
-val client = ContractClient.fromNetwork(
+// Create client with spec loaded from network
+val client = ContractClient.forContract(
     contractId = "CCREATE...",
     rpcUrl = "https://soroban-testnet.stellar.org",
     network = Network.TESTNET
@@ -1505,26 +1498,34 @@ client.invoke<Unit>(
 
 println("Transfer complete!")
 
-// Power user: Manual XDR control
-val clientManual = ContractClient.withoutSpec(
-    contractId = "CCREATE...",
-    rpcUrl = "https://soroban-testnet.stellar.org",
-    network = Network.TESTNET
-)
-
-val assembled = clientManual.invokeWithXdr(
+// Advanced: Multi-signature workflow with buildInvoke
+// Build transaction without auto-execution for manual control
+val assembled = client.buildInvoke<String>(
     functionName = "transfer",
-    parameters = listOf(
-        Scv.toAddress("GFROM..."),
-        Scv.toAddress("GTO..."),
-        Scv.toInt128(1000)
+    arguments = mapOf(
+        "from" to fromAddress,
+        "to" to toAddress,
+        "amount" to 1000
     ),
     source = sourceAccount.getAccountId(),
     signer = sourceAccount,
-    parseResultXdrFn = null
+    parseResultXdrFn = { Scv.fromString(it) }
 )
-    .signAuthEntries(sourceAccount)
-    .signAndSubmit(sourceAccount)
+
+// Detect which addresses need to sign authorization entries
+// Returns a Set<String> of account IDs that must authorize this transaction
+val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
+
+// Check if specific accounts need to sign and add their signatures
+if (whoNeedsToSign.contains(account1Id)) {
+    assembled.signAuthEntries(account1Keypair)
+}
+if (whoNeedsToSign.contains(account2Id)) {
+    assembled.signAuthEntries(account2Keypair)
+}
+
+// Then submit transaction
+val result = assembled.signAndSubmit(sourceAccount)
 
 // Deploy new contract
 val newClient = ContractClient.deploy(

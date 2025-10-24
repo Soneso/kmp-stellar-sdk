@@ -852,13 +852,13 @@ class SorobanAuthorizationManager {
         contractClient: ContractClient,
         contractId: String,
         method: String,
-        parameters: List<SCValXdr>,
+        arguments: Map<String, Any?>,
         authorizers: List<Authorizer>
     ): AssembledTransaction<*> {
-        // Initial simulation using advanced API for manual control
-        var assembled = contractClient.invokeWithXdr(
+        // Initial simulation using buildInvoke for manual control
+        var assembled = contractClient.buildInvoke<Any>(
             functionName = method,
-            parameters = parameters,
+            arguments = arguments,
             source = authorizers.first().accountId,
             signer = null
         )
@@ -2158,7 +2158,7 @@ class CustomContractClient(
         // Cache metadata
         private var cachedMetadata: TokenMetadata? = null
         private var metadataExpiry: Instant? = null
-        private val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+        private val client = ContractClient.forContract(contractId, rpcUrl, network)
 
         suspend fun getBalance(account: String): BigDecimal {
             val result = client.invoke<Long>(
@@ -2197,7 +2197,7 @@ class CustomContractClient(
                 )
             }
 
-            // Using new invoke API with native types
+            // Using invoke API with native types (auto-executes)
             client.invoke<Unit>(
                 functionName = if (memo != null) "transfer_with_memo" else "transfer",
                 arguments = arguments,
@@ -2205,16 +2205,14 @@ class CustomContractClient(
                 signer = from
             )
 
-            // For manual control over the transaction lifecycle, use invokeWithXdr
-            val assembled = client.invokeWithXdr(
+            // For manual control over the transaction lifecycle (multi-sig), use buildInvoke
+            val assembled = client.buildInvoke<Unit>(
                 functionName = "transfer",
-                parameters = listOf(
-                    Scv.toAddress(from.getAccountId()),
-                    Scv.toAddress(to),
-                    Scv.toInt128(rawAmount)
-                ),
-                source = from.getAccountId(),
-                signer = from
+                arguments = mapOf(
+                    "from" to from.getAccountId(),
+                    "to" to to,
+                    "amount" to rawAmount
+                )
             )
 
             return TransferResult(
@@ -2294,7 +2292,7 @@ class CustomContractClient(
         calls.map { call ->
             async {
                 runCatching {
-                    val client = ContractClient.fromNetwork(
+                    val client = ContractClient.forContract(
                         contractId = call.contractId,
                         rpcUrl = sorobanServer.serverUrl,
                         network = network
@@ -2574,7 +2572,6 @@ This advanced guide covers sophisticated patterns and techniques for building pr
 
 For specific implementation details and additional examples, refer to:
 - [API Reference](./api-reference.md) - Detailed API documentation
-- [Migration Guide](./migration.md) - Moving from Java SDK
 - [Platform Guides](./platforms/) - Platform-specific implementations
 - [Sample Applications](./sample-apps.md) - Complete example applications
 

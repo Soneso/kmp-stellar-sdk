@@ -586,7 +586,7 @@ private fun SuccessCard(result: DeployContractResult.Success, snackbarHostState:
             }
 
             Text(
-                text = "You can now use this contract ID to interact with your deployed contract via the SDK's ContractClient.fromNetwork() method.",
+                text = "You can now use this contract ID to interact with your deployed contract via the SDK's ContractClient.forContract() method.",
                 style = MaterialTheme.typography.bodySmall,
                 color = LightExtendedColors.onSuccessContainer
             )

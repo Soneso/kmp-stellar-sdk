@@ -1,10 +1,10 @@
 # Stellar SDK for Kotlin Multiplatform
 
-**Status: ALPHA - Work In Progress, do not use in production**
+**Status: BETA - Not recommended for production use yet**
 
-A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
+A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
-**Version:** 0.1.0-SNAPSHOT
+**Version:** 0.2.0
 
 ## Platform Support
 
@@ -19,9 +19,6 @@ A comprehensive Kotlin Multiplatform SDK for building applications on the Stella
 ## Quick Links
 
 - [Getting Started](docs/getting-started.md) - Installation and basic usage
-- [Features Guide](docs/features.md) - Complete features list with examples
-- [Platform Guide](docs/platforms.md) - Platform-specific setup and notes
-- [Testing Guide](docs/testing.md) - Running tests across platforms
 - [Demo App](demo/README.md) - Multi-platform sample application
 - [Development Guide](CLAUDE.md) - Architecture and development guidelines
 - [Horizon API Compatibility](compatibility/horizon/HORIZON_COMPATIBILITY_MATRIX.md) - Supported Horizon endpoints
@@ -32,12 +29,11 @@ A comprehensive Kotlin Multiplatform SDK for building applications on the Stella
 The Stellar SDK for Kotlin Multiplatform enables you to:
 
 - Build and sign Stellar transactions
-- Generate and manage Ed25519 keypairs
 - Connect to Horizon (Stellar's REST API server)
 - Interact with Soroban smart contracts via RPC
-- Run the same business logic on mobile, web, and server platforms
+- Run the same business logic on mobile, web, desktop, and server platforms
 
-This SDK uses production-ready, audited cryptographic libraries on all platforms - no experimental or custom crypto implementations.
+This SDK uses audited cryptographic libraries on all platforms.
 
 ## What Can I Build?
 
@@ -49,30 +45,35 @@ With this SDK, you can create:
 - **Token Issuance Platforms** - Create and distribute custom assets with trustline management
 - **Cross-Border Payment Systems** - Leverage path payments for currency conversion
 - **Account Services** - Multi-signature support, account recovery, and sponsorship flows
-- **Mobile-First Apps** - iOS and Android apps sharing business logic with web and server
+- **Mobile-First Apps** - iOS and Android apps sharing business logic with desktop, web and server
 
-See the [demo app](demo/README.md) for working examples of each feature category.
+See the [demo app](demo/README.md) for examples.
 
 ## Features
 
 The SDK provides comprehensive Stellar functionality:
 
 - **Cryptography** - Ed25519 keypairs, signing, verification with production-ready libraries (BouncyCastle, libsodium)
-- **Transaction Building** - TransactionBuilder with fluent API, all 27 Stellar operations, memos, time bounds, multi-signature support
+- **Transaction Building** - TransactionBuilder with fluent API, all 26 Stellar operations, memos, time bounds, multi-signature support
 - **Assets & Accounts** - Native (XLM) and issued assets, trustlines, muxed accounts, SAC contract ID derivation
 - **Horizon API Client** - Full REST API coverage with request builders, SSE streaming, automatic retries, SEP-29 validation
-- **Soroban Smart Contracts** - High-level ContractClient with beginner-friendly Map-based API and power-user XDR mode
+- **Soroban Smart Contracts** - High-level ContractClient with beginner-friendly Map-based API and power-user mode
 - **Soroban RPC Client** - Transaction simulation, event queries, ledger data, contract deployment and invocation
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
 
-See the [Features Guide](docs/features.md) for detailed documentation and examples.
-
 ## Installation
 
-**Note:** This SDK is currently in alpha. Installation instructions will be provided when artifacts are published to Maven Central.
+Add the SDK as a Maven dependency (recommended for most projects):
 
-For now, you can include it as a source dependency in your Kotlin Multiplatform project:
+```kotlin
+// In your module's build.gradle.kts
+dependencies {
+    implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+}
+```
+
+**Alternative: For advanced native Swift interop** (only needed for native iOS/macOS apps where Swift directly uses SDK types):
 
 ```kotlin
 // settings.gradle.kts
@@ -80,30 +81,35 @@ includeBuild("/path/to/kmp-stellar-sdk")
 
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:0.1.0-SNAPSHOT")
+    implementation("com.soneso.stellar:stellar-sdk:0.2.0")
 }
 ```
 
+See [Platform-Specific Requirements](#platform-specific-requirements) below and [docs/platforms/](docs/platforms/) for detailed setup instructions
+
 ### Platform-Specific Requirements
 
-#### iOS/macOS
-Add libsodium via Swift Package Manager. In Xcode:
-1. File → Add Package Dependencies
-2. Search for: `https://github.com/jedisct1/swift-sodium`
-3. Select the Clibsodium package
+#### JVM/Android
+No additional setup required. BouncyCastle is included as a dependency.
 
-Or add to `Package.swift`:
-```swift
-dependencies: [
-    .package(url: "https://github.com/jedisct1/swift-sodium", from: "0.9.1")
-]
-```
+#### iOS (Compose Multiplatform)
+No additional setup required when using Compose Multiplatform UI. The SDK handles cryptography internally using Maven artifacts.
+
+#### macOS (Desktop App - Recommended)
+No additional setup required. Use the Desktop app with Compose UI:
+- Uses BouncyCastle (JVM) for cryptography
+- Cross-platform (macOS/Windows/Linux)
+- Same code as Android/iOS/Web
+
+#### iOS/macOS (Native SwiftUI/UIKit Apps - Advanced)
+For native Swift apps where Swift code directly uses SDK types, add libsodium:
+- **iOS**: Add via Swift Package Manager: `https://github.com/jedisct1/swift-sodium` (Clibsodium product)
+- **macOS Native**: Install via Homebrew: `brew install libsodium`
+
+See [docs/platforms/](docs/platforms/) for detailed platform-specific instructions.
 
 #### JavaScript
 No additional setup required. The SDK automatically bundles and initializes libsodium.js.
-
-#### JVM
-No additional setup required. BouncyCastle is included as a dependency.
 
 ## Quick Start
 
@@ -171,22 +177,22 @@ suspend fun sendPayment() {
 
 ### Interact with Soroban Smart Contracts
 
-The SDK provides a high-level ContractClient API with two modes:
+The SDK provides a high-level ContractClient API with automatic type conversion:
 
-**Beginner-friendly mode** with automatic type conversion:
+**Simple invocation** with auto-execution:
 ```kotlin
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun callContract() {
     // Load contract spec from network
-    val client = ContractClient.fromNetwork(
+    val client = ContractClient.forContract(
         contractId = "CDLZ...",
         rpcUrl = "https://soroban-testnet.stellar.org:443",
         network = Network.TESTNET
     )
 
-    // Query with Map-based arguments
+    // Query with Map-based arguments (auto-executes)
     val balance = client.invoke<Long>(
         functionName = "balance",
         arguments = mapOf("account" to accountAddress),
@@ -213,24 +219,38 @@ suspend fun callContract() {
 }
 ```
 
-**Power user mode** with manual XDR control:
+**Multi-signature workflows** with buildInvoke for manual control:
 ```kotlin
-suspend fun advancedContractCall() {
-    val client = ContractClient.withoutSpec(contractId, rpcUrl, Network.TESTNET)
+suspend fun multiSigContractCall() {
+    val client = ContractClient.forContract(contractId, rpcUrl, Network.TESTNET)
 
-    val assembled = client.invokeWithXdr(
+    // Build transaction without auto-execution
+    val assembled = client.buildInvoke<String>(
         functionName = "transfer",
-        parameters = listOf(
-            Scv.toAddress(fromAddress),
-            Scv.toAddress(toAddress),
-            Scv.toInt128(1000)
+        arguments = mapOf(
+            "from" to fromAddress,
+            "to" to toAddress,
+            "amount" to 1000
         ),
         source = sourceAccount,
-        signer = keypair
+        signer = sourceKeypair,
+        parseResultXdrFn = { Scv.fromString(it) }
     )
 
-    assembled.simulate()
-    val result = assembled.signAndSubmit(keypair)
+    // Detect which addresses need to sign authorization entries
+    // Returns a Set<String> of account IDs that must authorize this transaction
+    val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
+
+    // Check if specific accounts need to sign and add their signatures
+    if (whoNeedsToSign.contains(account1Id)) {
+        assembled.signAuthEntries(account1Keypair)
+    }
+    if (whoNeedsToSign.contains(account2Id)) {
+        assembled.signAuthEntries(account2Keypair)
+    }
+
+    // Submit transaction when ready
+    val result = assembled.signAndSubmit(sourceKeypair)
 }
 ```
 
@@ -344,7 +364,7 @@ For detailed testing information, see the [Testing Guide](docs/testing.md).
 
 ## Contributing
 
-This project is currently in alpha development. Contribution guidelines will be provided as the project matures.
+This project is currently in beta. Contribution guidelines will be provided as the project matures.
 
 For development:
 1. Clone the repository
@@ -366,4 +386,4 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 
 ---
 
-**Note**: This SDK is under active development. Do not use in production.
+**Note**: This SDK is in beta. Not recommended for production use yet. See [CHANGELOG.md](CHANGELOG.md) for release notes.

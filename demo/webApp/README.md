@@ -276,7 +276,7 @@ All 10 features work identically in the browser:
 - Dynamic authorization handling
 - Same-invoker vs different-invoker scenarios
 - Conditional signing with `needsNonInvokerSigningBy()`
-- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
+- Uses: `ContractClient.buildInvoke()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Technology Stack
 

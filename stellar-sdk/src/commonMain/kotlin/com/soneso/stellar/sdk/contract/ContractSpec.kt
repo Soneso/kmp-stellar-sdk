@@ -4,7 +4,6 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
-import kotlin.math.abs
 
 /**
  * Utility class for working with Soroban contract specifications.
@@ -155,7 +154,6 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 is SCSpecEntryXdr.UdtEnumV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtErrorEnumV0 -> entry.value.name == name
                 is SCSpecEntryXdr.EventV0 -> entry.value.name.value == name
-                else -> false
             }
         }
     }
@@ -438,7 +436,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     /**
      * Converts a UDT (User-Defined Type) SCVal to native Kotlin value.
      */
-    private fun scValUdtToNative(scVal: SCValXdr, udt: SCSpecTypeUDTXdr): Any? {
+    private fun scValUdtToNative(scVal: SCValXdr, udt: SCSpecTypeUDTXdr): Any {
         val entry = findEntry(udt.name)
             ?: throw ContractSpecException.entryNotFound(udt.name)
 
@@ -588,9 +586,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Handles basic value types (bool, numbers, strings, addresses, etc.)
      */
     private fun handleValueType(value: Any?, typeDef: SCSpecTypeDefXdr): SCValXdr {
-        val typeDiscriminant = typeDef.discriminant
-
-        return when (typeDiscriminant) {
+        return when (val typeDiscriminant = typeDef.discriminant) {
             SCSpecTypeXdr.SC_SPEC_TYPE_VOID -> SCValXdr.Void(SCValTypeXdr.SCV_VOID)
             SCSpecTypeXdr.SC_SPEC_TYPE_BOOL -> {
                 if (value !is Boolean) {
@@ -686,7 +682,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         }
 
         // Use Scv.toUint128 for proper conversion
-        return com.soneso.stellar.sdk.scval.Scv.toUint128(
+        return Scv.toUint128(
             com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }
@@ -698,7 +694,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         val intVal = parseInteger(value, "i128")
 
         // Use Scv.toInt128 for proper conversion
-        return com.soneso.stellar.sdk.scval.Scv.toInt128(
+        return Scv.toInt128(
             com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }
@@ -713,7 +709,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         }
 
         // Use Scv.toUint256 for proper conversion
-        return com.soneso.stellar.sdk.scval.Scv.toUint256(
+        return Scv.toUint256(
             com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }
@@ -725,7 +721,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         val intVal = parseInteger(value, "i256")
 
         // Use Scv.toInt256 for proper conversion
-        return com.soneso.stellar.sdk.scval.Scv.toInt256(
+        return Scv.toInt256(
             com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
         )
     }

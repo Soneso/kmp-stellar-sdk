@@ -255,7 +255,7 @@ All 10 demo features are fully implemented in SwiftUI:
 - Dynamic authorization handling
 - Same-invoker vs different-invoker scenarios
 - Conditional signing with `needsNonInvokerSigningBy()`
-- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
+- Uses: `ContractClient.buildInvoke()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Design System
 

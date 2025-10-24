@@ -11,6 +11,19 @@ The demo app's **primary purpose** is to showcase SDK functionality for develope
 3. **Production Patterns**: Show best practices (error handling, async operations, UI patterns)
 4. **Don't Reimplement SDK**: Use SDK functionality directly - don't duplicate or simplify SDK features
 
+### Important: Demo vs Production Setup
+
+**This demo uses project dependencies** (`api(project(":stellar-sdk"))`) to enable advanced features:
+- Native Swift interop in macOS app (requires `export(project(":stellar-sdk"))`)
+- Direct framework access for educational purposes
+
+**Most external developers should use Maven artifacts** (`implementation("com.soneso.stellar:stellar-sdk:0.2.0")`):
+- Works perfectly for Compose Multiplatform apps (Android, iOS, Desktop, Web)
+- Standard KMP apps where SDK calls happen in Kotlin
+- Simpler dependency management
+
+**See platform guides** in `../docs/platforms/` for correct setup instructions for each platform.
+
 **Example (Correct)**:
 ```kotlin
 // Good: Uses SDK directly

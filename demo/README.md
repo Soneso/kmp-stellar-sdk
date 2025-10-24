@@ -6,6 +6,8 @@ A comprehensive Kotlin Multiplatform demo application showcasing the Stellar SDK
 
 This demo app demonstrates real-world usage of the Stellar SDK, including key generation, account management, payments, trustlines, and smart contract interactions. The demo's primary purpose is to showcase SDK functionality for developers learning how to use the SDK. The app follows a modern KMP architecture with shared business logic and platform-specific UIs.
 
+**Note for External Developers**: This demo uses project dependencies (`api(project(":stellar-sdk"))`) to showcase advanced native Swift interop in the macOS app. Most developers should use Maven artifacts (`implementation("com.soneso.stellar:stellar-sdk:0.2.0")`) which work perfectly for Compose Multiplatform and standard KMP apps. See [docs/platforms/](../docs/platforms/) for platform-specific setup instructions.
+
 ## Architecture
 
 The demo app uses a **Compose Multiplatform** architecture with maximum code sharing:
@@ -107,7 +109,7 @@ The demo app includes 10 comprehensive feature demonstrations:
 - Use ContractClient to load contract specifications from the network
 - Showcase funcResToNative for parsing XDR results to native types
 - Real-time contract function invocation on testnet
-- Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `funcResToNative()`
+- Demonstrates: `ContractClient.forContract()`, `invoke()`, `funcResToNative()`
 
 ### 10. Invoke Auth Contract
 - Dynamic Soroban authorization handling with same-invoker and different-invoker scenarios
@@ -115,7 +117,7 @@ The demo app includes 10 comprehensive feature demonstrations:
 - Manual authorization signing with `signAuthEntries()` when needed
 - Production-ready pattern for conditional authorization
 - Educational UI showing which authorization scenario was detected
-- Demonstrates: `ContractClient.fromNetwork()`, `invoke()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`
+- Demonstrates: `ContractClient.forContract()`, `buildInvoke()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`
 
 ## Project Structure
 

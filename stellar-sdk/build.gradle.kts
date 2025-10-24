@@ -1,6 +1,9 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
+    id("org.jetbrains.dokka")
+    id("maven-publish")
+    id("signing")
 }
 
 kotlin {
@@ -218,5 +221,80 @@ kotlin {
 
         val macosX64Test by getting { dependsOn(macosTest) }
         val macosArm64Test by getting { dependsOn(macosTest) }
+    }
+}
+
+// Dokka Configuration for API Documentation (V2 mode)
+tasks.register<Jar>("javadocJar") {
+    archiveClassifier.set("javadoc")
+    dependsOn(tasks.named("dokkaGeneratePublicationHtml"))
+    from(tasks.named("dokkaGeneratePublicationHtml").get().outputs)
+}
+
+// Maven Publishing Configuration
+publishing {
+    publications.withType<MavenPublication> {
+        // Add javadoc JAR to all publications
+        artifact(tasks.named("javadocJar"))
+
+        // Configure POM for all publications (KMP creates multiple publications automatically)
+        pom {
+            name.set("Stellar SDK for Kotlin Multiplatform")
+            description.set("Production-ready Stellar SDK for JVM, iOS, macOS, and JavaScript")
+            url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk")
+
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk/blob/main/LICENSE")
+                    distribution.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk/blob/main/LICENSE")
+                }
+            }
+
+            developers {
+                developer {
+                    id.set("soneso")
+                    name.set("Soneso")
+                    email.set("info@soneso.com")
+                    organization.set("Soneso")
+                    organizationUrl.set("https://github.com/Soneso")
+                }
+            }
+
+            scm {
+                url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk")
+                connection.set("scm:git:https://github.com/Soneso/stellar-kotlin-multiplatform-sdk.git")
+                developerConnection.set("scm:git:ssh://git@github.com/Soneso/stellar-kotlin-multiplatform-sdk.git")
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "OSSRH"
+            // Updated to use Central Portal OSSRH Staging API (OSSRH shut down June 30, 2025)
+            url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+            credentials {
+                username = project.findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME")
+                password = project.findProperty("ossrhPassword") as String? ?: System.getenv("OSSRH_PASSWORD")
+            }
+        }
+    }
+}
+
+// Signing Configuration
+signing {
+    // Only require signing when publishing to Maven Central (not for local builds/tests)
+    val publishTasks = listOf("publishAllPublicationsToOSSRHRepository", "publishToOSSRH", "publishToSonatype", "Sonatype")
+    isRequired = gradle.startParameter.taskNames.any { taskName ->
+        publishTasks.any { taskName.contains(it) }
+    }
+
+    // Use GPG command-line tool for signing
+    // This works with both Ed25519 and RSA keys
+    // Signing will only be attempted if isRequired is true
+    if (isRequired) {
+        useGpgCmd()
+        sign(publishing.publications)
     }
 }

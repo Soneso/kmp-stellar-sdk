@@ -31,39 +31,80 @@ Key characteristics:
 
 ## Installation
 
-### Development Setup
+### Two Approaches Based on Your App Type
 
-For development and testing, install libsodium via Homebrew:
+The setup differs depending on whether you're building a **Compose Desktop** app (JVM) or a **Native SwiftUI/AppKit** app:
+
+#### Option 1: Compose Desktop on macOS (Recommended - 95% of cases)
+
+**Use Maven artifact - no additional setup required:**
+
+```kotlin
+// build.gradle.kts
+kotlin {
+    jvm("desktop") {
+        compilations.all {
+            kotlinOptions.jvmTarget = "11"
+        }
+    }
+
+    sourceSets {
+        val desktopMain by getting {
+            dependencies {
+                // Maven artifact works perfectly for JVM/Compose Desktop
+                implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+                implementation(compose.desktop.currentOs)
+            }
+        }
+    }
+}
+```
+
+**Why this works:** Compose Desktop runs on the JVM and uses BouncyCastle for cryptography - no native dependencies needed.
+
+#### Option 2: Native SwiftUI/AppKit Apps
+
+**Requires SDK as Git submodule:**
 
 ```bash
-# Install libsodium
+# Add SDK as submodule
+git submodule add https://github.com/Soneso/stellar-kmp-sdk.git stellar-sdk
+git submodule update --init --recursive
+
+# Install libsodium via Homebrew
 brew install libsodium
-
-# Verify installation
-brew list libsodium
-# /opt/homebrew/Cellar/libsodium/1.0.19/...
 ```
 
-### Production Setup
-
-For production apps, use Swift Package Manager:
-
-```swift
-// Package.swift
-dependencies: [
-    .package(url: "https://github.com/jedisct1/swift-sodium", from: "0.9.1")
-],
-targets: [
-    .target(
-        name: "YourMacApp",
-        dependencies: [
-            .product(name: "Clibsodium", package: "swift-sodium")
-        ]
-    )
-]
+**In settings.gradle.kts:**
+```kotlin
+include(":stellar-sdk")
+project(":stellar-sdk").projectDir = file("stellar-sdk/stellar-sdk")
 ```
 
-### Building the Framework
+**In your shared module build.gradle.kts:**
+```kotlin
+kotlin {
+    macosArm64().binaries.framework {
+        baseName = "shared"
+        isStatic = true
+        // Export SDK for Swift access
+        export(project(":stellar-sdk"))
+    }
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                // Use project dependency for native Swift interop
+                api(project(":stellar-sdk"))
+            }
+        }
+    }
+}
+```
+
+**Why project dependency is needed:** When Swift code directly uses SDK types (like `KeyPair`, `Transaction`), the framework must export the SDK. Maven artifacts cannot be exported due to Kotlin/Native cinterop limitations with libsodium.
+
+### Framework Building (Native Apps Only)
 
 ```bash
 # For Apple Silicon
@@ -1097,22 +1138,6 @@ actor TransactionProcessor {
 ```
 
 ## Troubleshooting
-
-### libsodium Not Found
-
-```bash
-# Check if libsodium is installed
-brew list libsodium
-
-# Reinstall if needed
-brew reinstall libsodium
-
-# For M1/M2/M3 Macs, ensure correct path
-export PKG_CONFIG_PATH="/opt/homebrew/opt/libsodium/lib/pkgconfig"
-
-# For Intel Macs
-export PKG_CONFIG_PATH="/usr/local/opt/libsodium/lib/pkgconfig"
-```
 
 ### Framework Architecture Issues
 

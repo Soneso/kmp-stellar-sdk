@@ -12,10 +12,10 @@ import kotlin.random.Random
  * ## Beginner-Friendly Usage (Recommended)
  *
  * ```kotlin
- * // Load spec from network - enables automatic type conversion and result parsing!
- * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+ * // Load spec from network - enables automatic type conversion and result parsing
+ * val client = ContractClient.forContract(contractId, rpcUrl, network)
  *
- * // Invoke with native types - automatic argument conversion
+ * // Invoke with native types - automatic argument conversion and execution
  * val balance = client.invoke(
  *     functionName = "balance",
  *     arguments = mapOf("account" to "GABC..."),
@@ -36,16 +36,26 @@ import kotlin.random.Random
  * val balance = client.funcResToNative("balance", resultXdr) as BigInteger
  * ```
  *
- * ## Power User Options
+ * ## Advanced Usage (Transaction Control)
  *
  * ```kotlin
- * // Manual type conversion
- * val args = client.funcArgsToXdrSCValues("transfer", mapOf(...))
- * val assembled = client.invokeWithXdr("transfer", args, source, keypair)
+ * // Build transaction for manual control before signing
+ * val tx = client.buildInvoke(
+ *     functionName = "transfer",
+ *     arguments = mapOf(
+ *         "from" to fromAccount,
+ *         "to" to toAccount,
+ *         "amount" to 1000
+ *     ),
+ *     source = account.accountId,
+ *     signer = keypair
+ * )
  *
- * // Full manual control
- * assembled.simulate()
- * val result = assembled.signAndSubmit(keypair)
+ * // Customize transaction
+ * tx.raw?.addMemo(Memo.text("Payment"))
+ *
+ * // Sign and submit
+ * tx.signAndSubmit(keypair)
  * ```
  *
  * ## Result Parsing
@@ -83,7 +93,9 @@ class ContractClient private constructor(
     val server: SorobanServer = SorobanServer(rpcUrl)
 
     /**
-     * Get the contract specification (if loaded).
+     * Get the contract specification.
+     *
+     * The spec is always present as it's loaded during client initialization.
      */
     fun getContractSpec(): ContractSpec? = contractSpec
 
@@ -132,21 +144,17 @@ class ContractClient private constructor(
      * val balance = client.funcResToNative("balance", resultXdr) as BigInteger
      * ```
      *
-     * ## API Modes
+     * ## API Comparison
      *
-     * **Beginner API (this method)**:
+     * **Simple API (this method)**:
      * - Automatic argument conversion: Map<String, Any?> → XDR
      * - Flexible result parsing: parseResultXdrFn or funcResToNative
      * - Auto-execution (reads return results, writes auto-submit)
-     * - Requires contract spec (use [fromNetwork])
      *
-     * **Power API ([invokeWithXdr])**:
-     * - Manual XDR construction: List<SCValXdr>
-     * - Manual result handling: Returns raw SCValXdr
+     * **Advanced API ([buildInvoke])**:
+     * - Automatic argument conversion: Map<String, Any?> → XDR
      * - Manual transaction control: Returns [AssembledTransaction]
-     * - Works with or without spec
-     *
-     * Requires contract spec (use [fromNetwork] or [deploy]).
+     * - Allows customization (memos, preconditions) before signing
      *
      * @param functionName The contract function to invoke
      * @param arguments Function arguments as Map<String, Any> (native Kotlin types)
@@ -174,14 +182,14 @@ class ContractClient private constructor(
         val spec = contractSpec
             ?: throw IllegalStateException(
                 "invoke() requires ContractSpec for automatic type conversion. " +
-                "Use ContractClient.fromNetwork() to load spec automatically."
+                "Use ContractClient.forContract() to load spec automatically."
             )
 
         // Validate method exists
-        val func = spec.getFunc(functionName)
+        spec.getFunc(functionName)
             ?: throw IllegalArgumentException(
                 "Method '$functionName' not found in contract spec. " +
-                "Available methods: ${spec.funcs().map { it.name.value }.joinToString(", ")}"
+                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
             )
 
         // Convert arguments using ContractSpec
@@ -226,13 +234,145 @@ class ContractClient private constructor(
     }
 
     /**
+     * Build a transaction for invoking a contract method with Map arguments.
+     *
+     * This method returns an [AssembledTransaction] that you can manipulate before
+     * signing and submitting. **Essential for multi-signature workflows** where multiple
+     * parties need to sign authorization entries before the transaction is submitted.
+     *
+     * For simple execution without transaction manipulation, use [invoke] instead.
+     *
+     * ## Primary Use Case: Multi-Signature Workflows
+     *
+     * When a contract requires authorization from multiple parties (e.g., atomic swaps,
+     * multi-party escrow, DAO proposals), use `buildInvoke()` to:
+     *
+     * 1. Build the transaction with automatic type conversion
+     * 2. Check who needs to sign with `needsNonInvokerSigningBy()`
+     * 3. Collect signatures from each party with `signAuthEntries()`
+     * 4. Submit once all signatures are collected
+     *
+     * ```kotlin
+     * // Alice wants to swap Token A for Bob's Token B
+     * val client = ContractClient.forContract(swapContractId, rpcUrl, network)
+     *
+     * val tx = client.buildInvoke(
+     *     functionName = "swap",
+     *     arguments = mapOf(
+     *         "a" to aliceAddress,
+     *         "b" to bobAddress,
+     *         "token_a" to tokenAContractId,
+     *         "token_b" to tokenBContractId,
+     *         "amount_a" to 1000,
+     *         "min_b_for_a" to 4500,
+     *         "amount_b" to 5000,
+     *         "min_a_for_b" to 950
+     *     ),
+     *     source = aliceKeypair.accountId,
+     *     signer = aliceKeypair
+     * )
+     *
+     * // Check who else needs to sign
+     * val otherSigners = tx.needsNonInvokerSigningBy()
+     * println("Bob needs to sign: ${otherSigners.contains(bobAddress)}")
+     *
+     * // Bob signs his authorization entries
+     * tx.signAuthEntries(bobKeypair)
+     *
+     * // Alice submits the transaction with all signatures
+     * val result = tx.signAndSubmit(aliceKeypair)
+     * ```
+     *
+     * ## Other Use Cases
+     *
+     * - **Adding memos**: Attach metadata like invoice numbers or payment references
+     * - **Custom time bounds**: Set specific transaction validity windows
+     * - **Simulation inspection**: Review resource costs and footprint before committing
+     * - **Custom preconditions**: Add ledger bounds or minimum sequence number
+     *
+     * ```kotlin
+     * // Example: Adding a memo
+     * val tx = client.buildInvoke("transfer", transferArgs, source, signer)
+     * tx.raw?.addMemo(Memo.text("Invoice #12345"))
+     * tx.signAndSubmit(signer)
+     *
+     * // Example: Inspecting simulation results
+     * val tx = client.buildInvoke("complexCall", args, source, signer)
+     * val simData = tx.getSimulationData()
+     * if (simData.transactionData.resourceFee < maxAcceptableFee) {
+     *     tx.signAndSubmit(signer)
+     * }
+     * ```
+     *
+     * @param functionName The contract function to invoke
+     * @param arguments Function arguments as Map<String, Any?> (native Kotlin types)
+     * @param source The source account (G... or M... address)
+     * @param signer KeyPair for signing (null for read-only calls)
+     * @param parseResultXdrFn Optional custom function to parse result XDR
+     * @param options Invocation options
+     * @return AssembledTransaction for manual control
+     * @throws IllegalStateException if contract spec not loaded
+     * @throws IllegalArgumentException if method not found or invalid arguments
+     */
+    suspend fun <T> buildInvoke(
+        functionName: String,
+        arguments: Map<String, Any?>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)? = null,
+        options: ClientOptions = ClientOptions(
+            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
+            contractId = contractId,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+    ): AssembledTransaction<T> {
+        val spec = contractSpec
+            ?: throw IllegalStateException(
+                "buildInvoke() requires ContractSpec for automatic type conversion. " +
+                "Use ContractClient.forContract() to load spec automatically."
+            )
+
+        // Validate method exists
+        spec.getFunc(functionName)
+            ?: throw IllegalArgumentException(
+                "Method '$functionName' not found in contract spec. " +
+                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
+            )
+
+        // Convert arguments using ContractSpec
+        val parameters = try {
+            spec.funcArgsToXdrSCValues(functionName, arguments)
+        } catch (e: Exception) {
+            throw IllegalArgumentException(
+                "Failed to convert arguments for '$functionName': ${e.message}",
+                e
+            )
+        }
+
+        // Build transaction (simulate if enabled in options)
+        val assembled = buildTransaction(
+            functionName = functionName,
+            parameters = parameters,
+            source = source,
+            signer = signer,
+            parseResultXdrFn = parseResultXdrFn,
+            options = options
+        )
+
+        if (options.simulate) {
+            assembled.simulate(restore = options.restore)
+        }
+
+        return assembled
+    }
+
+    /**
      * Convert function arguments from native Kotlin types to XDR.
      *
      * This is a **power-user helper** that exposes the type conversion logic.
      * Use this when you want control over conversion timing or need to inspect
      * the XDR before invoking.
-     *
-     * Requires contract spec (use [fromNetwork]).
      *
      * @param functionName The function name
      * @param arguments Map of argument names to native Kotlin values
@@ -241,7 +381,7 @@ class ContractClient private constructor(
      *
      * @sample
      * ```kotlin
-     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     * val client = ContractClient.forContract(contractId, rpcUrl, network)
      *
      * // Manual conversion for inspection/reuse
      * val args = client.funcArgsToXdrSCValues("transfer", mapOf(
@@ -261,7 +401,7 @@ class ContractClient private constructor(
         val spec = contractSpec
             ?: throw IllegalStateException(
                 "funcArgsToXdrSCValues requires ContractSpec. " +
-                "Use ContractClient.fromNetwork()."
+                "Use ContractClient.forContract()."
             )
 
         return spec.funcArgsToXdrSCValues(functionName, arguments)
@@ -280,7 +420,7 @@ class ContractClient private constructor(
         val spec = contractSpec
             ?: throw IllegalStateException(
                 "nativeToXdrSCVal requires ContractSpec. " +
-                "Use ContractClient.fromNetwork()."
+                "Use ContractClient.forContract()."
             )
 
         return spec.nativeToXdrSCVal(value, typeDef)
@@ -293,8 +433,6 @@ class ContractClient private constructor(
      * Use this when you want control over result parsing or need to parse
      * results obtained outside of the standard invoke flow.
      *
-     * Requires contract spec (use [fromNetwork]).
-     *
      * @param functionName The function name
      * @param scVal The result value as SCValXdr
      * @return The converted native Kotlin value, or null for void results
@@ -303,7 +441,7 @@ class ContractClient private constructor(
      *
      * @sample
      * ```kotlin
-     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     * val client = ContractClient.forContract(contractId, rpcUrl, network)
      *
      * // Parse contract result to native type
      * val resultXdr = SCValXdr.I128(Int128PartsXdr(Int64Xdr(0L), Uint64Xdr(1000000UL)))
@@ -315,7 +453,7 @@ class ContractClient private constructor(
         val spec = contractSpec
             ?: throw IllegalStateException(
                 "funcResToNative requires ContractSpec. " +
-                "Use ContractClient.fromNetwork()."
+                "Use ContractClient.forContract()."
             )
 
         return spec.funcResToNative(functionName, scVal)
@@ -327,8 +465,6 @@ class ContractClient private constructor(
      * This is a **convenience overload** that first decodes the base64 XDR string
      * before converting to native types.
      *
-     * Requires contract spec (use [fromNetwork]).
-     *
      * @param functionName The function name
      * @param base64Xdr The result value as base64-encoded XDR string
      * @return The converted native Kotlin value, or null for void results
@@ -337,7 +473,7 @@ class ContractClient private constructor(
      *
      * @sample
      * ```kotlin
-     * val client = ContractClient.fromNetwork(contractId, rpcUrl, network)
+     * val client = ContractClient.forContract(contractId, rpcUrl, network)
      *
      * // Parse base64-encoded result
      * val base64Result = "AAAAAwAAAAQ="  // Encoded SCVal
@@ -349,99 +485,10 @@ class ContractClient private constructor(
         val spec = contractSpec
             ?: throw IllegalStateException(
                 "funcResToNative requires ContractSpec. " +
-                "Use ContractClient.fromNetwork()."
+                "Use ContractClient.forContract()."
             )
 
         return spec.funcResToNative(functionName, base64Xdr)
-    }
-
-    /**
-     * Invoke a contract function with manual XDR construction (ADVANCED).
-     *
-     * This is the **advanced method** for when you need full control over
-     * XDR construction and transaction execution.
-     *
-     * Returns an [AssembledTransaction] that you control manually.
-     * Results are **NOT** automatically parsed - you get raw SCValXdr.
-     *
-     * Most developers should use [invoke] instead for automatic type conversion.
-     *
-     * ## Beginner API vs Power API
-     *
-     * **Beginner API ([invoke])**:
-     * - Arguments: Map<String, Any?> (automatic conversion)
-     * - Results: Flexible (parseResultXdrFn or funcResToNative)
-     * - Execution: Automatic (reads return, writes auto-submit)
-     *
-     * **Power API (this method)**:
-     * - Arguments: List<SCValXdr> (manual XDR)
-     * - Results: Raw SCValXdr (manual parsing)
-     * - Execution: Manual via AssembledTransaction
-     *
-     * @param functionName The contract function to invoke
-     * @param parameters Function parameters as XDR (List<SCValXdr>)
-     * @param source The source account
-     * @param signer KeyPair for signing (can be null)
-     * @param parseResultXdrFn Optional result parser
-     * @param options Invocation options
-     * @return AssembledTransaction for manual control
-     *
-     * @sample
-     * ```kotlin
-     * // Power API - Manual XDR construction
-     * val params = listOf(
-     *     Address(accountId).toSCVal(),
-     *     Scv.toInt128(BigInteger.fromInt(1000))
-     * )
-     * val assembled = client.invokeWithXdr("transfer", params, source, keypair)
-     *
-     * // Manual simulation and execution
-     * assembled.simulate()
-     * val resultXdr = assembled.signAndSubmit(keypair)
-     *
-     * // Manual result parsing
-     * val balance = client.funcResToNative("transfer", resultXdr) as BigInteger
-     * ```
-     */
-    suspend fun <T> invokeWithXdr(
-        functionName: String,
-        parameters: List<SCValXdr>,
-        source: String,
-        signer: KeyPair?,
-        parseResultXdrFn: ((SCValXdr) -> T)? = null,
-        options: ClientOptions = ClientOptions(
-            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
-            contractId = contractId,
-            network = network,
-            rpcUrl = rpcUrl
-        )
-    ): AssembledTransaction<T> {
-        // Validate method name if spec available
-        if (contractSpec != null) {
-            val func = contractSpec.getFunc(functionName)
-            if (func == null) {
-                val available = contractSpec.funcs().map { it.name.value }
-                throw IllegalArgumentException(
-                    "Method '$functionName' not found in contract spec. " +
-                    "Available methods: ${available.joinToString(", ")}"
-                )
-            }
-        }
-
-        val assembled = buildTransaction(
-            functionName = functionName,
-            parameters = parameters,
-            source = source,
-            signer = signer,
-            parseResultXdrFn = parseResultXdrFn,
-            options = options
-        )
-
-        if (options.simulate) {
-            assembled.simulate(restore = options.restore)
-        }
-
-        return assembled
     }
 
     /**
@@ -488,7 +535,7 @@ class ContractClient private constructor(
 
     companion object {
         /**
-         * Create a ContractClient with contract spec loaded from the network (RECOMMENDED).
+         * Create a ContractClient for a contract with spec loaded from the network (RECOMMENDED).
          *
          * This is the **primary way** to create a ContractClient. It loads the
          * contract specification from the network, enabling:
@@ -497,15 +544,15 @@ class ContractClient private constructor(
          * - Contract introspection
          * - Manual result parsing helpers (funcResToNative)
          *
-         * If the contract spec cannot be loaded, returns a client without spec
-         * (falls back to manual XDR mode).
+         * Throws an exception if the contract spec cannot be loaded.
          *
          * @param contractId The contract ID (C... address)
          * @param rpcUrl The RPC server URL
          * @param network The network (TESTNET/PUBLIC)
-         * @return ContractClient with contract spec if available
+         * @return ContractClient with contract spec
+         * @throws IllegalStateException if contract spec not found or cannot be loaded
          */
-        suspend fun fromNetwork(
+        suspend fun forContract(
             contractId: String,
             rpcUrl: String,
             network: Network
@@ -517,32 +564,22 @@ class ContractClient private constructor(
                 if (contractInfo?.specEntries?.isNotEmpty() == true) {
                     ContractSpec(contractInfo.specEntries)
                 } else {
-                    null
+                    // CHANGE: Throw exception instead of returning null
+                    throw IllegalStateException(
+                        "Contract spec not found for contract $contractId. " +
+                        "Ensure the contract is deployed and has a valid spec."
+                    )
                 }
+            } catch (e: IllegalStateException) {
+                throw e
             } catch (e: Exception) {
-                null
+                throw IllegalStateException(
+                    "Failed to load contract spec for $contractId: ${e.message}",
+                    e
+                )
             }
 
             return ContractClient(contractId, rpcUrl, network, contractSpec)
-        }
-
-        /**
-         * Create a ContractClient without loading contract spec (ADVANCED).
-         *
-         * Use this for advanced scenarios where you want full manual control.
-         * Most developers should use [fromNetwork] instead.
-         *
-         * @param contractId The contract ID (C... address)
-         * @param rpcUrl The RPC server URL
-         * @param network The network (TESTNET/PUBLIC)
-         * @return ContractClient without contract spec
-         */
-        fun withoutSpec(
-            contractId: String,
-            rpcUrl: String,
-            network: Network
-        ): ContractClient {
-            return ContractClient(contractId, rpcUrl, network, null)
         }
 
         /**
@@ -591,7 +628,7 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String,
-            salt: ByteArray = Random.Default.nextBytes(32),
+            salt: ByteArray = Random.nextBytes(32),
             loadSpec: Boolean = true
         ): ContractClient {
             // Step 1: Upload WASM
@@ -706,7 +743,7 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String,
-            salt: ByteArray = Random.Default.nextBytes(32),
+            salt: ByteArray = Random.nextBytes(32),
             loadSpec: Boolean = true
         ): ContractClient {
             // Validate hex string format
@@ -733,7 +770,7 @@ class ContractClient private constructor(
 
             // Return client with or without spec
             return if (loadSpec) {
-                fromNetwork(contractId, rpcUrl, network)
+                forContract(contractId, rpcUrl, network)
             } else {
                 ContractClient(contractId, rpcUrl, network, null)
             }
@@ -846,7 +883,7 @@ class ContractClient private constructor(
 
             // Return client with or without spec
             return if (loadSpec) {
-                fromNetwork(contractId, rpcUrl, network)
+                forContract(contractId, rpcUrl, network)
             } else {
                 ContractClient(contractId, rpcUrl, network, null)
             }
@@ -879,7 +916,6 @@ class ContractClient private constructor(
             val executable = ContractExecutableXdr.WasmHash(wasmHashXdr)
 
             val operation: InvokeHostFunctionOperation
-            val transaction: Transaction
 
             if (constructorParams.isNotEmpty()) {
                 // Use CreateContractV2 for contracts with constructors
@@ -902,7 +938,7 @@ class ContractClient private constructor(
                 operation = InvokeHostFunctionOperation(hostFunction = createFunction)
             }
 
-            transaction = TransactionBuilder(
+            val transaction: Transaction = TransactionBuilder(
                 sourceAccount = account,
                 network = network
             )

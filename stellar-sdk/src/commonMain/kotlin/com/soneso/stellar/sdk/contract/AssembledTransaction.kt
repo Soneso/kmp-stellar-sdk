@@ -15,6 +15,9 @@ import kotlinx.coroutines.delay
 /**
  * Represents a prepared transaction ready for signing and submission.
  *
+ * AssembledTransaction is obtained from ContractClient methods ([ContractClient.invoke],
+ * [ContractClient.buildInvoke]) and should not be constructed directly.
+ *
  * AssembledTransaction manages the complete lifecycle:
  * 1. **Simulate** - Get resource estimates from the network
  * 2. **Sign** - Add transaction and/or authorization signatures
@@ -94,7 +97,7 @@ import kotlinx.coroutines.delay
  * @property parseResultXdrFn Optional function to parse result
  * @property transactionBuilder The transaction builder
  */
-class AssembledTransaction<T>(
+class AssembledTransaction<T> internal constructor(
     private val server: SorobanServer,
     private val submitTimeout: Int,
     private val transactionSigner: KeyPair?,
@@ -188,7 +191,7 @@ class AssembledTransaction<T>(
         if (restore && simulation!!.restorePreamble != null && !isReadCall()) {
             try {
                 restoreFootprint()
-            } catch (e: ContractException) {
+            } catch (_: ContractException) {
                 throw RestorationFailureException("Failed to restore contract data.", this)
             } catch (e: Exception) {
                 throw RestorationFailureException("Failed to restore contract data: ${e.message}", this)
@@ -600,8 +603,7 @@ class AssembledTransaction<T>(
         val response = submitInternal()
 
         // Parse result from transaction meta
-        val transactionMeta = TransactionMetaXdr.fromXdrBase64(response.resultMetaXdr!!)
-        val resultVal = when (transactionMeta) {
+        val resultVal = when (val transactionMeta = TransactionMetaXdr.fromXdrBase64(response.resultMetaXdr!!)) {
             is TransactionMetaXdr.V3 -> transactionMeta.value.sorobanMeta?.returnValue
             is TransactionMetaXdr.V4 -> transactionMeta.value.sorobanMeta?.returnValue
             else -> null

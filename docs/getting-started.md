@@ -18,7 +18,16 @@ This guide will help you get up and running with the Stellar KMP SDK on your pla
 
 ### Gradle Setup
 
-The SDK is currently in alpha development. For now, include it as a source dependency:
+Add the SDK as a Maven dependency (recommended for most projects):
+
+```kotlin
+// In your module's build.gradle.kts
+dependencies {
+    implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+}
+```
+
+**Alternative: For advanced native Swift interop** (only needed for native iOS/macOS apps where Swift directly uses SDK types):
 
 ```kotlin
 // settings.gradle.kts
@@ -26,17 +35,11 @@ includeBuild("/path/to/kmp-stellar-sdk")
 
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:0.1.0-SNAPSHOT")
+    implementation("com.soneso.stellar:stellar-sdk:0.2.0")
 }
 ```
 
-Once published to Maven Central (coming soon), you'll be able to use:
-
-```kotlin
-dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.0.0")
-}
-```
+See the [platform guides](platforms/) for when you need Git submodule setup vs Maven artifacts.
 
 ### Platform-Specific Requirements
 
@@ -55,6 +58,21 @@ android {
 ```
 
 #### iOS
+
+**Two options available:**
+
+**Option A: Compose Multiplatform iOS (Recommended - 95% of cases)**
+- Maven artifact works perfectly
+- UI in Kotlin (Compose)
+- Swift code only launches the app
+- Still requires libsodium via Swift Package Manager
+
+**Option B: Native SwiftUI/UIKit (Advanced)**
+- For apps where Swift directly accesses SDK types
+- Requires Git submodule + project dependencies
+- See [iOS Platform Guide](platforms/ios.md) for details
+
+**Swift Package Manager Setup (required for both options):**
 
 Add libsodium via Swift Package Manager in Xcode:
 
@@ -81,13 +99,28 @@ targets: [
 
 #### macOS
 
-For development and testing, install libsodium via Homebrew:
+**Two options available:**
 
-```bash
-brew install libsodium
+**Option 1: Desktop App (Compose) - Recommended**
+- No additional setup required
+- Uses BouncyCastle (JVM) for cryptography
+- Cross-platform (Windows/Linux/macOS)
+- Same Compose UI as Android/iOS/Web
+
+```kotlin
+dependencies {
+    implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+}
 ```
 
-For production apps, use Swift Package Manager as with iOS.
+**Option 2: Native SwiftUI App - Advanced**
+- Requires Homebrew libsodium:
+  ```bash
+  brew install libsodium
+  ```
+- Only needed when Swift code directly uses SDK types
+- Requires Git submodule + project dependencies
+- See [macOS Platform Guide](platforms/macos.md) for details
 
 #### JavaScript/Web
 
@@ -395,7 +428,7 @@ import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.contract.ContractClient
 
 // High-level contract interaction (recommended)
-val client = ContractClient.fromNetwork(
+val client = ContractClient.forContract(
     contractId = "CCXX...",
     rpcUrl = "https://soroban-testnet.stellar.org",
     network = Network.TESTNET

@@ -54,7 +54,7 @@ sealed class InvokeHelloWorldResult {
  *
  * ## How It Works
  *
- * 1. **Load Contract Spec**: ContractClient.fromNetwork() loads the contract specification
+ * 1. **Load Contract Spec**: ContractClient.forContract() loads the contract specification
  *    from the network, which enables automatic type conversion
  *
  * 2. **Invoke Function**: The invoke() method accepts a Map where:
@@ -150,7 +150,7 @@ sealed class InvokeHelloWorldResult {
  * @param secretKey The submitter's secret key for signing (S... format)
  * @return InvokeHelloWorldResult.Success with greeting if invocation succeeded, InvokeHelloWorldResult.Error if it failed
  *
- * @see ContractClient.fromNetwork
+ * @see ContractClient.forContract
  * @see ContractClient.invoke
  * @see ContractClient.funcResToNative
  * @see <a href="https://developers.stellar.org/docs/smart-contracts/guides/dapps/initialization">Contract Invocation Guide</a>
@@ -199,7 +199,7 @@ suspend fun invokeHelloWorldContract(
         // This loads the contract specification (WASM metadata) from the network,
         // which enables automatic type conversion in both invoke() and funcResToNative()
         val client = try {
-            ContractClient.fromNetwork(
+            ContractClient.forContract(
                 contractId = contractId,
                 rpcUrl = rpcUrl,
                 network = network

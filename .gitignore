@@ -107,6 +107,8 @@ test-results/
 *_COMPARISON.md
 *_PROGRESS.md
 *INVESTIGATION_REPORT.md
+*_PLAN.md
+stellar-sdk/native-libs/libsodium-macos/
 
 # Backup files
 *.bak

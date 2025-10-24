@@ -310,7 +310,7 @@ Soroban RPC client:
 Smart contract interaction:
 - `ContractClient` - High-level client with dual API patterns
   - Simple Map-based invoke for beginners (auto-converts native types)
-  - Advanced XDR-based invokeWithXdr for power users
+  - Advanced buildInvoke for manual transaction control (Map-based arguments, essential for multi-signature workflows)
   - One-step and two-step deployment capabilities
 - `AssembledTransaction` - Transaction lifecycle management
 - `ClientOptions` - Configuration for contract operations

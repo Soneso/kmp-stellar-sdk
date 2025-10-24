@@ -17,7 +17,6 @@ import com.soneso.stellar.sdk.Network
  * @property contractId The contract ID (C... address) to interact with
  * @property network The Stellar network (TESTNET, PUBLIC, etc.)
  * @property rpcUrl The RPC server URL (e.g., "https://soroban-testnet.stellar.org:443")
- * @property enableServerLogging Enable server logging for debugging (default: false)
  *
  * ## Invocation Behavior Options
  *
@@ -38,7 +37,6 @@ data class ClientOptions(
     val contractId: String,
     val network: Network,
     val rpcUrl: String,
-    val enableServerLogging: Boolean = false,
     val baseFee: Int = 100,
     val transactionTimeout: Long = 300,
     val submitTimeout: Int = 30,

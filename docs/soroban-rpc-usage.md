@@ -97,7 +97,7 @@ import kotlinx.coroutines.runBlocking
 
 suspend fun invokeContractHighLevel() {
     // Create client and load contract spec from network
-    val client = ContractClient.fromNetwork(
+    val client = ContractClient.forContract(
         contractId = "CDZJVZWCY4NFGHCCZMX6QW5AK3ET5L3UUAYBVNDYOXDLQXW7PHXGYOBJ",
         rpcUrl = "https://soroban-testnet.stellar.org",
         network = Network.TESTNET
@@ -211,21 +211,21 @@ suspend fun deployMultipleContracts() {
 }
 ```
 
-#### Advanced: Manual XDR Control
+#### Advanced: Manual Transaction Control for Multi-Signature Workflows
 
-For power users who need full control over XDR construction and result parsing:
+For advanced users who need manual control over the transaction lifecycle (primarily for multi-signature scenarios):
 
 ```kotlin
 suspend fun advancedContractInvocation() {
-    // Option 1: Use type conversion helpers
-    val client = ContractClient.fromNetwork(
+    val client = ContractClient.forContract(
         contractId = "CDZJ...",
         rpcUrl = "https://soroban-testnet.stellar.org",
         network = Network.TESTNET
     )
 
-    // Convert native types to XDR for inspection/debugging
-    val xdrArgs = client.funcArgsToXdrSCValues(
+    // Use buildInvoke() to get AssembledTransaction for manual control
+    // Note: buildInvoke() uses Map<String, Any?> arguments, NOT XDR types
+    val assembled = client.buildInvoke<Unit>(
         functionName = "transfer",
         arguments = mapOf(
             "from" to "GABC...",
@@ -233,125 +233,64 @@ suspend fun advancedContractInvocation() {
             "amount" to 1000
         )
     )
-    println("Converted XDR args: $xdrArgs")
 
-    // Use the converted XDR with advanced API
-    val assembled = client.invokeWithXdr(
-        functionName = "transfer",
-        parameters = xdrArgs,
-        source = "GABC...",
-        signer = KeyPair.fromSecretSeed("SECRET"),
-        parseResultXdrFn = null
-    )
+    // Manual control over transaction lifecycle
     assembled.simulate()
-    val result = assembled.signAndSubmit(KeyPair.fromSecretSeed("SECRET"))
 
-    // Option 2: Manual XDR without spec
-    val clientNoSpec = ContractClient.withoutSpec(
-        contractId = "CDZJ...",
-        rpcUrl = "https://soroban-testnet.stellar.org",
-        network = Network.TESTNET
-    )
+    // Check who needs to sign for multi-sig scenarios
+    val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
+    if (whoNeedsToSign.contains("GDEF...")) {
+        // Sign authorization entries with additional signers
+        assembled.signAuthEntries(KeyPair.fromSecretSeed("OTHER_SECRET"))
+    }
 
-    // Manually construct XDR parameters
-    val parameters = listOf(
-        Scv.toAddress("GABC..."),
-        Scv.toAddress("GDEF..."),
-        Scv.toInt128(1000L)
-    )
-
-    // Get AssembledTransaction for manual lifecycle control
-    val assembledManual = clientNoSpec.invokeWithXdr(
-        functionName = "transfer",
-        parameters = parameters,
-        source = "GABC...",
-        signer = KeyPair.fromSecretSeed("SECRET"),
-        parseResultXdrFn = null
-    )
-
-    // Manual control over simulation, signing, and submission
-    assembledManual.simulate()
-    val finalResult = assembledManual.signAndSubmit(KeyPair.fromSecretSeed("SECRET"))
-    println("Transaction result: $finalResult")
+    // Final signature and submission
+    val result = assembled.signAndSubmit(KeyPair.fromSecretSeed("INVOKER_SECRET"))
+    println("Transaction result: $result")
 }
 ```
 
-#### Result Parsing: Complete Round-Trip
+#### Result Parsing: Type Conversion Helpers
 
-The SDK provides complementary helpers for full XDR round-trip conversion:
+The SDK provides type conversion helpers for working with contract results:
 
 ```kotlin
-suspend fun demonstrateRoundTrip() {
-    val client = ContractClient.fromNetwork(
+suspend fun demonstrateResultParsing() {
+    val client = ContractClient.forContract(
         contractId = "CDZJ...",
         rpcUrl = "https://soroban-testnet.stellar.org",
         network = Network.TESTNET
     )
 
-    // Native → XDR (arguments)
-    val nativeArgs = mapOf(
-        "from" to "GABC...",
-        "to" to "GDEF...",
-        "amount" to 1000
-    )
-    val xdrArgs = client.funcArgsToXdrSCValues("transfer", nativeArgs)
-
-    // Invoke with XDR
-    val assembled = client.invokeWithXdr(
-        functionName = "balance",
-        parameters = listOf(Scv.toAddress("GABC...")),
-        source = "GABC...",
-        signer = null
-    )
-    assembled.simulate()
-
-    // XDR → Native (result parsing)
-    val resultXdr = assembled.simulation?.results?.firstOrNull()?.xdr
-    val balance = client.funcResToNative("balance", resultXdr ?: "") as BigInteger
-    println("Parsed balance: $balance stroops")
-}
-
-// Compare parsing approaches
-suspend fun compareParsing() {
-    val client = ContractClient.fromNetwork(contractId, rpcUrl, Network.TESTNET)
-
-    // Approach 1: Inline parsing with parseResultXdrFn
+    // Approach 1: Custom parsing with parseResultXdrFn (recommended)
     val balance1 = client.invoke<Long>(
         functionName = "balance",
         arguments = mapOf("account" to "GABC..."),
         source = "GABC...",
         signer = null,
         parseResultXdrFn = { xdr ->
-            (xdr as SCValXdr.I128).value.lo.value.toLong()
+            Scv.fromInt128(xdr).toLong()
         }
     )
+    println("Balance: $balance1")
 
-    // Approach 2: Manual parsing with funcResToNative
-    val resultXdr = client.invoke<SCValXdr>(
+    // Approach 2: Type conversion helper (if you have raw XDR)
+    val assembled = client.buildInvoke<SCValXdr>(
         functionName = "balance",
-        arguments = mapOf("account" to "GABC..."),
-        source = "GABC...",
-        signer = null
+        arguments = mapOf("account" to "GABC...")
     )
-    val balance2 = client.funcResToNative("balance", resultXdr) as BigInteger
+    assembled.simulate()
 
-    // Approach 3: Base64 XDR string parsing
-    val base64Xdr = "AAAABgAAAAEAAAAA..." // From RPC response
-    val balance3 = client.funcResToNative("balance", base64Xdr) as BigInteger
+    val resultXdr = assembled.simulation?.results?.firstOrNull()?.xdr
+    val balance2 = client.funcResToNative("balance", resultXdr ?: "") as BigInteger
+    println("Parsed balance: $balance2 stroops")
 }
 ```
 
-**When to use `funcResToNative()`:**
-- ✅ You have a contract spec loaded (`client.spec` is not null)
-- ✅ You want type-safe automatic conversion based on contract metadata
-- ✅ You're doing manual transaction lifecycle management
-- ✅ You want to avoid writing custom parsing logic
-
-**When to use `parseResultXdrFn`:**
-- ✅ You don't have a contract spec
-- ✅ You need custom parsing logic beyond standard type conversion
-- ✅ You want explicit control over result interpretation
-- ✅ You're using `withoutSpec()` client mode
+**Result Parsing Best Practices:**
+- ✅ Use `parseResultXdrFn` for custom type conversion in simple cases
+- ✅ Use `funcResToNative()` when you have a contract spec and need automatic type conversion
+- ✅ Use `buildInvoke()` when you need to access raw simulation results before submission
 
 #### Low-Level API: InvokeHostFunctionOperation
 

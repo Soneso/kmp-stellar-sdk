@@ -2,9 +2,18 @@ headers = sodium.h
 headerFilter = sodium.h sodium/**
 package = libsodium
 
+# macOS - Use system libsodium via Homebrew (dynamic linking)
+# Users must install: brew install libsodium
 compilerOpts.osx = -I/opt/homebrew/include -I/usr/local/include
 linkerOpts.osx = -L/opt/homebrew/lib -L/usr/local/lib -lsodium
 
+compilerOpts.macosArm64 = -I/opt/homebrew/include -I/usr/local/include
+linkerOpts.macosArm64 = -L/opt/homebrew/lib -L/usr/local/lib -lsodium
+
+compilerOpts.macosX64 = -I/opt/homebrew/include -I/usr/local/include
+linkerOpts.macosX64 = -L/opt/homebrew/lib -L/usr/local/lib -lsodium
+
+# iOS - Use bundled static libsodium (no external dependencies)
 compilerOpts.ios = -I/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/include
 linkerOpts.ios = /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/lib/libsodium.a
 

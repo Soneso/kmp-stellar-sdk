@@ -221,7 +221,7 @@ The demo app showcases 10 comprehensive SDK features:
 - Same-invoker vs different-invoker scenario detection
 - Conditional authorization signing
 - Production-ready authorization patterns
-- **SDK Features**: `ContractClient.invokeWithXdr()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`, `funcResToNative()`
+- **SDK Features**: `ContractClient.buildInvoke()`, `needsNonInvokerSigningBy()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Code Examples
 

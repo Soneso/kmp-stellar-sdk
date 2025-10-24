@@ -21,7 +21,6 @@ Welcome to the comprehensive documentation for the Stellar SDK for Kotlin Multip
 ### Development
 - **[Demo Apps Guide](sample-apps.md)** - Learn from complete example applications
 - **[Soroban RPC Usage](soroban-rpc-usage.md)** - Using Soroban smart contracts
-- **[Migration Guide](migration.md)** - Migrating from Java Stellar SDK
 
 ### Advanced Topics
 - **[Advanced Topics](advanced.md)** - Hardware wallets, multi-sig, performance optimization

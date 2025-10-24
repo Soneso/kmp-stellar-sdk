@@ -31,6 +31,8 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
+            // Export stellar-sdk for iOS (demo app uses project dependency)
+            export(project(":stellar-sdk"))
         }
     }
 
@@ -41,7 +43,7 @@ kotlin {
         macosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
-            // Export stellar-sdk so it's accessible from Swift
+            // Export stellar-sdk for macOS (demo app uses project dependency)
             export(project(":stellar-sdk"))
         }
     }
@@ -77,7 +79,12 @@ kotlin {
                 // - FriendBot for testnet funding (HTTP client internally)
                 // - Transaction building and submission
                 // - All transitive dependencies (ktor, serialization, coroutines, etc.)
+
+                // Demo uses project dependency (allows export for native frameworks)
                 api(project(":stellar-sdk"))
+
+                // Users consuming from Maven should use:
+                // api("com.soneso.stellar:stellar-sdk:0.2.0")
 
                 // ============================================================
                 // Coroutines

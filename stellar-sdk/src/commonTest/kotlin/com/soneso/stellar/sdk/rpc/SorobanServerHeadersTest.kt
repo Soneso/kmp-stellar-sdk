@@ -5,6 +5,7 @@ import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
@@ -228,10 +229,8 @@ class SorobanServerHeadersTest {
                 connectTimeoutMillis = 10_000L
             }
             install(DefaultRequest) {
-                headers {
-                    append("X-Client-Name", EXPECTED_CLIENT_NAME)
-                    append("X-Client-Version", Util.getSdkVersion())
-                }
+                header("X-Client-Name", EXPECTED_CLIENT_NAME)
+                header("X-Client-Version", Util.getSdkVersion())
             }
         }
     }
@@ -408,8 +407,8 @@ class SorobanServerHeadersTest {
         val mockClient = createMockClientWithHeaderCapture(capturedHeaders, TRANSACTION_RESPONSE)
         val server = SorobanServer(TEST_SERVER_URL, mockClient)
 
-        // When: Calling getTransaction
-        server.getTransaction("abc123")
+        // When: Calling getTransaction (with valid 64-char hex hash)
+        server.getTransaction("a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7")
 
         // Then: Client headers are sent
         verifyClientHeaders(capturedHeaders.first(), "getTransaction")
@@ -634,10 +633,8 @@ class SorobanServerHeadersTest {
                 })
             }
             install(DefaultRequest) {
-                headers {
-                    append("X-Client-Name", "custom-soroban-client")
-                    append("X-Client-Version", "9.9.9")
-                }
+                header("X-Client-Name", "custom-soroban-client")
+                header("X-Client-Version", "9.9.9")
             }
         }
 
@@ -677,10 +674,8 @@ class SorobanServerHeadersTest {
                 })
             }
             install(DefaultRequest) {
-                headers {
-                    append("X-Client-Name", EXPECTED_CLIENT_NAME)
-                    append("X-Client-Version", Util.getSdkVersion())
-                }
+                header("X-Client-Name", EXPECTED_CLIENT_NAME)
+                header("X-Client-Version", Util.getSdkVersion())
             }
         }
 
@@ -716,10 +711,8 @@ class SorobanServerHeadersTest {
                 })
             }
             install(DefaultRequest) {
-                headers {
-                    append("X-Client-Name", EXPECTED_CLIENT_NAME)
-                    append("X-Client-Version", Util.getSdkVersion())
-                }
+                header("X-Client-Name", EXPECTED_CLIENT_NAME)
+                header("X-Client-Version", Util.getSdkVersion())
             }
         }
 

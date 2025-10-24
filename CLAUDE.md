@@ -258,10 +258,10 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 - **macOS** (`demo/macosApp`): Native SwiftUI implementation (not Compose)
   ```bash
-  brew install libsodium  # Required
   ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
   cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
   ```
+  Note: libsodium is now bundled statically, no Homebrew installation required!
 
 - **Desktop** (`demo/desktopApp`): JVM Compose (recommended for macOS)
   ```bash
@@ -469,10 +469,10 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 ### Soroban Smart Contracts
 
 #### High-Level API
-- ✅ ContractClient: Dual-mode contract interaction
-  - **Factory methods**: `fromNetwork()` loads spec, `withoutSpec()` for manual mode
+- ✅ ContractClient: Type-safe contract interaction with automatic spec loading
+  - **Factory method**: `forContract()` loads contract spec from network
   - **Beginner API**: `invoke()` with Map<String, Any?> arguments and auto-execution
-  - **Power API**: `invokeWithXdr()` with List<SCValXdr> for manual control
+  - **Advanced API**: `buildInvoke()` with Map<String, Any?> arguments for transaction control (essential for multi-signature workflows)
   - **Type conversion helpers**:
     - `funcArgsToXdrSCValues()` - Convert native types to XDR arguments
     - `funcResToNative()` - Convert XDR results to native types (inverse of nativeToXdrSCVal)

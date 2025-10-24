@@ -135,7 +135,7 @@ class SorobanClientIntegrationTest {
      * 2. Same-invoker scenario (no auth required)
      * 3. Manual result parsing with parseResultXdrFn
      * 4. Different-invoker scenario (auth required)
-     * 5. Manual auth entry signing with invokeWithXdr
+     * 5. Manual auth entry signing with buildInvoke
      *
      * The auth contract has an "increment" function that requires authorization
      * from a specific user account and takes a u32 value to increment.
@@ -223,23 +223,18 @@ class SorobanClientIntegrationTest {
         }
         assertTrue(thrown, "Should fail without proper authorization")
 
-        // Step 7: Use invokeWithXdr for manual auth handling (power API)
+        // Step 7: Use buildInvoke for manual auth handling (advanced API)
         delay(5000)
-        val args = client.funcArgsToXdrSCValues(
-            "increment",
-            mapOf(
+        val assembled = client.buildInvoke(
+            functionName = "increment",
+            arguments = mapOf(
                 "user" to invokerAccountId,
                 "value" to 4
-            )
-        )
-
-        val assembled = client.invokeWithXdr(
-            functionName = "increment",
-            parameters = args,
+            ),
             source = sourceAccountId,
             signer = sourceKeyPair,
             parseResultXdrFn = { xdr ->
-                // Custom parsing for power API
+                // Custom parsing for advanced API
                 (xdr as SCValXdr.U32).value.value
             }
         )
@@ -410,10 +405,10 @@ class SorobanClientIntegrationTest {
         // Step 7: Execute atomic swap
         delay(10000)
 
-        // Use invokeWithXdr for manual control over auth
-        val swapArgs = swapClient.funcArgsToXdrSCValues(
-            "swap",
-            mapOf(
+        // Use buildInvoke for manual control over auth
+        val swapTx = swapClient.buildInvoke<SCValXdr>(
+            functionName = "swap",
+            arguments = mapOf(
                 "a" to aliceId,
                 "b" to bobId,
                 "token_a" to tokenAClient.contractId,
@@ -422,12 +417,7 @@ class SorobanClientIntegrationTest {
                 "min_b_for_a" to 4500,
                 "amount_b" to 5000,
                 "min_a_for_b" to 950
-            )
-        )
-
-        val swapTx = swapClient.invokeWithXdr<SCValXdr>(
-            functionName = "swap",
-            parameters = swapArgs,
+            ),
             source = sourceAccountId,
             signer = sourceKeyPair,
             parseResultXdrFn = null  // Return raw XDR
@@ -503,17 +493,12 @@ class SorobanClientIntegrationTest {
 
         // Step 3: Build transaction with invoker as different user
         delay(5000)
-        val args = client.funcArgsToXdrSCValues(
-            "increment",
-            mapOf(
+        val assembled = client.buildInvoke(
+            functionName = "increment",
+            arguments = mapOf(
                 "user" to invokerAccountId,
                 "value" to 5
-            )
-        )
-
-        val assembled = client.invokeWithXdr(
-            functionName = "increment",
-            parameters = args,
+            ),
             source = sourceAccountId,
             signer = sourceKeyPair,
             parseResultXdrFn = { xdr ->
@@ -663,5 +648,206 @@ class SorobanClientIntegrationTest {
         println("✓ Token2 name (funcResToNative): $token2Name")
 
         println("✓ Two-step deployment successful - WASM reused for 2 contracts")
+    }
+
+    /**
+     * Test buildInvoke with memo.
+     *
+     * This test demonstrates:
+     * 1. Using buildInvoke() to get transaction control
+     * 2. Adding a memo before signing
+     * 3. Signing and submitting the customized transaction
+     */
+    @Test
+    fun testBuildInvokeWithMemo() = runTest(timeout = 180.seconds) {
+        // Step 1: Create and fund test account
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+        }
+        delay(5000)
+
+        // Step 2: Deploy hello contract
+        val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+        val client = ContractClient.deploy(
+            wasmBytes = helloContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        println("Deployed hello contract: ${client.contractId}")
+
+        // Step 3: Build transaction using buildInvoke
+        delay(5000)
+        val tx = client.buildInvoke<List<String>>(
+            functionName = "hello",
+            arguments = mapOf("to" to "World"),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            parseResultXdrFn = { result ->
+                when (result) {
+                    is SCValXdr.Vec -> {
+                        result.value?.value?.map { scVal ->
+                            when (scVal) {
+                                is SCValXdr.Sym -> scVal.value.value
+                                else -> ""
+                            }
+                        }?.joinToString("") ?: ""
+                    }
+                    else -> ""
+                }.let { listOf(it) }
+            }
+        )
+
+        // Step 4: Add memo before signing
+        tx.raw?.addMemo(MemoText("Test buildInvoke"))
+
+        // Step 5: Get result (read-only call doesn't need signing)
+        val result = tx.result()
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        println("✓ buildInvoke with memo completed")
+    }
+
+    /**
+     * Test buildInvoke simulation inspection.
+     *
+     * This test demonstrates:
+     * 1. Using buildInvoke() without signing
+     * 2. Inspecting simulation data
+     * 3. Getting result without submitting transaction
+     */
+    @Test
+    fun testBuildInvokeSimulationInspection() = runTest(timeout = 180.seconds) {
+        // Step 1: Create and fund test account
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+        }
+        delay(5000)
+
+        // Step 2: Deploy hello contract
+        val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+        val client = ContractClient.deploy(
+            wasmBytes = helloContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        println("Deployed hello contract: ${client.contractId}")
+
+        // Step 3: Build transaction for inspection
+        delay(5000)
+        val tx = client.buildInvoke<List<String>>(
+            functionName = "hello",
+            arguments = mapOf("to" to "World"),
+            source = sourceAccountId,
+            signer = null,
+            parseResultXdrFn = { result ->
+                when (result) {
+                    is SCValXdr.Vec -> {
+                        result.value?.value?.map { scVal ->
+                            when (scVal) {
+                                is SCValXdr.Sym -> scVal.value.value
+                                else -> ""
+                            }
+                        }?.joinToString("") ?: ""
+                    }
+                    else -> ""
+                }.let { listOf(it) }
+            }
+        )
+
+        // Step 4: Transaction should be simulated (default behavior)
+        assertNotNull(tx.getSimulationData())
+
+        // Step 5: Should be a read call (no auth entries)
+        assertTrue(tx.isReadCall())
+
+        // Step 6: Get result without submitting
+        val result = tx.result()
+        assertNotNull(result)
+        println("✓ Simulation inspection completed")
+    }
+
+    /**
+     * Test buildInvoke transaction control.
+     *
+     * This test demonstrates:
+     * 1. Full transaction control workflow
+     * 2. Accessing transaction data
+     * 3. Customizing transaction before submission
+     */
+    @Test
+    fun testBuildInvokeTransactionControl() = runTest(timeout = 180.seconds) {
+        // Step 1: Create and fund test account
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+        }
+        delay(5000)
+
+        // Step 2: Deploy hello contract
+        val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+        val client = ContractClient.deploy(
+            wasmBytes = helloContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        println("Deployed hello contract: ${client.contractId}")
+
+        // Step 3: Build transaction
+        delay(5000)
+        val tx = client.buildInvoke<List<String>>(
+            functionName = "hello",
+            arguments = mapOf("to" to "BuildInvoke"),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            parseResultXdrFn = { result ->
+                when (result) {
+                    is SCValXdr.Vec -> {
+                        result.value?.value?.map { scVal ->
+                            when (scVal) {
+                                is SCValXdr.Sym -> scVal.value.value
+                                else -> ""
+                            }
+                        }?.joinToString("") ?: ""
+                    }
+                    else -> ""
+                }.let { listOf(it) }
+            }
+        )
+
+        // Step 4: Verify we can access transaction data
+        assertNotNull(tx.raw)
+        assertNotNull(tx.getSimulationData())
+
+        // Step 5: Customize transaction
+        tx.raw?.addMemo(MemoText("Control test"))
+
+        // Step 6: Get result (read-only call doesn't need signing)
+        val result = tx.result()
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        println("✓ Transaction control completed")
     }
 }

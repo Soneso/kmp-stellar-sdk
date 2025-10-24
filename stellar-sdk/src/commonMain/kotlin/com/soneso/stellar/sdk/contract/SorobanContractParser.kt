@@ -96,7 +96,7 @@ object SorobanContractParser {
             }
 
             SCEnvMetaEntryXdr.decode(XdrReader(metaEnvEntryBytes))
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -164,7 +164,7 @@ object SorobanContractParser {
                         break
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Error decoding entry, stop parsing
                 break
             }
@@ -207,9 +207,7 @@ object SorobanContractParser {
         var currentMetaBytes: ByteArray? = metaBytes
         while (currentMetaBytes != null && currentMetaBytes.isNotEmpty()) {
             try {
-                val entry = SCMetaEntryXdr.decode(XdrReader(currentMetaBytes))
-
-                when (entry) {
+                when (val entry = SCMetaEntryXdr.decode(XdrReader(currentMetaBytes))) {
                     is SCMetaEntryXdr.V0 -> {
                         result[entry.value.key] = entry.value.`val`
 
@@ -230,7 +228,7 @@ object SorobanContractParser {
                         break
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Error decoding entry, stop parsing
                 break
             }

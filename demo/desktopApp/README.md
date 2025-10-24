@@ -226,7 +226,7 @@ All 10 features from the shared module work identically on desktop:
 - Dynamic authorization handling
 - Same-invoker vs different-invoker scenarios
 - Conditional signing with `needsNonInvokerSigningBy()`
-- Uses: `ContractClient.invokeWithXdr()`, `signAuthEntries()`, `funcResToNative()`
+- Uses: `ContractClient.buildInvoke()`, `signAuthEntries()`, `funcResToNative()`
 
 ## Technology Stack
 

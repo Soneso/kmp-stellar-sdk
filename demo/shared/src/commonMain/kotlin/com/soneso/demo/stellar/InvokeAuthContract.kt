@@ -47,12 +47,10 @@ sealed class InvokeAuthContractResult {
  *
  * This function demonstrates a **unified production-ready pattern** for Soroban contract authorization
  * that automatically handles both same-invoker and different-invoker scenarios. It showcases how to:
- * - Use `ContractClient.fromNetwork()` to load contract specification
- * - Use `invokeWithXdr()` to build an AssembledTransaction (power API)
+ * - Use `ContractClient.forContract()` to load contract specification
+ * - Use `buildInvoke()` to build an AssembledTransaction (power API)
  * - Use `needsNonInvokerSigningBy()` to dynamically detect authorization requirements
  * - Conditionally call `signAuthEntries()` only when needed (different-invoker scenario)
- * - Use `funcArgsToXdrSCValues()` to convert Map arguments to XDR
- * - Use `funcResToNative()` to parse results automatically
  * - Extract transaction hash from sendTransactionResponse
  *
  * ## Soroban Authorization Patterns
@@ -81,7 +79,7 @@ sealed class InvokeAuthContractResult {
  *
  * ## How needsNonInvokerSigningBy() Works
  *
- * After calling `invokeWithXdr()` to build the transaction, the SDK simulates it and
+ * After calling `buildInvoke()` to build the transaction, the SDK simulates it and
  * detects which Soroban authorization entries need to be signed. It returns a set of
  * account IDs that need to provide signatures:
  *
@@ -103,7 +101,7 @@ sealed class InvokeAuthContractResult {
  * This function demonstrates the **recommended production pattern** for handling both scenarios
  * with a single code path:
  *
- * 1. Build the transaction with `invokeWithXdr()`
+ * 1. Build the transaction with `buildInvoke()`
  * 2. Check `needsNonInvokerSigningBy()` to detect authorization requirements
  * 3. Conditionally call `signAuthEntries()` only if needed
  * 4. Submit with `signAndSubmit()`
@@ -150,10 +148,8 @@ sealed class InvokeAuthContractResult {
  * @param value The amount to increment the counter
  * @return InvokeAuthContractResult.Success with authorization details or InvokeAuthContractResult.Failure with error
  *
- * @see ContractClient.fromNetwork
- * @see ContractClient.invokeWithXdr
- * @see ContractClient.funcArgsToXdrSCValues
- * @see ContractClient.funcResToNative
+ * @see ContractClient.forContract
+ * @see ContractClient.buildInvoke
  * @see com.soneso.stellar.sdk.contract.AssembledTransaction.needsNonInvokerSigningBy
  * @see com.soneso.stellar.sdk.contract.AssembledTransaction.signAuthEntries
  * @see <a href="https://developers.stellar.org/docs/smart-contracts/guides/authorization">Soroban Authorization Guide</a>
@@ -192,9 +188,9 @@ suspend fun invokeAuthContract(
 
         // Step 3: Initialize ContractClient from the network
         // This loads the contract specification (WASM metadata) from the network,
-        // which enables automatic type conversion in funcArgsToXdrSCValues() and funcResToNative()
+        // which enables automatic type conversion in buildInvoke()
         val client = try {
-            ContractClient.fromNetwork(
+            ContractClient.forContract(
                 contractId = contractId,
                 rpcUrl = rpcUrl,
                 network = network
@@ -206,39 +202,25 @@ suspend fun invokeAuthContract(
             )
         }
 
-        // Step 4: Convert arguments to XDR using the contract specification
-        // The auth contract's increment function signature is:
-        // fn increment(user: Address, value: u32) -> u32
-        //
-        // We use funcArgsToXdrSCValues() to convert the Map arguments to XDR types:
-        // - "user" (String account ID) → SCValXdr.Address
-        // - "value" (Int) → SCValXdr.U32
-        val args = try {
-            client.funcArgsToXdrSCValues(
-                functionName = "increment",
-                arguments = mapOf(
-                    "user" to userAccountId,  // User account to increment
-                    "value" to value          // Increment amount
-                )
-            )
-        } catch (e: Exception) {
-            return InvokeAuthContractResult.Failure(
-                message = "Failed to convert arguments to XDR: ${e.message}",
-                exception = e
-            )
-        }
-
-        // Step 5: Build the AssembledTransaction using invokeWithXdr (power API)
+        // Step 4: Build the AssembledTransaction using buildInvoke (power API)
         // This gives us control over the transaction before submission and allows us to:
         // 1. Detect authorization requirements with needsNonInvokerSigningBy()
         // 2. Conditionally sign auth entries if needed
         // 3. Submit the transaction when ready
         //
+        // The buildInvoke() method:
+        // - Takes Map-based arguments (automatic type conversion from the contract spec)
+        // - Builds and simulates the transaction
+        // - Returns an AssembledTransaction for further control
+        //
         // We provide a parseResultXdrFn to extract the UInt counter value from the result
         val assembled = try {
-            client.invokeWithXdr(
+            client.buildInvoke(
                 functionName = "increment",
-                parameters = args,
+                arguments = mapOf(
+                    "user" to userAccountId,  // User account to increment
+                    "value" to value          // Increment amount
+                ),
                 source = sourceAccountId,  // Account submitting the transaction
                 signer = sourceKeyPair,    // Keypair for signing the transaction
                 parseResultXdrFn = { xdr ->
@@ -253,7 +235,7 @@ suspend fun invokeAuthContract(
             )
         }
 
-        // Step 6: Detect authorization requirements dynamically
+        // Step 5: Detect authorization requirements dynamically
         // needsNonInvokerSigningBy() analyzes the simulated transaction and returns
         // a set of account IDs that need to sign authorization entries.
         //
@@ -262,7 +244,7 @@ suspend fun invokeAuthContract(
         // - Non-empty set: Different-invoker (user != source) - manual authorization needed
         val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
 
-        // Step 7: Conditionally sign authorization entries if needed
+        // Step 6: Conditionally sign authorization entries if needed
         // This is the key pattern - we only call signAuthEntries() when required.
         // For same-invoker scenarios, the SDK handles auth automatically.
         if (whoNeedsToSign.isNotEmpty()) {
@@ -284,7 +266,7 @@ suspend fun invokeAuthContract(
             }
         }
 
-        // Step 8: Submit the transaction and get the result
+        // Step 7: Submit the transaction and get the result
         // signAndSubmit() will:
         // 1. Sign the transaction with the source keypair (if not already signed)
         // 2. Submit to the network
@@ -299,20 +281,20 @@ suspend fun invokeAuthContract(
             )
         }
 
-        // Step 9: Extract transaction hash from the sendTransactionResponse
+        // Step 8: Extract transaction hash from the sendTransactionResponse
         val transactionHash = assembled.sendTransactionResponse?.hash
             ?: return InvokeAuthContractResult.Failure(
                 message = "Transaction hash not available"
             )
 
-        // Step 10: Determine the scenario based on who needed to sign
+        // Step 9: Determine the scenario based on who needed to sign
         val scenario = if (whoNeedsToSign.isEmpty()) {
             "Same-Invoker (Automatic Authorization)"
         } else {
             "Different-Invoker (Manual Authorization)"
         }
 
-        // Step 11: Return success with all details
+        // Step 10: Return success with all details
         InvokeAuthContractResult.Success(
             counterValue = counterValue,
             scenario = scenario,
