@@ -1,7 +1,5 @@
 # Stellar SDK for Kotlin Multiplatform
 
-**Status: BETA - Not recommended for production use yet**
-
 A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
 **Version:** 0.2.0
@@ -364,7 +362,7 @@ For detailed testing information, see the [Testing Guide](docs/testing.md).
 
 ## Contributing
 
-This project is currently in beta. Contribution guidelines will be provided as the project matures.
+Contribution guidelines will be provided as the project matures.
 
 For development:
 1. Clone the repository
@@ -376,6 +374,9 @@ For development:
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
 ## Acknowledgments
 
 - Built with [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
@@ -383,7 +384,3 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 - Network communication via [Ktor](https://ktor.io/)
 - Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) and the [Flutter Stellar SDK](https://github.com/Soneso/stellar_flutter_sdk)
 - Built with [Claude Code](https://claude.com/claude-code) - AI-powered development assistant
-
----
-
-**Note**: This SDK is in beta. Not recommended for production use yet. See [CHANGELOG.md](CHANGELOG.md) for release notes.
