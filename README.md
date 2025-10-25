@@ -295,9 +295,7 @@ cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
 
 ### SDK Documentation
 - [Getting Started](docs/getting-started.md) - Installation, setup, and first steps
-- [Features Guide](docs/features.md) - Complete features list with code examples
-- [Platform Guide](docs/platforms.md) - Platform-specific setup and requirements
-- [Testing Guide](docs/testing.md) - Running and writing tests
+- [Platform Guide](docs/platforms/) - Platform-specific setup and requirements
 - [Architecture Guide](CLAUDE.md) - Technical implementation details
 
 ### Demo App
@@ -347,8 +345,6 @@ The SDK includes comprehensive test coverage across all platforms.
 ./gradlew :stellar-sdk:macosArm64Test
 ./gradlew :stellar-sdk:iosSimulatorArm64Test
 ```
-
-For detailed testing information, see the [Testing Guide](docs/testing.md).
 
 ## Requirements
 

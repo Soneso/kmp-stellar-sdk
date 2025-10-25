@@ -258,10 +258,10 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 - **macOS** (`demo/macosApp`): Native SwiftUI implementation (not Compose)
   ```bash
+  brew install libsodium
   ./gradlew :demo:shared:linkDebugFrameworkMacosArm64
   cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
   ```
-  Note: libsodium is now bundled statically, no Homebrew installation required!
 
 - **Desktop** (`demo/desktopApp`): JVM Compose (recommended for macOS)
   ```bash
