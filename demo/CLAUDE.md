@@ -17,7 +17,7 @@ The demo app's **primary purpose** is to showcase SDK functionality for develope
 - Native Swift interop in macOS app (requires `export(project(":stellar-sdk"))`)
 - Direct framework access for educational purposes
 
-**Most external developers should use Maven artifacts** (`implementation("com.soneso.stellar:stellar-sdk:0.2.0")`):
+**Most external developers should use Maven artifacts** (`implementation("com.soneso.stellar:stellar-sdk:0.2.1")`):
 - Works perfectly for Compose Multiplatform apps (Android, iOS, Desktop, Web)
 - Standard KMP apps where SDK calls happen in Kotlin
 - Simpler dependency management

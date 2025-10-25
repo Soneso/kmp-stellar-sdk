@@ -6,7 +6,7 @@ A comprehensive Kotlin Multiplatform demo application showcasing the Stellar SDK
 
 This demo app demonstrates real-world usage of the Stellar SDK, including key generation, account management, payments, trustlines, and smart contract interactions. The demo's primary purpose is to showcase SDK functionality for developers learning how to use the SDK. The app follows a modern KMP architecture with shared business logic and platform-specific UIs.
 
-**Note for External Developers**: This demo uses project dependencies (`api(project(":stellar-sdk"))`) to showcase advanced native Swift interop in the macOS app. Most developers should use Maven artifacts (`implementation("com.soneso.stellar:stellar-sdk:0.2.0")`) which work perfectly for Compose Multiplatform and standard KMP apps. See [docs/platforms/](../docs/platforms/) for platform-specific setup instructions.
+**Note for External Developers**: This demo uses project dependencies (`api(project(":stellar-sdk"))`) to showcase advanced native Swift interop in the macOS app. Most developers should use Maven artifacts (`implementation("com.soneso.stellar:stellar-sdk:0.2.1")`) which work perfectly for Compose Multiplatform and standard KMP apps. See [docs/platforms/](../docs/platforms/) for platform-specific setup instructions.
 
 ## Architecture
 

@@ -52,7 +52,7 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 // Maven artifact works perfectly for JVM/Compose Desktop
-                implementation("com.soneso.stellar:stellar-sdk:0.2.0")
+                implementation("com.soneso.stellar:stellar-sdk:0.2.1")
                 implementation(compose.desktop.currentOs)
             }
         }

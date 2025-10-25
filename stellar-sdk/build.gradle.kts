@@ -240,14 +240,14 @@ publishing {
         // Configure POM for all publications (KMP creates multiple publications automatically)
         pom {
             name.set("Stellar SDK for Kotlin Multiplatform")
-            description.set("Production-ready Stellar SDK for JVM, iOS, macOS, and JavaScript")
-            url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk")
+            description.set("Kotlin Multiplatform Stellar SDK")
+            url.set("https://github.com/Soneso/kmp-stellar-sdk")
 
             licenses {
                 license {
                     name.set("The Apache License, Version 2.0")
-                    url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk/blob/main/LICENSE")
-                    distribution.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk/blob/main/LICENSE")
+                    url.set("https://github.com/Soneso/kmp-stellar-sdk/blob/main/LICENSE")
+                    distribution.set("https://github.com/Soneso/kmp-stellar-sdk/blob/main/LICENSE")
                 }
             }
 
@@ -262,9 +262,9 @@ publishing {
             }
 
             scm {
-                url.set("https://github.com/Soneso/stellar-kotlin-multiplatform-sdk")
-                connection.set("scm:git:https://github.com/Soneso/stellar-kotlin-multiplatform-sdk.git")
-                developerConnection.set("scm:git:ssh://git@github.com/Soneso/stellar-kotlin-multiplatform-sdk.git")
+                url.set("https://github.com/Soneso/kmp-stellar-sdk")
+                connection.set("scm:git:https://github.com/Soneso/kmp-stellar-sdk.git")
+                developerConnection.set("scm:git:ssh://git@github.com/Soneso/kmp-stellar-sdk.git")
             }
         }
     }

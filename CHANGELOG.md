@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-10-25
+
+### Fixed
+- **Maven Publishing**: Repository URLs now correctly point to `https://github.com/Soneso/kmp-stellar-sdk` (previously pointed to incorrect repository `stellar-kotlin-multiplatform-sdk`)
+- **Maven Publishing**: Package description updated to "Kotlin Multiplatform Stellar SDK"
+- **Documentation**: Removed broken links to non-existent documentation files (docs/testing.md, docs/features.md, docs/platforms.md)
+- **Documentation**: Updated Platform Guide link to point to correct docs/platforms/ directory
+- **macOS Setup**: Corrected macOS demo app setup instructions to require `brew install libsodium`
+
+### Changed
+- **Documentation**: Removed beta status warnings from README to reflect production-ready status
+- **Documentation**: Added standard Apache License warranty notice
+
 ## [0.2.0] - 2025-10-24
 
 ### Breaking Changes - ContractClient API Simplification
