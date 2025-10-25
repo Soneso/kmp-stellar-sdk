@@ -298,3 +298,20 @@ signing {
         sign(publishing.publications)
     }
 }
+
+// Fix Gradle 9.0 task dependency validation
+// All signing tasks share the javadocJar, so they must run sequentially
+afterEvaluate {
+    val signTasks = tasks.matching { it.name.startsWith("sign") && it.name.endsWith("Publication") }
+    val publishTasks = tasks.matching {
+        it.name.startsWith("publish") &&
+        (it.name.endsWith("PublicationToOSSRHRepository") || it.name.endsWith("PublicationToSonatypeRepository"))
+    }
+
+    // Make all publish tasks depend on all sign tasks
+    publishTasks.configureEach {
+        signTasks.forEach { signTask ->
+            mustRunAfter(signTask)
+        }
+    }
+}
