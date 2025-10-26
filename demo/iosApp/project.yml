@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     iOS: 14.0
 settings:
+  base:
+    ARCHS: arm64
+    VALID_ARCHS: arm64
+    EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
   ENABLE_USER_SCRIPT_SANDBOXING: NO
 packages:
   swift-sodium:
@@ -15,6 +19,8 @@ targets:
     platform: iOS
     sources:
       - StellarDemo
+    resources:
+      - StellarDemo/Assets.xcassets
     info:
       path: StellarDemo/Info.plist
       properties:

@@ -7,118 +7,161 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
-// Material 3 color palette matching macOS SwiftUI app
-// These colors are extracted from demo/macosApp/StellarDemo/StellarDemoApp.swift
+// Celestial color system - Inspired by deep space, stellar phenomena, and cosmic beauty
+// This design embodies the "Stellar" brand while maintaining developer professionalism
 
-// Primary colors (blue-based)
-private val Primary = Color(red = 0.13f, green = 0.35f, blue = 0.78f)
-private val OnPrimary = Color.White
-private val PrimaryContainer = Color(red = 0.85f, green = 0.90f, blue = 1.0f)
-private val OnPrimaryContainer = Color(red = 0.0f, green = 0.11f, blue = 0.36f)
+// === LIGHT THEME COLORS ===
 
-// Secondary colors (blue-gray)
-private val Secondary = Color(red = 0.38f, green = 0.35f, blue = 0.45f)
-private val OnSecondary = Color.White
-private val SecondaryContainer = Color(red = 0.85f, green = 0.92f, blue = 0.96f)
-private val OnSecondaryContainer = Color(red = 0.05f, green = 0.20f, blue = 0.30f)
+// Primary Palette (Stellar Blues)
+private val StellarBlue = Color(0xFF0A4FD6)
+private val StellarBlueLight = Color(0xFF3D7EFF)
+private val StellarBlueDark = Color(0xFF0639A3)
+private val NebulaBlue = Color(0xFFE8F1FF)
+private val NebulaBlueAccent = Color(0xFFD0E2FF)
 
-// Tertiary colors (warm beige/tan for secret seeds)
-private val Tertiary = Color(red = 0.49f, green = 0.31f, blue = 0.37f)
-private val OnTertiary = Color.White
-private val TertiaryContainer = Color(red = 0.98f, green = 0.92f, blue = 0.85f)
-private val OnTertiaryContainer = Color(red = 0.35f, green = 0.18f, blue = 0.03f)
+// Secondary Palette (Cosmic Purples)
+private val CosmicPurple = Color(0xFF5E3FBE)
+private val CosmicPurpleLight = Color(0xFF8B6DD9)
+private val CosmicPurpleDark = Color(0xFF3D2373)
+private val StardustPurple = Color(0xFFF3EFFF)
+private val StardustPurpleAccent = Color(0xFFE3D9FF)
 
-// Error colors
-private val Error = Color(red = 0.73f, green = 0.21f, blue = 0.18f)
-private val OnError = Color.White
-private val ErrorContainer = Color(red = 1.0f, green = 0.85f, blue = 0.85f)
-private val OnErrorContainer = Color(red = 0.4f, green = 0.0f, blue = 0.0f)
+// Accent Palette (Starlight Golds)
+private val StarlightGold = Color(0xFFD97706)
+private val StarlightGoldLight = Color(0xFFFFAB40)
+private val StarlightGoldDark = Color(0xFFA85A00)
 
-// Surface colors
-private val Background = Color(red = 0.98f, green = 0.98f, blue = 0.98f)
-private val OnBackground = Color(red = 0.1f, green = 0.1f, blue = 0.1f)
-private val Surface = Color(red = 0.98f, green = 0.98f, blue = 0.98f)
-private val OnSurface = Color(red = 0.1f, green = 0.1f, blue = 0.1f)
-private val SurfaceVariant = Color(red = 0.9f, green = 0.89f, blue = 0.94f)
-private val OnSurfaceVariant = Color(red = 0.4f, green = 0.4f, blue = 0.4f)
-private val Outline = Color(red = 0.47f, green = 0.45f, blue = 0.5f)
+// Alert Palette
+private val NovaRed = Color(0xFFDC2626)
+private val NovaRedLight = Color(0xFFEF4444)
+private val NovaRedDark = Color(0xFF991B1B)
+private val NovaRedContainer = Color(0xFFFEF2F2)
+private val NovaRedContainerAccent = Color(0xFFFEE2E2)
+
+private val NebulaTeal = Color(0xFF0D9488)
+private val NebulaTealLight = Color(0xFF14B8A6)
+private val NebulaTealDark = Color(0xFF0F766E)
+private val NebulaTealContainer = Color(0xFFF0FDFA)
+
+// Neutrals (Deep Space Grays)
+private val VoidBlack = Color(0xFF0A0E1A)
+private val SpaceDark = Color(0xFF1A1F2E)
+private val SpaceMedium = Color(0xFF2D3548)
+private val SpaceLight = Color(0xFF4A5568)
+private val StarWhite = Color(0xFFFAFAFA)
+private val MoonGray = Color(0xFFE5E7EB)
+private val MeteorGray = Color(0xFF9CA3AF)
+private val AsteroidGray = Color(0xFF6B7280)
+private val SurfaceLight = Color(0xFFFFFFFF)
+private val SurfaceVariantLight = Color(0xFFF9FAFB)
+private val OutlineLight = Color(0xFFE5E7EB)
+
+// === DARK THEME COLORS ===
+
+private val StellarBlueDarkTheme = Color(0xFF5B9FFF)
+private val StellarBlueLightDarkTheme = Color(0xFF8ABAFF)
+private val StellarBlueDarkDarkTheme = Color(0xFF2563EB)
+private val NebulaBlueDark = Color(0xFF0F1729)
+private val NebulaBlueDarkAccent = Color(0xFF1E293B)
+
+private val CosmicPurpleDarkTheme = Color(0xFF9F7AEA)
+private val CosmicPurpleLightDarkTheme = Color(0xFFB794F6)
+private val CosmicPurpleDarkDarkTheme = Color(0xFF7C3AED)
+private val StardustPurpleDark = Color(0xFF1A1625)
+private val StardustPurpleDarkAccent = Color(0xFF271F3D)
+
+private val StarlightGoldDarkTheme = Color(0xFFFBBF24)
+private val NovaRedDarkTheme = Color(0xFFF87171)
+private val NovaRedContainerDark = Color(0xFF1F1315)
+private val NebulaTealDarkTheme = Color(0xFF2DD4BF)
+private val NebulaTealContainerDark = Color(0xFF0F1C1A)
+
+private val VoidBlackDark = Color(0xFF050711)
+private val SurfaceDark = Color(0xFF0F1419)
+private val SurfaceVariantDark = Color(0xFF1A1F2E)
+private val OutlineDark = Color(0xFF2D3548)
+private val StarWhiteDark = Color(0xFFFAFAFA)
+private val MoonGrayDark = Color(0xFFD1D5DB)
 
 // Success colors (custom extension colors for Material 3)
-// These are not part of the standard ColorScheme, so we define them separately
-val SuccessContainer = Color(red = 0.85f, green = 0.95f, blue = 0.87f)
-val OnSuccessContainer = Color(red = 0.0f, green = 0.3f, blue = 0.1f)
+val SuccessContainer = NebulaTealContainer
+val OnSuccessContainer = NebulaTealDark
 
 private val LightColors = lightColorScheme(
-    primary = Primary,
-    onPrimary = OnPrimary,
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
+    primary = StellarBlue,
+    onPrimary = Color.White,
+    primaryContainer = NebulaBlue,
+    onPrimaryContainer = StellarBlueDark,
 
-    secondary = Secondary,
-    onSecondary = OnSecondary,
-    secondaryContainer = SecondaryContainer,
-    onSecondaryContainer = OnSecondaryContainer,
+    secondary = CosmicPurple,
+    onSecondary = Color.White,
+    secondaryContainer = StardustPurple,
+    onSecondaryContainer = CosmicPurpleDark,
 
-    tertiary = Tertiary,
-    onTertiary = OnTertiary,
-    tertiaryContainer = TertiaryContainer,
-    onTertiaryContainer = OnTertiaryContainer,
+    tertiary = StarlightGold,
+    onTertiary = Color.White,
+    tertiaryContainer = StardustPurpleAccent,
+    onTertiaryContainer = StarlightGoldDark,
 
-    error = Error,
-    onError = OnError,
-    errorContainer = ErrorContainer,
-    onErrorContainer = OnErrorContainer,
+    error = NovaRed,
+    onError = Color.White,
+    errorContainer = NovaRedContainer,
+    onErrorContainer = NovaRedDark,
 
-    background = Background,
-    onBackground = OnBackground,
+    background = SurfaceVariantLight,
+    onBackground = VoidBlack,
 
-    surface = Surface,
-    onSurface = OnSurface,
-    surfaceVariant = SurfaceVariant,
-    onSurfaceVariant = OnSurfaceVariant,
+    surface = SurfaceLight,
+    onSurface = VoidBlack,
+    surfaceVariant = NebulaBlue,
+    onSurfaceVariant = SpaceMedium,
 
-    outline = Outline,
-
-    // Additional Material 3 colors derived from the palette
-    outlineVariant = Outline.copy(alpha = 0.5f),
+    outline = OutlineLight,
+    outlineVariant = OutlineLight.copy(alpha = 0.5f),
     scrim = Color.Black.copy(alpha = 0.32f),
-    inverseSurface = OnSurface,
-    inverseOnSurface = Surface,
-    inversePrimary = PrimaryContainer,
-    surfaceTint = Primary
+    inverseSurface = VoidBlack,
+    inverseOnSurface = StarWhite,
+    inversePrimary = StellarBlueLight,
+    surfaceTint = StellarBlue
 )
 
-// Dark mode colors (can be customized later if needed)
+// Dark mode colors
 private val DarkColors = darkColorScheme(
-    primary = Color(red = 0.52f, green = 0.63f, blue = 0.91f),
-    onPrimary = OnPrimaryContainer,
-    primaryContainer = Color(red = 0.0f, green = 0.21f, blue = 0.58f),
-    onPrimaryContainer = PrimaryContainer,
+    primary = StellarBlueDarkTheme,
+    onPrimary = VoidBlackDark,
+    primaryContainer = StellarBlueDarkDarkTheme,
+    onPrimaryContainer = StellarBlueLightDarkTheme,
 
-    secondary = Color(red = 0.62f, green = 0.75f, blue = 0.85f),
-    onSecondary = OnSecondaryContainer,
-    secondaryContainer = Color(red = 0.1f, green = 0.3f, blue = 0.45f),
-    onSecondaryContainer = SecondaryContainer,
+    secondary = CosmicPurpleDarkTheme,
+    onSecondary = VoidBlackDark,
+    secondaryContainer = CosmicPurpleDarkDarkTheme,
+    onSecondaryContainer = CosmicPurpleLightDarkTheme,
 
-    tertiary = Color(red = 0.92f, green = 0.77f, blue = 0.65f),
-    onTertiary = OnTertiaryContainer,
-    tertiaryContainer = Color(red = 0.45f, green = 0.25f, blue = 0.1f),
-    onTertiaryContainer = TertiaryContainer,
+    tertiary = StarlightGoldDarkTheme,
+    onTertiary = VoidBlackDark,
+    tertiaryContainer = StarlightGoldDark,
+    onTertiaryContainer = StarlightGoldLight,
 
-    error = Color(red = 0.93f, green = 0.47f, blue = 0.44f),
-    onError = OnErrorContainer,
-    errorContainer = Color(red = 0.6f, green = 0.0f, blue = 0.0f),
-    onErrorContainer = ErrorContainer,
+    error = NovaRedDarkTheme,
+    onError = VoidBlackDark,
+    errorContainer = NovaRedContainerDark,
+    onErrorContainer = NovaRedLight,
 
-    background = Color(red = 0.1f, green = 0.1f, blue = 0.1f),
-    onBackground = Color(red = 0.95f, green = 0.95f, blue = 0.95f),
+    background = VoidBlackDark,
+    onBackground = StarWhiteDark,
 
-    surface = Color(red = 0.15f, green = 0.15f, blue = 0.15f),
-    onSurface = Color(red = 0.95f, green = 0.95f, blue = 0.95f),
-    surfaceVariant = Color(red = 0.25f, green = 0.25f, blue = 0.25f),
-    onSurfaceVariant = Color(red = 0.7f, green = 0.7f, blue = 0.7f),
+    surface = SurfaceDark,
+    onSurface = StarWhiteDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = MoonGrayDark,
 
-    outline = Color(red = 0.6f, green = 0.58f, blue = 0.65f)
+    outline = OutlineDark,
+    outlineVariant = OutlineDark.copy(alpha = 0.5f),
+    scrim = Color.Black.copy(alpha = 0.5f),
+    inverseSurface = StarWhiteDark,
+    inverseOnSurface = VoidBlackDark,
+    inversePrimary = StellarBlueDark,
+    surfaceTint = StellarBlueDarkTheme
 )
 
 @Composable

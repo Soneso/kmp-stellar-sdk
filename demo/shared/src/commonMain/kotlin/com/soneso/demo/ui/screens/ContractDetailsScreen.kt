@@ -1,29 +1,45 @@
 package com.soneso.demo.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.demo.stellar.ContractDetailsResult
 import com.soneso.demo.stellar.fetchContractDetails
-import com.soneso.demo.ui.theme.LightExtendedColors
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCardMediumTitle
+import com.soneso.demo.ui.components.StellarTopBar
+import com.soneso.demo.util.StellarValidation
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.launch
@@ -43,19 +59,9 @@ class ContractDetailsScreen : Screen {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
-        // Validate contract ID
-        fun validateContractId(id: String): String? {
-            return when {
-                id.isBlank() -> "Contract ID is required"
-                !id.startsWith('C') -> "Contract ID must start with 'C'"
-                id.length != 56 -> "Contract ID must be 56 characters long"
-                else -> null
-            }
-        }
-
         // Function to fetch contract details
         fun fetchDetails() {
-            val error = validateContractId(contractId)
+            val error = StellarValidation.validateContractId(contractId)
             if (error != null) {
                 validationError = error
             } else {
@@ -73,144 +79,117 @@ class ContractDetailsScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Fetch Smart Contract Details") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Fetch Smart Contract Details",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        Text(
-                            text = "Soroban RPC: fetch and parse smart contract details",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "Enter a contract ID to fetch its WASM bytecode from the network and parse the contract specification including metadata and function definitions.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
-                // Demo Contract Card
-                Card(
+                // Information card - Purple
+                InfoCardMediumTitle(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Example Testnet Contract",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "The contract ID field is pre-filled with a testnet contract ID.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "You can use it as-is or replace it with your own contract ID.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // Contract ID Input Field
-                OutlinedTextField(
-                    value = contractId,
-                    onValueChange = {
-                        contractId = it.trim()
-                        validationError = null
-                        detailsResult = null
-                    },
-                    label = { Text("Contract ID") },
-                    placeholder = { Text("C...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationError != null,
-                    supportingText = validationError?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { fetchDetails() }
-                    )
+                    title = "Soroban RPC: Fetch and Parse Smart Contract Details",
+                    description = "Enter a contract ID to fetch its WASM bytecode from the network and parse the contract specification including metadata and function definitions. The field is pre-filled with a testnet contract ID."
                 )
 
+                // Contract ID Input Field - Gold
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFFBF0) // Starlight Gold background
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Contract Configuration",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 22.sp
+                            ),
+                            color = Color(0xFFA85A00) // Starlight Gold Dark
+                        )
+
+                        OutlinedTextField(
+                            value = contractId,
+                            onValueChange = {
+                                contractId = it.trim()
+                                validationError = null
+                                detailsResult = null
+                            },
+                            label = { Text("Contract ID") },
+                            placeholder = { Text("C...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationError != null,
+                            supportingText = validationError?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = Color(0xFF991B1B) // Nova Red
+                                    )
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706), // Starlight Gold
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { fetchDetails() }
+                            )
+                        )
+                    }
+                }
+
                 // Submit button
-                Button(
+                AnimatedButton(
                     onClick = { fetchDetails() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isLoading && contractId.isNotBlank()
+                    enabled = !isLoading && contractId.isNotBlank(),
+                    isLoading = isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A4FD6), // Stellar Blue
+                        contentColor = Color.White
+                    )
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetching...")
-                    } else {
+                    if (!isLoading) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetch Details")
                     }
+                    Text(
+                        if (isLoading) "Fetching..." else "Fetch Contract Details",
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 // Result display
@@ -223,23 +202,6 @@ class ContractDetailsScreen : Screen {
                             ErrorCard(result)
                         }
                     }
-                }
-
-                // Placeholder when no action taken
-                if (detailsResult == null && !isLoading && contractId.isBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.Code,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Enter a contract ID to view its parsed specification",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
@@ -310,28 +272,48 @@ private fun getSpecTypeInfo(specType: SCSpecTypeDefXdr): String {
 
 @Composable
 private fun ContractInfoCards(contractInfo: SorobanContractInfo) {
-    // Success header card
+    // Success header card - Teal
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = LightExtendedColors.successContainer
-        )
+            containerColor = Color(0xFFF0FDFA) // Nebula Teal Container
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Contract Found",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = LightExtendedColors.onSuccessContainer
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = Color(0xFF0F766E) // Nebula Teal Dark
             )
-            Text(
-                text = "Successfully fetched and parsed contract details",
-                style = MaterialTheme.typography.bodyMedium,
-                color = LightExtendedColors.onSuccessContainer
-            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Success",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF0F766E)
+                )
+                Text(
+                    text = "Contract details fetched and parsed successfully",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF0F766E).copy(alpha = 0.8f)
+                )
+            }
         }
     }
 
@@ -346,21 +328,32 @@ private fun ContractInfoCards(contractInfo: SorobanContractInfo) {
 private fun ContractMetadataCard(contractInfo: SorobanContractInfo) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Contract Metadata",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0639A3) // Stellar Blue Dark
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             // Environment Interface Version
             DetailRow(
@@ -370,14 +363,20 @@ private fun ContractMetadataCard(contractInfo: SorobanContractInfo) {
 
             // Meta entries
             if (contractInfo.metaEntries.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Meta Entries (${contractInfo.metaEntries.size})",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF0639A3).copy(alpha = 0.7f)
                 )
-                contractInfo.metaEntries.forEach { (key, value) ->
-                    DetailRow(label = key, value = value, monospace = true)
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        contractInfo.metaEntries.forEach { (key, value) ->
+                            DetailRow(label = key, value = value, monospace = true)
+                        }
+                    }
                 }
             } else {
                 DetailRow(
@@ -403,761 +402,629 @@ private fun ContractSpecEntriesCard(specEntries: List<SCSpecEntryXdr>) {
         }
     }
 
+    // Track which entries are expanded
+    var expandedEntries by remember { mutableStateOf(setOf<Int>()) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Contract Spec Entries (${specEntries.size})",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0639A3) // Stellar Blue Dark
             )
-            HorizontalDivider()
+            Text(
+                text = "Click on an entry to view details",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0639A3).copy(alpha = 0.7f)
+            )
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             if (sortedEntries.isEmpty()) {
                 Text(
                     text = "No spec entries found",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF0639A3).copy(alpha = 0.7f),
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             } else {
                 sortedEntries.forEachIndexed { index, entry ->
-                    if (index > 0) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    }
-                    SpecEntryItem(entry)
-                }
-            }
-        }
-    }
-}
+                    val isExpanded = expandedEntries.contains(index)
 
-@Composable
-private fun SpecEntryItem(entry: SCSpecEntryXdr) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        when (entry) {
-            is SCSpecEntryXdr.FunctionV0 -> {
-                FunctionSpecItem(entry.value)
-            }
-            is SCSpecEntryXdr.UdtStructV0 -> {
-                StructSpecItem(entry.value)
-            }
-            is SCSpecEntryXdr.UdtUnionV0 -> {
-                UnionSpecItem(entry.value)
-            }
-            is SCSpecEntryXdr.UdtEnumV0 -> {
-                EnumSpecItem(entry.value)
-            }
-            is SCSpecEntryXdr.UdtErrorEnumV0 -> {
-                ErrorEnumSpecItem(entry.value)
-            }
-            is SCSpecEntryXdr.EventV0 -> {
-                EventSpecItem(entry.value)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FunctionSpecItem(function: SCSpecFunctionV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "Function: ${function.name.value}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (function.doc.isNotEmpty()) {
-                Text(
-                    text = function.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-
-            if (expanded) {
-                // Input parameters
-                if (function.inputs.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Inputs (${function.inputs.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    function.inputs.forEachIndexed { index, input ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                expandedEntries = if (isExpanded) {
+                                    expandedEntries - index
+                                } else {
+                                    expandedEntries + index
+                                }
+                            },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
                         Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "[$index] ${input.name}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Type: ${getSpecTypeInfo(input.type)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
-                            if (input.doc.isNotEmpty()) {
-                                Text(
-                                    text = "Doc: ${input.doc}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            // Entry header (always visible)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = getEntryTitle(entry),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = getEntrySummary(entry),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Collapse" else "Expand"
                                 )
+                            }
+
+                            // Expandable entry details
+                            AnimatedVisibility(
+                                visible = isExpanded,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    HorizontalDivider()
+                                    SpecEntryDetails(entry)
+                                }
                             }
                         }
                     }
-                } else {
-                    Text(
-                        text = "Inputs: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+            }
+        }
+    }
+}
 
-                // Output types
-                if (function.outputs.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Outputs (${function.outputs.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    function.outputs.forEachIndexed { index, output ->
-                        Text(
-                            text = "[$index] ${getSpecTypeInfo(output)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(start = 12.dp)
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Outputs: None (void)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Summary when collapsed
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+/**
+ * Gets the title for a spec entry based on its type.
+ */
+private fun getEntryTitle(entry: SCSpecEntryXdr): String {
+    return when (entry) {
+        is SCSpecEntryXdr.FunctionV0 -> "Function: ${entry.value.name.value}"
+        is SCSpecEntryXdr.UdtStructV0 -> "Struct: ${entry.value.name}"
+        is SCSpecEntryXdr.UdtUnionV0 -> "Union: ${entry.value.name}"
+        is SCSpecEntryXdr.UdtEnumV0 -> "Enum: ${entry.value.name}"
+        is SCSpecEntryXdr.UdtErrorEnumV0 -> "Error Enum: ${entry.value.name}"
+        is SCSpecEntryXdr.EventV0 -> "Event: ${entry.value.name.value}"
+    }
+}
+
+/**
+ * Gets a summary for a spec entry when collapsed.
+ */
+private fun getEntrySummary(entry: SCSpecEntryXdr): String {
+    return when (entry) {
+        is SCSpecEntryXdr.FunctionV0 -> "Inputs: ${entry.value.inputs.size}, Outputs: ${entry.value.outputs.size}"
+        is SCSpecEntryXdr.UdtStructV0 -> "Fields: ${entry.value.fields.size}"
+        is SCSpecEntryXdr.UdtUnionV0 -> "Cases: ${entry.value.cases.size}"
+        is SCSpecEntryXdr.UdtEnumV0 -> "Cases: ${entry.value.cases.size}"
+        is SCSpecEntryXdr.UdtErrorEnumV0 -> "Cases: ${entry.value.cases.size}"
+        is SCSpecEntryXdr.EventV0 -> "Prefix Topics: ${entry.value.prefixTopics.size}, Params: ${entry.value.params.size}"
+    }
+}
+
+/**
+ * Displays detailed information about a spec entry.
+ */
+@Composable
+private fun SpecEntryDetails(entry: SCSpecEntryXdr) {
+    when (entry) {
+        is SCSpecEntryXdr.FunctionV0 -> FunctionSpecDetails(entry.value)
+        is SCSpecEntryXdr.UdtStructV0 -> StructSpecDetails(entry.value)
+        is SCSpecEntryXdr.UdtUnionV0 -> UnionSpecDetails(entry.value)
+        is SCSpecEntryXdr.UdtEnumV0 -> EnumSpecDetails(entry.value)
+        is SCSpecEntryXdr.UdtErrorEnumV0 -> ErrorEnumSpecDetails(entry.value)
+        is SCSpecEntryXdr.EventV0 -> EventSpecDetails(entry.value)
+    }
+}
+
+@Composable
+private fun FunctionSpecDetails(function: SCSpecFunctionV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (function.doc.isNotEmpty()) {
+            Text(
+                text = function.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+
+        // Input parameters
+        if (function.inputs.isNotEmpty()) {
+            Text(
+                text = "Inputs (${function.inputs.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            function.inputs.forEachIndexed { index, input ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "Inputs: ${function.inputs.size}",
+                        text = "[$index] ${input.name}",
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Outputs: ${function.outputs.size}",
+                        text = "Type: ${getSpecTypeInfo(input.type)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
+                    if (input.doc.isNotEmpty()) {
+                        Text(
+                            text = "Doc: ${input.doc}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
-
+        } else {
             Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
+                text = "Inputs: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-}
 
-@Composable
-private fun StructSpecItem(struct: SCSpecUDTStructV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+        // Output types
+        if (function.outputs.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Struct: ${struct.name}",
-                style = MaterialTheme.typography.titleSmall,
+                text = "Outputs (${function.outputs.size}):",
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (struct.doc.isNotEmpty()) {
+            function.outputs.forEachIndexed { index, output ->
                 Text(
-                    text = struct.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            if (struct.lib.isNotEmpty()) {
-                Text(
-                    text = "Lib: ${struct.lib}",
+                    text = "[$index] ${getSpecTypeInfo(output)}",
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(start = 12.dp)
                 )
             }
-
-            if (expanded) {
-                // Fields
-                if (struct.fields.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Fields (${struct.fields.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    struct.fields.forEachIndexed { index, field ->
-                        Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "[$index] ${field.name}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Type: ${getSpecTypeInfo(field.type)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
-                            if (field.doc.isNotEmpty()) {
-                                Text(
-                                    text = "Doc: ${field.doc}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Fields: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Summary when collapsed
-                Text(
-                    text = "Fields: ${struct.fields.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
+        } else {
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
+                text = "Outputs: None (void)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
 @Composable
-private fun UnionSpecItem(union: SCSpecUDTUnionV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+private fun StructSpecDetails(struct: SCSpecUDTStructV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (struct.doc.isNotEmpty()) {
             Text(
-                text = "Union: ${union.name}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (union.doc.isNotEmpty()) {
-                Text(
-                    text = union.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            if (union.lib.isNotEmpty()) {
-                Text(
-                    text = "Lib: ${union.lib}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-            }
-
-            if (expanded) {
-                // Cases
-                if (union.cases.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Cases (${union.cases.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    union.cases.forEachIndexed { index, uCase ->
-                        Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            when (uCase) {
-                                is SCSpecUDTUnionCaseV0Xdr.VoidCase -> {
-                                    Text(
-                                        text = "[$index] ${uCase.value.name} (void)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    if (uCase.value.doc.isNotEmpty()) {
-                                        Text(
-                                            text = "Doc: ${uCase.value.doc}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                                is SCSpecUDTUnionCaseV0Xdr.TupleCase -> {
-                                    Text(
-                                        text = "[$index] ${uCase.value.name} (tuple)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    val types = uCase.value.type.joinToString(", ") { getSpecTypeInfo(it) }
-                                    Text(
-                                        text = "Types: [$types]",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    )
-                                    if (uCase.value.doc.isNotEmpty()) {
-                                        Text(
-                                            text = "Doc: ${uCase.value.doc}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Cases: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Summary when collapsed
-                Text(
-                    text = "Cases: ${union.cases.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
+                text = struct.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
         }
-    }
-}
-
-@Composable
-private fun EnumSpecItem(enum: SCSpecUDTEnumV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+        if (struct.lib.isNotEmpty()) {
             Text(
-                text = "Enum: ${enum.name}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (enum.doc.isNotEmpty()) {
-                Text(
-                    text = enum.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            if (enum.lib.isNotEmpty()) {
-                Text(
-                    text = "Lib: ${enum.lib}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-            }
-
-            if (expanded) {
-                // Cases
-                if (enum.cases.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Cases (${enum.cases.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    enum.cases.forEachIndexed { index, enumCase ->
-                        Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "[$index] ${enumCase.name}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Value: ${enumCase.value}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
-                            if (enumCase.doc.isNotEmpty()) {
-                                Text(
-                                    text = "Doc: ${enumCase.doc}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Cases: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Summary when collapsed
-                Text(
-                    text = "Cases: ${enum.cases.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ErrorEnumSpecItem(errorEnum: SCSpecUDTErrorEnumV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "Error Enum: ${errorEnum.name}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (errorEnum.doc.isNotEmpty()) {
-                Text(
-                    text = errorEnum.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            if (errorEnum.lib.isNotEmpty()) {
-                Text(
-                    text = "Lib: ${errorEnum.lib}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-            }
-
-            if (expanded) {
-                // Cases
-                if (errorEnum.cases.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Cases (${errorEnum.cases.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    errorEnum.cases.forEachIndexed { index, errorCase ->
-                        Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "[$index] ${errorCase.name}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Value: ${errorCase.value}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
-                            if (errorCase.doc.isNotEmpty()) {
-                                Text(
-                                    text = "Doc: ${errorCase.doc}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Cases: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Summary when collapsed
-                Text(
-                    text = "Cases: ${errorEnum.cases.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun EventSpecItem(event: SCSpecEventV0Xdr) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        ),
-        onClick = { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "Event: ${event.name.value}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (event.doc.isNotEmpty()) {
-                Text(
-                    text = event.doc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            Text(
-                text = "Lib: ${event.lib}",
+                text = "Lib: ${struct.lib}",
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
+        }
 
-            if (expanded) {
-                // Prefix Topics
-                if (event.prefixTopics.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+        // Fields
+        if (struct.fields.isNotEmpty()) {
+            Text(
+                text = "Fields (${struct.fields.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            struct.fields.forEachIndexed { index, field ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     Text(
-                        text = "Prefix Topics (${event.prefixTopics.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = "[$index] ${field.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    event.prefixTopics.forEachIndexed { index, topic ->
+                    Text(
+                        text = "Type: ${getSpecTypeInfo(field.type)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    if (field.doc.isNotEmpty()) {
                         Text(
-                            text = "[$index] $topic",
+                            text = "Doc: ${field.doc}",
                             style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(start = 12.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
-                } else {
-                    Text(
-                        text = "Prefix Topics: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+            }
+        } else {
+            Text(
+                text = "Fields: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
-                // Parameters
-                if (event.params.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Params (${event.params.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    event.params.forEachIndexed { index, param ->
-                        Column(
-                            modifier = Modifier.padding(start = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
+@Composable
+private fun UnionSpecDetails(union: SCSpecUDTUnionV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (union.doc.isNotEmpty()) {
+            Text(
+                text = union.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+        if (union.lib.isNotEmpty()) {
+            Text(
+                text = "Lib: ${union.lib}",
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+
+        // Cases
+        if (union.cases.isNotEmpty()) {
+            Text(
+                text = "Cases (${union.cases.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            union.cases.forEachIndexed { index, uCase ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    when (uCase) {
+                        is SCSpecUDTUnionCaseV0Xdr.VoidCase -> {
                             Text(
-                                text = "[$index] ${param.name}",
+                                text = "[$index] ${uCase.value.name} (void)",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (uCase.value.doc.isNotEmpty()) {
+                                Text(
+                                    text = "Doc: ${uCase.value.doc}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                        is SCSpecUDTUnionCaseV0Xdr.TupleCase -> {
                             Text(
-                                text = "Type: ${getSpecTypeInfo(param.type)}",
+                                text = "[$index] ${uCase.value.name} (tuple)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            val types = uCase.value.type.joinToString(", ") { getSpecTypeInfo(it) }
+                            Text(
+                                text = "Types: [$types]",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             )
-                            val location = when (param.location) {
-                                SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_DATA -> "data"
-                                SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST -> "topic list"
-                                else -> "unknown"
-                            }
-                            Text(
-                                text = "Location: $location",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
-                            if (param.doc.isNotEmpty()) {
+                            if (uCase.value.doc.isNotEmpty()) {
                                 Text(
-                                    text = "Doc: ${param.doc}",
+                                    text = "Doc: ${uCase.value.doc}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
                             }
                         }
                     }
-                } else {
-                    Text(
-                        text = "Params: None",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Data format
-                Spacer(modifier = Modifier.height(4.dp))
-                val dataFormat = when (event.dataFormat) {
-                    SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE -> "single value"
-                    SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_MAP -> "map"
-                    SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_VEC -> "vec"
-                    else -> "unknown"
-                }
-                Text(
-                    text = "Data Format: $dataFormat",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                // Summary when collapsed
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Prefix Topics: ${event.prefixTopics.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Params: ${event.params.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
-
+        } else {
             Text(
-                text = if (expanded) "Click to collapse" else "Click to expand",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp)
+                text = "Cases: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun EnumSpecDetails(enum: SCSpecUDTEnumV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (enum.doc.isNotEmpty()) {
+            Text(
+                text = enum.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+        if (enum.lib.isNotEmpty()) {
+            Text(
+                text = "Lib: ${enum.lib}",
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+
+        // Cases
+        if (enum.cases.isNotEmpty()) {
+            Text(
+                text = "Cases (${enum.cases.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            enum.cases.forEachIndexed { index, enumCase ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "[$index] ${enumCase.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Value: ${enumCase.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    if (enumCase.doc.isNotEmpty()) {
+                        Text(
+                            text = "Doc: ${enumCase.doc}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        } else {
+            Text(
+                text = "Cases: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorEnumSpecDetails(errorEnum: SCSpecUDTErrorEnumV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (errorEnum.doc.isNotEmpty()) {
+            Text(
+                text = errorEnum.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+        if (errorEnum.lib.isNotEmpty()) {
+            Text(
+                text = "Lib: ${errorEnum.lib}",
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+
+        // Cases
+        if (errorEnum.cases.isNotEmpty()) {
+            Text(
+                text = "Cases (${errorEnum.cases.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            errorEnum.cases.forEachIndexed { index, errorCase ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "[$index] ${errorCase.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Value: ${errorCase.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    if (errorCase.doc.isNotEmpty()) {
+                        Text(
+                            text = "Doc: ${errorCase.doc}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        } else {
+            Text(
+                text = "Cases: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun EventSpecDetails(event: SCSpecEventV0Xdr) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (event.doc.isNotEmpty()) {
+            Text(
+                text = event.doc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+        Text(
+            text = "Lib: ${event.lib}",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+        )
+
+        // Prefix Topics
+        if (event.prefixTopics.isNotEmpty()) {
+            Text(
+                text = "Prefix Topics (${event.prefixTopics.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            event.prefixTopics.forEachIndexed { index, topic ->
+                Text(
+                    text = "[$index] $topic",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(start = 12.dp)
+                )
+            }
+        } else {
+            Text(
+                text = "Prefix Topics: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Parameters
+        if (event.params.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Params (${event.params.size}):",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            event.params.forEachIndexed { index, param ->
+                Column(
+                    modifier = Modifier.padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "[$index] ${param.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Type: ${getSpecTypeInfo(param.type)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    val location = when (param.location) {
+                        SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_DATA -> "data"
+                        SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST -> "topic list"
+                        else -> "unknown"
+                    }
+                    Text(
+                        text = "Location: $location",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    if (param.doc.isNotEmpty()) {
+                        Text(
+                            text = "Doc: ${param.doc}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        } else {
+            Text(
+                text = "Params: None",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Data format
+        Spacer(modifier = Modifier.height(4.dp))
+        val dataFormat = when (event.dataFormat) {
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE -> "single value"
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_MAP -> "map"
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_VEC -> "vec"
+            else -> "unknown"
+        }
+        Text(
+            text = "Data Format: $dataFormat",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -1172,94 +1039,176 @@ private fun DetailRow(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.7f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 22.sp
+            ),
             fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = Color(0xFF0639A3)
         )
     }
 }
 
 @Composable
 private fun ErrorCard(error: ContractDetailsResult.Error) {
-    // Error card
+    // Error header card - Red
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+            containerColor = Color(0xFFFEF2F2) // Nova Red Container
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF991B1B).copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Error",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFF991B1B) // Nova Red Dark
+                )
+                Text(
+                    text = "Error",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF991B1B)
+                )
+            }
             Text(
                 text = error.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF991B1B).copy(alpha = 0.9f)
             )
+
+            // Technical details in nested white card
             error.exception?.let { exception ->
-                Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    SelectionContainer {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Technical Details",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = Color(0xFF991B1B).copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = exception.message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    lineHeight = 20.sp
+                                ),
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF991B1B)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Troubleshooting tips
+    // Troubleshooting tips - Purple
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
+            containerColor = Color(0xFFF3EFFF) // Stardust Purple
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF5E3FBE).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF3D2373) // Cosmic Purple Dark
             )
             Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "• Verify the contract ID is valid (starts with 'C' and is 56 characters)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF3D2373).copy(alpha = 0.8f)
                 )
                 Text(
                     text = "• Make sure the contract exists on testnet and has been deployed",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF3D2373).copy(alpha = 0.8f)
                 )
                 Text(
                     text = "• Check your internet connection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF3D2373).copy(alpha = 0.8f)
                 )
                 Text(
                     text = "• Try again in a moment if you're being rate-limited",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF3D2373).copy(alpha = 0.8f)
                 )
             }
+                }
         }
     }
 }

@@ -117,3 +117,6 @@ stellar-sdk/native-libs/libsodium-macos/
 tools/sdk-analysis/
 compatibility/horizon/data/
 compatibility/rpc/data/
+
+# Vite build cache (demo web app)
+demo/webApp/.vite/

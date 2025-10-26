@@ -5,25 +5,27 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -31,7 +33,10 @@ import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.FetchTransactionResult
 import com.soneso.demo.stellar.fetchTransactionFromHorizon
 import com.soneso.demo.stellar.fetchTransactionFromRpc
-import com.soneso.demo.ui.theme.LightExtendedColors
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCard
+import com.soneso.demo.ui.components.StellarTopBar
+import com.soneso.demo.ui.FormValidation
 import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.*
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionResponse
@@ -68,19 +73,10 @@ class FetchTransactionScreen : Screen {
             }
         }
 
-        // Validate transaction hash
-        fun validateTransactionHash(hash: String): String? {
-            return when {
-                hash.isBlank() -> "Transaction hash is required"
-                hash.length != 64 -> "Transaction hash must be 64 characters long"
-                !hash.matches(Regex("^[0-9a-fA-F]{64}$")) -> "Transaction hash must be a valid hexadecimal string"
-                else -> null
-            }
-        }
 
         // Function to fetch transaction
         fun fetchTransaction() {
-            val error = validateTransactionHash(transactionHash)
+            val error = FormValidation.validateTransactionHashField(transactionHash)
             if (error != null) {
                 validationError = error
             } else {
@@ -102,158 +98,162 @@ class FetchTransactionScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Fetch Transaction Details") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Fetch Transaction Details",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                // Information card (Purple - Stardust)
+                InfoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "Fetch Transaction Details",
+                    description = "Retrieve comprehensive transaction information from Horizon API (general transactions) or Soroban RPC (smart contract transactions).",
+                    useRoundedShape = true,
+                    useBorder = true,
+                    titleStyle = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    descriptionAlpha = 0.85f
+                )
+
+                // API Selection & Input Card (Gold - Starlight)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
+                        containerColor = Color(0xFFFFFBF0) // Starlight Gold
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Fetch transaction details from Horizon or Soroban RPC",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "Enter a transaction hash to retrieve comprehensive transaction information. " +
-                                    "Choose between Horizon API (for general transactions) or Soroban RPC (for smart contract transactions).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
-                // Compact API Selection
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .border(
+                                width = 1.dp,
+                                color = Color(0xFFD97706).copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (useHorizon) "Using Horizon API" else "Using Soroban RPC",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Switch between Horizon API and RPC API",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
-                        Switch(
-                            checked = useHorizon,
-                            onCheckedChange = {
-                                useHorizon = it
-                                fetchResult = null
-                            }
-                        )
-                    }
-                }
-
-                // Transaction Hash Input Field with hint
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "This is a demo transaction hash. You can replace it with your own transaction hash to fetch different transaction details.",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = transactionHash,
-                        onValueChange = {
-                            transactionHash = it.trim().lowercase()
-                            validationError = null
-                            fetchResult = null
-                        },
-                        label = { Text("Transaction Hash") },
-                        placeholder = { Text("64-character hex string") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        isError = validationError != null,
-                        supportingText = validationError?.let { error ->
-                            {
+                        // API Selection Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = error,
-                                    color = MaterialTheme.colorScheme.error
+                                    text = if (useHorizon) "Using Horizon API" else "Using Soroban RPC",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFA85A00) // Starlight Gold Dark
+                                )
+                                Text(
+                                    text = "Switch between Horizon and RPC",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFA85A00).copy(alpha = 0.7f),
+                                    lineHeight = 22.sp
                                 )
                             }
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = { fetchTransaction() }
+                            Switch(
+                                checked = useHorizon,
+                                onCheckedChange = {
+                                    useHorizon = it
+                                    fetchResult = null
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFFD97706),
+                                    checkedTrackColor = Color(0xFFD97706).copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(color = Color(0xFFD97706).copy(alpha = 0.2f))
+
+                        // Transaction Hash Input
+                        OutlinedTextField(
+                            value = transactionHash,
+                            onValueChange = {
+                                transactionHash = it.trim().lowercase()
+                                validationError = null
+                                fetchResult = null
+                            },
+                            label = {
+                                Text(
+                                    "Transaction Hash",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            placeholder = { Text("64-character hex string") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationError != null,
+                            supportingText = validationError?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = Color(0xFF991B1B),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { fetchTransaction() }
+                            )
                         )
-                    )
+                    }
                 }
 
                 // Submit button
-                Button(
+                AnimatedButton(
                     onClick = { fetchTransaction() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isLoading && transactionHash.isNotBlank()
+                    enabled = !isLoading && transactionHash.isNotBlank(),
+                    isLoading = isLoading
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetching...")
-                    } else {
+                    if (!isLoading) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = Color.White
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetch Transaction")
+                        Spacer(modifier = Modifier.width(12.dp))
                     }
+                    Text(
+                        text = if (isLoading) "Fetching..." else "Fetch Transaction",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
                 }
 
                 // Result display
@@ -270,23 +270,6 @@ class FetchTransactionScreen : Screen {
                         }
                     }
                 }
-
-                // Placeholder when no action taken
-                if (fetchResult == null && !isLoading && transactionHash.isBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.Receipt,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Enter a transaction hash to view its details",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
@@ -298,61 +281,102 @@ private fun HorizonTransactionCards(
     operations: List<OperationResponse>,
     onCopy: (String, String) -> Unit
 ) {
-    // Success header card
+    // Success header card (Teal or Red)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (transaction.successful) {
-                LightExtendedColors.successContainer
+                Color(0xFFF0FDFA) // Nebula Teal
             } else {
-                MaterialTheme.colorScheme.errorContainer
+                Color(0xFFFEF2F2) // Nova Red
             }
-        )
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = if (transaction.successful) {
+                        Color(0xFF0F766E).copy(alpha = 0.3f)
+                    } else {
+                        Color(0xFF991B1B).copy(alpha = 0.3f)
+                    },
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = if (transaction.successful) "Transaction Successful" else "Transaction Failed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (transaction.successful) {
-                    LightExtendedColors.onSuccessContainer
-                } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                }
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (transaction.successful) Icons.Default.CheckCircle else Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = if (transaction.successful) {
+                        Color(0xFF0F766E) // Nebula Teal Dark
+                    } else {
+                        Color(0xFF991B1B) // Nova Red Dark
+                    }
+                )
+                Text(
+                    text = if (transaction.successful) "Success" else "Failed",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (transaction.successful) {
+                        Color(0xFF0F766E)
+                    } else {
+                        Color(0xFF991B1B)
+                    },
+                    lineHeight = 22.sp
+                )
+            }
             Text(
                 text = "Fetched from Horizon API",
                 style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = if (transaction.successful) {
-                    LightExtendedColors.onSuccessContainer
+                    Color(0xFF0F766E).copy(alpha = 0.85f)
                 } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                }
+                    Color(0xFF991B1B).copy(alpha = 0.85f)
+                },
+                lineHeight = 22.sp
             )
         }
     }
 
-    // Basic Information Card
+    // Basic Information Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Basic Information",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3), // Stellar Blue Dark
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             CopyableDetailRow("Hash", transaction.hash, onCopy)
             DetailRow("ID", transaction.id)
@@ -363,24 +387,34 @@ private fun HorizonTransactionCards(
         }
     }
 
-    // Account and Fees Card
+    // Account and Fees Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Account and Fees",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             CopyableDetailRow("Source Account", transaction.sourceAccount, onCopy)
             transaction.accountMuxed?.let { muxed ->
@@ -401,24 +435,34 @@ private fun HorizonTransactionCards(
         OperationsCard(operations, onCopy)
     }
 
-    // Memo Card
+    // Memo Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Memo",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             DetailRow("Memo Type", transaction.memoType)
             transaction.memoValue?.let { memo ->
@@ -430,24 +474,34 @@ private fun HorizonTransactionCards(
         }
     }
 
-    // Signatures Card
+    // Signatures Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Signatures (${transaction.signatures.size})",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             if (transaction.signatures.isEmpty()) {
                 Text(
@@ -463,24 +517,34 @@ private fun HorizonTransactionCards(
         }
     }
 
-    // XDR Data Card
+    // XDR Data Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "XDR Data",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             transaction.envelopeXdr?.let { xdr ->
                 CopyableDetailRow("Envelope XDR", xdr, onCopy)
@@ -509,25 +573,37 @@ private fun OperationsCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Operations (${operations.size})",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3), // Stellar Blue Dark
+                lineHeight = 22.sp
             )
             Text(
                 text = "Click on an operation to view details",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0639A3).copy(alpha = 0.7f),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             operations.forEachIndexed { index, operation ->
                 val isExpanded = expandedOperations.contains(index)
@@ -981,66 +1057,107 @@ private fun RpcTransactionCards(
     transaction: GetTransactionResponse,
     onCopy: (String, String) -> Unit
 ) {
-    // Success header card
+    // Success header card (Teal or Red)
     val isSuccess = transaction.status == GetTransactionStatus.SUCCESS
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isSuccess) {
-                LightExtendedColors.successContainer
+                Color(0xFFF0FDFA) // Nebula Teal
             } else {
-                MaterialTheme.colorScheme.errorContainer
+                Color(0xFFFEF2F2) // Nova Red
             }
-        )
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = if (isSuccess) {
+                        Color(0xFF0F766E).copy(alpha = 0.3f)
+                    } else {
+                        Color(0xFF991B1B).copy(alpha = 0.3f)
+                    },
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = when (transaction.status) {
-                    GetTransactionStatus.SUCCESS -> "Transaction Successful"
-                    GetTransactionStatus.FAILED -> "Transaction Failed"
-                    GetTransactionStatus.NOT_FOUND -> "Transaction Not Found"
-                },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isSuccess) {
-                    LightExtendedColors.onSuccessContainer
-                } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                }
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = if (isSuccess) {
+                        Color(0xFF0F766E)
+                    } else {
+                        Color(0xFF991B1B)
+                    }
+                )
+                Text(
+                    text = when (transaction.status) {
+                        GetTransactionStatus.SUCCESS -> "Success"
+                        GetTransactionStatus.FAILED -> "Failed"
+                        GetTransactionStatus.NOT_FOUND -> "Not Found"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSuccess) {
+                        Color(0xFF0F766E)
+                    } else {
+                        Color(0xFF991B1B)
+                    },
+                    lineHeight = 22.sp
+                )
+            }
             Text(
                 text = "Fetched from Soroban RPC",
                 style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = if (isSuccess) {
-                    LightExtendedColors.onSuccessContainer
+                    Color(0xFF0F766E).copy(alpha = 0.85f)
                 } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                }
+                    Color(0xFF991B1B).copy(alpha = 0.85f)
+                },
+                lineHeight = 22.sp
             )
         }
     }
 
-    // Basic Information Card
+    // Transaction Information Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Transaction Information",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             DetailRow("Status", transaction.status.toString())
             transaction.txHash?.let { hash ->
@@ -1061,24 +1178,39 @@ private fun RpcTransactionCards(
         }
     }
 
-    // Ledger Window Card
+    // Events Card with expandable details (if present)
+    transaction.events?.let { events ->
+        EventsCard(events, transaction.ledger, onCopy)
+    }
+
+    // Ledger Window Card (Blue - Nebula)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color(0xFFE8F1FF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Ledger Window",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             transaction.latestLedger?.let { latest ->
                 DetailRow("Latest Ledger", latest.toString())
@@ -1095,25 +1227,35 @@ private fun RpcTransactionCards(
         }
     }
 
-    // XDR Data Card
+    // XDR Data Card (Blue - Nebula)
     if (transaction.envelopeXdr != null || transaction.resultXdr != null || transaction.resultMetaXdr != null) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+                containerColor = Color(0xFFE8F1FF)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "XDR Data",
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color(0xFF0639A3),
+                    lineHeight = 22.sp
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
                 transaction.envelopeXdr?.let { xdr ->
                     CopyableDetailRow("Envelope XDR", xdr, onCopy)
@@ -1126,11 +1268,6 @@ private fun RpcTransactionCards(
                 }
             }
         }
-    }
-
-    // Events Card with expandable details (if present)
-    transaction.events?.let { events ->
-        EventsCard(events, transaction.ledger, onCopy)
     }
 
     // Return Value Card (if present)
@@ -1317,25 +1454,37 @@ private fun EventsCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF0A4FD6).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Contract Events (${allEvents.size})",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF0639A3), // Stellar Blue Dark
+                lineHeight = 22.sp
             )
             Text(
                 text = "Click on an event to view details",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF0639A3).copy(alpha = 0.7f),
+                lineHeight = 22.sp
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             allEvents.forEachIndexed { index, eventItem ->
                 val isExpanded = expandedEvents.contains(index)
@@ -1818,86 +1967,150 @@ private fun DetailRow(
 
 @Composable
 private fun ErrorCard(error: FetchTransactionResult.Error) {
-    // Error card
+    // Error card (Red - Nova)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+            containerColor = Color(0xFFFEF2F2) // Nova Red
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF991B1B).copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Error",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFF991B1B)
+                )
+                Text(
+                    text = "Error",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF991B1B),
+                    lineHeight = 22.sp
+                )
+            }
             Text(
                 text = error.message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF991B1B).copy(alpha = 0.85f),
+                lineHeight = 22.sp
             )
             error.exception?.let { exception ->
-                Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Technical Details",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF991B1B)
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = exception.message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF991B1B).copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Troubleshooting tips
+    // Troubleshooting tips (Purple - Stardust)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
+            containerColor = Color(0xFFF3EFFF)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFF5E3FBE).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = Color(0xFF3D2373),
+                lineHeight = 22.sp
             )
             Column(
                 modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "• Verify the transaction hash is correct (64 hex characters)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3D2373).copy(alpha = 0.85f),
+                    lineHeight = 22.sp
                 )
                 Text(
                     text = "• Make sure you're using the correct API (Horizon vs Soroban RPC)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3D2373).copy(alpha = 0.85f),
+                    lineHeight = 22.sp
                 )
                 Text(
                     text = "• Confirm the transaction exists on testnet",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3D2373).copy(alpha = 0.85f),
+                    lineHeight = 22.sp
                 )
                 Text(
                     text = "• Check if the transaction is outside the retention window (RPC only)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3D2373).copy(alpha = 0.85f),
+                    lineHeight = 22.sp
                 )
                 Text(
                     text = "• Ensure you have a stable internet connection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3D2373).copy(alpha = 0.85f),
+                    lineHeight = 22.sp
                 )
             }
+                }
         }
     }
 }

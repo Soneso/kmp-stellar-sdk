@@ -1,32 +1,44 @@
 package com.soneso.demo.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.TrustAssetResult
 import com.soneso.demo.stellar.trustAsset
-import com.soneso.demo.ui.theme.LightExtendedColors
+import com.soneso.demo.ui.FormValidation
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCard
+import com.soneso.demo.ui.components.StellarTopBar
 import com.soneso.stellar.sdk.ChangeTrustOperation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -53,38 +65,23 @@ class TrustAssetScreen : Screen {
         val snackbarHostState = remember { SnackbarHostState() }
 
         // Validation functions
+        // Validation functions
         fun validateInputs(): Map<String, String> {
             val errors = mutableMapOf<String, String>()
 
-            if (accountId.isBlank()) {
-                errors["accountId"] = "Account ID is required"
-            } else if (!accountId.startsWith('G')) {
-                errors["accountId"] = "Account ID must start with 'G'"
-            } else if (accountId.length != 56) {
-                errors["accountId"] = "Account ID must be 56 characters"
+            FormValidation.validateAccountIdField(accountId)?.let {
+                errors["accountId"] = it
             }
 
-            if (assetCode.isBlank()) {
-                errors["assetCode"] = "Asset code is required"
-            } else if (assetCode.length > 12) {
-                errors["assetCode"] = "Asset code cannot exceed 12 characters"
-            } else {
-                val invalidChars = assetCode.filter { char ->
-                    char !in 'A'..'Z' && char !in '0'..'9'
-                }
-                if (invalidChars.isNotEmpty()) {
-                    errors["assetCode"] = "Only uppercase letters and digits allowed"
-                }
+            FormValidation.validateAssetCodeField(assetCode)?.let {
+                errors["assetCode"] = it
             }
 
-            if (assetIssuer.isBlank()) {
-                errors["assetIssuer"] = "Asset issuer is required"
-            } else if (!assetIssuer.startsWith('G')) {
-                errors["assetIssuer"] = "Asset issuer must start with 'G'"
-            } else if (assetIssuer.length != 56) {
-                errors["assetIssuer"] = "Asset issuer must be 56 characters"
+            FormValidation.validateAccountIdField(assetIssuer)?.let {
+                errors["assetIssuer"] = it
             }
 
+            // Trust limit validation (domain-specific, not in FormValidation)
             if (trustLimit.isNotBlank()) {
                 try {
                     val limitValue = trustLimit.toDouble()
@@ -96,12 +93,8 @@ class TrustAssetScreen : Screen {
                 }
             }
 
-            if (secretSeed.isBlank()) {
-                errors["secretSeed"] = "Secret seed is required"
-            } else if (!secretSeed.startsWith('S')) {
-                errors["secretSeed"] = "Secret seed must start with 'S'"
-            } else if (secretSeed.length != 56) {
-                errors["secretSeed"] = "Secret seed must be 56 characters"
+            FormValidation.validateSecretSeedField(secretSeed)?.let {
+                errors["secretSeed"] = it
             }
 
             return errors
@@ -149,297 +142,257 @@ class TrustAssetScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Trust Asset") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Trust Asset",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                // Information card with celestial styling
+                InfoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "Establish Asset Trustline",
+                    description = "A trustline is required before an account can hold non-native assets. The pre-filled SRT asset is a testnet example from Stellar's testnet anchor. You can replace these values with any asset you want to trust."
+                )
+
+                // Input Fields Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFFD97706).copy(alpha = 0.3f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        containerColor = Color(0xFFFFFBF0) // Warm light gold background
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Establish a trustline to an asset",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            text = "Asset Configuration",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color(0xFFA85A00) // StarlightGoldDark
                         )
-                        Text(
-                            text = "A trustline is required before an account can hold non-native assets (assets other than XLM). " +
-                                    "The trustline includes a limit that defines the maximum amount of the asset the account is willing to hold.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+
+                        // Account ID Input
+                        OutlinedTextField(
+                            value = accountId,
+                            onValueChange = {
+                                accountId = it.trim()
+                                validationErrors = validationErrors - "accountId"
+                                trustResult = null
+                            },
+                            label = { Text("Account ID") },
+                            placeholder = { Text("G...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationErrors.containsKey("accountId"),
+                            supportingText = validationErrors["accountId"]?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Asset Code Input
+                        OutlinedTextField(
+                            value = assetCode,
+                            onValueChange = {
+                                // Auto-uppercase for asset codes
+                                assetCode = it.uppercase().trim()
+                                validationErrors = validationErrors - "assetCode"
+                                trustResult = null
+                            },
+                            label = { Text("Asset Code") },
+                            placeholder = { Text("USD, EUR, USDC, etc.") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationErrors.containsKey("assetCode"),
+                            supportingText = validationErrors["assetCode"]?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Asset Issuer Input
+                        OutlinedTextField(
+                            value = assetIssuer,
+                            onValueChange = {
+                                assetIssuer = it.trim()
+                                validationErrors = validationErrors - "assetIssuer"
+                                trustResult = null
+                            },
+                            label = { Text("Asset Issuer") },
+                            placeholder = { Text("G...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationErrors.containsKey("assetIssuer"),
+                            supportingText = validationErrors["assetIssuer"]?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Trust Limit Input (Optional)
+                        OutlinedTextField(
+                            value = trustLimit,
+                            onValueChange = {
+                                trustLimit = it.trim()
+                                validationErrors = validationErrors - "trustLimit"
+                                trustResult = null
+                            },
+                            label = { Text("Trust Limit (Optional)") },
+                            placeholder = { Text("Leave empty for maximum") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = validationErrors.containsKey("trustLimit"),
+                            supportingText = validationErrors["trustLimit"]?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Secret Seed Input
+                        OutlinedTextField(
+                            value = secretSeed,
+                            onValueChange = {
+                                secretSeed = it.trim()
+                                validationErrors = validationErrors - "secretSeed"
+                                trustResult = null
+                            },
+                            label = { Text("Secret Seed") },
+                            placeholder = { Text("S...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            isError = validationErrors.containsKey("secretSeed"),
+                            supportingText = validationErrors["secretSeed"]?.let { error ->
+                                {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { submitTrustAsset() }
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }
 
-                // Important Notes Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Important Notes",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "• Account must have at least 0.5 XLM for the trustline reserve",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = "• Asset codes must be 1-12 uppercase alphanumeric characters",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = "• Leave limit empty for maximum trust (recommended)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = "• Setting limit to '0' removes the trustline (requires zero asset balance)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // Example Asset Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Example Testnet Asset",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "The asset code and issuer fields are pre-filled with SRT, a testnet asset provided by Stellar as part of the testnet anchor.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "You can replace these values with your own asset if you want to trust a different asset.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // Account ID Input
-                OutlinedTextField(
-                    value = accountId,
-                    onValueChange = {
-                        accountId = it.trim()
-                        validationErrors = validationErrors - "accountId"
-                        trustResult = null
-                    },
-                    label = { Text("Account ID") },
-                    placeholder = { Text("G...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("accountId"),
-                    supportingText = validationErrors["accountId"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    )
-                )
-
-                // Asset Code Input
-                OutlinedTextField(
-                    value = assetCode,
-                    onValueChange = {
-                        // Auto-uppercase for asset codes
-                        assetCode = it.uppercase().trim()
-                        validationErrors = validationErrors - "assetCode"
-                        trustResult = null
-                    },
-                    label = { Text("Asset Code") },
-                    placeholder = { Text("USD, EUR, USDC, etc.") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("assetCode"),
-                    supportingText = validationErrors["assetCode"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    )
-                )
-
-                // Asset Issuer Input
-                OutlinedTextField(
-                    value = assetIssuer,
-                    onValueChange = {
-                        assetIssuer = it.trim()
-                        validationErrors = validationErrors - "assetIssuer"
-                        trustResult = null
-                    },
-                    label = { Text("Asset Issuer") },
-                    placeholder = { Text("G...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("assetIssuer"),
-                    supportingText = validationErrors["assetIssuer"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    )
-                )
-
-                // Trust Limit Input (Optional)
-                OutlinedTextField(
-                    value = trustLimit,
-                    onValueChange = {
-                        trustLimit = it.trim()
-                        validationErrors = validationErrors - "trustLimit"
-                        trustResult = null
-                    },
-                    label = { Text("Trust Limit (Optional)") },
-                    placeholder = { Text("Leave empty for maximum") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = validationErrors.containsKey("trustLimit"),
-                    supportingText = validationErrors["trustLimit"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    )
-                )
-
-                // Secret Seed Input
-                OutlinedTextField(
-                    value = secretSeed,
-                    onValueChange = {
-                        secretSeed = it.trim()
-                        validationErrors = validationErrors - "secretSeed"
-                        trustResult = null
-                    },
-                    label = { Text("Secret Seed") },
-                    placeholder = { Text("S...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    isError = validationErrors.containsKey("secretSeed"),
-                    supportingText = validationErrors["secretSeed"]?.let { error ->
-                        {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { submitTrustAsset() }
-                    )
-                )
-
-                // Submit button
-                Button(
+                // Submit button using AnimatedButton component
+                AnimatedButton(
                     onClick = { submitTrustAsset() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     enabled = !isLoading && accountId.isNotBlank() && assetCode.isNotBlank() &&
-                            assetIssuer.isNotBlank() && secretSeed.isNotBlank()
+                            assetIssuer.isNotBlank() && secretSeed.isNotBlank(),
+                    isLoading = isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A4FD6), // StellarBlue
+                        contentColor = Color.White
+                    )
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Creating Trustline...")
-                    } else {
+                    if (!isLoading) {
                         Icon(
-                            imageVector = Icons.Default.AttachMoney,
-                            contentDescription = null
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Establish Trustline")
+                        Spacer(modifier = Modifier.width(12.dp))
                     }
+                    Text(
+                        text = if (isLoading) "Creating Trustline..." else "Create Trustline",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
                 }
 
                 // Result display
@@ -453,25 +406,6 @@ class TrustAssetScreen : Screen {
                         }
                     }
                 }
-
-                // Placeholder when no action taken
-                if (trustResult == null && !isLoading &&
-                    (accountId.isBlank() || assetCode.isBlank() || assetIssuer.isBlank() || secretSeed.isBlank())
-                ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.AttachMoney,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Fill in the required fields to establish a trustline to an asset",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
@@ -479,107 +413,149 @@ class TrustAssetScreen : Screen {
 
 @Composable
 private fun TrustAssetSuccessCard(success: TrustAssetResult.Success, snackbarHostState: SnackbarHostState, scope: CoroutineScope) {
-    // Success header card
+    // Success header card with teal celestial styling
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF0D9488).copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = LightExtendedColors.successContainer
+            containerColor = Color(0xFFF0FDFA) // NebulaTealContainer
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = LightExtendedColors.onSuccessContainer,
-                    modifier = Modifier.size(24.dp)
+                    tint = Color(0xFF0F766E), // NebulaTealDark
+                    modifier = Modifier.size(28.dp)
                 )
                 Text(
-                    text = "Trustline Established",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = LightExtendedColors.onSuccessContainer
+                    text = "Success",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF0F766E) // NebulaTealDark
                 )
             }
-            Text(
-                text = success.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = LightExtendedColors.onSuccessContainer
-            )
-        }
-    }
-
-    // Transaction Hash Card
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+            SelectionContainer {
                 Text(
-                    text = "Transaction Hash",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = success.transactionHash,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            IconButton(onClick = {
-                scope.launch {
-                    val clipboard = getClipboard()
-                    val copied = clipboard.copyToClipboard(success.transactionHash)
-                    snackbarHostState.showSnackbar(
-                        if (copied) "Transaction hash copied to clipboard"
-                        else "Failed to copy to clipboard"
-                    )
-                }
-            }) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy transaction hash",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    text = if (success.limit == "0" || success.limit.toDoubleOrNull() == 0.0) {
+                        "Trustline successfully removed"
+                    } else {
+                        "Trustline established successfully"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color(0xFF0F766E).copy(alpha = 0.9f),
+                    lineHeight = 24.sp
                 )
             }
         }
     }
 
-    // Transaction Details Card
+    // Transaction Hash Card with blue styling
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF0A4FD6).copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = Color(0xFFE8F1FF) // NebulaBlue
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Transaction Hash",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF0639A3) // StellarBlueDark
+                )
+
+                val copyInteractionSource = remember { MutableInteractionSource() }
+                val isCopyHovered by copyInteractionSource.collectIsHoveredAsState()
+                val copyButtonScale by animateFloatAsState(
+                    targetValue = if (isCopyHovered) 1.1f else 1f,
+                    animationSpec = tween(durationMillis = 150),
+                    label = "copy_button_scale"
+                )
+
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            val clipboard = getClipboard()
+                            val copied = clipboard.copyToClipboard(success.transactionHash)
+                            snackbarHostState.showSnackbar(
+                                if (copied) "Transaction hash copied to clipboard"
+                                else "Failed to copy to clipboard"
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .scale(copyButtonScale)
+                        .hoverable(interactionSource = copyInteractionSource)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy transaction hash",
+                        tint = Color(0xFF0A4FD6), // StellarBlue
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            SelectionContainer {
+                Text(
+                    text = success.transactionHash,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF0639A3).copy(alpha = 0.9f),
+                    lineHeight = 22.sp
+                )
+            }
+        }
+    }
+
+    // Transaction Details Card with blue styling
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF0A4FD6).copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFE8F1FF) // NebulaBlue
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Transaction Details",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF0639A3) // StellarBlueDark
             )
-            HorizontalDivider()
+
+            HorizontalDivider(color = Color(0xFF0A4FD6).copy(alpha = 0.2f))
 
             TrustAssetDetailRow("Asset Code", success.assetCode)
             TrustAssetDetailRow("Asset Issuer", success.assetIssuer, monospace = true)
@@ -593,51 +569,6 @@ private fun TrustAssetSuccessCard(success: TrustAssetResult.Success, snackbarHos
             )
         }
     }
-
-    // Next Steps Card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "What's Next?",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "• You can now receive ${success.assetCode} from the asset issuer",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check your account balances to see the new trustline",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Use the 'Fetch Account Details' feature to view your trustlines",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• You can modify the trust limit or remove the trustline later",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -647,109 +578,147 @@ private fun TrustAssetDetailRow(
     monospace: Boolean = false
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.7f) // StellarBlueDark
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        SelectionContainer {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium
+                ),
+                fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
+                color = Color(0xFF0639A3).copy(alpha = 0.9f),
+                lineHeight = 22.sp
+            )
+        }
     }
 }
 
 @Composable
 private fun TrustAssetErrorCard(error: TrustAssetResult.Error) {
-    // Error card
+    // Error card with red celestial styling
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
+            containerColor = Color(0xFFFEF2F2) // NovaRedContainer
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Failed to Establish Trustline",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF991B1B) // NovaRedDark
             )
-            Text(
-                text = error.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            error.exception?.let { exception ->
+            SelectionContainer {
                 Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    text = error.message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color(0xFF991B1B).copy(alpha = 0.9f),
+                    lineHeight = 24.sp
                 )
+            }
+            error.exception?.let { exception ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Technical Details:",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color(0xFF991B1B)
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = exception.message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF991B1B).copy(alpha = 0.85f),
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Troubleshooting tips
+    // Troubleshooting tips card with purple styling
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            containerColor = Color(0xFFF3EFFF) // StardustPurple
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                text = "Troubleshooting Tips",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF3D2373) // CosmicPurpleDark
             )
             Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "• Verify all inputs are valid (account ID and issuer start with 'G', secret seed starts with 'S')",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Ensure the account has been funded (at least 0.5 XLM for reserve)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check that the secret seed matches the account ID",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Verify the asset issuer account exists on the network",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Ensure you have a stable internet connection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Asset codes must be uppercase letters and digits only",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+                TroubleshootingItem("Verify all inputs are valid (account ID and issuer start with 'G', secret seed starts with 'S')")
+                TroubleshootingItem("Ensure the account has been funded (at least 0.5 XLM for reserve)")
+                TroubleshootingItem("Check that the secret seed matches the account ID")
+                TroubleshootingItem("Verify the asset issuer account exists on the network")
+                TroubleshootingItem("Asset codes must be uppercase letters and digits only")
             }
+                }
         }
+    }
+}
+
+@Composable
+private fun TroubleshootingItem(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF3D2373), // CosmicPurpleDark
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF3D2373).copy(alpha = 0.85f),
+            lineHeight = 22.sp,
+            modifier = Modifier.weight(1f)
+        )
     }
 }

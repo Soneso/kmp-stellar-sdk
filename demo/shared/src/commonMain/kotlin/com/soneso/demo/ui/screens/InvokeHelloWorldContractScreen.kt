@@ -1,12 +1,14 @@
 package com.soneso.demo.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Error
@@ -14,18 +16,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.demo.stellar.InvokeHelloWorldResult
 import com.soneso.demo.stellar.invokeHelloWorldContract
-import com.soneso.demo.ui.theme.LightExtendedColors
+import com.soneso.demo.ui.FormValidation
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCardMediumTitle
+import com.soneso.demo.ui.components.StellarTopBar
 import kotlinx.coroutines.launch
 
 class InvokeHelloWorldContractScreen : Screen {
@@ -46,40 +52,24 @@ class InvokeHelloWorldContractScreen : Screen {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
-        // Validation function
+        // Validation function using FormValidation utility
         fun validateInputs(): Map<String, String> {
             val errors = mutableMapOf<String, String>()
 
-            // Validate contract ID
-            if (contractId.isBlank()) {
-                errors["contractId"] = "Contract ID is required"
-            } else if (!contractId.startsWith('C')) {
-                errors["contractId"] = "Contract ID must start with 'C'"
-            } else if (contractId.length != 56) {
-                errors["contractId"] = "Contract ID must be 56 characters"
+            FormValidation.validateContractIdField(contractId)?.let {
+                errors["contractId"] = it
             }
 
-            // Validate "to" parameter
             if (toParameter.isBlank()) {
                 errors["toParameter"] = "Name parameter is required"
             }
 
-            // Validate submitter account ID
-            if (submitterAccountId.isBlank()) {
-                errors["submitterAccount"] = "Submitter account ID is required"
-            } else if (!submitterAccountId.startsWith('G')) {
-                errors["submitterAccount"] = "Account ID must start with 'G'"
-            } else if (submitterAccountId.length != 56) {
-                errors["submitterAccount"] = "Account ID must be 56 characters"
+            FormValidation.validateAccountIdField(submitterAccountId)?.let {
+                errors["submitterAccount"] = it
             }
 
-            // Validate secret key
-            if (secretKey.isBlank()) {
-                errors["secretKey"] = "Secret key is required"
-            } else if (!secretKey.startsWith('S')) {
-                errors["secretKey"] = "Secret key must start with 'S'"
-            } else if (secretKey.length != 56) {
-                errors["secretKey"] = "Secret key must be 56 characters"
+            FormValidation.validateSecretSeedField(secretKey)?.let {
+                errors["secretKey"] = it
             }
 
             return errors
@@ -113,75 +103,63 @@ class InvokeHelloWorldContractScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Invoke Hello World Contract") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Invoke Hello World Contract",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        Text(
-                            text = "ContractClient.invoke(): Beginner-friendly contract invocation",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "This demo showcases the SDK's high-level contract invocation API with automatic type conversion. " +
-                                    "The invoke() method accepts Map-based arguments and handles XDR conversion, transaction building, " +
-                                    "signing, submission, and result parsing automatically.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
+                // Information card - Purple
+                InfoCardMediumTitle(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "Beginner-friendly Contract Invocation",
+                    description = "This demo showcases the SDK's high-level contract invocation API with automatic type conversion. " +
+                            "The invoke() method accepts Map-based arguments and handles XDR conversion, transaction building, " +
+                            "signing, submission, and result parsing automatically."
+                )
 
-                // Input fields card
+                // Input fields card - Gold (consolidated)
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = Color(0xFFD97706).copy(alpha = 0.3f),
+                            shape = MaterialTheme.shapes.medium
+                        ),
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = Color(0xFFFFFBF0) // Warm Gold
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Contract Details",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "Contract Configuration",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 22.sp
+                            ),
+                            color = Color(0xFFA85A00) // Starlight Gold Dark
                         )
 
                         OutlinedTextField(
@@ -200,15 +178,20 @@ class InvokeHelloWorldContractScreen : Screen {
                                 {
                                     Text(
                                         text = error,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = Color(0xFF991B1B)
                                     )
                                 }
                             } ?: {
                                 Text(
                                     text = "Deploy hello world contract first using 'Deploy a Smart Contract'",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = Color(0xFFA85A00).copy(alpha = 0.7f)
                                 )
                             },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
                             keyboardOptions = KeyboardOptions(
                                 imeAction = ImeAction.Next
                             )
@@ -230,38 +213,33 @@ class InvokeHelloWorldContractScreen : Screen {
                                 {
                                     Text(
                                         text = error,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = Color(0xFF991B1B)
                                     )
                                 }
                             } ?: {
                                 Text(
                                     text = "The name to greet in the hello function",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = Color(0xFFA85A00).copy(alpha = 0.7f)
                                 )
                             },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
                             keyboardOptions = KeyboardOptions(
                                 imeAction = ImeAction.Next
                             )
                         )
-                    }
-                }
 
-                // Submitter account card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                        HorizontalDivider(color = Color(0xFFD97706).copy(alpha = 0.2f))
+
                         Text(
                             text = "Submitter Account",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color(0xFFA85A00)
                         )
 
                         OutlinedTextField(
@@ -280,15 +258,20 @@ class InvokeHelloWorldContractScreen : Screen {
                                 {
                                     Text(
                                         text = error,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = Color(0xFF991B1B)
                                     )
                                 }
                             } ?: {
                                 Text(
                                     text = "Account that will sign and submit the transaction",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = Color(0xFFA85A00).copy(alpha = 0.7f)
                                 )
                             },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
                             keyboardOptions = KeyboardOptions(
                                 imeAction = ImeAction.Next
                             )
@@ -311,10 +294,15 @@ class InvokeHelloWorldContractScreen : Screen {
                                 {
                                     Text(
                                         text = error,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = Color(0xFF991B1B)
                                     )
                                 }
                             },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFD97706),
+                                focusedLabelColor = Color(0xFFD97706),
+                                cursorColor = Color(0xFFD97706)
+                            ),
                             keyboardOptions = KeyboardOptions(
                                 imeAction = ImeAction.Done
                             ),
@@ -325,33 +313,34 @@ class InvokeHelloWorldContractScreen : Screen {
                     }
                 }
 
-                // Invoke button
-                Button(
+                // Invoke button with AnimatedButton
+                AnimatedButton(
                     onClick = { invokeContract() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isInvoking &&
-                            contractId.isNotBlank() &&
+                    enabled = contractId.isNotBlank() &&
                             toParameter.isNotBlank() &&
                             submitterAccountId.isNotBlank() &&
-                            secretKey.isNotBlank()
+                            secretKey.isNotBlank(),
+                    isLoading = isInvoking,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A4FD6), // Stellar Blue
+                        contentColor = Color.White
+                    )
                 ) {
-                    if (isInvoking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Invoke Contract",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Invoking...")
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Invoke Contract")
-                    }
+                    )
                 }
 
                 // Result display
@@ -362,25 +351,21 @@ class InvokeHelloWorldContractScreen : Screen {
                         }
                         is InvokeHelloWorldResult.Error -> {
                             ErrorCard(result)
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Purple troubleshooting tips card - ONLY ON ERROR
+                            InfoCardMediumTitle(
+                                modifier = Modifier.fillMaxWidth(),
+                                title = "Troubleshooting",
+                                description = "• Ensure the contract ID is correct and the contract is deployed on testnet\n" +
+                                        "• Verify the submitter account has sufficient XLM balance for fees\n" +
+                                        "• Check that the secret key matches the submitter account ID\n" +
+                                        "• Make sure you deployed the Hello World contract first (not another contract)\n" +
+                                        "• Check your internet connection and Soroban RPC availability"
+                            )
                         }
                     }
-                }
-
-                // Placeholder when no action taken
-                if (invocationResult == null && !isInvoking && contractId.isBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Enter contract details to invoke the hello function",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
@@ -389,63 +374,87 @@ class InvokeHelloWorldContractScreen : Screen {
 
 @Composable
 private fun SuccessCard(result: InvokeHelloWorldResult.Success) {
+    // Teal success header
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = LightExtendedColors.successContainer
+            containerColor = Color(0xFFF0FDFA) // Nebula Teal Container
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = Color(0xFF0F766E), // Nebula Teal Dark
+                modifier = Modifier.size(28.dp)
+            )
+            Text(
+                text = "Success",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0F766E)
+            )
+        }
+    }
+
+    // Blue greeting response card
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFE8F1FF) // Nebula Blue
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = LightExtendedColors.onSuccessContainer
-                )
-                Text(
-                    text = "Contract Invocation Successful",
-                    style = MaterialTheme.typography.titleMedium,
+            Text(
+                text = "Greeting Response",
+                style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = LightExtendedColors.onSuccessContainer
-                )
-            }
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0639A3) // Stellar Blue Dark
+            )
 
-            HorizontalDivider()
-
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Greeting Response",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LightExtendedColors.onSuccessContainer.copy(alpha = 0.7f)
-                )
+            SelectionContainer {
                 Card(
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = LightExtendedColors.onSuccessContainer.copy(alpha = 0.1f)
+                        containerColor = Color.White
                     )
                 ) {
                     Text(
                         text = result.greeting,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Medium,
-                        color = LightExtendedColors.onSuccessContainer,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 28.sp
+                        ),
+                        color = Color(0xFF0639A3),
                         modifier = Modifier.padding(16.dp)
                     )
                 }
             }
 
+            HorizontalDivider(color = Color(0xFF0639A3).copy(alpha = 0.2f))
+
             Text(
                 text = "The contract function was successfully invoked using ContractClient.invoke() with automatic type conversion from Map arguments to Soroban XDR types.",
-                style = MaterialTheme.typography.bodySmall,
-                color = LightExtendedColors.onSuccessContainer
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF0639A3).copy(alpha = 0.8f)
             )
         }
     }
@@ -453,94 +462,81 @@ private fun SuccessCard(result: InvokeHelloWorldResult.Success) {
 
 @Composable
 private fun ErrorCard(error: InvokeHelloWorldResult.Error) {
+    // Red error header card
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
+            containerColor = Color(0xFFFEF2F2) // Nova Red Container
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer
+                    tint = Color(0xFF991B1B), // Nova Red Dark
+                    modifier = Modifier.size(28.dp)
                 )
                 Text(
-                    text = "Invocation Failed",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    text = "Error",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF991B1B)
                 )
             }
+
             Text(
                 text = error.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF991B1B).copy(alpha = 0.9f)
             )
-            error.exception?.let { exception ->
-                Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    }
 
-    // Troubleshooting tips
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "• Ensure the contract ID is correct and the contract is deployed on testnet",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Verify the submitter account has sufficient XLM balance for fees",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check that the secret key matches the submitter account ID",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Make sure you deployed the Hello World contract first (not another contract)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check your internet connection and Soroban RPC availability",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+            // Technical details in white nested card
+            error.exception?.let { exception ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    )
+                ) {
+                    SelectionContainer {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Technical Details",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = Color(0xFF991B1B).copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = exception.message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    lineHeight = 20.sp
+                                ),
+                                color = Color(0xFF991B1B).copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+}
 }

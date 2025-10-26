@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1f48"/>
+      <stop offset="50%" stop-color="#1d3e8a"/>
+      <stop offset="100%" stop-color="#2a58b5"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="108" height="108" fill="url(#bgGrad)"/>
+  <!-- Subtle starfield -->
+  <g opacity="0.35">
+    <circle cx="15" cy="18" r="0.5" fill="#ffffff"/>
+    <circle cx="35" cy="42" r="0.4" fill="#ffffff"/>
+    <circle cx="65" cy="26" r="0.6" fill="#ffffff"/>
+    <circle cx="85" cy="38" r="0.4" fill="#ffffff"/>
+    <circle cx="48" cy="78" r="0.5" fill="#ffffff"/>
+    <circle cx="75" cy="62" r="0.6" fill="#ffffff"/>
+    <circle cx="28" cy="72" r="0.4" fill="#ffffff"/>
+    <circle cx="88" cy="82" r="0.3" fill="#ffffff"/>
+  </g>
+</svg>

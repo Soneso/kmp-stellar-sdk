@@ -143,7 +143,7 @@ export default defineConfig(({ command }) => ({
   },
 
   server: {
-    port: 8081,
+    port: parseInt(process.env.VITE_PORT || '9002'),
     open: false,
     headers: {
       'Access-Control-Allow-Origin': '*'
@@ -151,7 +151,7 @@ export default defineConfig(({ command }) => ({
   },
 
   preview: {
-    port: 8082,
+    port: parseInt(process.env.VITE_PORT || '9002'),
     open: false
   },
 

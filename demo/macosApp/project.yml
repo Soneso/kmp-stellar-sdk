@@ -18,6 +18,8 @@ targets:
       properties:
         LSMinimumSystemVersion: "13.0"
         NSHumanReadableCopyright: Copyright © 2025 Stellar Development Foundation
+    resources:
+      - path: StellarDemo/Assets.xcassets
     settings:
       FRAMEWORK_SEARCH_PATHS:
         - $(inherited)

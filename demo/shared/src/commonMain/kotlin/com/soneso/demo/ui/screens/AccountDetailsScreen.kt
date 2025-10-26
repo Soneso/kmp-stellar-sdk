@@ -1,31 +1,56 @@
 package com.soneso.demo.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.demo.stellar.AccountDetailsResult
 import com.soneso.demo.stellar.fetchAccountDetails
+import com.soneso.demo.ui.FormValidation
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCard
+import com.soneso.demo.ui.components.StellarTopBar
 import com.soneso.demo.ui.theme.LightExtendedColors
 import com.soneso.stellar.sdk.horizon.responses.AccountResponse
 import kotlinx.coroutines.launch
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class AccountDetailsScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -42,19 +67,9 @@ class AccountDetailsScreen : Screen {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
-        // Validate account ID
-        fun validateAccountId(id: String): String? {
-            return when {
-                id.isBlank() -> "Account ID is required"
-                !id.startsWith('G') -> "Account ID must start with 'G'"
-                id.length != 56 -> "Account ID must be 56 characters long"
-                else -> null
-            }
-        }
-
         // Function to fetch account details
         fun fetchDetails() {
-            val error = validateAccountId(accountId)
+            val error = FormValidation.validateAccountIdField(accountId)
             if (error != null) {
                 validationError = error
             } else {
@@ -72,58 +87,36 @@ class AccountDetailsScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Fetch Account Details") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Account Details",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        Text(
-                            text = "Horizon API: fetch account details",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "Enter a Stellar account ID to retrieve comprehensive account information including balances, signers, thresholds, and more.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
+                // Information card with celestial styling
+                InfoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "Horizon API: Fetch Account Details",
+                    description = "Enter a Stellar account ID to retrieve comprehensive account information including balances, signers, thresholds, flags, and sponsorship details from the testnet."
+                )
 
-                // Account ID Input Field
+                // Account ID Input Field with modern styling
                 OutlinedTextField(
                     value = accountId,
                     onValueChange = {
@@ -140,7 +133,8 @@ class AccountDetailsScreen : Screen {
                         {
                             Text(
                                 text = error,
-                                color = MaterialTheme.colorScheme.error
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     },
@@ -149,32 +143,42 @@ class AccountDetailsScreen : Screen {
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = { fetchDetails() }
-                    )
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF0A4FD6),
+                        focusedLabelColor = Color(0xFF0A4FD6),
+                        cursorColor = Color(0xFF0A4FD6)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
-                // Submit button
-                Button(
+                // Submit button with AnimatedButton component
+                AnimatedButton(
                     onClick = { fetchDetails() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isLoading && accountId.isNotBlank()
+                    enabled = !isLoading && accountId.isNotBlank(),
+                    isLoading = isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A4FD6), // StellarBlue
+                        contentColor = Color.White
+                    )
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetching...")
-                    } else {
+                    if (!isLoading) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = null
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fetch Details")
+                        Spacer(modifier = Modifier.width(12.dp))
                     }
+                    Text(
+                        text = if (isLoading) "Fetching..." else "Fetch Details",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
                 }
 
                 // Result display
@@ -188,55 +192,52 @@ class AccountDetailsScreen : Screen {
                         }
                     }
                 }
-
-                // Placeholder when no action taken
-                if (detailsResult == null && !isLoading && accountId.isBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Enter an account ID to view its details on the testnet",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
 }
 
+/**
+ * Helper function to check if a decoded string is printable/valid UTF-8.
+ * Allows letters, digits, whitespace, and common punctuation.
+ */
+private fun isPrintableString(str: String): Boolean {
+    return str.all { char ->
+        char.isLetterOrDigit() ||
+        char.isWhitespace() ||
+        char in "!\"#\$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+    }
+}
+
+/**
+ * Decodes a base64-encoded data entry value and determines how to display it.
+ *
+ * Returns a Pair of:
+ * - First: The display value (decoded string or original base64)
+ * - Second: Description of the format ("decoded string" or "base64-encoded binary")
+ */
+@OptIn(ExperimentalEncodingApi::class)
+private fun decodeDataEntryValue(base64Value: String): Pair<String, String> {
+    return try {
+        // Decode the base64 value
+        val decodedBytes = Base64.decode(base64Value)
+        val decodedString = decodedBytes.decodeToString()
+
+        // Check if the decoded value is printable UTF-8
+        if (isPrintableString(decodedString)) {
+            Pair(decodedString, "decoded string")
+        } else {
+            // Binary data - show base64
+            Pair(base64Value, "base64-encoded binary")
+        }
+    } catch (e: Exception) {
+        // If decoding fails, show base64
+        Pair(base64Value, "base64-encoded (decode failed)")
+    }
+}
+
 @Composable
 private fun AccountDetailsCard(account: AccountResponse) {
-    // Success header card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = LightExtendedColors.successContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Account Found",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = LightExtendedColors.onSuccessContainer
-            )
-            Text(
-                text = "Successfully fetched details for account ${shortenAccountId(account.accountId)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = LightExtendedColors.onSuccessContainer
-            )
-        }
-    }
-
     // Basic Information
     DetailsSectionCard("Basic Information") {
         DetailRow("Account ID", account.accountId, monospace = true)
@@ -247,21 +248,34 @@ private fun AccountDetailsCard(account: AccountResponse) {
         DetailRow("Last Modified Time", account.lastModifiedTime)
     }
 
-    // Balances
+    // Balances - Individual collapsible entries with Native XLM first
+    // Sort balances: Native (XLM) first, then others
+    val sortedBalances = remember(account.balances) {
+        account.balances.sortedWith(
+            compareByDescending<AccountResponse.Balance> { it.assetType == "native" }
+                .thenBy { it.assetCode ?: "" }
+        )
+    }
+
     DetailsSectionCard("Balances (${account.balances.size})") {
-        account.balances.forEachIndexed { index, balance ->
+        sortedBalances.forEachIndexed { index, balance ->
             if (index > 0) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             }
-            BalanceItem(balance)
+            CollapsibleBalanceItem(balance)
         }
     }
 
     // Thresholds
     DetailsSectionCard("Thresholds") {
-        DetailRow("Low Threshold", account.thresholds.lowThreshold.toString())
-        DetailRow("Medium Threshold", account.thresholds.medThreshold.toString())
-        DetailRow("High Threshold", account.thresholds.highThreshold.toString())
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ThresholdItem("Low", account.thresholds.lowThreshold.toString())
+            ThresholdItem("Medium", account.thresholds.medThreshold.toString())
+            ThresholdItem("High", account.thresholds.highThreshold.toString())
+        }
     }
 
     // Flags
@@ -289,7 +303,7 @@ private fun AccountDetailsCard(account: AccountResponse) {
                 if (index > 0) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 }
-                DetailRow(entry.key, entry.value, monospace = true)
+                DataEntryItem(entry.key, entry.value)
             }
         }
     }
@@ -311,22 +325,112 @@ private fun DetailsSectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF0A4FD6).copy(alpha = 0.2f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = Color(0xFFE8F1FF) // NebulaBlue
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF0639A3) // StellarBlueDark
             )
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFF0639A3).copy(alpha = 0.2f))
             content()
+        }
+    }
+}
+
+@Composable
+private fun CollapsibleDetailsSectionCard(
+    title: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val headerInteractionSource = remember { MutableInteractionSource() }
+    val isHeaderHovered by headerInteractionSource.collectIsHoveredAsState()
+
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 300),
+        label = "chevron_rotation"
+    )
+
+    val headerElevation by animateDpAsState(
+        targetValue = if (isHeaderHovered) 3.dp else 2.dp,
+        animationSpec = tween(durationMillis = 150),
+        label = "header_elevation"
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF0A4FD6).copy(alpha = 0.2f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = headerElevation),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFE8F1FF) // NebulaBlue
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Clickable header with expand/collapse icon
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = headerInteractionSource,
+                        indication = null,
+                        onClick = onToggle
+                    )
+                    .hoverable(interactionSource = headerInteractionSource),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF0639A3) // StellarBlueDark
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = Color(0xFF0639A3).copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .rotate(chevronRotation)
+                )
+            }
+
+            // Animated content visibility
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 300)
+                ) + fadeOut(animationSpec = tween(durationMillis = 300))
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HorizontalDivider(color = Color(0xFF0639A3).copy(alpha = 0.2f))
+                    content()
+                }
+            }
         }
     }
 }
@@ -338,18 +442,46 @@ private fun DetailRow(
     monospace: Boolean = false
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.7f)
+        )
+        SelectionContainer {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
+                color = Color(0xFF0639A3).copy(alpha = 0.95f),
+                lineHeight = 22.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThresholdItem(label: String, value: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.7f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = Color(0xFF0639A3)
         )
     }
 }
@@ -363,77 +495,152 @@ private fun FlagRow(label: String, enabled: Boolean) {
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Medium
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.9f)
         )
         Card(
+            shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (enabled) {
-                    LightExtendedColors.successContainer
+                    Color(0xFF0D9488) // NebulaTeal
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    Color(0xFF9CA3AF).copy(alpha = 0.3f) // MeteorGray
                 }
             )
         ) {
             Text(
                 text = if (enabled) "Enabled" else "Disabled",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
                 color = if (enabled) {
-                    LightExtendedColors.onSuccessContainer
+                    Color.White
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    Color(0xFF4A5568) // SpaceLight
                 },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
         }
     }
 }
 
 @Composable
-private fun BalanceItem(balance: AccountResponse.Balance) {
+private fun CollapsibleBalanceItem(balance: AccountResponse.Balance) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val headerInteractionSource = remember { MutableInteractionSource() }
+    val isHeaderHovered by headerInteractionSource.collectIsHoveredAsState()
+
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 300),
+        label = "balance_chevron_rotation"
+    )
+
+    val headerScale by animateFloatAsState(
+        targetValue = if (isHeaderHovered) 1.01f else 1f,
+        animationSpec = tween(durationMillis = 150),
+        label = "balance_header_scale"
+    )
+
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Asset type
-        Text(
-            text = when {
-                balance.assetType == "native" -> "Native (XLM)"
-                balance.assetCode != null -> "${balance.assetCode} (${balance.assetType})"
-                balance.liquidityPoolId != null -> "Liquidity Pool"
-                else -> balance.assetType
-            },
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // Clickable header showing asset type and balance
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .scale(headerScale)
+                .clickable(
+                    interactionSource = headerInteractionSource,
+                    indication = null,
+                    onClick = { isExpanded = !isExpanded }
+                )
+                .hoverable(interactionSource = headerInteractionSource),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Asset type
+                Text(
+                    text = when {
+                        balance.assetType == "native" -> "XLM"
+                        balance.assetCode != null -> balance.assetCode!!
+                        balance.liquidityPoolId != null -> "Liquidity Pool"
+                        else -> balance.assetType
+                    },
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF0639A3) // StellarBlueDark
+                )
 
-        // Balance
-        DetailRow("Balance", balance.balance)
+                // Balance amount
+                Text(
+                    text = balance.balance,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = Color(0xFF0639A3).copy(alpha = 0.85f)
+                )
+            }
 
-        // Asset issuer (if not native)
-        balance.assetIssuer?.let {
-            DetailRow("Issuer", it, monospace = true)
+            // Chevron icon
+            Icon(
+                imageVector = Icons.Default.ExpandMore,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = Color(0xFF0639A3).copy(alpha = 0.7f),
+                modifier = Modifier
+                    .size(24.dp)
+                    .rotate(chevronRotation)
+            )
         }
 
-        // Liquidity pool ID (if applicable)
-        balance.liquidityPoolId?.let {
-            DetailRow("Pool ID", it, monospace = true)
-        }
+        // Animated expandable content
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        ) {
+            Column(
+                modifier = Modifier.padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Asset issuer (if not native)
+                balance.assetIssuer?.let {
+                    DetailRow("Issuer", it, monospace = true)
+                }
 
-        // Additional details
-        balance.limit?.let { DetailRow("Limit", it) }
-        balance.buyingLiabilities?.let { DetailRow("Buying Liabilities", it) }
-        balance.sellingLiabilities?.let { DetailRow("Selling Liabilities", it) }
+                // Liquidity pool ID (if applicable)
+                balance.liquidityPoolId?.let {
+                    DetailRow("Pool ID", it, monospace = true)
+                }
 
-        // Authorization flags
-        balance.isAuthorized?.let {
-            FlagRow("Authorized", it)
-        }
-        balance.isAuthorizedToMaintainLiabilities?.let {
-            FlagRow("Authorized to Maintain Liabilities", it)
-        }
-        balance.isClawbackEnabled?.let {
-            FlagRow("Clawback Enabled", it)
+                // Additional details
+                balance.limit?.let { DetailRow("Limit", it) }
+                balance.buyingLiabilities?.let { DetailRow("Buying Liabilities", it) }
+                balance.sellingLiabilities?.let { DetailRow("Selling Liabilities", it) }
+
+                // Authorization flags
+                balance.isAuthorized?.let {
+                    FlagRow("Authorized", it)
+                }
+                balance.isAuthorizedToMaintainLiabilities?.let {
+                    FlagRow("Authorized to Maintain Liabilities", it)
+                }
+                balance.isClawbackEnabled?.let {
+                    FlagRow("Clawback Enabled", it)
+                }
+            }
         }
     }
 }
@@ -467,96 +674,157 @@ private fun SignerItem(signer: AccountResponse.Signer) {
 }
 
 @Composable
-private fun ErrorCard(error: AccountDetailsResult.Error) {
-    // Error card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Error",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Text(
-                text = error.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            error.exception?.let { exception ->
-                Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    }
+private fun DataEntryItem(key: String, base64Value: String) {
+    // Decode the base64 value and determine display format
+    val (displayValue, formatDescription) = decodeDataEntryValue(base64Value)
 
-    // Troubleshooting tips
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        // Entry key
+        Text(
+            text = key,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = Color(0xFF0639A3).copy(alpha = 0.7f)
+        )
+
+        // Format description
+        Text(
+            text = "Format: $formatDescription",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF0639A3).copy(alpha = 0.6f)
+        )
+
+        // Display value
+        SelectionContainer {
             Text(
-                text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                text = displayValue,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = if (formatDescription.startsWith("base64")) FontFamily.Monospace else FontFamily.Default,
+                color = Color(0xFF0639A3).copy(alpha = 0.95f),
+                lineHeight = 22.sp
             )
-            Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "• Verify the account ID is valid (starts with 'G' and is 56 characters)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Make sure the account exists on testnet (fund it via Friendbot if needed)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check your internet connection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Try again in a moment if you're being rate-limited",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
         }
     }
 }
 
-/**
- * Shortens an account ID for display purposes.
- * Shows first 4 and last 4 characters with "..." in between.
- *
- * @param accountId The full account ID
- * @return Shortened account ID (e.g., "GABC...XYZ1")
- */
-private fun shortenAccountId(accountId: String): String {
-    return if (accountId.length > 12) {
-        "${accountId.take(4)}...${accountId.takeLast(4)}"
-    } else {
-        accountId
+@Composable
+private fun ErrorCard(error: AccountDetailsResult.Error) {
+    // Error card with celestial styling
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFEF2F2) // NovaRedContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Error",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF991B1B) // NovaRedDark
+            )
+            Text(
+                text = error.message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF991B1B).copy(alpha = 0.9f),
+                lineHeight = 24.sp
+            )
+            error.exception?.let { exception ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Technical Details:",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color(0xFF991B1B)
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = exception.message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF991B1B).copy(alpha = 0.85f),
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Troubleshooting tips card
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF3EFFF) // StardustPurple
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Troubleshooting Tips",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF3D2373) // CosmicPurpleDark
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TroubleshootingItem("Verify the account ID is valid (starts with 'G' and is 56 characters)")
+                TroubleshootingItem("Make sure the account exists on testnet (fund it via Friendbot if needed)")
+                TroubleshootingItem("Check your internet connection")
+                TroubleshootingItem("Try again in a moment if you're being rate-limited")
+            }
+                }
+        }
+    }
+}
+
+@Composable
+private fun TroubleshootingItem(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF3D2373), // CosmicPurpleDark
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF3D2373).copy(alpha = 0.85f),
+            lineHeight = 22.sp,
+            modifier = Modifier.weight(1f)
+        )
     }
 }

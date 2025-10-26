@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1f48"/>
+      <stop offset="50%" stop-color="#1d3e8a"/>
+      <stop offset="100%" stop-color="#2a58b5"/>
+    </linearGradient>
+    <radialGradient id="goldenGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6d4"/>
+      <stop offset="40%" stop-color="#ffd76f" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb300" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="kGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7F52FF"/>
+      <stop offset="100%" stop-color="#FF8A00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Circular background -->
+  <circle cx="512" cy="512" r="512" fill="url(#bgGrad)"/>
+
+  <!-- Kotlin accent arc (adjusted for circle) -->
+  <path d="M 1024 300 Q 700 550 1024 800 L 1024 300 Z" fill="url(#kGrad)" opacity="0.8"/>
+
+  <!-- Starfield (adjusted positions for circular area) -->
+  <g opacity="0.35">
+    <circle cx="200" cy="250" r="3" fill="#ffffff"/>
+    <circle cx="380" cy="450" r="2.5" fill="#ffffff"/>
+    <circle cx="680" cy="320" r="3.5" fill="#ffffff"/>
+    <circle cx="820" cy="420" r="2.5" fill="#ffffff"/>
+    <circle cx="520" cy="750" r="3" fill="#ffffff"/>
+    <circle cx="740" cy="650" r="3.5" fill="#ffffff"/>
+    <circle cx="320" cy="720" r="2.5" fill="#ffffff"/>
+    <circle cx="150" cy="180" r="2" fill="#ffffff"/>
+  </g>
+
+  <!-- Larger star (scaled up to fill circular space better) -->
+  <g>
+    <!-- Star glow -->
+    <circle cx="512" cy="512" r="280" fill="url(#goldenGlow)" opacity="0.9"/>
+
+    <!-- Star core (larger) -->
+    <circle cx="512" cy="512" r="85" fill="#ffec99"/>
+
+    <!-- Main spikes (thicker and longer) -->
+    <rect x="505" y="150" width="14" height="724" rx="7" fill="#ffde5c"/>
+    <rect x="150" y="505" width="724" height="14" rx="7" fill="#ffde5c"/>
+
+    <!-- Diagonal spikes (thicker and longer) -->
+    <g transform="rotate(45 512 512)">
+      <rect x="505" y="190" width="14" height="644" rx="7" fill="#ffde5c"/>
+      <rect x="190" y="505" width="644" height="14" rx="7" fill="#ffde5c"/>
+    </g>
+  </g>
+</svg>

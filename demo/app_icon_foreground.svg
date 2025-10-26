@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <radialGradient id="goldenGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#fff6d4" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#ffd76f" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb300" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Star glow -->
+  <circle cx="54" cy="54" r="33" fill="url(#goldenGlow)" opacity="0.9"/>
+
+  <!-- Star core -->
+  <circle cx="54" cy="54" r="10" fill="#ffec99"/>
+
+  <!-- Main spikes -->
+  <rect x="53" y="20" width="2" height="68" rx="1" fill="#ffde5c"/>
+  <rect x="20" y="53" width="68" height="2" rx="1" fill="#ffde5c"/>
+
+  <!-- Diagonal spikes -->
+  <g transform="rotate(45 54 54)">
+    <rect x="53" y="23" width="2" height="62" rx="1" fill="#ffde5c"/>
+    <rect x="23" y="53" width="62" height="2" rx="1" fill="#ffde5c"/>
+  </g>
+</svg>

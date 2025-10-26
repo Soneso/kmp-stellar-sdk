@@ -1,0 +1,85 @@
+<!--
+  Stellar SDK Demo App Icon — SVG (Golden Star 20% Bigger, Bright Blue Background)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Stellar SDK Demo App Icon — golden shining star larger with bright blue background</title>
+  <desc id="desc">Friendly bright blue celestial background with a larger golden glowing star, Kotlin accent, and subtle starfield.</desc>
+
+  <defs>
+    <!-- Brighter blue celestial gradient -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1f48"/>
+      <stop offset="50%" stop-color="#1d3e8a"/>
+      <stop offset="100%" stop-color="#2a58b5"/>
+    </linearGradient>
+
+    <!-- Kotlin accent gradient -->
+    <linearGradient id="kGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7F52FF"/>
+      <stop offset="100%" stop-color="#FF8A00"/>
+    </linearGradient>
+
+    <!-- Golden star glow -->
+    <radialGradient id="goldenGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#fff6d4" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#ffd76f" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb300" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Soft shadow -->
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Sparkle glyph -->
+    <symbol id="sparkle" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 0l2.2 5.3L20 7.1l-5 2.1L13.9 14l-2-4.8L7 8l4.8-1.1L12 0z"/>
+    </symbol>
+  </defs>
+
+  <!-- Full-bleed friendly blue celestial background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgGrad)"/>
+
+  <!-- Subtle starfield -->
+  <g opacity="0.35">
+    <circle cx="150" cy="180" r="2" fill="#ffffff"/>
+    <circle cx="340" cy="420" r="1.6" fill="#ffffff"/>
+    <circle cx="640" cy="260" r="2.4" fill="#ffffff"/>
+    <circle cx="840" cy="380" r="1.5" fill="#ffffff"/>
+    <circle cx="480" cy="780" r="2.2" fill="#ffffff"/>
+    <circle cx="740" cy="620" r="2.6" fill="#ffffff"/>
+    <circle cx="280" cy="720" r="1.5" fill="#ffffff"/>
+    <circle cx="870" cy="820" r="1.3" fill="#ffffff"/>
+  </g>
+
+  <!-- Kotlin diagonal accent -->
+  <g opacity="0.8" filter="url(#softShadow)">
+    <path fill="url(#kGrad)" d="M 1024 260 L 664 620 L 1024 980 Z"/>
+  </g>
+
+  <!-- Larger golden shining star (20% bigger) -->
+  <g filter="url(#softShadow)">
+    <!-- star glow -->
+    <circle cx="512" cy="512" r="312" fill="url(#goldenGlow)" opacity="0.9"/>
+
+    <!-- star core -->
+    <circle cx="512" cy="512" r="96" fill="#ffec99"/>
+
+    <!-- main spikes -->
+    <rect x="506" y="192" width="12" height="640" rx="6" fill="#ffde5c"/>
+    <rect x="192" y="506" width="640" height="12" rx="6" fill="#ffde5c"/>
+
+    <!-- diagonal spikes -->
+    <g transform="rotate(45 512 512)">
+      <rect x="506" y="222" width="12" height="580" rx="6" fill="#ffde5c"/>
+      <rect x="222" y="506" width="580" height="12" rx="6" fill="#ffde5c"/>
+    </g>
+  </g>
+
+  <!-- Sparkles -->
+  <g fill="#fff3c1">
+    <use href="#sparkle" x="220" y="270" width="18" height="18" opacity="0.8"/>
+    <use href="#sparkle" x="780" y="340" width="22" height="22" opacity="0.9"/>
+    <use href="#sparkle" x="320" y="760" width="16" height="16" opacity="0.7"/>
+  </g>
+</svg>

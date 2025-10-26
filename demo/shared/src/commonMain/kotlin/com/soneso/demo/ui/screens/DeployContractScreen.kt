@@ -1,12 +1,14 @@
 package com.soneso.demo.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -14,19 +16,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.demo.platform.getClipboard
 import com.soneso.demo.stellar.*
-import com.soneso.demo.ui.theme.LightExtendedColors
+import com.soneso.demo.ui.FormValidation
+import com.soneso.demo.ui.components.AnimatedButton
+import com.soneso.demo.ui.components.InfoCardMediumTitle
+import com.soneso.demo.ui.components.StellarTopBar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -53,21 +59,13 @@ class DeployContractScreen : Screen {
             val errors = mutableMapOf<String, String>()
 
             // Validate source account
-            if (sourceAccountId.isBlank()) {
-                errors["sourceAccount"] = "Source account ID is required"
-            } else if (!sourceAccountId.startsWith('G')) {
-                errors["sourceAccount"] = "Account ID must start with 'G'"
-            } else if (sourceAccountId.length != 56) {
-                errors["sourceAccount"] = "Account ID must be 56 characters"
+            FormValidation.validateAccountIdField(sourceAccountId)?.let {
+                errors["sourceAccount"] = it
             }
 
             // Validate secret key
-            if (secretKey.isBlank()) {
-                errors["secretKey"] = "Secret key is required"
-            } else if (!secretKey.startsWith('S')) {
-                errors["secretKey"] = "Secret key must start with 'S'"
-            } else if (secretKey.length != 56) {
-                errors["secretKey"] = "Secret key must be 56 characters"
+            FormValidation.validateSecretSeedField(secretKey)?.let {
+                errors["secretKey"] = it
             }
 
             // Validate constructor arguments
@@ -81,8 +79,8 @@ class DeployContractScreen : Screen {
                             // Type-specific validation
                             when (param.type) {
                                 ConstructorParamType.ADDRESS -> {
-                                    if (!value.startsWith('G') || value.length != 56) {
-                                        errors["constructor_${param.name}"] = "Must be a valid address (G...)"
+                                    FormValidation.validateAccountIdField(value)?.let { error ->
+                                        errors["constructor_${param.name}"] = error
                                     }
                                 }
                                 ConstructorParamType.U32 -> {
@@ -154,73 +152,68 @@ class DeployContractScreen : Screen {
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Deploy a Smart Contract") },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                StellarTopBar(
+                    title = "Deploy Smart Contract",
+                    onNavigationClick = { navigator.pop() }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Information card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 800.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "ContractClient.deploy(): One-step contract deployment",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "This demo showcases the SDK's high-level deployment API that handles WASM upload, contract deployment, and constructor invocation in a single call.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
+                // Information card (Purple)
+                InfoCardMediumTitle(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "ContractClient.deploy(): One-step contract deployment",
+                    description = "This demo showcases the SDK's high-level deployment API that handles WASM upload, contract deployment, and constructor invocation in a single call.",
+                    useBorder = true,
+                    useRoundedShape = true
+                )
 
-                // Contract selection dropdown
+                // Consolidated Input Card (Gold)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                        containerColor = Color(0xFFFFFBF0)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFFEDD5))
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        Text(
+                            text = "Deployment Configuration",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 22.sp
+                            ),
+                            color = Color(0xFFD97706)
+                        )
+
+                        HorizontalDivider(color = Color(0xFFFFEDD5))
+
+                        // Step 1: Contract Selection
                         Text(
                             text = "1. Select Contract",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color(0xFF2D3548)
                         )
 
                         var expanded by remember { mutableStateOf(false) }
@@ -280,10 +273,9 @@ class DeployContractScreen : Screen {
 
                         // Display selected contract description
                         selectedContract?.let { contract ->
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                )
+                            Surface(
+                                color = Color.White.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
                                 Column(
                                     modifier = Modifier.padding(12.dp),
@@ -291,40 +283,33 @@ class DeployContractScreen : Screen {
                                 ) {
                                     Text(
                                         text = contract.description,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            lineHeight = 20.sp
+                                        ),
+                                        color = Color(0xFF2D3548)
                                     )
                                     if (contract.hasConstructor) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "Constructor required: ${contract.constructorParams.size} parameter(s)",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = Color(0xFF6B7280),
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
                                 }
                             }
                         }
-                    }
-                }
 
-                // Source account inputs
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                        HorizontalDivider(color = Color(0xFFFFEDD5))
+
+                        // Step 2: Source Account
                         Text(
                             text = "2. Source Account",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color(0xFF2D3548)
                         )
 
                         OutlinedTextField(
@@ -384,27 +369,18 @@ class DeployContractScreen : Screen {
                                 }
                             )
                         )
-                    }
-                }
 
-                // Constructor arguments (if contract has constructor)
-                selectedContract?.let { contract ->
-                    if (contract.hasConstructor) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
+                        // Step 3: Constructor Parameters (if applicable)
+                        selectedContract?.let { contract ->
+                            if (contract.hasConstructor) {
+                                HorizontalDivider(color = Color(0xFFFFEDD5))
+
                                 Text(
                                     text = "3. Constructor Parameters",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = Color(0xFF2D3548)
                                 )
 
                                 contract.constructorParams.forEachIndexed { index, param ->
@@ -458,30 +434,32 @@ class DeployContractScreen : Screen {
                     }
                 }
 
-                // Deploy button
-                Button(
+                // Deploy button with AnimatedButton
+                AnimatedButton(
                     onClick = { deployContract() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !isDeploying && selectedContract != null &&
-                            sourceAccountId.isNotBlank() && secretKey.isNotBlank()
+                    enabled = selectedContract != null &&
+                            sourceAccountId.isNotBlank() && secretKey.isNotBlank(),
+                    isLoading = isDeploying,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A4FD6)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (isDeploying) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
+                    Icon(
+                        imageVector = Icons.Default.CloudUpload,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Deploy Contract",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Deploying...")
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.CloudUpload,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Deploy Contract")
-                    }
+                    )
                 }
 
                 // Result display
@@ -492,25 +470,21 @@ class DeployContractScreen : Screen {
                         }
                         is DeployContractResult.Error -> {
                             ErrorCard(result)
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Troubleshooting tips (Purple) - ONLY ON ERROR
+                            InfoCardMediumTitle(
+                                modifier = Modifier.fillMaxWidth(),
+                                title = "Troubleshooting Tips",
+                                description = "• Verify the source account has sufficient XLM balance (at least 100 XLM recommended)\n" +
+                                        "• Ensure the source account exists on testnet (use 'Fund Testnet Account' first)\n" +
+                                        "• Check that the secret key matches the source account ID\n" +
+                                        "• Verify constructor arguments match the expected types\n" +
+                                        "• Check your internet connection and Soroban RPC availability"
+                            )
                         }
                     }
-                }
-
-                // Placeholder when no contract selected
-                if (selectedContract == null && deploymentResult == null && !isDeploying) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.CloudUpload,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Text(
-                        text = "Select a demo contract to begin deployment",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
@@ -522,73 +496,97 @@ private fun SuccessCard(result: DeployContractResult.Success, snackbarHostState:
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = LightExtendedColors.successContainer
-        )
+            containerColor = Color(0xFFF0FDFA)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFFCCFBF1))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = LightExtendedColors.onSuccessContainer
+                    tint = Color(0xFF0F766E),
+                    modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "Deployment Successful",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = LightExtendedColors.onSuccessContainer
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color(0xFF0F766E)
                 )
             }
 
-            HorizontalDivider()
+            HorizontalDivider(color = Color(0xFFCCFBF1))
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Contract ID",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LightExtendedColors.onSuccessContainer.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color(0xFF0F766E)
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = result.contractId,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = LightExtendedColors.onSuccessContainer,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = {
-                        scope.launch {
-                            val success = getClipboard().copyToClipboard(result.contractId)
-                            snackbarHostState.showSnackbar(
-                                if (success) "Contract ID copied to clipboard"
-                                else "Failed to copy to clipboard"
+                SelectionContainer {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = result.contractId,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 20.sp
+                                ),
+                                color = Color(0xFF1A1F2E),
+                                modifier = Modifier.weight(1f)
                             )
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        val success = getClipboard().copyToClipboard(result.contractId)
+                                        snackbarHostState.showSnackbar(
+                                            if (success) "Contract ID copied to clipboard"
+                                            else "Failed to copy to clipboard"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy contract ID",
+                                    tint = Color(0xFF0F766E),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy contract ID",
-                            tint = LightExtendedColors.onSuccessContainer
-                        )
                     }
                 }
             }
 
             Text(
                 text = "You can now use this contract ID to interact with your deployed contract via the SDK's ContractClient.forContract() method.",
-                style = MaterialTheme.typography.bodySmall,
-                color = LightExtendedColors.onSuccessContainer
+                style = MaterialTheme.typography.bodySmall.copy(
+                    lineHeight = 18.sp
+                ),
+                color = Color(0xFF2D3548)
             )
         }
     }
@@ -599,81 +597,50 @@ private fun ErrorCard(error: DeployContractResult.Error) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+            containerColor = Color(0xFFFEF2F2)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFFFEE2E2))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Deployment Failed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF991B1B)
             )
+
+            HorizontalDivider(color = Color(0xFFFEE2E2))
+
             Text(
                 text = error.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    lineHeight = 22.sp
+                ),
+                color = Color(0xFF2D3548)
             )
             error.exception?.let { exception ->
-                Text(
-                    text = "Technical details: ${exception.message}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                Surface(
+                    color = Color.White.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Technical details: ${exception.message}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 18.sp
+                        ),
+                        color = Color(0xFF6B7280),
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
         }
     }
-
-    // Troubleshooting tips
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Troubleshooting",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Column(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "• Verify the source account has sufficient XLM balance (at least 100 XLM recommended)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Ensure the source account exists on testnet (use 'Fund Testnet Account' first)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check that the secret key matches the source account ID",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Verify constructor arguments match the expected types",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "• Check your internet connection and Soroban RPC availability",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
-    }
+}
 }

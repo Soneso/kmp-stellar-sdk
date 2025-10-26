@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1f48"/>
+      <stop offset="50%" stop-color="#1d3e8a"/>
+      <stop offset="100%" stop-color="#2a58b5"/>
+    </linearGradient>
+    <radialGradient id="goldenGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6d4"/>
+      <stop offset="40%" stop-color="#ffd76f" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb300" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Full square blue gradient background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgGrad)"/>
+
+  <!-- Subtle starfield -->
+  <g opacity="0.35">
+    <circle cx="200" cy="250" r="3" fill="#ffffff"/>
+    <circle cx="380" cy="450" r="2.5" fill="#ffffff"/>
+    <circle cx="680" cy="320" r="3.5" fill="#ffffff"/>
+    <circle cx="820" cy="420" r="2.5" fill="#ffffff"/>
+    <circle cx="520" cy="750" r="3" fill="#ffffff"/>
+    <circle cx="740" cy="650" r="3.5" fill="#ffffff"/>
+    <circle cx="320" cy="720" r="2.5" fill="#ffffff"/>
+    <circle cx="150" cy="180" r="2" fill="#ffffff"/>
+  </g>
+
+  <!-- MUCH LARGER star to fill the icon -->
+  <g>
+    <!-- Star glow (bigger) -->
+    <circle cx="512" cy="512" r="420" fill="url(#goldenGlow)" opacity="0.9"/>
+
+    <!-- Star core (bigger) -->
+    <circle cx="512" cy="512" r="120" fill="#ffec99"/>
+
+    <!-- Main spikes (thicker and extending to edges) -->
+    <rect x="502" y="50" width="20" height="924" rx="10" fill="#ffde5c"/>
+    <rect x="50" y="502" width="924" height="20" rx="10" fill="#ffde5c"/>
+
+    <!-- Diagonal spikes (thicker and extending to edges) -->
+    <g transform="rotate(45 512 512)">
+      <rect x="502" y="100" width="20" height="824" rx="10" fill="#ffde5c"/>
+      <rect x="100" y="502" width="824" height="20" rx="10" fill="#ffde5c"/>
+    </g>
+  </g>
+</svg>
