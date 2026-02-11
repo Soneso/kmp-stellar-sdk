@@ -99,7 +99,6 @@ Comprehensive tests for Soroban RPC server operations against live testnet:
 | `testInvokeContract` | Invoke Soroban contract function | simulateTransaction, sendTransaction |
 | `testGetLedgerEntries` | Retrieve ledger entries by key | getLedgerEntries |
 | `testEvents` | Contract events emission and querying | getEvents |
-| `testDeploySACWithSourceAccount` | Deploy Stellar Asset Contract (native) | simulateTransaction, sendTransaction |
 | `testSACWithAsset` | Deploy Stellar Asset Contract (custom asset) | simulateTransaction, sendTransaction |
 
 **GetLedgers Test Suite Details**:
@@ -129,7 +128,6 @@ The contract tests demonstrate the complete Soroban smart contract lifecycle:
 
 **Stellar Asset Contract (SAC) Tests**:
 
-- **Native Asset**: Deploy SAC for XLM using CONTRACT_ID_PREIMAGE_FROM_ADDRESS
 - **Custom Asset**: Create trustline → establish holdings → deploy SAC using CONTRACT_ID_PREIMAGE_FROM_ASSET
 
 **Test Duration**: ~90-120 seconds for full contract tests (includes network delays and polling)

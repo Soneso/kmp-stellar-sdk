@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-02-11
+
+### Added
+- **SEP-8 (Regulated Assets)**: Production-ready client for assets requiring issuer approval before transactions can be submitted
+  - `Sep08Service` class with service discovery and approval server interaction:
+    - `fromDomain()` - Initialize from issuer's stellar.toml configuration
+    - `postTransaction()` - Submit transactions to the approval server for regulatory approval
+    - `postAction()` - Complete required user actions (e.g., KYC verification)
+    - `authorizationRequired()` - Check if issuer has authorization required/revocable flags set
+    - `regulatedAssets` - Discover regulated assets and their approval server URLs
+  - `Sep08PostTransactionResponse` sealed class with 5 response types:
+    - `Success` - Transaction approved, ready for submission
+    - `Revised` - Transaction modified by approval server (e.g., additional operations added)
+    - `Pending` - Approval server needs more time; resubmit after timeout
+    - `ActionRequired` - User must complete an action (e.g., KYC) before approval
+    - `Rejected` - Transaction rejected with reason
+  - `Sep08PostActionResponse` sealed class with 2 response types:
+    - `Done` - Action completed, transaction approved
+    - `NextUrl` - Additional action required at a new URL
+  - `RegulatedAsset` data class with asset code, issuer, approval server URL, and approval criteria
+  - 4 exception types:
+    - `Sep08Exception` - Base exception
+    - `Sep08IncompleteInitDataException` - Missing network/Horizon configuration
+    - `Sep08InvalidTransactionResponseException` - Malformed approval server response
+    - `Sep08InvalidActionResponseException` - Malformed action URL response
+  - 95 unit tests + 13 integration tests against live testnet
+  - Documentation in `docs/sep/sep-08.md`
+  - SEP-8 compatibility matrix showing 100% feature coverage (22/22 features)
+
+### Removed
+- Removed `testDeploySACWithSourceAccount` integration test. The test used `CONTRACT_ID_PREIMAGE_FROM_ADDRESS` with `CONTRACT_EXECUTABLE_STELLAR_ASSET`, a combination no longer accepted by the network. SAC deployment via `CONTRACT_ID_PREIMAGE_FROM_ASSET` (tested in `testSACWithAsset`) remains the correct approach.
+
 ## [1.2.0] - 2026-02-04
 
 ### Added
