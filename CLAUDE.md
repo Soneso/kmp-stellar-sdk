@@ -29,7 +29,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
 
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
@@ -142,6 +142,24 @@ secureMnemonic.close()
 - NFKD normalization for mnemonic and passphrase
 - Memory cleanup (entropy zeroed after use, close() zeros seed)
 - PBKDF2-HMAC-SHA512 with 2048 iterations
+
+### SEP-8 Regulated Assets
+
+The SDK implements SEP-8 (Regulated Assets) for assets requiring issuer approval before transactions can be submitted.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep08/
+├── Sep08Service.kt                    # Service client (fromDomain, postTransaction, postAction)
+├── Sep08PostTransactionResponse.kt    # Sealed class: Success, Revised, Pending, ActionRequired, Rejected
+├── Sep08PostActionResponse.kt         # Sealed class: Done, NextUrl
+├── RegulatedAsset.kt                  # Regulated asset with approval server URL
+└── exceptions/
+    ├── Sep08Exception.kt                          # Base exception
+    ├── Sep08IncompleteInitDataException.kt        # Missing network/Horizon config
+    ├── Sep08InvalidTransactionResponseException.kt # Malformed approval server response
+    └── Sep08InvalidActionResponseException.kt     # Malformed action URL response
+```
 
 ## Documentation Standards
 
