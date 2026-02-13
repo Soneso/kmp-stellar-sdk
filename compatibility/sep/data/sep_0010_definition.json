@@ -1,0 +1,100 @@
+{
+    "sep_number": "0010",
+    "preamble": {
+        "sep": "0010",
+        "title": "Stellar Web Authentication",
+        "author": "Sergey Nebolsin <@nebolsin>, Tom Quisel <tom.quisel@gmail.com>, Leigh McCulloch <@leighmcculloch>, Jake Urban <jake@stellar.org>",
+        "status": "Active",
+        "created": "2018-07-31",
+        "updated": "2024-03-20",
+        "version": "3.4.1"
+    },
+    "summary": "This SEP defines the standard way for clients such as wallets or exchanges to create authenticated web sessions on behalf of a user who holds a Stellar account. A wallet may want to authenticate with any web service which requires a Stellar account ownership verification, for example, to upload KYC information to an anchor in an authenticated way as described in [SEP-12](sep-0012.md). This SEP also supports authenticating users of shared, omnibus, or pooled Stellar accounts. Clients can use [memos](#memos) or [muxed accounts](#muxed-accounts) to distinguish users or sub-accounts of shared accounts.",
+    "sections": [
+        {
+            "title": "Authentication Endpoints",
+            "key": "authentication_endpoints",
+            "field_count": 0,
+            "fields": []
+        },
+        {
+            "title": "Challenge Features",
+            "key": "challenge_features",
+            "field_count": 0,
+            "fields": []
+        },
+        {
+            "title": "JWT Features",
+            "key": "jwt_features",
+            "field_count": 9,
+            "fields": [
+                {
+                    "name": "Content",
+                    "description": "-Type: `application/x-www-form-urlencoded`, body: `transaction=<signed XDR (URL-encoded)>`)",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "decode",
+                    "description": "the received input as a base64-urlencoded XDR representation of Stellar transaction envelope;",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "verify",
+                    "description": "that transaction source account is equal to the **Server Account**",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "if",
+                    "description": "the first operation's source account exists: - verify that the remaining signature count is one or more; - verify that remaining signatures on the transaction are signers of the **Client Account** - verify that remaining signatures are correct; - verify that remaining signatures provide weight that meets the required threshold(s), if any;",
+                    "requirements": "varies",
+                    "required": true
+                },
+                {
+                    "name": "iss",
+                    "description": "(the principal that issued a token, [RFC7519, Section 4.1.1](https://tools.ietf.org/html/rfc7519#section-4.1.1)) — a [Uniform Resource Identifier (URI)] for the issuer (`https://example.com` or `https://example.com/G...`)",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "sub",
+                    "description": "(the principal that is the subject of the JWT, [RFC7519, Section 4.1.2](https://tools.ietf.org/html/rfc7519#section-4.1.2)) — there are several possible formats: - If the **Client Account** is a muxed account (`M...`), the `sub` value should be the muxed account (`M...`). - If the **Client Account** is a stellar account (`G...`): - And, a memo was attached to the challenge transaction, the `sub` should be the stellar account appended with the memo, separated by a colon (`G...:17509749319012223907`). - Otherwise, the `sub` value should be Stellar account (`G...`).",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "iat",
+                    "description": "(the time at which the JWT was issued [RFC7519, Section 4.1.6](https://tools.ietf.org/html/rfc7519#section-4.1.6)) — current timestamp (`1530644093`)",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "exp",
+                    "description": "(the expiration time on or after which the JWT must not be accepted for processing, [RFC7519, Section 4.1.4](https://tools.ietf.org/html/rfc7519#section-4.1.4)) — a server can pick its own expiration period for the token (`1530730493`)",
+                    "requirements": "varies",
+                    "required": false
+                },
+                {
+                    "name": "client_domain",
+                    "description": "- (optional) a nonstandard JWT claim containing the client home domain, included if the challenge transaction contained a `client_domain` (see [Verifying the Client Domain](#verifying-the-client-domain))",
+                    "requirements": "varies",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "title": "Verification",
+            "key": "verification",
+            "field_count": 0,
+            "fields": []
+        }
+    ],
+    "metadata": {
+        "parsed_at": "2026-02-13T19:09:43.338496+00:00",
+        "source_url": "https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md",
+        "total_fields": 9,
+        "content_length": 35290
+    }
+}

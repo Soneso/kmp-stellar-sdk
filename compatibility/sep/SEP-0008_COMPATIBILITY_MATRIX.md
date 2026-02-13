@@ -1,28 +1,23 @@
 # SEP-0008 (Regulated Assets) Compatibility Matrix
 
-**Generated:** 2026-02-10 12:00:00
+**Generated:** 2026-02-13 20:09:44
 
-**SEP Version:** 1.0.0<br>
+**SEP Version:** 1.7.4<br>
 **SEP Status:** Active<br>
 **SDK Version:** 1.2.1<br>
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md
 
 ## SEP Summary
 
-SEP-8 defines a protocol for regulated assets that require issuer approval before transactions can be submitted to the Stellar network. Issuers publish an approval server URL in their stellar.toml, and clients submit transactions to the approval server for authorization before network submission.
-
-## Overall Implementation
-
-**Implementation Type:** Client-Side Only
-
-This SDK implements the client-side of SEP-8 regulated assets. The implementation provides service discovery from stellar.toml, authorization flag checking, transaction submission to approval servers, and action URL handling.
+Regulated Assets are assets that require an issuer’s approval (or a delegated third party’s approval, such as a licensed securities exchange) on a per-transaction basis. It standardizes the identification of such assets as well as defines the protocol for performing compliance checks and requesting issuer approval.
 
 ## Overall Coverage
 
-**Total Coverage:** 100% (22/22 features)
+**Total Coverage:** 100.0% (32/32 fields)
 
-- ✅ **Implemented:** 22/22
-- ❌ **Not Implemented:** 0/22
+- ✅ **Implemented:** 32/32
+- ❌ **Not Implemented:** 0/32
+- **Required Fields:** 100.0% (27/27)
 
 ## Implementation Status
 
@@ -30,124 +25,169 @@ This SDK implements the client-side of SEP-8 regulated assets. The implementatio
 
 ### Implementation Files
 
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08Service.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/RegulatedAsset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/` (4 exception types)
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08Service.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08IncompleteInitDataException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidActionResponseException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidTransactionResponseException.kt`
 
 ### Key Classes
 
-- **`Sep08Service`** - Main client class with methods: fromDomain, authorizationRequired, postTransaction, postAction
-- **`Sep08PostTransactionResponse`** - Sealed class with 5 response variants: Success, Revised, Pending, ActionRequired, Rejected
-- **`Sep08PostActionResponse`** - Sealed class with 2 response variants: Done, NextUrl
-- **`RegulatedAsset`** - Regulated asset with code, issuer, approval server URL, and optional criteria
+- **`wraps`** - Methods: toXdr, toAsset, toString, compareTo, equals, hashCode
+- **`RegulatedAsset`** - Methods: toXdr, toAsset, toString, compareTo, equals, hashCode
+- **`of`**
+- **`Sep08PostActionResponse`** - Methods: fromJson, parseNextUrl
+- **`Done`** - Methods: fromJson, parseNextUrl
+- **`NextUrl`** - Methods: fromJson, parseNextUrl
+- **`returned`** - Methods: parseNextUrl
+- **`variant`** - Methods: parseNextUrl
+- **`of`**
+- **`Sep08PostTransactionResponse`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`Success`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`Revised`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`Pending`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`ActionRequired`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`Rejected`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`returned`** - Methods: parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`variant`** - Methods: parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
+- **`Sep08Service`** - Methods: fromDomain, authorizationRequired, postTransaction, postAction, buildHeaders
+- **`for`** - Methods: toString
+- **`to`** - Methods: toString
+- **`Sep08Exception`** - Methods: toString
+- **`Sep08IncompleteInitDataException`** - Methods: toString
+- **`Sep08InvalidActionResponseException`** - Methods: toString
+- **`Sep08InvalidTransactionResponseException`** - Methods: toString
 
 ### Test Coverage
 
-**Tests:** 108 test cases across 4 test files (2,950 lines of test code)
+**Tests:** 108 test cases
 
 **Test Files:**
-- `Sep08ExceptionsTest.kt` - Exception hierarchy and error handling
-- `Sep08ResponseParsingTest.kt` - All response type parsing and validation
-- `Sep08ServiceTest.kt` - Service initialization, regulated asset discovery, HTTP client behavior
-- `Sep08IntegrationTest.kt` - Live testnet integration
 
-## Detailed Feature Matrix
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep08/Sep08IntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ExceptionsTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ResponseParsingTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ServiceTest.kt`
 
-### Service Discovery and Initialization
+## Coverage by Section
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Initialize from domain (stellar.toml) | ✅ | `Sep08Service.fromDomain()` |
-| Network passphrase resolution from stellar.toml | ✅ | Falls back to NETWORK_PASSPHRASE in toml |
-| Horizon URL resolution from stellar.toml | ✅ | Falls back to HORIZON_URL in toml |
-| Explicit network override | ✅ | Optional `network` parameter |
-| Explicit Horizon URL override | ✅ | Optional `horizonUrl` parameter |
-| Direct constructor initialization | ✅ | For pre-configured scenarios |
-| Custom HTTP client support | ✅ | Injectable HttpClient for testing/proxies |
-| Custom HTTP headers | ✅ | Add custom headers to requests |
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| Action Required Response Fields | 100.0% | 3/3 | 5 | 5 |
+| Action URL Handling | 100.0% | 4/4 | 4 | 4 |
+| Approval Endpoint | 100.0% | 1/1 | 1 | 1 |
+| Authorization Flags | 100.0% | 2/2 | 2 | 2 |
+| Pending Response Fields | 100.0% | 2/2 | 3 | 3 |
+| Rejected Response Fields | 100.0% | 2/2 | 2 | 2 |
+| Request Parameters | 100.0% | 1/1 | 1 | 1 |
+| Response Statuses | 100.0% | 5/5 | 5 | 5 |
+| Revised Response Fields | 100.0% | 3/3 | 3 | 3 |
+| Stellar TOML Fields | 100.0% | 2/2 | 3 | 3 |
+| Success Response Fields | 100.0% | 2/2 | 3 | 3 |
 
-### Regulated Asset Discovery
+## Detailed Field Comparison
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Extract regulated assets from stellar.toml | ✅ | Filters currencies with `regulated = true` |
-| Asset code extraction | ✅ | `RegulatedAsset.code` |
-| Asset issuer extraction | ✅ | `RegulatedAsset.issuer` |
-| Approval server URL extraction | ✅ | `RegulatedAsset.approvalServer` |
-| Approval criteria extraction | ✅ | `RegulatedAsset.approvalCriteria` (optional) |
-| Underlying Asset conversion | ✅ | `toAsset()` returns AlphaNum4 or AlphaNum12 |
-| XDR conversion | ✅ | `toXdr()` returns AssetXdr |
+### Action Required Response Fields
 
-### Authorization Flag Checking
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `status` | ✓ | ✅ | `(implicit)` | Status value "action_required" |
+| `message` | ✓ | ✅ | `message` | A human readable string containing information regarding the action required |
+| `action_url` | ✓ | ✅ | `actionUrl` | A URL that allows the user to complete the actions required to have the transaction approved |
+| `action_method` |  | ✅ | `actionMethod` | GET or POST, indicating the type of request that should be made to the action_url. If not provide... |
+| `action_fields` |  | ✅ | `actionFields` | An array of additional fields defined by SEP-9 Standard KYC / AML fields that the client may opti... |
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Check AUTH_REQUIRED flag | ✅ | Via `authorizationRequired()` |
-| Check AUTH_REVOCABLE flag | ✅ | Both flags validated together |
+### Action URL Handling
 
-### Transaction Approval (POST /tx_approve)
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `action_url_get` | ✓ | ✅ | `postAction` | Support for GET method to action_url with query parameters |
+| `action_url_post` | ✓ | ✅ | `postAction` | Support for POST method to action_url with JSON body |
+| `action_url_post_response_no_further_action` | ✓ | ✅ | `Done` | Handle POST response with result "no_further_action_required" |
+| `action_url_post_response_follow_next_url` | ✓ | ✅ | `NextUrl` | Handle POST response with result "follow_next_url" and next_url field |
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Submit transaction XDR to approval server | ✅ | `postTransaction(tx, approvalServer)` |
-| Parse "success" response | ✅ | `Sep08PostTransactionResponse.Success` with tx and optional message |
-| Parse "revised" response | ✅ | `Sep08PostTransactionResponse.Revised` with tx and message |
-| Parse "pending" response | ✅ | `Sep08PostTransactionResponse.Pending` with timeout and optional message |
-| Parse "action_required" response | ✅ | `Sep08PostTransactionResponse.ActionRequired` with actionUrl, actionMethod, actionFields |
-| Parse "rejected" response (200) | ✅ | `Sep08PostTransactionResponse.Rejected` with error |
-| Parse "rejected" response (400) | ✅ | HTTP 400 with status "rejected" handled |
-| Unexpected HTTP status handling | ✅ | Throws Sep08InvalidTransactionResponseException |
+### Approval Endpoint
 
-### Action URL Handling (POST action_url)
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `tx_approve` | ✓ | ✅ | `postTransaction` | POST /tx_approve - Approval server endpoint that receives a signed transaction, checks for compli... |
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Submit action fields to action URL | ✅ | `postAction(url, actionFields)` |
-| Parse "no_further_action_required" response | ✅ | `Sep08PostActionResponse.Done` |
-| Parse "follow_next_url" response | ✅ | `Sep08PostActionResponse.NextUrl` with nextUrl and optional message |
-| Unexpected HTTP status handling | ✅ | Throws Sep08InvalidActionResponseException |
+### Authorization Flags
 
-### Error Handling
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `authorization_required` | ✓ | ✅ | `(Stellar account flags)` | Authorization Required flag must be set on issuer account |
+| `authorization_revocable` | ✓ | ✅ | `(Stellar account flags)` | Authorization Revocable flag must be set on issuer account |
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Base exception class | ✅ | `Sep08Exception` |
-| Incomplete init data exception | ✅ | `Sep08IncompleteInitDataException` |
-| Invalid transaction response exception | ✅ | `Sep08InvalidTransactionResponseException` |
-| Invalid action response exception | ✅ | `Sep08InvalidActionResponseException` |
+### Pending Response Fields
 
-### Server-Side Features (Not Applicable)
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `status` | ✓ | ✅ | `(implicit)` | Status value "pending" |
+| `timeout` | ✓ | ✅ | `timeout` | Number of milliseconds to wait before submitting the same transaction again. Use 0 if the wait ti... |
+| `message` |  | ✅ | `message` | A human readable string containing information to pass on to the user |
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Approval server implementation | ⚪ N/A | Server-side functionality - not in scope for client SDK |
-| Transaction evaluation and compliance rules | ⚪ N/A | Server-side functionality - not in scope for client SDK |
-| Action URL server implementation | ⚪ N/A | Server-side functionality - not in scope for client SDK |
+### Rejected Response Fields
 
-## Platform Support
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `status` | ✓ | ✅ | `(implicit)` | Status value "rejected" |
+| `error` | ✓ | ✅ | `error` | A human readable string explaining why the transaction is not compliant and could not be made com... |
 
-All features work across all supported platforms:
-- JVM (Android, Server)
-- iOS
-- macOS
-- JavaScript (Browser & Node.js)
+### Request Parameters
 
-## Additional Information
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `tx` | ✓ | ✅ | `(handled by postTransaction)` | A base64 encoded transaction envelope XDR signed by the user. This is the transaction that will b... |
 
-**Documentation:** See `docs/sep/sep-08.md` for usage examples and API reference
+### Response Statuses
 
-**Specification:** [SEP-0008: Regulated Assets](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md)
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `success` | ✓ | ✅ | `Success` | Transaction was found compliant and signed without being revised |
+| `revised` | ✓ | ✅ | `Revised` | Transaction was revised to be made compliant |
+| `pending` | ✓ | ✅ | `Pending` | Issuer could not determine whether to approve the transaction at the time of receiving it |
+| `action_required` | ✓ | ✅ | `ActionRequired` | User must complete an action before this transaction can be approved |
+| `rejected` | ✓ | ✅ | `Rejected` | Transaction is not compliant and could not be revised to be made compliant |
 
-**Implementation Package:** `com.soneso.stellar.sdk.sep.sep08`
+### Revised Response Fields
 
-**Integration Tests:** Live testnet integration with regulated asset approval flow
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `status` | ✓ | ✅ | `(implicit)` | Status value "revised" |
+| `tx` | ✓ | ✅ | `tx` | Transaction envelope XDR, base64 encoded. This transaction is a revised compliant version of the ... |
+| `message` | ✓ | ✅ | `message` | A human readable string explaining the modifications made to the transaction to make it compliant |
 
-**Last Updated:** 2026-02-10
+### Stellar TOML Fields
+
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `regulated` | ✓ | ✅ | `(in Currency.regulated)` | A boolean indicating whether or not this is a regulated asset. If missing, false is assumed. |
+| `approval_server` | ✓ | ✅ | `approvalServer` | The URL of an approval service that signs validated transactions |
+| `approval_criteria` |  | ✅ | `approvalCriteria` | A human readable string that explains the issuer's requirements for approving transactions |
+
+### Success Response Fields
+
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `status` | ✓ | ✅ | `(implicit)` | Status value "success" |
+| `tx` | ✓ | ✅ | `tx` | Transaction envelope XDR, base64 encoded. This transaction will have both the original signature(... |
+| `message` |  | ✅ | `message` | A human readable string containing information to pass on to the user |
 
 ## Legend
 
-- ✅ **Implemented**: Feature is fully supported in the SDK
-- ❌ **Not Implemented**: Feature is not currently supported
-- ⚪ **N/A**: Not applicable (server-side feature)
+- ✅ **Implemented**: Field is fully supported in the SDK
+- ❌ **Not Implemented**: Field is not currently supported
+- ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
+
+## Additional Information
+
+**Documentation:** See `docs/sep-implementations.md` for usage examples and API reference
+
+**Specification:** [SEP-0008](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md)
+
+**Implementation Package:** `com.soneso.stellar.sdk.sep.sep0008`

@@ -1,6 +1,6 @@
 # SEP-0010 (Stellar Web Authentication) Compatibility Matrix
 
-**Generated:** 2026-01-14 16:30:00
+**Generated:** 2026-02-13 20:09:45
 
 **SEP Version:** 3.4.1<br>
 **SEP Status:** Active<br>
@@ -9,20 +9,15 @@
 
 ## SEP Summary
 
-SEP-10 defines a standard for wallet and application authentication using a challenge-response mechanism with Stellar transaction signing. This specification provides secure authentication without exposing private keys, enabling clients to prove account ownership to service providers such as anchors.
-
-## Overall Implementation
-
-**Implementation Type:** Client-Side Only
-
-This SDK implements the client-side of SEP-10 authentication. The implementation provides both high-level and low-level APIs for interacting with SEP-10 authentication servers.
+This SEP defines the standard way for clients such as wallets or exchanges to create authenticated web sessions on behalf of a user who holds a Stellar account. A wallet may want to authenticate with any web service which requires a Stellar account ownership verification, for example, to upload KYC information to an anchor in an authenticated way as described in [SEP-12](sep-0012.md). This SEP also supports authenticating users of shared, omnibus, or pooled Stellar accounts. Clients can use [memos](#memos) or [muxed accounts](#muxed-accounts) to distinguish users or sub-accounts of shared accounts.
 
 ## Overall Coverage
 
-**Total Coverage:** 100% (31/31 features)
+**Total Coverage:** 100.0% (9/9 fields)
 
-- ✅ **Implemented:** 31/31
-- ❌ **Not Implemented:** 0/31
+- ✅ **Implemented:** 9/9
+- ❌ **Not Implemented:** 0/9
+- **Required Fields:** 100.0% (1/1)
 
 ## Implementation Status
 
@@ -30,182 +25,107 @@ This SDK implements the client-side of SEP-10 authentication. The implementation
 
 ### Implementation Files
 
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/WebAuth.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/AuthToken.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/ClientDomainSigningDelegate.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/ChallengeResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/` (18 exception types)
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionRequest.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/WebAuth.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeRequestException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeValidationException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/GenericChallengeValidationException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidClientDomainSourceException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidHomeDomainException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoTypeException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoValueException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidOperationTypeException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSequenceNumberException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureCountException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSourceAccountException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidTimeBoundsException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidWebAuthDomainException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/MemoWithMuxedAccountException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/NoMemoForMuxedAccountsException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/TokenSubmissionException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/WebAuthException.kt`
 
 ### Key Classes
 
-- **`WebAuth`** - Main client class with methods: fromDomain, jwtToken, getChallenge, validateChallenge, signTransaction, sendSignedChallenge
-- **`AuthToken`** - JWT token parser with properties: token, iss, sub, iat, exp, jti, clientDomain, account, memo
-- **`ClientDomainSigningDelegate`** - Functional interface for external domain signing (HSM/wallet backend)
-- **`ChallengeResponse`** - Server challenge response wrapper
+- **`parses`**
+- **`AuthToken`** - Methods: isExpired, toString, parse, decodeBase64UrlSafe
+- **`ChallengeResponse`**
+- **`TokenSubmissionRequest`**
+- **`TokenSubmissionResponse`**
+- **`WebAuth`** - Methods: fromDomain, jwtToken, getChallenge, validateChallengeRequest, buildChallengeUrl, validateChallenge, validateOperations, validateTimeBounds, validateServerSignature, signTransaction, sendSignedChallenge
+- **`ChallengeRequestException`**
+- **`ChallengeValidationException`**
+- **`GenericChallengeValidationException`**
+- **`InvalidClientDomainSourceException`**
+- **`InvalidHomeDomainException`**
+- **`InvalidMemoTypeException`**
+- **`InvalidMemoValueException`**
+- **`InvalidOperationTypeException`**
+- **`InvalidSequenceNumberException`**
+- **`InvalidSignatureCountException`**
+- **`InvalidSignatureException`**
+- **`InvalidSourceAccountException`**
+- **`InvalidTimeBoundsException`**
+- **`InvalidWebAuthDomainException`**
+- **`MemoWithMuxedAccountException`**
+- **`NoMemoForMuxedAccountsException`**
+- **`TokenSubmissionException`**
+- **`WebAuthException`**
 
 ### Test Coverage
 
-**Tests:** 115+ test cases across 9 test files (4,656 lines of test code)
+**Tests:** 165 test cases
 
 **Test Files:**
-- `WebAuthValidationTest.kt` - All 13 validation checks
-- `WebAuthChallengeTest.kt` - Challenge request flows
-- `WebAuthSigningTest.kt` - Transaction signing
-- `WebAuthTokenSubmissionTest.kt` - Token submission
-- `WebAuthJwtTokenTest.kt` - High-level API
-- `WebAuthClientDomainSigningDelegateTest.kt` - External signing
-- `AuthTokenTest.kt` - JWT parsing
-- `AuthTokenEnhancedTest.kt` - Advanced token features
-- `WebAuthIntegrationTest.kt` - Live testnet integration
 
-## Detailed Feature Matrix
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep10/WebAuthIntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenEnhancedTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/Sep10ExceptionsTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthChallengeTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthClientDomainSigningDelegateTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthJwtTokenTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthSigningTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthTokenSubmissionTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthValidationTest.kt`
 
-### Client-Side Features
+## Coverage by Section
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **Challenge Request (GET)** | ✅ | Full support with all query parameters |
-| Account parameter | ✅ | Required parameter - G... and M... addresses supported |
-| Memo parameter | ✅ | Optional memo ID for sub-account identification |
-| Home domain parameter | ✅ | Optional home domain for multi-domain servers |
-| Client domain parameter | ✅ | Optional client domain for wallet verification |
-| Challenge response parsing | ✅ | JSON response with transaction and networkPassphrase |
-| **Challenge Validation (13 Checks)** | ✅ | All SEP-10 security requirements enforced |
-| 1. Transaction envelope type | ✅ | Must be ENVELOPE_TYPE_TX |
-| 2. Sequence number validation | ✅ | Must be exactly 0 (prevents network submission) |
-| 3. Memo type validation | ✅ | Must be MEMO_NONE or MEMO_ID only |
-| 4. Memo value validation | ✅ | Must match expected memo if provided |
-| 5. Memo/muxed exclusivity | ✅ | Cannot have both memo and muxed account |
-| 6. Operation type validation | ✅ | All operations must be ManageData type |
-| 7. First operation source | ✅ | Must match client account |
-| 8. First operation data name | ✅ | Must be "{serverHomeDomain} auth" |
-| 9. Client domain source | ✅ | Client domain operation source verification |
-| 10. Web auth domain value | ✅ | Must match endpoint host |
-| 11. Time bounds validation | ✅ | With configurable grace period (default 300s) |
-| 12. Signature count | ✅ | Must have exactly 1 signature (server's) |
-| 13. Server signature verification | ✅ | Cryptographic signature validation |
-| **Transaction Signing** | ✅ | Client-side signing with multiple signers |
-| Single signature | ✅ | Sign with single keypair |
-| Multi-signature support | ✅ | Sign with multiple keypairs for threshold accounts |
-| Client domain signing (local) | ✅ | Sign with client domain keypair |
-| Client domain signing (external) | ✅ | Delegate signing to HSM/wallet backend |
-| Signature preservation | ✅ | Server signature preserved during signing |
-| **Token Submission (POST)** | ✅ | Submit signed challenge for JWT token |
-| JSON request format | ✅ | Content-Type: application/json |
-| Signed transaction XDR | ✅ | Base64-encoded transaction envelope |
-| Token response parsing | ✅ | Extract JWT from JSON response |
-| **JWT Token Handling** | ✅ | Complete JWT parsing and validation |
-| JWT parsing | ✅ | Parse standard and SEP-10 claims |
-| Standard claims (iss, sub, iat, exp, jti) | ✅ | All RFC 7519 claims supported |
-| SEP-10 claims (client_domain) | ✅ | Client domain claim extraction |
-| Account extraction | ✅ | Extract account from sub (handles memo format) |
-| Memo extraction | ✅ | Extract memo from sub (format: "ACCOUNT:MEMO") |
-| Expiration checking | ✅ | isExpired() method with system time comparison |
-| **Account Types** | ✅ | Full support for all account formats |
-| Ed25519 public keys (G...) | ✅ | Standard Stellar accounts |
-| Muxed accounts (M...) | ✅ | Multiplexed accounts with embedded IDs |
-| Memo-based sub-accounts | ✅ | Sub-accounts identified by memo ID |
-| **Error Handling** | ✅ | 18 exception types covering all failures |
-| Challenge request errors (400, 401, 403, 404, 5xx) | ✅ | ChallengeRequestException with status codes |
-| Validation errors | ✅ | 15 specific ChallengeValidationException subtypes |
-| Token submission errors (400, 401, 403, 404, 5xx) | ✅ | TokenSubmissionException with status codes |
-| Network errors | ✅ | Network failure handling with retries |
-| **Advanced Features** | ✅ | Enterprise and wallet infrastructure support |
-| Automatic configuration from stellar.toml | ✅ | WebAuth.fromDomain() discovers endpoints and keys |
-| High-level API | ✅ | jwtToken() - one-line authentication |
-| Low-level API | ✅ | Manual step-by-step control for custom flows |
-| Custom HTTP client support | ✅ | Injectable HttpClient for testing/proxies |
-| Custom HTTP headers | ✅ | Add custom headers to requests |
-| Configurable grace period | ✅ | Time bounds validation with adjustable tolerance |
-| HTTP request retries | ✅ | Automatic retry on server errors (3 attempts) |
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| JWT Features | 100.0% | 1/1 | 9 | 9 |
 
-### Server-Side Features (Not Applicable)
+## Detailed Field Comparison
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Challenge generation | ⚪ N/A | Server-side functionality - not in scope for client SDK |
-| Signature verification | ⚪ N/A | Server-side functionality - not in scope for client SDK |
-| JWT token generation | ⚪ N/A | Server-side functionality - not in scope for client SDK |
-| Account threshold validation | ⚪ N/A | Server-side functionality - not in scope for client SDK |
+### JWT Features
 
-## API Levels
-
-### High-Level API
-
-```kotlin
-// One-line authentication
-val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
-val authToken = webAuth.jwtToken(clientAccountId, signers)
-```
-
-### Low-Level API
-
-```kotlin
-// Manual control over each step
-val challenge = webAuth.getChallenge(clientAccountId)
-webAuth.validateChallenge(challenge.transaction, clientAccountId)
-val signedChallenge = webAuth.signTransaction(challenge.transaction, signers)
-val authToken = webAuth.sendSignedChallenge(signedChallenge)
-```
-
-## Exception Types (18 Total)
-
-| Exception | Purpose |
-|-----------|---------|
-| `WebAuthException` | Base exception for all SEP-10 errors |
-| `ChallengeRequestException` | Challenge request failures (network, HTTP errors) |
-| `ChallengeValidationException` | Base class for validation failures |
-| `GenericChallengeValidationException` | Generic validation errors |
-| `InvalidSequenceNumberException` | Sequence number not zero |
-| `InvalidMemoTypeException` | Invalid memo type (not NONE/ID) |
-| `InvalidMemoValueException` | Memo value mismatch |
-| `MemoWithMuxedAccountException` | Both memo and muxed account present |
-| `NoMemoForMuxedAccountsException` | Memo provided with muxed account |
-| `InvalidOperationTypeException` | Non-ManageData operation found |
-| `InvalidSourceAccountException` | Operation source mismatch |
-| `InvalidHomeDomainException` | Home domain mismatch |
-| `InvalidClientDomainSourceException` | Client domain source mismatch |
-| `InvalidWebAuthDomainException` | Web auth domain mismatch |
-| `InvalidTimeBoundsException` | Time bounds invalid or expired |
-| `InvalidSignatureCountException` | Wrong number of signatures |
-| `InvalidSignatureException` | Invalid server signature |
-| `TokenSubmissionException` | Token submission failures |
-
-## Security Features
-
-| Feature | Status | Implementation |
-|---------|--------|---------------|
-| Time bounds validation | ✅ | With configurable grace period (default 300 seconds) |
-| Replay attack prevention | ✅ | Sequence number zero + time bounds validation |
-| Server signature verification | ✅ | Ed25519 cryptographic verification |
-| Domain confusion prevention | ✅ | Home domain and web auth domain validation |
-| MITM attack prevention | ✅ | Server signature validation before signing |
-| Nonce validation | ✅ | ManageData operation value checked |
-| Network passphrase validation | ✅ | Transaction hash includes network passphrase |
-
-## Platform Support
-
-All features work across all supported platforms:
-- JVM (Android, Server)
-- iOS
-- macOS
-- JavaScript (Browser & Node.js)
-
-## Additional Information
-
-**Documentation:** See `docs/sep/sep-10.md` for usage examples and API reference
-
-**Specification:** [SEP-0010: Stellar Web Authentication](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md)
-
-**Implementation Package:** `com.soneso.stellar.sdk.sep.sep10`
-
-**Integration Tests:** Live testnet integration against testanchor.stellar.org
-
-**Last Updated:** 2025-12-09
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `Content` |  | ✅ | `(handled by sendSignedChallenge)` | -Type: `application/x-www-form-urlencoded`, body: `transaction=<signed XDR (URL-encoded)>`) |
+| `decode` |  | ✅ | `validateChallenge` | the received input as a base64-urlencoded XDR representation of Stellar transaction envelope; |
+| `verify` |  | ✅ | `validateChallenge` | that transaction source account is equal to the **Server Account** |
+| `if` | ✓ | ✅ | `validateChallenge` | the first operation's source account exists: - verify that the remaining signature count is one o... |
+| `iss` |  | ✅ | `token` | (the principal that issued a token, [RFC7519, Section 4.1.1](https://tools.ietf.org/html/rfc7519#section-4.1.1)) — a [Uniform Resource Identifier (URI)] for the issuer (`https://example.com` or `https://example.com/G...`) |
+| `sub` |  | ✅ | `token` | (the principal that is the subject of the JWT, [RFC7519, Section 4.1.2](https://tools.ietf.org/html/rfc7519#section-4.1.2)) — there are several possible formats: - If the **Client Account** is a muxed account (`M...`), the `sub` value should be the muxed account (`M...`). - If the **Client Account** is a stellar account (`G...`): - And, a memo was attached to the challenge transaction, the `sub` should be the stellar account appended with the memo, separated by a colon (`G...:17509749319012223907`). - Otherwise, the `sub` value should be Stellar account (`G...`). |
+| `iat` |  | ✅ | `token` | (the time at which the JWT was issued [RFC7519, Section 4.1.6](https://tools.ietf.org/html/rfc7519#section-4.1.6)) — current timestamp (`1530644093`) |
+| `exp` |  | ✅ | `token` | (the expiration time on or after which the JWT must not be accepted for processing, [RFC7519, Section 4.1.4](https://tools.ietf.org/html/rfc7519#section-4.1.4)) — a server can pick its own expiration period for the token (`1530730493`) |
+| `client_domain` |  | ✅ | `token` | - (optional) a nonstandard JWT claim containing the client home domain, included if the challenge... |
 
 ## Legend
 
-- ✅ **Implemented**: Feature is fully supported in the SDK
-- ❌ **Not Implemented**: Feature is not currently supported
-- ⚠️ **Partial**: Feature is partially supported with limitations
-- ⚪ **N/A**: Not applicable (server-side feature)
+- ✅ **Implemented**: Field is fully supported in the SDK
+- ❌ **Not Implemented**: Field is not currently supported
+- ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
+
+## Additional Information
+
+**Documentation:** See `docs/sep-implementations.md` for usage examples and API reference
+
+**Specification:** [SEP-0010](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md)
+
+**Implementation Package:** `com.soneso.stellar.sdk.sep.sep0010`

@@ -1,0 +1,189 @@
+{
+    "sep_number": "0012",
+    "preamble": {
+        "sep": "0012",
+        "title": "KYC API",
+        "author": "Interstellar",
+        "status": "Active",
+        "created": "2018-09-11",
+        "updated": "2024-07-23",
+        "version": "1.15.0"
+    },
+    "summary": "This SEP defines a standard way for stellar clients to upload KYC (or other) information to anchors and other services. [SEP-6](sep-0006.md) and [SEP-31](sep-0031.md) use this protocol, but it can serve as a stand-alone service as well. This SEP was made with these goals in mind: - interoperability - Allow a customer to enter their KYC information to their wallet once and use it across many services without re-entering information manually - handle the most common 80% of use cases - handle image and binary data - support the set of fields defined in [SEP-9](sep-0009.md) - support authentication via [SEP-10](sep-0010.md) - support the provision of data for [SEP-6](sep-0006.md), [SEP-24](sep-0024.md), [SEP-31](sep-0031.md), and others - give customers control over their data by supporting complete data erasure To support this protocol an anchor acts as a server and implements the specified REST API endpoints, while a wallet implements a client that consumes the API. The goal is interoperability, so a wallet implements a single client according to the protocol, and will be able to interact with any compliant anchor. Similarly, an anchor that implements the API endpoints according to the protocol will work with any compliant wallet.",
+    "sections": [
+        {
+            "title": "Customer GET",
+            "key": "customer_get",
+            "field_count": 12,
+            "fields": [
+                {
+                    "name": "id",
+                    "description": "(optional) The ID of the customer as returned in the response of a previous `PUT` request. If the customer has not been registered, they do not yet have an `id`.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`string`"
+                },
+                {
+                    "name": "account",
+                    "description": "(**deprecated**, optional) The server should infer the account from the `sub` value in the SEP-10/SEP-45 JWT to identify the customer. The `account` parameter is only used for backwards compatibility, and if explicitly provided in the request body it should match the `sub` value of the decoded SEP-10/SEP-45 JWT.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`G...` or `M...` or `C...` string"
+                },
+                {
+                    "name": "memo",
+                    "description": "(optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "memo_type",
+                    "description": "(**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memos should always be of type `id`, although anchors should continue to support this parameter for outdated clients. If `hash`, `memo` should be base64-encoded. If a memo is present in the decoded SEP-10 JWT's `sub` value, this parameter can be ignored. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "type",
+                    "description": "(optional) the type of action the customer is being KYCd for. See the [Type Specification](#type-specification) below.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "transaction_id",
+                    "description": "(optional) The transaction id with which the customer's info is associated. When information from the customer depends on the transaction (e.g., more information is required for larger amounts)",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`string`"
+                },
+                {
+                    "name": "lang",
+                    "description": "(optional) Defaults to `en`. Language code specified using [ISO 639-1](https://en.wikipedia.org/wiki/ISO_639-1). Human readable descriptions, choices, and messages should be in this language.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "id",
+                    "description": "(optional) ID of the customer, if the customer has already been created via a `PUT /customer` request.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "status",
+                    "description": "Status of the customers KYC process.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "fields",
+                    "description": "(optional) An object containing the fields the anchor has not yet received for the given customer of the `type` provided in the request. Required for customers in the `NEEDS_INFO` status. See [Fields](#fields) for more detailed information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "object"
+                },
+                {
+                    "name": "provided_fields",
+                    "description": "(optional) An object containing the fields the anchor has received for the given customer. See [Provided Fields](#provided-fields) for more detailed information. Required for customers whose information needs [verification](#verification).",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "object"
+                },
+                {
+                    "name": "message",
+                    "description": "(optional) Human readable message describing the current state of customer's KYC process.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "title": "Customer PUT",
+            "key": "customer_put",
+            "field_count": 7,
+            "fields": [
+                {
+                    "name": "id",
+                    "description": "(optional) The `id` value returned from a previous call to this endpoint. If specified, no other parameter is required.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "account",
+                    "description": "(**deprecated**, optional) The server should infer the account from the `sub` value in the SEP-10/SEP-45 JWT to identify the customer. The `account` parameter is only used for backwards compatibility, and if explicitly provided in the request body it should match the `sub` value of the decoded SEP-10/SEP-45 JWT.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`G...` or `M...` or `C...` string"
+                },
+                {
+                    "name": "memo",
+                    "description": "(optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "memo_type",
+                    "description": "(**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memos should always be of type `id`, although anchors should continue to support this parameter for outdated clients. If `hash`, `memo` should be base64-encoded. If a memo is present in the decoded SEP-10 JWT's `sub` value, this parameter can be ignored. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "type",
+                    "description": "(optional) The type of the customer as defined in the [Type Specification](#type-specification).",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "transaction_id",
+                    "description": "(optional) The transaction id with which the customer's info is associated. When information from the customer depends on the transaction (e.g., more information is required for larger amounts)",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`string`"
+                },
+                {
+                    "name": "id",
+                    "description": "An identifier for the updated or created customer",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "`string`"
+                }
+            ]
+        },
+        {
+            "title": "Customer DELETE",
+            "key": "customer_delete",
+            "field_count": 2,
+            "fields": [
+                {
+                    "name": "memo",
+                    "description": "(optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                },
+                {
+                    "name": "memo_type",
+                    "description": "(**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memos should always be of type `id`, although anchors should continue to support this parameter for outdated clients. If `hash`, `memo` should be base64-encoded. If a memo is present in the decoded SEP-10 JWT's `sub` value, this parameter can be ignored. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information.",
+                    "requirements": "optional",
+                    "required": false,
+                    "type": "string"
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "parsed_at": "2026-02-13T19:09:43.499285+00:00",
+        "source_url": "https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md",
+        "total_fields": 21,
+        "content_length": 54480
+    }
+}

@@ -128,7 +128,7 @@ tools/sdk-analysis/
 # Compatibility analysis generated data (keep source code)
 compatibility/horizon/data/
 compatibility/rpc/data/
-compatibility/sep/data/
+# Note: compatibility/sep/data/ is tracked (generated JSON files are committed)
 
 # Vite build cache (demo web app)
 demo/webApp/.vite/

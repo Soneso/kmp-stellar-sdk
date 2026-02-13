@@ -1,6 +1,6 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-02-11 15:11:25
+**Generated:** 2026-02-13 20:09:45
 
 **SEP Version:** 2.5.0<br>
 **SEP Status:** Draft<br>
@@ -13,10 +13,11 @@ This protocol enables anchors to accept off-chain assets in exchange for differe
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (63/63 fields)
+**Total Coverage:** 100.0% (69/69 fields)
 
-- ✅ **Implemented:** 63/63
-- ❌ **Not Implemented:** 0/63
+- ✅ **Implemented:** 69/69
+- ❌ **Not Implemented:** 0/69
+- **Required Fields:** 100.0% (2/2)
 
 ## Implementation Status
 
@@ -25,233 +26,181 @@ This protocol enables anchors to accept off-chain assets in exchange for differe
 ### Implementation Files
 
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/QuoteService.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38InfoResponse.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38Asset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38DeliveryMethod.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PricesResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38SellAsset.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38BuyAsset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PriceResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38DeliveryMethod.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38Fee.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38FeeDetail.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38InfoResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PriceResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PricesResponse.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteRequest.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38Exception.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38SellAsset.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38BadRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38PermissionDeniedException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38Exception.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38NotFoundException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38PermissionDeniedException.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38UnknownResponseException.kt`
 
 ### Key Classes
 
-- **`QuoteService`** - Methods: fromDomain, info, prices, price, postQuote, getQuote
-- **`Sep38InfoResponse`**
+- **`QuoteService`** - Methods: fromDomain, info, prices, price, postQuote, getQuote, extractErrorMessage
 - **`Sep38Asset`**
-- **`Sep38DeliveryMethod`**
-- **`Sep38PricesResponse`**
-- **`Sep38SellAsset`**
 - **`Sep38BuyAsset`**
-- **`Sep38PriceResponse`**
+- **`Sep38DeliveryMethod`**
 - **`Sep38Fee`**
 - **`Sep38FeeDetail`**
+- **`Sep38InfoResponse`**
+- **`Sep38PriceResponse`**
+- **`Sep38PricesResponse`**
 - **`Sep38QuoteRequest`**
 - **`Sep38QuoteResponse`**
-- **`Sep38Exception`**
-- **`Sep38BadRequestException`**
-- **`Sep38PermissionDeniedException`**
-- **`Sep38NotFoundException`**
-- **`Sep38UnknownResponseException`**
+- **`Sep38SellAsset`**
+- **`Sep38BadRequestException`** - Methods: toString
+- **`for`** - Methods: toString
+- **`to`** - Methods: toString
+- **`Sep38Exception`** - Methods: toString
+- **`QuoteCache`**
+- **`CachedQuote`**
+- **`Sep38NotFoundException`** - Methods: toString
+- **`Sep38Client`**
+- **`Sep38PermissionDeniedException`** - Methods: toString
+- **`QuoteResult`**
+- **`Success`**
+- **`Retryable`**
+- **`Failed`**
+- **`Sep38UnknownResponseException`** - Methods: toString
 
 ### Test Coverage
 
-**Tests:** 42 test cases
+**Tests:** 93 test cases
 
 **Test Files:**
 
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38InfoResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PriceResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteRequestTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PricesResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep38/QuoteServiceIntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/QuoteServiceTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38AssetTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38DeliveryMethodTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38ExceptionsTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38InfoResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PriceResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PricesResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteRequestTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteResponseTest.kt`
 
 ## Coverage by Section
 
-| Section | Coverage | Implemented | Total |
-|---------|----------|-------------|-------|
-| Asset Fields | 100.0% | 4 | 4 |
-| Buy Asset Fields | 100.0% | 3 | 3 |
-| Delivery Method Fields | 100.0% | 2 | 2 |
-| Fee Details Fields | 100.0% | 3 | 3 |
-| Fee Fields | 100.0% | 3 | 3 |
-| Get Quote Endpoint | 100.0% | 1 | 1 |
-| Info Endpoint | 100.0% | 1 | 1 |
-| Info Response Fields | 100.0% | 1 | 1 |
-| Post Quote Endpoint | 100.0% | 1 | 1 |
-| Post Quote Request Fields | 100.0% | 9 | 9 |
-| Price Endpoint | 100.0% | 1 | 1 |
-| Price Request Parameters | 100.0% | 8 | 8 |
-| Price Response Fields | 100.0% | 5 | 5 |
-| Prices Endpoint | 100.0% | 1 | 1 |
-| Prices Request Parameters | 100.0% | 7 | 7 |
-| Prices Response Fields | 100.0% | 2 | 2 |
-| Quote Response Fields | 100.0% | 11 | 11 |
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| GET Info | 100.0% | N/A | 7 | 7 |
+| GET Price | 100.0% | N/A | 19 | 19 |
+| GET Prices | 100.0% | N/A | 12 | 12 |
+| GET Quote | 100.0% | 1/1 | 11 | 11 |
+| POST Quote | 100.0% | 1/1 | 20 | 20 |
 
 ## Detailed Field Comparison
 
-### Asset Fields
+### GET Info
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `asset` | ✓ | ✅ | `Sep38Asset.asset` | Asset identifier in Asset Identification Format (stellar:CODE:ISSUER or iso4217:CUR) |
-| `sell_delivery_methods` |  | ✅ | `Sep38Asset.sellDeliveryMethods` | Array of delivery methods for selling this asset (off-chain assets only) |
-| `buy_delivery_methods` |  | ✅ | `Sep38Asset.buyDeliveryMethods` | Array of delivery methods for buying this asset (off-chain assets only) |
-| `country_codes` |  | ✅ | `Sep38Asset.countryCodes` | Array of ISO 3166-2 or ISO 3166-1 alpha-2 country codes (fiat assets only) |
+| `assets` |  | ✅ | `assets` | An array of objects describing the assets available in exchange for one or more of the other asse... |
+| `asset` |  | ✅ | `asset` | The [Asset Identification Format](#asset-identification-format) value. |
+| `sell_delivery_methods` |  | ✅ | `sellDeliveryMethods` | (optional) Only for non-Stellar assets. An array of objects describing the methods a client can u... |
+| `buy_delivery_methods` |  | ✅ | `buyDeliveryMethods` | (optional) Only for non-Stellar assets. An array of objects describing the methods a client can u... |
+| `country_codes` |  | ✅ | `countryCodes` | (optional) Only for fiat assets. A list of [ISO 3166-2](https://en.wikipedia.org/wiki/ISO_3166-2) codes of the countries where the Anchor operates for fiat transactions. Anchor may not require second part of the ISO 3166-2 to be passed (i.e. use [ISO-3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) instead). |
+| `name` |  | ✅ | `name` | The value to use when making `POST /quote` requests. |
+| `description` |  | ✅ | `description` | A human readable description of the method identified by `name`. |
 
-### Buy Asset Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `asset` | ✓ | ✅ | `Sep38BuyAsset.asset / Sep38SellAsset.asset` | Asset identifier in Asset Identification Format |
-| `price` | ✓ | ✅ | `Sep38BuyAsset.price / Sep38SellAsset.price` | Price offered by anchor for one unit of buy_asset |
-| `decimals` | ✓ | ✅ | `Sep38BuyAsset.decimals / Sep38SellAsset.decimals` | Number of decimals for the buy asset |
-
-### Delivery Method Fields
+### GET Price
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `name` | ✓ | ✅ | `Sep38DeliveryMethod.name` | Delivery method name identifier |
-| `description` | ✓ | ✅ | `Sep38DeliveryMethod.description` | Human-readable description of the delivery method |
+| `sell_asset` |  | ✅ | `sellAsset` | The asset the client would like to sell. Ex. `USDC:G...`, `iso4217:ARS` |
+| `buy_asset` |  | ✅ | `buyAsset` | The asset the client would like to exchange for `sell_asset`. |
+| `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` the client would like to exchange for `buy_asset`. |
+| `buy_amount` |  | ✅ | `buyAmount` | The amount of `buy_asset` the client would like to purchase with `sell_asset`. |
+| `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) One of the `name` values specified by the `sell_delivery_methods` array for the associ... |
+| `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) One of the `name` values specified by the `buy_delivery_methods` array for the associa... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-2](https://en.wikipedia.org/wiki/ISO_3166-2) or [ISO-3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) code of the user's current address. Should be provided if there are two or more country codes available for the desired asset in [`GET /info`](#get-info). |
+| `context` |  | ✅ | `context` | The context for what this quote will be used for. Must be one of `sep6` or `sep31`. |
+| `total_price` |  | ✅ | `totalPrice` | The total conversion price offered by the anchor for one unit of `buy_asset` in terms of `sell_as... |
+| `price` |  | ✅ | `price` | The conversion price offered by the anchor for one unit of `buy_asset` in terms of `sell_asset`, ... |
+| `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` the anchor will exchange for `buy_asset`. It could be different from t... |
+| `buy_amount` |  | ✅ | `buyAmount` | The amount of `buy_asset` the anchor will provide with `sell_asset`. It could be different from t... |
+| `fee` |  | ✅ | `fee` | An object describing the fee used to calculate the conversion price. This can be used to detail t... |
+| `total` |  | ✅ | `total` | The total amount of fee applied. |
+| `asset` |  | ✅ | `asset` | The asset in which the fee is applied, represented through the [Asset Identification Format](#ass... |
+| `details` |  | ✅ | `details` | (optional) An array of objects detailing the fees that were used to calculate the conversion pric... |
+| `name` |  | ✅ | `name` | The name of the fee, for example `ACH fee`, `Brazilian conciliation fee`, `Service fee`, etc. |
+| `description` |  | ✅ | `description` | (optional) A text describing the fee. |
+| `amount` |  | ✅ | `amount` | The amount of asset applied. If `fee.details` is provided, `sum(fee.details.amount)` should be eq... |
 
-### Fee Details Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `name` | ✓ | ✅ | `Sep38FeeDetail.name` | Name identifier for the fee component |
-| `description` |  | ✅ | `Sep38FeeDetail.description` | Human-readable description of the fee |
-| `amount` | ✓ | ✅ | `Sep38FeeDetail.amount` | Fee amount as decimal string |
-
-### Fee Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `total` | ✓ | ✅ | `Sep38Fee.total` | Total fee amount as decimal string |
-| `asset` | ✓ | ✅ | `Sep38Fee.asset` | Asset identifier for the fee |
-| `details` |  | ✅ | `Sep38Fee.details` | Optional array of fee breakdown objects |
-
-### Get Quote Endpoint
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `get_quote_endpoint` | ✓ | ✅ | `QuoteService.getQuote()` | GET /quote/:id - Fetch a previously-provided firm quote |
-
-### Info Endpoint
+### GET Prices
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `info_endpoint` | ✓ | ✅ | `QuoteService.info()` | GET /info - Returns supported Stellar and off-chain assets available for trading |
+| `sell_asset` |  | ✅ | `sellAsset` | The asset you want to sell, using the [Asset Identification Format](#asset-identification-format)... |
+| `buy_asset` |  | ✅ | `buyAsset` | The asset you want to buy, using the [Asset Identification Format](#asset-identification-format).... |
+| `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` the client would exchange for each of the `buy_assets`. The `sell_amou... |
+| `buy_amount` |  | ✅ | `buyAmount` | The amount of `buy_asset` the client would exchange for each of the `sell_assets`. The `buy_amoun... |
+| `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) One of the `name` values specified by the `sell_delivery_methods` array for the associ... |
+| `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) One of the `name` values specified by the `buy_delivery_methods` array for the associa... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-2](https://en.wikipedia.org/wiki/ISO_3166-2) or [ISO-3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) code of the user's current address. Should be provided if there are two or more country codes available for the desired asset in [`GET /info`](#get-info). |
+| `buy_assets` |  | ✅ | `buyAssets` | An array of objects containing information on the assets that the client will receive when the `s... |
+| `sell_assets` |  | ✅ | `sellAssets` | An array of objects containing information on the assets that the client will receive when the `b... |
+| `asset` |  | ✅ | `asset` | The [Asset Identification Format](#asset-identification-format) value. |
+| `price` |  | ✅ | `price` | The price offered by the anchor for one unit of `asset` in terms of `sell_asset`. In traditional ... |
+| `decimals` |  | ✅ | `decimals` | The number of decimals needed to represent `asset`. |
 
-### Info Response Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `assets` | ✓ | ✅ | `Sep38InfoResponse.assets` | Array of asset objects supported for trading |
-
-### Post Quote Endpoint
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `post_quote_endpoint` | ✓ | ✅ | `QuoteService.postQuote()` | POST /quote - Request a firm quote for asset exchange |
-
-### Post Quote Request Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `context` | ✓ | ✅ | `Sep38QuoteRequest.context` | Context for quote usage (sep6, sep24, or sep31) |
-| `sell_asset` | ✓ | ✅ | `Sep38QuoteRequest.sellAsset` | Asset client would like to sell |
-| `buy_asset` | ✓ | ✅ | `Sep38QuoteRequest.buyAsset` | Asset client would like to exchange for sell_asset |
-| `sell_amount` |  | ✅ | `Sep38QuoteRequest.sellAmount` | Amount of sell_asset to exchange (mutually exclusive with buy_amount) |
-| `buy_amount` |  | ✅ | `Sep38QuoteRequest.buyAmount` | Amount of buy_asset to exchange for (mutually exclusive with sell_amount) |
-| `expire_after` |  | ✅ | `Sep38QuoteRequest.expireAfter` | Requested expiration timestamp for the quote (ISO 8601) |
-| `sell_delivery_method` |  | ✅ | `Sep38QuoteRequest.sellDeliveryMethod` | Delivery method for off-chain sell asset |
-| `buy_delivery_method` |  | ✅ | `Sep38QuoteRequest.buyDeliveryMethod` | Delivery method for off-chain buy asset |
-| `country_code` |  | ✅ | `Sep38QuoteRequest.countryCode` | ISO 3166-2 or ISO 3166-1 alpha-2 country code |
-
-### Price Endpoint
+### GET Quote
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `price_endpoint` | ✓ | ✅ | `QuoteService.price()` | GET /price - Returns indicative price for a specific asset pair |
+| `id` |  | ✅ | `id` | The unique identifier for the quote. Same as the `id` returned in the [`POST /quote`](#post-quote... |
+| `id` |  | ✅ | `id` | The `id` specified in the request. |
+| `expires_at` |  | ✅ | `expiresAt` | The date and time by which the anchor must receive funds from the client. |
+| `price` |  | ✅ | `price` | The price offered by the anchor for one unit of `buy_asset` in terms of `sell_asset`. In traditio... |
+| `sell_asset` |  | ✅ | `sellAsset` | The asset the client would like to sell. Ex. `USDC:G...`, `iso4217:ARS` |
+| `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` to be exchanged for `buy_asset`. |
+| `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) The method by which the user plans to deliver an off-chain asset to the anchor. This w... |
+| `buy_asset` |  | ✅ | `buyAsset` | The asset the client would like to exchange for `sell_asset`. |
+| `buy_amount` | ✓ | ✅ | `buyAmount` | The amount of `buy_asset` to be exchanged for `sell_asset`. `price * buy_amount = sell_amount` mu... |
+| `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) The method by which the user plans to receive an off-chain asset from the anchor. This... |
+| `fee` |  | ✅ | `fee` | An object describing the fee used to calculate the conversion price. This can be used to datail t... |
 
-### Price Request Parameters
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `context` | ✓ | ✅ | `QuoteService.price(context)` | Context for quote usage (sep6, sep24, or sep31) |
-| `sell_asset` | ✓ | ✅ | `QuoteService.price(sellAsset)` | Asset to sell using Asset Identification Format |
-| `buy_asset` | ✓ | ✅ | `QuoteService.price(buyAsset)` | Asset to buy using Asset Identification Format |
-| `sell_amount` |  | ✅ | `QuoteService.price(sellAmount)` | Amount of sell_asset to exchange (mutually exclusive with buy_amount) |
-| `buy_amount` |  | ✅ | `QuoteService.price(buyAmount)` | Amount of buy_asset to receive (mutually exclusive with sell_amount) |
-| `sell_delivery_method` |  | ✅ | `QuoteService.price(sellDeliveryMethod)` | Delivery method for off-chain sell asset |
-| `buy_delivery_method` |  | ✅ | `QuoteService.price(buyDeliveryMethod)` | Delivery method for off-chain buy asset |
-| `country_code` |  | ✅ | `QuoteService.price(countryCode)` | ISO 3166-2 or ISO 3166-1 alpha-2 country code |
-
-### Price Response Fields
+### POST Quote
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `total_price` | ✓ | ✅ | `Sep38PriceResponse.totalPrice` | Total conversion price including fees |
-| `price` | ✓ | ✅ | `Sep38PriceResponse.price` | Base conversion price excluding fees |
-| `sell_amount` | ✓ | ✅ | `Sep38PriceResponse.sellAmount` | Amount of sell_asset to be exchanged |
-| `buy_amount` | ✓ | ✅ | `Sep38PriceResponse.buyAmount` | Amount of buy_asset to be received |
-| `fee` | ✓ | ✅ | `Sep38PriceResponse.fee` | Fee object with total, asset, and optional details |
-
-### Prices Endpoint
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `prices_endpoint` | ✓ | ✅ | `QuoteService.prices()` | GET /prices - Returns indicative prices of off-chain assets in exchange for Stellar assets |
-
-### Prices Request Parameters
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `sell_asset` |  | ✅ | `QuoteService.prices(sellAsset)` | Asset to sell using Asset Identification Format (mutually exclusive with buy_asset) |
-| `buy_asset` |  | ✅ | `QuoteService.prices(buyAsset)` | Asset to buy using Asset Identification Format (mutually exclusive with sell_asset) |
-| `sell_amount` |  | ✅ | `QuoteService.prices(sellAmount)` | Amount of sell_asset to exchange (required when sell_asset is provided) |
-| `buy_amount` |  | ✅ | `QuoteService.prices(buyAmount)` | Amount of buy_asset to receive (required when buy_asset is provided) |
-| `sell_delivery_method` |  | ✅ | `QuoteService.prices(sellDeliveryMethod)` | Delivery method for off-chain sell asset |
-| `buy_delivery_method` |  | ✅ | `QuoteService.prices(buyDeliveryMethod)` | Delivery method for off-chain buy asset |
-| `country_code` |  | ✅ | `QuoteService.prices(countryCode)` | ISO 3166-2 or ISO 3166-1 alpha-2 country code |
-
-### Prices Response Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `buy_assets` |  | ✅ | `Sep38PricesResponse.buyAssets` | Array of buy asset objects with prices (when sell_asset is provided) |
-| `sell_assets` |  | ✅ | `Sep38PricesResponse.sellAssets` | Array of sell asset objects with prices (when buy_asset is provided) |
-
-### Quote Response Fields
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `id` | ✓ | ✅ | `Sep38QuoteResponse.id` | Unique identifier for the quote |
-| `expires_at` | ✓ | ✅ | `Sep38QuoteResponse.expiresAt` | Expiration timestamp for the quote (ISO 8601) |
-| `total_price` | ✓ | ✅ | `Sep38QuoteResponse.totalPrice` | Total conversion price including fees |
-| `price` | ✓ | ✅ | `Sep38QuoteResponse.price` | Base conversion price excluding fees |
-| `sell_asset` | ✓ | ✅ | `Sep38QuoteResponse.sellAsset` | Asset to be sold |
-| `sell_amount` | ✓ | ✅ | `Sep38QuoteResponse.sellAmount` | Amount of sell_asset to be exchanged |
-| `sell_delivery_method` |  | ✅ | `Sep38QuoteResponse.sellDeliveryMethod` | Delivery method for off-chain sell asset |
-| `buy_asset` | ✓ | ✅ | `Sep38QuoteResponse.buyAsset` | Asset to be bought |
-| `buy_amount` | ✓ | ✅ | `Sep38QuoteResponse.buyAmount` | Amount of buy_asset to be received |
-| `buy_delivery_method` |  | ✅ | `Sep38QuoteResponse.buyDeliveryMethod` | Delivery method for off-chain buy asset |
-| `fee` | ✓ | ✅ | `Sep38QuoteResponse.fee` | Fee object with total, asset, and optional details |
+| `sell_asset` |  | ✅ | `sellAsset` | Same as the definition of `sell_asset` in `GET /price`. |
+| `buy_asset` |  | ✅ | `buyAsset` | Same as the definition of `buy_asset` in `GET /price`. |
+| `sell_amount` |  | ✅ | `sellAmount` | Same as the definition of `sell_amount` in `GET /price`. |
+| `buy_amount` |  | ✅ | `buyAmount` | The same definition of `buy_amount` in `GET /price`. |
+| `expire_after` |  | ✅ | `expireAfter` | (optional) The client's desired `expires_at` date and time for the quote. Anchors may choose an `... |
+| `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) One of the `name` values specified by the `sell_delivery_methods` array for the associ... |
+| `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) One of the `name` values specified by the `buy_delivery_methods` array for the associa... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-2](https://en.wikipedia.org/wiki/ISO_3166-2) or [ISO-3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) code of the user's current address. Should be provided if there are two or more country codes available for the desired asset in [`GET /info`](#get-info). |
+| `context` |  | ✅ | `context` | The context for what this quote will be used for. Must be one of `sep6`, `sep24` or `sep31`. |
+| `id` |  | ✅ | `id` | The unique identifier for the quote to be used in other Stellar Ecosystem Proposals (SEPs). |
+| `expires_at` |  | ✅ | `expiresAt` | The date and time by which the anchor must receive funds from the client. |
+| `total_price` |  | ✅ | `totalPrice` | The total conversion price offered by the anchor for one unit of `buy_asset` in terms of `sell_as... |
+| `price` |  | ✅ | `price` | The conversion price offered by the anchor for one unit of `buy_asset` in terms of `sell_asset`, ... |
+| `sell_asset` |  | ✅ | `sellAsset` | The asset the client would like to sell. Ex. `USDC:G...`, `iso4217:ARS` |
+| `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` to be exchanged for `buy_asset`. It could be different from the `sell_... |
+| `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) The method by which the user plans to deliver an off-chain asset to the anchor. This w... |
+| `buy_asset` |  | ✅ | `buyAsset` | The asset the client would like to exchange for `sell_asset`. |
+| `buy_amount` | ✓ | ✅ | `buyAmount` | The amount of `buy_asset` to be exchanged for `sell_asset`. It could be different from the `buy_a... |
+| `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) The method by which the user plans to receive an off-chain asset from the anchor. This... |
+| `fee` |  | ✅ | `fee` | An object describing the fee used to calculate the conversion price. This can be used to datail t... |
 
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information
 

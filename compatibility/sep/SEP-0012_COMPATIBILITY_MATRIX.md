@@ -1,6 +1,6 @@
 # SEP-0012 (KYC API) Compatibility Matrix
 
-**Generated:** 2026-02-11 15:11:20
+**Generated:** 2026-02-13 20:09:45
 
 **SEP Version:** 1.15.0<br>
 **SEP Status:** Active<br>
@@ -9,14 +9,15 @@
 
 ## SEP Summary
 
-Defines a standard way for stellar clients to upload KYC (or other) information to anchors and other services. SEP-6 and SEP-31 use this protocol, but it can serve as a stand-alone service as well. Supports authentication via SEP-10, handles image and binary data, supports SEP-9 fields, and gives customers control over their data.
+This SEP defines a standard way for stellar clients to upload KYC (or other) information to anchors and other services. [SEP-6](sep-0006.md) and [SEP-31](sep-0031.md) use this protocol, but it can serve as a stand-alone service as well. This SEP was made with these goals in mind: - interoperability - Allow a customer to enter their KYC information to their wallet once and use it across many services without re-entering information manually - handle the most common 80% of use cases - handle image and binary data - support the set of fields defined in [SEP-9](sep-0009.md) - support authentication via [SEP-10](sep-0010.md) - support the provision of data for [SEP-6](sep-0006.md), [SEP-24](sep-0024.md), [SEP-31](sep-0031.md), and others - give customers control over their data by supporting complete data erasure To support this protocol an anchor acts as a server and implements the specified REST API endpoints, while a wallet implements a client that consumes the API. The goal is interoperability, so a wallet implements a single client according to the protocol, and will be able to interact with any compliant anchor. Similarly, an anchor that implements the API endpoints according to the protocol will work with any compliant wallet.
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (28/28 fields)
+**Total Coverage:** 100.0% (21/21 fields)
 
-- ✅ **Implemented:** 28/28
-- ❌ **Not Implemented:** 0/28
+- ✅ **Implemented:** 21/21
+- ❌ **Not Implemented:** 0/21
+- **Required Fields:** 100% (0/0)
 
 ## Implementation Status
 
@@ -24,141 +25,127 @@ Defines a standard way for stellar clients to upload KYC (or other) information 
 
 ### Implementation Files
 
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/KYCService.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CallbackSignatureVerifier.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerFileResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerStatus.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/FieldStatus.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerFilesResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoField.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoProvidedField.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoRequest.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoResponse.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/KYCService.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerCallbackRequest.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerInfoRequest.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerInfoResponse.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerVerificationRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerCallbackRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerFileResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerFilesResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/FieldStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoField.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoProvidedField.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CallbackSignatureVerifier.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/KYCException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/CustomerNotFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/UnauthorizedException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/FileTooLargeException.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/CustomerAlreadyExistsException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/CustomerNotFoundException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/FileTooLargeException.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/InvalidFieldException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/KYCException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/UnauthorizedException.kt`
 
 ### Key Classes
 
-- **`KYCService`** - Methods: fromDomain, getCustomerInfo, putCustomerInfo, putCustomerVerification, deleteCustomer, putCustomerCallback, postCustomerFile, getCustomerFiles
+- **`provides`**
+- **`CallbackSignatureVerifier`** - Methods: verify, parseSignatureHeader
+- **`CustomerFileResponse`**
+- **`CustomerStatus`** - Methods: fromString
+- **`FieldStatus`** - Methods: fromString
+- **`GetCustomerFilesResponse`**
+- **`is`**
+- **`with`**
+- **`GetCustomerInfoField`**
+- **`is`**
+- **`GetCustomerInfoProvidedField`**
 - **`GetCustomerInfoRequest`**
 - **`GetCustomerInfoResponse`**
+- **`KYCService`** - Methods: fromDomain, getCustomerInfo, putCustomerInfo, putCustomerVerification, deleteCustomer, putCustomerCallback, postCustomerFile, getCustomerFiles, extractFieldName, extractAccountId, extractCustomerId, extractFileSize
+- **`PutCustomerCallbackRequest`**
 - **`PutCustomerInfoRequest`**
 - **`PutCustomerInfoResponse`**
 - **`PutCustomerVerificationRequest`**
-- **`PutCustomerCallbackRequest`**
-- **`CustomerFileResponse`**
-- **`GetCustomerFilesResponse`**
-- **`CustomerStatus`**
-- **`FieldStatus`**
-- **`GetCustomerInfoField`**
-- **`GetCustomerInfoProvidedField`**
-- **`CallbackSignatureVerifier`** - Methods: verify
+- **`CustomerAlreadyExistsException`**
+- **`CustomerNotFoundException`**
+- **`FileTooLargeException`**
+- **`ValidationError`**
+- **`InvalidFieldException`**
+- **`for`**
+- **`to`**
+- **`KYCException`**
+- **`KYCClient`**
+- **`UnauthorizedException`**
 
 ### Test Coverage
 
-**Tests:** 105 test cases
+**Tests:** 151 test cases
 
 **Test Files:**
 
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerStatusTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/FieldStatusTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerInfoRequestTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerFileResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/KYCServiceTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/CallbackSignatureVerifierTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep12/MuxedAccountParsingTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep12/KYCServiceIntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CallbackSignatureVerifierTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CustomerFileResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CustomerStatusTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/FieldStatusTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/GetCustomerInfoResponseTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/KYCServiceTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/MuxedAccountParsingTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/PutCustomerInfoRequestTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/Sep12ExceptionsTest.kt`
 
 ## Coverage by Section
 
-| Section | Coverage | Implemented | Total |
-|---------|----------|-------------|-------|
-| Customer Callback PUT | 100.0% | 4 | 4 |
-| Customer DELETE | 100.0% | 3 | 3 |
-| Customer Files GET | 100.0% | 2 | 2 |
-| Customer Files POST | 100.0% | 1 | 1 |
-| Customer GET | 100.0% | 7 | 7 |
-| Customer PUT | 100.0% | 9 | 9 |
-| Customer Verification PUT (Deprecated) | 100.0% | 2 | 2 |
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| Customer DELETE | 100.0% | N/A | 2 | 2 |
+| Customer GET | 100.0% | N/A | 12 | 12 |
+| Customer PUT | 100.0% | N/A | 7 | 7 |
 
 ## Detailed Field Comparison
-
-### Customer Callback PUT
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `url` | ✓ | ✅ | `PutCustomerCallbackRequest.url` | Callback URL for status updates |
-| `id` |  | ✅ | `PutCustomerCallbackRequest.id` | Customer ID |
-| `account` |  | ✅ | `PutCustomerCallbackRequest.account` | Stellar account (G.../M.../C...) |
-| `memo` |  | ✅ | `PutCustomerCallbackRequest.memo` | Memo if account is shared |
 
 ### Customer DELETE
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `account` | ✓ | ✅ | `KYCService.deleteCustomer(account)` | Stellar account ID in URL path |
-| `memo` |  | ✅ | `KYCService.deleteCustomer(memo)` | Memo if account is shared |
-| `memo_type` |  | ✅ | `KYCService.deleteCustomer(memoType)` | Type of memo (text, id, or hash) |
-
-### Customer Files GET
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `file_id` |  | ✅ | `KYCService.getCustomerFiles(fileId)` | File ID to retrieve specific file info |
-| `customer_id` |  | ✅ | `KYCService.getCustomerFiles(customerId)` | Customer ID to retrieve all files for a customer |
-
-### Customer Files POST
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `file` | ✓ | ✅ | `KYCService.postCustomerFile(file)` | Binary file data |
+| `memo` |  | ✅ | `memo` | (optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information. |
+| `memo_type` |  | ✅ | `memoType` | (**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memo... |
 
 ### Customer GET
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `id` |  | ✅ | `GetCustomerInfoRequest.id` | ID of the customer as returned in a previous PUT request |
-| `account` |  | ✅ | `GetCustomerInfoRequest.account` | Stellar account (G.../M.../C...) - deprecated, use JWT sub instead |
-| `memo` |  | ✅ | `GetCustomerInfoRequest.memo` | Memo uniquely identifying the customer for shared accounts |
-| `memo_type` |  | ✅ | `GetCustomerInfoRequest.memoType` | Type of memo (text, id, or hash) - deprecated, use id only |
-| `type` |  | ✅ | `GetCustomerInfoRequest.type` | Type of action the customer is being KYC'd for (e.g., sep31-sender) |
-| `transaction_id` |  | ✅ | `GetCustomerInfoRequest.transactionId` | Transaction ID with which customer's info is associated |
-| `lang` |  | ✅ | `GetCustomerInfoRequest.lang` | Language code for human readable content (ISO 639-1) |
+| `id` |  | ✅ | `id` | (optional) The ID of the customer as returned in the response of a previous `PUT` request. If the... |
+| `account` |  | ✅ | `account` | (**deprecated**, optional) The server should infer the account from the `sub` value in the SEP-10... |
+| `memo` |  | ✅ | `memo` | (optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information. |
+| `memo_type` |  | ✅ | `memoType` | (**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memo... |
+| `type` |  | ✅ | `type` | (optional) the type of action the customer is being KYCd for. See the [Type Specification](#type-... |
+| `transaction_id` |  | ✅ | `transactionId` | (optional) The transaction id with which the customer's info is associated. When information from... |
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en`. Language code specified using [ISO 639-1](https://en.wikipedia.org/wiki/ISO_639-1). Human readable descriptions, choices, and messages should be in this language. |
+| `id` |  | ✅ | `id` | (optional) ID of the customer, if the customer has already been created via a `PUT /customer` req... |
+| `status` |  | ✅ | `status` | Status of the customers KYC process. |
+| `fields` |  | ✅ | `fields` | (optional) An object containing the fields the anchor has not yet received for the given customer... |
+| `provided_fields` |  | ✅ | `providedFields` | (optional) An object containing the fields the anchor has received for the given customer. See [P... |
+| `message` |  | ✅ | `message` | (optional) Human readable message describing the current state of customer's KYC process. |
 
 ### Customer PUT
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `id` |  | ✅ | `PutCustomerInfoRequest.id` | Customer ID from previous PUT request |
-| `account` |  | ✅ | `PutCustomerInfoRequest.account` | Stellar account (G.../M.../C...) - deprecated, use JWT sub instead |
-| `memo` |  | ✅ | `PutCustomerInfoRequest.memo` | Memo uniquely identifying the customer for shared accounts |
-| `memo_type` |  | ✅ | `PutCustomerInfoRequest.memoType` | Type of memo (text, id, or hash) - deprecated, use id only |
-| `type` |  | ✅ | `PutCustomerInfoRequest.type` | Type of action the customer is being KYC'd for |
-| `transaction_id` |  | ✅ | `PutCustomerInfoRequest.transactionId` | Transaction ID with which customer's info is associated |
-| `SEP-9 fields` |  | ✅ | `PutCustomerInfoRequest.kycFields` | Any SEP-9 standard KYC fields (text and binary) |
-| `verification fields` |  | ✅ | `PutCustomerInfoRequest.verificationFields` | Verification codes with _verification suffix (e.g., email_address_verification) |
-| `file references` |  | ✅ | `PutCustomerInfoRequest.fileReferences` | File IDs with _file_id suffix (e.g., photo_id_front_file_id) |
-
-### Customer Verification PUT (Deprecated)
-
-| Field | Required | Status | SDK Property | Description |
-|-------|----------|--------|--------------|-------------|
-| `id` | ✓ | ✅ | `PutCustomerVerificationRequest.id` | Customer ID |
-| `verification fields` | ✓ | ✅ | `PutCustomerVerificationRequest.verificationFields` | Field verification codes |
+| `id` |  | ✅ | `id` | (optional) The `id` value returned from a previous call to this endpoint. If specified, no other ... |
+| `account` |  | ✅ | `account` | (**deprecated**, optional) The server should infer the account from the `sub` value in the SEP-10... |
+| `memo` |  | ✅ | `memo` | (optional) the client-generated [memo](https://developers.stellar.org/docs/glossary/transactions/#memo) that uniquely identifies the customer. If a memo is present in the decoded SEP-10 JWT's `sub` value, it must match this parameter value. If a muxed account is used as the JWT's `sub` value, memos sent in requests must match the 64-bit integer subaccount ID of the muxed account. If the `account` is a `C...` account, the `memo` must not be specified. See the [Shared Accounts](#shared-omnibus-or-pooled-accounts) section for more information. |
+| `memo_type` |  | ✅ | `memoType` | (**deprecated**, optional) type of `memo`. One of `text`, `id` or `hash`. Deprecated because memo... |
+| `type` |  | ✅ | `type` | (optional) The type of the customer as defined in the [Type Specification](#type-specification). |
+| `transaction_id` |  | ✅ | `transactionId` | (optional) The transaction id with which the customer's info is associated. When information from... |
+| `id` |  | ✅ | `id` | An identifier for the updated or created customer |
 
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information
 

@@ -1,0 +1,290 @@
+{
+    "sep_number": "0008",
+    "preamble": {
+        "sep": "0008",
+        "title": "Regulated Assets",
+        "author": "Tomer Weller <@tomerweller>, Howard Chen <@howardtw>, Christian Peters (DSTOQ) <@shredding>, Leigh McCulloch <@leighmcculloch>",
+        "status": "Active",
+        "created": "2018-08-22",
+        "updated": "2022-02-21",
+        "version": "1.7.4"
+    },
+    "summary": "Regulated Assets are assets that require an issuer’s approval (or a delegated third party’s approval, such as a licensed securities exchange) on a per-transaction basis. It standardizes the identification of such assets as well as defines the protocol for performing compliance checks and requesting issuer approval.",
+    "sections": [
+        {
+            "title": "Approval Endpoint",
+            "key": "approval_endpoint",
+            "field_count": 1,
+            "fields": [
+                {
+                    "name": "tx_approve",
+                    "description": "POST /tx_approve - Approval server endpoint that receives a signed transaction, checks for compliance, and signs it on success",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Request Parameters",
+            "key": "request_parameters",
+            "field_count": 1,
+            "fields": [
+                {
+                    "name": "tx",
+                    "description": "A base64 encoded transaction envelope XDR signed by the user. This is the transaction that will be tested for compliance and signed on success.",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Response Statuses",
+            "key": "response_statuses",
+            "field_count": 5,
+            "fields": [
+                {
+                    "name": "success",
+                    "description": "Transaction was found compliant and signed without being revised",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "revised",
+                    "description": "Transaction was revised to be made compliant",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "pending",
+                    "description": "Issuer could not determine whether to approve the transaction at the time of receiving it",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_required",
+                    "description": "User must complete an action before this transaction can be approved",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "rejected",
+                    "description": "Transaction is not compliant and could not be revised to be made compliant",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Success Response Fields",
+            "key": "success_response_fields",
+            "field_count": 3,
+            "fields": [
+                {
+                    "name": "status",
+                    "description": "Status value \"success\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "tx",
+                    "description": "Transaction envelope XDR, base64 encoded. This transaction will have both the original signature(s) from the request as well as one or multiple additional signatures from the issuer.",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "description": "A human readable string containing information to pass on to the user",
+                    "requirements": "optional",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "title": "Revised Response Fields",
+            "key": "revised_response_fields",
+            "field_count": 3,
+            "fields": [
+                {
+                    "name": "status",
+                    "description": "Status value \"revised\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "tx",
+                    "description": "Transaction envelope XDR, base64 encoded. This transaction is a revised compliant version of the original request transaction, signed by the issuer.",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "description": "A human readable string explaining the modifications made to the transaction to make it compliant",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Pending Response Fields",
+            "key": "pending_response_fields",
+            "field_count": 3,
+            "fields": [
+                {
+                    "name": "status",
+                    "description": "Status value \"pending\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "timeout",
+                    "description": "Number of milliseconds to wait before submitting the same transaction again. Use 0 if the wait time cannot be determined.",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "description": "A human readable string containing information to pass on to the user",
+                    "requirements": "optional",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "title": "Action Required Response Fields",
+            "key": "action_required_response_fields",
+            "field_count": 5,
+            "fields": [
+                {
+                    "name": "status",
+                    "description": "Status value \"action_required\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "message",
+                    "description": "A human readable string containing information regarding the action required",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_url",
+                    "description": "A URL that allows the user to complete the actions required to have the transaction approved",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_method",
+                    "description": "GET or POST, indicating the type of request that should be made to the action_url. If not provided, GET is assumed.",
+                    "requirements": "optional",
+                    "required": false
+                },
+                {
+                    "name": "action_fields",
+                    "description": "An array of additional fields defined by SEP-9 Standard KYC / AML fields that the client may optionally provide to the approval service when sending the request to the action_url",
+                    "requirements": "optional",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "title": "Rejected Response Fields",
+            "key": "rejected_response_fields",
+            "field_count": 2,
+            "fields": [
+                {
+                    "name": "status",
+                    "description": "Status value \"rejected\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "error",
+                    "description": "A human readable string explaining why the transaction is not compliant and could not be made compliant",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Action URL Handling",
+            "key": "action_url_handling",
+            "field_count": 4,
+            "fields": [
+                {
+                    "name": "action_url_get",
+                    "description": "Support for GET method to action_url with query parameters",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_url_post",
+                    "description": "Support for POST method to action_url with JSON body",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_url_post_response_no_further_action",
+                    "description": "Handle POST response with result \"no_further_action_required\"",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "action_url_post_response_follow_next_url",
+                    "description": "Handle POST response with result \"follow_next_url\" and next_url field",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "title": "Stellar TOML Fields",
+            "key": "stellar_toml_fields",
+            "field_count": 3,
+            "fields": [
+                {
+                    "name": "regulated",
+                    "description": "A boolean indicating whether or not this is a regulated asset. If missing, false is assumed.",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "approval_server",
+                    "description": "The URL of an approval service that signs validated transactions",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "approval_criteria",
+                    "description": "A human readable string that explains the issuer's requirements for approving transactions",
+                    "requirements": "optional",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "title": "Authorization Flags",
+            "key": "authorization_flags",
+            "field_count": 2,
+            "fields": [
+                {
+                    "name": "authorization_required",
+                    "description": "Authorization Required flag must be set on issuer account",
+                    "requirements": "required",
+                    "required": true
+                },
+                {
+                    "name": "authorization_revocable",
+                    "description": "Authorization Revocable flag must be set on issuer account",
+                    "requirements": "required",
+                    "required": true
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "parsed_at": "2026-02-13T19:09:42.814589+00:00",
+        "source_url": "https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md",
+        "total_fields": 32,
+        "content_length": 21958
+    }
+}

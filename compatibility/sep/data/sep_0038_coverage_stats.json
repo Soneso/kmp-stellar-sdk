@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-02-13T20:09:45.115977",
+  "sep_number": "0038",
+  "sep_version": "2.5.0",
+  "sdk_version": "1.2.1",
+  "overall": {
+    "total_fields": 69,
+    "implemented": 69,
+    "not_implemented": 0,
+    "coverage_percentage": 100.0,
+    "required_total": 2,
+    "required_implemented": 2,
+    "required_percentage": 100.0
+  },
+  "by_section": {
+    "GET Info": {
+      "total": 7,
+      "implemented": 7,
+      "required_total": 0,
+      "required_implemented": 0,
+      "percentage": 100.0,
+      "required_percentage": 100
+    },
+    "GET Prices": {
+      "total": 12,
+      "implemented": 12,
+      "required_total": 0,
+      "required_implemented": 0,
+      "percentage": 100.0,
+      "required_percentage": 100
+    },
+    "GET Price": {
+      "total": 19,
+      "implemented": 19,
+      "required_total": 0,
+      "required_implemented": 0,
+      "percentage": 100.0,
+      "required_percentage": 100
+    },
+    "POST Quote": {
+      "total": 20,
+      "implemented": 20,
+      "required_total": 1,
+      "required_implemented": 1,
+      "percentage": 100.0,
+      "required_percentage": 100.0
+    },
+    "GET Quote": {
+      "total": 11,
+      "implemented": 11,
+      "required_total": 1,
+      "required_implemented": 1,
+      "percentage": 100.0,
+      "required_percentage": 100.0
+    }
+  },
+  "gaps_by_priority": {
+    "critical": [],
+    "high": [],
+    "medium": [],
+    "low": []
+  },
+  "test_coverage": {
+    "test_count": 93,
+    "test_files": [
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep38/QuoteServiceIntegrationTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/QuoteServiceTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38AssetTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38DeliveryMethodTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38ExceptionsTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38InfoResponseTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PriceResponseTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PricesResponseTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteRequestTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteResponseTest.kt"
+    ]
+  }
+}

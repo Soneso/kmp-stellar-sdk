@@ -1,0 +1,513 @@
+{
+  "implemented": true,
+  "files": [
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/AuthToken.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/ChallengeResponse.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionRequest.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionResponse.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/WebAuth.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeRequestException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeValidationException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/GenericChallengeValidationException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidClientDomainSourceException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidHomeDomainException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoTypeException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoValueException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidOperationTypeException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSequenceNumberException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureCountException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSourceAccountException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidTimeBoundsException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidWebAuthDomainException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/MemoWithMuxedAccountException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/NoMemoForMuxedAccountsException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/TokenSubmissionException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/WebAuthException.kt"
+  ],
+  "test_files": [
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep10/WebAuthIntegrationTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenEnhancedTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/Sep10ExceptionsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthChallengeTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthClientDomainSigningDelegateTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthJwtTokenTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthSigningTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthTokenSubmissionTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthValidationTest.kt"
+  ],
+  "test_count": 165,
+  "classes": [
+    {
+      "name": "parses",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/AuthToken.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "AuthToken",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/AuthToken.kt",
+      "methods": [
+        {
+          "name": "isExpired",
+          "params": [],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        },
+        {
+          "name": "parse",
+          "params": [
+            "jwtToken: String"
+          ],
+          "return_type": "AuthToken",
+          "suspend": false
+        },
+        {
+          "name": "decodeBase64UrlSafe",
+          "params": [
+            "encoded: String"
+          ],
+          "return_type": "ByteArray",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "token",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "iss",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "sub",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "iat",
+          "type": "Long",
+          "nullable": true
+        },
+        {
+          "name": "exp",
+          "type": "Long",
+          "nullable": true
+        },
+        {
+          "name": "jti",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "clientDomain",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "account",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "memo",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "ChallengeResponse",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/ChallengeResponse.kt",
+      "methods": [],
+      "properties": [
+        {
+          "name": "transaction",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "networkPassphrase",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "TokenSubmissionRequest",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionRequest.kt",
+      "methods": [],
+      "properties": [
+        {
+          "name": "transaction",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "TokenSubmissionResponse",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionResponse.kt",
+      "methods": [],
+      "properties": [
+        {
+          "name": "token",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "WebAuth",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/WebAuth.kt",
+      "methods": [
+        {
+          "name": "fromDomain",
+          "params": [
+            "domain: String",
+            "network: Network",
+            "httpClient: HttpClient?",
+            "httpRequestHeaders: Map<String",
+            "clientDomainSigningDelegate: ClientDomainSigningDelegate?"
+          ],
+          "return_type": "WebAuth",
+          "suspend": false
+        },
+        {
+          "name": "jwtToken",
+          "params": [
+            "clientAccountId: String",
+            "signers: List<KeyPair>",
+            "memo: Long?",
+            "homeDomain: String?",
+            "clientDomain: String?",
+            "clientDomainKeyPair: KeyPair?",
+            "clientDomainSigningDelegate: ClientDomainSigningDelegate?"
+          ],
+          "return_type": "AuthToken",
+          "suspend": false
+        },
+        {
+          "name": "getChallenge",
+          "params": [
+            "clientAccountId: String",
+            "memo: Long?",
+            "homeDomain: String?",
+            "clientDomain: String?"
+          ],
+          "return_type": "ChallengeResponse",
+          "suspend": false
+        },
+        {
+          "name": "validateChallengeRequest",
+          "params": [
+            "clientAccountId: String",
+            "memo: Long?"
+          ],
+          "return_type": "Unit",
+          "suspend": false
+        },
+        {
+          "name": "buildChallengeUrl",
+          "params": [
+            "clientAccountId: String",
+            "memo: Long?",
+            "homeDomain: String?",
+            "clientDomain: String?"
+          ],
+          "return_type": "String",
+          "suspend": false
+        },
+        {
+          "name": "validateChallenge",
+          "params": [
+            "challengeXdr: String",
+            "clientAccountId: String",
+            "clientDomainAccountId: String?",
+            "expectedMemo: Long?"
+          ],
+          "return_type": "Unit",
+          "suspend": false
+        },
+        {
+          "name": "validateOperations",
+          "params": [
+            "operations: List<OperationXdr>",
+            "clientAccountId: String",
+            "clientDomainAccountId: String?"
+          ],
+          "return_type": "Unit",
+          "suspend": false
+        },
+        {
+          "name": "validateTimeBounds",
+          "params": [
+            "preconditions: PreconditionsXdr"
+          ],
+          "return_type": "Unit",
+          "suspend": false
+        },
+        {
+          "name": "validateServerSignature",
+          "params": [
+            "transaction: AbstractTransaction",
+            "signature: DecoratedSignatureXdr"
+          ],
+          "return_type": "Unit",
+          "suspend": false
+        },
+        {
+          "name": "signTransaction",
+          "params": [
+            "challengeXdr: String",
+            "signers: List<KeyPair>",
+            "clientDomainKeyPair: KeyPair?",
+            "clientDomainSigningDelegate: ClientDomainSigningDelegate?"
+          ],
+          "return_type": "String",
+          "suspend": false
+        },
+        {
+          "name": "sendSignedChallenge",
+          "params": [
+            "signedChallengeXdr: String"
+          ],
+          "return_type": "AuthToken",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "authEndpoint",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "network",
+          "type": "Network,",
+          "nullable": false
+        },
+        {
+          "name": "serverSigningKey",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "serverHomeDomain",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "gracePeriodSeconds",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "httpClient",
+          "type": "HttpClient",
+          "nullable": true
+        },
+        {
+          "name": "httpRequestHeaders",
+          "type": "Map<String,",
+          "nullable": false
+        },
+        {
+          "name": "clientDomainSigningDelegate",
+          "type": "ClientDomainSigningDelegate",
+          "nullable": true
+        },
+        {
+          "name": "client",
+          "type": "HttpClient",
+          "nullable": false
+        },
+        {
+          "name": "response",
+          "type": "HttpResponse",
+          "nullable": false
+        },
+        {
+          "name": "response",
+          "type": "HttpResponse",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "ChallengeRequestException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeRequestException.kt",
+      "methods": [],
+      "properties": [
+        {
+          "name": "statusCode",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "errorMessage",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "ChallengeValidationException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeValidationException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "GenericChallengeValidationException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/GenericChallengeValidationException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidClientDomainSourceException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidClientDomainSourceException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidHomeDomainException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidHomeDomainException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidMemoTypeException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoTypeException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidMemoValueException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoValueException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidOperationTypeException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidOperationTypeException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidSequenceNumberException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSequenceNumberException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidSignatureCountException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureCountException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidSignatureException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidSourceAccountException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSourceAccountException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidTimeBoundsException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidTimeBoundsException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "InvalidWebAuthDomainException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidWebAuthDomainException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "MemoWithMuxedAccountException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/MemoWithMuxedAccountException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "NoMemoForMuxedAccountsException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/NoMemoForMuxedAccountsException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "TokenSubmissionException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/TokenSubmissionException.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "WebAuthException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/WebAuthException.kt",
+      "methods": [],
+      "properties": []
+    }
+  ],
+  "field_mappings": {
+    "authentication_endpoints": {},
+    "challenge_features": {},
+    "jwt_features": {
+      "Content": "(handled by sendSignedChallenge)",
+      "decode": "validateChallenge",
+      "verify": "validateChallenge",
+      "if": "validateChallenge",
+      "iss": "token",
+      "sub": "token",
+      "iat": "token",
+      "exp": "token",
+      "client_domain": "token"
+    },
+    "verification": {}
+  },
+  "metadata": {
+    "generated_at": "2026-02-13T19:09:44.652372+00:00",
+    "sdk_version": "1.2.1",
+    "total_fields_implemented": 9,
+    "coverage": "100.0%"
+  }
+}

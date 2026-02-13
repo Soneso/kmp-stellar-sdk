@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-02-13T20:09:44.915465",
+  "sep_number": "0002",
+  "sep_version": "1.1.0",
+  "sdk_version": "1.2.1",
+  "overall": {
+    "total_fields": 10,
+    "implemented": 10,
+    "not_implemented": 0,
+    "coverage_percentage": 100.0,
+    "required_total": 6,
+    "required_implemented": 6,
+    "required_percentage": 100.0
+  },
+  "by_section": {
+    "Request Parameters": {
+      "total": 2,
+      "implemented": 2,
+      "required_total": 2,
+      "required_implemented": 2,
+      "percentage": 100.0,
+      "required_percentage": 100.0
+    },
+    "Request Types": {
+      "total": 4,
+      "implemented": 4,
+      "required_total": 2,
+      "required_implemented": 2,
+      "percentage": 100.0,
+      "required_percentage": 100.0
+    },
+    "Response Fields": {
+      "total": 4,
+      "implemented": 4,
+      "required_total": 2,
+      "required_implemented": 2,
+      "percentage": 100.0,
+      "required_percentage": 100.0
+    }
+  },
+  "gaps_by_priority": {
+    "critical": [],
+    "high": [],
+    "medium": [],
+    "low": []
+  },
+  "test_coverage": {
+    "test_count": 37,
+    "test_files": [
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep02/FederationServiceIntegrationTest.kt",
+      "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep02/FederationServiceTest.kt"
+    ]
+  }
+}

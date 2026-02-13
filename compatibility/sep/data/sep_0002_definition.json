@@ -1,0 +1,112 @@
+{
+    "sep_number": "0002",
+    "preamble": {
+        "sep": "0002",
+        "title": "Federation protocol",
+        "author": "stellar.org",
+        "status": "Final",
+        "created": "2017-10-30",
+        "updated": "2019-10-10",
+        "version": "1.1.0"
+    },
+    "summary": "The Stellar federation protocol maps Stellar addresses to more information about a given user. It’s a way for Stellar client software to resolve email-like addresses such as `name*yourdomain.com` into account IDs like: `GCCVPYFOHY7ZB7557JKENAX62LUAPLMGIWNZJAFV2MITK6T32V37KEJU`. Stellar addresses provide an easy way for users to share payment details by using a syntax that interoperates across different domains and providers.",
+    "sections": [
+        {
+            "title": "Request Parameters",
+            "key": "request_parameters",
+            "field_count": 2,
+            "fields": [
+                {
+                    "name": "q",
+                    "description": "String to look up (stellar address, account ID, or transaction ID)",
+                    "requirements": "",
+                    "required": true,
+                    "type": "parameter"
+                },
+                {
+                    "name": "type",
+                    "description": "Type of lookup (name, id, txid, or forward)",
+                    "requirements": "",
+                    "required": true,
+                    "type": "parameter"
+                }
+            ]
+        },
+        {
+            "title": "Request Types",
+            "key": "request_types",
+            "field_count": 4,
+            "fields": [
+                {
+                    "name": "name",
+                    "description": "returns the federation record for the given Stellar address.",
+                    "requirements": "",
+                    "required": true,
+                    "type": "query_type"
+                },
+                {
+                    "name": "forward",
+                    "description": "Used for forwarding the payment on to a different network or different financial institution. The other parameters of the query will vary depending on what kind of institution is the ultimate destination of the payment and what you as the forwarding anchor supports. Your `stellar.toml` file should specify what parameters you expect in a forward federation request. If you are unable to forward or the other parameters in the request are incorrect you should return an error to this effect.",
+                    "requirements": "",
+                    "required": false,
+                    "type": "query_type"
+                },
+                {
+                    "name": "id",
+                    "description": "returns the federation record of the Stellar address associated with the given account ID. In some cases this is ambiguous. For instance if an anchor sends transactions on behalf of its users the account id will be of the anchor and the federation server won’t be able to resolve the particular user that sent the transaction. In cases like that you may need to use txid instead.",
+                    "requirements": "",
+                    "required": true,
+                    "type": "query_type"
+                },
+                {
+                    "name": "txid",
+                    "description": "returns the federation record of the sender of the transaction if known by the server.",
+                    "requirements": "",
+                    "required": false,
+                    "type": "query_type"
+                }
+            ]
+        },
+        {
+            "title": "Response Fields",
+            "key": "response_fields",
+            "field_count": 4,
+            "fields": [
+                {
+                    "name": "stellar_address",
+                    "description": "stellar address",
+                    "requirements": "",
+                    "required": true,
+                    "type": "field"
+                },
+                {
+                    "name": "account_id",
+                    "description": "Stellar public key / account ID",
+                    "requirements": "",
+                    "required": true,
+                    "type": "field"
+                },
+                {
+                    "name": "memo_type",
+                    "description": "type of memo to attach to transaction, one of text, id or hash",
+                    "requirements": "",
+                    "required": false,
+                    "type": "field"
+                },
+                {
+                    "name": "memo",
+                    "description": "value of memo to attach to transaction, for hash this should be base64-encoded",
+                    "requirements": "",
+                    "required": false,
+                    "type": "field"
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "parsed_at": "2026-02-13T19:09:41.829969+00:00",
+        "source_url": "https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0002.md",
+        "total_fields": 10,
+        "content_length": 6612
+    }
+}

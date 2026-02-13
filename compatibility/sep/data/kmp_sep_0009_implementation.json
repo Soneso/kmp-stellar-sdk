@@ -1,0 +1,679 @@
+{
+  "implemented": true,
+  "files": [
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/CardKYCFields.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/FinancialAccountKYCFields.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/NaturalPersonKYCFields.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/OrganizationKYCFields.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/StandardKYCFields.kt"
+  ],
+  "test_files": [
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/CardKYCFieldsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/FinancialAccountKYCFieldsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/NaturalPersonKYCFieldsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/OrganizationKYCFieldsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/StandardKYCFieldsTest.kt"
+  ],
+  "test_count": 128,
+  "classes": [
+    {
+      "name": "CardKYCFields",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/CardKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "number",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "expirationDate",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "cvc",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "holderName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "network",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "postalCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "countryCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "stateOrProvince",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "address",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "token",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "FinancialAccountKYCFields",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/FinancialAccountKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [
+            "keyPrefix: String"
+          ],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "bankName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "bankAccountType",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "bankAccountNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "bankNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "bankPhoneNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "bankBranchNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "externalTransferMemo",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "clabeNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "cbuNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "cbuAlias",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "mobileMoneyNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "mobileMoneyProvider",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "cryptoAddress",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "cryptoMemo",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "supports",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/NaturalPersonKYCFields.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "NaturalPersonKYCFields",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/NaturalPersonKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        },
+        {
+          "name": "files",
+          "params": [],
+          "return_type": "Map<String, ByteArray>",
+          "suspend": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other: Any?"
+          ],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "hashCode",
+          "params": [],
+          "return_type": "Int",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "lastName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "firstName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "additionalName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "addressCountryCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "stateOrProvince",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "postalCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "address",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "mobileNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "mobileNumberFormat",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "emailAddress",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "birthDate",
+          "type": "LocalDate",
+          "nullable": true
+        },
+        {
+          "name": "idIssueDate",
+          "type": "LocalDate",
+          "nullable": true
+        },
+        {
+          "name": "idExpirationDate",
+          "type": "LocalDate",
+          "nullable": true
+        },
+        {
+          "name": "birthPlace",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "birthCountryCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "taxId",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "taxIdName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "occupation",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "employerName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "employerAddress",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "languageCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "idType",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "idCountryCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "idNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "ipAddress",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "sex",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "referralId",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "photoIdFront",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "photoIdBack",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "notaryApprovalOfPhotoId",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "photoProofResidence",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "proofOfIncome",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "proofOfLiveness",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "financialAccountKYCFields",
+          "type": "FinancialAccountKYCFields",
+          "nullable": true
+        },
+        {
+          "name": "cardKYCFields",
+          "type": "CardKYCFields",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "supports",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/OrganizationKYCFields.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "OrganizationKYCFields",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/OrganizationKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        },
+        {
+          "name": "files",
+          "params": [],
+          "return_type": "Map<String, ByteArray>",
+          "suspend": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other: Any?"
+          ],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "hashCode",
+          "params": [],
+          "return_type": "Int",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "name",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "VATNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "registrationNumber",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "registrationDate",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "registeredAddress",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "numberOfShareholders",
+          "type": "Int",
+          "nullable": true
+        },
+        {
+          "name": "shareholderName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "addressCountryCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "stateOrProvince",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "postalCode",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "directorName",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "website",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "photoIncorporationDoc",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "photoProofAddress",
+          "type": "ByteArray",
+          "nullable": true
+        },
+        {
+          "name": "financialAccountKYCFields",
+          "type": "FinancialAccountKYCFields",
+          "nullable": true
+        },
+        {
+          "name": "cardKYCFields",
+          "type": "CardKYCFields",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "serves",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/StandardKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        },
+        {
+          "name": "files",
+          "params": [],
+          "return_type": "Map<String, ByteArray>",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "StandardKYCFields",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/StandardKYCFields.kt",
+      "methods": [
+        {
+          "name": "fields",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        },
+        {
+          "name": "files",
+          "params": [],
+          "return_type": "Map<String, ByteArray>",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "naturalPersonKYCFields",
+          "type": "NaturalPersonKYCFields",
+          "nullable": true
+        },
+        {
+          "name": "organizationKYCFields",
+          "type": "OrganizationKYCFields",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "field_mappings": {
+    "natural_person_fields": {
+      "last_name": "lastName",
+      "first_name": "firstName",
+      "additional_name": "additionalName",
+      "address_country_code": "addressCountryCode",
+      "state_or_province": "stateOrProvince",
+      "city": "city",
+      "postal_code": "postalCode",
+      "address": "address",
+      "mobile_number": "mobileNumber",
+      "mobile_number_format": "mobileNumberFormat",
+      "email_address": "emailAddress",
+      "birth_date": "birthDate",
+      "birth_place": "birthPlace",
+      "birth_country_code": "birthCountryCode",
+      "tax_id": "taxId",
+      "tax_id_name": "taxIdName",
+      "occupation": "occupation",
+      "employer_name": "employerName",
+      "employer_address": "employerAddress",
+      "language_code": "languageCode",
+      "id_type": "idType",
+      "id_country_code": "idCountryCode",
+      "id_issue_date": "idIssueDate",
+      "id_expiration_date": "idExpirationDate",
+      "id_number": "idNumber",
+      "ip_address": "ipAddress",
+      "sex": "sex",
+      "referral_id": "referralId",
+      "photo_id_front": "photoIdFront",
+      "photo_id_back": "photoIdBack",
+      "notary_approval_of_photo_id": "notaryApprovalOfPhotoId",
+      "photo_proof_residence": "photoProofResidence",
+      "proof_of_income": "proofOfIncome",
+      "proof_of_liveness": "proofOfLiveness"
+    },
+    "organization_fields": {
+      "organization.name": "name",
+      "organization.VAT_number": "VATNumber",
+      "organization.registration_number": "registrationNumber",
+      "organization.registration_date": "registrationDate",
+      "organization.registered_address": "registeredAddress",
+      "organization.number_of_shareholders": "numberOfShareholders",
+      "organization.shareholder_name": "shareholderName",
+      "organization.address_country_code": "addressCountryCode",
+      "organization.state_or_province": "stateOrProvince",
+      "organization.city": "city",
+      "organization.postal_code": "postalCode",
+      "organization.director_name": "directorName",
+      "organization.website": "website",
+      "organization.email": "email",
+      "organization.phone": "phone",
+      "organization.photo_incorporation_doc": "photoIncorporationDoc",
+      "organization.photo_proof_address": "photoProofAddress"
+    },
+    "financial_account_fields": {
+      "bank_account_number": "bankAccountNumber",
+      "bank_account_type": "bankAccountType",
+      "bank_name": "bankName",
+      "bank_branch_number": "bankBranchNumber",
+      "bank_routing_number": "bankRoutingNumber",
+      "bank_swift_code": "bankSwiftCode",
+      "bank_iban": "bankIban",
+      "bank_code": "bankCode",
+      "clabe_number": "clabeNumber",
+      "cbu_number": "cbuNumber",
+      "cbu_alias": "cbuAlias",
+      "crypto_address": "cryptoAddress",
+      "crypto_memo": "cryptoMemo",
+      "crypto_network": "cryptoNetwork"
+    },
+    "card_fields": {
+      "card.type": "type",
+      "card.brand": "brand",
+      "card.number": "number",
+      "card.expiration_month": "expirationMonth",
+      "card.expiration_year": "expirationYear",
+      "card.cvv": "cvv",
+      "card.name_on_card": "nameOnCard",
+      "card.billing_address": "billingAddress",
+      "card.billing_city": "billingCity",
+      "card.billing_postal_code": "billingPostalCode",
+      "card.billing_country_code": "billingCountryCode"
+    }
+  },
+  "metadata": {
+    "generated_at": "2026-02-13T19:09:44.605106+00:00",
+    "sdk_version": "1.2.1",
+    "total_fields_implemented": 76,
+    "coverage": "100.0%"
+  }
+}

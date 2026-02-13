@@ -1,0 +1,1156 @@
+{
+  "implemented": true,
+  "files": [
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/RegulatedAsset.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08Service.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08IncompleteInitDataException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidActionResponseException.kt",
+    "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidTransactionResponseException.kt"
+  ],
+  "test_files": [
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep08/Sep08IntegrationTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ExceptionsTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ResponseParsingTest.kt",
+    "stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ServiceTest.kt"
+  ],
+  "test_count": 108,
+  "classes": [
+    {
+      "name": "wraps",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/RegulatedAsset.kt",
+      "methods": [
+        {
+          "name": "toXdr",
+          "params": [],
+          "return_type": "AssetXdr",
+          "suspend": false
+        },
+        {
+          "name": "toAsset",
+          "params": [],
+          "return_type": "Asset",
+          "suspend": false
+        },
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        },
+        {
+          "name": "compareTo",
+          "params": [
+            "other: RegulatedAsset"
+          ],
+          "return_type": "Int",
+          "suspend": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other: Any?"
+          ],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "hashCode",
+          "params": [],
+          "return_type": "Int",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "RegulatedAsset",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/RegulatedAsset.kt",
+      "methods": [
+        {
+          "name": "toXdr",
+          "params": [],
+          "return_type": "AssetXdr",
+          "suspend": false
+        },
+        {
+          "name": "toAsset",
+          "params": [],
+          "return_type": "Asset",
+          "suspend": false
+        },
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        },
+        {
+          "name": "compareTo",
+          "params": [
+            "other: RegulatedAsset"
+          ],
+          "return_type": "Int",
+          "suspend": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other: Any?"
+          ],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "hashCode",
+          "params": [],
+          "return_type": "Int",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "code",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "issuer",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "approvalServer",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "approvalCriteria",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "asset",
+          "type": "Asset",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "type": "AssetTypeXdr",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "of",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "Sep08PostActionResponse",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostActionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseNextUrl",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "NextUrl",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "nextUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "Done",
+      "type": "object",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostActionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseNextUrl",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "NextUrl",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "NextUrl",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostActionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseNextUrl",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "NextUrl",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "nextUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "returned",
+      "type": "object",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [
+        {
+          "name": "parseNextUrl",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "NextUrl",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "variant",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt",
+      "methods": [
+        {
+          "name": "parseNextUrl",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "NextUrl",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "of",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "Sep08PostTransactionResponse",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "tx",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "timeout",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "actionUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionMethod",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "actionFields",
+          "type": "List<String>",
+          "nullable": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Success",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "tx",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "tx",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "timeout",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "message",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionMethod",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "actionFields",
+          "type": "List<String>",
+          "nullable": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Revised",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "tx",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "timeout",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "message",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionMethod",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "actionFields",
+          "type": "List<String>",
+          "nullable": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Pending",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "timeout",
+          "type": "Int",
+          "nullable": false
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "message",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionMethod",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "actionFields",
+          "type": "List<String>",
+          "nullable": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "ActionRequired",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "message",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionUrl",
+          "type": "String,",
+          "nullable": false
+        },
+        {
+          "name": "actionMethod",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "actionFields",
+          "type": "List<String>",
+          "nullable": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Rejected",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "fromJson",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "error",
+          "type": "String",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "returned",
+      "type": "object",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "variant",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt",
+      "methods": [
+        {
+          "name": "parseSuccess",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Success",
+          "suspend": false
+        },
+        {
+          "name": "parseRevised",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Revised",
+          "suspend": false
+        },
+        {
+          "name": "parsePending",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Pending",
+          "suspend": false
+        },
+        {
+          "name": "parseActionRequired",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "ActionRequired",
+          "suspend": false
+        },
+        {
+          "name": "parseRejected",
+          "params": [
+            "json: JsonObject"
+          ],
+          "return_type": "Rejected",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "Sep08Service",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08Service.kt",
+      "methods": [
+        {
+          "name": "fromDomain",
+          "params": [
+            "domain: String",
+            "horizonUrl: String?",
+            "network: Network?",
+            "httpClient: HttpClient?",
+            "httpRequestHeaders: Map<String"
+          ],
+          "return_type": "Sep08Service",
+          "suspend": false
+        },
+        {
+          "name": "authorizationRequired",
+          "params": [
+            "asset: RegulatedAsset"
+          ],
+          "return_type": "Boolean",
+          "suspend": false
+        },
+        {
+          "name": "postTransaction",
+          "params": [
+            "tx: String",
+            "approvalServer: String"
+          ],
+          "return_type": "Sep08PostTransactionResponse",
+          "suspend": false
+        },
+        {
+          "name": "postAction",
+          "params": [
+            "url: String",
+            "actionFields: Map<String"
+          ],
+          "return_type": "Sep08PostActionResponse",
+          "suspend": false
+        },
+        {
+          "name": "buildHeaders",
+          "params": [],
+          "return_type": "Map<String, String>",
+          "suspend": false
+        }
+      ],
+      "properties": [
+        {
+          "name": "tomlData",
+          "type": "StellarToml,",
+          "nullable": false
+        },
+        {
+          "name": "regulatedAssets",
+          "type": "List<RegulatedAsset>,",
+          "nullable": false
+        },
+        {
+          "name": "network",
+          "type": "Network,",
+          "nullable": false
+        },
+        {
+          "name": "horizonServer",
+          "type": "HorizonServer,",
+          "nullable": false
+        },
+        {
+          "name": "httpClient",
+          "type": "HttpClient",
+          "nullable": true
+        },
+        {
+          "name": "httpRequestHeaders",
+          "type": "Map<String,",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "for",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "to",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "Sep08Exception",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "Sep08IncompleteInitDataException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08IncompleteInitDataException.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "Sep08InvalidActionResponseException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidActionResponseException.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    },
+    {
+      "name": "Sep08InvalidTransactionResponseException",
+      "type": "class",
+      "file": "stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidTransactionResponseException.kt",
+      "methods": [
+        {
+          "name": "toString",
+          "params": [],
+          "return_type": "String",
+          "suspend": false
+        }
+      ],
+      "properties": []
+    }
+  ],
+  "field_mappings": {
+    "approval_endpoint": {
+      "tx_approve": "postTransaction"
+    },
+    "request_parameters": {
+      "tx": "(handled by postTransaction)"
+    },
+    "response_statuses": {
+      "success": "Success",
+      "revised": "Revised",
+      "pending": "Pending",
+      "action_required": "ActionRequired",
+      "rejected": "Rejected"
+    },
+    "success_response_fields": {
+      "status": "(implicit)",
+      "tx": "tx",
+      "message": "message"
+    },
+    "revised_response_fields": {
+      "status": "(implicit)",
+      "tx": "tx",
+      "message": "message"
+    },
+    "pending_response_fields": {
+      "status": "(implicit)",
+      "timeout": "timeout",
+      "message": "message"
+    },
+    "action_required_response_fields": {
+      "status": "(implicit)",
+      "message": "message",
+      "action_url": "actionUrl",
+      "action_method": "actionMethod",
+      "action_fields": "actionFields"
+    },
+    "rejected_response_fields": {
+      "status": "(implicit)",
+      "error": "error"
+    },
+    "action_url_handling": {
+      "action_url_get": "postAction",
+      "action_url_post": "postAction",
+      "action_url_post_response_no_further_action": "Done",
+      "action_url_post_response_follow_next_url": "NextUrl"
+    },
+    "stellar_toml_fields": {
+      "regulated": "(in Currency.regulated)",
+      "approval_server": "approvalServer",
+      "approval_criteria": "approvalCriteria"
+    },
+    "authorization_flags": {
+      "authorization_required": "(Stellar account flags)",
+      "authorization_revocable": "(Stellar account flags)"
+    }
+  },
+  "metadata": {
+    "generated_at": "2026-02-13T19:09:44.571979+00:00",
+    "sdk_version": "1.2.1",
+    "total_fields_implemented": 32,
+    "coverage": "100.0%"
+  }
+}
