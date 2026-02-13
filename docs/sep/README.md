@@ -21,6 +21,7 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-24 | Interactive Deposit and Withdrawal | [sep-24.md](sep-24.md) |
 | SEP-38 | Anchor RFQ API | [sep-38.md](sep-38.md) |
 | SEP-45 | Web Authentication for Contract Accounts | [sep-45.md](sep-45.md) |
+| SEP-53 | Sign and Verify Messages | [sep-53.md](sep-53.md) |
 
 ## Compatibility Matrices
 
@@ -37,6 +38,7 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0024 Compatibility Matrix](../../compatibility/sep/SEP-0024_COMPATIBILITY_MATRIX.md)
 - [SEP-0038 Compatibility Matrix](../../compatibility/sep/SEP-0038_COMPATIBILITY_MATRIX.md)
 - [SEP-0045 Compatibility Matrix](../../compatibility/sep/SEP-0045_COMPATIBILITY_MATRIX.md)
+- [SEP-0053 Compatibility Matrix](../../compatibility/sep/SEP-0053_COMPATIBILITY_MATRIX.md)
 
 To regenerate all matrices: `python3 tools/sdk-analysis/sep/run_sep_analysis.py`
 
@@ -48,4 +50,4 @@ To regenerate all matrices: `python3 tools/sdk-analysis/sep/run_sep_analysis.py`
 
 ---
 
-**Last Updated**: 2026-02-10
+**Last Updated**: 2026-02-13

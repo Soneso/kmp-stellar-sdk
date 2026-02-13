@@ -1,6 +1,6 @@
 # SEP-0008 (Regulated Assets) Compatibility Matrix
 
-**Generated:** 2026-02-13 21:02:49
+**Generated:** 2026-02-13 22:05:28
 
 **SEP Version:** 1.7.4<br>
 **SEP Status:** Active<br>
