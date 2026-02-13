@@ -1,6 +1,6 @@
 # SEP-0001 (Stellar Info File) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:44
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 2.7.0<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-The `stellar.toml` file is used to provide a common place where the Internet can find information about your organization’s Stellar integration. By setting the home_domain of your Stellar account to the domain that hosts your `stellar.toml`, you can create a definitive link between this information and that account. Any website can publish Stellar network information, and the `stellar.toml` is designed to be readable by both humans and machines. If you are an anchor or issuer, the `stellar.toml` file serves a very important purpose: it allows you to publish information about your organization and token(s) that help to legitimize your offerings. Clients and exchanges can use this information to decide whether a token should be listed. Fully and truthfully disclosing contact and business information is an essential step in responsible token issuance. If you are a validator, the `stellar.toml` file allows you to declare your node(s) to other network participants, which improves discoverability, and contributes to the health and decentralization of the network as a whole.
+The `stellar.toml` file publishes information about an organization's Stellar integration, including token details, contact info, and validator nodes. Anchors, issuers, and validators host it at their domain so clients can look up and verify their offerings.
 
 ## Overall Coverage
 

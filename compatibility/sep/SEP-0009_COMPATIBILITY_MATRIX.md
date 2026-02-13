@@ -1,6 +1,6 @@
 # SEP-0009 (Standard KYC Fields) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:45
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 1.17.0<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This SEP defines a list of standard KYC, AML, and financial account-related fields for use in Stellar ecosystem protocols. Applications on Stellar should use these fields when sending or requesting KYC, AML, or financial account-related information with other parties on Stellar. This is an evolving list, so please suggest any missing fields that you use. This is a list of possible fields that may be necessary to handle many different use cases, there is no expectation that any particular fields be used for a particular application. The best fields to use in a particular case is determined by the needs of the application.
+A standard list of KYC and financial account fields (names, addresses, ID documents, bank details) used across Stellar ecosystem protocols.
 
 ## Overall Coverage
 

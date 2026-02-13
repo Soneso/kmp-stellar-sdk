@@ -1,6 +1,6 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:44
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 4.3.0<br>
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This SEP defines the standard way for anchors and wallets to interact on behalf of users. This improves user experience by allowing wallets and other clients to interact with anchors directly without the user needing to leave the wallet to go to the anchor's site. Please note that this SEP provides a normalized interface specification that allows wallets and other services to interact with anchors _programmatically_. [SEP-24](sep-0024.md) was created to support use cases where the anchor may want to interact with users _interactively_ using a popup opened within the wallet application.
+A programmatic API for anchors and wallets to handle deposits and withdrawals without the user leaving the wallet. For interactive flows, see SEP-24.
 
 ## Overall Coverage
 

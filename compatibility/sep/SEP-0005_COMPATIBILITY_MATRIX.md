@@ -1,6 +1,6 @@
 # SEP-0005 (Key Derivation Methods for Stellar Keys) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:44
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** N/A<br>
 **SEP Status:** Final<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This Stellar Ecosystem Proposal describes methods for key derivation for Stellar. This should improve key storage and moving keys between wallets and apps.
+Defines methods for deriving Stellar keypairs from mnemonic phrases, making it easier to back up and move keys between wallets.
 
 ## Overall Coverage
 

@@ -1,6 +1,6 @@
 # SEP-0008 (Regulated Assets) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:44
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 1.7.4<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-Regulated Assets are assets that require an issuer’s approval (or a delegated third party’s approval, such as a licensed securities exchange) on a per-transaction basis. It standardizes the identification of such assets as well as defines the protocol for performing compliance checks and requesting issuer approval.
+Defines how assets that require per-transaction issuer approval are identified, and the protocol for performing compliance checks before submission.
 
 ## Overall Coverage
 

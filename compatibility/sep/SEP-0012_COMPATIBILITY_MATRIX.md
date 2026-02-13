@@ -1,6 +1,6 @@
 # SEP-0012 (KYC API) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:45
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 1.15.0<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This SEP defines a standard way for stellar clients to upload KYC (or other) information to anchors and other services. [SEP-6](sep-0006.md) and [SEP-31](sep-0031.md) use this protocol, but it can serve as a stand-alone service as well. This SEP was made with these goals in mind: - interoperability - Allow a customer to enter their KYC information to their wallet once and use it across many services without re-entering information manually - handle the most common 80% of use cases - handle image and binary data - support the set of fields defined in [SEP-9](sep-0009.md) - support authentication via [SEP-10](sep-0010.md) - support the provision of data for [SEP-6](sep-0006.md), [SEP-24](sep-0024.md), [SEP-31](sep-0031.md), and others - give customers control over their data by supporting complete data erasure To support this protocol an anchor acts as a server and implements the specified REST API endpoints, while a wallet implements a client that consumes the API. The goal is interoperability, so a wallet implements a single client according to the protocol, and will be able to interact with any compliant anchor. Similarly, an anchor that implements the API endpoints according to the protocol will work with any compliant wallet.
+A standard API for wallets to upload KYC data to anchors. Customers enter their information once and reuse it across multiple services.
 
 ## Overall Coverage
 

@@ -1,6 +1,6 @@
 # SEP-0002 (Federation protocol) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:44
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 1.1.0<br>
 **SEP Status:** Final<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-The Stellar federation protocol maps Stellar addresses to more information about a given user. It’s a way for Stellar client software to resolve email-like addresses such as `name*yourdomain.com` into account IDs like: `GCCVPYFOHY7ZB7557JKENAX62LUAPLMGIWNZJAFV2MITK6T32V37KEJU`. Stellar addresses provide an easy way for users to share payment details by using a syntax that interoperates across different domains and providers.
+The federation protocol resolves human-readable addresses like `name*yourdomain.com` into Stellar account IDs, so users can share payment details without exchanging raw public keys.
 
 ## Overall Coverage
 

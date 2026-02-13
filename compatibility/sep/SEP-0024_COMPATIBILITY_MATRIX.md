@@ -1,6 +1,6 @@
 # SEP-0024 (Hosted Deposit and Withdrawal) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:45
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 3.8.0<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This SEP defines the standard way for anchors and wallets to interact on behalf of users. This improves user experience by allowing wallets and other clients to interact with anchors directly without the user needing to leave the wallet to go to the anchor's site. It is based on [SEP-0006](sep-0006.md), but only supports the interactive flow, and cleans up or removes confusing artifacts. If you are updating from SEP-0006 see the [changes from SEP-6](#changes-from-SEP-6) at the bottom of this document.
+An interactive deposit and withdrawal flow where the anchor controls the UI via a popup within the wallet. Based on SEP-06 but limited to the interactive path.
 
 ## Overall Coverage
 

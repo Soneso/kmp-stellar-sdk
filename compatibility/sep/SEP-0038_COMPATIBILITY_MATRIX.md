@@ -1,6 +1,6 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:45
+**Generated:** 2026-02-13 21:02:50
 
 **SEP Version:** 2.5.0<br>
 **SEP Status:** Draft<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This protocol enables anchors to accept off-chain assets in exchange for different on-chain assets, and vice versa. Specifically, it enables anchors to provide quotes that can be referenced within the context of existing Stellar Ecosystem Proposals. How the exchange of assets is facilitated is outside the scope of this document.
+Lets anchors provide quotes for exchanging on-chain assets for off-chain assets and vice versa.
 
 ## Overall Coverage
 

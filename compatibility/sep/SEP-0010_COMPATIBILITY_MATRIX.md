@@ -1,6 +1,6 @@
 # SEP-0010 (Stellar Web Authentication) Compatibility Matrix
 
-**Generated:** 2026-02-13 20:09:45
+**Generated:** 2026-02-13 21:02:49
 
 **SEP Version:** 3.4.1<br>
 **SEP Status:** Active<br>
@@ -9,7 +9,7 @@
 
 ## SEP Summary
 
-This SEP defines the standard way for clients such as wallets or exchanges to create authenticated web sessions on behalf of a user who holds a Stellar account. A wallet may want to authenticate with any web service which requires a Stellar account ownership verification, for example, to upload KYC information to an anchor in an authenticated way as described in [SEP-12](sep-0012.md). This SEP also supports authenticating users of shared, omnibus, or pooled Stellar accounts. Clients can use [memos](#memos) or [muxed accounts](#muxed-accounts) to distinguish users or sub-accounts of shared accounts.
+Lets wallets and exchanges create authenticated web sessions by proving Stellar account ownership. Supports individual, shared, and muxed accounts.
 
 ## Overall Coverage
 
