@@ -29,7 +29,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
 
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
@@ -142,6 +142,34 @@ secureMnemonic.close()
 - NFKD normalization for mnemonic and passphrase
 - Memory cleanup (entropy zeroed after use, close() zeros seed)
 - PBKDF2-HMAC-SHA512 with 2048 iterations
+
+### SEP-2 Federation Protocol
+
+The SDK implements SEP-2 (Federation Protocol) for resolving human-readable Stellar addresses to account IDs.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep02/
+├── FederationService.kt              # Federation service client (fromDomain, 4 query methods)
+├── FederationResponse.kt             # Federation response data class
+└── exceptions/
+    ├── Sep02Exception.kt                    # Base exception
+    ├── Sep02InvalidAddressException.kt      # Invalid stellar address format
+    ├── Sep02FederationNotFoundException.kt  # No federation server in stellar.toml
+    └── Sep02InvalidResponseException.kt     # Malformed server response
+```
+
+#### Usage Example
+```kotlin
+// Resolve a stellar address
+val response = FederationService.resolveStellarAddress("bob*stellar.org")
+println("Account: ${response.accountId}")
+println("Memo: ${response.memo} (${response.memoType})")
+
+// Create service for a specific domain
+val service = FederationService.fromDomain("stellar.org")
+val result = service.resolveAccountId("GABC...")
+```
 
 ### SEP-8 Regulated Assets
 

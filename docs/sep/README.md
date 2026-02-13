@@ -11,6 +11,7 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP | Title | Documentation |
 |-----|-------|---------------|
 | SEP-1 | Stellar TOML | [sep-01.md](sep-01.md) |
+| SEP-2 | Federation Protocol | [sep-02.md](sep-02.md) |
 | SEP-5 | Key Derivation Methods for Stellar Keys | [sep-05.md](sep-05.md) |
 | SEP-6 | Programmatic Deposit and Withdrawal | [sep-06-transfer-service.md](sep-06-transfer-service.md) |
 | SEP-8 | Regulated Assets | [sep-08.md](sep-08.md) |
@@ -28,6 +29,7 @@ Detailed field-by-field coverage for each SEP implementation:
 | SEP | Coverage | Matrix |
 |-----|----------|--------|
 | SEP-1 | 100% (71/71 fields) | [SEP-0001 Compatibility Matrix](../../compatibility/sep/SEP-0001_COMPATIBILITY_MATRIX.md) |
+| SEP-2 | 100% (12/12 fields) | [SEP-0002 Compatibility Matrix](../../compatibility/sep/SEP-0002_COMPATIBILITY_MATRIX.md) |
 | SEP-5 | 100% (31/31 features) | [SEP-0005 Compatibility Matrix](../../compatibility/sep/SEP-0005_COMPATIBILITY_MATRIX.md) |
 | SEP-6 | 100% (95/95 fields) | [SEP-0006 Compatibility Matrix](../../compatibility/sep/SEP-0006_COMPATIBILITY_MATRIX.md) |
 | SEP-8 | 100% (22/22 features) | [SEP-0008 Compatibility Matrix](../../compatibility/sep/SEP-0008_COMPATIBILITY_MATRIX.md) |
@@ -42,7 +44,6 @@ Detailed field-by-field coverage for each SEP implementation:
 
 | SEP | Title |
 |-----|-------|
-| SEP-2 | Federation Protocol |
 | SEP-30 | Account Recovery |
 
 ---
