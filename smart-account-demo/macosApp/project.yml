@@ -1,0 +1,43 @@
+name: StellarSmartDemo
+options:
+  bundleIdPrefix: com.soneso.stellar.smartdemo
+  deploymentTarget:
+    macOS: 13.0
+settings:
+  ENABLE_USER_SCRIPT_SANDBOXING: NO
+  MARKETING_VERSION: "0.1.0"
+  CURRENT_PROJECT_VERSION: "1"
+targets:
+  StellarSmartDemo:
+    type: application
+    platform: macOS
+    sources:
+      - StellarSmartDemo
+    info:
+      path: StellarSmartDemo/Info.plist
+      properties:
+        LSMinimumSystemVersion: "13.0"
+        NSHumanReadableCopyright: Copyright 2025 Stellar Development Foundation
+    resources:
+      - path: StellarSmartDemo/Assets.xcassets
+    settings:
+      PRODUCT_NAME: "Smart Account Demo"
+      FRAMEWORK_SEARCH_PATHS:
+        - $(inherited)
+        - $(SRCROOT)/../../shared/build/bin/macosArm64/debugFramework
+        - $(SRCROOT)/../../shared/build/bin/macosX64/debugFramework
+      LIBRARY_SEARCH_PATHS:
+        - $(inherited)
+        - /opt/homebrew/opt/libsodium/lib
+      HEADER_SEARCH_PATHS:
+        - $(inherited)
+        - /opt/homebrew/opt/libsodium/include
+      OTHER_LDFLAGS:
+        - $(inherited)
+        - -L/opt/homebrew/opt/libsodium/lib
+        - -lsodium
+        - -framework shared
+      MACOSX_DEPLOYMENT_TARGET: 13.0
+    dependencies:
+      - framework: ../shared/build/bin/macosArm64/debugFramework/shared.framework
+        embed: true

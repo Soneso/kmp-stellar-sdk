@@ -124,9 +124,12 @@ sealed class PolicyInstallParams {
                 weightsMap[signerScVal] = Scv.toUint32(weight)
             }
 
+            // Sort signer weights map keys by XDR bytes (Soroban requirement)
+            val sortedWeightsMap = SmartAccountSharedUtils.sortMapByKeyXdr(weightsMap)
+
             // Map with alphabetically sorted keys: ["signer_weights", "threshold"]
             val map = linkedMapOf(
-                Scv.toSymbol("signer_weights") to Scv.toMap(weightsMap),
+                Scv.toSymbol("signer_weights") to Scv.toMap(sortedWeightsMap),
                 Scv.toSymbol("threshold") to Scv.toUint32(threshold)
             )
             return Scv.toMap(map)

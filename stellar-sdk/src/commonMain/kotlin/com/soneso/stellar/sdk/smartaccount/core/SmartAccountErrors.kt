@@ -649,6 +649,87 @@ sealed class SessionException(
     }
 }
 
+// MARK: - Error Wrapping Utility
+
+/**
+ * Wraps an arbitrary [Throwable] into a [SmartAccountException].
+ *
+ * If the throwable is already a [SmartAccountException], it is returned as-is.
+ * Otherwise, a new [ValidationException.InvalidInput] is created using the
+ * given [defaultCode], preserving the original throwable as [cause].
+ *
+ * This mirrors the TypeScript SDK's `wrapError()` function and ensures all
+ * errors surfaced from the Smart Account Kit are consistently typed.
+ *
+ * @param err The throwable to wrap
+ * @param defaultCode The error code to use when wrapping non-SmartAccountException errors.
+ *   Defaults to [SmartAccountErrorCode.INVALID_INPUT].
+ * @return A [SmartAccountException] wrapping the original error
+ */
+fun wrapError(
+    err: Throwable,
+    defaultCode: SmartAccountErrorCode = SmartAccountErrorCode.INVALID_INPUT
+): SmartAccountException {
+    if (err is SmartAccountException) {
+        return err
+    }
+    val message = err.message ?: err.toString()
+    return when (defaultCode) {
+        SmartAccountErrorCode.INVALID_CONFIG ->
+            ConfigurationException.InvalidConfig(message, err)
+        SmartAccountErrorCode.MISSING_CONFIG ->
+            ConfigurationException.MissingConfig(message, err)
+        SmartAccountErrorCode.WALLET_NOT_CONNECTED ->
+            WalletException.NotConnected(message, err)
+        SmartAccountErrorCode.WALLET_ALREADY_EXISTS ->
+            WalletException.AlreadyExists(message, err)
+        SmartAccountErrorCode.WALLET_NOT_FOUND ->
+            WalletException.NotFound(message, err)
+        SmartAccountErrorCode.CREDENTIAL_NOT_FOUND ->
+            CredentialException.NotFound(message, err)
+        SmartAccountErrorCode.CREDENTIAL_ALREADY_EXISTS ->
+            CredentialException.AlreadyExists(message, err)
+        SmartAccountErrorCode.CREDENTIAL_INVALID ->
+            CredentialException.Invalid(message, err)
+        SmartAccountErrorCode.CREDENTIAL_DEPLOYMENT_FAILED ->
+            CredentialException.DeploymentFailed(message, err)
+        SmartAccountErrorCode.WEBAUTHN_REGISTRATION_FAILED ->
+            WebAuthnException.RegistrationFailed(message, err)
+        SmartAccountErrorCode.WEBAUTHN_AUTHENTICATION_FAILED ->
+            WebAuthnException.AuthenticationFailed(message, err)
+        SmartAccountErrorCode.WEBAUTHN_NOT_SUPPORTED ->
+            WebAuthnException.NotSupported(message, err)
+        SmartAccountErrorCode.WEBAUTHN_CANCELLED ->
+            WebAuthnException.Cancelled(message, err)
+        SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED ->
+            TransactionException.SimulationFailed(message, err)
+        SmartAccountErrorCode.TRANSACTION_SIGNING_FAILED ->
+            TransactionException.SigningFailed(message, err)
+        SmartAccountErrorCode.TRANSACTION_SUBMISSION_FAILED ->
+            TransactionException.SubmissionFailed(message, err)
+        SmartAccountErrorCode.TRANSACTION_TIMEOUT ->
+            TransactionException.Timeout(message, err)
+        SmartAccountErrorCode.SIGNER_NOT_FOUND ->
+            SignerException.NotFound(message, err)
+        SmartAccountErrorCode.SIGNER_INVALID ->
+            SignerException.Invalid(message, err)
+        SmartAccountErrorCode.INVALID_ADDRESS ->
+            ValidationException.InvalidAddress(message, err)
+        SmartAccountErrorCode.INVALID_AMOUNT ->
+            ValidationException.InvalidAmount(message, err)
+        SmartAccountErrorCode.INVALID_INPUT ->
+            ValidationException.InvalidInput(message, err)
+        SmartAccountErrorCode.STORAGE_READ_FAILED ->
+            StorageException.ReadFailed(message, err)
+        SmartAccountErrorCode.STORAGE_WRITE_FAILED ->
+            StorageException.WriteFailed(message, err)
+        SmartAccountErrorCode.SESSION_EXPIRED ->
+            SessionException.Expired(message, err)
+        SmartAccountErrorCode.SESSION_INVALID ->
+            SessionException.Invalid(message, err)
+    }
+}
+
 // MARK: - Smart Account Constants
 
 /**

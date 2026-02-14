@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
+    id("com.android.library")
     id("org.jetbrains.dokka")
     id("org.jetbrains.kotlinx.kover")
     id("maven-publish")
@@ -28,6 +29,14 @@ kotlin {
             // Enable TLS debugging if needed (uncomment for troubleshooting)
             // systemProperty("javax.net.debug", "ssl,handshake")
         }
+    }
+
+    // Android target
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+        publishLibraryVariants("release")
     }
 
     // JS target (Browser and Node.js)
@@ -198,6 +207,20 @@ kotlin {
             }
         }
 
+        // Android source set: inherits all JVM platform code (BouncyCastle crypto, StrKey, XDR, etc.)
+        // and adds Android-specific APIs (Credential Manager for WebAuthn passkeys).
+        // The dependsOn(jvmMain) ensures the JVM actual declarations are used for Android compilation.
+        val androidMain by getting {
+            dependsOn(jvmMain)
+            dependencies {
+                // Android Credential Manager API for WebAuthn/passkey support
+                implementation("androidx.credentials:credentials:1.3.0")
+                implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+                // Encrypted SharedPreferences for secure credential/session storage
+                implementation("androidx.security:security-crypto:1.1.0-alpha06")
+            }
+        }
+
         val jsMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-js:3.3.2")
@@ -263,6 +286,21 @@ kotlin {
 
         val macosX64Test by getting { dependsOn(macosTest) }
         val macosArm64Test by getting { dependsOn(macosTest) }
+    }
+}
+
+// Android Library Configuration
+android {
+    namespace = "com.soneso.stellar.sdk"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

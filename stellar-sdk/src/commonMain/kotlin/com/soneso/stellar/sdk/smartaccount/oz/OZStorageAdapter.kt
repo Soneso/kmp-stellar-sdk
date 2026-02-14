@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.currentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -87,7 +88,7 @@ data class StoredCredential(
     /**
      * Timestamp of when this credential was created.
      */
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = currentTimeMillis(),
 
     /**
      * Timestamp of when this credential was last used for signing.
@@ -108,7 +109,35 @@ data class StoredCredential(
      *
      * The primary credential is used as the default for signing operations.
      */
-    val isPrimary: Boolean = false
+    val isPrimary: Boolean = false,
+
+    /**
+     * Authenticator transport hints indicating how the browser can communicate
+     * with the authenticator (e.g., "usb", "nfc", "ble", "internal").
+     *
+     * Used when constructing allowCredentials for future authentication ceremonies,
+     * which helps the browser select the correct authenticator more efficiently.
+     */
+    val transports: List<String>? = null,
+
+    /**
+     * Authenticator device type.
+     *
+     * - "singleDevice": Hardware security key (not synced)
+     * - "multiDevice": Synced/cloud-backed passkey (available across devices)
+     *
+     * Corresponds to the credentialDeviceType field in WebAuthn authenticator data flags.
+     */
+    val deviceType: String? = null,
+
+    /**
+     * Whether the passkey is backed up or synced to a cloud provider.
+     *
+     * When true, the credential is available across the user's devices via
+     * iCloud Keychain, Google Password Manager, or similar sync services.
+     * Corresponds to the credentialBackedUp flag in WebAuthn authenticator data.
+     */
+    val backedUp: Boolean? = null
 ) {
     /**
      * Custom equals implementation that properly compares ByteArray.
@@ -135,6 +164,9 @@ data class StoredCredential(
         if (lastUsedAt != other.lastUsedAt) return false
         if (nickname != other.nickname) return false
         if (isPrimary != other.isPrimary) return false
+        if (transports != other.transports) return false
+        if (deviceType != other.deviceType) return false
+        if (backedUp != other.backedUp) return false
 
         return true
     }
@@ -158,6 +190,9 @@ data class StoredCredential(
         result = 31 * result + (lastUsedAt?.hashCode() ?: 0)
         result = 31 * result + (nickname?.hashCode() ?: 0)
         result = 31 * result + isPrimary.hashCode()
+        result = 31 * result + (transports?.hashCode() ?: 0)
+        result = 31 * result + (deviceType?.hashCode() ?: 0)
+        result = 31 * result + (backedUp?.hashCode() ?: 0)
         return result
     }
 }
@@ -175,8 +210,8 @@ data class StoredCredential(
  * val session = StoredSession(
  *     credentialId = "base64url-encoded-id",
  *     contractId = "CBCD1234...",
- *     connectedAt = System.currentTimeMillis(),
- *     expiresAt = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000) // 7 days
+ *     connectedAt = currentTimeMillis(),
+ *     expiresAt = currentTimeMillis() + (7 * 24 * 60 * 60 * 1000) // 7 days
  * )
  *
  * if (!session.isExpired) {
@@ -209,7 +244,7 @@ data class StoredSession(
      * Whether the session has expired.
      */
     val isExpired: Boolean
-        get() = System.currentTimeMillis() >= expiresAt
+        get() = currentTimeMillis() >= expiresAt
 }
 
 // MARK: - Stored Credential Update
@@ -217,7 +252,11 @@ data class StoredSession(
 /**
  * Partial updates for a stored credential.
  *
- * Only non-null fields are applied during an update operation.
+ * Only non-null fields are applied during an update operation. A `null` value means
+ * "no change" -- it does **not** clear the field to null. This is a deliberate design
+ * choice: there is no way to set a previously non-null field back to null via
+ * [StorageAdapter.update]. To reset a field, call [StorageAdapter.save] with a full
+ * [StoredCredential] replacement.
  *
  * Example:
  * ```kotlin
@@ -257,7 +296,22 @@ data class StoredCredentialUpdate(
     /**
      * New primary flag.
      */
-    val isPrimary: Boolean? = null
+    val isPrimary: Boolean? = null,
+
+    /**
+     * New authenticator transport hints.
+     */
+    val transports: List<String>? = null,
+
+    /**
+     * New device type ("singleDevice" or "multiDevice").
+     */
+    val deviceType: String? = null,
+
+    /**
+     * New backed up flag.
+     */
+    val backedUp: Boolean? = null
 )
 
 // MARK: - Storage Adapter Interface
@@ -273,10 +327,11 @@ data class StoredCredentialUpdate(
  */
 interface StorageAdapter {
     /**
-     * Saves a credential to storage.
+     * Saves a credential to storage using upsert semantics.
+     *
+     * If a credential with the same ID already exists, it is overwritten.
      *
      * @param credential The credential to save
-     * @throws CredentialException.AlreadyExists if the credential already exists
      * @throws StorageException.WriteFailed if saving fails
      */
     suspend fun save(credential: StoredCredential)
@@ -382,9 +437,6 @@ class InMemoryStorageAdapter : StorageAdapter {
     private val mutex = Mutex()
 
     override suspend fun save(credential: StoredCredential): Unit = mutex.withLock {
-        if (credentials.containsKey(credential.credentialId)) {
-            throw CredentialException.alreadyExists(credential.credentialId)
-        }
         credentials[credential.credentialId] = credential
     }
 
@@ -415,7 +467,10 @@ class InMemoryStorageAdapter : StorageAdapter {
             contractId = updates.contractId ?: credential.contractId,
             lastUsedAt = updates.lastUsedAt ?: credential.lastUsedAt,
             nickname = updates.nickname ?: credential.nickname,
-            isPrimary = updates.isPrimary ?: credential.isPrimary
+            isPrimary = updates.isPrimary ?: credential.isPrimary,
+            transports = updates.transports ?: credential.transports,
+            deviceType = updates.deviceType ?: credential.deviceType,
+            backedUp = updates.backedUp ?: credential.backedUp
         )
 
         credentials[credentialId] = updated
@@ -444,6 +499,83 @@ class InMemoryStorageAdapter : StorageAdapter {
     }
 }
 
+// MARK: - Connected Wallet
+
+/**
+ * Information about an externally connected wallet.
+ *
+ * Returned by [ExternalWalletAdapter.connect] and [ExternalWalletAdapter.getConnectedWallets]
+ * to identify which wallet is connected and its signing address.
+ *
+ * Example:
+ * ```kotlin
+ * val wallet = ConnectedWallet(
+ *     address = "GABC123...",
+ *     walletId = "freighter",
+ *     walletName = "Freighter"
+ * )
+ * ```
+ */
+data class ConnectedWallet(
+    /**
+     * The Stellar G-address of the connected wallet.
+     */
+    val address: String,
+
+    /**
+     * Unique wallet identifier (e.g., "freighter", "lobstr").
+     *
+     * Used for reconnection via [ExternalWalletAdapter.reconnect].
+     */
+    val walletId: String,
+
+    /**
+     * Human-readable display name for the wallet (e.g., "Freighter", "LOBSTR").
+     */
+    val walletName: String
+)
+
+// MARK: - Sign Auth Entry Types
+
+/**
+ * Options for signing an authorization entry with an external wallet.
+ *
+ * Allows specifying a network passphrase and a particular address when
+ * multiple wallets are connected.
+ */
+data class SignAuthEntryOptions(
+    /**
+     * Network passphrase for signing context.
+     */
+    val networkPassphrase: String? = null,
+
+    /**
+     * Specific address to sign with, if multiple wallets are connected.
+     */
+    val address: String? = null
+)
+
+/**
+ * Result of signing an authorization entry with an external wallet.
+ *
+ * Contains the signed auth entry and optionally the signer address, which
+ * may differ from the requested address in some wallet implementations.
+ */
+data class SignAuthEntryResult(
+    /**
+     * The base64-encoded signed authorization entry (raw Ed25519 signature).
+     */
+    val signedAuthEntry: String,
+
+    /**
+     * The Stellar G-address that produced the signature.
+     *
+     * May be null if the wallet does not report the signer address.
+     * When null, callers should assume the signature came from the requested address.
+     */
+    val signerAddress: String? = null
+)
+
 // MARK: - External Wallet Adapter Interface
 
 /**
@@ -456,13 +588,21 @@ class InMemoryStorageAdapter : StorageAdapter {
  * Example implementation:
  * ```kotlin
  * class FreighterAdapter : ExternalWalletAdapter {
- *     override suspend fun connect() {
- *         // Request wallet connection via Freighter browser extension
+ *     override suspend fun connect(): ConnectedWallet? {
+ *         // Show wallet selection modal
+ *         // Return ConnectedWallet with address, walletId, walletName
+ *         // Return null if the user cancelled
  *     }
  *
- *     override suspend fun signAuthEntry(preimageXdr: String): String {
+ *     override suspend fun signAuthEntry(
+ *         authEntryXdr: String,
+ *         options: SignAuthEntryOptions?
+ *     ): SignAuthEntryResult {
  *         // Request signature from Freighter
- *         return "base64-encoded-signature"
+ *         return SignAuthEntryResult(
+ *             signedAuthEntry = "base64-encoded-signature",
+ *             signerAddress = "GABC123..."
+ *         )
  *     }
  * }
  * ```
@@ -471,42 +611,75 @@ interface ExternalWalletAdapter {
     /**
      * Connects to the external wallet.
      *
-     * Prompts the user to authorize the connection via the wallet's UI.
+     * Prompts the user to authorize the connection via the wallet's UI
+     * (e.g., showing a wallet selection modal).
      *
-     * @throws WalletException if connection fails or is rejected
+     * @return The connected wallet info, or null if the user cancelled
+     * @throws WalletException if connection fails
      */
-    suspend fun connect()
+    suspend fun connect(): ConnectedWallet?
 
     /**
-     * Disconnects from the external wallet.
+     * Disconnects all external wallets.
      *
      * @throws WalletException if disconnection fails
      */
     suspend fun disconnect()
 
     /**
-     * Signs an authorization entry preimage with the external wallet.
+     * Signs an authorization entry with the external wallet.
      *
-     * @param preimageXdr The base64-encoded XDR of the auth entry preimage
-     * @return The base64-encoded signature
+     * The auth entry is a base64-encoded XDR (typically a HashIdPreimage) that the
+     * wallet should sign with Ed25519.
+     *
+     * @param authEntryXdr The base64-encoded XDR of the auth entry
+     * @param options Optional signing options (network passphrase, specific address)
+     * @return The signing result containing the signature and optionally the signer address
      * @throws TransactionException.SigningFailed if signing fails or is rejected
      */
-    suspend fun signAuthEntry(preimageXdr: String): String
+    suspend fun signAuthEntry(
+        authEntryXdr: String,
+        options: SignAuthEntryOptions? = null
+    ): SignAuthEntryResult
 
     /**
-     * Gets the connected wallet addresses.
+     * Gets all currently connected wallets.
      *
-     * @return List of connected Stellar addresses (G-addresses)
-     * @throws WalletException if retrieval fails
+     * @return List of connected wallets with their addresses and identifiers
      */
-    suspend fun getConnectedWallets(): List<String>
+    fun getConnectedWallets(): List<ConnectedWallet>
 
     /**
-     * Checks if the wallet can sign for a specific address.
+     * Checks if a specific address has a connected wallet that can sign for it.
      *
-     * @param address The Stellar address to check
-     * @return True if the wallet can sign for this address
-     * @throws WalletException if the check fails
+     * @param address The Stellar G-address to check
+     * @return True if a connected wallet can sign for this address
      */
-    suspend fun canSignFor(address: String): Boolean
+    fun canSignFor(address: String): Boolean
+
+    /**
+     * Gets wallet info for a specific address.
+     *
+     * Optional method for looking up a connected wallet by its Stellar address.
+     * Default implementation returns null.
+     *
+     * @param address The Stellar G-address to look up
+     * @return The connected wallet info, or null if not found
+     */
+    fun getWalletForAddress(address: String): ConnectedWallet? {
+        return null
+    }
+
+    /**
+     * Reconnects to a previously connected wallet by its wallet ID.
+     *
+     * Used for restoring wallet connections after page reloads or app restarts.
+     * Default implementation returns null (reconnection not supported).
+     *
+     * @param walletId The wallet identifier (e.g., "freighter", "lobstr")
+     * @return The reconnected wallet info, or null if reconnection failed
+     */
+    suspend fun reconnect(walletId: String): ConnectedWallet? {
+        return null
+    }
 }

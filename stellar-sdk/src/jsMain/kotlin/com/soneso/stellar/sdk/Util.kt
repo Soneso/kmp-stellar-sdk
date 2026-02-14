@@ -26,3 +26,13 @@ internal actual suspend fun platformDelay(timeMillis: Long) {
         cont.invokeOnCancellation { clearTimeout(id) }
     }
 }
+
+/**
+ * JavaScript implementation of platformSynchronized.
+ *
+ * JavaScript is single-threaded, so no synchronization is needed.
+ * The block is executed directly.
+ */
+internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
+    return block()
+}

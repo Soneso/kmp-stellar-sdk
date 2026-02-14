@@ -20,8 +20,32 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+/**
+ * Known error codes returned by the relayer service.
+ *
+ * These codes identify specific failure conditions and can be used for
+ * programmatic error handling.
+ */
+object RelayerErrorCodes {
+    const val INVALID_PARAMS = "INVALID_PARAMS"
+    const val INVALID_XDR = "INVALID_XDR"
+    const val POOL_CAPACITY = "POOL_CAPACITY"
+    const val SIMULATION_FAILED = "SIMULATION_FAILED"
+    const val ONCHAIN_FAILED = "ONCHAIN_FAILED"
+    const val INVALID_TIME_BOUNDS = "INVALID_TIME_BOUNDS"
+    const val FEE_LIMIT_EXCEEDED = "FEE_LIMIT_EXCEEDED"
+    const val UNAUTHORIZED = "UNAUTHORIZED"
+    const val TIMEOUT = "TIMEOUT"
+}
 
 /**
  * Response from the relayer service.
@@ -29,30 +53,22 @@ import kotlinx.serialization.json.Json
  * The relayer wraps transactions with fee bumps and submits them to Stellar,
  * enabling gasless onboarding for users with empty wallets.
  *
- * Known error codes:
- * - INVALID_PARAMS: Request parameters are invalid
- * - INVALID_XDR: XDR encoding is malformed
- * - POOL_CAPACITY: Relayer pool is at capacity
- * - SIMULATION_FAILED: Transaction simulation failed
- * - ONCHAIN_FAILED: Transaction failed on-chain
- * - INVALID_TIME_BOUNDS: Transaction time bounds are invalid
- * - FEE_LIMIT_EXCEEDED: Transaction fee exceeds relayer limit
- * - UNAUTHORIZED: Request is not authorized
- * - TIMEOUT: Request timed out (client-side)
- *
  * @property success Indicates whether the transaction was successfully submitted
+ * @property transactionId Transaction ID assigned by the relayer (if successful)
  * @property hash The transaction hash if submission succeeded
  * @property status The transaction status (e.g., "PENDING", "SUCCESS", "ERROR")
  * @property error Error message if the request failed
- * @property errorCode Error code if the request failed
+ * @property errorCode Error code if the request failed (see [RelayerErrorCodes])
+ * @property details Additional error details from the relayer (if available)
  */
-@Serializable
 data class RelayerResponse(
     val success: Boolean,
+    val transactionId: String? = null,
     val hash: String? = null,
     val status: String? = null,
     val error: String? = null,
-    val errorCode: String? = null
+    val errorCode: String? = null,
+    val details: JsonElement? = null
 )
 
 /**
@@ -85,19 +101,32 @@ data class RelayerResponse(
  * if (response.success) {
  *     println("Transaction hash: ${response.hash ?: "unknown"}")
  * } else {
- *     println("Error: ${response.error ?: "unknown"}")
+ *     println("Error: ${response.error ?: "unknown"} (${response.errorCode ?: ""})")
  * }
  * ```
  *
- * @property relayerUrl The relayer endpoint URL
- * @property timeoutMs Request timeout in milliseconds (default: 6 minutes)
- * @property httpClient Optional custom HTTP client for testing
+ * @param relayerUrl The relayer endpoint URL (trailing slashes are stripped)
+ * @param timeoutMs Default request timeout in milliseconds (default: 6 minutes for testnet retries)
+ * @param httpClient Optional custom HTTP client for testing
+ * @throws ConfigurationException.InvalidConfig if relayerUrl is blank
  */
 class OZRelayerClient(
-    private val relayerUrl: String,
+    relayerUrl: String,
     private val timeoutMs: Long = SmartAccountConstants.DEFAULT_RELAYER_TIMEOUT_MS,
     private val httpClient: HttpClient? = null
 ) {
+    /**
+     * Normalized URL with trailing slashes stripped.
+     */
+    private val normalizedUrl: String
+
+    init {
+        if (relayerUrl.isBlank()) {
+            throw ConfigurationException.invalidConfig("Relayer URL is required")
+        }
+        normalizedUrl = relayerUrl.trimEnd('/')
+    }
+
     /**
      * JSON configuration for encoding/decoding requests and responses.
      */
@@ -106,6 +135,12 @@ class OZRelayerClient(
         isLenient = true
         encodeDefaults = false
     }
+
+    /**
+     * Whether the client is properly configured with a valid URL.
+     */
+    val isConfigured: Boolean
+        get() = normalizedUrl.isNotBlank()
 
     // MARK: - Mode 1: Host Function + Auth Entries
 
@@ -117,21 +152,21 @@ class OZRelayerClient(
      *
      * @param hostFunction The host function to execute
      * @param authEntries Authorization entries for the transaction
+     * @param perRequestTimeoutMs Optional per-request timeout override in milliseconds
      * @return The relayer response with transaction hash or error
-     * @throws TransactionException.SubmissionFailed if the request fails
-     * @throws TransactionException.Timeout if the request times out
      */
     suspend fun send(
         hostFunction: HostFunctionXdr,
-        authEntries: List<SorobanAuthorizationEntryXdr>
+        authEntries: List<SorobanAuthorizationEntryXdr>,
+        perRequestTimeoutMs: Long? = null
     ): RelayerResponse {
         // Encode host function to base64
         val funcBase64 = try {
             hostFunction.toXdrBase64()
         } catch (e: Exception) {
-            throw TransactionException.submissionFailed(
-                "Failed to encode host function to XDR",
-                e
+            return RelayerResponse(
+                success = false,
+                error = "Failed to encode host function to XDR: ${e.message}"
             )
         }
 
@@ -139,9 +174,9 @@ class OZRelayerClient(
         val authBase64Array = try {
             authEntries.map { it.toXdrBase64() }
         } catch (e: Exception) {
-            throw TransactionException.submissionFailed(
-                "Failed to encode auth entry to XDR",
-                e
+            return RelayerResponse(
+                success = false,
+                error = "Failed to encode auth entry to XDR: ${e.message}"
             )
         }
 
@@ -151,7 +186,7 @@ class OZRelayerClient(
             "auth" to authBase64Array
         )
 
-        return performRequest(payload)
+        return performRequest(payload, perRequestTimeoutMs)
     }
 
     // MARK: - Mode 2: Signed Transaction XDR
@@ -159,22 +194,24 @@ class OZRelayerClient(
     /**
      * Submits a complete signed transaction envelope.
      *
-     * The relayer will wrap this transaction with a fee bump and submit it
-     * to the Stellar network.
+     * Use this for transactions that require source_account auth (e.g., deployment).
+     * The relayer will fee-bump the signed transaction, preserving the inner signature.
      *
      * @param transactionEnvelope TransactionEnvelope XDR to submit
+     * @param perRequestTimeoutMs Optional per-request timeout override in milliseconds
      * @return The relayer response with transaction hash or error
-     * @throws TransactionException.SubmissionFailed if the request fails
-     * @throws TransactionException.Timeout if the request times out
      */
-    suspend fun sendXdr(transactionEnvelope: TransactionEnvelopeXdr): RelayerResponse {
+    suspend fun sendXdr(
+        transactionEnvelope: TransactionEnvelopeXdr,
+        perRequestTimeoutMs: Long? = null
+    ): RelayerResponse {
         // Encode transaction envelope to base64
         val xdrBase64 = try {
             transactionEnvelope.toXdrBase64()
         } catch (e: Exception) {
-            throw TransactionException.submissionFailed(
-                "Failed to encode transaction envelope to XDR",
-                e
+            return RelayerResponse(
+                success = false,
+                error = "Failed to encode transaction envelope to XDR: ${e.message}"
             )
         }
 
@@ -183,7 +220,7 @@ class OZRelayerClient(
             "xdr" to xdrBase64
         )
 
-        return performRequest(payload)
+        return performRequest(payload, perRequestTimeoutMs)
     }
 
     // MARK: - Private Methods
@@ -191,79 +228,142 @@ class OZRelayerClient(
     /**
      * Performs the HTTP request to the relayer.
      *
+     * Matches the TypeScript SDK behavior:
+     * - Sends X-Client-Name and X-Client-Version headers
+     * - On success: extracts fields from nested `data` wrapper if present
+     * - On error (including non-2xx): parses error code from multiple locations
+     * - On timeout: returns a response with TIMEOUT error code
+     * - On network failure: returns a response with the error message
+     *
+     * Unlike the previous version that threw exceptions for HTTP and network errors,
+     * this now returns a RelayerResponse for all cases, matching the TypeScript SDK
+     * pattern. Only XDR encoding failures (before the request) return early responses.
+     *
      * @param payload The JSON payload to send
-     * @return The parsed relayer response
-     * @throws TransactionException.SubmissionFailed if the request fails
-     * @throws TransactionException.Timeout if the request times out
+     * @param perRequestTimeoutMs Optional per-request timeout override
+     * @return The parsed relayer response (never throws)
      */
-    private suspend fun performRequest(payload: Map<String, Any>): RelayerResponse {
-        return withHttpClient { client ->
+    private suspend fun performRequest(
+        payload: Map<String, Any>,
+        perRequestTimeoutMs: Long? = null
+    ): RelayerResponse {
+        val effectiveTimeout = perRequestTimeoutMs ?: timeoutMs
+
+        return withHttpClient(effectiveTimeout) { client ->
             val response = try {
-                client.post(relayerUrl) {
+                client.post(normalizedUrl) {
                     contentType(ContentType.Application.Json)
+                    header("X-Client-Name", SmartAccountVersion.NAME)
+                    header("X-Client-Version", SmartAccountVersion.VERSION)
                     setBody(payload)
                     timeout {
-                        requestTimeoutMillis = timeoutMs
-                        connectTimeoutMillis = timeoutMs
-                        socketTimeoutMillis = timeoutMs
+                        requestTimeoutMillis = effectiveTimeout
+                        connectTimeoutMillis = effectiveTimeout
+                        socketTimeoutMillis = effectiveTimeout
                     }
                 }
             } catch (e: HttpRequestTimeoutException) {
-                throw TransactionException.timeout(
-                    "Request timed out after ${timeoutMs}ms",
-                    e
+                return@withHttpClient RelayerResponse(
+                    success = false,
+                    error = "Relayer request timed out",
+                    errorCode = RelayerErrorCodes.TIMEOUT
                 )
             } catch (e: Exception) {
-                throw TransactionException.submissionFailed(
-                    "Network request failed: ${e.message}",
-                    e
+                return@withHttpClient RelayerResponse(
+                    success = false,
+                    error = e.message ?: "Relayer request failed"
                 )
             }
 
-            // Handle non-200 status codes
-            if (response.status.value != 200) {
-                val errorMessage = try {
-                    response.bodyAsText()
-                } catch (e: Exception) {
-                    response.status.description
-                }
-
-                throw TransactionException.submissionFailed(
-                    "Relayer returned HTTP ${response.status.value}: $errorMessage"
-                )
-            }
-
-            // Decode response
-            val relayerResponse = try {
-                val body = response.bodyAsText()
-                json.decodeFromString<RelayerResponse>(body)
+            // Parse the response body as JSON
+            val responseBody = try {
+                response.bodyAsText()
             } catch (e: Exception) {
-                throw TransactionException.submissionFailed(
-                    "Failed to decode relayer response",
-                    e
+                return@withHttpClient RelayerResponse(
+                    success = false,
+                    error = "Failed to read relayer response body"
                 )
             }
 
-            // Warn if success=true but hash is missing
-            if (relayerResponse.success && relayerResponse.hash == null) {
-                println("Warning: Relayer returned success=true but hash is null")
+            val responseJson = try {
+                json.parseToJsonElement(responseBody).jsonObject
+            } catch (e: Exception) {
+                return@withHttpClient RelayerResponse(
+                    success = false,
+                    error = "Failed to parse relayer response as JSON: $responseBody"
+                )
             }
 
-            relayerResponse
+            // Check for success: HTTP 2xx AND success=true in body
+            val bodySuccess = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
+            if (response.status.isSuccess() && bodySuccess) {
+                // Extract from nested "data" wrapper if present, otherwise use top-level
+                val data = (responseJson["data"] as? JsonObject) ?: responseJson
+                return@withHttpClient RelayerResponse(
+                    success = true,
+                    transactionId = data["transactionId"]?.jsonPrimitive?.contentOrNull,
+                    hash = data["hash"]?.jsonPrimitive?.contentOrNull,
+                    status = data["status"]?.jsonPrimitive?.contentOrNull
+                )
+            }
+
+            // Error response: extract error message and code
+            val errorMessage = responseJson["error"]?.jsonPrimitive?.contentOrNull
+                ?: responseJson["message"]?.jsonPrimitive?.contentOrNull
+                ?: "Relayer request failed with status ${response.status.value}"
+            val errorCode = extractErrorCode(responseJson)
+            val details = responseJson["data"] ?: responseJson
+
+            RelayerResponse(
+                success = false,
+                error = errorMessage,
+                errorCode = errorCode,
+                details = details
+            )
         }
+    }
+
+    /**
+     * Extracts the error code from a relayer error response.
+     *
+     * Checks multiple locations in order, matching the TypeScript SDK:
+     * 1. Top-level `code` field
+     * 2. Top-level `errorCode` field
+     * 3. Nested `data.code` field
+     *
+     * @param responseJson The parsed JSON response object
+     * @return The error code string, or null if none found
+     */
+    private fun extractErrorCode(responseJson: JsonObject): String? {
+        // Check top-level "code"
+        (responseJson["code"] as? JsonPrimitive)?.contentOrNull?.let { return it }
+
+        // Check top-level "errorCode"
+        (responseJson["errorCode"] as? JsonPrimitive)?.contentOrNull?.let { return it }
+
+        // Check nested "data.code"
+        val data = responseJson["data"] as? JsonObject
+        if (data != null) {
+            (data["code"] as? JsonPrimitive)?.contentOrNull?.let { return it }
+        }
+
+        return null
     }
 
     /**
      * Executes a block with an HTTP client, managing lifecycle properly.
      */
-    private suspend fun <T> withHttpClient(block: suspend (HttpClient) -> T): T {
+    private suspend fun <T> withHttpClient(
+        effectiveTimeout: Long,
+        block: suspend (HttpClient) -> T
+    ): T {
         val client = httpClient ?: HttpClient {
             install(ContentNegotiation) {
                 json(json)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = timeoutMs
-                requestTimeoutMillis = timeoutMs
+                connectTimeoutMillis = effectiveTimeout
+                requestTimeoutMillis = effectiveTimeout
             }
         }
 

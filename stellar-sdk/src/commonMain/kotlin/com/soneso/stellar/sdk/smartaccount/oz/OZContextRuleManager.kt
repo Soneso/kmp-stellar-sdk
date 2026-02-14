@@ -281,8 +281,8 @@ class OZContextRuleManager internal constructor(
         // arg 0: context_type (ScVal from contextType.toScVal())
         val contextTypeScVal = contextType.toScVal()
 
-        // arg 1: name (Symbol)
-        val nameScVal = Scv.toSymbol(name)
+        // arg 1: name (String - Soroban String type, not Symbol)
+        val nameScVal = Scv.toString(name)
 
         // arg 2: valid_until (Option<u32> - represented as void for None, u32 for Some)
         val validUntilScVal: SCValXdr = if (validUntil != null) {
@@ -296,12 +296,14 @@ class OZContextRuleManager internal constructor(
         val signersScVal = Scv.toVec(signersVec)
 
         // arg 4: policies (Map<Address, ScVal> for policy address -> install param)
+        // Keys must be sorted by XDR bytes (Soroban requirement for ScMap)
         val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
         for ((address, installParam) in policies) {
             val policyAddress = Address(address).toSCAddress()
             policiesMap[Scv.toAddress(policyAddress)] = installParam
         }
-        val policiesScVal = Scv.toMap(policiesMap)
+        val sortedPoliciesMap = SmartAccountSharedUtils.sortMapByKeyXdr(policiesMap)
+        val policiesScVal = Scv.toMap(sortedPoliciesMap)
 
         // Build invocation
         val functionArgs: List<SCValXdr> = listOf(
@@ -524,10 +526,10 @@ class OZContextRuleManager internal constructor(
             throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
         }
 
-        // Build invocation
+        // Build invocation (name is Soroban String type, not Symbol)
         val functionArgs: List<SCValXdr> = listOf(
             Scv.toUint32(id),
-            Scv.toSymbol(name)
+            Scv.toString(name)
         )
 
         val invokeArgs = InvokeContractArgsXdr(

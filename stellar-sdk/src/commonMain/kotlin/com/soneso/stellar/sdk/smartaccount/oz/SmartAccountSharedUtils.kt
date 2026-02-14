@@ -18,8 +18,10 @@ import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.Int128PartsXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
+import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.Uint64Xdr
+import com.soneso.stellar.sdk.xdr.XdrWriter
 import io.ktor.utils.io.core.toByteArray
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -141,51 +143,124 @@ object SmartAccountSharedUtils {
     // MARK: - Base64URL Encoding/Decoding
 
     /**
-     * Encodes data to Base64URL format (RFC 4648, no padding).
+     * Encodes data to Base64URL format (RFC 4648 Section 5, no padding).
      *
-     * Converts standard Base64 characters to URL-safe equivalents:
-     * - `+` becomes `-`
-     * - `/` becomes `_`
-     * - Padding `=` characters are removed
+     * Uses URL-safe alphabet: `-` instead of `+`, `_` instead of `/`.
+     * Padding `=` characters are stripped.
      *
      * @param data The data to encode
      * @return Base64URL-encoded string without padding
      */
     @OptIn(ExperimentalEncodingApi::class)
     fun base64urlEncode(data: ByteArray): String {
-        return Base64.encode(data)
-            .replace("+", "-")
-            .replace("/", "_")
-            .replace("=", "")
+        return Base64.UrlSafe.encode(data).trimEnd('=')
     }
 
     /**
      * Decodes a Base64URL-encoded string to data.
      *
-     * Converts URL-safe characters back to standard Base64:
-     * - `-` becomes `+`
-     * - `_` becomes `/`
-     * - Adds padding `=` characters as needed
+     * Accepts input with or without padding. Uses URL-safe alphabet:
+     * `-` instead of `+`, `_` instead of `/`.
      *
-     * @param string The Base64URL-encoded string
+     * @param string The Base64URL-encoded string (with or without padding)
      * @return Decoded data, or null if decoding fails
      */
     @OptIn(ExperimentalEncodingApi::class)
     fun base64urlDecode(string: String): ByteArray? {
-        var base64 = string
-            .replace("-", "+")
-            .replace("_", "/")
-
-        // Add padding
-        while (base64.length % 4 != 0) {
-            base64 += "="
+        // Add padding if needed - Base64.UrlSafe.decode() requires it
+        val padded = when (string.length % 4) {
+            2 -> string + "=="
+            3 -> string + "="
+            else -> string
         }
 
         return try {
-            Base64.decode(base64)
+            Base64.UrlSafe.decode(padded)
         } catch (e: Exception) {
             null
         }
+    }
+
+    // MARK: - ScMap Key Sorting
+
+    /**
+     * Encodes an SCValXdr to its XDR byte representation.
+     *
+     * Used for deterministic key comparison when sorting ScMap entries.
+     *
+     * @param scVal The SCVal to encode
+     * @return The XDR-encoded bytes
+     */
+    fun scValToXdrBytes(scVal: SCValXdr): ByteArray {
+        val writer = XdrWriter()
+        scVal.encode(writer)
+        return writer.toByteArray()
+    }
+
+    /**
+     * Sorts ScMap entries by lexicographic comparison of their keys' XDR byte representation.
+     *
+     * Soroban mandates that ScMap keys are sorted lexicographically by their XDR-encoded
+     * bytes. This function takes a LinkedHashMap of ScVal entries and returns a new
+     * LinkedHashMap with entries sorted by their key's XDR encoding.
+     *
+     * This matches the behavior of the TypeScript Smart Account Kit SDK which sorts
+     * policy parameter maps and policy address maps before encoding to XDR.
+     *
+     * @param map The unsorted map of ScVal key-value pairs
+     * @return A new LinkedHashMap with entries sorted by XDR-encoded key bytes
+     */
+    fun sortMapByKeyXdr(map: LinkedHashMap<SCValXdr, SCValXdr>): LinkedHashMap<SCValXdr, SCValXdr> {
+        val sorted = LinkedHashMap<SCValXdr, SCValXdr>()
+        map.entries
+            .sortedWith(Comparator { a, b ->
+                val aBytes = scValToXdrBytes(a.key)
+                val bBytes = scValToXdrBytes(b.key)
+                compareByteArraysLexicographically(aBytes, bBytes)
+            })
+            .forEach { (key, value) ->
+                sorted[key] = value
+            }
+        return sorted
+    }
+
+    /**
+     * Sorts a list of SCMapEntryXdr by lexicographic comparison of their keys' XDR bytes.
+     *
+     * Soroban mandates that ScMap keys are sorted lexicographically by their XDR-encoded
+     * bytes. This function sorts entries in-place.
+     *
+     * @param entries The list of map entries to sort
+     * @return A new list with entries sorted by XDR-encoded key bytes
+     */
+    fun sortMapEntriesByKeyXdr(entries: List<SCMapEntryXdr>): List<SCMapEntryXdr> {
+        return entries.sortedWith(Comparator { a, b ->
+            val aBytes = scValToXdrBytes(a.key)
+            val bBytes = scValToXdrBytes(b.key)
+            compareByteArraysLexicographically(aBytes, bBytes)
+        })
+    }
+
+    /**
+     * Compares two byte arrays lexicographically (unsigned byte comparison).
+     *
+     * Compares each byte as unsigned values. If all compared bytes are equal,
+     * the shorter array is considered less than the longer one.
+     *
+     * @param a First byte array
+     * @param b Second byte array
+     * @return Negative if a < b, positive if a > b, zero if equal
+     */
+    private fun compareByteArraysLexicographically(a: ByteArray, b: ByteArray): Int {
+        val minLength = minOf(a.size, b.size)
+        for (i in 0 until minLength) {
+            val aByte = a[i].toInt() and 0xFF
+            val bByte = b[i].toInt() and 0xFF
+            if (aByte != bByte) {
+                return aByte - bByte
+            }
+        }
+        return a.size - b.size
     }
 
     // MARK: - Address Extraction

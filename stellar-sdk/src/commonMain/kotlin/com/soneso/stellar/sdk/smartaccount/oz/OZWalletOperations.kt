@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -294,12 +295,15 @@ class OZWalletOperations internal constructor(
         // STEP 6: Base64URL-encode credential ID
         val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(registrationResult.credentialId)
 
-        // STEP 7: Save credential as pending
+        // STEP 7: Save credential as pending (with metadata from registration)
         val credential = try {
             credentialManager.createPendingCredential(
                 credentialId = credentialIdBase64url,
                 publicKey = publicKey,
-                contractId = contractId
+                contractId = contractId,
+                transports = registrationResult.transports,
+                deviceType = registrationResult.deviceType,
+                backedUp = registrationResult.backedUp
             )
         } catch (e: CredentialException) {
             throw e
@@ -696,11 +700,11 @@ class OZWalletOperations internal constructor(
             )
 
         // STEP 7: Save session
-        val expiresAt = System.currentTimeMillis() + kit.config.sessionExpiryMs
+        val expiresAt = currentTimeMillis() + kit.config.sessionExpiryMs
         val newSession = StoredSession(
             credentialId = credentialIdBase64url,
             contractId = finalContractId,
-            connectedAt = System.currentTimeMillis(),
+            connectedAt = currentTimeMillis(),
             expiresAt = expiresAt
         )
 
@@ -1002,11 +1006,11 @@ class OZWalletOperations internal constructor(
         }
 
         // Save new session
-        val expiresAt = System.currentTimeMillis() + kit.config.sessionExpiryMs
+        val expiresAt = currentTimeMillis() + kit.config.sessionExpiryMs
         val newSession = StoredSession(
             credentialId = finalCredentialId,
             contractId = finalContractId,
-            connectedAt = System.currentTimeMillis(),
+            connectedAt = currentTimeMillis(),
             expiresAt = expiresAt
         )
 

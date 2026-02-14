@@ -8,6 +8,9 @@
 
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.currentTimeMillis
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
 
 /**
  * Manages the lifecycle of smart account credentials.
@@ -77,6 +80,9 @@ class OZCredentialManager internal constructor(
      * @param credentialId The Base64URL-encoded credential ID (must be unique and non-empty)
      * @param publicKey The uncompressed secp256r1 public key (must be 65 bytes)
      * @param contractId The smart account contract address (C-address)
+     * @param transports Authenticator transport hints (e.g., "usb", "nfc", "ble", "internal")
+     * @param deviceType Authenticator device type ("singleDevice" or "multiDevice")
+     * @param backedUp Whether the passkey is backed up or synced
      * @return The newly created credential
      * @throws ValidationException.InvalidInput if validation fails
      * @throws CredentialException.AlreadyExists if a credential with the same ID exists
@@ -87,7 +93,10 @@ class OZCredentialManager internal constructor(
      * val credential = manager.createPendingCredential(
      *     credentialId = "abc123",
      *     publicKey = publicKeyData,
-     *     contractId = "CBCD1234..."
+     *     contractId = "CBCD1234...",
+     *     transports = listOf("internal"),
+     *     deviceType = "multiDevice",
+     *     backedUp = true
      * )
      * println("Created credential: ${credential.credentialId}")
      * ```
@@ -95,7 +104,10 @@ class OZCredentialManager internal constructor(
     suspend fun createPendingCredential(
         credentialId: String,
         publicKey: ByteArray,
-        contractId: String
+        contractId: String,
+        transports: List<String>? = null,
+        deviceType: String? = null,
+        backedUp: Boolean? = null
     ): StoredCredential {
         // Validate public key size
         if (publicKey.size != SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
@@ -126,7 +138,10 @@ class OZCredentialManager internal constructor(
             contractId = contractId,
             deploymentStatus = CredentialDeploymentStatus.PENDING,
             isPrimary = true,
-            createdAt = System.currentTimeMillis()
+            createdAt = currentTimeMillis(),
+            transports = transports,
+            deviceType = deviceType,
+            backedUp = backedUp
         )
 
         // Save to storage
@@ -144,6 +159,107 @@ class OZCredentialManager internal constructor(
         }
 
         return credential
+    }
+
+    /**
+     * Saves a credential to storage.
+     *
+     * Saves a pre-built credential directly to storage. The credential is stored with
+     * PENDING deployment status by default. Unlike [createPendingCredential], this
+     * method does not validate or modify the credential -- it performs a direct save.
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.save()`.
+     *
+     * @param credentialId The Base64URL-encoded credential ID (must not be empty)
+     * @param publicKey The uncompressed secp256r1 public key (65 bytes)
+     * @param nickname Optional user-friendly name for the credential
+     * @param contractId Optional smart account contract address (C-address)
+     * @return The saved credential
+     * @throws ValidationException.InvalidInput if credentialId is empty or publicKey is wrong size
+     * @throws StorageException.WriteFailed if saving fails
+     *
+     * Example:
+     * ```kotlin
+     * val credential = manager.saveCredential(
+     *     credentialId = "abc123",
+     *     publicKey = publicKeyData,
+     *     nickname = "MacBook Pro",
+     *     contractId = "CBCD1234..."
+     * )
+     * ```
+     */
+    suspend fun saveCredential(
+        credentialId: String,
+        publicKey: ByteArray,
+        nickname: String? = null,
+        contractId: String? = null
+    ): StoredCredential {
+        // Validate credential ID is not empty
+        if (credentialId.isEmpty()) {
+            throw ValidationException.invalidInput(
+                field = "credentialId",
+                reason = "Credential ID cannot be empty"
+            )
+        }
+
+        // Validate public key size
+        if (publicKey.size != SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
+            throw ValidationException.invalidInput(
+                field = "publicKey",
+                reason = "Expected ${SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE} bytes, got ${publicKey.size}"
+            )
+        }
+
+        val credential = StoredCredential(
+            credentialId = credentialId,
+            publicKey = publicKey,
+            contractId = contractId ?: "",
+            nickname = nickname,
+            createdAt = currentTimeMillis(),
+            deploymentStatus = CredentialDeploymentStatus.PENDING
+        )
+
+        try {
+            storage.save(credential)
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.writeFailed(
+                key = credentialId,
+                cause = e
+            )
+        }
+
+        return credential
+    }
+
+    /**
+     * Marks a credential as deployed by removing it from storage.
+     *
+     * After successful deployment, credentials are deleted from storage because
+     * reconnection works via sessions or the indexer. This matches the TypeScript
+     * SDK's `CredentialManager.markDeployed()` behavior.
+     *
+     * @param credentialId The ID of the credential that was successfully deployed
+     * @throws StorageException.WriteFailed if deletion fails
+     *
+     * Example:
+     * ```kotlin
+     * // After successful deployment transaction confirmation
+     * manager.markDeployed(credentialId = "abc123")
+     * ```
+     */
+    suspend fun markDeployed(credentialId: String) {
+        try {
+            storage.delete(credentialId)
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.writeFailed(
+                key = credentialId,
+                cause = e
+            )
+        }
     }
 
     /**
@@ -194,23 +310,166 @@ class OZCredentialManager internal constructor(
     }
 
     /**
-     * Deletes a credential from storage.
+     * Syncs a credential with on-chain state.
      *
-     * Called after successful deployment. Credentials are not persisted after deployment
-     * because reconnection works via sessions or the indexer.
+     * Checks whether the smart account contract for this credential exists on-chain
+     * by querying the contract instance via Soroban RPC. If the contract exists, the
+     * credential is deleted from storage (deployment is confirmed) and the method
+     * returns true. If the contract does not exist, the credential is not modified
+     * and the method returns false.
      *
-     * This method does not throw if the credential does not exist (deletion is idempotent).
+     * This is essential for the pending credentials workflow: when a deployment
+     * transaction is submitted but the app closes before confirmation, sync() allows
+     * the app to discover on next launch whether the deployment actually succeeded.
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.sync()`.
+     *
+     * @param credentialId The ID of the credential to sync
+     * @return true if the contract exists on-chain (credential was deployed), false otherwise
+     * @throws CredentialException.NotFound if the credential does not exist in storage
+     * @throws StorageException.ReadFailed if reading the credential fails
+     *
+     * Example:
+     * ```kotlin
+     * val isDeployed = manager.sync(credentialId = "abc123")
+     * if (isDeployed) {
+     *     println("Contract is deployed on-chain, credential removed from storage")
+     * } else {
+     *     println("Contract not yet deployed, credential still pending")
+     * }
+     * ```
+     */
+    suspend fun sync(credentialId: String): Boolean {
+        val credential = try {
+            storage.get(credentialId)
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.readFailed(
+                key = credentialId,
+                cause = e
+            )
+        } ?: throw CredentialException.notFound(credentialId)
+
+        val contractAddress = credential.contractId
+        if (contractAddress.isNullOrEmpty()) {
+            return false
+        }
+
+        // Check on-chain contract existence via getContractData
+        return try {
+            val result = kit.sorobanServer.getContractData(
+                contractId = contractAddress,
+                key = Scv.toLedgerKeyContractInstance(),
+                durability = SorobanServer.Durability.PERSISTENT
+            )
+            if (result != null) {
+                // Contract exists on-chain -- remove credential from storage
+                storage.delete(credentialId)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            // Contract does not exist or RPC error -- treat as not deployed
+            false
+        }
+    }
+
+    /**
+     * Syncs all stored credentials with on-chain state.
+     *
+     * Iterates through all stored credentials and checks each one against on-chain
+     * state. Deployed credentials are removed from storage. Returns a summary of
+     * deployment statuses.
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.syncAll()`.
+     *
+     * @return A [SyncResult] containing counts of deployed, pending, and failed credentials
+     * @throws StorageException.ReadFailed if reading credentials fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = manager.syncAll()
+     * println("Deployed: ${result.deployed}, Pending: ${result.pending}, Failed: ${result.failed}")
+     * ```
+     */
+    suspend fun syncAll(): SyncResult {
+        val all = try {
+            storage.getAll()
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.readFailed(
+                key = "all",
+                cause = e
+            )
+        }
+
+        var deployed = 0
+        var pending = 0
+        var failed = 0
+
+        for (credential in all) {
+            val exists = try {
+                sync(credential.credentialId)
+            } catch (e: CredentialException) {
+                // Credential may have been deleted by a previous sync in this loop
+                false
+            }
+
+            if (exists) {
+                deployed++
+            } else if (credential.deploymentStatus == CredentialDeploymentStatus.FAILED) {
+                failed++
+            } else {
+                pending++
+            }
+        }
+
+        return SyncResult(deployed = deployed, pending = pending, failed = failed)
+    }
+
+    /**
+     * Deletes a pending credential from storage.
+     *
+     * Before deleting, checks whether the contract exists on-chain by calling [sync].
+     * If the contract is already deployed, the deletion is rejected because the wallet
+     * exists on-chain and the credential has already been removed by sync.
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.delete()`.
      *
      * @param credentialId The ID of the credential to delete
+     * @throws CredentialException.NotFound if the credential does not exist
+     * @throws CredentialException.Invalid if the credential is already deployed on-chain
      * @throws StorageException.WriteFailed if deletion fails
      *
      * Example:
      * ```kotlin
-     * // After successful deployment
      * manager.deleteCredential(credentialId = "abc123")
      * ```
      */
     suspend fun deleteCredential(credentialId: String) {
+        // Verify credential exists before sync
+        val credential = try {
+            storage.get(credentialId)
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.readFailed(
+                key = credentialId,
+                cause = e
+            )
+        } ?: throw CredentialException.notFound(credentialId)
+
+        // Check on-chain status -- if deployed, sync removes it and we throw
+        val isDeployed = sync(credentialId)
+        if (isDeployed) {
+            throw CredentialException.invalid(
+                "Cannot delete a deployed credential. The wallet exists on-chain."
+            )
+        }
+
         try {
             storage.delete(credentialId)
         } catch (e: StorageException) {
@@ -314,6 +573,66 @@ class OZCredentialManager internal constructor(
     }
 
     /**
+     * Retrieves credentials for the currently connected wallet.
+     *
+     * Returns credentials where the contractId matches the kit's currently connected
+     * contract ID. Returns an empty list if no wallet is connected.
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.getForWallet()`.
+     *
+     * @return List of credentials for the connected wallet (empty if not connected or none found)
+     * @throws StorageException.ReadFailed if reading fails
+     *
+     * Example:
+     * ```kotlin
+     * val walletCredentials = manager.getForConnectedWallet()
+     * println("Found ${walletCredentials.size} credential(s) for current wallet")
+     * ```
+     */
+    suspend fun getForConnectedWallet(): List<StoredCredential> {
+        val contractId = kit.contractId ?: return emptyList()
+        return getCredentialsByContract(contractId)
+    }
+
+    /**
+     * Retrieves credentials that are pending deployment or have failed deployment.
+     *
+     * Returns all credentials with deployment status PENDING or FAILED. These are
+     * credentials that have not been confirmed on-chain and may need attention
+     * (retry, sync, or delete).
+     *
+     * Corresponds to TypeScript SDK's `CredentialManager.getPending()`.
+     *
+     * @return List of pending and failed credentials (empty if none exist)
+     * @throws StorageException.ReadFailed if reading fails
+     *
+     * Example:
+     * ```kotlin
+     * val pendingCredentials = manager.getPendingCredentials()
+     * for (cred in pendingCredentials) {
+     *     println("${cred.credentialId}: ${cred.deploymentStatus}")
+     * }
+     * ```
+     */
+    suspend fun getPendingCredentials(): List<StoredCredential> {
+        val all = try {
+            storage.getAll()
+        } catch (e: StorageException) {
+            throw e
+        } catch (e: Exception) {
+            throw StorageException.readFailed(
+                key = "all",
+                cause = e
+            )
+        }
+
+        return all.filter {
+            it.deploymentStatus == CredentialDeploymentStatus.PENDING ||
+                it.deploymentStatus == CredentialDeploymentStatus.FAILED
+        }
+    }
+
+    /**
      * Updates a credential with partial changes.
      *
      * Only non-null fields in the update are applied. The credential must exist
@@ -328,7 +647,7 @@ class OZCredentialManager internal constructor(
      * ```kotlin
      * val update = StoredCredentialUpdate(
      *     nickname = "MacBook Pro",
-     *     lastUsedAt = System.currentTimeMillis()
+     *     lastUsedAt = currentTimeMillis()
      * )
      * manager.updateCredential(credentialId = "abc123", updates = update)
      * ```
@@ -367,7 +686,7 @@ class OZCredentialManager internal constructor(
      */
     suspend fun updateLastUsed(credentialId: String) {
         val update = StoredCredentialUpdate(
-            lastUsedAt = System.currentTimeMillis()
+            lastUsedAt = currentTimeMillis()
         )
         updateCredential(credentialId, update)
     }
@@ -485,3 +804,19 @@ class OZCredentialManager internal constructor(
         }
     }
 }
+
+/**
+ * Result of syncing all credentials with on-chain state.
+ *
+ * Returned by [OZCredentialManager.syncAll] to provide a summary
+ * of how many credentials are deployed, pending, or failed.
+ *
+ * @property deployed Number of credentials confirmed as deployed on-chain (removed from storage)
+ * @property pending Number of credentials still pending deployment
+ * @property failed Number of credentials with failed deployment status
+ */
+data class SyncResult(
+    val deployed: Int,
+    val pending: Int,
+    val failed: Int
+)

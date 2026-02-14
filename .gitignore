@@ -130,8 +130,9 @@ compatibility/horizon/data/
 compatibility/rpc/data/
 compatibility/sep/data/
 
-# Vite build cache (demo web app)
+# Vite build cache (demo web apps)
 demo/webApp/.vite/
+smart-account-demo/webApp/.vite/
 
 # Kotlin/JS build artifacts
 kotlin-js-store/

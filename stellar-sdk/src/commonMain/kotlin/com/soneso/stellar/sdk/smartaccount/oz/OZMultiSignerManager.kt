@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -584,13 +585,6 @@ class OZMultiSignerManager internal constructor(
 
                 val webAuthnSignatureScVal = webAuthnSignature.toScVal()
 
-                // Look up stored credential to get the public key
-                val storage = kit.getStorage()
-                val storedCredential = storage.get(credentialId)
-                    ?: throw CredentialException.notFound(credentialId)
-
-                val publicKey = storedCredential.publicKey
-
                 // Build key_data: publicKey (65 bytes) + credentialIdBytes
                 val credentialIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
                     ?: throw ValidationException.invalidInput(
@@ -598,7 +592,31 @@ class OZMultiSignerManager internal constructor(
                         "Failed to decode credential ID"
                     )
 
-                val keyData = publicKey + credentialIdBytes
+                // Try local storage first, fall back to on-chain available signers
+                val keyData: ByteArray
+                val storage = kit.getStorage()
+                val storedCredential = storage.get(credentialId)
+                if (storedCredential != null) {
+                    keyData = storedCredential.publicKey + credentialIdBytes
+                } else {
+                    // Look up from available signers (already queried from on-chain context rules)
+                    val matchingSigner = availableSigners.firstOrNull { signer ->
+                        signer.source == SignerSource.PASSKEY &&
+                        signer.signer is ExternalSigner &&
+                        (signer.signer as ExternalSigner).keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE &&
+                        (signer.signer as ExternalSigner).keyData.copyOfRange(
+                            SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
+                            (signer.signer as ExternalSigner).keyData.size
+                        ).contentEquals(credentialIdBytes)
+                    }
+                    if (matchingSigner != null) {
+                        keyData = (matchingSigner.signer as ExternalSigner).keyData
+                    } else {
+                        throw CredentialException.notFound(
+                            "No signer found for credential ID: $credentialId (not in local storage or on-chain context rules)"
+                        )
+                    }
+                }
 
                 // Build ExternalSigner with WebAuthn verifier and full key data
                 val passkeySigner = ExternalSigner(
@@ -644,8 +662,14 @@ class OZMultiSignerManager internal constructor(
                     val authEntryXdrBase64 = kotlin.io.encoding.Base64.encode(authEntryXdr)
 
                     // Request signature from external wallet
-                    val signedAuthEntryXdrBase64: String = try {
-                        externalWallet.signAuthEntry(authEntryXdrBase64)
+                    val signResult: SignAuthEntryResult = try {
+                        externalWallet.signAuthEntry(
+                            authEntryXdrBase64,
+                            SignAuthEntryOptions(
+                                networkPassphrase = kit.config.networkPassphrase,
+                                address = additionalSigner.address
+                            )
+                        )
                     } catch (e: Exception) {
                         throw TransactionException.signingFailed(
                             "External wallet signing failed: ${e.message}",
@@ -656,7 +680,7 @@ class OZMultiSignerManager internal constructor(
                     // Decode from base64
                     @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
                     val signedAuthEntryXdr = try {
-                        kotlin.io.encoding.Base64.decode(signedAuthEntryXdrBase64)
+                        kotlin.io.encoding.Base64.decode(signResult.signedAuthEntry)
                     } catch (e: Exception) {
                         throw TransactionException.signingFailed(
                             "Failed to decode base64 from external wallet",
@@ -828,7 +852,7 @@ class OZMultiSignerManager internal constructor(
         }
 
         // Use timestamp-based nonce
-        val nonce = (System.currentTimeMillis())
+        val nonce = (currentTimeMillis())
 
         val addressCredentials = SorobanAddressCredentialsXdr(
             address = delegatedScAddress,

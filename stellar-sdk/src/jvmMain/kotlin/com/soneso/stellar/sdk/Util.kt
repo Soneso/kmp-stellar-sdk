@@ -19,3 +19,12 @@ internal actual suspend fun platformDelay(timeMillis: Long) {
         Thread.sleep(timeMillis)
     }
 }
+
+/**
+ * JVM implementation of platformSynchronized using kotlin.synchronized.
+ *
+ * Delegates to the JVM's built-in monitor-based synchronization for thread safety.
+ */
+internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
+    return kotlin.synchronized(lock, block)
+}

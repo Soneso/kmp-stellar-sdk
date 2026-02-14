@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -151,6 +152,7 @@ class OZTransactionOperations internal constructor(
      * @param tokenContract The token contract address (C-address)
      * @param recipient The recipient address (G-address for accounts, C-address for contracts)
      * @param amount The amount to transfer in XLM (will be converted to stroops)
+     * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails, simulation fails, or submission fails
      *
@@ -172,7 +174,8 @@ class OZTransactionOperations internal constructor(
     suspend fun transfer(
         tokenContract: String,
         recipient: String,
-        amount: Double
+        amount: Double,
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // STEP 1: Validate inputs
         val (_, contractId) = kit.requireConnected()
@@ -237,7 +240,7 @@ class OZTransactionOperations internal constructor(
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
         // STEP 4-8: Submit the transaction (will handle simulation, signing, and polling)
-        return submit(hostFunction = hostFunction, auth = emptyList())
+        return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
     // MARK: - Auth Entry Signing
@@ -367,6 +370,7 @@ class OZTransactionOperations internal constructor(
      *
      * @param hostFunction The host function to execute
      * @param auth Authorization entries for the transaction (typically empty; simulation provides them)
+     * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if submission, simulation, signing, or polling fails
      *
@@ -374,7 +378,8 @@ class OZTransactionOperations internal constructor(
      */
     suspend fun submit(
         hostFunction: HostFunctionXdr,
-        auth: List<SorobanAuthorizationEntryXdr>
+        auth: List<SorobanAuthorizationEntryXdr>,
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // STEP 1: Require connected wallet
         val (credentialId, contractId) = kit.requireConnected()
@@ -460,18 +465,23 @@ class OZTransactionOperations internal constructor(
                     signature = compactSig
                 )
 
-                // (f) Reconstruct keyData from stored credential
-                val storage = kit.getStorage()
-                val stored = storage.get(credentialId)
-                    ?: throw CredentialException.notFound(credentialId)
-
-                val publicKey = stored.publicKey
+                // (f) Get keyData from stored credential or on-chain lookup
                 val credIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
                     ?: throw CredentialException.invalid(
                         "Failed to decode credentialId from Base64URL: $credentialId"
                     )
 
-                val keyData = publicKey + credIdBytes
+                val keyData: ByteArray
+                val storage = kit.getStorage()
+                val stored = storage.get(credentialId)
+                if (stored != null) {
+                    // Local storage has the credential - reconstruct keyData
+                    keyData = stored.publicKey + credIdBytes
+                } else {
+                    // Credential not in local storage - look up from on-chain context rules
+                    // This matches the TypeScript SDK's findKeyDataByCredentialId() behavior
+                    keyData = findKeyDataByCredentialId(credIdBytes, entry)
+                }
 
                 // (g) Build external signer
                 val signer = ExternalSigner(
@@ -540,23 +550,27 @@ class OZTransactionOperations internal constructor(
             .setSorobanData(transactionData)
             .build()
 
-        // STEP 12: Conditionally sign with deployer keypair
-        // Only sign when NOT using fee sponsoring OR when has source_account auth
-        val shouldUseFeeSponsoring = kit.relayerClient != null
+        // STEP 12: Determine submission method and conditionally sign with deployer keypair
+        val submissionMethod = getSubmissionMethod(forceMethod)
+        val shouldUseFeeSponsoring = submissionMethod == SubmissionMethod.RELAYER
         val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
 
+        // Only sign when NOT using fee sponsoring OR when has source_account auth
         if (!shouldUseFeeSponsoring || hasSourceAuth) {
             finalTransaction.sign(deployer)
         }
 
-        // STEP 13: Determine submission method using SIGNED auth entries (not original input)
-        return if (kit.relayerClient != null) {
+        // STEP 13: Submit using the determined method
+        return if (submissionMethod == SubmissionMethod.RELAYER) {
+            val relayer = kit.relayerClient
+                ?: throw TransactionException.submissionFailed("Relayer is not configured")
+
             val useMode2 = shouldUseRelayerMode2(signedAuthEntries)
 
             if (useMode2) {
                 // Mode 2: Submit signed transaction XDR
                 val txXdr = finalTransaction.toEnvelopeXdr()
-                val relayerResponse = kit.relayerClient.sendXdr(txXdr)
+                val relayerResponse = relayer.sendXdr(txXdr)
 
                 // Emit transaction submitted event
                 if (relayerResponse.hash != null) {
@@ -578,7 +592,7 @@ class OZTransactionOperations internal constructor(
                 }
             } else {
                 // Mode 1: Submit host function and signed auth entries
-                val relayerResponse = kit.relayerClient.send(hostFunction, signedAuthEntries)
+                val relayerResponse = relayer.send(hostFunction, signedAuthEntries)
 
                 // Emit transaction submitted event
                 if (relayerResponse.hash != null) {
@@ -600,7 +614,7 @@ class OZTransactionOperations internal constructor(
                 }
             }
         } else {
-            // No relayer - submit via RPC
+            // Submit via RPC
             val sendResult = kit.sorobanServer.sendTransaction(finalTransaction)
 
             val hash = sendResult.hash
@@ -728,6 +742,7 @@ class OZTransactionOperations internal constructor(
      * IMPORTANT: Only works on testnet. Do not use on mainnet.
      *
      * @param nativeTokenContract The native token (XLM) contract address (C-address)
+     * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return The amount funded in XLM
      * @throws SmartAccountException if funding fails at any step
      *
@@ -749,7 +764,10 @@ class OZTransactionOperations internal constructor(
      *
      * @see convertAndSignAuthEntries for source_account to Address credential conversion
      */
-    suspend fun fundWallet(nativeTokenContract: String): Double {
+    suspend fun fundWallet(
+        nativeTokenContract: String,
+        forceMethod: SubmissionMethod? = null
+    ): Double {
         val (_, contractId) = kit.requireConnected()
 
         // Validate native token contract address
@@ -897,21 +915,25 @@ class OZTransactionOperations internal constructor(
             .build()
 
         // STEP 11: Determine submission method
-        val shouldUseFeeSponsoring = kit.relayerClient != null
+        val submissionMethod = getSubmissionMethod(forceMethod)
+        val useFeeSponsoring = submissionMethod == SubmissionMethod.RELAYER
         val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
 
         // Sign with temp keypair only if NOT using fee sponsoring OR has source auth (Mode 2)
-        if (!shouldUseFeeSponsoring || hasSourceAuth) {
+        if (!useFeeSponsoring || hasSourceAuth) {
             finalTransaction.sign(tempKeypair)
         }
 
         // STEP 12: Submit transaction
-        val result = if (shouldUseFeeSponsoring) {
+        val result = if (useFeeSponsoring) {
+            val relayer = kit.relayerClient
+                ?: throw TransactionException.submissionFailed("Relayer is not configured")
+
             // Use relayer submission
             if (hasSourceAuth) {
                 // Mode 2: Submit signed transaction XDR
                 val txXdr = finalTransaction.toEnvelopeXdr()
-                val relayerResponse = kit.relayerClient!!.sendXdr(txXdr)
+                val relayerResponse = relayer.sendXdr(txXdr)
 
                 if (relayerResponse.success && relayerResponse.hash != null) {
                     pollForConfirmation(relayerResponse.hash)
@@ -923,7 +945,7 @@ class OZTransactionOperations internal constructor(
                 }
             } else {
                 // Mode 1: Submit host function and signed auth entries
-                val relayerResponse = kit.relayerClient!!.send(hostFunction, signedAuthEntries)
+                val relayerResponse = relayer.send(hostFunction, signedAuthEntries)
 
                 if (relayerResponse.success && relayerResponse.hash != null) {
                     pollForConfirmation(relayerResponse.hash)
@@ -981,7 +1003,7 @@ class OZTransactionOperations internal constructor(
             // For source_account credentials, convert to Address credentials
             if (credType is SorobanCredentialsXdr.Void) {
                 // Generate a nonce for the new Address credential
-                val nonce = Int64Xdr(System.currentTimeMillis())
+                val nonce = Int64Xdr(currentTimeMillis())
 
                 // Build auth payload hash
                 val payloadHash = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
@@ -1076,10 +1098,36 @@ class OZTransactionOperations internal constructor(
     }
 
     /**
+     * Determines the submission method based on configuration and optional override.
+     *
+     * Priority:
+     * 1. If `forceMethod` is specified, use it directly
+     * 2. If a relayer is configured, use relayer
+     * 3. Otherwise, use RPC
+     *
+     * This matches the TypeScript SDK's `getSubmissionMethod()` logic.
+     *
+     * @param forceMethod Optional override to force a specific submission method
+     * @return The submission method to use
+     */
+    private fun getSubmissionMethod(forceMethod: SubmissionMethod?): SubmissionMethod {
+        if (forceMethod != null) {
+            return forceMethod
+        }
+        return if (kit.relayerClient != null) {
+            SubmissionMethod.RELAYER
+        } else {
+            SubmissionMethod.RPC
+        }
+    }
+
+    /**
      * Determines if relayer Mode 2 should be used based on auth entries.
      *
      * Mode 2 (signed transaction XDR) is required when any auth entry has
      * source_account credentials rather than address credentials.
+     *
+     * This is equivalent to the TypeScript SDK's `hasSourceAccountAuth()`.
      *
      * @param authEntries The authorization entries to check
      * @return True if Mode 2 should be used, false for Mode 1
@@ -1089,6 +1137,153 @@ class OZTransactionOperations internal constructor(
             // Check if credentials is SourceAccount type (Void in KMP SDK)
             entry.credentials is SorobanCredentialsXdr.Void
         }
+    }
+
+    /**
+     * Looks up the full key_data for a credential ID from on-chain context rules.
+     *
+     * Queries the smart account contract's context rules to find a signer whose
+     * key_data suffix matches the provided credential ID bytes. This is the KMP
+     * equivalent of the TypeScript SDK's `findKeyDataByCredentialId()`.
+     *
+     * This enables signing auth entries even when the credential is not in local
+     * storage, by discovering the full key_data (publicKey + credentialId) from
+     * the on-chain contract state.
+     *
+     * The function walks through context rules matching the auth entry's invocation
+     * targets (specific contract calls first, then Default rules), checking External
+     * signers whose key_data length exceeds the secp256r1 public key size (65 bytes).
+     *
+     * @param credentialIdBytes The raw credential ID bytes to search for
+     * @param entry The authorization entry to extract context rule types from
+     * @return The full key_data bytes (publicKey + credentialId)
+     * @throws CredentialException.NotFound if no matching signer is found
+     */
+    private suspend fun findKeyDataByCredentialId(
+        credentialIdBytes: ByteArray,
+        entry: SorobanAuthorizationEntryXdr
+    ): ByteArray {
+        val (_, contractId) = kit.requireConnected()
+
+        // Build context rule types from the auth entry's invocations
+        val contextRuleTypes = buildContextRuleTypes(entry)
+
+        // Search through each context rule type
+        for (contextRuleType in contextRuleTypes) {
+            val rulesScVal: SCValXdr
+            try {
+                val invokeArgs = InvokeContractArgsXdr(
+                    contractAddress = Address(contractId).toSCAddress(),
+                    functionName = SCSymbolXdr("get_context_rules"),
+                    args = listOf(contextRuleType.toScVal())
+                )
+                val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+                rulesScVal = SmartAccountSharedUtils.simulateAndExtractResult(
+                    hostFunction = hostFunction,
+                    kit = kit
+                )
+            } catch (e: Exception) {
+                // Query failed, try next context type
+                continue
+            }
+
+            // Parse rules Vec
+            val rules = (rulesScVal as? SCValXdr.Vec)?.value?.value ?: continue
+
+            for (ruleScVal in rules) {
+                // Each rule is a Map (struct)
+                val fields = (ruleScVal as? SCValXdr.Map)?.value?.value ?: continue
+
+                // Find the "signers" field
+                for (field in fields) {
+                    val key = (field.key as? SCValXdr.Sym)?.value?.value ?: continue
+                    if (key != "signers") continue
+
+                    val signerVec = (field.`val` as? SCValXdr.Vec)?.value?.value ?: break
+
+                    for (signerScVal in signerVec) {
+                        val signerParts = (signerScVal as? SCValXdr.Vec)?.value?.value
+                        if (signerParts.isNullOrEmpty()) continue
+
+                        val tag = (signerParts[0] as? SCValXdr.Sym)?.value?.value ?: continue
+                        if (tag != "External" || signerParts.size < 3) continue
+
+                        val keyDataBytes = (signerParts[2] as? SCValXdr.Bytes)?.value?.value
+                            ?: continue
+
+                        // Check if key_data is long enough to contain a credential ID
+                        if (keyDataBytes.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
+                            val suffix = keyDataBytes.copyOfRange(
+                                SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
+                                keyDataBytes.size
+                            )
+                            if (suffix.contentEquals(credentialIdBytes)) {
+                                return keyDataBytes
+                            }
+                        }
+                    }
+                    break // Found signers field, move to next rule
+                }
+            }
+        }
+
+        throw CredentialException.notFound(
+            "No signer found on-chain for credential ID: ${SmartAccountSharedUtils.base64urlEncode(credentialIdBytes)}"
+        )
+    }
+
+    /**
+     * Builds a list of [ContextRuleType] values from an authorization entry's root invocation.
+     *
+     * Walks the invocation tree to determine which context rule types might apply.
+     * This matches the TypeScript SDK's `buildContextRuleTypes()` function.
+     *
+     * The resulting list is ordered: specific contract calls first, then Default as fallback.
+     *
+     * @param entry The authorization entry to analyze
+     * @return List of context rule types derived from the entry's invocations
+     */
+    private fun buildContextRuleTypes(
+        entry: SorobanAuthorizationEntryXdr
+    ): List<ContextRuleType> {
+        val types = mutableListOf<ContextRuleType>()
+        val seen = mutableSetOf<String>()
+
+        fun add(type: ContextRuleType) {
+            val key = when (type) {
+                is ContextRuleType.Default -> "Default"
+                is ContextRuleType.CallContract -> "CallContract:${type.contractAddress}"
+                is ContextRuleType.CreateContract -> "CreateContract:${type.wasmHash.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }}"
+            }
+            if (key !in seen) {
+                seen.add(key)
+                types.add(type)
+            }
+        }
+
+        fun walk(invocation: com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr) {
+            when (val fn = invocation.function) {
+                is com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr.ContractFn -> {
+                    val contractAddress = SmartAccountSharedUtils.extractAddressString(
+                        fn.value.contractAddress
+                    )
+                    if (contractAddress != null) {
+                        add(ContextRuleType.CallContract(contractAddress))
+                    }
+                }
+                else -> {
+                    // CreateContract variants could be handled here if needed
+                }
+            }
+            for (sub in invocation.subInvocations) {
+                walk(sub)
+            }
+        }
+
+        walk(entry.rootInvocation)
+        add(ContextRuleType.Default)
+
+        return types
     }
 
     /**

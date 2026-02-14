@@ -196,17 +196,25 @@ class SmartAccountKitTest {
     }
 
     @Test
-    fun testStorageAdapter_saveAlreadyExists() = runTest {
+    fun testStorageAdapter_saveUpsert() = runTest {
         val storage = InMemoryStorageAdapter()
-        val credential = StoredCredential(
+        val credential1 = StoredCredential(
             credentialId = "test-credential-1",
-            publicKey = ByteArray(65) { 0x04 }
+            publicKey = ByteArray(65) { 0x04 },
+            nickname = "original"
+        )
+        val credential2 = StoredCredential(
+            credentialId = "test-credential-1",
+            publicKey = ByteArray(65) { 0x04 },
+            nickname = "updated"
         )
 
-        storage.save(credential)
-        assertFailsWith<CredentialException.AlreadyExists> {
-            storage.save(credential)
-        }
+        storage.save(credential1)
+        storage.save(credential2) // Should overwrite, not throw
+
+        val retrieved = storage.get("test-credential-1")
+        assertNotNull(retrieved)
+        assertEquals("updated", retrieved.nickname)
     }
 
     @Test
@@ -1156,6 +1164,25 @@ class SmartAccountKitTest {
         )
 
         assertNotNull(client)
+        assertTrue(client.isConfigured)
+    }
+
+    @Test
+    fun testRelayerClient_blankUrl_throwsConfigurationError() {
+        assertFailsWith<ConfigurationException.InvalidConfig> {
+            OZRelayerClient(relayerUrl = "")
+        }
+        assertFailsWith<ConfigurationException.InvalidConfig> {
+            OZRelayerClient(relayerUrl = "   ")
+        }
+    }
+
+    @Test
+    fun testRelayerClient_trailingSlashNormalization() {
+        // Trailing slashes should be stripped; no exception thrown
+        val client = OZRelayerClient(relayerUrl = "https://relayer.example.com///")
+        assertNotNull(client)
+        assertTrue(client.isConfigured)
     }
 
     // Note: Full relayer tests would require a mock HTTP client

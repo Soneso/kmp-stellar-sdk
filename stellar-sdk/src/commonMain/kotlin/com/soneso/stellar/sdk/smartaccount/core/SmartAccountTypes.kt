@@ -331,6 +331,39 @@ data class ExternalSigner(
     }
 }
 
+// MARK: - Submission Method
+
+/**
+ * Determines how a transaction is submitted to the network.
+ *
+ * By default, the SDK uses the relayer if configured, otherwise submits directly via RPC.
+ * Use [SubmissionMethod] with the `forceMethod` parameter on transaction methods to
+ * override this default behavior.
+ *
+ * Example:
+ * ```kotlin
+ * // Force direct RPC submission even when relayer is configured
+ * val result = txOps.transfer(
+ *     tokenContract = "CBCD...",
+ *     recipient = "GA7Q...",
+ *     amount = 10.0,
+ *     forceMethod = SubmissionMethod.RPC
+ * )
+ * ```
+ */
+enum class SubmissionMethod {
+    /**
+     * Submit via the relayer proxy for fee-sponsored transactions.
+     * Fails if no relayer is configured.
+     */
+    RELAYER,
+
+    /**
+     * Submit directly via Soroban RPC. Always available.
+     */
+    RPC
+}
+
 // MARK: - Extension Functions
 
 /**

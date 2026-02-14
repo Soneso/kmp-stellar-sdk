@@ -9,6 +9,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlin.concurrent.AtomicReference
 
 /**
  * Native implementation of currentTimeMillis using gettimeofday().
@@ -29,5 +30,26 @@ internal actual fun currentTimeMillis(): Long = memScoped {
 internal actual suspend fun platformDelay(timeMillis: Long) {
     withContext(Dispatchers.Default) {
         delay(timeMillis)
+    }
+}
+
+/**
+ * Native implementation of platformSynchronized using a spinlock based on AtomicReference.
+ *
+ * Under the new Kotlin/Native memory model, objects can be shared across threads.
+ * This implementation uses a simple spinlock via AtomicReference<Boolean> to provide
+ * mutual exclusion for short critical sections (listener list management).
+ */
+private val nativeLock = AtomicReference(false)
+
+internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
+    // Spin until we acquire the lock
+    while (!nativeLock.compareAndSet(false, true)) {
+        // Busy-wait (acceptable for very short critical sections like list snapshots)
+    }
+    try {
+        return block()
+    } finally {
+        nativeLock.compareAndSet(true, false)
     }
 }

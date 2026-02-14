@@ -458,78 +458,13 @@ class OZIndexerClient(
      * @throws ValidationException.InvalidInput if the input is not valid base64url
      */
     private fun base64UrlToHex(base64url: String): String {
-        try {
-            // Convert base64url to standard base64
-            var base64 = base64url
-                .replace('-', '+')
-                .replace('_', '/')
-
-            // Add padding if needed (base64 requires length to be multiple of 4)
-            val paddingLength = (4 - base64.length % 4) % 4
-            base64 += "=".repeat(paddingLength)
-
-            // Decode base64 to bytes
-            val bytes = try {
-                // Use kotlinx.serialization's built-in base64 support
-                // or platform-specific base64 decoder via expect/actual
-                decodeBase64(base64)
-            } catch (e: Exception) {
-                throw ValidationException.InvalidInput(
-                    "Failed to decode base64url credential ID: $base64url",
-                    e
-                )
-            }
-
-            // Convert bytes to hex string
-            return bytes.joinToString("") { byte ->
-                val hex = byte.toInt() and 0xFF
-                if (hex < 16) "0${hex.toString(16)}" else hex.toString(16)
-            }
-        } catch (e: ValidationException) {
-            throw e
-        } catch (e: Exception) {
-            throw ValidationException.InvalidInput(
-                "Failed to convert credential ID from base64url to hex: $base64url",
-                e
+        val bytes = SmartAccountSharedUtils.base64urlDecode(base64url)
+            ?: throw ValidationException.InvalidInput(
+                "Failed to decode base64url credential ID: $base64url"
             )
+
+        return bytes.joinToString("") { byte ->
+            (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
         }
-    }
-
-    /**
-     * Decodes a base64 string to a byte array.
-     *
-     * Platform-agnostic base64 decoding using built-in Kotlin capabilities.
-     * This simple implementation works across all KMP targets.
-     *
-     * @param base64 The base64 string to decode
-     * @return The decoded byte array
-     */
-    private fun decodeBase64(base64: String): ByteArray {
-        // Use a simple base64 decoder that works across all KMP platforms
-        val base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-        // Remove padding and whitespace
-        val cleaned = base64.replace("=", "").replace("\\s".toRegex(), "")
-
-        val result = mutableListOf<Byte>()
-        var buffer = 0
-        var bitsCollected = 0
-
-        for (c in cleaned) {
-            val value = base64Chars.indexOf(c)
-            if (value == -1) {
-                throw IllegalArgumentException("Invalid base64 character: $c")
-            }
-
-            buffer = (buffer shl 6) or value
-            bitsCollected += 6
-
-            if (bitsCollected >= 8) {
-                bitsCollected -= 8
-                result.add(((buffer shr bitsCollected) and 0xFF).toByte())
-            }
-        }
-
-        return result.toByteArray()
     }
 }

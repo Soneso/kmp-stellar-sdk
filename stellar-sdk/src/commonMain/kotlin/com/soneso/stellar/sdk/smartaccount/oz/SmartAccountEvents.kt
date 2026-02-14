@@ -7,18 +7,16 @@
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
+import com.soneso.stellar.sdk.platformSynchronized
 import com.soneso.stellar.sdk.smartaccount.core.*
-
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Events emitted by the Smart Account Kit during wallet lifecycle operations.
  *
  * These events provide hooks for monitoring and responding to key operations:
- * - Wallet connection and creation
+ * - Wallet connection and disconnection
  * - Credential lifecycle (creation, deletion)
- * - Transaction lifecycle (signing, submission, confirmation)
+ * - Transaction lifecycle (signing, submission)
  * - Session management (expiration)
  *
  * Example:
@@ -121,7 +119,7 @@ sealed class SmartAccountEvent {
      * succeeded (transaction accepted by network) or failed (network error).
      *
      * Note: A successful submission does not mean the transaction was included
-     * in a ledger. Use TransactionConfirmed for final confirmation.
+     * in a ledger.
      *
      * @property hash The transaction hash
      * @property success True if submitted successfully, false if submission failed
@@ -161,22 +159,36 @@ fun interface SmartAccountEventListener {
  * This class manages event subscriptions and dispatches events to all registered
  * listeners. It provides thread-safe subscription management and error handling.
  *
+ * All synchronization uses [platformSynchronized] on the [listeners] map as the single
+ * lock. Event emission snapshots the listener list under the lock, then invokes
+ * listeners outside the lock to avoid holding the lock during callbacks.
+ *
  * Features:
- * - Thread-safe listener management with Mutex
+ * - Thread-safe listener management with platformSynchronized
  * - Multiple listeners per event type
  * - Error isolation (one failing listener does not affect others)
  * - Optional error handler for debugging listener failures
+ * - Public addListener() for Java/Swift/non-Kotlin callers
  *
  * Example:
  * ```kotlin
  * val emitter = SmartAccountEventEmitter()
  *
- * // Add a listener
+ * // Type-safe subscription (Kotlin only, uses reified generics)
  * val unsubscribe = emitter.on<SmartAccountEvent.WalletConnected> { event ->
  *     println("Connected to ${event.contractId}")
  * }
  *
- * // Add a one-time listener
+ * // Non-generic subscription (works from Java, Swift, etc.)
+ * val unsub = emitter.addListener { event ->
+ *     when (event) {
+ *         is SmartAccountEvent.WalletConnected ->
+ *             println("Connected to ${event.contractId}")
+ *         else -> {}
+ *     }
+ * }
+ *
+ * // One-time listener
  * emitter.once<SmartAccountEvent.TransactionSubmitted> { event ->
  *     println("First transaction: ${event.hash}")
  * }
@@ -188,13 +200,15 @@ fun interface SmartAccountEventListener {
 class SmartAccountEventEmitter {
     /**
      * Map of event types to their registered listeners.
+     * All access must be synchronized on this map.
      */
     private val listeners = mutableMapOf<String, MutableSet<SmartAccountEventListener>>()
 
     /**
-     * Mutex for thread-safe listener management.
+     * Global listeners that receive all event types.
+     * All access must be synchronized on [listeners].
      */
-    private val listenerLock = Mutex()
+    private val globalListeners = mutableSetOf<SmartAccountEventListener>()
 
     /**
      * Optional error handler for listener errors.
@@ -224,6 +238,41 @@ class SmartAccountEventEmitter {
     }
 
     /**
+     * Subscribes a listener to receive all Smart Account events.
+     *
+     * Unlike [on], this method does not use reified type parameters, making it
+     * callable from Java, Swift, and other non-Kotlin languages. The listener
+     * receives all event types and must dispatch internally using when/instanceof.
+     *
+     * @param listener The event listener to register
+     * @return A function that unsubscribes the listener when called
+     *
+     * Example:
+     * ```kotlin
+     * val unsubscribe = emitter.addListener { event ->
+     *     when (event) {
+     *         is SmartAccountEvent.WalletConnected ->
+     *             println("Wallet ${event.contractId} connected")
+     *         is SmartAccountEvent.TransactionSubmitted ->
+     *             println("Transaction ${event.hash}: success=${event.success}")
+     *         else -> {}
+     *     }
+     * }
+     * // Later: unsubscribe()
+     * ```
+     */
+    fun addListener(listener: SmartAccountEventListener): () -> Unit {
+        platformSynchronized(listeners) {
+            globalListeners.add(listener)
+        }
+        return {
+            platformSynchronized(listeners) {
+                globalListeners.remove(listener)
+            }
+        }
+    }
+
+    /**
      * Subscribes to events of a specific type.
      *
      * The listener will be called whenever an event of the specified type is emitted.
@@ -231,6 +280,9 @@ class SmartAccountEventEmitter {
      *
      * This method is type-safe: the listener parameter is constrained to match
      * the event type through Kotlin's reified type parameter.
+     *
+     * Note: This method uses reified generics and cannot be called from Java or Swift.
+     * Use [addListener] for cross-language compatibility.
      *
      * @param T The event type to subscribe to
      * @param listener The callback function to invoke on events
@@ -303,12 +355,13 @@ class SmartAccountEventEmitter {
      * emitter.removeAllListeners()
      * ```
      */
-    suspend fun removeAllListeners(eventType: String? = null) {
-        listenerLock.withLock {
+    fun removeAllListeners(eventType: String? = null) {
+        platformSynchronized(listeners) {
             if (eventType != null) {
                 listeners.remove(eventType)
             } else {
                 listeners.clear()
+                globalListeners.clear()
             }
         }
     }
@@ -316,8 +369,11 @@ class SmartAccountEventEmitter {
     /**
      * Returns the number of listeners for a specific event type.
      *
+     * This count includes both type-specific listeners registered via [on] and
+     * global listeners registered via [addListener].
+     *
      * @param eventType The event class name
-     * @return The number of registered listeners
+     * @return The number of registered listeners (type-specific + global)
      *
      * Example:
      * ```kotlin
@@ -325,16 +381,19 @@ class SmartAccountEventEmitter {
      * println("$count listeners for WalletConnected")
      * ```
      */
-    suspend fun listenerCount(eventType: String): Int {
-        return listenerLock.withLock {
-            listeners[eventType]?.size ?: 0
+    fun listenerCount(eventType: String): Int {
+        return platformSynchronized(listeners) {
+            (listeners[eventType]?.size ?: 0) + globalListeners.size
         }
     }
 
     /**
      * Emits an event to all registered listeners.
      *
-     * This method dispatches the event to all listeners registered for the event's type.
+     * This method dispatches the event to all type-specific listeners registered for the
+     * event's type, plus all global listeners registered via [addListener]. The listener
+     * list is snapshotted under the lock, then listeners are invoked outside the lock.
+     *
      * Listener errors are caught and optionally passed to the error handler to prevent
      * one failing listener from affecting others.
      *
@@ -350,10 +409,13 @@ class SmartAccountEventEmitter {
      * ))
      * ```
      */
-    internal suspend fun emit(event: SmartAccountEvent) {
+    internal fun emit(event: SmartAccountEvent) {
         val eventType = event::class.simpleName ?: return
-        val currentListeners = listenerLock.withLock {
-            listeners[eventType]?.toList() ?: emptyList()
+        val currentListeners: List<SmartAccountEventListener>
+        currentListeners = platformSynchronized(listeners) {
+            val typeSpecific = listeners[eventType]?.toList() ?: emptyList()
+            val global = globalListeners.toList()
+            typeSpecific + global
         }
 
         currentListeners.forEach { listener ->
@@ -368,23 +430,21 @@ class SmartAccountEventEmitter {
     }
 
     /**
-     * Internal helper to add a listener with synchronization.
+     * Internal helper to add a listener for a specific event type.
      */
     @PublishedApi
     internal fun addListenerInternal(eventType: String, listener: SmartAccountEventListener) {
-        // Note: We can't use suspend here due to inline/crossinline constraints
-        // So we use synchronized instead for this specific case
-        synchronized(listeners) {
+        platformSynchronized(listeners) {
             listeners.getOrPut(eventType) { mutableSetOf() }.add(listener)
         }
     }
 
     /**
-     * Internal helper to remove a listener with synchronization.
+     * Internal helper to remove a listener for a specific event type.
      */
     @PublishedApi
     internal fun removeListenerInternal(eventType: String, listener: SmartAccountEventListener) {
-        synchronized(listeners) {
+        platformSynchronized(listeners) {
             listeners[eventType]?.remove(listener)
         }
     }

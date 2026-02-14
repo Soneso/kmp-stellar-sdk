@@ -59,16 +59,45 @@ data class WebAuthnAuthenticationResult(
  * WebAuthn registration result from a passkey creation ceremony.
  *
  * Contains the public key and credential information needed to deploy
- * a smart account contract.
+ * a smart account contract, along with optional metadata about the
+ * authenticator and passkey characteristics.
+ *
+ * **Primary path**: Providers should populate [publicKey] directly with the 65-byte
+ * uncompressed secp256r1 key (0x04 prefix + X + Y). Most WebAuthn APIs expose the
+ * public key via `response.getPublicKey()` or equivalent.
+ *
+ * **Fallback**: If the provider cannot extract the public key directly, it can pass
+ * the raw bytes from the WebAuthn API in [publicKey] and supply [attestationObject].
+ * Callers can then use [SmartAccountUtils.extractPublicKeyFromRegistration] which
+ * supports three extraction strategies: direct validation, authenticator data parsing,
+ * and attestation object pattern matching.
  *
  * @property credentialId The WebAuthn credential identifier (raw bytes)
- * @property publicKey Uncompressed secp256r1 public key (65 bytes, starting with 0x04)
- * @property attestationObject Raw attestation object from WebAuthn registration
+ * @property publicKey Uncompressed secp256r1 public key (65 bytes, starting with 0x04).
+ *           This is the primary extraction path. If the platform WebAuthn API wraps
+ *           the key in COSE/SPKI encoding, pass the raw bytes and use
+ *           [SmartAccountUtils.extractPublicKeyFromRegistration] for extraction with
+ *           fallback strategies.
+ * @property attestationObject Raw attestation object from WebAuthn registration. Used as
+ *           a fallback source for public key extraction when [publicKey] is not directly
+ *           available as a 65-byte uncompressed key.
+ * @property transports Authenticator transport hints indicating how the browser can
+ *   communicate with the authenticator (e.g., "usb", "nfc", "ble", "internal").
+ *   Used when constructing allowCredentials for future authentication ceremonies.
+ * @property deviceType Authenticator device type: "singleDevice" for hardware security keys
+ *   or "multiDevice" for synced/cloud-backed passkeys. Corresponds to the
+ *   credentialDeviceType field in the WebAuthn authenticator data flags.
+ * @property backedUp Whether the passkey is backed up or synced to a cloud provider.
+ *   When true, the credential is available across the user's devices.
+ *   Corresponds to the credentialBackedUp flag in the WebAuthn authenticator data.
  */
 data class WebAuthnRegistrationResult(
     val credentialId: ByteArray,
     val publicKey: ByteArray,
-    val attestationObject: ByteArray
+    val attestationObject: ByteArray,
+    val transports: List<String>? = null,
+    val deviceType: String? = null,
+    val backedUp: Boolean? = null
 ) {
     /**
      * Custom equals implementation that properly compares ByteArray fields.
@@ -82,6 +111,9 @@ data class WebAuthnRegistrationResult(
         if (!credentialId.contentEquals(other.credentialId)) return false
         if (!publicKey.contentEquals(other.publicKey)) return false
         if (!attestationObject.contentEquals(other.attestationObject)) return false
+        if (transports != other.transports) return false
+        if (deviceType != other.deviceType) return false
+        if (backedUp != other.backedUp) return false
 
         return true
     }
@@ -93,6 +125,9 @@ data class WebAuthnRegistrationResult(
         var result = credentialId.contentHashCode()
         result = 31 * result + publicKey.contentHashCode()
         result = 31 * result + attestationObject.contentHashCode()
+        result = 31 * result + (transports?.hashCode() ?: 0)
+        result = 31 * result + (deviceType?.hashCode() ?: 0)
+        result = 31 * result + (backedUp?.hashCode() ?: 0)
         return result
     }
 }

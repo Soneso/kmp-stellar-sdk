@@ -266,3 +266,17 @@ internal expect fun currentTimeMillis(): Long
  * @param timeMillis The delay duration in milliseconds
  */
 internal expect suspend fun platformDelay(timeMillis: Long)
+
+/**
+ * Provides mutual exclusion for concurrent access to shared mutable state.
+ *
+ * On JVM, this delegates to [kotlin.synchronized] for proper thread synchronization.
+ * On JS, this simply executes the block directly since JavaScript is single-threaded.
+ * On Native, this uses [kotlin.native.concurrent.AtomicReference]-based spinlock or
+ * platform-specific synchronization to protect shared state under the new memory model.
+ *
+ * @param lock The object to use as the monitor lock
+ * @param block The block to execute under mutual exclusion
+ * @return The result of executing [block]
+ */
+internal expect fun <T> platformSynchronized(lock: Any, block: () -> T): T
