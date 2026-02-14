@@ -1,6 +1,6 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 4.3.0<br>
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
@@ -46,7 +46,6 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 - **`Sep06WithdrawExchangeRequest`**
 - **`Sep06TransactionsRequest`**
 - **`Sep06TransactionRequest`**
-- **`is`**
 - **`Sep06FeeRequest`**
 - **`Sep06PatchTransactionRequest`**
 - **`Sep06InfoResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
@@ -67,9 +66,7 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 - **`Sep06TransactionsResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
 - **`Sep06TransactionResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
 - **`Sep06FeeResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`instead`** - Methods: getStatusEnum, getKindEnum, isTerminal
 - **`Sep06Transaction`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`instead`** - Methods: getStatusEnum, getKindEnum, isTerminal
 - **`Sep06FeeDetails`**
 - **`Sep06FeeDetail`**
 - **`Sep06Refunds`**
@@ -80,9 +77,6 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 - **`Sep06AuthenticationRequiredException`** - Methods: toString
 - **`Sep06CustomerInformationNeededException`** - Methods: toString
 - **`Sep06CustomerInformationStatusException`** - Methods: toString
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep06Exception`** - Methods: toString
 - **`Sep06InvalidRequestException`** - Methods: toString
 - **`Sep06ServerErrorException`** - Methods: toString
 - **`Sep06TransactionNotFoundException`** - Methods: toString

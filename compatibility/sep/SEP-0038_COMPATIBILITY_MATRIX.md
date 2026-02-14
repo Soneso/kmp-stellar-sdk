@@ -1,6 +1,6 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 2.5.0<br>
 **SEP Status:** Draft<br>
@@ -58,18 +58,8 @@ Lets anchors provide quotes for exchanging on-chain assets for off-chain assets 
 - **`Sep38QuoteResponse`**
 - **`Sep38SellAsset`**
 - **`Sep38BadRequestException`** - Methods: toString
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep38Exception`** - Methods: toString
-- **`QuoteCache`**
-- **`CachedQuote`**
 - **`Sep38NotFoundException`** - Methods: toString
-- **`Sep38Client`**
 - **`Sep38PermissionDeniedException`** - Methods: toString
-- **`QuoteResult`**
-- **`Success`**
-- **`Retryable`**
-- **`Failed`**
 - **`Sep38UnknownResponseException`** - Methods: toString
 
 ### Test Coverage

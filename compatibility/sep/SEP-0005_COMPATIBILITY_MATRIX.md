@@ -1,6 +1,6 @@
 # SEP-0005 (Key Derivation Methods for Stellar Keys) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** N/A<br>
 **SEP Status:** Final<br>
@@ -43,11 +43,9 @@ Defines methods for deriving Stellar keypairs from mnemonic phrases, making it e
 
 - **`HexCodec`** - Methods: encode, decode, hexCharToInt
 - **`Mnemonic`** - Methods: generate12WordsMnemonic, generate15WordsMnemonic, generate18WordsMnemonic, generate21WordsMnemonic, generate24WordsMnemonic, validate, detectLanguage, from, fromEntropy, fromBip39HexSeed, fromBip39Seed, getKeyPair, getAccountId, getPrivateKey, getPublicKey, getBip39Seed, getBip39SeedHex, close, derivePath, deriveChild
-- **`contains`**
 - **`MnemonicConstants`**
 - **`MnemonicLanguage`**
 - **`MnemonicStrength`** - Methods: fromWordCount, fromEntropyBits
-- **`provides`** - Methods: generateMnemonic, entropyToMnemonic, mnemonicToEntropy, validateMnemonic, detectLanguage, mnemonicToSeed, mnemonicToSeedHex, getMnemonicStrength, normalizeWords, validateEntropy, deriveChecksumBits, bytesToBinaryString
 - **`MnemonicUtils`** - Methods: generateMnemonic, entropyToMnemonic, mnemonicToEntropy, validateMnemonic, detectLanguage, mnemonicToSeed, mnemonicToSeedHex, getMnemonicStrength, normalizeWords, validateEntropy, deriveChecksumBits, bytesToBinaryString
 - **`WordList`** - Methods: getWordList, getWordIndex, loadWordList
 - **`InvalidChecksumException`** - Methods: toString
@@ -55,9 +53,6 @@ Defines methods for deriving Stellar keypairs from mnemonic phrases, making it e
 - **`InvalidMnemonicException`** - Methods: toString
 - **`InvalidPathException`** - Methods: toString
 - **`InvalidWordException`** - Methods: toString
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep05Exception`** - Methods: toString
 
 ## Coverage by Section
 

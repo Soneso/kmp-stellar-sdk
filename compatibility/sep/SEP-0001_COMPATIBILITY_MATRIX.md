@@ -1,6 +1,6 @@
 # SEP-0001 (Stellar Info File) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 2.7.0<br>
 **SEP Status:** Active<br>
@@ -39,9 +39,7 @@ The `stellar.toml` file publishes information about an organization's Stellar in
 - **`Documentation`**
 - **`GeneralInformation`**
 - **`PointOfContact`**
-- **`supports`**
 - **`StellarToml`** - Methods: fromDomain, currencyFromUrl, parse, safeguardTomlContent, parseTomlTree, parseGeneralInformation, parseDocumentation, parsePointsOfContact, parseCurrencies, parseCurrency, parseCurrencyFromMap, parseValidators
-- **`containing`** - Methods: safeguardTomlContent, parseTomlTree, parseGeneralInformation, parseDocumentation, parsePointsOfContact, parseCurrencies, parseCurrency, parseCurrencyFromMap, parseValidators
 - **`TomlParser`** - Methods: parse, parseValue, parseArray
 - **`Validator`**
 

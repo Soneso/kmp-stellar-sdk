@@ -1,6 +1,6 @@
 # SEP-0010 (Stellar Web Authentication) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 3.4.1<br>
 **SEP Status:** Active<br>
@@ -51,7 +51,6 @@ Lets wallets and exchanges create authenticated web sessions by proving Stellar 
 
 ### Key Classes
 
-- **`parses`**
 - **`AuthToken`** - Methods: isExpired, toString, parse, decodeBase64UrlSafe
 - **`ChallengeResponse`**
 - **`TokenSubmissionRequest`**

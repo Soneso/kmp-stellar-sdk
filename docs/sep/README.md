@@ -19,6 +19,7 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-10 | Web Authentication | [sep-10.md](sep-10.md) |
 | SEP-12 | KYC API | [sep-12.md](sep-12.md) |
 | SEP-24 | Interactive Deposit and Withdrawal | [sep-24.md](sep-24.md) |
+| SEP-30 | Account Recovery | [sep-30.md](sep-30.md) |
 | SEP-38 | Anchor RFQ API | [sep-38.md](sep-38.md) |
 | SEP-45 | Web Authentication for Contract Accounts | [sep-45.md](sep-45.md) |
 | SEP-53 | Sign and Verify Messages | [sep-53.md](sep-53.md) |
@@ -36,18 +37,13 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0010 Compatibility Matrix](../../compatibility/sep/SEP-0010_COMPATIBILITY_MATRIX.md)
 - [SEP-0012 Compatibility Matrix](../../compatibility/sep/SEP-0012_COMPATIBILITY_MATRIX.md)
 - [SEP-0024 Compatibility Matrix](../../compatibility/sep/SEP-0024_COMPATIBILITY_MATRIX.md)
+- [SEP-0030 Compatibility Matrix](../../compatibility/sep/SEP-0030_COMPATIBILITY_MATRIX.md)
 - [SEP-0038 Compatibility Matrix](../../compatibility/sep/SEP-0038_COMPATIBILITY_MATRIX.md)
 - [SEP-0045 Compatibility Matrix](../../compatibility/sep/SEP-0045_COMPATIBILITY_MATRIX.md)
 - [SEP-0053 Compatibility Matrix](../../compatibility/sep/SEP-0053_COMPATIBILITY_MATRIX.md)
 
 To regenerate all matrices: `python3 tools/sdk-analysis/sep/run_sep_analysis.py`
 
-## Planned SEPs
-
-| SEP | Title |
-|-----|-------|
-| SEP-30 | Account Recovery |
-
 ---
 
-**Last Updated**: 2026-02-13
+**Last Updated**: 2026-02-14

@@ -1,6 +1,6 @@
 # SEP-0053 (Sign and Verify Messages) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:20:52
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 0.0.1<br>
 **SEP Status:** Draft<br>
@@ -33,7 +33,7 @@ Standardizes signing and verification of arbitrary messages using Stellar Ed2551
 
 ### Test Coverage
 
-**Tests:** 25 test cases
+**Tests:** 29 test cases
 
 **Test Files:**
 

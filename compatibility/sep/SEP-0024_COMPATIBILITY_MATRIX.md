@@ -1,6 +1,6 @@
 # SEP-0024 (Hosted Deposit and Withdrawal) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 3.8.0<br>
 **SEP Status:** Active<br>
@@ -39,7 +39,6 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 
 - **`Sep24DepositRequest`**
 - **`Sep24WithdrawRequest`**
-- **`is`**
 - **`Sep24FeeRequest`**
 - **`Sep24TransactionsRequest`**
 - **`Sep24TransactionRequest`**
@@ -51,9 +50,7 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 - **`Sep24FeeResponse`** - Methods: getStatusEnum, isTerminal
 - **`Sep24TransactionResponse`** - Methods: getStatusEnum, isTerminal
 - **`Sep24TransactionsResponse`** - Methods: getStatusEnum, isTerminal
-- **`instead`** - Methods: getStatusEnum, isTerminal
 - **`Sep24Transaction`** - Methods: getStatusEnum, isTerminal
-- **`instead`** - Methods: getStatusEnum, isTerminal
 - **`Sep24FeeDetails`**
 - **`Sep24FeeDetail`**
 - **`Sep24Refunds`**
@@ -61,9 +58,6 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 - **`Sep24Service`** - Methods: fromDomain, info, fee, deposit, withdraw, transactions, transaction, buildHeaders, parseErrorMessage, parseErrorType
 - **`Sep24TransactionStatus`** - Methods: fromValue, isTerminal
 - **`Sep24AuthenticationRequiredException`** - Methods: toString
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep24Exception`** - Methods: toString
 - **`Sep24InvalidRequestException`** - Methods: toString
 - **`Sep24ServerErrorException`** - Methods: toString
 - **`Sep24TransactionNotFoundException`** - Methods: toString

@@ -1,6 +1,6 @@
 # SEP-0008 (Regulated Assets) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 1.7.4<br>
 **SEP Status:** Active<br>
@@ -36,27 +36,17 @@ Defines how assets that require per-transaction issuer approval are identified, 
 
 ### Key Classes
 
-- **`wraps`** - Methods: toXdr, toAsset, toString, compareTo, equals, hashCode
 - **`RegulatedAsset`** - Methods: toXdr, toAsset, toString, compareTo, equals, hashCode
-- **`of`**
 - **`Sep08PostActionResponse`** - Methods: fromJson, parseNextUrl
 - **`Done`** - Methods: fromJson, parseNextUrl
 - **`NextUrl`** - Methods: fromJson, parseNextUrl
-- **`returned`** - Methods: parseNextUrl
-- **`variant`** - Methods: parseNextUrl
-- **`of`**
 - **`Sep08PostTransactionResponse`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`Success`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`Revised`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`Pending`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`ActionRequired`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`Rejected`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`returned`** - Methods: parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`variant`** - Methods: parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
 - **`Sep08Service`** - Methods: fromDomain, authorizationRequired, postTransaction, postAction, buildHeaders
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep08Exception`** - Methods: toString
 - **`Sep08IncompleteInitDataException`** - Methods: toString
 - **`Sep08InvalidActionResponseException`** - Methods: toString
 - **`Sep08InvalidTransactionResponseException`** - Methods: toString

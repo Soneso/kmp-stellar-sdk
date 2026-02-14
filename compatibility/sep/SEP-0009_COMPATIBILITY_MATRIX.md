@@ -1,6 +1,6 @@
 # SEP-0009 (Standard KYC Fields) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 1.17.0<br>
 **SEP Status:** Active<br>
@@ -35,11 +35,8 @@ A standard list of KYC and financial account fields (names, addresses, ID docume
 
 - **`CardKYCFields`** - Methods: fields
 - **`FinancialAccountKYCFields`** - Methods: fields
-- **`supports`**
 - **`NaturalPersonKYCFields`** - Methods: fields, files, equals, hashCode
-- **`supports`**
 - **`OrganizationKYCFields`** - Methods: fields, files, equals, hashCode
-- **`serves`** - Methods: fields, files
 - **`StandardKYCFields`** - Methods: fields, files
 
 ### Test Coverage

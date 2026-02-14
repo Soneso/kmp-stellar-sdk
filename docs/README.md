@@ -63,6 +63,7 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-10 (Web Authentication) - Secure challenge-response authentication
 - SEP-12 (KYC API) - Customer information management
 - SEP-24 (Hosted Deposit/Withdrawal) - Interactive anchor transfers
+- SEP-30 (Account Recovery) - Multi-party account recovery
 - SEP-38 (Anchor RFQ API) - Quote service for asset exchanges
 - SEP-45 (Web Authentication for Contract Accounts) - Contract account authentication
 - SEP-53 (Sign and Verify Messages) - Off-chain message signing with Ed25519

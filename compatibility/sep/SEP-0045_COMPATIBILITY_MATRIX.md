@@ -1,6 +1,6 @@
 # SEP-0045 (Stellar Web Authentication for Contract Accounts) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 0.1.1<br>
 **SEP Status:** Draft<br>
@@ -55,15 +55,12 @@ Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to s
 
 ### Key Classes
 
-- **`parses`**
 - **`Sep45AuthToken`** - Methods: isExpired, toString, parse, decodeBase64UrlSafe
 - **`Sep45ChallengeResponse`** - Methods: fromJson
 - **`Sep45TokenResponse`**
-- **`when`**
 - **`WebAuthForContracts`** - Methods: fromDomain, getChallenge, validateChallenge, signAuthorizationEntries, sendSignedChallenge, decodeAuthorizationEntries, encodeAuthorizationEntries, extractArgsFromEntry, verifyServerSignature, scAddressToString, entryToBase64, base64ToEntry
 - **`Sep45ChallengeRequestException`**
 - **`Sep45ChallengeValidationException`**
-- **`Sep45Exception`**
 - **`Sep45InvalidAccountException`**
 - **`Sep45InvalidArgsException`**
 - **`Sep45InvalidContractAddressException`**

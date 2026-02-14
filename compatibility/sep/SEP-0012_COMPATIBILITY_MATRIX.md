@@ -1,6 +1,6 @@
 # SEP-0012 (KYC API) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 1.15.0<br>
 **SEP Status:** Active<br>
@@ -48,16 +48,12 @@ A standard API for wallets to upload KYC data to anchors. Customers enter their 
 
 ### Key Classes
 
-- **`provides`**
 - **`CallbackSignatureVerifier`** - Methods: verify, parseSignatureHeader
 - **`CustomerFileResponse`**
 - **`CustomerStatus`** - Methods: fromString
 - **`FieldStatus`** - Methods: fromString
 - **`GetCustomerFilesResponse`**
-- **`is`**
-- **`with`**
 - **`GetCustomerInfoField`**
-- **`is`**
 - **`GetCustomerInfoProvidedField`**
 - **`GetCustomerInfoRequest`**
 - **`GetCustomerInfoResponse`**
@@ -69,12 +65,7 @@ A standard API for wallets to upload KYC data to anchors. Customers enter their 
 - **`CustomerAlreadyExistsException`**
 - **`CustomerNotFoundException`**
 - **`FileTooLargeException`**
-- **`ValidationError`**
 - **`InvalidFieldException`**
-- **`for`**
-- **`to`**
-- **`KYCException`**
-- **`KYCClient`**
 - **`UnauthorizedException`**
 
 ### Test Coverage

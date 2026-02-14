@@ -1,6 +1,6 @@
 # SEP-0002 (Federation protocol) Compatibility Matrix
 
-**Generated:** 2026-02-13 22:05:28
+**Generated:** 2026-02-14 12:23:34
 
 **SEP Version:** 1.1.0<br>
 **SEP Status:** Final<br>
@@ -35,11 +35,7 @@ The federation protocol resolves human-readable addresses like `name*yourdomain.
 ### Key Classes
 
 - **`FederationResponse`** - Methods: fromJson
-- **`returned`** - Methods: fromJson
 - **`FederationService`** - Methods: fromDomain, resolveStellarAddress, parseAddress, resolveAccountId, resolveTransactionId, resolveForward, buildHeaders, executeQuery
-- **`for`** - Methods: toString
-- **`to`** - Methods: toString
-- **`Sep02Exception`** - Methods: toString
 - **`Sep02FederationNotFoundException`** - Methods: toString
 - **`Sep02InvalidAddressException`** - Methods: toString
 - **`Sep02InvalidResponseException`** - Methods: toString
