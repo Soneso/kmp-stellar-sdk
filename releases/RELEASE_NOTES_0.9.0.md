@@ -46,7 +46,7 @@ Production-ready client for programmatic anchor transfers without interactive we
 
 ## Documentation
 
-- User guide: `docs/sep/sep-06-transfer-service.md`
+- User guide: `docs/sep/sep-06.md`
 - Compatibility matrix: `compatibility/sep/SEP-0006_COMPATIBILITY_MATRIX.md`
 - Updated SEP README with SEP-6 entry
 

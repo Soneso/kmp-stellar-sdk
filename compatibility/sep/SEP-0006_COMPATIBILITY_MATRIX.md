@@ -1,258 +1,219 @@
-# SEP-6 Compatibility Matrix
+# SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-## Overview
+**Generated:** 2026-02-14 12:23:34
 
-| Property | Value |
-|----------|-------|
-| SEP | SEP-0006 |
-| Title | Deposit and Withdrawal API |
-| Version | 4.3.0 |
-| SDK Version | 1.2.1 |
-| Status | Active |
-| Overall Coverage | 100% (95/95 fields) |
+**SEP Version:** 4.3.0<br>
+**SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
+**SDK Version:** 1.2.1<br>
+**SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md
 
-SEP-6 enables programmatic deposit and withdrawal flows between Stellar and external systems (bank accounts, other blockchains, etc.) without interactive web flows. This is the non-interactive counterpart to SEP-24.
+## SEP Summary
 
-## Implementation Files
+A programmatic API for anchors and wallets to handle deposits and withdrawals without the user leaving the wallet. For interactive flows, see SEP-24.
 
-| File | Description |
-|------|-------------|
-| `Sep06Service.kt` | Main service class with 9 methods |
-| `Sep06Requests.kt` | 8 request data classes |
-| `Sep06Responses.kt` | 17+ response data classes |
-| `Sep06TransactionStatus.kt` | 17 transaction status values |
-| `Sep06TransactionKind.kt` | 4 transaction kind values |
-| `exceptions/*.kt` | 7 exception classes |
+## Overall Coverage
 
-## Endpoints Coverage
+**Total Coverage:** 100.0% (72/72 fields)
 
-| Endpoint | Method | Supported | Service Method | Notes |
-|----------|--------|-----------|----------------|-------|
-| `/info` | GET | Yes | `info()` | Anchor capabilities |
-| `/deposit` | GET | Yes | `deposit()` | Standard deposit |
-| `/deposit-exchange` | GET | Yes | `depositExchange()` | SEP-38 exchange deposit |
-| `/withdraw` | GET | Yes | `withdraw()` | Standard withdrawal |
-| `/withdraw-exchange` | GET | Yes | `withdrawExchange()` | SEP-38 exchange withdrawal |
-| `/fee` | GET | Yes | `fee()` | Deprecated, use SEP-38 |
-| `/transactions` | GET | Yes | `transactions()` | Transaction history |
-| `/transaction` | GET | Yes | `transaction()` | Single transaction |
-| `/transaction/:id` | PATCH | Yes | `patchTransaction()` | Update transaction info |
+- ✅ **Implemented:** 72/72
+- ❌ **Not Implemented:** 0/72
+- **Required Fields:** 100.0% (4/4)
 
-**Endpoints: 9/9 (100%)**
+## Implementation Status
 
-## Request Parameters
+✅ **Fully Implemented**
 
-### Deposit Request (Sep06DepositRequest)
+### Implementation Files
 
-| Parameter | Required | Supported | Deprecated | Notes |
-|-----------|----------|-----------|------------|-------|
-| asset_code | Yes | Yes | No | Stellar asset code |
-| account | Yes | Yes | No | Destination Stellar account |
-| jwt | Yes | Yes | No | SEP-10 authentication token |
-| asset_issuer | No | Yes | No | For multi-issuer assets |
-| memo_type | No | Yes | No | Memo type |
-| memo | No | Yes | No | Memo value |
-| email_address | No | Yes | No | User email |
-| type | No | Yes | Yes | Use funding_method |
-| funding_method | No | Yes | No | Deposit method |
-| amount | No | Yes | No | Deposit amount |
-| country_code | No | Yes | No | ISO 3166-1 alpha-2 |
-| claimable_balance_supported | No | Yes | No | Boolean flag |
-| customer_id | No | Yes | No | SEP-12 customer ID |
-| location_id | No | Yes | No | Location ID |
-| wallet_name | No | Yes | Yes | Use client_domain |
-| wallet_url | No | Yes | Yes | Use client_domain |
-| lang | No | Yes | No | RFC 4646 language |
-| on_change_callback | No | Yes | No | Webhook URL |
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Requests.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Responses.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Service.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06TransactionKind.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06TransactionStatus.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06AuthenticationRequiredException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06CustomerInformationNeededException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06CustomerInformationStatusException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06Exception.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06InvalidRequestException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06ServerErrorException.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06TransactionNotFoundException.kt`
 
-**Deposit Request: 18/18 (100%)**
+### Key Classes
 
-### Withdraw Request (Sep06WithdrawRequest)
+- **`Sep06DepositRequest`**
+- **`Sep06DepositExchangeRequest`**
+- **`Sep06WithdrawRequest`**
+- **`Sep06WithdrawExchangeRequest`**
+- **`Sep06TransactionsRequest`**
+- **`Sep06TransactionRequest`**
+- **`Sep06FeeRequest`**
+- **`Sep06PatchTransactionRequest`**
+- **`Sep06InfoResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06DepositAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06DepositExchangeAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06WithdrawAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06WithdrawType`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06WithdrawExchangeAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06Field`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06FeeEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06TransactionEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06TransactionsEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06FeatureFlags`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06DepositResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06DepositInstruction`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06ExtraInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06WithdrawResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06TransactionsResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06TransactionResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06FeeResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06Transaction`** - Methods: getStatusEnum, getKindEnum, isTerminal
+- **`Sep06FeeDetails`**
+- **`Sep06FeeDetail`**
+- **`Sep06Refunds`**
+- **`Sep06RefundPayment`**
+- **`Sep06Service`** - Methods: fromDomain, fromUrl, info, deposit, depositExchange, withdraw, withdrawExchange, fee, transactions, transaction, patchTransaction, buildHeaders, httpPatch, handleForbiddenResponse, parseErrorMessage
+- **`Sep06TransactionKind`** - Methods: isDeposit, isWithdrawal, isExchange, fromValue
+- **`Sep06TransactionStatus`** - Methods: isTerminal, isError, isPending, fromValue
+- **`Sep06AuthenticationRequiredException`** - Methods: toString
+- **`Sep06CustomerInformationNeededException`** - Methods: toString
+- **`Sep06CustomerInformationStatusException`** - Methods: toString
+- **`Sep06InvalidRequestException`** - Methods: toString
+- **`Sep06ServerErrorException`** - Methods: toString
+- **`Sep06TransactionNotFoundException`** - Methods: toString
 
-| Parameter | Required | Supported | Deprecated | Notes |
-|-----------|----------|-----------|------------|-------|
-| asset_code | Yes | Yes | No | Stellar asset code |
-| type | Yes | Yes | Yes | Use funding_method |
-| jwt | Yes | Yes | No | SEP-10 authentication token |
-| funding_method | No | Yes | No | Withdrawal method |
-| dest | No | Yes | No | Destination address |
-| dest_extra | No | Yes | No | Additional destination info |
-| account | No | Yes | No | Source Stellar account |
-| memo | No | Yes | No | Memo value |
-| memo_type | No | Yes | Yes | Memo type |
-| amount | No | Yes | No | Withdrawal amount |
-| country_code | No | Yes | No | ISO 3166-1 alpha-2 |
-| refund_memo | No | Yes | No | Refund memo |
-| refund_memo_type | No | Yes | No | Refund memo type |
-| customer_id | No | Yes | No | SEP-12 customer ID |
-| location_id | No | Yes | No | Location ID |
-| wallet_name | No | Yes | Yes | Use client_domain |
-| wallet_url | No | Yes | Yes | Use client_domain |
-| lang | No | Yes | No | RFC 4646 language |
-| on_change_callback | No | Yes | No | Webhook URL |
+### Test Coverage
 
-**Withdraw Request: 19/19 (100%)**
+**Tests:** 137 test cases
 
-## Response Fields
+**Test Files:**
 
-### Deposit Response (Sep06DepositResponse)
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep06/Sep06IntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ExceptionsTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ResponseParsingTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ServiceTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06TransactionKindTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06TransactionStatusTest.kt`
 
-| Field | Required | Supported | Deprecated | Notes |
-|-------|----------|-----------|------------|-------|
-| how | No | Yes | Yes | Use instructions |
-| id | No | Yes | No | Transaction ID |
-| eta | No | Yes | No | ETA in seconds |
-| min_amount | No | Yes | No | Minimum amount |
-| max_amount | No | Yes | No | Maximum amount |
-| fee_fixed | No | Yes | No | Fixed fee |
-| fee_percent | No | Yes | No | Percentage fee |
-| extra_info | No | Yes | No | Additional info |
-| instructions | No | Yes | No | Deposit instructions map |
+## Coverage by Section
 
-**Deposit Response: 9/9 (100%)**
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| Deposit | 100.0% | 1/1 | 16 | 16 |
+| Deposit Exchange | 100.0% | 1/1 | 18 | 18 |
+| Info | 100.0% | N/A | 1 | 1 |
+| Withdraw | 100.0% | 1/1 | 17 | 17 |
+| Withdraw Exchange | 100.0% | 1/1 | 20 | 20 |
 
-### Withdraw Response (Sep06WithdrawResponse)
+## Detailed Field Comparison
 
-| Field | Required | Supported | Notes |
-|-------|----------|-----------|-------|
-| account_id | Yes | Yes | Anchor's Stellar account |
-| memo_type | Yes | Yes | Memo type for payment |
-| memo | No | Yes | Memo value |
-| id | No | Yes | Transaction ID |
-| eta | No | Yes | ETA in seconds |
-| min_amount | No | Yes | Minimum amount |
-| max_amount | No | Yes | Maximum amount |
-| fee_fixed | No | Yes | Fixed fee |
-| fee_percent | No | Yes | Percentage fee |
-| extra_info | No | Yes | Additional info |
+### Deposit
 
-**Withdraw Response: 10/10 (100%)**
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `asset_code` |  | ✅ | `assetCode` | The code of the on-chain asset the user wants to get from the Anchor after doing an off-chain dep... |
+| `account` |  | ✅ | `account` | The classic account, contract account or muxed account ID of the user that wants to deposit to. T... |
+| `funding_method` | ✓ | ✅ | `fundingMethod` | A method supported by the Anchor for transferring or settling assets. Must match one of the value... |
+| `memo_type` |  | ✅ | `memoType` | (optional) Type of memo that the anchor should attach to the Stellar payment transaction, one of ... |
+| `memo` |  | ✅ | `memo` | (optional) Value of memo to attach to transaction, for `hash` this should be base64-encoded. Beca... |
+| `email_address` |  | ✅ | `emailAddress` | (optional) Email address of depositor. If desired, an anchor can use this to send email updates t... |
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
+| `on_change_callback` |  | ✅ | `onChangeCallback` | (optional) A URL that the anchor should `POST` a JSON message to when the `status` property of th... |
+| `amount` |  | ✅ | `amount` | (optional) The amount of the asset the user would like to deposit with the anchor. This field may... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) code of the user's current address. This field may be necessary for the anchor to determine what KYC information is necessary to collect. |
+| `claimable_balance_supported` |  | ✅ | `claimableBalanceSupported` | (optional) `true` if the client supports receiving deposit transactions as a claimable balance, `... |
+| `customer_id` |  | ✅ | `customerId` | (optional) id of an off-chain account (managed by the anchor) associated with this user's Stellar... |
+| `location_id` |  | ✅ | `locationId` | (optional) optional) id of the chosen location to drop off cash |
+| `type` |  | ✅ | `type` | (**Deprecated** in favor of `funding_method`) Type of deposit. If the Anchor supports multiple de... |
+| `wallet_name` |  | ✅ | `walletName` | (**Deprecated**, optional) In communications / pages about the deposit, anchor should display the... |
+| `wallet_url` |  | ✅ | `walletUrl` | (**Deprecated**, optional) Anchor should link to this when notifying the user that the transactio... |
 
-### Transaction Fields (Sep06Transaction)
+### Deposit Exchange
 
-| # | Field | Required | Supported | Deprecated | Notes |
-|---|-------|----------|-----------|------------|-------|
-| 1 | id | Yes | Yes | No | Unique transaction ID |
-| 2 | kind | Yes | Yes | No | Transaction type |
-| 3 | status | Yes | Yes | No | Current status |
-| 4 | status_eta | No | Yes | No | ETA in seconds |
-| 5 | more_info_url | No | Yes | No | URL for details |
-| 6 | amount_in | No | Yes | No | Amount received |
-| 7 | amount_in_asset | No | Yes | No | Asset of amount_in |
-| 8 | amount_out | No | Yes | No | Amount sent |
-| 9 | amount_out_asset | No | Yes | No | Asset of amount_out |
-| 10 | amount_fee | No | Yes | Yes | Use fee_details |
-| 11 | amount_fee_asset | No | Yes | Yes | Use fee_details |
-| 12 | fee_details | No | Yes | No | Detailed fee breakdown |
-| 13 | quote_id | No | Yes | No | SEP-38 quote ID |
-| 14 | from | No | Yes | No | Sending account |
-| 15 | to | No | Yes | No | Receiving account |
-| 16 | external_extra | No | Yes | No | Routing number, BIC |
-| 17 | external_extra_text | No | Yes | No | Bank name |
-| 18 | deposit_memo | No | Yes | No | Deposit memo |
-| 19 | deposit_memo_type | No | Yes | No | Deposit memo type |
-| 20 | withdraw_anchor_account | No | Yes | No | Anchor's account |
-| 21 | withdraw_memo | No | Yes | No | Withdrawal memo |
-| 22 | withdraw_memo_type | No | Yes | No | Withdrawal memo type |
-| 23 | started_at | No | Yes | No | ISO 8601 timestamp |
-| 24 | updated_at | No | Yes | No | ISO 8601 timestamp |
-| 25 | completed_at | No | Yes | No | ISO 8601 timestamp |
-| 26 | user_action_required_by | No | Yes | No | User action deadline |
-| 27 | stellar_transaction_id | No | Yes | No | Stellar tx hash |
-| 28 | external_transaction_id | No | Yes | No | External tx ID |
-| 29 | message | No | Yes | No | Status message |
-| 30 | refunded | No | Yes | Yes | Use refunds object |
-| 31 | refunds | No | Yes | No | Refund details |
-| 32 | required_info_message | No | Yes | No | Info update message |
-| 33 | required_info_updates | No | Yes | No | Fields to update |
-| 34 | instructions | No | Yes | No | Deposit instructions |
-| 35 | claimable_balance_id | No | Yes | No | Claimable balance ID |
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `destination_asset` |  | ✅ | `destinationAsset` | The code of the on-chain asset the user wants to get from the Anchor after doing an off-chain dep... |
+| `source_asset` |  | ✅ | `sourceAsset` | The off-chain asset the Anchor will receive from the user. The value must match one of the `asset... |
+| `amount` |  | ✅ | `amount` | The amount of the `source_asset` the user would like to deposit to the anchor's off-chain account... |
+| `funding_method` | ✓ | ✅ | `fundingMethod` | A method supported by the Anchor for transferring or settling assets. Must match one of the value... |
+| `account` |  | ✅ | `account` | The classic account, muxed account, or contract account where the clients wants the deposit to be... |
+| `quote_id` |  | ✅ | `quoteId` | (optional) The `id` returned from a `SEP-38 POST /quote` response. If this parameter is provided ... |
+| `memo_type` |  | ✅ | `memoType` | (optional) Type of memo that the anchor should attach to the Stellar payment transaction, one of ... |
+| `memo` |  | ✅ | `memo` | (optional) Value of memo to attach to transaction, for `hash` this should be base64-encoded. Beca... |
+| `email_address` |  | ✅ | `emailAddress` | (optional) Email address of depositor. If desired, an anchor can use this to send email updates t... |
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
+| `on_change_callback` |  | ✅ | `onChangeCallback` | (optional) A URL that the anchor should `POST` a JSON message to when the `status` property of th... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) code of the user's current address. This field may be necessary for the anchor to determine what KYC information is necessary to collect. |
+| `claimable_balance_supported` |  | ✅ | `claimableBalanceSupported` | (optional) `true` if the client supports receiving deposit transactions as a claimable balance, `... |
+| `customer_id` |  | ✅ | `customerId` | (optional) id of an off-chain account (managed by the anchor) associated with this user's Stellar... |
+| `location_id` |  | ✅ | `locationId` | (optional) optional) id of the chosen location to drop off cash |
+| `type` |  | ✅ | `type` | (**Deprecated** in favor of `funding_method`) Type of deposit. If the Anchor supports multiple de... |
+| `wallet_name` |  | ✅ | `walletName` | (**Deprecated**, optional) In communications / pages about the deposit, anchor should display the... |
+| `wallet_url` |  | ✅ | `walletUrl` | (**Deprecated**, optional) Anchor should link to this when notifying the user that the transactio... |
 
-**Transaction Fields: 35/35 (100%)**
+### Info
 
-## Transaction Status Values
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
 
-| Status | Supported | Category | Description |
-|--------|-----------|----------|-------------|
-| incomplete | Yes | Initial | Transaction not yet started |
-| pending_user_transfer_start | Yes | Pending | Waiting for user to send funds |
-| pending_user_transfer_complete | Yes | Pending | User has sent funds |
-| pending_external | Yes | Pending | Waiting for external system |
-| pending_anchor | Yes | Pending | Anchor is processing |
-| pending_stellar | Yes | Pending | Stellar transaction pending |
-| pending_trust | Yes | Pending | Waiting for trustline |
-| pending_user | Yes | Pending | Waiting for user action |
-| pending_customer_info_update | Yes | Pending | KYC info update needed |
-| pending_transaction_info_update | Yes | Pending | Transaction info update needed |
-| completed | Yes | Terminal | Successfully completed |
-| refunded | Yes | Terminal | Funds returned |
-| expired | Yes | Terminal | Transaction expired |
-| error | Yes | Terminal/Error | Processing failed |
-| no_market | Yes | Terminal/Error | No market for conversion |
-| too_small | Yes | Terminal/Error | Amount below minimum |
-| too_large | Yes | Terminal/Error | Amount above maximum |
+### Withdraw
 
-**Transaction Statuses: 17/17 (100%)**
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `asset_code` |  | ✅ | `assetCode` | Code of the on-chain asset the user wants to withdraw. The value passed must match one of the cod... |
+| `funding_method` | ✓ | ✅ | `fundingMethod` | A method supported by the Anchor for transferring or settling assets. Must match one of the value... |
+| `account` |  | ✅ | `account` | (optional) The classic account, muxed account, or contract account that the client will use as th... |
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
+| `on_change_callback` |  | ✅ | `onChangeCallback` | (optional) A URL that the anchor should `POST` a JSON message to when the `status` property of th... |
+| `amount` |  | ✅ | `amount` | (optional) The amount of the asset the user would like to withdraw. This field may be necessary f... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) code of the user's current address. This field may be necessary for the anchor to determine what KYC information is necessary to collect. |
+| `refund_memo` |  | ✅ | `refundMemo` | (optional) The memo the anchor must use when sending refund payments back to the user. If not spe... |
+| `refund_memo_type` |  | ✅ | `refundMemoType` | (optional) The type of the `refund_memo`. Can be `id`, `text`, or `hash`. See the [memos](https://developers.stellar.org/docs/encyclopedia/memos) documentation for more information. If specified, `refund_memo` must also be specified. |
+| `customer_id` |  | ✅ | `customerId` | (optional) id of an off-chain account (managed by the anchor) associated with this user's Stellar... |
+| `location_id` |  | ✅ | `locationId` | (optional) id of the chosen location to pick up cash |
+| `type` |  | ✅ | `type` | (**Deprecated** in favor of `funding_method`) Type of withdrawal. Can be: `crypto`, `bank_account... |
+| `dest` |  | ✅ | `dest` | (**Deprecated**, [see note below](#dest--dest_extra-parameters)) The account that the user wants ... |
+| `dest_extra` |  | ✅ | `destExtra` | (**Deprecated**, [see note below](#dest--dest_extra-parameters), optional) Extra information to s... |
+| `memo_type` |  | ✅ | `memoType` | (**Deprecated**, optional) Type of `memo`. One of `text`, `id` or `hash`. Deprecated because memo... |
+| `wallet_name` |  | ✅ | `walletName` | (**Deprecated**, optional) In communications / pages about the withdrawal, anchor should display ... |
+| `wallet_url` |  | ✅ | `walletUrl` | (**Deprecated**, optional) Anchor can show this to the user when referencing the wallet involved ... |
 
-## Transaction Kind Values
+### Withdraw Exchange
 
-| Kind | Supported | Description |
-|------|-----------|-------------|
-| deposit | Yes | Standard deposit |
-| withdrawal | Yes | Standard withdrawal |
-| deposit-exchange | Yes | Deposit with SEP-38 conversion |
-| withdrawal-exchange | Yes | Withdrawal with SEP-38 conversion |
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `source_asset` |  | ✅ | `sourceAsset` | Code of the on-chain asset the user wants to withdraw. The value passed must match one of the cod... |
+| `destination_asset` |  | ✅ | `destinationAsset` | The off-chain asset the Anchor will deliver to the user's account. The value must match one of th... |
+| `amount` |  | ✅ | `amount` | The amount of the on-chain asset (`source_asset`) the user would like to send to the anchor's Ste... |
+| `funding_method` | ✓ | ✅ | `fundingMethod` | A method supported by the Anchor for transferring or settling assets. Must match one of the value... |
+| `quote_id` |  | ✅ | `quoteId` | (optional) The `id` returned from a `SEP-38 POST /quote` response. If this parameter is provided and the Stellar transaction used to send the asset to the Anchor has a [`created_at`](https://developers.stellar.org/api/resources/transactions/object/) timestamp earlier than the quote's `expires_at` attribute, the Anchor should respect the conversion rate agreed in that quote. If the values of `destination_asset`, `source_asset`, `amount` and `funding_method` conflict with the ones used to create the [SEP-38] quote, this request should be rejected with a `400`. |
+| `account` |  | ✅ | `account` | (optional) The classic account, contract account or muxed account of the user that wants to do th... |
+| `memo` |  | ✅ | `memo` | (optional) This field should only be used if SEP-10 authentication is not. It was originally inte... |
+| `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
+| `on_change_callback` |  | ✅ | `onChangeCallback` | (optional) A URL that the anchor should `POST` a JSON message to when the `status` property of th... |
+| `country_code` |  | ✅ | `countryCode` | (optional) The [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) code of the user's current address. This field may be necessary for the anchor to determine what KYC information is necessary to collect. |
+| `refund_memo` |  | ✅ | `refundMemo` | (optional) The memo the anchor must use when sending refund payments back to the user. If not spe... |
+| `refund_memo_type` |  | ✅ | `refundMemoType` | (optional) The type of the `refund_memo`. Can be `id`, `text`, or `hash`. See the [memos](https://developers.stellar.org/docs/encyclopedia/memos) documentation for more information. If specified, `refund_memo` must also be specified. |
+| `customer_id` |  | ✅ | `customerId` | (optional) id of an off-chain account (managed by the anchor) associated with this user's Stellar... |
+| `location_id` |  | ✅ | `locationId` | (optional) id of the chosen location to pick up cash |
+| `type` |  | ✅ | `type` | (**Deprecated** in favor of `funding_method`) Type of withdrawal. Can be: `crypto`, `bank_account... |
+| `dest` |  | ✅ | `dest` | (**Deprecated**, [see note](#dest--dest_extra-parameters)) The account that the user wants to wit... |
+| `dest_extra` |  | ✅ | `destExtra` | (**Deprecated**, [see note](#dest--dest_extra-parameters), optional) Extra information to specify... |
+| `memo_type` |  | ✅ | `memoType` | (**Deprecated**, optional) Type of `memo`. One of `text`, `id` or `hash`. Deprecated because memo... |
+| `wallet_name` |  | ✅ | `walletName` | (**Deprecated**, optional) In communications / pages about the withdrawal, anchor should display ... |
+| `wallet_url` |  | ✅ | `walletUrl` | (**Deprecated**, optional) Anchor can show this to the user when referencing the wallet involved ... |
 
-**Transaction Kinds: 4/4 (100%)**
+## Legend
 
-## Exception Handling
+- ✅ **Implemented**: Field is fully supported in the SDK
+- ❌ **Not Implemented**: Field is not currently supported
+- ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
 
-| Exception | HTTP Status | Description |
-|-----------|-------------|-------------|
-| Sep06Exception | - | Base exception class |
-| Sep06AuthenticationRequiredException | 403 | JWT missing or invalid |
-| Sep06CustomerInformationNeededException | 403 | SEP-12 KYC required |
-| Sep06CustomerInformationStatusException | 403 | KYC pending or denied |
-| Sep06InvalidRequestException | 400 | Malformed request |
-| Sep06ServerErrorException | 5xx | Server error |
-| Sep06TransactionNotFoundException | 404 | Transaction not found |
+## Additional Information
 
-**Exception Types: 7/7 (100%)**
+**Documentation:** See `docs/sep-implementations.md` for usage examples and API reference
 
-## SEP Integration
+**Specification:** [SEP-0006](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md)
 
-| SEP | Integration | Status |
-|-----|-------------|--------|
-| SEP-1 | Service discovery via stellar.toml | Yes |
-| SEP-10 | JWT authentication | Yes |
-| SEP-12 | KYC integration | Yes |
-| SEP-38 | Quote integration | Yes |
-
-## Feature Support
-
-| Feature | Supported | Notes |
-|---------|-----------|-------|
-| Programmatic deposits | Yes | Full /deposit support |
-| Programmatic withdrawals | Yes | Full /withdraw support |
-| Exchange operations | Yes | SEP-38 quotes |
-| Transaction tracking | Yes | /transactions and /transaction |
-| Transaction updates | Yes | PATCH /transaction/:id |
-| Claimable balances | Yes | claimable_balance_supported flag |
-| Callback notifications | Yes | on_change_callback parameter |
-| Refund tracking | Yes | Full refunds object |
-| Fee details | Yes | Detailed fee breakdown |
-
-## Coverage Summary
-
-| Section | Coverage | Required | Notes |
-|---------|----------|----------|-------|
-| Endpoints | 9/9 (100%) | 9/9 | All endpoints implemented |
-| Deposit Request | 18/18 (100%) | 2/2 | All parameters |
-| Withdraw Request | 19/19 (100%) | 2/2 | All parameters |
-| Deposit Response | 9/9 (100%) | 1/1 | All fields |
-| Withdraw Response | 10/10 (100%) | 2/2 | All fields |
-| Transaction Fields | 35/35 (100%) | 4/4 | All 35 fields |
-| Transaction Statuses | 17/17 (100%) | 4/4 | All statuses |
-| Transaction Kinds | 4/4 (100%) | 4/4 | All kinds |
-| Exception Types | 7/7 (100%) | 3/3 | All error types |
-| **Overall** | **95/95 (100%)** | **22/22** | Complete coverage |
+**Implementation Package:** `com.soneso.stellar.sdk.sep.sep0006`

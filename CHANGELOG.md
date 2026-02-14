@@ -161,7 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Callback notification support via `onChangeCallback` parameter
   - Refund tracking with payment breakdowns
   - 93 unit tests + 12 integration tests against live testnet
-  - Documentation in `docs/sep/sep-06-transfer-service.md` with usage examples
+  - Documentation in `docs/sep/sep-06.md` with usage examples
   - SEP-6 compatibility matrix showing 100% API coverage (95/95 fields)
 
 ### Documentation

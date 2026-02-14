@@ -29,7 +29,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-53 (Sign and Verify Messages)
 
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
@@ -143,6 +143,34 @@ secureMnemonic.close()
 - Memory cleanup (entropy zeroed after use, close() zeros seed)
 - PBKDF2-HMAC-SHA512 with 2048 iterations
 
+### SEP-2 Federation Protocol
+
+The SDK implements SEP-2 (Federation Protocol) for resolving human-readable Stellar addresses to account IDs.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep02/
+├── FederationService.kt              # Federation service client (fromDomain, 4 query methods)
+├── FederationResponse.kt             # Federation response data class
+└── exceptions/
+    ├── Sep02Exception.kt                    # Base exception
+    ├── Sep02InvalidAddressException.kt      # Invalid stellar address format
+    ├── Sep02FederationNotFoundException.kt  # No federation server in stellar.toml
+    └── Sep02InvalidResponseException.kt     # Malformed server response
+```
+
+#### Usage Example
+```kotlin
+// Resolve a stellar address
+val response = FederationService.resolveStellarAddress("bob*stellar.org")
+println("Account: ${response.accountId}")
+println("Memo: ${response.memo} (${response.memoType})")
+
+// Create service for a specific domain
+val service = FederationService.fromDomain("stellar.org")
+val result = service.resolveAccountId("GABC...")
+```
+
 ### SEP-8 Regulated Assets
 
 The SDK implements SEP-8 (Regulated Assets) for assets requiring issuer approval before transactions can be submitted.
@@ -159,6 +187,32 @@ com.soneso.stellar.sdk.sep.sep08/
     ├── Sep08IncompleteInitDataException.kt        # Missing network/Horizon config
     ├── Sep08InvalidTransactionResponseException.kt # Malformed approval server response
     └── Sep08InvalidActionResponseException.kt     # Malformed action URL response
+```
+
+### SEP-30 Account Recovery
+
+The SDK implements SEP-30 (Account Recovery) for multi-party recovery of Stellar accounts using alternative authentication methods.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep30/
+├── Sep30Service.kt                    # Service client (registerAccount, updateIdentitiesForAccount, signTransaction, accountDetails, deleteAccount, accounts)
+├── Sep30Request.kt                    # Registration/update request with identities
+├── Sep30RequestIdentity.kt            # Identity with role and auth methods
+├── Sep30AuthMethod.kt                 # Authentication method (email, phone, stellar_address)
+├── Sep30AccountResponse.kt            # Account response with address, identities, signers
+├── Sep30AccountsResponse.kt           # List accounts response
+├── Sep30SignatureResponse.kt          # Transaction signature response
+├── Sep30ResponseIdentity.kt           # Response identity with role and authenticated flag
+├── Sep30ResponseSigner.kt             # Response signer with key
+└── exceptions/
+    ├── Sep30Exception.kt                      # Base exception
+    ├── Sep30BadRequestException.kt            # HTTP 400
+    ├── Sep30UnauthorizedException.kt          # HTTP 401
+    ├── Sep30NotFoundException.kt              # HTTP 404
+    ├── Sep30ConflictException.kt              # HTTP 409
+    ├── Sep30UnknownResponseException.kt       # Other HTTP errors
+    └── Sep30InvalidResponseException.kt       # Malformed 200 responses
 ```
 
 ## Documentation Standards
