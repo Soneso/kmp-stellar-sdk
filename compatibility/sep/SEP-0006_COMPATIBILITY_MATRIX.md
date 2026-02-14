@@ -1,10 +1,10 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-02-14 12:23:34
+**Generated:** 2026-02-14 20:32:36
 
 **SEP Version:** 4.3.0<br>
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
-**SDK Version:** 1.2.1<br>
+**SDK Version:** 1.3.0<br>
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md
 
 ## SEP Summary

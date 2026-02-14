@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-14
+
+### Added
+- **SEP-2 (Federation Protocol)**: Resolve human-readable Stellar addresses (e.g., `bob*stellar.org`) to account IDs and reverse-lookup accounts to addresses
+  - `FederationService` with `fromDomain()` factory and 4 query methods: `resolveStellarAddress()`, `resolveAccountId()`, `resolveTransactionId()`, `resolveForward()`
+  - `FederationResponse` data class with account ID, memo, memo type, and stellar address
+  - 4 typed exceptions for invalid addresses, missing federation servers, and malformed responses
+  - Unit tests with MockEngine and integration test against live federation server
+  - Documentation in `docs/sep/sep-02.md`
+
+- **SEP-30 (Account Recovery)**: Multi-party account recovery using alternative authentication methods (email, phone, Stellar address)
+  - `Sep30Service` with all 6 spec endpoints: register, update identities, sign transaction, account details, delete, list accounts
+  - 9 data model classes with JSON serialization/deserialization
+  - 7 typed exceptions mapping HTTP status codes (400, 401, 404, 409, unknown, malformed 200)
+  - 83 unit tests covering response parsing, exceptions, and service operations
+  - Documentation in `docs/sep/sep-30.md`
+
+- **SEP-53 (Sign and Verify Messages)**: Off-chain message signing and verification using Ed25519 keypairs
+  - `signMessage()` and `verifySignedMessage()` methods on `KeyPair`
+  - Domain-separated signing using SEP-53 payload format (36-byte prefix + SHA-256 hash)
+  - Unit tests with known test vectors
+  - Documentation in `docs/sep/sep-53.md`
+
+- **SEP Compatibility Matrix Automation**: 3-stage Python pipeline for generating field-by-field coverage reports
+  - `sep_parser.py` - Fetches and parses SEP specifications from GitHub
+  - `sep_analyzer.py` - Scans SDK Kotlin source and maps spec fields to implementation
+  - `generate_sep_comparison.py` - Compares definitions against implementation and generates markdown matrices
+  - `run_sep_analysis.py` - Orchestrator for all implemented SEPs
+
 ## [1.2.1] - 2026-02-11
 
 ### Added

@@ -23,7 +23,7 @@ object Util {
      * @return The SDK version string (e.g., "1.0.0")
      */
     fun getSdkVersion(): String {
-        return "1.2.1"
+        return "1.3.0"
     }
 
     /**
