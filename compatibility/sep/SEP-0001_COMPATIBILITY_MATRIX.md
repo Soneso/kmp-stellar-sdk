@@ -1,15 +1,15 @@
 # SEP-0001 (Stellar Info File) Compatibility Matrix
 
-**Generated:** 2026-01-14 16:20:59
+**Generated:** 2026-02-14 20:32:36
 
 **SEP Version:** 2.7.0<br>
 **SEP Status:** Active<br>
-**SDK Version:** 1.0.0<br>
+**SDK Version:** 1.3.0<br>
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0001.md
 
 ## SEP Summary
 
-The `stellar.toml` file is used to provide a common place where the Internet can find information about your organization's Stellar integration. By setting the home_domain of your Stellar account to the domain that hosts your `stellar.toml`, you can create a definitive link between this information and that account. Any website can publish Stellar network information, and the `stellar.toml` is designed to be readable by both humans and machines.
+The `stellar.toml` file publishes information about an organization's Stellar integration, including token details, contact info, and validator nodes. Anchors, issuers, and validators host it at their domain so clients can look up and verify their offerings.
 
 ## Overall Coverage
 
@@ -17,6 +17,7 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 
 - ✅ **Implemented:** 71/71
 - ❌ **Not Implemented:** 0/71
+- **Required Fields:** 100.0% (3/3)
 
 ## Implementation Status
 
@@ -24,21 +25,22 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 
 ### Implementation Files
 
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/StellarToml.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/GeneralInformation.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Documentation.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/PointOfContact.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Currency.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Validator.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Documentation.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/GeneralInformation.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/PointOfContact.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/StellarToml.kt`
 - `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/TomlParser.kt`
+- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Validator.kt`
 
 ### Key Classes
 
-- **`StellarToml`** - Methods: fromDomain, currencyFromUrl, parse
-- **`GeneralInformation`**
-- **`Documentation`**
-- **`PointOfContact`**
 - **`Currency`**
+- **`Documentation`**
+- **`GeneralInformation`**
+- **`PointOfContact`**
+- **`StellarToml`** - Methods: fromDomain, currencyFromUrl, parse, safeguardTomlContent, parseTomlTree, parseGeneralInformation, parseDocumentation, parsePointsOfContact, parseCurrencies, parseCurrency, parseCurrencyFromMap, parseValidators
+- **`TomlParser`** - Methods: parse, parseValue, parseArray
 - **`Validator`**
 
 ### Test Coverage
@@ -47,18 +49,18 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 
 **Test Files:**
 
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep01/StellarTomlTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/sep/sep01/StellarTomlIntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep01/StellarTomlIntegrationTest.kt`
+- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep01/StellarTomlTest.kt`
 
 ## Coverage by Section
 
-| Section | Coverage | Implemented | Total |
-|---------|----------|-------------|-------|
-| Currency Documentation | 100.0% | 25 | 25 |
-| General Information | 100.0% | 16 | 16 |
-| Organization Documentation | 100.0% | 17 | 17 |
-| Point of Contact Documentation | 100.0% | 8 | 8 |
-| Validator Information | 100.0% | 5 | 5 |
+| Section | Coverage | Required | Implemented | Total |
+|---------|----------|----------|-------------|-------|
+| Currency Documentation | 100.0% | 3/3 | 25 | 25 |
+| General Information | 100.0% | N/A | 16 | 16 |
+| Organization Documentation | 100.0% | N/A | 17 | 17 |
+| Point of Contact Documentation | 100.0% | N/A | 8 | 8 |
+| Validator Information | 100.0% | N/A | 5 | 5 |
 
 ## Detailed Field Comparison
 
@@ -66,12 +68,11 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `toml` |  | ✅ | `toml` | Alternately, stellar.toml can link out to a separate TOML file for each currency by specifying to... |
-| `code` |  | ✅ | `code` | Token code |
+| `code` | ✓ | ✅ | `code` | Token code. Required. |
+| `issuer` | ✓ | ✅ | `issuer` | Stellar public key of the issuing account. Required for tokens that are Stellar Assets. Omitted i... |
+| `contract` | ✓ | ✅ | `contract` | Contract ID of the token contract. The token must be compatible with the [SEP-41 Token Interface]... |
 | `code_template` |  | ✅ | `codeTemplate` | A pattern with `?` as a single character wildcard. Allows a `[[CURRENCIES]]` entry to apply to mu... |
-| `issuer` |  | ✅ | `issuer` | Stellar public key of the issuing account. Required for tokens that are Stellar Assets. |
-| `contract` |  | ✅ | `contract` | Contract ID of the token contract. The token must be compatible with the SEP-41 Token Interface. ... |
-| `status` |  | ✅ | `status` | Status of token. One of `live`, `dead`, `test`, or `private`. |
+| `status` |  | ✅ | `status` | Status of token. One of `live`, `dead`, `test`, or `private`. Allows issuer to mark whether token... |
 | `display_decimals` |  | ✅ | `displayDecimals` | Preference for number of decimals to show when a client displays currency balance |
 | `name` |  | ✅ | `name` | A short name for the token |
 | `desc` |  | ✅ | `desc` | Description of token and what it represents |
@@ -82,51 +83,52 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 | `is_unlimited` |  | ✅ | `isUnlimited` | The number of tokens is dilutable at the issuer's discretion |
 | `is_asset_anchored` |  | ✅ | `isAssetAnchored` | `true` if token can be redeemed for underlying asset, otherwise `false` |
 | `anchor_asset_type` |  | ✅ | `anchorAssetType` | Type of asset anchored. Can be `fiat`, `crypto`, `nft`, `stock`, `bond`, `commodity`, `realestate... |
-| `anchor_asset` |  | ✅ | `anchorAsset` | If anchored token, code / symbol for asset that token is anchored to. E.g. USD, BTC, SBUX. |
+| `anchor_asset` |  | ✅ | `anchorAsset` | If anchored token, code / symbol for asset that token is anchored to. E.g. USD, BTC, SBUX, Addres... |
 | `attestation_of_reserve` |  | ✅ | `attestationOfReserve` | URL to attestation or other proof, evidence, or verification of reserves, such as third-party aud... |
 | `redemption_instructions` |  | ✅ | `redemptionInstructions` | If anchored token, these are instructions to redeem the underlying asset from tokens. |
 | `collateral_addresses` |  | ✅ | `collateralAddresses` | If this is an anchored crypto token, list of one or more public addresses that hold the assets fo... |
 | `collateral_address_messages` |  | ✅ | `collateralAddressMessages` | Messages stating that funds in the `collateral_addresses` list are reserved to back the issued as... |
 | `collateral_address_signatures` |  | ✅ | `collateralAddressSignatures` | These prove you control the `collateral_addresses`. For each address you list, sign the entry in ... |
-| `regulated` |  | ✅ | `regulated` | Indicates whether or not this is a SEP-0008 regulated asset. If missing, `false` is assumed. |
-| `approval_server` |  | ✅ | `approvalServer` | URL of a SEP-0008 compliant approval service that signs validated transactions. |
-| `approval_criteria` |  | ✅ | `approvalCriteria` | A human readable string that explains the issuer's requirements for approving transactions. |
+| `regulated` |  | ✅ | `regulated` | indicates whether or not this is a [sep0008](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md) regulated asset. If missing, `false` is assumed. |
+| `approval_server` |  | ✅ | `approvalServer` | url of a [sep0008](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md) compliant approval service that signs validated transactions. |
+| `approval_criteria` |  | ✅ | `approvalCriteria` | a human readable string that explains the issuer's requirements for approving transactions. |
+| `toml` |  | ✅ | `toml` | Alternately, stellar.toml can link out to a separate TOML file for each currency by specifying to... |
 
 ### General Information
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `VERSION` |  | ✅ | `version` | The version of SEP-1 your `stellar.toml` adheres to. This helps parsers know which fields to expect. |
-| `NETWORK_PASSPHRASE` |  | ✅ | `networkPassphrase` | The passphrase for the specific Stellar network this infrastructure operates on |
-| `FEDERATION_SERVER` |  | ✅ | `federationServer` | The endpoint for clients to resolve stellar addresses for users on your domain via SEP-2 Federati... |
-| `AUTH_SERVER` |  | ✅ | `authServer` | The endpoint used for SEP-3 Compliance Protocol |
-| `TRANSFER_SERVER` |  | ✅ | `transferServer` | The server used for SEP-6 Anchor/Client interoperability |
-| `TRANSFER_SERVER_SEP0024` |  | ✅ | `transferServerSep24` | The server used for SEP-24 Anchor/Client interoperability |
-| `KYC_SERVER` |  | ✅ | `kycServer` | The server used for SEP-12 Anchor/Client customer info transfer |
-| `WEB_AUTH_ENDPOINT` |  | ✅ | `webAuthEndpoint` | The endpoint used for SEP-10 Web Authentication |
-| `WEB_AUTH_FOR_CONTRACTS_ENDPOINT` |  | ✅ | `webAuthForContractsEndpoint` | The endpoint used for SEP-45 Web Authentication |
-| `WEB_AUTH_CONTRACT_ID` |  | ✅ | `webAuthContractId` | The web authentication contract ID for SEP-45 Web Authentication |
-| `SIGNING_KEY` |  | ✅ | `signingKey` | The signing key is used for SEP-3 Compliance Protocol and SEP-10/SEP-45 Authentication Protocols |
+| `NETWORK_PASSPHRASE` |  | ✅ | `networkPassphrase` | The passphrase for the specific [Stellar network](https://developers.stellar.org/docs/networks) this infrastructure operates on |
+| `FEDERATION_SERVER` |  | ✅ | `federationServer` | The endpoint for clients to resolve stellar addresses for users on your domain via [SEP-2](sep-00... |
+| `AUTH_SERVER` |  | ✅ | `authServer` | (deprecated) The endpoint used for [SEP-3](sep-0003.md) Compliance Protocol |
+| `TRANSFER_SERVER` |  | ✅ | `transferServer` | The server used for [SEP-6](sep-0006.md) Anchor/Client interoperability |
+| `TRANSFER_SERVER_SEP0024` |  | ✅ | `transferServerSep24` | The server used for [SEP-24](sep-0024.md) Anchor/Client interoperability |
+| `KYC_SERVER` |  | ✅ | `kycServer` | The server used for [SEP-12](sep-0012.md) Anchor/Client customer info transfer |
+| `WEB_AUTH_ENDPOINT` |  | ✅ | `webAuthEndpoint` | The endpoint used for [SEP-10 Web Authentication](sep-0010.md) |
+| `WEB_AUTH_FOR_CONTRACTS_ENDPOINT` |  | ✅ | `webAuthForContractsEndpoint` | The endpoint used for [SEP-45 Web Authentication](sep-0045.md) |
+| `WEB_AUTH_CONTRACT_ID` |  | ✅ | `webAuthContractId` | The web authentication contract ID for [SEP-45 Web Authentication](sep-0045.md) |
+| `SIGNING_KEY` |  | ✅ | `signingKey` | The signing key is used for [SEP-3](sep-0003.md) Compliance Protocol (deprecated) and [SEP-10](se... |
 | `HORIZON_URL` |  | ✅ | `horizonUrl` | Location of public-facing Horizon instance (if you offer one) |
 | `ACCOUNTS` |  | ✅ | `accounts` | A list of Stellar accounts that are controlled by this domain |
-| `URI_REQUEST_SIGNING_KEY` |  | ✅ | `uriRequestSigningKey` | The signing key is used for SEP-7 delegated signing |
-| `DIRECT_PAYMENT_SERVER` |  | ✅ | `directPaymentServer` | The server used for receiving SEP-31 direct fiat-to-fiat payments. Requires SEP-12 and hence a `K... |
-| `ANCHOR_QUOTE_SERVER` |  | ✅ | `anchorQuoteServer` | The server used for receiving SEP-38 requests. |
+| `URI_REQUEST_SIGNING_KEY` |  | ✅ | `uriRequestSigningKey` | The signing key is used for [SEP-7](sep-0007.md) delegated signing |
+| `DIRECT_PAYMENT_SERVER` |  | ✅ | `directPaymentServer` | The server used for receiving [SEP-31](sep-0031.md) direct fiat-to-fiat payments. Requires [SEP-1... |
+| `ANCHOR_QUOTE_SERVER` |  | ✅ | `anchorQuoteServer` | The server used for receiving [SEP-38](sep-0038.md) requests. |
 
 ### Organization Documentation
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `ORG_NAME` |  | ✅ | `orgName` | Legal name of your organization |
-| `ORG_DBA` |  | ✅ | `orgDba` | DBA of your organization |
+| `ORG_DBA` |  | ✅ | `orgDba` | (may not apply) [DBA](https://www.entrepreneur.com/encyclopedia/doing-business-as-dba) of your organization |
 | `ORG_URL` |  | ✅ | `orgUrl` | Your organization's official URL. Your `stellar.toml` must be hosted on the same domain. |
 | `ORG_LOGO` |  | ✅ | `orgLogo` | A PNG image of your organization's logo on a transparent background |
 | `ORG_DESCRIPTION` |  | ✅ | `orgDescription` | Short description of your organization |
 | `ORG_PHYSICAL_ADDRESS` |  | ✅ | `orgPhysicalAddress` | Physical address for your organization |
 | `ORG_PHYSICAL_ADDRESS_ATTESTATION` |  | ✅ | `orgPhysicalAddressAttestation` | URL on the same domain as your `ORG_URL` that contains an image or pdf official document attestin... |
-| `ORG_PHONE_NUMBER` |  | ✅ | `orgPhoneNumber` | Your organization's phone number in E.164 format, e.g. `+14155552671`. |
+| `ORG_PHONE_NUMBER` |  | ✅ | `orgPhoneNumber` | Your organization's phone number in [E.164 format](https://en.wikipedia.org/wiki/E.164), e.g. `+14155552671`. See also [this guide](https://support.twilio.com/hc/en-us/articles/223183008-Formatting-International-Phone-Numbers). |
 | `ORG_PHONE_NUMBER_ATTESTATION` |  | ✅ | `orgPhoneNumberAttestation` | URL on the same domain as your `ORG_URL` that contains an image or pdf of a phone bill showing bo... |
-| `ORG_KEYBASE` |  | ✅ | `orgKeybase` | A Keybase account name for your organization. Should contain proof of ownership of any public onl... |
+| `ORG_KEYBASE` |  | ✅ | `orgKeybase` | A [Keybase](https://keybase.io/) account name for your organization. Should contain proof of ownership of any public online accounts you list here, including your organization's domain. |
 | `ORG_TWITTER` |  | ✅ | `orgTwitter` | Your organization's Twitter account |
 | `ORG_GITHUB` |  | ✅ | `orgGithub` | Your organization's Github account |
 | `ORG_OFFICIAL_EMAIL` |  | ✅ | `orgOfficialEmail` | An email that business partners such as wallets, exchanges, or anchors can use to contact your or... |
@@ -163,6 +165,7 @@ The `stellar.toml` file is used to provide a common place where the Internet can
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information
 

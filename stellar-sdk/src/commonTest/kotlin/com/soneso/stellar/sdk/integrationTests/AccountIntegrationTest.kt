@@ -82,7 +82,7 @@ class AccountIntegrationTest {
         }
 
         // Wait for account to be created
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
         val seqNum = accountA.sequenceNumber
@@ -127,7 +127,7 @@ class AccountIntegrationTest {
         assertNotNull(response.hash)
 
         // Wait for transaction to be processed
-        delay(3000)
+        realDelay(3000)
 
         // Verify account was updated
         val updatedAccountA = horizonServer.accounts().account(accountAId)
@@ -201,7 +201,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -229,7 +229,7 @@ class AccountIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         val accountC = horizonServer.accounts().account(accountCId)
 
@@ -256,7 +256,7 @@ class AccountIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Find accounts for asset
         val accountsForAsset = horizonServer.accounts()
@@ -312,7 +312,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountYId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Merge Y into X
         val accountMergeOp = AccountMergeOperation(destination = accountXId)
@@ -332,7 +332,7 @@ class AccountIntegrationTest {
         val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "AccountMerge transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify account Y no longer exists
         try {
@@ -385,7 +385,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountYId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create muxed accounts
         val muxedDestinationAccount = MuxedAccount(accountXId, 10120291UL)
@@ -410,7 +410,7 @@ class AccountIntegrationTest {
         val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "AccountMerge with muxed accounts should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify account Y no longer exists
         try {
@@ -457,7 +457,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val account = horizonServer.accounts().account(accountId)
         val startSequence = account.sequenceNumber
@@ -479,7 +479,7 @@ class AccountIntegrationTest {
         val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "BumpSequence transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify sequence number was bumped
         val updatedAccount = horizonServer.accounts().account(accountId)
@@ -517,7 +517,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val account = horizonServer.accounts().account(accountId)
 
@@ -542,7 +542,7 @@ class AccountIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageData set transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify data was set
         val updatedAccount = horizonServer.accounts().account(accountId)
@@ -570,7 +570,7 @@ class AccountIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageData delete transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify data was deleted
         val finalAccount = horizonServer.accounts().account(accountId)
@@ -624,7 +624,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val account = horizonServer.accounts().account(accountId)
 
@@ -649,7 +649,7 @@ class AccountIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageData transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Test the accountData endpoint
         val dataResponse = horizonServer.accounts().accountData(accountId, key)
@@ -676,7 +676,7 @@ class AccountIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Delete data transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify data retrieval fails
         try {
@@ -713,7 +713,7 @@ class AccountIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -741,7 +741,7 @@ class AccountIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Thread-safe counter for received events
         var count = 0
@@ -796,7 +796,7 @@ class AccountIntegrationTest {
                 }
             )
 
-        delay(3000)
+        realDelay(3000)
 
         try {
             // Submit first payment from B to A to trigger the stream
@@ -824,7 +824,7 @@ class AccountIntegrationTest {
             // Wait for stream to receive all events
             // Use real delay (not virtual time) since SSE stream runs on Dispatchers.Default
             withContext(Dispatchers.Default) {
-                delay(30000)
+                realDelay(30000)
             }
 
             // Verify count

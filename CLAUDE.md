@@ -14,7 +14,7 @@ This is a Kotlin Multiplatform (KMP) project for building a Stellar SDK. The SDK
 The SDK is **production-ready** with comprehensive functionality implemented:
 
 ### Platform Support
-- **JVM**: Android API 24+, Server applications (Java 11+)
+- **JVM**: Android API 24+, Server applications (Java 17+)
 - **iOS**: iOS 14.0+ (iosX64, iosArm64, iosSimulatorArm64)
 - **macOS**: macOS 11.0+ (macosX64, macosArm64)
 - **JavaScript**: Browser (WebAssembly) and Node.js 14+
@@ -29,7 +29,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-6 (Deposit and Withdrawal API), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-53 (Sign and Verify Messages)
 
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
@@ -89,6 +89,131 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
    - Proper cleanup in native code
 4. **Input Validation**: All inputs validated before crypto operations
 5. **Error Handling**: Comprehensive validation with clear error messages
+
+### SEP-5 Key Derivation (HD Wallets)
+
+The SDK implements SEP-5 (Key Derivation Methods for Stellar Keys) for hierarchical deterministic wallet support:
+
+#### Features
+- **BIP-39 Mnemonic**: Generation and validation (12, 15, 18, 21, 24 words)
+- **9 Languages**: English, Chinese (Simplified/Traditional), French, Italian, Japanese, Korean, Spanish, Malay
+- **SLIP-0010**: Ed25519 hierarchical key derivation
+- **Stellar Path**: `m/44'/148'/x'` (all hardened indices)
+- **Passphrase Support**: Optional BIP-39 passphrase for additional security
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep05/
+├── Mnemonic.kt              # High-level mnemonic and HD key derivation API
+├── MnemonicUtils.kt       # BIP-39 mnemonic operations
+├── WordList.kt            # 9 language word lists (2048 words each)
+├── MnemonicLanguage.kt    # Language enum
+├── MnemonicStrength.kt    # Word count/entropy enum
+├── MnemonicConstants.kt   # BIP-39/SLIP-0010 constants
+├── HexCodec.kt            # Hex encoding utilities
+├── crypto/                # Platform-specific crypto (PBKDF2, HMAC-SHA512, SHA-256)
+└── exceptions/            # SEP-5 specific exceptions
+```
+
+#### Usage Example
+```kotlin
+// Generate 24-word mnemonic phrase
+val phrase = Mnemonic.generate24WordsMnemonic()
+
+// Create Mnemonic instance from phrase
+val mnemonic = Mnemonic.from(phrase)
+
+// Derive multiple accounts
+val account0 = mnemonic.getKeyPair(index = 0)  // m/44'/148'/0'
+val account1 = mnemonic.getKeyPair(index = 1)  // m/44'/148'/1'
+
+// With passphrase
+val secureMnemonic = Mnemonic.from(phrase, passphrase = "secret")
+
+// Cleanup
+mnemonic.close()
+secureMnemonic.close()
+```
+
+#### Security Features
+- CSPRNG for entropy generation (SecureRandom/randombytes_buf/crypto.getRandomValues)
+- O(1) HashMap word lookup (timing attack mitigation)
+- Constant-time checksum comparison
+- NFKD normalization for mnemonic and passphrase
+- Memory cleanup (entropy zeroed after use, close() zeros seed)
+- PBKDF2-HMAC-SHA512 with 2048 iterations
+
+### SEP-2 Federation Protocol
+
+The SDK implements SEP-2 (Federation Protocol) for resolving human-readable Stellar addresses to account IDs.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep02/
+├── FederationService.kt              # Federation service client (fromDomain, 4 query methods)
+├── FederationResponse.kt             # Federation response data class
+└── exceptions/
+    ├── Sep02Exception.kt                    # Base exception
+    ├── Sep02InvalidAddressException.kt      # Invalid stellar address format
+    ├── Sep02FederationNotFoundException.kt  # No federation server in stellar.toml
+    └── Sep02InvalidResponseException.kt     # Malformed server response
+```
+
+#### Usage Example
+```kotlin
+// Resolve a stellar address
+val response = FederationService.resolveStellarAddress("bob*stellar.org")
+println("Account: ${response.accountId}")
+println("Memo: ${response.memo} (${response.memoType})")
+
+// Create service for a specific domain
+val service = FederationService.fromDomain("stellar.org")
+val result = service.resolveAccountId("GABC...")
+```
+
+### SEP-8 Regulated Assets
+
+The SDK implements SEP-8 (Regulated Assets) for assets requiring issuer approval before transactions can be submitted.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep08/
+├── Sep08Service.kt                    # Service client (fromDomain, postTransaction, postAction)
+├── Sep08PostTransactionResponse.kt    # Sealed class: Success, Revised, Pending, ActionRequired, Rejected
+├── Sep08PostActionResponse.kt         # Sealed class: Done, NextUrl
+├── RegulatedAsset.kt                  # Regulated asset with approval server URL
+└── exceptions/
+    ├── Sep08Exception.kt                          # Base exception
+    ├── Sep08IncompleteInitDataException.kt        # Missing network/Horizon config
+    ├── Sep08InvalidTransactionResponseException.kt # Malformed approval server response
+    └── Sep08InvalidActionResponseException.kt     # Malformed action URL response
+```
+
+### SEP-30 Account Recovery
+
+The SDK implements SEP-30 (Account Recovery) for multi-party recovery of Stellar accounts using alternative authentication methods.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep30/
+├── Sep30Service.kt                    # Service client (registerAccount, updateIdentitiesForAccount, signTransaction, accountDetails, deleteAccount, accounts)
+├── Sep30Request.kt                    # Registration/update request with identities
+├── Sep30RequestIdentity.kt            # Identity with role and auth methods
+├── Sep30AuthMethod.kt                 # Authentication method (email, phone, stellar_address)
+├── Sep30AccountResponse.kt            # Account response with address, identities, signers
+├── Sep30AccountsResponse.kt           # List accounts response
+├── Sep30SignatureResponse.kt          # Transaction signature response
+├── Sep30ResponseIdentity.kt           # Response identity with role and authenticated flag
+├── Sep30ResponseSigner.kt             # Response signer with key
+└── exceptions/
+    ├── Sep30Exception.kt                      # Base exception
+    ├── Sep30BadRequestException.kt            # HTTP 400
+    ├── Sep30UnauthorizedException.kt          # HTTP 401
+    ├── Sep30NotFoundException.kt              # HTTP 404
+    ├── Sep30ConflictException.kt              # HTTP 409
+    ├── Sep30UnknownResponseException.kt       # Other HTTP errors
+    └── Sep30InvalidResponseException.kt       # Malformed 200 responses
+```
 
 ## Documentation Standards
 
@@ -188,73 +313,52 @@ MainScope().launch {
 
 ### Testing
 - **Run all tests**: `./gradlew test`
+- **Run all tests (unit only, no integration)**: `./gradlew test -PexcludeIntegrationTests`
 - **Run JVM tests**: `./gradlew jvmTest`
+- **Run JVM unit tests only**: `./gradlew jvmTest -PexcludeIntegrationTests`
 - **Run single test class**: `./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest"`
 - **Run single test method**: `./gradlew :stellar-sdk:jvmTest --tests "KeyPairTest.testRandomKeyPair"`
 - **Run tests with pattern**: `./gradlew :stellar-sdk:jvmTest --tests "*Key*"`
 - **Run JS tests (Browser)**: `./gradlew jsBrowserTest` (requires Chrome)
-- **Run JS tests (Node.js)**:
-  - Individual test class: `./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"`
+- **Run JS tests (Node.js)**: `./gradlew :stellar-sdk:jsNodeTest`
+  - Single test class: `./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"`
   - Pattern matching: `./gradlew :stellar-sdk:jsNodeTest --tests "*Key*"`
-  - **Note**: Running all Node.js tests together currently hangs (see JS Testing Notes below)
 - **Run macOS tests**: `./gradlew macosArm64Test` or `./gradlew macosX64Test`
-- **Run iOS Simulator tests**: `./gradlew iosSimulatorArm64Test` or `./gradlew iosX64Test`
+- **Run iOS Simulator tests**: `./gradlew iosSimulatorArm64Test` (unit tests only — see note below)
 
 #### JS Testing Notes
 
-**Current Status**: Individual test classes work perfectly on both Node.js and Browser, but running all tests together fails.
+JS Node and JS Browser tests all pass. Browser tests require Chrome to be installed. Karma configuration and WASM file serving are handled automatically by the Gradle build config — no manual setup needed.
 
-**Working Approach**:
-```bash
-# Node.js - Run specific test classes
-./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"
-./gradlew :stellar-sdk:jsNodeTest --tests "StrKeyTest"
+#### iOS Simulator Limitation
 
-# Browser - Run specific test classes
-./gradlew :stellar-sdk:jsBrowserTest --tests "KeyPairTest"
-./gradlew :stellar-sdk:jsBrowserTest --tests "StrKeyTest"
-
-# Or use patterns
-./gradlew :stellar-sdk:jsNodeTest --tests "*Test"
-./gradlew :stellar-sdk:jsBrowserTest --tests "*Test"
-```
-
-**Why This Happens**:
-- ✅ Libsodium initialization works correctly
-- ✅ Individual async tests pass (including crypto tests)
-- ✅ NODE_PATH and Karma are properly configured
-- ⚠️ Running all tests in a single bundle causes failures (likely Kotlin/JS test bundling issue)
-- **Node.js**: Tests hang (Kotlin/JS + Mocha interaction)
-- **Browser**: Webpack fails with crypto module errors when bundling all tests
-
-**Investigation Done**:
-- Attempted Mocha `--no-parallel` configuration for Node.js
-- Added webpack fallback configuration for browser (helps but doesn't fully resolve)
-- Tried `.mocharc.js` with sequential settings
-- Confirmed not a timeout issue (individual tests complete quickly)
-- Root cause appears to be test bundling/compilation interaction in Kotlin/JS plugin
-
-**Recommendation**: Use test filtering (common pattern for large test suites) or run test classes individually in CI/CD. This is a Kotlin/JS tooling limitation, not an SDK issue - the web sample app proves browser compatibility works perfectly.
+iOS simulator integration tests are currently skipped. The simulator does not trust the Sectigo root CA used by Stellar's servers (`NSURLErrorDomain Code=-1202`), causing all network-dependent tests to fail. Unit tests (3983) pass fine. Run iOS simulator tests with `-PexcludeIntegrationTests`. Integration tests are validated on macOS native, JVM, and JS Node.
 
 #### Integration Tests
 
 The SDK includes comprehensive integration tests that validate against a live Stellar Testnet:
 
-- **Location**: `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/ContractClientIntegrationTest.kt`
-- **Documentation**: See `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/contract/INTEGRATION_TESTS_README.md` for detailed setup
-- **Status**: Integration tests are NOT ignored and always run with testnet connectivity (accounts are automatically funded by Friendbot)
-- **Coverage**: ContractClient, AssembledTransaction, authorization, state restoration, error handling, polling, custom result parsing
-- **Run tests**:
+- **Location**: `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/`
+- **Status**: Integration tests run by default when executing tests locally. In CI, they are excluded via `-PexcludeIntegrationTests`.
+- **Coverage**: Accounts, payments, sponsorships, claimable balances, clawback, fee bumps, ContractClient, AssembledTransaction, authorization, state restoration, and more.
+- **Funding**: Test accounts are automatically funded via Friendbot (no manual setup needed).
+- **Timing**: Use `realDelay()` instead of `delay()` in integration tests — `runTest` uses virtual time, so `delay()` completes instantly and won't actually wait for network operations.
+- **Run all tests (including integration)**:
   ```bash
-  ./gradlew :stellar-sdk:jvmTest --tests "ContractClientIntegrationTest"
+  ./gradlew :stellar-sdk:jvmTest
+  ```
+- **Run unit tests only (exclude integration tests)**:
+  ```bash
+  ./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests
   ```
 
-**Prerequisites**:
-- Testnet connectivity to `https://soroban-testnet.stellar.org:443`
-- Test accounts are automatically funded via Friendbot
-- Pre-deployed contract (contract ID provided in tests)
+#### CI Workflow
 
-**Duration**: 3-5 minutes for full suite (network latency dependent)
+The GitHub Actions CI uses `-PexcludeIntegrationTests` on all jobs (integration tests require testnet connectivity):
+
+- **JVM unit tests**: Runs on push to `main` and PRs to `main`. Matrix across JDK 17, 21, and 25. Code coverage collected on JDK 25.
+- **JS Node unit tests**: Runs on push to `main` and PRs to `main` (Ubuntu runner).
+- **macOS native unit tests**: Runs on PRs to `main` only (macOS runner — restricted to PRs to save runner minutes).
 
 ### Demo Apps
 

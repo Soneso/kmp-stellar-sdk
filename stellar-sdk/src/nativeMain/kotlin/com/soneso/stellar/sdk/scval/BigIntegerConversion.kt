@@ -1,24 +1,18 @@
 package com.soneso.stellar.sdk.scval
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import com.ionspin.kotlin.bignum.integer.Sign
+import com.ionspin.kotlin.bignum.integer.util.fromTwosComplementByteArray
+import com.ionspin.kotlin.bignum.integer.util.toTwosComplementByteArray
 
 /**
- * Native (iOS/macOS) implementation using manual two's complement conversion.
+ * Native (iOS/macOS) implementation using ionspin's two's complement conversion utilities.
  *
  * Same approach as JS since native platforms don't have Java's BigInteger.
+ * Uses ionspin's built-in [toTwosComplementByteArray] / [fromTwosComplementByteArray]
+ * which correctly handle sign encoding in the byte representation.
  */
 internal actual fun bytesToBigIntegerSigned(bytes: ByteArray): BigInteger {
-    // Same implementation as JS
-    val isNegative = (bytes[0].toInt() and 0x80) != 0
-
-    return if (isNegative) {
-        val inverted = bytes.map { (it.toInt().inv() and 0xFF).toByte() }.toByteArray()
-        val magnitude = BigInteger.fromByteArray(inverted, Sign.POSITIVE) + BigInteger.ONE
-        -magnitude
-    } else {
-        BigInteger.fromByteArray(bytes, Sign.POSITIVE)
-    }
+    return BigInteger.fromTwosComplementByteArray(bytes)
 }
 
 /**
@@ -28,17 +22,20 @@ internal actual fun bigIntegerToBytesSigned(
     value: BigInteger,
     byteCount: Int
 ): ByteArray {
-    // Same implementation as JS
-    val bytes = value.toByteArray()
+    val twosComplementBytes = value.toTwosComplementByteArray()
     val paddedBytes = ByteArray(byteCount)
+    val fillByte: Byte = if (value.signum() < 0) 0xFF.toByte() else 0x00
 
-    if (value.signum() >= 0) {
-        val numBytesToCopy = minOf(bytes.size, byteCount)
-        val copyStartIndex = bytes.size - numBytesToCopy
-        bytes.copyInto(paddedBytes, byteCount - numBytesToCopy, copyStartIndex, bytes.size)
+    if (twosComplementBytes.size <= byteCount) {
+        // Pad with sign extension bytes on the left
+        paddedBytes.fill(fillByte, 0, byteCount - twosComplementBytes.size)
+        twosComplementBytes.copyInto(paddedBytes, byteCount - twosComplementBytes.size)
     } else {
-        paddedBytes.fill(0xFF.toByte(), 0, byteCount - bytes.size)
-        bytes.copyInto(paddedBytes, byteCount - bytes.size, 0, bytes.size)
+        // Trim excess sign extension bytes from the left
+        twosComplementBytes.copyInto(
+            paddedBytes, 0,
+            twosComplementBytes.size - byteCount, twosComplementBytes.size
+        )
     }
 
     return paddedBytes

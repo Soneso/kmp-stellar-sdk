@@ -3,7 +3,6 @@ package com.soneso.stellar.sdk.integrationTests
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.xdr.AccountFlagsXdr
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -116,7 +115,7 @@ class TrustIntegrationTest {
             FriendBot.fundFuturenetAccount(trustorAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create issuer account
         val trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -139,7 +138,7 @@ class TrustIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset ASTRO (AlphaNum12)
         val assetCode = "ASTRO"
@@ -167,7 +166,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust create transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify trustline appears in balances with correct limit
         trustorAccountReloaded = horizonServer.accounts().account(trustorAccountId)
@@ -203,7 +202,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust update transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify updated limit
         trustorAccountReloaded = horizonServer.accounts().account(trustorAccountId)
@@ -239,7 +238,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust delete transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify trustline no longer exists
         trustorAccountReloaded = horizonServer.accounts().account(trustorAccountId)
@@ -304,7 +303,7 @@ class TrustIntegrationTest {
             FriendBot.fundFuturenetAccount(trustingAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset IOM (AlphaNum4)
         val myAsset = AssetTypeCreditAlphaNum4("IOM", issuerAccountId)
@@ -332,7 +331,7 @@ class TrustIntegrationTest {
         val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust with max limit should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify trustline was created
         val trustingAccountReloaded = horizonServer.accounts().account(trustingAccountId)
@@ -412,7 +411,7 @@ class TrustIntegrationTest {
             FriendBot.fundFuturenetAccount(trustorAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset ASTRO (AlphaNum12)
         val assetCode = "ASTRO"
@@ -438,7 +437,7 @@ class TrustIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetOptions transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Trustor creates trustline to ASTRO
         var trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -461,7 +460,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify trustline exists
         trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -505,7 +504,7 @@ class TrustIntegrationTest {
                       "Should fail with op_not_authorized")
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Authorize trustline using SetTrustlineFlags
         issuerAccount = horizonServer.accounts().account(issuerAccountId)
@@ -529,7 +528,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetTrustlineFlags authorize should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Now payment should succeed
         issuerAccount = horizonServer.accounts().account(issuerAccountId)
@@ -553,7 +552,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment should succeed after authorization")
 
-        delay(3000)
+        realDelay(3000)
 
         // Trustor creates passive sell offer
         trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -578,7 +577,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreatePassiveSellOffer should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer exists
         var offersPage = horizonServer.offers().forAccount(trustorAccountId).execute()
@@ -606,7 +605,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetTrustlineFlags deauthorize should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer was deleted (deauthorization deletes offers)
         offersPage = horizonServer.offers().forAccount(trustorAccountId).execute()
@@ -646,7 +645,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetTrustlineFlags re-authorize should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create offer again
         trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -671,7 +670,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreatePassiveSellOffer should succeed after re-authorization")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer exists
         offersPage = horizonServer.offers().forAccount(trustorAccountId).execute()
@@ -700,7 +699,7 @@ class TrustIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetTrustlineFlags maintain liabilities should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer still exists (maintain liabilities allows existing offers)
         offersPage = horizonServer.offers().forAccount(trustorAccountId).execute()
@@ -737,7 +736,7 @@ class TrustIntegrationTest {
                       "Should fail with op_not_authorized")
         }
 
-        delay(3000)
+        realDelay(3000)
 
 //         // Verify operations and effects can be parsed
 //         val trustorOperationsPage = horizonServer.operations().forAccount(trustorAccountId).execute()

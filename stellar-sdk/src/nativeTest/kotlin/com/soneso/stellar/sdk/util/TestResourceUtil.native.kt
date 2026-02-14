@@ -22,14 +22,23 @@ actual object TestResourceUtil {
      * @throws IllegalArgumentException if the file cannot be found or read
      */
     actual fun readWasmFile(filename: String): ByteArray {
-        // Try multiple possible paths (relative to different build/execution contexts)
-        val paths = listOf(
+        // Use PROJECT_DIR env var (set by Gradle) for absolute path resolution.
+        // This is needed because iOS simulator runs from a different CWD
+        // inside CoreSimulator, where relative paths don't work.
+        val projectDir = getenv("PROJECT_DIR")?.toKString()
+
+        val paths = mutableListOf<String>()
+
+        // Absolute path via PROJECT_DIR (works regardless of CWD)
+        if (projectDir != null) {
+            paths.add("$projectDir/src/commonTest/resources/wasm/$filename")
+        }
+
+        // Relative paths (work when CWD is the project or repo root)
+        paths.addAll(listOf(
             "src/commonTest/resources/wasm/$filename",
-            "../src/commonTest/resources/wasm/$filename",
-            "../../src/commonTest/resources/wasm/$filename",
-            "../../../src/commonTest/resources/wasm/$filename",
             "stellar-sdk/src/commonTest/resources/wasm/$filename"
-        )
+        ))
 
         for (path in paths) {
             try {
@@ -68,7 +77,7 @@ actual object TestResourceUtil {
 
         throw IllegalArgumentException(
             "WASM file not found in any expected location: '$filename'. " +
-            "Searched paths: ${paths.joinToString(", ")}"
+            "PROJECT_DIR: $projectDir. Searched paths: ${paths.joinToString(", ")}"
         )
     }
 }

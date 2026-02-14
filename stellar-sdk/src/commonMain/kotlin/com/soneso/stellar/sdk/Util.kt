@@ -23,7 +23,7 @@ object Util {
      * @return The SDK version string (e.g., "1.0.0")
      */
     fun getSdkVersion(): String {
-        return "1.0.0"
+        return "1.3.0"
     }
 
     /**
@@ -251,3 +251,18 @@ object Util {
  * @return Current time in milliseconds
  */
 internal expect fun currentTimeMillis(): Long
+
+/**
+ * Suspends for the specified time using a real wall-clock delay.
+ *
+ * On JVM, this uses [Thread.sleep] via [Dispatchers.IO] to bypass coroutine virtual time.
+ * On JS, this uses `setTimeout` via a [Promise] to bypass the coroutine test scheduler.
+ * On Native, this uses [platform.posix.usleep] to ensure real-time delay.
+ *
+ * This is necessary because [kotlinx.coroutines.delay] can be skipped by
+ * [kotlinx.coroutines.test.runTest]'s virtual time scheduler, which breaks
+ * polling loops that need to wait for real network responses.
+ *
+ * @param timeMillis The delay duration in milliseconds
+ */
+internal expect suspend fun platformDelay(timeMillis: Long)

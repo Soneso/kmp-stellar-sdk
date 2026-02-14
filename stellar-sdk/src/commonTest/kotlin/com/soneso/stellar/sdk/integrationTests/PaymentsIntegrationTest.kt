@@ -73,7 +73,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -96,7 +96,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send 100 XLM native payment from A to C
         val accountAReloaded = horizonServer.accounts().account(accountAId)
@@ -114,7 +114,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify account C balance
         val accountC = horizonServer.accounts().account(accountCId)
@@ -175,7 +175,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -198,7 +198,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Get current ledger from Horizon to calculate safe maxLedger
         val root = horizonServer.root().execute()
@@ -211,7 +211,7 @@ class PaymentsIntegrationTest {
             ledgerBounds = LedgerBounds(minLedger = 0, maxLedger = maxLedger)
         )
 
-        delay(1000)
+        realDelay(1000)
 
         // Send 100 XLM native payment from A to C with preconditions
         val accountAReloaded = horizonServer.accounts().account(accountAId)
@@ -232,7 +232,7 @@ class PaymentsIntegrationTest {
         val hash = response.hash
         assertNotNull(hash, "Transaction hash should not be null")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify preconditions were stored
         val trx = horizonServer.transactions().transaction(hash)
@@ -303,7 +303,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -326,7 +326,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create muxed accounts
         val muxedDestinationAccount = MuxedAccount(accountCId, 10120291UL)
@@ -358,7 +358,7 @@ class PaymentsIntegrationTest {
         val transactionHash = response.hash
         assertNotNull(transactionHash)
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify account C balance
         val accountC = horizonServer.accounts().account(accountCId)
@@ -424,7 +424,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -447,7 +447,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount with custom fee should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send 100 XLM native payment from A to C
         val accountAReloaded = horizonServer.accounts().account(accountAId)
@@ -465,7 +465,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify account C balance
         val accountC = horizonServer.accounts().account(accountCId)
@@ -503,7 +503,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -527,7 +527,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         val accountAReloaded1 = horizonServer.accounts().account(accountAId)
         transaction = TransactionBuilder(
@@ -543,7 +543,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset IOM
         val iomAsset = AssetTypeCreditAlphaNum4("IOM", accountAId)
@@ -563,7 +563,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Create trustline from B to IOM
         val accountB = horizonServer.accounts().account(accountBId)
@@ -580,7 +580,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Send 100 IOM from A to C
         val accountAReloaded2 = horizonServer.accounts().account(accountAId)
@@ -597,7 +597,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment of IOM from A to C should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify C has IOM balance
         var accountCReloaded = horizonServer.accounts().account(accountCId)
@@ -626,7 +626,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment of IOM from C to B should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify B has IOM balance
         val accountBReloaded = horizonServer.accounts().account(accountBId)
@@ -671,7 +671,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -703,7 +703,7 @@ class PaymentsIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Create account B with muxed source
         val createBOp = CreateAccountOperation(destination = accountBId, startingBalance = "10")
@@ -723,7 +723,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset IOM
         val iomAsset = AssetTypeCreditAlphaNum4("IOM", accountAId)
@@ -746,7 +746,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Create trustline from B to IOM with muxed account
         val changeTrustBOp = ChangeTrustOperation(asset = iomAsset, limit = "200999")
@@ -766,7 +766,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Send 100 IOM from A to C with muxed accounts
         val paymentOp1 = PaymentOperation(
@@ -790,7 +790,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify C has IOM balance
         var accountCReloaded = horizonServer.accounts().account(accountCId)
@@ -826,7 +826,7 @@ class PaymentsIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful)
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify B has IOM balance
         val accountBReloaded = horizonServer.accounts().account(accountBId)
@@ -862,7 +862,7 @@ class PaymentsIntegrationTest {
             FriendBot.fundFuturenetAccount(accountAId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val accountA = horizonServer.accounts().account(accountAId)
 

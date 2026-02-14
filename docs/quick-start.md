@@ -16,7 +16,7 @@ Add the SDK to your Gradle project:
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.0.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.3.0")
 }
 ```
 
@@ -24,7 +24,7 @@ dependencies {
 
 ### JVM/Android
 - Android: API 24+ (Android 7.0)
-- JVM: Java 11+
+- JVM: Java 17+
 
 ### iOS
 Add libsodium via Swift Package Manager:

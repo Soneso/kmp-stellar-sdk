@@ -93,7 +93,7 @@ All features demonstrate SDK usage directly - no wrappers, no simplified impleme
 |----------|--------------|-------------|-------|
 | Android  | Compose | API 24 (Android 7.0) | Fully tested |
 | iOS | Compose | iOS 14.0 | Requires Xcode 15+ |
-| Desktop (JVM) | Compose | Java 11+ | Runs on macOS, Windows, Linux |
+| Desktop (JVM) | Compose | Java 17+ | Runs on macOS, Windows, Linux |
 | Web | Compose | Modern browsers | Chrome 90+, Firefox 88+, Safari 15.4+ |
 | macOS Native | SwiftUI | macOS 11.0 | Alternative native app |
 

@@ -2,7 +2,6 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -111,7 +110,7 @@ class SponsorshipIntegrationTest {
             FriendBot.fundFuturenetAccount(masterAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val masterAccount = horizonServer.accounts().account(masterAccountId)
 
@@ -243,7 +242,7 @@ class SponsorshipIntegrationTest {
 
         println("Sponsorship transaction submitted: ${response.hash}")
 
-        delay(3000)
+        realDelay(3000)
 
         // 8. Verify account A was created and has the expected data
         val accountA = horizonServer.accounts().account(accountAId)

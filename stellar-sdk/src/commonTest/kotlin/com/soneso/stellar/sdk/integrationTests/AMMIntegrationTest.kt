@@ -6,7 +6,6 @@ import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.horizon.responses.operations.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -103,7 +102,7 @@ class AMMIntegrationTest {
             FriendBot.fundFuturenetAccount(assetBIssuerId)
         }
 
-        delay(5000)
+        realDelay(5000)
 
         // Create assets
         val assetA = AssetTypeCreditAlphaNum4("SDK", assetAIssuerId)
@@ -125,7 +124,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust operations should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send assets from issuers to test account
         val paymentOp1 = PaymentOperation(
@@ -158,7 +157,7 @@ class AMMIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment operations should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations and effects can be parsed
         val operationsPage = horizonServer.operations().forAccount(assetAIssuerId).execute()
@@ -207,7 +206,7 @@ class AMMIntegrationTest {
         val response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "ChangeTrust for pool share should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Query liquidity pool
         val poolsPage = horizonServer.liquidityPools()
@@ -289,7 +288,7 @@ class AMMIntegrationTest {
         val response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "ChangeTrust for pool share should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Query liquidity pool
         val poolsPage = horizonServer.liquidityPools()
@@ -343,7 +342,7 @@ class AMMIntegrationTest {
      * @return TestContext with pool deposits made
      */
     private suspend fun depositNonNative(context: TestContext): TestContext {
-        delay(3000)
+        realDelay(3000)
 
         val testAccountId = context.testAccountKeyPair.getAccountId()
         var testAccount = horizonServer.accounts().account(testAccountId)
@@ -377,7 +376,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "Liquidity pool deposit should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations and effects can be parsed
         val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
@@ -417,7 +416,7 @@ class AMMIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "Deposit with strkey-converted pool ID should succeed")
 
-            delay(3000)
+            realDelay(3000)
         }
 
         return context
@@ -448,7 +447,7 @@ class AMMIntegrationTest {
      * @return TestContext with pool deposits made
      */
     private suspend fun depositNative(context: TestContext): TestContext {
-        delay(3000)
+        realDelay(3000)
 
         val testAccountId = context.testAccountKeyPair.getAccountId()
         var testAccount = horizonServer.accounts().account(testAccountId)
@@ -482,7 +481,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "Liquidity pool deposit should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations and effects can be parsed
         val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
@@ -522,7 +521,7 @@ class AMMIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "Deposit with strkey-converted pool ID should succeed")
 
-            delay(3000)
+            realDelay(3000)
         }
 
         return context
@@ -553,7 +552,7 @@ class AMMIntegrationTest {
      * @return TestContext after withdrawal
      */
     private suspend fun withdrawNonNative(context: TestContext): TestContext {
-        delay(3000)
+        realDelay(3000)
 
         val testAccountId = context.testAccountKeyPair.getAccountId()
         var testAccount = horizonServer.accounts().account(testAccountId)
@@ -586,7 +585,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "Liquidity pool withdrawal should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations and effects can be parsed
         val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
@@ -625,7 +624,7 @@ class AMMIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "Withdrawal with strkey-converted pool ID should succeed")
 
-            delay(3000)
+            realDelay(3000)
         }
 
         return context
@@ -658,7 +657,7 @@ class AMMIntegrationTest {
      * @return TestContext after withdrawal
      */
     private suspend fun withdrawNative(context: TestContext): TestContext {
-        delay(3000)
+        realDelay(3000)
 
         val testAccountId = context.testAccountKeyPair.getAccountId()
         var testAccount = horizonServer.accounts().account(testAccountId)
@@ -691,7 +690,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(envelope)
         assertTrue(response.successful, "Liquidity pool withdrawal should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations and effects can be parsed
         val operationsPage = horizonServer.operations().forAccount(testAccountId).execute()
@@ -730,7 +729,7 @@ class AMMIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "Withdrawal with strkey-converted pool ID should succeed")
 
-            delay(3000)
+            realDelay(3000)
         }
 
         return context
@@ -783,7 +782,7 @@ class AMMIntegrationTest {
         val contextWithDeposit = depositNonNative(contextWithTrustline)
         val contextWithWithdrawal = withdrawNonNative(contextWithDeposit)
 
-        delay(5000)
+        realDelay(5000)
 
         // Query effects for liquidity pool
         val effectsPage = horizonServer.effects()
@@ -889,7 +888,7 @@ class AMMIntegrationTest {
             FriendBot.fundFuturenetAccount(accYId)
         }
 
-        delay(5000)
+        realDelay(5000)
 
         // Create trustlines for new accounts
         val changeTrustOp1 = ChangeTrustOperation(
@@ -920,7 +919,7 @@ class AMMIntegrationTest {
         var response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust operations should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send assetA to accX
         val paymentOp = PaymentOperation(
@@ -944,7 +943,7 @@ class AMMIntegrationTest {
         response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment operation should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Execute path payment strict send through liquidity pool
         val pathPaymentOp = PathPaymentStrictSendOperation(
@@ -969,7 +968,7 @@ class AMMIntegrationTest {
         response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Path payment should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Query trades for liquidity pool
         var tradesPage = horizonServer.trades()
@@ -1024,7 +1023,7 @@ class AMMIntegrationTest {
         val contextWithNonNative = createPoolShareTrustlineNonNative(context)
         val contextWithNative = createPoolShareTrustlineNative(contextWithNonNative)
 
-        delay(3000)
+        realDelay(3000)
 
         val testAccountId = contextWithNative.testAccountKeyPair.getAccountId()
 

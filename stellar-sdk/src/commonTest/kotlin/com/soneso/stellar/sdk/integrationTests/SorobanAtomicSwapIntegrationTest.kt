@@ -8,7 +8,6 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.*
@@ -172,7 +171,7 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 520-538)
      */
     @Test
-    fun testInstallContracts() = runTest(timeout = 300.seconds) {
+    fun testStep1InstallContracts() = runTest(timeout = 300.seconds) {
         // Given: Create and fund three test accounts
         val admin = KeyPair.random()
         val adminId = admin.getAccountId()
@@ -197,7 +196,7 @@ class SorobanAtomicSwapIntegrationTest {
         } else if (testOn == "futurenet") {
             FriendBot.fundFuturenetAccount(bobId)
         }
-        delay(5000) // Wait for account creation
+        realDelay(5000) // Wait for account creation
 
         // Store keypairs for later tests
         adminKeyPair = admin
@@ -209,13 +208,13 @@ class SorobanAtomicSwapIntegrationTest {
         println("Bob: $bobId")
 
         // When: Upload TokenA contract using SDK helper method
-        delay(5000)
+        realDelay(5000)
         val tokenAWasmId = installContract("soroban_token_contract.wasm")
         tokenAContractWasmId = tokenAWasmId
         println("TokenA WASM ID: $tokenAWasmId")
 
         // Extend TokenA contract code footprint TTL
-        delay(5000)
+        realDelay(5000)
         extendContractCodeFootprintTTL(tokenAWasmId, 100000)
 
         // Verify TokenB contract info can be loaded
@@ -225,13 +224,13 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenAInfo.metaEntries.isNotEmpty(), "TokenA should have meta entries")
 
         // When: Upload TokenB contract using SDK helper method
-        delay(5000)
+        realDelay(5000)
         val tokenBWasmId = installContract("soroban_token_contract.wasm")
         tokenBContractWasmId = tokenBWasmId
         println("TokenB WASM ID: $tokenBWasmId")
 
         // Extend TokenB contract code footprint TTL
-        delay(5000)
+        realDelay(5000)
         extendContractCodeFootprintTTL(tokenBWasmId, 100000)
 
         // Verify TokenB contract info can be loaded
@@ -241,13 +240,13 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(tokenBInfo.metaEntries.isNotEmpty(), "TokenB should have meta entries")
 
         // When: Upload atomic swap contract using SDK helper method
-        delay(5000)
+        realDelay(5000)
         val swapWasmId = installContract("soroban_atomic_swap_contract.wasm")
         swapContractWasmId = swapWasmId
         println("Swap WASM ID: $swapWasmId")
 
         // Extend swap contract code footprint TTL
-        delay(5000)
+        realDelay(5000)
         extendContractCodeFootprintTTL(swapWasmId, 100000)
 
         // Verify swap contract info can be loaded
@@ -256,7 +255,7 @@ class SorobanAtomicSwapIntegrationTest {
         assertTrue(swapInfo.specEntries.isNotEmpty(), "Swap should have spec entries")
         assertTrue(swapInfo.metaEntries.isNotEmpty(), "Swap should have meta entries")
 
-        delay(5000) // Final wait for ledger to settle
+        realDelay(5000) // Final wait for ledger to settle
         println("All contracts installed successfully")
     }
 
@@ -264,7 +263,7 @@ class SorobanAtomicSwapIntegrationTest {
      * Tests creating (deploying) contract instances from uploaded WASMs.
      *
      * This test validates the contract deployment workflow:
-     * 1. Uses WASM IDs from testInstallContracts
+     * 1. Uses WASM IDs from testStep1InstallContracts
      * 2. Deploys TokenA contract instance with constructor args (admin, decimals, name, symbol) using SDK helper method
      * 3. Verifies TokenA contract info can be loaded
      * 4. Deploys TokenB contract instance with constructor args using SDK helper method
@@ -282,11 +281,11 @@ class SorobanAtomicSwapIntegrationTest {
      * **NOTE**: The new token contract is initialized in the constructor, NOT via a separate "initialize" call.
      * Constructor parameters: (admin: Address, decimal: u32, name: String, symbol: String)
      *
-     * This test depends on testInstallContracts having run first.
+     * This test depends on testStep1InstallContracts having run first.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testInstallContracts must run first (provides WASM IDs)
+     * - testStep1InstallContracts must run first (provides WASM IDs)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~60-90 seconds (includes three contract deployments)
@@ -295,15 +294,15 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 486-528)
      */
     @Test
-    fun testCreateContracts() = runTest(timeout = 180.seconds) {
-        // Given: Check that testInstallContracts has run
+    fun testStep2CreateContracts() = runTest(timeout = 180.seconds) {
+        // Given: Check that testStep1InstallContracts has run
         val tokenAWasmId = tokenAContractWasmId
         val tokenBWasmId = tokenBContractWasmId
         val swapWasmId = swapContractWasmId
         val admin = adminKeyPair
 
         if (tokenAWasmId == null || tokenBWasmId == null || swapWasmId == null || admin == null) {
-            println("Skipping testCreateContracts: testInstallContracts must run first")
+            println("Skipping testStep2CreateContracts: testStep1InstallContracts must run first")
             return@runTest
         }
 
@@ -318,13 +317,13 @@ class SorobanAtomicSwapIntegrationTest {
             Scv.toString("TokenA"), // name
             Scv.toString("TokenA")  // symbol
         )
-        delay(5000)
+        realDelay(5000)
         val tokenAId = createContract(tokenAWasmId, constructorArgs = tokenAConstructorArgs)
         tokenAContractId = tokenAId
         println("TokenA Contract ID: $tokenAId")
 
         // Verify TokenA contract info can be loaded
-        delay(5000)
+        realDelay(5000)
         val tokenAInfo = sorobanServer.loadContractInfoForContractId(tokenAId)
         assertNotNull(tokenAInfo, "TokenA contract info should be loaded")
         assertTrue(tokenAInfo.specEntries.isNotEmpty(), "TokenA should have spec entries")
@@ -337,32 +336,32 @@ class SorobanAtomicSwapIntegrationTest {
             Scv.toString("TokenB"), // name
             Scv.toString("TokenB")  // symbol
         )
-        delay(5000)
+        realDelay(5000)
         val tokenBId = createContract(tokenBWasmId, constructorArgs = tokenBConstructorArgs)
         tokenBContractId = tokenBId
         println("TokenB Contract ID: $tokenBId")
 
         // Verify TokenB contract info can be loaded
-        delay(5000)
+        realDelay(5000)
         val tokenBInfo = sorobanServer.loadContractInfoForContractId(tokenBId)
         assertNotNull(tokenBInfo, "TokenB contract info should be loaded")
         assertTrue(tokenBInfo.specEntries.isNotEmpty(), "TokenB should have spec entries")
         assertTrue(tokenBInfo.metaEntries.isNotEmpty(), "TokenB should have meta entries")
 
         // When: Deploy atomic swap contract (no constructor args) using SDK helper method
-        delay(5000)
+        realDelay(5000)
         val swapId = createContract(swapWasmId)
         swapContractId = swapId
         println("Swap Contract ID: $swapId")
 
         // Verify swap contract info can be loaded
-        delay(5000)
+        realDelay(5000)
         val swapInfo = sorobanServer.loadContractInfoForContractId(swapId)
         assertNotNull(swapInfo, "Swap contract info should be loaded")
         assertTrue(swapInfo.specEntries.isNotEmpty(), "Swap should have spec entries")
         assertTrue(swapInfo.metaEntries.isNotEmpty(), "Swap should have meta entries")
 
-        delay(5000) // Final wait for ledger to settle
+        realDelay(5000) // Final wait for ledger to settle
         println("All contracts created successfully")
     }
 
@@ -386,7 +385,7 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 560-563)
      */
     @Test
-    fun testRestoreFootprint() = runTest(timeout = 180.seconds) {
+    fun testStep3RestoreFootprint() = runTest(timeout = 180.seconds) {
         // Create and fund test account for restore operations
         val restoreAdmin = KeyPair.random()
         val restoreAdminId = restoreAdmin.getAccountId()
@@ -395,7 +394,7 @@ class SorobanAtomicSwapIntegrationTest {
         } else if (testOn == "futurenet") {
             FriendBot.fundFuturenetAccount(restoreAdminId)
         }
-        delay(5000) // Wait for account creation
+        realDelay(5000) // Wait for account creation
 
         // Temporarily set adminKeyPair for restore operations
         val originalAdminKeyPair = adminKeyPair
@@ -420,7 +419,7 @@ class SorobanAtomicSwapIntegrationTest {
      * Tests minting tokens to test accounts.
      *
      * This test validates the token minting workflow:
-     * 1. Uses contract IDs from testCreateContracts (tokens are now initialized in constructor)
+     * 1. Uses contract IDs from testStep2CreateContracts (tokens are now initialized in constructor)
      * 2. Mints 10,000,000,000,000 units of TokenA to Alice using SDK helper method
      * 3. Queries Alice's TokenA balance using SDK helper method
      * 4. Mints 10,000,000,000,000 units of TokenB to Bob using SDK helper method
@@ -432,14 +431,14 @@ class SorobanAtomicSwapIntegrationTest {
      * - Querying token balances using SDK helper methods
      * - Validating i128 return values
      *
-     * **NOTE**: Tokens are now initialized in the constructor during deployment (testCreateContracts),
+     * **NOTE**: Tokens are now initialized in the constructor during deployment (testStep2CreateContracts),
      * so there's no separate initialization step needed before minting.
      *
-     * This test depends on testCreateContracts having run first.
+     * This test depends on testStep2CreateContracts having run first.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testCreateContracts must run first (provides deployed and initialized tokens)
+     * - testStep2CreateContracts must run first (provides deployed and initialized tokens)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~60-90 seconds (includes minting and balance queries)
@@ -448,15 +447,15 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 535-546)
      */
     @Test
-    fun testMintTokens() = runTest(timeout = 150.seconds) {
-        // Given: Check that testCreateContracts has run
+    fun testStep4MintTokens() = runTest(timeout = 150.seconds) {
+        // Given: Check that testStep2CreateContracts has run
         val tokenAId = tokenAContractId
         val tokenBId = tokenBContractId
         val alice = aliceKeyPair
         val bob = bobKeyPair
 
         if (tokenAId == null || tokenBId == null || alice == null || bob == null) {
-            println("Skipping testMintTokens: testCreateContracts must run first")
+            println("Skipping testStep4MintTokens: testStep2CreateContracts must run first")
             return@runTest
         }
 
@@ -465,21 +464,21 @@ class SorobanAtomicSwapIntegrationTest {
 
         // When: Mint TokenA to Alice
         mint(tokenAId, aliceId, 10000000000000L)
-        delay(5000)
+        realDelay(5000)
 
         // When: Mint TokenB to Bob
         mint(tokenBId, bobId, 10000000000000L)
-        delay(5000)
+        realDelay(5000)
 
         // Then: Verify Alice's TokenA balance
         val aliceTokenABalance = balance(tokenAId, aliceId)
         assertEquals(10000000000000L, aliceTokenABalance, "Alice should have 10T TokenA")
-        delay(5000)
+        realDelay(5000)
 
         // Then: Verify Bob's TokenB balance
         val bobTokenBBalance = balance(tokenBId, bobId)
         assertEquals(10000000000000L, bobTokenBBalance, "Bob should have 10T TokenB")
-        delay(5000)
+        realDelay(5000)
 
         println("Tokens minted successfully - Alice: 10T TokenA, Bob: 10T TokenB")
     }
@@ -488,7 +487,7 @@ class SorobanAtomicSwapIntegrationTest {
      * Tests atomic swap execution between two parties.
      *
      * This test validates the complete atomic swap workflow:
-     * 1. Uses contract IDs from testCreateContracts
+     * 1. Uses contract IDs from testStep2CreateContracts
      * 2. Alice wants to swap 1000 TokenA for at least 4500 TokenB
      * 3. Bob wants to swap 5000 TokenB for at least 950 TokenA
      * 4. Admin submits the swap transaction using SDK helper method
@@ -512,11 +511,11 @@ class SorobanAtomicSwapIntegrationTest {
      * This is the most complex test, demonstrating real-world multi-party
      * smart contract interaction with proper authorization.
      *
-     * This test depends on testMintTokens having run first.
+     * This test depends on testStep4MintTokens having run first.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testMintTokens must run first (provides funded accounts)
+     * - testStep4MintTokens must run first (provides funded accounts)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~30-60 seconds (includes simulation, signing, submission)
@@ -525,7 +524,7 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 585-697)
      */
     @Test
-    fun testAtomicSwap() = runTest(timeout = 120.seconds) {
+    fun testStep5AtomicSwap() = runTest(timeout = 120.seconds) {
         // Given: Check that all previous tests have run
         val atomicSwapContractId = swapContractId
         val tokenACId = tokenAContractId
@@ -536,11 +535,11 @@ class SorobanAtomicSwapIntegrationTest {
 
         if (atomicSwapContractId == null || tokenACId == null || tokenBCId == null ||
             admin == null || aliceKp == null || bobKp == null) {
-            println("Skipping testAtomicSwap: previous tests must run first")
+            println("Skipping testStep5AtomicSwap: previous tests must run first")
             return@runTest
         }
 
-        delay(10000) // Extra delay before swap
+        realDelay(10000) // Extra delay before swap
 
         val swapSubmitterAccountId = admin.getAccountId()
         val aliceAccountId = aliceKp.getAccountId()
@@ -652,6 +651,11 @@ class SorobanAtomicSwapIntegrationTest {
             auth = signedAuthEntries
         )
 
+        // Reset account sequence number so the rebuilt transaction
+        // uses the same sequence as the simulated one (TransactionBuilder.build()
+        // increments the sequence number each time it's called).
+        account.setSequenceNumber(account.sequenceNumber - 1)
+
         // Rebuild transaction with signed operation
         val signedTransaction = TransactionBuilder(
             sourceAccount = account,
@@ -713,7 +717,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @return The WASM ID (hex string) of the uploaded contract
      */
     private suspend fun installContract(contractCodePath: String): String {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -791,7 +795,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @return The contract ID (strkey C... format) of the deployed contract
      */
     private suspend fun createContract(wasmId: String, constructorArgs: List<SCValXdr>? = null): String {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -869,7 +873,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @param amount The amount of tokens to mint
      */
     private suspend fun mint(contractId: String, toAccountId: String, amount: Long) {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -948,7 +952,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @return The token balance
      */
     private suspend fun balance(contractId: String, accountId: String): Long {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -1031,7 +1035,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @param contractCodePath The path to the WASM file in test resources
      */
     private suspend fun restoreContractFootprint(contractCodePath: String) {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -1147,7 +1151,7 @@ class SorobanAtomicSwapIntegrationTest {
      * @param extendTo The number of ledgers to extend the TTL by
      */
     private suspend fun extendContractCodeFootprintTTL(wasmId: String, extendTo: Int) {
-        delay(5000)
+        realDelay(5000)
 
         val admin = adminKeyPair!!
         val adminId = admin.getAccountId()
@@ -1195,7 +1199,7 @@ class SorobanAtomicSwapIntegrationTest {
         )
 
         // Reload account for current sequence number before rebuilding transaction
-        delay(3000)
+        realDelay(3000)
         account = sorobanServer.getAccount(adminId)
         assertNotNull(account, "Account should be reloaded")
 
@@ -1249,7 +1253,7 @@ class SorobanAtomicSwapIntegrationTest {
         )
 
         // Wait for Horizon to process
-        delay(5000)
+        realDelay(5000)
 
         // Check Horizon responses decoding
         val transactionResponse = horizonServer.transactions().transaction(sendResponse.hash)

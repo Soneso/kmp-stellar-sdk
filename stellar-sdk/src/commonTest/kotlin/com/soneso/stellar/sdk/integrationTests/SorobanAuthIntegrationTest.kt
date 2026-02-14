@@ -7,7 +7,6 @@ import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -76,12 +75,12 @@ class SorobanAuthIntegrationTest {
 
     companion object {
         /**
-         * Shared WASM ID from testUploadAuthContract, used by testCreateAuthContract.
+         * Shared WASM ID from testStep1UploadAuthContract, used by testStep2CreateAuthContract.
          */
         var authContractWasmId: String? = null
 
         /**
-         * Shared contract ID from testCreateAuthContract, used by invoke tests.
+         * Shared contract ID from testStep2CreateAuthContract, used by invoke tests.
          */
         var authContractId: String? = null
 
@@ -128,7 +127,7 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 232-280)
      */
     @Test
-    fun testUploadAuthContract() = runTest(timeout = 150.seconds) {
+    fun testStep1UploadAuthContract() = runTest(timeout = 150.seconds) {
         // Given: Create and fund two test accounts (submitter and invoker)
         val submitter = KeyPair.random()
         val submitterId = submitter.getAccountId()
@@ -143,7 +142,7 @@ class SorobanAuthIntegrationTest {
             FriendBot.fundFuturenetAccount(submitterId)
             FriendBot.fundFuturenetAccount(invokerId)
         }
-        delay(5000) // Wait for account creation
+        realDelay(5000) // Wait for account creation
 
         // Store keypairs for later tests
         submitterKeyPair = submitter
@@ -219,7 +218,7 @@ class SorobanAuthIntegrationTest {
      * Tests creating (deploying) the Soroban auth contract instance from an uploaded WASM.
      *
      * This test validates the contract deployment workflow for authorization contracts:
-     * 1. Uses the WASM ID from testUploadAuthContract
+     * 1. Uses the WASM ID from testStep1UploadAuthContract
      * 2. Creates a CreateContractHostFunction using SDK helper method
      * 3. Simulates the deployment transaction
      * 4. Applies authorization entries from simulation (auto-auth for contract creation)
@@ -233,11 +232,11 @@ class SorobanAuthIntegrationTest {
      * - Authorization entry handling (auto-auth from simulation)
      * - Contract ID extraction from transaction result
      *
-     * This test depends on testUploadAuthContract having run first to provide the WASM ID.
+     * This test depends on testStep1UploadAuthContract having run first to provide the WASM ID.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testUploadAuthContract must run first (provides WASM ID)
+     * - testStep1UploadAuthContract must run first (provides WASM ID)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~30-60 seconds (includes network delays and polling)
@@ -246,17 +245,17 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 282-326)
      */
     @Test
-    fun testCreateAuthContract() = runTest(timeout = 120.seconds) {
-        // Given: Check that testUploadAuthContract has run and provided a WASM ID
+    fun testStep2CreateAuthContract() = runTest(timeout = 120.seconds) {
+        // Given: Check that testStep1UploadAuthContract has run and provided a WASM ID
         val wasmId = authContractWasmId
         val submitter = submitterKeyPair
 
         if (wasmId == null || submitter == null) {
-            println("Skipping testCreateAuthContract: testUploadAuthContract must run first to provide WASM ID")
+            println("Skipping testStep2CreateAuthContract: testStep1UploadAuthContract must run first to provide WASM ID")
             return@runTest
         }
 
-        delay(5000) // Wait for network to settle
+        realDelay(5000) // Wait for network to settle
 
         // Reload account for current sequence number
         val submitterId = submitter.getAccountId()
@@ -352,8 +351,8 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 328-330, references lines 70-143)
      */
     @Test
-    fun testRestoreFootprint() = runTest(timeout = 120.seconds) {
-        delay(5000) // Wait between tests
+    fun testStep3RestoreFootprint() = runTest(timeout = 120.seconds) {
+        realDelay(5000) // Wait between tests
 
         // Given: Create and fund test account
         val keyPair = KeyPair.random()
@@ -365,7 +364,7 @@ class SorobanAuthIntegrationTest {
         } else if (testOn == "futurenet") {
             FriendBot.fundFuturenetAccount(accountId)
         }
-        delay(5000) // Wait for account creation
+        realDelay(5000) // Wait for account creation
 
         // Load account
         var account = sorobanServer.getAccount(accountId)
@@ -476,7 +475,7 @@ class SorobanAuthIntegrationTest {
      *
      * This test validates the complete authorization workflow when the transaction submitter
      * is different from the account being authorized to invoke the contract:
-     * 1. Uses the contract ID from testCreateAuthContract
+     * 1. Uses the contract ID from testStep2CreateAuthContract
      * 2. Builds an InvokeContract operation using SDK helper method
      * 3. Simulates the transaction to get authorization entries
      * 4. Gets the latest ledger to set signature expiration
@@ -496,11 +495,11 @@ class SorobanAuthIntegrationTest {
      * - Horizon API integration
      * - Using SDK helper method for contract invocation
      *
-     * This test depends on testCreateAuthContract having run first to provide the contract ID.
+     * This test depends on testStep2CreateAuthContract having run first to provide the contract ID.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testCreateAuthContract must run first (provides contract ID)
+     * - testStep2CreateAuthContract must run first (provides contract ID)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~30-60 seconds (includes network delays and polling)
@@ -509,18 +508,18 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 332-434)
      */
     @Test
-    fun testInvokeAuthAccount() = runTest(timeout = 120.seconds) {
-        // Given: Check that testCreateAuthContract has run and provided a contract ID
+    fun testStep4InvokeAuthAccount() = runTest(timeout = 120.seconds) {
+        // Given: Check that testStep2CreateAuthContract has run and provided a contract ID
         val contractId = authContractId
         val submitter = submitterKeyPair
         val invoker = invokerKeyPair
 
         if (contractId == null || submitter == null || invoker == null) {
-            println("Skipping testInvokeAuthAccount: testCreateAuthContract must run first to provide contract ID")
+            println("Skipping testStep4InvokeAuthAccount: testStep2CreateAuthContract must run first to provide contract ID")
             return@runTest
         }
 
-        delay(5000) // Wait for network to settle
+        realDelay(5000) // Wait for network to settle
 
         // Reload submitter account for sequence number
         val submitterId = submitter.getAccountId()
@@ -587,6 +586,11 @@ class SorobanAuthIntegrationTest {
             auth = signedAuthEntries
         )
 
+        // Reset account sequence number so the rebuilt transaction
+        // uses the same sequence as the simulated one (TransactionBuilder.build()
+        // increments the sequence number each time it's called).
+        account.setSequenceNumber(account.sequenceNumber - 1)
+
         // Rebuild transaction with signed operation
         val signedTransaction = TransactionBuilder(
             sourceAccount = account,
@@ -639,7 +643,7 @@ class SorobanAuthIntegrationTest {
         val resultValue = resVal.value.value
         println("Result: $resultValue")
 
-        delay(5000) // Wait for Horizon to process
+        realDelay(5000) // Wait for Horizon to process
 
         // Verify transaction can be parsed via Horizon
         val horizonTransaction = horizonServer.transactions().transaction(sendResponse.hash)
@@ -666,7 +670,7 @@ class SorobanAuthIntegrationTest {
      *
      * This test validates the auto-authorization workflow when the transaction submitter
      * is the same as the account being authorized to invoke the contract:
-     * 1. Uses the contract ID from testCreateAuthContract
+     * 1. Uses the contract ID from testStep2CreateAuthContract
      * 2. Builds an InvokeContract operation using SDK helper method
      * 3. Simulates the transaction to get authorization entries and transaction data
      * 4. Uses authorization entries directly from simulation (auto-auth)
@@ -681,11 +685,11 @@ class SorobanAuthIntegrationTest {
      * - Result value extraction and validation
      * - Using SDK helper method for contract invocation
      *
-     * This test depends on testCreateAuthContract having run first to provide the contract ID.
+     * This test depends on testStep2CreateAuthContract having run first to provide the contract ID.
      * If run independently, it will be skipped with an appropriate message.
      *
      * **Prerequisites**:
-     * - testCreateAuthContract must run first (provides contract ID)
+     * - testStep2CreateAuthContract must run first (provides contract ID)
      * - Network connectivity to Stellar testnet
      *
      * **Duration**: ~30-60 seconds (includes network delays and polling)
@@ -694,17 +698,17 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 436-494)
      */
     @Test
-    fun testInvokeAuthInvoker() = runTest(timeout = 120.seconds) {
-        // Given: Check that testCreateAuthContract has run and provided a contract ID
+    fun testStep5InvokeAuthInvoker() = runTest(timeout = 120.seconds) {
+        // Given: Check that testStep2CreateAuthContract has run and provided a contract ID
         val contractId = authContractId
         val invoker = invokerKeyPair
 
         if (contractId == null || invoker == null) {
-            println("Skipping testInvokeAuthInvoker: testCreateAuthContract must run first to provide contract ID")
+            println("Skipping testStep5InvokeAuthInvoker: testStep2CreateAuthContract must run first to provide contract ID")
             return@runTest
         }
 
-        delay(5000) // Wait for network to settle
+        realDelay(5000) // Wait for network to settle
 
         // Load invoker account for sequence number (invoker is also the submitter)
         val invokerId = invoker.getAccountId()
@@ -805,7 +809,7 @@ class SorobanAuthIntegrationTest {
      * @param extendTo The number of ledgers to extend the TTL by
      */
     private suspend fun extendContractCodeFootprintTTL(wasmId: String, extendTo: Int) {
-        delay(5000) // Wait between operations
+        realDelay(5000) // Wait between operations
 
         val submitter = submitterKeyPair!!
         val submitterId = submitter.getAccountId()

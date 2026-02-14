@@ -26,7 +26,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.delay
+import com.soneso.stellar.sdk.platformDelay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 import kotlin.uuid.ExperimentalUuidApi
@@ -596,7 +596,11 @@ class SorobanServer(
             attempts++
             if (attempts < maxAttempts) {
                 val sleepTime = sleepStrategy(attempts)
-                delay(sleepTime)
+                // Use platformDelay to ensure real wall-clock delay.
+                // Plain delay() is skipped by kotlinx.coroutines.test.runTest
+                // virtual time, and on JS Dispatchers.Default shares the same
+                // event loop so withContext(Dispatchers.Default) doesn't escape it.
+                platformDelay(sleepTime)
             }
         }
 

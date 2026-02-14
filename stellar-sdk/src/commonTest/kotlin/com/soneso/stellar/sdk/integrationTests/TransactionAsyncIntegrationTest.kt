@@ -4,7 +4,6 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse
 import com.soneso.stellar.sdk.horizon.exceptions.BadRequestException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -188,7 +187,7 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(5000) // Increased delay for account creation
+        realDelay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -232,7 +231,7 @@ class TransactionAsyncIntegrationTest {
         val maxAttempts = 10 // Increased to 10 attempts (50 seconds total)
 
         while (attempts < maxAttempts) {
-            delay(5000)
+            realDelay(5000)
             attempts++
 
             try {
@@ -317,7 +316,7 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(5000) // Increased delay for account creation
+        realDelay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -375,7 +374,7 @@ class TransactionAsyncIntegrationTest {
         val maxAttempts = 10 // Increased to 10 attempts (50 seconds total)
 
         while (attempts < maxAttempts) {
-            delay(5000)
+            realDelay(5000)
             attempts++
 
             try {
@@ -451,7 +450,7 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(5000) // Increased delay for account creation
+        realDelay(5000) // Increased delay for account creation
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -558,7 +557,7 @@ class TransactionAsyncIntegrationTest {
             FriendBot.fundFuturenetAccount(accountId)
         }
 
-        delay(5000) // Increased delay for account creation
+        realDelay(5000) // Increased delay for account creation
 
         // 2. Create Account with INVALID sequence number
         // This will cause the transaction to fail with tx_bad_seq

@@ -1,8 +1,9 @@
 # Stellar SDK for Kotlin Multiplatform
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-blueviolet?logo=kotlin)](https://kotlinlang.org/docs/multiplatform.html)
 [![Maven Central](https://img.shields.io/maven-central/v/com.soneso.stellar/stellar-sdk)](https://search.maven.org/artifact/com.soneso.stellar/stellar-sdk)
+[![codecov](https://codecov.io/gh/Soneso/kmp-stellar-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/Soneso/kmp-stellar-sdk)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Soneso/kmp-stellar-sdk)
 
 A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
@@ -63,7 +64,7 @@ The SDK provides comprehensive Stellar functionality:
 - **Soroban RPC Client** - Transaction simulation, event queries, ledger data, contract deployment and invocation
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
-- **SEP Support** - SEP-1 (stellar.toml), SEP-6 (Deposit and Withdrawal API), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts)
+- **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-53 (Sign and Verify Messages)
 
 ## Installation
 
@@ -72,7 +73,7 @@ Add the SDK as a Maven dependency (recommended for most projects):
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.0.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.3.0")
 }
 ```
 
@@ -296,7 +297,7 @@ See [Testing Guide](docs/testing.md) for information on running tests.
 
 - **Kotlin**: 2.2.20
 - **Gradle**: 9.0+
-- **JVM**: Java 11+
+- **JVM**: Java 17+
 - **Android**: API 24+ (Android 7.0)
 - **iOS**: iOS 14.0+
 - **macOS**: macOS 11.0+

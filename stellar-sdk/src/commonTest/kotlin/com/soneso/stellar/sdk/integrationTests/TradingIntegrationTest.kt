@@ -2,7 +2,6 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -101,7 +100,7 @@ class TradingIntegrationTest {
             FriendBot.fundFuturenetAccount(buyerAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create issuer account
         val buyerAccount = horizonServer.accounts().account(buyerAccountId)
@@ -124,7 +123,7 @@ class TradingIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create custom asset ASTRO
         val assetCode = "ASTRO"
@@ -151,7 +150,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create a buy offer: buying 100 ASTRO at price 0.5 XLM per ASTRO
         val amountBuying = "100"
@@ -180,7 +179,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageBuyOffer create transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer appears in account's offers
         var offersPage = horizonServer.offers().forAccount(buyerAccountId).execute()
@@ -285,7 +284,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageBuyOffer update transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify updated offer
         offersPage = horizonServer.offers().forAccount(buyerAccountId).execute()
@@ -353,7 +352,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageBuyOffer delete transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer no longer exists
         offersPage = horizonServer.offers().forAccount(buyerAccountId).execute()
@@ -416,7 +415,7 @@ class TradingIntegrationTest {
             FriendBot.fundFuturenetAccount(sellerAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)
@@ -439,7 +438,7 @@ class TradingIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Get issuer account
         val issuerAccount = horizonServer.accounts().account(issuerAccountId)
@@ -469,7 +468,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send MOON tokens from issuer to seller
         val issuerAccountReloaded = horizonServer.accounts().account(issuerAccountId)
@@ -493,7 +492,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create a sell offer: selling 100 MOON at price 0.5 XLM per MOON
         val amountSelling = "100"
@@ -522,7 +521,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer create transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer appears in account's offers
         var offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -624,7 +623,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer update transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify updated offer
         offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -670,7 +669,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer delete transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer no longer exists
         offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -719,7 +718,7 @@ class TradingIntegrationTest {
             FriendBot.fundFuturenetAccount(sellerAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)
@@ -742,7 +741,7 @@ class TradingIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Get issuer account
         val issuerAccount = horizonServer.accounts().account(issuerAccountId)
@@ -771,7 +770,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Send MARS tokens from issuer to seller
         val issuerAccountReloaded = horizonServer.accounts().account(issuerAccountId)
@@ -795,7 +794,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Create a passive sell offer: selling 100 MARS at price 0.5 XLM per MARS
         val amountSelling = "100"
@@ -823,7 +822,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreatePassiveSellOffer transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer appears in account's offers
         var offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -873,7 +872,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer update transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify updated offer
         offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -919,7 +918,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer delete transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify offer no longer exists
         offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -971,7 +970,7 @@ class TradingIntegrationTest {
             FriendBot.fundFuturenetAccount(buyerAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)
@@ -994,7 +993,7 @@ class TradingIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         val issuerAccount = horizonServer.accounts().account(issuerAccountId)
 
@@ -1023,7 +1022,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Seller ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Buyer establishes trustline
         val buyerAccount = horizonServer.accounts().account(buyerAccountId)
@@ -1046,7 +1045,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Buyer ChangeTrust transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Issuer sends asset to seller
         val issuerAccountReloaded = horizonServer.accounts().account(issuerAccountId)
@@ -1070,7 +1069,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Seller creates sell offer
         val amountSelling = "100"
@@ -1099,7 +1098,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageSellOffer create transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Get the offer ID
         val offersPage = horizonServer.offers().forAccount(sellerAccountId).execute()
@@ -1134,7 +1133,7 @@ class TradingIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "ManageBuyOffer transaction should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Now test the /offers/{offer_id}/trades endpoint
         val tradesPage = horizonServer.trades()

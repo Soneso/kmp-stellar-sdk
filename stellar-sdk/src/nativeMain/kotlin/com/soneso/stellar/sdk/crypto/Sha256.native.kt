@@ -27,20 +27,23 @@ internal class Sha256CryptoNative : Sha256Crypto {
     }
 
     override suspend fun hash(data: ByteArray): ByteArray {
-        require(data.isNotEmpty()) { "Data must not be empty" }
-
         return memScoped {
             // Allocate output buffer for 32-byte hash
             val output = allocArray<UByteVar>(32)
 
-            // Hash the data
-            data.usePinned { pinnedData ->
-                val result = crypto_hash_sha256(
-                    output,
-                    pinnedData.addressOf(0).reinterpret(),
-                    data.size.toULong()
-                )
+            // Hash the data (empty input is valid for SHA-256)
+            if (data.isEmpty()) {
+                val result = crypto_hash_sha256(output, null, 0u)
                 require(result == 0) { "SHA-256 hash failed" }
+            } else {
+                data.usePinned { pinnedData ->
+                    val result = crypto_hash_sha256(
+                        output,
+                        pinnedData.addressOf(0).reinterpret(),
+                        data.size.toULong()
+                    )
+                    require(result == 0) { "SHA-256 hash failed" }
+                }
             }
 
             // Convert to ByteArray

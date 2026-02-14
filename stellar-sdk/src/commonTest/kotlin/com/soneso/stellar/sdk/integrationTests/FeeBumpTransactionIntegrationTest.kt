@@ -99,7 +99,7 @@ class FeeBumpTransactionIntegrationTest {
             FriendBot.fundFuturenetAccount(payerId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // 2. Get source account details
         val sourceAccount = horizonServer.accounts().account(sourceId)
@@ -144,7 +144,7 @@ class FeeBumpTransactionIntegrationTest {
 
         println("Fee bump transaction submitted: ${response.hash}")
 
-        delay(3000)
+        realDelay(3000)
 
         // 9. Verify destination account was created with correct balance
         val destination = horizonServer.accounts().account(destinationId)
@@ -255,7 +255,7 @@ class FeeBumpTransactionIntegrationTest {
             FriendBot.fundFuturenetAccount(payerId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // 2. Create muxed accounts
         val muxedSourceAccount = MuxedAccount(sourceId, 97839283928292UL)
@@ -308,7 +308,7 @@ class FeeBumpTransactionIntegrationTest {
 
         println("Fee bump transaction submitted: ${response.hash}")
 
-        delay(3000)
+        realDelay(3000)
 
         // 10. Verify destination account was created with correct balance
         val destination = horizonServer.accounts().account(destinationId)

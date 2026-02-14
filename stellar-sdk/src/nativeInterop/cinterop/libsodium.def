@@ -13,15 +13,5 @@ linkerOpts.macosArm64 = -L/opt/homebrew/lib -L/usr/local/lib -lsodium
 compilerOpts.macosX64 = -I/opt/homebrew/include -I/usr/local/include
 linkerOpts.macosX64 = -L/opt/homebrew/lib -L/usr/local/lib -lsodium
 
-# iOS - Use bundled static libsodium (no external dependencies)
-compilerOpts.ios = -I/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/include
-linkerOpts.ios = /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/lib/libsodium.a
-
-compilerOpts.iosArm64 = -I/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/include
-linkerOpts.iosArm64 = /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/lib/libsodium.a
-
-compilerOpts.iosX64 = -I/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/include
-linkerOpts.iosX64 = /Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/lib/libsodium.a
-
-compilerOpts.iosSimulatorArm64 = -I/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/include
-linkerOpts.iosSimulatorArm64 = -Wl,-force_load,/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk/stellar-sdk/native-libs/libsodium-ios/lib/libsodium.a
+# iOS - compilerOpts and linkerOpts are configured in build.gradle.kts
+# using project.projectDir for portable paths (see cinterops and binaries blocks)

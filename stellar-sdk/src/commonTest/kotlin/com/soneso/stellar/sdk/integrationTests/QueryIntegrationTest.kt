@@ -88,7 +88,7 @@ class QueryIntegrationTest {
                 FriendBot.fundFuturenetAccount(accountId)
             }
 
-            delay(3000)
+            realDelay(3000)
 
             val account = horizonServer.accounts().account(accountId)
 
@@ -144,7 +144,7 @@ class QueryIntegrationTest {
             var response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
             assertTrue(response.successful, "CreateAccount transactions should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Add main account as signer to test accounts
             val updatedAccount = horizonServer.accounts().account(accountId)
@@ -176,7 +176,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
             assertTrue(response.successful, "SetOptions transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Verify accounts appear in forSigner query
             val accountsForSignerPage = horizonServer.accounts().forSigner(accountId).execute()
@@ -225,7 +225,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
             assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Verify accounts appear in forAsset query
             val accountsForAsset = horizonServer.accounts()
@@ -623,7 +623,7 @@ class QueryIntegrationTest {
                 FriendBot.fundFuturenetAccount(buyerAccountId)
             }
 
-            delay(3000)
+            realDelay(3000)
 
             val buyerAccount = horizonServer.accounts().account(buyerAccountId)
 
@@ -650,7 +650,7 @@ class QueryIntegrationTest {
             var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Create custom asset
             val assetCode = "ASTRO"
@@ -677,7 +677,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "ChangeTrust transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Create buy offer
             val amountBuying = "100"
@@ -705,7 +705,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "ManageBuyOffer transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Query offers for account
             val offers = horizonServer.offers().forSeller(buyerAccountId).execute()
@@ -815,7 +815,7 @@ class QueryIntegrationTest {
                 FriendBot.fundFuturenetAccount(accountAId)
             }
 
-            delay(3000)
+            realDelay(3000)
 
             val accountA = horizonServer.accounts().account(accountAId)
 
@@ -848,7 +848,7 @@ class QueryIntegrationTest {
             var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "CreateAccount transaction should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Create assets issued by A
             val iomAsset = AssetTypeCreditAlphaNum4("IOM", accountAId)
@@ -870,7 +870,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // Set up trustlines for B (IOM, ECO)
             val accountB = horizonServer.accounts().account(accountBId)
@@ -888,7 +888,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // Set up trustlines for D (ECO, MOON)
             val accountD = horizonServer.accounts().account(accountDId)
@@ -906,7 +906,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // Set up trustlines for E (MOON)
             val accountE = horizonServer.accounts().account(accountEId)
@@ -923,7 +923,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // Distribute assets from A
             val accountAForPayments = horizonServer.accounts().account(accountAId)
@@ -943,7 +943,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // B creates sell offer: ECO -> IOM
             val accountBForOffer = horizonServer.accounts().account(accountBId)
@@ -967,7 +967,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // D creates sell offer: MOON -> ECO
             val accountDForOffer = horizonServer.accounts().account(accountDId)
@@ -991,7 +991,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful)
 
-            delay(3000)
+            realDelay(3000)
 
             // Test strict send paths - should throw with destinationAssets but no destinationAccount
             var exceptionThrown = false
@@ -1009,7 +1009,7 @@ class QueryIntegrationTest {
             }
             // This might not throw in all implementations, so we just test the path
 
-            delay(3000)
+            realDelay(3000)
 
             // Query strict send paths
             val strictSendPaths = horizonServer.strictSendPaths()
@@ -1089,7 +1089,7 @@ class QueryIntegrationTest {
             response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             assertTrue(response.successful, "PathPaymentStrictSend should succeed")
 
-            delay(3000)
+            realDelay(3000)
 
             // Verify E received MOON
             var accountEUpdated = horizonServer.accounts().account(accountEId)
@@ -1140,7 +1140,7 @@ class QueryIntegrationTest {
                 }
                 // May or may not throw
 
-                delay(1000)
+                realDelay(1000)
 
                 // Query strict receive paths
                 val strictReceivePaths = horizonServer.strictReceivePaths()
@@ -1219,7 +1219,7 @@ class QueryIntegrationTest {
                 response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
                 assertTrue(response.successful, "PathPaymentStrictReceive should succeed")
 
-                delay(3000)
+                realDelay(3000)
 
                 // Verify E received more MOON
                 accountEUpdated = horizonServer.accounts().account(accountEId)
@@ -1262,7 +1262,7 @@ class QueryIntegrationTest {
                 assertEquals(4.0, trade2.baseAmount.toDouble(), 0.1, "Base amount should be 4")
 
                 // Wait for trade stream event
-                delay(10000)
+                realDelay(10000)
 
                 assertTrue(tradeExecuted, "Trade should have been streamed")
             } finally {

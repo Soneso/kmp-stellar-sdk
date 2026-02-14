@@ -10,6 +10,7 @@ This guide provides practical code examples for common Stellar SDK operations. E
   - [Creating Keypairs](#creating-keypairs)
   - [Loading an Account](#loading-an-account)
   - [Funding Testnet Accounts](#funding-testnet-accounts)
+  - [HD Wallets (SEP-5)](#hd-wallets-sep-5)
 - [Building Classic Transactions](#building-classic-transactions)
   - [Simple Payments](#simple-payments)
   - [Multi-Operation Transactions](#multi-operation-transactions)
@@ -105,6 +106,30 @@ if (success) {
 
 // For mainnet, use CreateAccountOperation instead (see Operations section)
 ```
+
+### HD Wallets (SEP-5)
+
+Generate multiple Stellar accounts from a single mnemonic phrase using BIP-39/SLIP-0010 key derivation.
+
+```kotlin
+import com.soneso.stellar.sdk.sep.sep05.Mnemonic
+
+// Generate a 24-word mnemonic (recommended for maximum security)
+val phrase = Mnemonic.generate24WordsMnemonic()
+
+// Create Mnemonic instance and derive accounts
+val mnemonic = Mnemonic.from(phrase)
+val account0 = mnemonic.getKeyPair(index = 0)  // Path: m/44'/148'/0'
+val account1 = mnemonic.getKeyPair(index = 1)  // Path: m/44'/148'/1'
+
+println("Account 0: ${account0.getAccountId()}")
+println("Account 1: ${account1.getAccountId()}")
+
+// Clean up when done (zeros internal seed)
+mnemonic.close()
+```
+
+For passphrase support, validation, multi-language support, and security best practices, see the [SEP-5 Documentation](sep/sep-05.md).
 
 ## Building Classic Transactions
 

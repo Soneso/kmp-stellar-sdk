@@ -24,7 +24,7 @@ You have three options for adding libsodium:
 
 1. In Xcode, go to File > Add Package Dependencies
 2. Enter the URL: `https://github.com/jedisct1/swift-libsodium`
-3. Select "Up to Next Major Version" with version 1.0.0
+3. Select "Up to Next Major Version" with version 1.2.0
 4. Click "Add Package"
 
 #### Option B: CocoaPods

@@ -89,7 +89,6 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
             val secretKey = UByteArray(SECRET_KEY_BYTES)
             val signature = UByteArray(SIGNATURE_BYTES)
             val seed = privateKey.asUByteArray()
-            val dataU = data.asUByteArray()
 
             seed.usePinned { seedPinned ->
                 publicKey.usePinned { pkPinned ->
@@ -105,26 +104,37 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
                             throw IllegalStateException("Failed to derive keypair from seed")
                         }
 
-                        // Sign the data
-                        dataU.usePinned { dataPinned ->
-                            signature.usePinned { sigPinned ->
-                                val signedLength = alloc<ULongVar>()
+                        // Sign the data (empty data is valid for Ed25519)
+                        signature.usePinned { sigPinned ->
+                            val signedLength = alloc<ULongVar>()
 
-                                val signResult = crypto_sign_detached(
+                            val signResult = if (data.isEmpty()) {
+                                crypto_sign_detached(
                                     sig = sigPinned.addressOf(0),
                                     siglen_p = signedLength.ptr,
-                                    m = dataPinned.addressOf(0),
-                                    mlen = data.size.toULong(),
+                                    m = null,
+                                    mlen = 0u,
                                     sk = skPinned.addressOf(0)
                                 )
-
-                                if (signResult != 0) {
-                                    throw IllegalStateException("Failed to sign data")
+                            } else {
+                                val dataU = data.asUByteArray()
+                                dataU.usePinned { dataPinned ->
+                                    crypto_sign_detached(
+                                        sig = sigPinned.addressOf(0),
+                                        siglen_p = signedLength.ptr,
+                                        m = dataPinned.addressOf(0),
+                                        mlen = data.size.toULong(),
+                                        sk = skPinned.addressOf(0)
+                                    )
                                 }
+                            }
 
-                                if (signedLength.value != SIGNATURE_BYTES.toULong()) {
-                                    throw IllegalStateException("Unexpected signature length: ${signedLength.value}")
-                                }
+                            if (signResult != 0) {
+                                throw IllegalStateException("Failed to sign data")
+                            }
+
+                            if (signedLength.value != SIGNATURE_BYTES.toULong()) {
+                                throw IllegalStateException("Unexpected signature length: ${signedLength.value}")
                             }
                         }
                     }
@@ -143,22 +153,32 @@ internal class NativeEd25519Crypto : Ed25519Crypto {
         require(signature.size == SIGNATURE_BYTES) { "Signature must be $SIGNATURE_BYTES bytes" }
 
         return memScoped {
-            val dataU = data.asUByteArray()
             val signatureU = signature.asUByteArray()
             val publicKeyU = publicKey.asUByteArray()
 
-            dataU.usePinned { dataPinned ->
-                signatureU.usePinned { sigPinned ->
-                    publicKeyU.usePinned { pkPinned ->
-                        val result = crypto_sign_verify_detached(
+            signatureU.usePinned { sigPinned ->
+                publicKeyU.usePinned { pkPinned ->
+                    // Empty data is valid for Ed25519
+                    val result = if (data.isEmpty()) {
+                        crypto_sign_verify_detached(
                             sig = sigPinned.addressOf(0),
-                            m = dataPinned.addressOf(0),
-                            mlen = data.size.toULong(),
+                            m = null,
+                            mlen = 0u,
                             pk = pkPinned.addressOf(0)
                         )
-
-                        result == 0
+                    } else {
+                        val dataU = data.asUByteArray()
+                        dataU.usePinned { dataPinned ->
+                            crypto_sign_verify_detached(
+                                sig = sigPinned.addressOf(0),
+                                m = dataPinned.addressOf(0),
+                                mlen = data.size.toULong(),
+                                pk = pkPinned.addressOf(0)
+                            )
+                        }
                     }
+
+                    result == 0
                 }
             }
         }

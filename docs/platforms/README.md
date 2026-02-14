@@ -13,7 +13,7 @@ Platform-specific setup instructions and considerations for the Stellar KMP SDK.
 
 | Platform | Minimum Version | Crypto Library | HTTP Client |
 |----------|----------------|----------------|-------------|
-| JVM | Java 11+ | BouncyCastle | Ktor CIO |
+| JVM | Java 17+ | BouncyCastle | Ktor CIO |
 | Android | API 24+ | BouncyCastle | Ktor CIO |
 | JavaScript | ES2015+ | libsodium.js | Ktor JS |
 | iOS | 14.0+ | libsodium | Ktor Darwin |

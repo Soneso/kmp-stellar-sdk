@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("org.jetbrains.dokka")
+    id("org.jetbrains.kotlinx.kover")
     id("maven-publish")
     id("signing")
 }
@@ -9,10 +10,16 @@ plugins {
 kotlin {
     jvm {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
+
+            // Exclude integration tests in CI (they require network access to Stellar Testnet)
+            // CI passes -PexcludeIntegrationTests; local/IDE runs include them by default
+            if (project.hasProperty("excludeIntegrationTests")) {
+                exclude("**/integrationTests/**")
+            }
 
             // Configure system properties for tests
             systemProperty("javax.net.ssl.trustStore", System.getProperty("javax.net.ssl.trustStore", ""))
@@ -47,6 +54,25 @@ kotlin {
         // Generate both library (for consumption) and executable (for tests)
         binaries.library()
         binaries.executable()
+    }
+
+    // Exclude integration tests from JS and Native test tasks in CI
+    // CI passes -PexcludeIntegrationTests; local/IDE runs include them by default
+    if (project.hasProperty("excludeIntegrationTests")) {
+        tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest> {
+            filter.excludeTestsMatching("com.soneso.stellar.sdk.integrationTests.*")
+        }
+        tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest> {
+            filter.excludeTestsMatching("com.soneso.stellar.sdk.integrationTests.*")
+        }
+    }
+
+    // Pass project directory to native tests so they can find test resources.
+    // iOS simulator runs from a different CWD (CoreSimulator sandbox), so relative paths fail.
+    // SIMCTL_CHILD_ prefix makes simctl forward the env var to the spawned process.
+    tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest> {
+        environment("PROJECT_DIR", project.projectDir.absolutePath)
+        environment("SIMCTL_CHILD_PROJECT_DIR", project.projectDir.absolutePath)
     }
 
     // Configure NODE_PATH for test environment
@@ -107,11 +133,27 @@ kotlin {
     }
 
     // Configure C interop for libsodium
+    val libsodiumIosDir = project.projectDir.resolve("native-libs/libsodium-ios")
     targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
         compilations.getByName("main") {
             cinterops {
                 val libsodium by creating {
                     defFile(project.file("src/nativeInterop/cinterop/libsodium.def"))
+                    // iOS targets: pass include path for header resolution
+                    if (konanTarget.family == org.jetbrains.kotlin.konan.target.Family.IOS) {
+                        compilerOpts("-I${libsodiumIosDir.resolve("include")}")
+                    }
+                }
+            }
+        }
+        // iOS targets: set linker opts on ALL binaries (framework, test, executable)
+        // Note: cinterop's linkerOpts() is silently ignored — linker opts must go here
+        if (konanTarget.family == org.jetbrains.kotlin.konan.target.Family.IOS) {
+            binaries.all {
+                if (konanTarget == org.jetbrains.kotlin.konan.target.KonanTarget.IOS_SIMULATOR_ARM64) {
+                    linkerOpts("-Wl,-force_load,${libsodiumIosDir.resolve("lib/libsodium.a")}")
+                } else {
+                    linkerOpts("${libsodiumIosDir.resolve("lib/libsodium.a")}")
                 }
             }
         }
@@ -221,6 +263,18 @@ kotlin {
 
         val macosX64Test by getting { dependsOn(macosTest) }
         val macosArm64Test by getting { dependsOn(macosTest) }
+    }
+}
+
+// Kover Code Coverage Configuration
+kover {
+    reports {
+        // Filter out integration test classes from coverage reports
+        filters {
+            excludes {
+                packages("com.soneso.stellar.sdk.integrationTests")
+            }
+        }
     }
 }
 

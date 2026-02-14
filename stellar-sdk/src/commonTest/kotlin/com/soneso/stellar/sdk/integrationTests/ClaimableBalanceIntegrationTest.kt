@@ -89,7 +89,7 @@ class ClaimableBalanceIntegrationTest {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         val sourceAccount = horizonServer.accounts().account(sourceAccountId)
 
@@ -148,7 +148,7 @@ class ClaimableBalanceIntegrationTest {
 
         println("CreateClaimableBalance transaction hash: ${response.hash}")
 
-        delay(3000)
+        realDelay(3000)
 
         // Query effects to find the claimable balance ID
         val effectsPage = horizonServer.effects()
@@ -217,7 +217,7 @@ class ClaimableBalanceIntegrationTest {
             FriendBot.fundFuturenetAccount(firstClaimantId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // Claim the claimable balance
         val claimClaimableBalanceOp = ClaimClaimableBalanceOperation(
@@ -246,7 +246,7 @@ class ClaimableBalanceIntegrationTest {
 
         println("ClaimClaimableBalance transaction hash: ${claimResponse.hash}")
 
-        delay(3000)
+        realDelay(3000)
 
         // Verify operations for claimant account
         val claimantOperationsPage = horizonServer.operations()

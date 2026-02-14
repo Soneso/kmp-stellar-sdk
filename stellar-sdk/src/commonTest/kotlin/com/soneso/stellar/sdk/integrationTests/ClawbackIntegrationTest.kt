@@ -88,7 +88,7 @@ class ClawbackIntegrationTest {
             FriendBot.fundFuturenetAccount(masterAccountId)
         }
 
-        delay(3000)
+        realDelay(3000)
 
         // 2. Create destination account
         val destinationAccountKeyPair = KeyPair.random()
@@ -118,7 +118,7 @@ class ClawbackIntegrationTest {
         var response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Create destination account should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // 3. Create SKY issuer account
         val skyIssuerAccountKeyPair = KeyPair.random()
@@ -148,7 +148,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Create SKY issuer account should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // 4. Enable clawback on issuer account
         val skyIssuerAccount = horizonServer.accounts().account(skyIssuerAccountId)
@@ -177,7 +177,7 @@ class ClawbackIntegrationTest {
 
         println("Clawback enabled on issuer account")
 
-        delay(3000)
+        realDelay(3000)
 
         // 5. Create SKY asset and establish trustline
         val assetCode = "SKY"
@@ -207,7 +207,7 @@ class ClawbackIntegrationTest {
 
         println("Destination account is trusting SKY")
 
-        delay(3000)
+        realDelay(3000)
 
         // 6. Send 100 SKY to destination
         val skyIssuerAccountReloaded = horizonServer.accounts().account(skyIssuerAccountId)
@@ -232,7 +232,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Payment should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // 7. Verify destination received SKY
         var destinationAccountUpdated = horizonServer.accounts().account(destinationAccountId)
@@ -272,7 +272,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Clawback should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // 9. Verify balance is reduced
         destinationAccountUpdated = horizonServer.accounts().account(destinationAccountId)
@@ -317,7 +317,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "Create claimant account should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Establish trustline for claimant
         val claimantAccount = horizonServer.accounts().account(claimantAccountId)
@@ -343,7 +343,7 @@ class ClawbackIntegrationTest {
 
         println("Claimant account is trusting SKY")
 
-        delay(3000)
+        realDelay(3000)
 
         // 11. Verify claimant trustline has clawback enabled
         val claimantAccountUpdated = horizonServer.accounts().account(claimantAccountId)
@@ -386,7 +386,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "CreateClaimableBalance should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // Query claimable balance
         val claimableBalances = horizonServer.claimableBalances()
@@ -420,7 +420,7 @@ class ClawbackIntegrationTest {
 
         println("Claimable balance clawed back")
 
-        delay(3000)
+        realDelay(3000)
 
         // 14. Verify claimable balance no longer exists
         val claimableBalancesAfter = horizonServer.claimableBalances()
@@ -474,7 +474,7 @@ class ClawbackIntegrationTest {
         response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
         assertTrue(response.successful, "SetTrustLineFlags should succeed")
 
-        delay(3000)
+        realDelay(3000)
 
         // 17. Verify TrustlineFlagsUpdatedEffect
         val effectsPageForFlags = horizonServer.effects()

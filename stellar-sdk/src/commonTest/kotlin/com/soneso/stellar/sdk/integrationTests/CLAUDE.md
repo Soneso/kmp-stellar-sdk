@@ -4,13 +4,13 @@ This file provides guidance for porting integration tests from the Flutter Stell
 
 ## Overview
 
-The Flutter Stellar SDK (`/Users/chris/projects/Stellar/stellar_flutter_sdk/test/`) contains comprehensive integration tests that should be ported to the KMP SDK to ensure feature parity. This document captures learnings from successful test ports.
+The Flutter Stellar SDK contains comprehensive integration tests that have been ported to the KMP SDK to ensure feature parity. This document captures learnings from successful test ports.
 
 ## Porting Process
 
 ### 1. Identify Source Test
 
-- **Location**: `/Users/chris/projects/Stellar/stellar_flutter_sdk/test/`
+- **Location**: Flutter Stellar SDK test directory (soneso/stellar_flutter_sdk repo)
 - **Common test files**:
   - `account_test.dart` - Account operations ✅ PORTED
   - `sponsorship_test.dart` - Sponsorship operations ✅ PORTED
@@ -46,7 +46,7 @@ fun testName() = runTest(timeout = 60.seconds) {
 
 ### 3. Create Test File
 
-- **Location**: `stellar-sdk/src/commonTest/kotlin/com/stellar/sdk/integrationTests/`
+- **Location**: `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/`
 - **Naming**: `[Feature]IntegrationTest.kt` (e.g., `AccountIntegrationTest.kt`)
 - **Do NOT add @Ignore** - Tests should run automatically with FriendBot funding
 
@@ -58,7 +58,7 @@ fun testName() = runTest(timeout = 60.seconds) {
 |---------|--------|
 | `async { }` | `runTest { }` or `suspend fun` |
 | `await someFunction()` | `someFunction()` (in suspend context) |
-| `Future.delayed(Duration(seconds: 3))` | `delay(3000)` |
+| `Future.delayed(Duration(seconds: 3))` | `realDelay(3000)` |
 | `Future<T>` | `suspend fun(): T` |
 
 ### Types
@@ -155,7 +155,7 @@ if (testOn == "testnet") {
     FriendBot.fundFuturenetAccount(accountId)
 }
 
-delay(3000) // Wait for account creation
+realDelay(3000) // Wait for account creation
 ```
 
 ### Pattern 2: Transaction Building
@@ -225,11 +225,22 @@ val stream = horizonServer.transactions()
 
 try {
     // Test logic
-    delay(30000) // Wait for events
+    realDelay(30000) // Wait for events
 } finally {
     stream.close()
 }
 ```
+
+### Why `realDelay()` Instead of `delay()`
+
+`runTest` uses **virtual time** — `delay()` completes instantly (time is skipped). This is great for unit tests but breaks integration tests that need to actually wait for network operations.
+
+`realDelay()` delegates to `platformDelay()`, which uses platform-native timing:
+- **JVM**: `Thread.sleep()`
+- **JS**: `setTimeout()` / `Promise`-based delay
+- **Native**: `Dispatchers.Default` coroutine delay
+
+Always use `realDelay()` in integration tests when you need real wall-clock waiting (e.g., after funding accounts, submitting transactions, waiting for ledger close).
 
 ## Critical Gotchas
 
@@ -281,13 +292,13 @@ private val network = if (testOn == "testnet") {
 ✅ **Correct**: `horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())`
 
 ### 8. Delays
-Always add delays after network operations:
+Always add `realDelay()` (not `delay()`) after network operations — `runTest` uses virtual time so `delay()` is skipped:
 ```kotlin
 FriendBot.fundTestnetAccount(accountId)
-delay(3000) // Wait for account creation
+realDelay(3000) // Wait for account creation
 
 horizonServer.submitTransaction(tx)
-delay(3000) // Wait for transaction processing
+realDelay(3000) // Wait for transaction processing
 ```
 
 ### 9. JSON Deserialization (for streaming)
@@ -315,10 +326,11 @@ data class TransactionResponse(
 ## Test Structure
 
 ```kotlin
-package com.stellar.sdk.integrationTests
+package com.soneso.stellar.sdk.integrationTests
 
-import com.stellar.sdk.*
-import com.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.integrationTests.realDelay
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -431,8 +443,8 @@ println("Sequence number: ${account.sequenceNumber}")
 - Look up accounts, transactions, operations
 
 ### 4. Common Failures
-- **Timeout**: Increase delay after operations
-- **404**: Account not funded yet, add longer delay
+- **Timeout**: Increase `realDelay()` after operations
+- **404**: Account not funded yet, add longer `realDelay()`
 - **Insufficient balance**: Check account has enough XLM
 - **Invalid sequence**: Reload account before building transaction
 - **Deserialization error**: Check response class has all fields (use `ignoreUnknownKeys = true`)
@@ -446,11 +458,11 @@ When porting a new integration test:
 - [ ] Verify KMP SDK has all required operations
 - [ ] Create test file in `integrationTests/` folder
 - [ ] Use `runTest(timeout = X.seconds)` for all tests
-- [ ] Add FriendBot funding with delays
+- [ ] Add FriendBot funding with `realDelay()` waits
 - [ ] Convert async/await to suspend functions
 - [ ] Update type mappings (BigInt → Long, etc.)
 - [ ] Convert assertions (assert → assertTrue/assertEquals)
-- [ ] Add delays after network operations (3+ seconds)
+- [ ] Add `realDelay()` after network operations (3+ seconds)
 - [ ] Test operations and effects parsing
 - [ ] Add descriptive test documentation
 - [ ] Do NOT add @Ignore annotation
@@ -460,9 +472,10 @@ When porting a new integration test:
 
 ## References
 
-- **Flutter SDK**: `/Users/chris/projects/Stellar/stellar_flutter_sdk/test/`
-- **Java SDK**: `/Users/chris/projects/Stellar/java-stellar-sdk` (reference implementation)
-- **KMP SDK**: `/Users/chris/projects/Stellar/kmp/kmp-stellar-sdk`
+- **Flutter SDK**: Reference for porting tests (see soneso/stellar_flutter_sdk repo)
+- **Java SDK**: Reference implementation (see soneso/java-stellar-sdk repo)
+- **KMP SDK**: This repo (work from the repo root)
+- **Integration tests location**: `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/`
 - **Stellar Docs**: https://developers.stellar.org/
 - **Horizon API**: https://developers.stellar.org/api/horizon
 

@@ -5,6 +5,115 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-14
+
+### Added
+- **SEP-2 (Federation Protocol)**: Resolve human-readable Stellar addresses (e.g., `bob*stellar.org`) to account IDs and reverse-lookup accounts to addresses
+  - `FederationService` with `fromDomain()` factory and 4 query methods: `resolveStellarAddress()`, `resolveAccountId()`, `resolveTransactionId()`, `resolveForward()`
+  - `FederationResponse` data class with account ID, memo, memo type, and stellar address
+  - 4 typed exceptions for invalid addresses, missing federation servers, and malformed responses
+  - Unit tests with MockEngine and integration test against live federation server
+  - Documentation in `docs/sep/sep-02.md`
+
+- **SEP-30 (Account Recovery)**: Multi-party account recovery using alternative authentication methods (email, phone, Stellar address)
+  - `Sep30Service` with all 6 spec endpoints: register, update identities, sign transaction, account details, delete, list accounts
+  - 9 data model classes with JSON serialization/deserialization
+  - 7 typed exceptions mapping HTTP status codes (400, 401, 404, 409, unknown, malformed 200)
+  - 83 unit tests covering response parsing, exceptions, and service operations
+  - Documentation in `docs/sep/sep-30.md`
+
+- **SEP-53 (Sign and Verify Messages)**: Off-chain message signing and verification using Ed25519 keypairs
+  - `signMessage()` and `verifySignedMessage()` methods on `KeyPair`
+  - Domain-separated signing using SEP-53 payload format (36-byte prefix + SHA-256 hash)
+  - Unit tests with known test vectors
+  - Documentation in `docs/sep/sep-53.md`
+
+- **SEP Compatibility Matrix Automation**: 3-stage Python pipeline for generating field-by-field coverage reports
+  - `sep_parser.py` - Fetches and parses SEP specifications from GitHub
+  - `sep_analyzer.py` - Scans SDK Kotlin source and maps spec fields to implementation
+  - `generate_sep_comparison.py` - Compares definitions against implementation and generates markdown matrices
+  - `run_sep_analysis.py` - Orchestrator for all implemented SEPs
+
+## [1.2.1] - 2026-02-11
+
+### Added
+- **SEP-8 (Regulated Assets)**: Production-ready client for assets requiring issuer approval before transactions can be submitted
+  - `Sep08Service` class with service discovery and approval server interaction:
+    - `fromDomain()` - Initialize from issuer's stellar.toml configuration
+    - `postTransaction()` - Submit transactions to the approval server for regulatory approval
+    - `postAction()` - Complete required user actions (e.g., KYC verification)
+    - `authorizationRequired()` - Check if issuer has authorization required/revocable flags set
+    - `regulatedAssets` - Discover regulated assets and their approval server URLs
+  - `Sep08PostTransactionResponse` sealed class with 5 response types:
+    - `Success` - Transaction approved, ready for submission
+    - `Revised` - Transaction modified by approval server (e.g., additional operations added)
+    - `Pending` - Approval server needs more time; resubmit after timeout
+    - `ActionRequired` - User must complete an action (e.g., KYC) before approval
+    - `Rejected` - Transaction rejected with reason
+  - `Sep08PostActionResponse` sealed class with 2 response types:
+    - `Done` - Action completed, transaction approved
+    - `NextUrl` - Additional action required at a new URL
+  - `RegulatedAsset` data class with asset code, issuer, approval server URL, and approval criteria
+  - 4 exception types:
+    - `Sep08Exception` - Base exception
+    - `Sep08IncompleteInitDataException` - Missing network/Horizon configuration
+    - `Sep08InvalidTransactionResponseException` - Malformed approval server response
+    - `Sep08InvalidActionResponseException` - Malformed action URL response
+  - 95 unit tests + 13 integration tests against live testnet
+  - Documentation in `docs/sep/sep-08.md`
+  - SEP-8 compatibility matrix showing 100% feature coverage (22/22 features)
+
+### Removed
+- Removed `testDeploySACWithSourceAccount` integration test. The test used `CONTRACT_ID_PREIMAGE_FROM_ADDRESS` with `CONTRACT_EXECUTABLE_STELLAR_ASSET`, a combination no longer accepted by the network. SAC deployment via `CONTRACT_ID_PREIMAGE_FROM_ASSET` (tested in `testSACWithAsset`) remains the correct approach.
+
+## [1.2.0] - 2026-02-04
+
+### Added
+- **SEP-5 (Key Derivation Methods for Stellar Keys)**: HD wallet support for deriving multiple Stellar accounts from a single mnemonic phrase
+  - `Mnemonic` class with BIP-39 mnemonic generation and SLIP-0010 key derivation:
+    - `generate12/15/18/21/24WordsMnemonic()` - Generate mnemonics with varying entropy
+    - `from()` - Create Mnemonic instance from phrase with optional passphrase
+    - `fromEntropy()` - Create from raw entropy bytes
+    - `fromBip39Seed()` / `fromBip39HexSeed()` - Create from pre-computed seed
+    - `getKeyPair()` / `getAccountId()` - Derive Stellar accounts at index
+    - `getPrivateKey()` / `getPublicKey()` - Get raw key bytes
+    - `validate()` - Validate mnemonic phrase and checksum
+    - `detectLanguage()` - Auto-detect mnemonic language
+    - `close()` - Zero internal seed data for security
+  - `MnemonicLanguage` enum with 9 BIP-39 languages:
+    - English, Japanese, Korean, Spanish, Chinese Simplified, Chinese Traditional, French, Italian, Malay
+  - `MnemonicStrength` enum for word count selection (128-256 bits entropy)
+  - `MnemonicUtils` low-level utilities for advanced use cases
+  - Exception classes: `InvalidMnemonicException`, `InvalidChecksumException`, `InvalidWordException`, `InvalidEntropyException`, `InvalidPathException`
+  - Platform-specific crypto implementations:
+    - JVM: BouncyCastle for PBKDF2-HMAC-SHA512
+    - JS: libsodium-wrappers-sumo
+    - Native: libsodium via C interop
+  - 182 unit tests including all 5 official SEP-5 test vectors
+  - Documentation in `docs/sep/sep-05.md`
+  - SEP-5 compatibility matrix showing 100% feature coverage (31/31 features)
+
+## [1.1.0] - 2026-02-03
+
+### Added
+- **Test Infrastructure**: Code coverage tooling and CI workflow improvements
+  - Kover plugin for JVM code coverage with HTML and XML reports
+  - Codecov integration with coverage badge in README
+  - CI workflow: JVM tests across JDK 17/21/25 (push + PR), JS Node tests (push + PR), macOS native tests (PR only)
+  - Integration test exclusion via `-PexcludeIntegrationTests` flag
+  - Real wall-clock delay utilities (`platformDelay()`, `realDelay()`) for integration tests
+  - Test reorganization: Split `commonTest` into `unitTests/` and `integrationTests/` directories
+- **Unit Tests**: 133 new unit test files (~3,984 tests across 5 platforms)
+  - Coverage includes: crypto, StrKey, KeyPair, transactions, operations, assets, accounts, memos, Horizon request builders, Horizon response deserialization, all operation response types, all effect types, Soroban RPC, contract client, assembled transactions, SEP-1/6/9/10/12/24/38/45, XDR round-trips
+
+### Fixed
+- **BigInteger two's complement (JS & Native)**: `bigIntegerToBytesSigned()` used magnitude-only encoding instead of proper two's complement. Negative Int128/Int256 values were silently corrupted on JS and Native targets. JVM was unaffected.
+- **Native empty data crypto**: SHA-256 of empty data crashed (invalid assertion); Ed25519 sign/verify of empty data crashed (`addressOf(0)` on empty ByteArray)
+- **SorobanServer.pollTransaction()**: Added `withContext(Dispatchers.Default)` for real wall-clock delay during polling, fixing too-fast polling on JS and Native
+
+### Changed
+- **JVM Target**: Bumped from Java 11 to Java 17 (required by Android AGP 8.x and Gradle 8+)
+
 ## [1.0.0] - 2026-01-15
 
 ### Added
@@ -81,7 +190,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Callback notification support via `onChangeCallback` parameter
   - Refund tracking with payment breakdowns
   - 93 unit tests + 12 integration tests against live testnet
-  - Documentation in `docs/sep/sep-06-transfer-service.md` with usage examples
+  - Documentation in `docs/sep/sep-06.md` with usage examples
   - SEP-6 compatibility matrix showing 100% API coverage (95/95 fields)
 
 ### Documentation

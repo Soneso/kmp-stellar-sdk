@@ -1,0 +1,165 @@
+name: Unit Tests & Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  jvm-tests:
+    name: JVM Tests (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21', '25']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run JVM unit tests
+        if: matrix.java != '25'
+        run: ./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests --no-daemon
+
+      - name: Run JVM unit tests with coverage
+        if: matrix.java == '25'
+        run: ./gradlew :stellar-sdk:koverHtmlReport :stellar-sdk:koverXmlReport -PexcludeIntegrationTests --no-daemon
+
+      - name: Print coverage summary
+        if: always() && matrix.java == '25'
+        run: |
+          XML_REPORT="stellar-sdk/build/reports/kover/report.xml"
+          if [ -f "$XML_REPORT" ]; then
+            echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Extract coverage counters from JaCoCo XML
+            LINE_MISSED=$(grep -o 'type="LINE" missed="[0-9]*"' "$XML_REPORT" | tail -1 | grep -o 'missed="[0-9]*"' | grep -o '[0-9]*')
+            LINE_COVERED=$(grep -o 'type="LINE".*covered="[0-9]*"' "$XML_REPORT" | tail -1 | grep -o 'covered="[0-9]*"' | grep -o '[0-9]*')
+
+            BRANCH_MISSED=$(grep -o 'type="BRANCH" missed="[0-9]*"' "$XML_REPORT" | tail -1 | grep -o 'missed="[0-9]*"' | grep -o '[0-9]*')
+            BRANCH_COVERED=$(grep -o 'type="BRANCH".*covered="[0-9]*"' "$XML_REPORT" | tail -1 | grep -o 'covered="[0-9]*"' | grep -o '[0-9]*')
+
+            if [ -n "$LINE_COVERED" ] && [ -n "$LINE_MISSED" ]; then
+              TOTAL=$((LINE_COVERED + LINE_MISSED))
+              if [ "$TOTAL" -gt 0 ]; then
+                PCT=$((LINE_COVERED * 100 / TOTAL))
+                echo "| Metric | Covered | Missed | Total | % |" >> $GITHUB_STEP_SUMMARY
+                echo "|--------|---------|--------|-------|---|" >> $GITHUB_STEP_SUMMARY
+                echo "| Lines | $LINE_COVERED | $LINE_MISSED | $TOTAL | ${PCT}% |" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+
+            if [ -n "$BRANCH_COVERED" ] && [ -n "$BRANCH_MISSED" ]; then
+              TOTAL=$((BRANCH_COVERED + BRANCH_MISSED))
+              if [ "$TOTAL" -gt 0 ]; then
+                PCT=$((BRANCH_COVERED * 100 / TOTAL))
+                echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $TOTAL | ${PCT}% |" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          else
+            echo "⚠️ Coverage report not found at $XML_REPORT" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload coverage to Codecov
+        if: always() && matrix.java == '25'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: stellar-sdk/build/reports/kover/report.xml
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload coverage report
+        if: always() && matrix.java == '25'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: stellar-sdk/build/reports/kover/
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-jdk-${{ matrix.java }}
+          path: stellar-sdk/build/reports/tests/
+          retention-days: 30
+
+  js-node-tests:
+    name: JS Node Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run JS Node unit tests
+        run: ./gradlew :stellar-sdk:jsNodeTest -PexcludeIntegrationTests --no-daemon
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-js-node
+          path: stellar-sdk/build/reports/tests/
+          retention-days: 30
+
+  native-tests:
+    name: macOS Native Tests
+    runs-on: macos-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run macOS native unit tests
+        run: ./gradlew :stellar-sdk:macosArm64Test -PexcludeIntegrationTests --no-daemon
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-native-macos
+          path: stellar-sdk/build/reports/tests/
+          retention-days: 30

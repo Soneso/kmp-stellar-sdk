@@ -1,39 +1,26 @@
-module.exports = function(config) {
-    // Load base config from Kotlin/JS
-    const kotlinConfigPath = './build/js/packages/kmp-stellar-sdk-stellar-sdk-test/karma.conf.js';
+// Custom Karma configuration — appended INSIDE the Kotlin-generated
+// module.exports function by useConfigDirectory(project.projectDir).
+// `config` is already in scope from the outer function, so we operate on it directly.
+// Do NOT use `module.exports = function(config) { ... }` — that would just reassign
+// the export without ever being called.
 
-    // Check if the Kotlin config exists, if so load it
-    try {
-        const kotlinConfig = require(kotlinConfigPath);
-        kotlinConfig(config);
-    } catch (e) {
-        // If Kotlin config doesn't exist yet, use basic config
-        config.set({
-            frameworks: ['mocha'],
-            browsers: ['ChromeHeadless'],
-            singleRun: true
-        });
-    }
+;(function() {
+    const path = require('path');
+    const fs = require('fs');
+    // __dirname inside the generated config points to the build packages dir
+    // (build/js/packages/kmp-stellar-sdk-stellar-sdk-test/).
+    // Navigate up to the project root to find the original source files.
+    const projectDir = path.resolve(__dirname, '..', '..', '..', '..', 'stellar-sdk');
 
-    // Add our setup file to the beginning of files list
+    // ── Setup file (libsodium init) ──
     const existingFiles = config.files || [];
-    const setupFile = 'src/jsTest/resources/karma-setup.js';
+    const setupFile = path.resolve(projectDir, 'src/jsTest/resources/karma-setup.js');
 
     // Remove setup file if it's already in the list (to avoid duplicates)
     const filteredFiles = existingFiles.filter(f =>
-        typeof f === 'string' ? f !== setupFile : f.pattern !== setupFile
+        typeof f === 'string' ? f !== setupFile : (f.pattern !== setupFile)
     );
-
-    // Add setup file at the beginning
     filteredFiles.unshift(setupFile);
-
-    // Also serve libsodium from node_modules
-    filteredFiles.push({
-        pattern: 'node_modules/libsodium-wrappers/dist/browsers/sodium.js',
-        included: false,
-        served: true,
-        watched: false
-    });
 
     config.set({
         files: filteredFiles,
@@ -44,5 +31,34 @@ module.exports = function(config) {
         }
     });
 
-    console.log('✓ Karma configured with libsodium setup');
-};
+    // ── WASM file serving middleware ──
+    // karma-webpack intercepts normal file serving, so we add a custom middleware
+    // to serve WASM test resources directly from the filesystem.
+    const wasmDir = path.resolve(projectDir, 'src/commonTest/resources/wasm');
+
+    const middlewareFactory = function() {
+        return function(req, res, next) {
+            if (req.url && req.url.startsWith('/wasm/')) {
+                const filename = req.url.replace('/wasm/', '').split('?')[0];
+                const filePath = path.join(wasmDir, filename);
+                if (fs.existsSync(filePath)) {
+                    res.setHeader('Content-Type', 'application/wasm');
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    const content = fs.readFileSync(filePath);
+                    res.end(content);
+                    return;
+                }
+            }
+            next();
+        };
+    };
+    middlewareFactory.$inject = [];
+
+    config.plugins = config.plugins || [];
+    config.plugins.push({ 'middleware:wasmServer': ['factory', middlewareFactory] });
+
+    config.beforeMiddleware = config.beforeMiddleware || [];
+    config.beforeMiddleware.push('wasmServer');
+
+    console.log('✓ Karma configured with libsodium setup and WASM middleware (wasmDir: ' + wasmDir + ')');
+})();

@@ -36,13 +36,13 @@ val generateVersionFile by tasks.registering {
 kotlin {
     androidTarget {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 
     jvm("desktop") {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 
@@ -113,7 +113,7 @@ kotlin {
                 api(project(":stellar-sdk"))
 
                 // Users consuming from Maven should use:
-                // api("com.soneso.stellar:stellar-sdk:1.0.0")
+                // api("com.soneso.stellar:stellar-sdk:1.3.0")
 
                 // ============================================================
                 // Coroutines
@@ -230,8 +230,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

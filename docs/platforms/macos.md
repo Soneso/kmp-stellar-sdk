@@ -29,14 +29,14 @@ Use Maven artifact - no additional setup required:
 kotlin {
     jvm("desktop") {
         compilations.all {
-            kotlinOptions.jvmTarget = "11"
+            kotlinOptions.jvmTarget = "17"
         }
     }
 
     sourceSets {
         val desktopMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.0.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.3.0")
                 implementation(compose.desktop.currentOs)
             }
         }

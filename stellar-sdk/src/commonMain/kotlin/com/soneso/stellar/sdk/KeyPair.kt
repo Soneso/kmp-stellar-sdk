@@ -69,6 +69,30 @@ class KeyPair private constructor(
         private val crypto = getEd25519Crypto()
 
         /**
+         * UTF-8 encoded prefix prepended to all messages before hashing,
+         * as defined by SEP-53.
+         */
+        private val MESSAGE_PREFIX = "Stellar Signed Message:\n".encodeToByteArray()
+
+        /**
+         * Computes the SHA-256 hash of a message with the SEP-53 prefix prepended.
+         *
+         * Concatenates `"Stellar Signed Message:\n"` (24 bytes) with the provided [message]
+         * and returns the SHA-256 digest. This is the canonical message hash used for both
+         * signing and verification as specified by SEP-53.
+         *
+         * @param message The raw bytes of the message to hash.
+         * @return The 32-byte SHA-256 hash of the prefixed message.
+         * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md">SEP-53</a>
+         */
+        private suspend fun calculateMessageHash(message: ByteArray): ByteArray {
+            val payload = ByteArray(MESSAGE_PREFIX.size + message.size)
+            MESSAGE_PREFIX.copyInto(payload)
+            message.copyInto(payload, destinationOffset = MESSAGE_PREFIX.size)
+            return Util.hash(payload)
+        }
+
+        /**
          * Returns the name of the cryptographic library being used by the SDK.
          *
          * Examples:
@@ -320,6 +344,83 @@ class KeyPair private constructor(
      */
     suspend fun verify(data: ByteArray, signature: ByteArray): Boolean {
         return crypto.verify(data, signature, publicKey)
+    }
+
+    /**
+     * Signs an arbitrary binary [message] according to
+     * [SEP-53](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md).
+     *
+     * The message is prefixed with `"Stellar Signed Message:\n"`, hashed with SHA-256,
+     * and the resulting digest is signed with this keypair's Ed25519 private key.
+     *
+     * @param message The raw bytes of the message to sign.
+     * @return A 64-byte Ed25519 signature.
+     * @throws IllegalStateException if this keypair does not contain a private key.
+     *   Use [canSign] to check before calling this method.
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md">SEP-53</a>
+     */
+    suspend fun signMessage(message: ByteArray): ByteArray {
+        val messageHash = calculateMessageHash(message)
+        return sign(messageHash)
+    }
+
+    /**
+     * Signs an arbitrary UTF-8 string [message] according to
+     * [SEP-53](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md).
+     *
+     * The [message] is encoded to UTF-8 bytes, prefixed with `"Stellar Signed Message:\n"`,
+     * hashed with SHA-256, and the resulting digest is signed with this keypair's Ed25519
+     * private key.
+     *
+     * @param message The string message to sign (will be UTF-8 encoded).
+     * @return A 64-byte Ed25519 signature.
+     * @throws IllegalStateException if this keypair does not contain a private key.
+     *   Use [canSign] to check before calling this method.
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md">SEP-53</a>
+     */
+    suspend fun signMessage(message: String): ByteArray {
+        return signMessage(message.encodeToByteArray())
+    }
+
+    /**
+     * Verifies a binary [message] and its [signature] according to
+     * [SEP-53](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md).
+     *
+     * The [message] is prefixed with `"Stellar Signed Message:\n"`, hashed with SHA-256,
+     * and the resulting digest is verified against the provided [signature] using this
+     * keypair's Ed25519 public key.
+     *
+     * @param message The raw bytes of the original message.
+     * @param signature The Ed25519 signature to verify (expected 64 bytes).
+     * @return `true` if the signature is valid for the given message and this keypair's
+     *   public key, `false` otherwise (including malformed signatures).
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md">SEP-53</a>
+     */
+    suspend fun verifyMessage(message: ByteArray, signature: ByteArray): Boolean {
+        return try {
+            val messageHash = calculateMessageHash(message)
+            verify(messageHash, signature)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Verifies a UTF-8 string [message] and its [signature] according to
+     * [SEP-53](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md).
+     *
+     * The [message] is encoded to UTF-8 bytes, prefixed with `"Stellar Signed Message:\n"`,
+     * hashed with SHA-256, and the resulting digest is verified against the provided
+     * [signature] using this keypair's Ed25519 public key.
+     *
+     * @param message The original string message (will be UTF-8 encoded).
+     * @param signature The Ed25519 signature to verify (expected 64 bytes).
+     * @return `true` if the signature is valid for the given message and this keypair's
+     *   public key, `false` otherwise (including malformed signatures).
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md">SEP-53</a>
+     */
+    suspend fun verifyMessage(message: String, signature: ByteArray): Boolean {
+        return verifyMessage(message.encodeToByteArray(), signature)
     }
 
     override fun equals(other: Any?): Boolean {

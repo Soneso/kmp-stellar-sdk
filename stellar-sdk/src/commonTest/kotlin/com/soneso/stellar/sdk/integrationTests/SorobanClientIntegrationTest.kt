@@ -8,7 +8,6 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -88,7 +87,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000) // Wait for account creation
+        realDelay(5000) // Wait for account creation
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -156,7 +155,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Deploy auth contract
         val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
@@ -203,7 +202,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(invokerAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 6: Attempt without auth should fail
         var thrown = false
@@ -224,7 +223,7 @@ class SorobanClientIntegrationTest {
         assertTrue(thrown, "Should fail without proper authorization")
 
         // Step 7: Use buildInvoke for manual auth handling (advanced API)
-        delay(5000)
+        realDelay(5000)
         val assembled = client.buildInvoke(
             functionName = "increment",
             arguments = mapOf(
@@ -283,22 +282,22 @@ class SorobanClientIntegrationTest {
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(sourceAccountId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundTestnetAccount(adminId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundTestnetAccount(aliceId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundTestnetAccount(bobId)
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundFuturenetAccount(adminId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundFuturenetAccount(aliceId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundFuturenetAccount(bobId)
         }
-        delay(5000)
+        realDelay(5000)
 
         println("Accounts funded:")
         println("  Source: $sourceAccountId")
@@ -319,7 +318,7 @@ class SorobanClientIntegrationTest {
         println("Deployed swap contract: ${swapClient.contractId}")
 
         // Step 3: Deploy token A with constructor
-        delay(5000)
+        realDelay(5000)
         val tokenContractWasm = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
         val tokenAClient = ContractClient.deploy(
             wasmBytes = tokenContractWasm,
@@ -337,7 +336,7 @@ class SorobanClientIntegrationTest {
         println("Deployed TokenA: ${tokenAClient.contractId}")
 
         // Step 4: Deploy token B with constructor
-        delay(5000)
+        realDelay(5000)
         val tokenBClient = ContractClient.deploy(
             wasmBytes = tokenContractWasm,
             constructorArgs = mapOf(
@@ -354,7 +353,7 @@ class SorobanClientIntegrationTest {
         println("Deployed TokenB: ${tokenBClient.contractId}")
 
         // Step 5: Mint tokens to Alice and Bob
-        delay(5000)
+        realDelay(5000)
         tokenAClient.invoke<Unit>(
             functionName = "mint",
             arguments = mapOf(
@@ -366,7 +365,7 @@ class SorobanClientIntegrationTest {
         )
         println("✓ Minted TokenA to Alice")
 
-        delay(5000)
+        realDelay(5000)
         tokenBClient.invoke<Unit>(
             functionName = "mint",
             arguments = mapOf(
@@ -379,7 +378,7 @@ class SorobanClientIntegrationTest {
         println("✓ Minted TokenB to Bob")
 
         // Step 6: Verify balances with manual parsing using funcResToNative
-        delay(5000)
+        realDelay(5000)
         val aliceBalanceXdr = tokenAClient.invoke<SCValXdr>(
             functionName = "balance",
             arguments = mapOf("id" to aliceId),
@@ -403,7 +402,7 @@ class SorobanClientIntegrationTest {
         println("✓ Bob balance (funcResToNative): $bobBalance TokenB")
 
         // Step 7: Execute atomic swap
-        delay(10000)
+        realDelay(10000)
 
         // Use buildInvoke for manual control over auth
         val swapTx = swapClient.buildInvoke<SCValXdr>(
@@ -470,14 +469,14 @@ class SorobanClientIntegrationTest {
 
         if (testOn == "testnet") {
             FriendBot.fundTestnetAccount(sourceAccountId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundTestnetAccount(invokerAccountId)
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
-            delay(3000)
+            realDelay(3000)
             FriendBot.fundFuturenetAccount(invokerAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Deploy auth contract
         val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
@@ -492,7 +491,7 @@ class SorobanClientIntegrationTest {
         println("Deployed auth contract: ${client.contractId}")
 
         // Step 3: Build transaction with invoker as different user
-        delay(5000)
+        realDelay(5000)
         val assembled = client.buildInvoke(
             functionName = "increment",
             arguments = mapOf(
@@ -569,7 +568,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Install WASM once
         val tokenContractWasm = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
@@ -583,7 +582,7 @@ class SorobanClientIntegrationTest {
         println("Installed WASM ID: $wasmId")
 
         // Step 3: Deploy first instance with constructor
-        delay(5000)
+        realDelay(5000)
         val token1 = ContractClient.deployFromWasmId(
             wasmId = wasmId,
             constructorArgs = listOf(
@@ -600,7 +599,7 @@ class SorobanClientIntegrationTest {
         println("Deployed Token1: ${token1.contractId}")
 
         // Step 4: Deploy second instance with different constructor args
-        delay(5000)
+        realDelay(5000)
         val token2 = ContractClient.deployFromWasmId(
             wasmId = wasmId,
             constructorArgs = listOf(
@@ -620,7 +619,7 @@ class SorobanClientIntegrationTest {
         assertNotEquals(token1.contractId, token2.contractId, "Contract IDs should be different")
 
         // Verify Token1 name with parseResultXdrFn
-        delay(5000)
+        realDelay(5000)
         val token1Name = token1.invoke<String>(
             functionName = "name",
             arguments = emptyMap(),
@@ -635,7 +634,7 @@ class SorobanClientIntegrationTest {
         println("✓ Token1 name (parseResultXdrFn): $token1Name")
 
         // Verify Token2 name with funcResToNative
-        delay(5000)
+        realDelay(5000)
         val token2NameXdr = token2.invoke<SCValXdr>(
             functionName = "name",
             arguments = emptyMap(),
@@ -669,7 +668,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -684,7 +683,7 @@ class SorobanClientIntegrationTest {
         println("Deployed hello contract: ${client.contractId}")
 
         // Step 3: Build transaction using buildInvoke
-        delay(5000)
+        realDelay(5000)
         val tx = client.buildInvoke<List<String>>(
             functionName = "hello",
             arguments = mapOf("to" to "World"),
@@ -734,7 +733,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -749,7 +748,7 @@ class SorobanClientIntegrationTest {
         println("Deployed hello contract: ${client.contractId}")
 
         // Step 3: Build transaction for inspection
-        delay(5000)
+        realDelay(5000)
         val tx = client.buildInvoke<List<String>>(
             functionName = "hello",
             arguments = mapOf("to" to "World"),
@@ -801,7 +800,7 @@ class SorobanClientIntegrationTest {
         } else {
             FriendBot.fundFuturenetAccount(sourceAccountId)
         }
-        delay(5000)
+        realDelay(5000)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -816,7 +815,7 @@ class SorobanClientIntegrationTest {
         println("Deployed hello contract: ${client.contractId}")
 
         // Step 3: Build transaction
-        delay(5000)
+        realDelay(5000)
         val tx = client.buildInvoke<List<String>>(
             functionName = "hello",
             arguments = mapOf("to" to "BuildInvoke"),
