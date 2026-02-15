@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.soneso.stellar.smartdemo.android"
-        minSdk = 24
+        minSdk = 28 // Passkey support requires API 28+
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"

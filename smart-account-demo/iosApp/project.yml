@@ -2,7 +2,7 @@ name: StellarSmartDemo
 options:
   bundleIdPrefix: com.soneso.stellar.smartdemo
   deploymentTarget:
-    iOS: 16.0
+    iOS: 16.0  # Required for passkey support
 settings:
   base:
     ARCHS: arm64
@@ -32,6 +32,27 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CADisableMinimumFrameDurationOnPhone: true
+    # Passkey Configuration (Required for AppleWebAuthnProvider)
+    #
+    # To enable passkey authentication in production:
+    # 1. Add Associated Domains capability with webcredentials:
+    #    entitlements:
+    #      com.apple.developer.associated-domains:
+    #        - webcredentials:demo.stellar.org
+    #
+    # 2. Host an apple-app-site-association file at:
+    #    https://demo.stellar.org/.well-known/apple-app-site-association
+    #
+    #    Example content:
+    #    {
+    #      "webcredentials": {
+    #        "apps": ["TEAMID.com.soneso.stellar.smartdemo"]
+    #      }
+    #    }
+    #
+    # 3. Update rpId in PlatformInit.ios.kt to match your domain
+    #
+    # Note: Passkeys may not work on simulator. Test on real devices.
     settings:
       FRAMEWORK_SEARCH_PATHS:
         - $(inherited)

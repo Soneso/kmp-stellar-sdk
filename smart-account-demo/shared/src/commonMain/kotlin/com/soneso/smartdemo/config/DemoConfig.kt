@@ -1,0 +1,67 @@
+package com.soneso.smartdemo.config
+
+/**
+ * Demo configuration with Stellar testnet defaults.
+ *
+ * These values point to shared testnet contracts deployed by the OpenZeppelin/Stellar team.
+ * Using the same contracts ensures cross-SDK interoperability - wallets created with
+ * the TypeScript SDK are accessible from the KMP SDK and vice versa.
+ */
+object DemoConfig {
+    // Network
+    const val RPC_URL = "https://soroban-testnet.stellar.org"
+    const val NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
+
+    // Smart Account Contract
+    const val ACCOUNT_WASM_HASH = "a12e8fa9621efd20315753bd4007d974390e31fbcb4a7ddc4dd0a0dec728bf2e"
+
+    // Verifier Contracts
+    const val WEBAUTHN_VERIFIER_ADDRESS = "CBSHV66WG7UV6FQVUTB67P3DZUEJ2KJ5X6JKQH5MFRAAFNFJUAJVXJYV"
+    const val ED25519_VERIFIER_ADDRESS = "CDGMOL3BP6Y6LYOXXTRNXBNJ2SLNTQ47BGG3LOS2OBBE657E3NYCN54B"
+
+    // Token Contracts
+    const val NATIVE_TOKEN_CONTRACT = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+
+    // Relayer (optional fee sponsoring, empty = disabled)
+    const val DEFAULT_RELAYER_URL = ""
+
+    // Relying Party for WebAuthn
+    const val RP_NAME = "Smart Account Kit Demo"
+
+    // UI Constants
+    const val MAX_LOG_ENTRIES = 50
+
+    // Conversion
+    const val STROOPS_PER_XLM = 10_000_000L
+}
+
+/**
+ * Known policy contracts deployed on testnet.
+ */
+data class PolicyInfo(
+    val type: String,
+    val name: String,
+    val description: String,
+    val address: String
+)
+
+val KNOWN_POLICIES = listOf(
+    PolicyInfo(
+        type = "threshold",
+        name = "Threshold (M-of-N)",
+        description = "Requires M signatures out of N total signers",
+        address = "CCT4MMN5MJ6O2OU6LXPYTCVORQ2QVTBMDJ7MYBZQ2ULSYQVUIYP4IFYD"
+    ),
+    PolicyInfo(
+        type = "spending_limit",
+        name = "Spending Limit",
+        description = "Limits spending to a maximum amount per time period",
+        address = "CBMMWY54XOV6JJHSWCMKWWPXVRXASR5U26UJMLZDN4SP6CFFTVZARPTY"
+    ),
+    PolicyInfo(
+        type = "weighted_threshold",
+        name = "Weighted Threshold",
+        description = "Requires minimum total weight from signers with different voting weights",
+        address = "CBYDQ5XUBP7G24FI3LLGLW56QZCIEUSVRPX7FVOUCKHJQQ6DTF6BQGBZ"
+    )
+)

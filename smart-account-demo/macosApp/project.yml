@@ -2,7 +2,7 @@ name: StellarSmartDemo
 options:
   bundleIdPrefix: com.soneso.stellar.smartdemo
   deploymentTarget:
-    macOS: 13.0
+    macOS: 13.0  # Required for passkey/WebAuthn support (ASAuthorizationPlatformPublicKeyCredential)
 settings:
   ENABLE_USER_SCRIPT_SANDBOXING: NO
   MARKETING_VERSION: "0.1.0"
@@ -18,6 +18,20 @@ targets:
       properties:
         LSMinimumSystemVersion: "13.0"
         NSHumanReadableCopyright: Copyright 2025 Stellar Development Foundation
+    # Associated Domains capability for WebAuthn/passkeys
+    # Configure the domain in Xcode after project generation:
+    # 1. Select the target -> Signing & Capabilities
+    # 2. Add "Associated Domains" capability
+    # 3. Add domain: webcredentials:demo.stellar.org (or your domain)
+    # 4. Ensure apple-app-site-association is hosted at https://demo.stellar.org/.well-known/
+    #
+    # Note: xcodegen does not directly support Associated Domains configuration.
+    # You must add this capability manually in Xcode after running `xcodegen generate`.
+    # Alternatively, add it to the .entitlements file:
+    #   <key>com.apple.developer.associated-domains</key>
+    #   <array>
+    #     <string>webcredentials:demo.stellar.org</string>
+    #   </array>
     resources:
       - path: StellarSmartDemo/Assets.xcassets
     settings:

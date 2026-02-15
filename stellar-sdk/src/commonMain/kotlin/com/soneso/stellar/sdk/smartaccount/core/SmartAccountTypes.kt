@@ -89,7 +89,7 @@ data class DelegatedSigner(
             throw ValidationException.invalidAddress("Address must start with 'G' (account) or 'C' (contract), got: $address")
         }
         if (address.length != 56) {
-            throw ValidationException.InvalidAddress("Address must be 56 characters long, got: ${address.length}")
+            throw ValidationException.invalidAddress("Address must be 56 characters long, got: ${address.length}")
         }
 
         // Validate it's a valid StrKey address
@@ -174,7 +174,7 @@ data class ExternalSigner(
             throw ValidationException.invalidAddress("Verifier address must start with 'C' (contract), got: $verifierAddress")
         }
         if (verifierAddress.length != 56) {
-            throw ValidationException.InvalidAddress("Verifier address must be 56 characters long, got: ${verifierAddress.length}")
+            throw ValidationException.invalidAddress("Verifier address must be 56 characters long, got: ${verifierAddress.length}")
         }
 
         // Validate it's a valid contract address

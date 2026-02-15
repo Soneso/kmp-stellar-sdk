@@ -16,5 +16,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Passkey support: Digital Asset Links configuration -->
+        <!-- The assetlinks.json file must be hosted at https://your-domain.example.com/.well-known/assetlinks.json
+             Example assetlinks.json:
+             [
+               {
+                 "relation": ["delegate_permission/common.get_login_creds"],
+                 "target": {
+                   "namespace": "android_app",
+                   "package_name": "com.soneso.stellar.smartdemo.android",
+                   "sha256_cert_fingerprints": ["YOUR_APP_SHA256_FINGERPRINT"]
+                 }
+               }
+             ]
+
+             Generate your SHA-256 fingerprint with:
+             ./gradlew signingReport
+
+             For local testing without a proper domain setup, passkeys will not work.
+             You must configure a real domain and deploy the assetlinks.json file for production.
+        -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
     </application>
 </manifest>
