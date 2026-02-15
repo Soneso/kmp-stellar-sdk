@@ -838,10 +838,60 @@ Removes a signer from a context rule.
 
 ### OZPolicyManager
 
-Manages policies for context rules.
+Manages policies for context rules. Provides both a generic `addPolicy` method for arbitrary policy contracts and convenience methods (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) for common policy types.
 
 ```kotlin
 val policyMgr = kit.policyManager
+```
+
+---
+
+#### addPolicy
+
+```kotlin
+suspend fun addPolicy(
+    contextRuleId: UInt,
+    policyAddress: String,
+    installParams: SCValXdr
+): TransactionResult
+```
+
+Generic method for adding any policy contract to a context rule. The convenience methods (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) delegate to this method.
+
+**Parameters**:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `contextRuleId` | `UInt` | Context rule ID (e.g., 0 for Default) |
+| `policyAddress` | `String` | C-address of the policy contract |
+| `installParams` | `SCValXdr` | Policy-specific installation parameters |
+
+**Returns**: `TransactionResult`
+
+**Throws**:
+- `ValidationException`: Invalid address or wallet not connected
+- `TransactionException`: Transaction simulation or submission failed
+
+**Example**:
+
+```kotlin
+// Add a custom policy with manually constructed install parameters
+val installParams = Scv.toVec(
+    listOf(
+        Scv.toUint32(3u),         // custom param 1
+        Scv.toBoolean(true)       // custom param 2
+    )
+)
+
+val result = kit.policyManager.addPolicy(
+    contextRuleId = 0u,
+    policyAddress = "CBCD1234...",
+    installParams = installParams
+)
+
+if (result.success) {
+    println("Policy added: ${result.hash}")
+}
 ```
 
 ---

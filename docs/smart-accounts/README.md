@@ -241,6 +241,18 @@ val limitResult = kit.policyManager.addSpendingLimit(
 )
 ```
 
+For custom policy contracts beyond the built-in types, use `addPolicy()` with policy-specific installation parameters:
+
+```kotlin
+val result = kit.policyManager.addPolicy(
+    contextRuleId = 0u,
+    policyAddress = "CCUSTOMPOLICY...",
+    installParams = Scv.toMap(linkedMapOf(
+        Scv.toSymbol("my_param") to Scv.toUint32(42u)
+    ))
+)
+```
+
 ### Error Handling
 
 All operations throw typed exceptions from the `SmartAccountException` hierarchy:

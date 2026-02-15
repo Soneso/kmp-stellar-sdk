@@ -211,6 +211,11 @@ sealed class PolicyInstallParams {
  * This manager is typically accessed via [OZSmartAccountKit] rather than
  * instantiated directly.
  *
+ * Three convenience methods are provided for built-in policy types:
+ * [addSimpleThreshold], [addWeightedThreshold], and [addSpendingLimit].
+ * For custom policy contracts, use [addPolicy] directly with policy-specific
+ * installation parameters encoded as [SCValXdr].
+ *
  * Example usage:
  * ```kotlin
  * val kit = OZSmartAccountKit.create(config)
@@ -221,6 +226,13 @@ sealed class PolicyInstallParams {
  *     contextRuleId = 0u,
  *     policyAddress = "CBCD1234...",
  *     threshold = 2u
+ * )
+ *
+ * // Add a custom policy with raw install parameters
+ * val customResult = policyManager.addPolicy(
+ *     contextRuleId = 0u,
+ *     policyAddress = "CBCD5678...",
+ *     installParams = myCustomPolicyParams
  * )
  *
  * if (result.success) {
@@ -486,19 +498,63 @@ class OZPolicyManager internal constructor(
         return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Add Generic Policy
 
     /**
-     * Internal helper to add a policy with encoded installation parameters.
+     * Adds a policy to a context rule with custom installation parameters.
      *
-     * @param contextRuleId The context rule ID
-     * @param policyAddress The policy contract address
-     * @param installParams The encoded installation parameters as ScVal
+     * This is the generic method that [addSimpleThreshold], [addWeightedThreshold],
+     * and [addSpendingLimit] delegate to. Use this method directly when adding
+     * custom policy contracts that are not covered by the convenience methods.
+     *
+     * Flow:
+     * 1. Validates inputs (connected wallet, policy address format)
+     * 2. Builds contract invocation for add_policy
+     * 3. Submits transaction via transactionOps (handles simulation, signing, polling)
+     *
+     * IMPORTANT: This operation requires the connected wallet to have authorization
+     * on the smart account. The user will be prompted for biometric authentication
+     * to sign the transaction.
+     *
+     * Contract limits:
+     * - Maximum [SmartAccountConstants.MAX_POLICIES] policies per context rule
+     * - Policy address must be a valid C-address
+     *
+     * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
+     * @param policyAddress The policy contract address (C-address)
+     * @param installParams Policy-specific installation parameters encoded as [SCValXdr].
+     *   The structure depends on the policy contract. For built-in policy types, use
+     *   [PolicyInstallParams.SimpleThreshold.toScVal],
+     *   [PolicyInstallParams.WeightedThreshold.toScVal], or
+     *   [PolicyInstallParams.SpendingLimit.toScVal].
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
+     *
+     * Example:
+     * ```kotlin
+     * // Add a custom policy with manually constructed install parameters
+     * val installParams = Scv.toMap(linkedMapOf(
+     *     Scv.toSymbol("max_operations") to Scv.toUint32(5u),
+     *     Scv.toSymbol("allowed_contracts") to Scv.toVec(listOf(
+     *         Scv.toAddress(Address("CBCD1234...").toSCAddress())
+     *     ))
+     * ))
+     *
+     * val result = policyManager.addPolicy(
+     *     contextRuleId = 0u,
+     *     policyAddress = "CBCD5678...",
+     *     installParams = installParams
+     * )
+     *
+     * if (result.success) {
+     *     println("Custom policy added: ${result.hash ?: ""}")
+     * } else {
+     *     println("Failed to add policy: ${result.error ?: ""}")
+     * }
+     * ```
      */
-    private suspend fun addPolicy(
+    suspend fun addPolicy(
         contextRuleId: UInt,
         policyAddress: String,
         installParams: SCValXdr
@@ -524,6 +580,8 @@ class OZPolicyManager internal constructor(
         // Submit transaction
         return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
     }
+
+    // MARK: - Private Helpers
 
     /**
      * Builds the host function for adding a policy.
