@@ -2,6 +2,8 @@
 
 The Smart Account Kit provides passkey-authenticated smart accounts on Stellar using OpenZeppelin's Soroban contracts. Users authenticate with biometrics (Face ID, fingerprint, security keys) instead of managing secret keys. The SDK handles wallet creation, contract deployment, transaction signing, signer management, and policy enforcement across all KMP targets.
 
+New to smart accounts? Start with the [onboarding guide](onboarding.md) for background on how smart accounts, passkeys, and the on-chain contracts work.
+
 ## Overview
 
 A smart account is a Soroban contract that replaces traditional Stellar key management with programmable authorization. Each smart account supports:
@@ -281,7 +283,7 @@ try {
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `deployerKeypair` | `KeyPair?` | `null` (uses default) | Keypair that pays deployment fees. If null, derived from `SHA256("openzeppelin-smart-account-kit")`. Does not control user wallets. |
+| `deployerKeypair` | `KeyPair?` | `null` (uses default) | Keypair used for contract deployment. If null, derived from `SHA256("openzeppelin-smart-account-kit")`. See [How Wallet Deployment Works](#how-wallet-deployment-works). |
 | `rpId` | `String?` | `null` | WebAuthn Relying Party ID. Should match your domain (e.g., `"example.com"`). If null, the browser uses the current origin. |
 | `rpName` | `String` | `"Smart Account"` | Display name shown to users during WebAuthn ceremonies. |
 | `sessionExpiryMs` | `Long` | `604800000` (7 days) | Session duration in milliseconds. Sessions enable reconnection without re-authentication. |
@@ -310,17 +312,28 @@ val config = OZSmartAccountConfig.builder(
     .build()
 ```
 
+## How Wallet Deployment Works
+
+When `createWallet()` is called, the SDK deploys a Soroban smart account contract. The deployment involves two roles:
+
+**Deployer keypair**: The deployer is the source account of the deployment transaction. It serves two purposes:
+
+1. **Address derivation**: The contract address is computed from `hash(deployer_public_key + credential_id)`. This makes the address deterministic — the same credential and deployer always produce the same contract address.
+2. **Transaction signing**: The deployer signs the deployment transaction as the source account.
+
+After deployment, the deployer has no privileges over the contract. Only the configured signers (passkeys, delegated accounts, Ed25519 keys) can authorize operations on the smart account.
+
+**Fee payment**: The deployer account pays the deployment transaction fee. When a relayer is configured, the relayer can sponsor the fee instead. If you use the default deployer (derived from a well-known seed — see below), you need either a relayer for fee sponsoring or to fund the deployer account before deployment. You can also provide your own funded keypair via `deployerKeypair` in the config.
+
 ## Cross-SDK Interoperability
 
-The KMP SDK produces identical on-chain results as the TypeScript Smart Account Kit (`@openzeppelin/smart-account-kit`). Wallets created by one SDK can be managed by the other.
+The KMP SDK produces identical on-chain results as the [TypeScript Smart Account Kit](https://github.com/kalepail/smart-account-kit). Wallets created by one SDK can be managed by the other.
 
 ### Shared Deployer Keypair
 
-Both SDKs derive the same default deployer from `SHA256("openzeppelin-smart-account-kit")`. This means:
+Both SDKs derive the same default deployer from `SHA256("openzeppelin-smart-account-kit")`. Since contract addresses are computed from the deployer's public key and the credential ID, using the same deployer ensures that the same passkey credential maps to the same contract address in both SDKs. This allows a wallet created through a web app (TypeScript SDK) to be accessed from a mobile app (KMP SDK) without an indexer lookup.
 
-- A wallet created by the TypeScript SDK has the same contract address when looked up by the KMP SDK
-- No deployer coordination is required between SDKs
-- The deployer only pays deployment fees; it does not control user funds
+The default deployer's secret seed is publicly derivable. It is intended to be used with a relayer that sponsors transaction fees, or funded externally. To use a private deployer, set `deployerKeypair` in the config — but both SDKs must use the same deployer for cross-SDK wallet discovery to work.
 
 ```kotlin
 // The default deployer is deterministic across SDKs
@@ -330,9 +343,9 @@ val deployer = OZSmartAccountConfig.createDefaultDeployer()
 
 ### Deterministic Contract Addresses
 
-Contract addresses are derived from the credential ID and deployer public key using `SmartAccountUtils.deriveContractAddress()`. Given the same credential ID and deployer, both SDKs compute the same C-address. This enables:
+Given the same credential ID and deployer, `SmartAccountUtils.deriveContractAddress()` computes the same C-address. This enables:
 
-- Wallet discovery without an indexer (derive the address, verify on-chain)
+- Wallet discovery without an indexer (derive the address, check if it exists on-chain)
 - Cross-platform wallet access (create on mobile, use on web)
 - Consistent address display across applications
 
@@ -356,5 +369,6 @@ These limits are defined in `SmartAccountConstants` and validated client-side be
 
 | Guide | Description |
 |-------|-------------|
+| [Onboarding Guide](onboarding.md) | Smart account concepts, passkeys, on-chain contract interface, end-to-end lifecycle |
 | [WebAuthn Setup: Android](webauthn-android.md) | Android Credential Manager integration, Digital Asset Links setup |
 | [WebAuthn Setup: iOS](webauthn-ios.md) | iOS AuthenticationServices integration, apple-app-site-association setup |
