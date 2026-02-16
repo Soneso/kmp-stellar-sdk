@@ -151,9 +151,17 @@ data class AuthenticatePasskeyResult(
  * val wallet = walletOps.createWallet(userName = "Alice", autoSubmit = true)
  * println("Created wallet: ${wallet.contractId}")
  *
- * // Connect to existing wallet
+ * // Connect to existing wallet (returns null if no session and prompt = false)
  * val connected = walletOps.connectWallet()
- * println("Connected: ${connected.contractId}")
+ * if (connected != null) {
+ *     println("Connected: ${connected.contractId}")
+ * } else {
+ *     println("No active session found")
+ * }
+ *
+ * // Connect with WebAuthn prompt fallback if no session
+ * val prompted = walletOps.connectWallet(ConnectWalletOptions(prompt = true))
+ * println("Connected: ${prompted?.contractId}")
  * ```
  *
  * @property kit Reference to the parent OZSmartAccountKit instance
@@ -398,12 +406,31 @@ class OZWalletOperations internal constructor(
      * These options control how wallet connection is performed, allowing for different
      * connection flows based on your application's needs.
      *
+     * ## Decision Matrix
+     *
+     * | Options | Behavior |
+     * |---------|----------|
+     * | (default) | Session restore, return null if no session |
+     * | credentialId and/or contractId | Direct connect, skip session check |
+     * | fresh = true | Skip session, always WebAuthn |
+     * | prompt = true | Session restore, WebAuthn if no session |
+     * | fresh = true, prompt = true | fresh takes priority, always WebAuthn |
+     *
      * ## Option Patterns
      *
-     * **Session Restoration (default)**
+     * **Silent Session Check (default)**
      * ```kotlin
-     * // Uses saved session if valid, otherwise prompts for WebAuthn
-     * connectWallet(ConnectWalletOptions())
+     * // Returns saved session if valid, null if no session
+     * val result = connectWallet()
+     * if (result == null) {
+     *     // Show login UI
+     * }
+     * ```
+     *
+     * **Session Check with WebAuthn Fallback**
+     * ```kotlin
+     * // Uses saved session if valid, prompts WebAuthn if no session
+     * connectWallet(ConnectWalletOptions(prompt = true))
      * ```
      *
      * **Direct Connection with Known Credentials**
@@ -438,46 +465,54 @@ class OZWalletOperations internal constructor(
      * @property fresh Force fresh WebAuthn authentication, skipping session restore.
      *                 Use this to require re-authentication even if a valid session exists.
      *                 Useful for sensitive operations or after session timeout warnings.
+     *
+     * @property prompt When true, triggers WebAuthn authentication if no valid session exists.
+     *                  When false (default), returns null if no session is found.
+     *                  Has no effect when [fresh] is true (WebAuthn is always triggered).
+     *                  Has no effect when [credentialId] is provided (direct connect path).
      */
     data class ConnectWalletOptions(
         val credentialId: String? = null,
         val contractId: String? = null,
-        val fresh: Boolean = false
+        val fresh: Boolean = false,
+        val prompt: Boolean = false
     )
 
     /**
      * Connects to an existing smart account wallet.
      *
-     * Attempts to connect to a wallet by:
-     * 1. Checking for a valid saved session (silent reconnection)
-     * 2. Prompting for WebAuthn authentication (if no session)
-     * 3. Looking up the contract address via storage or indexer
-     * 4. Verifying the contract exists on-chain
-     * 5. Saving a new session
+     * Returns a [ConnectWalletResult] on successful connection, or null if no valid
+     * session exists and neither [ConnectWalletOptions.prompt] nor
+     * [ConnectWalletOptions.fresh] is set.
      *
-     * Flow:
-     * 1. Check storage for valid (non-expired) session
-     * 2. If valid session: set kit connected state, return restoredFromSession: true
-     * 3. If expired session: delete silently, continue
-     * 4. If no valid session: trigger WebAuthn authentication
-     * 5. Extract credentialId from authentication result (base64url encode)
-     * 6. Look up contractId:
-     *    a. Check local storage
-     *    b. If not found and indexer configured: call indexer
-     *    c. If not found: derive contract address and verify on-chain via RPC
-     *    d. If contract doesn't exist: throw WALLET_NOT_FOUND
-     * 7. Save session
-     * 8. Set kit connected state
-     * 9. Return result
+     * Connection flow:
+     * 1. If credentialId/contractId provided: direct connect (always returns non-null)
+     * 2. If fresh = true: skip session, trigger WebAuthn authentication
+     * 3. Otherwise, check storage for a valid (non-expired) session
+     * 4. If valid session found: restore and return restoredFromSession = true
+     * 5. If no valid session and prompt = false: return null
+     * 6. If no valid session and prompt = true: trigger WebAuthn authentication
+     * 7. Look up contract address via storage, indexer, or on-chain derivation
+     * 8. Save session, set kit connected state, return result
      *
      * ## Connection Options
      *
-     * Use `ConnectWalletOptions` to customize the connection flow:
-     *
-     * **Session Restoration (default)**
+     * **Silent Session Check (default)**
      * ```kotlin
      * val result = walletOps.connectWallet()
-     * // Silently reconnects if session is valid, otherwise prompts WebAuthn
+     * if (result != null) {
+     *     println("Connected: ${result.contractId}")
+     * } else {
+     *     println("No active session - show login UI")
+     * }
+     * ```
+     *
+     * **Session Check with WebAuthn Fallback**
+     * ```kotlin
+     * val result = walletOps.connectWallet(
+     *     ConnectWalletOptions(prompt = true)
+     * )
+     * // Restores session if valid, prompts WebAuthn if not
      * ```
      *
      * **Direct Connection**
@@ -499,47 +534,21 @@ class OZWalletOperations internal constructor(
      * // Always prompts WebAuthn, ignoring any saved session
      * ```
      *
-     * **Credential Lookup**
-     * ```kotlin
-     * val result = walletOps.connectWallet(
-     *     ConnectWalletOptions(credentialId = "abc123...")
-     * )
-     * // Uses credential ID, looks up contract from storage/indexer/derivation
-     * ```
-     *
      * IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config
-     * for non-session reconnection.
+     * when WebAuthn authentication is needed (prompt = true, fresh = true, or
+     * direct credential connection).
      *
      * @param options Connection options controlling the flow behavior
-     * @return ConnectWalletResult containing credential ID, contract ID, and session flag
+     * @return ConnectWalletResult on success, or null if no session and prompt is false
      * @throws WebAuthnException if authentication fails or no provider configured
      * @throws WalletException if wallet not found
      * @throws ValidationException if options are invalid (e.g., contractId without credentialId)
      *
-     * Example:
-     * ```kotlin
-     * try {
-     *     val result = walletOps.connectWallet()
-     *     if (result.restoredFromSession) {
-     *         println("Silently reconnected to: ${result.contractId}")
-     *     } else {
-     *         println("Authenticated and connected to: ${result.contractId}")
-     *     }
-     * } catch (e: WalletException) {
-     *     when (e) {
-     *         is WalletException.NotFound ->
-     *             println("No wallet found for this credential")
-     *         else ->
-     *             println("Connection failed: ${e.message}")
-     *     }
-     * }
-     * ```
-     *
-     * @see ConnectWalletOptions for detailed option descriptions and use cases
+     * @see ConnectWalletOptions for detailed option descriptions and the decision matrix
      */
     suspend fun connectWallet(
         options: ConnectWalletOptions = ConnectWalletOptions()
-    ): ConnectWalletResult {
+    ): ConnectWalletResult? {
         // STEP 1: If credentialId or contractId provided, connect directly
         if (options.credentialId != null || options.contractId != null) {
             return connectWithCredentials(
@@ -594,9 +603,14 @@ class OZWalletOperations internal constructor(
                     // Non-critical - continue
                 }
             }
+
+            // No valid session found - check if we should prompt for WebAuthn
+            if (!options.prompt) {
+                return null
+            }
         }
 
-        // STEP 3: No valid session or fresh = true - require WebAuthn authentication
+        // STEP 3: No valid session with prompt = true, or fresh = true - require WebAuthn authentication
         val webauthnProvider = kit.config.webauthnProvider
             ?: throw WebAuthnException.notSupported(
                 "No WebAuthnProvider configured. Set webauthnProvider in config before calling connectWallet()."

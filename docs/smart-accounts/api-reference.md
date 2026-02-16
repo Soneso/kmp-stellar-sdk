@@ -332,45 +332,59 @@ println("Funded: ${wallet2.contractId}")
 ```kotlin
 suspend fun connectWallet(
     options: ConnectWalletOptions = ConnectWalletOptions()
-): ConnectWalletResult
+): ConnectWalletResult?
 
 data class ConnectWalletOptions(
     val credentialId: String? = null,
     val contractId: String? = null,
-    val fresh: Boolean = false
+    val fresh: Boolean = false,
+    val prompt: Boolean = false
 )
 ```
 
-Connects to an existing smart account wallet with optional session restoration or direct connection.
+Connects to an existing smart account wallet. Returns `null` when no session exists and no WebAuthn prompt is requested, enabling a two-phase connect pattern.
 
-**Connection Options**:
-- No options (default): Try session restoration first, then WebAuthn authentication
-- `fresh = true`: Force fresh WebAuthn authentication, skip session restore
-- `credentialId` only: Look up contract from storage/indexer/derivation
-- `credentialId` + `contractId`: Direct connection without lookup
+**Options Decision Matrix**:
 
-**Returns**: `ConnectWalletResult` with credential ID, contract ID, and session restore flag
+| Options | Behavior |
+|---------|----------|
+| (default) | Session restore; return `null` if no session |
+| `credentialId` and/or `contractId` | Direct connect, skip session check; always returns non-null |
+| `fresh = true` | Skip session, always trigger WebAuthn |
+| `prompt = true` | Session restore; trigger WebAuthn if no session |
+| `fresh = true, prompt = true` | `fresh` takes priority, always trigger WebAuthn |
+
+**Returns**: `ConnectWalletResult?` -- non-null on successful connection, `null` when no session exists and `prompt` is `false`
+
+When `credentialId` and/or `contractId` are provided, the direct connect path always returns non-null.
 
 **Throws**:
-- `WebAuthnException`: Authentication failed
+- `WebAuthnException`: Authentication failed (only when WebAuthn is triggered)
 - `WalletException.NotFound`: Wallet not found for credential
 - `ValidationException`: Invalid options
 
 **Example**:
 
 ```kotlin
-// Default: try session first, then WebAuthn
+// Phase 1: Silent restore at app launch (returns null if no session)
 val result = walletOps.connectWallet()
-if (result.restoredFromSession) {
+if (result != null) {
     println("Silently reconnected to ${result.contractId}")
+} else {
+    // Show a "Connect" button in the UI
 }
+
+// Phase 2: User taps "Connect" -- triggers WebAuthn if no session
+val connected = walletOps.connectWallet(
+    ConnectWalletOptions(prompt = true)
+)
 
 // Force fresh authentication
 val fresh = walletOps.connectWallet(
     ConnectWalletOptions(fresh = true)
 )
 
-// Direct connection
+// Direct connection (always returns non-null)
 val direct = walletOps.connectWallet(
     ConnectWalletOptions(
         credentialId = "abc123...",
@@ -443,6 +457,20 @@ data class ConnectWalletResult(
 - `credentialId`: Base64URL-encoded credential ID
 - `contractId`: Smart account contract address
 - `restoredFromSession`: True if reconnected from saved session, false if new authentication
+
+#### AddPasskeySignerResult
+```kotlin
+data class AddPasskeySignerResult(
+    val credentialId: String,
+    val publicKey: ByteArray,
+    val transactionResult: TransactionResult
+)
+```
+
+**Fields**:
+- `credentialId`: Base64URL-encoded credential ID of the newly registered passkey
+- `publicKey`: 65-byte uncompressed secp256r1 public key (starts with 0x04)
+- `transactionResult`: Result of the on-chain signer addition transaction
 
 ---
 
@@ -753,6 +781,46 @@ val signerMgr = kit.signerManager
 
 ---
 
+#### addNewPasskeySigner
+
+```kotlin
+suspend fun addNewPasskeySigner(
+    contextRuleId: UInt,
+    userName: String
+): AddPasskeySignerResult
+```
+
+Registers a new passkey and adds it as a signer to a context rule in one step. Handles the full lifecycle: WebAuthn registration, credential storage, event emission, and on-chain signer addition.
+
+Internally calls the WebAuthn provider's `register()` method, stores the credential, emits a `CredentialCreated` event, and delegates to `addPasskey()` for the on-chain transaction.
+
+**Parameters**:
+- `contextRuleId`: Context rule ID (e.g., 0 for Default)
+- `userName`: Display name shown during the WebAuthn registration ceremony
+
+**Returns**: `AddPasskeySignerResult` with the new credential ID, public key, and transaction result
+
+**Throws**:
+- `WebAuthnException.NotSupported`: No WebAuthn provider configured
+- `WalletException.NotConnected`: Wallet is not connected
+- `WebAuthnException.RegistrationFailed`: Passkey registration failed
+- `TransactionException`: On-chain signer addition failed
+
+**Example**:
+
+```kotlin
+val result = kit.signerManager.addNewPasskeySigner(
+    contextRuleId = 0u,
+    userName = "Alice backup device"
+)
+println("New passkey credential: ${result.credentialId}")
+println("Transaction hash: ${result.transactionResult.hash}")
+```
+
+**TS SDK divergence**: The TypeScript SDK's `addPasskey()` returns an unsigned transaction for the caller to submit. The KMP SDK's `addNewPasskeySigner()` returns a `TransactionResult` because the transaction is assembled and submitted internally (via relayer when configured).
+
+---
+
 #### addPasskey
 
 ```kotlin
@@ -763,7 +831,7 @@ suspend fun addPasskey(
 ): TransactionResult
 ```
 
-Adds a WebAuthn passkey signer to a context rule.
+Low-level method that adds a pre-registered WebAuthn passkey signer to a context rule. Use this when you handle WebAuthn registration yourself and have the raw cryptographic materials. For most use cases, prefer `addNewPasskeySigner()`.
 
 **Parameters**:
 - `contextRuleId`: Context rule ID (e.g., 0 for Default)

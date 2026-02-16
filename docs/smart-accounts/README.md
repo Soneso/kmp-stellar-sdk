@@ -85,11 +85,13 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 
 // Step 1: Configure the kit
 //
-// You need four values from the OpenZeppelin deployment:
+// Required fields come from the OpenZeppelin deployment:
 // - rpcUrl: Soroban RPC endpoint
 // - networkPassphrase: Stellar network identifier
 // - accountWasmHash: SHA-256 hash of the smart account WASM (hex string)
 // - webauthnVerifierAddress: Deployed WebAuthn verifier contract (C-address)
+//
+// Optional fields configure platform adapters and services:
 
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
@@ -98,14 +100,12 @@ val config = OZSmartAccountConfig(
     webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
     relayerUrl = "https://relayer.example.com",    // optional: enables fee sponsoring
     indexerUrl = "https://indexer.example.com",     // optional: enables credential lookup
-    webauthnProvider = MyWebAuthnProvider()          // your platform-specific implementation
+    webauthnProvider = MyWebAuthnProvider(),         // optional: platform-specific passkey implementation
+    storage = MyStorageAdapter(),                    // optional: defaults to InMemoryStorageAdapter
+    externalWallet = null                            // optional: external signer (e.g. Freighter)
 )
 
 // Step 2: Create the kit
-//
-// Storage defaults to InMemoryStorageAdapter (for testing). For production,
-// set a platform-specific adapter (Keychain, SharedPreferences, etc.)
-// via the `storage` field in OZSmartAccountConfig.
 
 val kit = OZSmartAccountKit.create(config)
 
@@ -154,7 +154,7 @@ kit.disconnect()
 
 ### Reconnecting to an Existing Wallet
 
-On app relaunch, call `connectWallet()` to restore the session or re-authenticate:
+On app relaunch, use a two-phase connect pattern. Phase 1 silently restores the session without prompting the user. If no session exists, show a connect button and let the user trigger Phase 2.
 
 ```kotlin
 val config = OZSmartAccountConfig(
@@ -166,14 +166,20 @@ val config = OZSmartAccountConfig(
 )
 val kit = OZSmartAccountKit.create(config)
 
-val connection = kit.walletOperations.connectWallet()
-
-if (connection.restoredFromSession) {
-    // Silently reconnected from saved session (no biometric prompt)
-    println("Reconnected to ${connection.contractId}")
+// Phase 1: Silent restore at app launch (no biometric prompt)
+val result = kit.walletOperations.connectWallet()
+if (result != null) {
+    println("Reconnected to ${result.contractId}")
 } else {
-    // User authenticated with passkey
-    println("Authenticated and connected to ${connection.contractId}")
+    // No saved session -- show a "Connect" button in the UI
+}
+
+// Phase 2: User taps "Connect" -- triggers WebAuthn if no session
+val connected = kit.walletOperations.connectWallet(
+    ConnectWalletOptions(prompt = true)
+)
+if (connected != null) {
+    println("Connected to ${connected.contractId}")
 }
 ```
 
@@ -181,15 +187,15 @@ Force fresh authentication when needed (e.g., before sensitive operations):
 
 ```kotlin
 val connection = kit.walletOperations.connectWallet(
-    OZWalletOperations.ConnectWalletOptions(fresh = true)
+    ConnectWalletOptions(fresh = true)
 )
 ```
 
-Connect directly with known credentials (skips WebAuthn and session check):
+Connect directly with known credentials (skips WebAuthn and session check, always returns non-null):
 
 ```kotlin
 val connection = kit.walletOperations.connectWallet(
-    OZWalletOperations.ConnectWalletOptions(
+    ConnectWalletOptions(
         credentialId = "abc123...",
         contractId = "CABC..."
     )
@@ -207,8 +213,18 @@ val addResult = kit.signerManager.addDelegated(
     address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 )
 
-// Add another passkey signer
-val passkeyResult = kit.signerManager.addPasskey(
+// Add a new passkey signer (handles WebAuthn registration, credential storage,
+// and on-chain signer addition in one step)
+val passkeyResult = kit.signerManager.addNewPasskeySigner(
+    contextRuleId = 0u,
+    userName = "Alice backup device"
+)
+// passkeyResult.credentialId  -- Base64URL-encoded credential ID
+// passkeyResult.publicKey     -- 65-byte secp256r1 uncompressed public key
+// passkeyResult.transactionResult -- on-chain submission result
+
+// Low-level alternative: add a passkey signer with pre-extracted cryptographic materials
+val lowLevelResult = kit.signerManager.addPasskey(
     contextRuleId = 0u,
     publicKey = otherPublicKey,       // 65-byte uncompressed secp256r1 key
     credentialId = otherCredentialId  // raw credential ID bytes

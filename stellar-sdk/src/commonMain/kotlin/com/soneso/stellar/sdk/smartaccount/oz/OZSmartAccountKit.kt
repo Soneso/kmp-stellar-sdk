@@ -46,21 +46,26 @@ import kotlinx.coroutines.sync.withLock
  * val kit = OZSmartAccountKit.create(config)
  *
  * // Create a new wallet (prompts for biometric authentication)
- * val wallet = kit.walletOperations.createWallet(name = "My Wallet")
- * println("Created wallet: ${wallet.address}")
+ * val wallet = kit.walletOperations.createWallet(userName = "My Wallet")
+ * println("Created wallet: ${wallet.contractId}")
  *
- * // Connect to an existing wallet
- * val existingWallet = kit.walletOperations.connectWallet()
- * println("Connected to: ${existingWallet.address}")
+ * // Silent session check (returns null if no valid session)
+ * val existing = kit.walletOperations.connectWallet()
+ * if (existing != null) {
+ *     println("Connected to: ${existing.contractId}")
+ * }
  *
- * // Send a payment
- * val result = kit.transactionOperations.sendPayment(
- *     destination = "GABC123...",
- *     amount = 100_000_000, // 10 XLM in stroops
- *     assetCode = "USDC",
- *     assetIssuer = "GABC123..."
+ * // Session check with WebAuthn fallback if no session
+ * val connected = kit.walletOperations.connectWallet(
+ *     OZWalletOperations.ConnectWalletOptions(prompt = true)
  * )
- * println("Transaction hash: ${result.hash}")
+ * println("Connected to: ${connected?.contractId}")
+ *
+ * // Explicit connect with fresh WebAuthn prompt (skips session restore)
+ * val fresh = kit.walletOperations.connectWallet(
+ *     OZWalletOperations.ConnectWalletOptions(fresh = true)
+ * )
+ * println("Authenticated and connected to: ${fresh?.contractId}")
  *
  * // Disconnect
  * kit.disconnect()

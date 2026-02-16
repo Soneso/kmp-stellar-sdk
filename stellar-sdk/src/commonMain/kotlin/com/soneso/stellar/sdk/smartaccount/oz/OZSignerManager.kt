@@ -10,12 +10,56 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+
+/**
+ * Result of the [OZSignerManager.addNewPasskeySigner] operation.
+ *
+ * Contains the WebAuthn credential information from the registration ceremony
+ * and the on-chain transaction result from adding the passkey signer to the
+ * smart account contract.
+ *
+ * @property credentialId Base64URL-encoded credential ID (no padding)
+ * @property publicKey 65-byte uncompressed secp256r1 public key (0x04 prefix + X + Y)
+ * @property transactionResult Result from the on-chain signer addition transaction
+ */
+data class AddPasskeySignerResult(
+    val credentialId: String,
+    val publicKey: ByteArray,
+    val transactionResult: TransactionResult
+) {
+    /**
+     * Custom equals implementation that properly compares ByteArray fields.
+     */
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as AddPasskeySignerResult
+
+        if (credentialId != other.credentialId) return false
+        if (!publicKey.contentEquals(other.publicKey)) return false
+        if (transactionResult != other.transactionResult) return false
+
+        return true
+    }
+
+    /**
+     * Custom hashCode implementation that properly handles ByteArray fields.
+     */
+    override fun hashCode(): Int {
+        var result = credentialId.hashCode()
+        result = 31 * result + publicKey.contentHashCode()
+        result = 31 * result + transactionResult.hashCode()
+        return result
+    }
+}
 
 /**
  * Manager for smart account signer operations.
@@ -61,6 +105,110 @@ class OZSignerManager internal constructor(
     private val kit: OZSmartAccountKit
 ) {
     // MARK: - Add Signers
+
+    /**
+     * Registers a new WebAuthn passkey and adds it as a signer to a context rule.
+     *
+     * Performs the full end-to-end flow of creating a new passkey via the platform's
+     * WebAuthn API, persisting the credential locally, and adding it as a signer on
+     * the smart account contract. This is the high-level method for adding passkey
+     * signers; use [addPasskey] if you already have the public key and credential ID.
+     *
+     * Flow:
+     * 1. Validates that a wallet is connected and a WebAuthnProvider is configured
+     * 2. Generates cryptographically secure random challenge and user ID (32 bytes each)
+     * 3. Triggers the platform WebAuthn registration ceremony (biometric prompt)
+     * 4. Base64URL-encodes the credential ID for storage
+     * 5. Saves the credential locally via [OZCredentialManager.createPendingCredential]
+     * 6. Emits a [SmartAccountEvent.CredentialCreated] event
+     * 7. Adds the passkey signer on-chain via [addPasskey]
+     *
+     * The on-chain addition requires authorization from an existing signer on the
+     * specified context rule. The user will be prompted for biometric authentication
+     * twice: once for the new passkey registration and once for the existing signer
+     * to authorize the on-chain transaction.
+     *
+     * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
+     * @param userName User-friendly name for the new passkey (displayed by the authenticator)
+     * @return [AddPasskeySignerResult] containing the credential ID, public key, and transaction result
+     * @throws WebAuthnException.NotSupported if no WebAuthnProvider is configured
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws WebAuthnException if the WebAuthn registration ceremony fails or the user cancels
+     * @throws SmartAccountException if credential storage or on-chain signer addition fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = signerManager.addNewPasskeySigner(
+     *     contextRuleId = 0u,
+     *     userName = "Recovery Passkey"
+     * )
+     *
+     * println("Credential ID: ${result.credentialId}")
+     * println("On-chain result: ${result.transactionResult.success}")
+     * ```
+     */
+    suspend fun addNewPasskeySigner(
+        contextRuleId: UInt,
+        userName: String
+    ): AddPasskeySignerResult {
+        // Step 1: Validate wallet is connected
+        val (_, contractId) = kit.requireConnected()
+
+        // Step 2: Get WebAuthn provider, throw if not configured
+        val webauthnProvider = kit.config.webauthnProvider
+            ?: throw WebAuthnException.notSupported(
+                "No WebAuthnProvider configured. Set webauthnProvider in config before calling addNewPasskeySigner()."
+            )
+
+        // Step 3: Generate cryptographically secure random challenge and user ID (32 bytes each)
+        val crypto = getEd25519Crypto()
+        val challengeData = crypto.generatePrivateKey()
+        val userIdData = crypto.generatePrivateKey()
+
+        // Step 4: Trigger WebAuthn registration ceremony
+        val registrationResult = try {
+            webauthnProvider.register(
+                challenge = challengeData,
+                userId = userIdData,
+                userName = userName
+            )
+        } catch (e: Exception) {
+            throw WebAuthnException.registrationFailed(
+                "WebAuthn registration failed: ${e.message}",
+                e
+            )
+        }
+
+        // Step 5: Base64URL-encode credential ID for storage
+        val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(registrationResult.credentialId)
+
+        // Step 6: Save credential locally as pending
+        val credential = kit.credentialManager.createPendingCredential(
+            credentialId = credentialIdBase64url,
+            publicKey = registrationResult.publicKey,
+            contractId = contractId,
+            transports = registrationResult.transports,
+            deviceType = registrationResult.deviceType,
+            backedUp = registrationResult.backedUp
+        )
+
+        // Step 7: Emit credential created event
+        kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
+
+        // Step 8: Add passkey signer on-chain (reuse existing low-level method)
+        val transactionResult = addPasskey(
+            contextRuleId = contextRuleId,
+            publicKey = registrationResult.publicKey,
+            credentialId = registrationResult.credentialId
+        )
+
+        // Step 9: Return combined result
+        return AddPasskeySignerResult(
+            credentialId = credentialIdBase64url,
+            publicKey = registrationResult.publicKey,
+            transactionResult = transactionResult
+        )
+    }
 
     /**
      * Adds a WebAuthn passkey signer to a context rule.

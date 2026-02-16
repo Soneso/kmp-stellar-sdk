@@ -575,12 +575,25 @@ class SmartAccountKitTest {
     }
 
     @Test
-    fun testWalletOperations_connectWallet_noWebAuthnProvider() = runTest {
+    fun testWalletOperations_connectWallet_defaultReturnsNullWithNoSession() = runTest {
+        // Default options (prompt=false): no session -> return null
+        val config = createTestConfig(webauthnProvider = null)
+        val kit = OZSmartAccountKit.create(config)
+
+        val result = kit.walletOperations.connectWallet()
+        assertNull(result)
+    }
+
+    @Test
+    fun testWalletOperations_connectWallet_promptWithNoProvider_throws() = runTest {
+        // prompt=true but no WebAuthn provider -> throws NotSupported
         val config = createTestConfig(webauthnProvider = null)
         val kit = OZSmartAccountKit.create(config)
 
         assertFailsWith<WebAuthnException.NotSupported> {
-            kit.walletOperations.connectWallet()
+            kit.walletOperations.connectWallet(
+                options = OZWalletOperations.ConnectWalletOptions(prompt = true)
+            )
         }
     }
 
@@ -608,7 +621,8 @@ class SmartAccountKitTest {
     }
 
     @Test
-    fun testWalletOperations_connectWallet_withExpiredSession() = runTest {
+    fun testWalletOperations_connectWallet_expiredSessionReturnsNull() = runTest {
+        // Default options (prompt=false) with expired session -> return null
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
@@ -623,10 +637,32 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
-        // Should trigger WebAuthn authentication due to expired session
-        // This will fail without indexer/storage lookup, but test the flow
+        val result = kit.walletOperations.connectWallet()
+        assertNull(result)
+    }
+
+    @Test
+    fun testWalletOperations_connectWallet_expiredSessionWithPrompt_triggersWebAuthn() = runTest {
+        // prompt=true with expired session -> triggers WebAuthn, fails on lookup
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        // Save an expired session
+        val session = StoredSession(
+            credentialId = "test-credential-1",
+            contractId = "CBCD1234" + "A".repeat(48),
+            connectedAt = Clock.System.now().toEpochMilliseconds() - 120000,
+            expiresAt = Clock.System.now().toEpochMilliseconds() - 60000 // Expired
+        )
+        storage.saveSession(session)
+
+        // Should trigger WebAuthn authentication, then fail on contract lookup
         assertFailsWith<WalletException.NotFound> {
-            kit.walletOperations.connectWallet()
+            kit.walletOperations.connectWallet(
+                options = OZWalletOperations.ConnectWalletOptions(prompt = true)
+            )
         }
     }
 
@@ -738,6 +774,123 @@ class SmartAccountKitTest {
 
         assertNotNull(signer)
         assertEquals(32, signer.keyData.size)
+    }
+
+    // MARK: - 6a. addNewPasskeySigner Tests
+
+    @Test
+    fun testAddNewPasskeySigner_throwsWhenNotConnected() = runTest {
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val kit = OZSmartAccountKit.create(config)
+
+        // Kit is not connected -- requireConnected() should throw
+        assertFailsWith<WalletException.NotConnected> {
+            kit.signerManager.addNewPasskeySigner(
+                contextRuleId = 0u,
+                userName = "Recovery Passkey"
+            )
+        }
+    }
+
+    @Test
+    fun testAddNewPasskeySigner_throwsWhenNoWebAuthnProvider() = runTest {
+        val config = createTestConfig(webauthnProvider = null)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        // Connect the kit via a stored session so requireConnected() passes
+        val session = StoredSession(
+            credentialId = "test-credential-1",
+            contractId = "CBCD1234" + "A".repeat(48),
+            connectedAt = Clock.System.now().toEpochMilliseconds(),
+            expiresAt = Clock.System.now().toEpochMilliseconds() + 60000
+        )
+        storage.saveSession(session)
+        kit.walletOperations.connectWallet()
+
+        assertTrue(kit.isConnected)
+
+        // No WebAuthnProvider configured -- should throw NotSupported
+        assertFailsWith<WebAuthnException.NotSupported> {
+            kit.signerManager.addNewPasskeySigner(
+                contextRuleId = 0u,
+                userName = "Recovery Passkey"
+            )
+        }
+    }
+
+    @Test
+    fun testAddNewPasskeySigner_registersCredentialAndEmitsEvent() = runTest {
+        // This test verifies that addNewPasskeySigner:
+        // 1. Performs WebAuthn registration
+        // 2. Stores the credential locally
+        // 3. Emits CredentialCreated event
+        // The on-chain addPasskey step will fail (no live RPC), so we catch that
+        // and verify the steps that completed before the failure.
+
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        // Connect the kit
+        kit.setConnectedState("existing-credential", "CBCD1234" + "A".repeat(48))
+        assertTrue(kit.isConnected)
+
+        // Track emitted events
+        var credentialCreatedEvent: SmartAccountEvent.CredentialCreated? = null
+        kit.events.on<SmartAccountEvent.CredentialCreated> { event ->
+            credentialCreatedEvent = event
+        }
+
+        // The call will fail at the on-chain addPasskey step (submit to Soroban RPC),
+        // but the WebAuthn registration, credential storage, and event emission
+        // all happen before that step.
+        try {
+            kit.signerManager.addNewPasskeySigner(
+                contextRuleId = 0u,
+                userName = "Recovery Passkey"
+            )
+        } catch (e: Exception) {
+            // Expected: the on-chain submission step fails without a live RPC
+        }
+
+        // Verify the CredentialCreated event was emitted
+        assertNotNull(credentialCreatedEvent, "CredentialCreated event should have been emitted")
+        val emittedCredential = credentialCreatedEvent!!.credential
+        assertNotNull(emittedCredential.credentialId)
+        assertTrue(emittedCredential.credentialId.isNotEmpty())
+        assertEquals(65, emittedCredential.publicKey.size)
+        assertEquals(SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX, emittedCredential.publicKey[0])
+        assertEquals("CBCD1234" + "A".repeat(48), emittedCredential.contractId)
+        assertEquals(CredentialDeploymentStatus.PENDING, emittedCredential.deploymentStatus)
+
+        // Verify the credential was stored
+        val storedCredentials = storage.getAll()
+        // At least the newly created credential should be in storage
+        val newCredential = storedCredentials.find { it.credentialId == emittedCredential.credentialId }
+        assertNotNull(newCredential, "New credential should be stored in storage")
+        assertEquals(65, newCredential.publicKey.size)
+    }
+
+    @Test
+    fun testAddNewPasskeySigner_registrationFailurePropagatesAsWebAuthnException() = runTest {
+        // When the WebAuthn provider throws during registration, addNewPasskeySigner
+        // should wrap it in a WebAuthnException.RegistrationFailed
+        val mockProvider = MockWebAuthnProvider(shouldCancel = true)
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val kit = OZSmartAccountKit.create(config)
+
+        kit.setConnectedState("existing-credential", "CBCD1234" + "A".repeat(48))
+
+        val exception = assertFailsWith<WebAuthnException.RegistrationFailed> {
+            kit.signerManager.addNewPasskeySigner(
+                contextRuleId = 0u,
+                userName = "Recovery Passkey"
+            )
+        }
+        assertTrue(exception.message.contains("WebAuthn registration failed"))
     }
 
     // MARK: - 7. Context Rule Manager Tests
@@ -1593,18 +1746,6 @@ class SmartAccountKitTest {
         assertNull(client)
     }
 
-    // MARK: - GAP-02: authenticatePasskey Tests
-
-    @Test
-    fun testWalletOperations_authenticatePasskey_noProvider() = runTest {
-        val config = createTestConfig()
-        val kit = OZSmartAccountKit.create(config)
-
-        assertFailsWith<WebAuthnException.NotSupported> {
-            kit.walletOperations.connectWallet()
-        }
-    }
-
     // MARK: - GAP-04: IndexerClient getStats/isHealthy Tests
 
     @Test
@@ -1822,6 +1963,7 @@ class SmartAccountKitTest {
         assertNull(options.credentialId)
         assertNull(options.contractId)
         assertFalse(options.fresh)
+        assertFalse(options.prompt)
     }
 
     @Test
@@ -1830,6 +1972,7 @@ class SmartAccountKitTest {
         assertEquals("test-credential", options.credentialId)
         assertNull(options.contractId)
         assertFalse(options.fresh)
+        assertFalse(options.prompt)
     }
 
     @Test
@@ -1838,6 +1981,16 @@ class SmartAccountKitTest {
         assertNull(options.credentialId)
         assertNull(options.contractId)
         assertTrue(options.fresh)
+        assertFalse(options.prompt)
+    }
+
+    @Test
+    fun testConnectWalletOptions_withPrompt() = runTest {
+        val options = OZWalletOperations.ConnectWalletOptions(prompt = true)
+        assertNull(options.credentialId)
+        assertNull(options.contractId)
+        assertFalse(options.fresh)
+        assertTrue(options.prompt)
     }
 
     @Test
@@ -1849,6 +2002,7 @@ class SmartAccountKitTest {
         assertEquals("test-credential", options.credentialId)
         assertEquals("CBCD1234" + "A".repeat(48), options.contractId)
         assertFalse(options.fresh)
+        assertFalse(options.prompt)
     }
 
     @Test
@@ -1907,6 +2061,58 @@ class SmartAccountKitTest {
         assertFailsWith<WalletException.NotFound> {
             kit.walletOperations.connectWallet(
                 options = OZWalletOperations.ConnectWalletOptions(fresh = true)
+            )
+        }
+    }
+
+    @Test
+    fun testConnectWallet_noSessionDefaultReturnsNull() = runTest {
+        // No session, default options (prompt=false) -> returns null
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        val result = kit.walletOperations.connectWallet()
+        assertNull(result)
+    }
+
+    @Test
+    fun testConnectWallet_noSessionWithPrompt_triggersWebAuthn() = runTest {
+        // No session, prompt=true -> triggers WebAuthn, fails on contract lookup
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        assertFailsWith<WalletException.NotFound> {
+            kit.walletOperations.connectWallet(
+                options = OZWalletOperations.ConnectWalletOptions(prompt = true)
+            )
+        }
+    }
+
+    @Test
+    fun testConnectWallet_freshTakesPriorityOverPrompt() = runTest {
+        // fresh=true, prompt=true -> fresh takes priority, skips session, triggers WebAuthn
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val storage = InMemoryStorageAdapter()
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+
+        // Save a valid session
+        val session = StoredSession(
+            credentialId = "test-credential-1",
+            contractId = "CBCD1234" + "A".repeat(48),
+            connectedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+            expiresAt = kotlin.time.Clock.System.now().toEpochMilliseconds() + 60000
+        )
+        storage.saveSession(session)
+
+        // fresh=true skips session even though it's valid, triggers WebAuthn, fails on lookup
+        assertFailsWith<WalletException.NotFound> {
+            kit.walletOperations.connectWallet(
+                options = OZWalletOperations.ConnectWalletOptions(fresh = true, prompt = true)
             )
         }
     }

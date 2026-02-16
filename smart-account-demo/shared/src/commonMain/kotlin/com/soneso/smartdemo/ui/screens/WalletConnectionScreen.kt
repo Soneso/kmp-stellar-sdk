@@ -51,7 +51,6 @@ import com.soneso.stellar.sdk.AssetTypeNative
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.smartaccount.oz.AuthenticatePasskeyResult
-import com.soneso.stellar.sdk.smartaccount.oz.ConnectWalletResult
 import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import kotlinx.coroutines.launch
@@ -147,7 +146,16 @@ class WalletConnectionScreen : Screen {
                                             return@launch
                                         }
 
-                                        val result: ConnectWalletResult = kit.walletOperations.connectWallet()
+                                        // Use prompt = true so WebAuthn is triggered if no session
+                                        val result = kit.walletOperations.connectWallet(
+                                            OZWalletOperations.ConnectWalletOptions(prompt = true)
+                                        )
+
+                                        if (result == null) {
+                                            // Should not happen with prompt = true, but handle defensively
+                                            ActivityLogState.info("No wallet session found")
+                                            return@launch
+                                        }
 
                                         if (result.restoredFromSession) {
                                             ActivityLogState.success("Restored from saved session")
@@ -249,11 +257,18 @@ class WalletConnectionScreen : Screen {
                                             authenticatedCredentialId = authResult.credentialId
                                             ActivityLogState.success("Authenticated with credential: ${authResult.credentialId.take(16)}...")
 
-                                            // Connect with credential ID - SDK will handle indexer lookup internally
+                                            // Connect with credential ID - SDK will handle indexer lookup internally.
+                                            // Throws WalletException.NotFound if no contract is found for this credential.
                                             ActivityLogState.info("Looking up contract for credential...")
                                             val result = kit.walletOperations.connectWallet(
                                                 OZWalletOperations.ConnectWalletOptions(credentialId = authResult.credentialId)
                                             )
+
+                                            if (result == null) {
+                                                ActivityLogState.error("Failed to resolve contract for credential")
+                                                return@launch
+                                            }
+
                                             ActivityLogState.success("Connected to contract: ${result.contractId}")
                                             DemoState.setConnected(true, result.contractId, result.credentialId)
                                             fetchBalance(result.contractId)
@@ -402,12 +417,18 @@ class WalletConnectionScreen : Screen {
                                                                     }
 
                                                                     ActivityLogState.info("Retrying deployment for ${credential.credentialId.take(16)}...")
+                                                                    // connectWallet throws WalletException.NotFound if the credential cannot be resolved.
                                                                     val result = kit.walletOperations.connectWallet(
                                                                         OZWalletOperations.ConnectWalletOptions(
                                                                             credentialId = credential.credentialId,
                                                                             contractId = credential.contractId
                                                                         )
                                                                     )
+
+                                                                    if (result == null) {
+                                                                        ActivityLogState.error("Failed to connect with pending credential")
+                                                                        return@launch
+                                                                    }
 
                                                                     ActivityLogState.success("Successfully deployed contract")
                                                                     DemoState.setConnected(true, result.contractId, result.credentialId)

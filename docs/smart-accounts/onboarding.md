@@ -65,8 +65,12 @@ kit.signerManager.addDelegated(contextRuleId = 0u, address = "GA7QYNF7...")
 
 On-chain representation: `Vec([Symbol("External"), Address(verifier), Bytes(publicKey + credentialId)])`
 
-SDK method:
+SDK methods:
 ```kotlin
+// Convenience: registers a new passkey and adds it as a signer in one step
+kit.signerManager.addNewPasskeySigner(contextRuleId = 0u, userName = "Alice")
+
+// Low-level: adds a pre-registered passkey signer with raw cryptographic materials
 kit.signerManager.addPasskey(
     contextRuleId = 0u,
     publicKey = secp256r1PublicKey,     // public key from passkey registration
@@ -328,9 +332,9 @@ App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles t
 
 ### Reconnecting
 
-1. On app relaunch, the SDK checks for a saved session in the `StorageAdapter` (a platform-specific interface for persisting credentials and session data, covered in the [SDK guide](README.md)).
-2. If a valid (non-expired) session exists, the wallet is silently reconnected. No biometric prompt is shown. The SDK loads the credential ID and contract ID from the session. Sessions last 7 days by default, configurable via `sessionExpiryMs` in `OZSmartAccountConfig`.
-3. If no session exists or it has expired, the user must authenticate with their passkey again. The operating system shows a biometric prompt.
+1. On app relaunch, the app calls `connectWallet()` with default options. The SDK checks for a saved session in the `StorageAdapter` (a platform-specific interface for persisting credentials and session data, covered in the [SDK guide](README.md)).
+2. If a valid (non-expired) session exists, the wallet is silently reconnected. No biometric prompt is shown. The SDK loads the credential ID and contract ID from the session and returns a non-null `ConnectWalletResult`. Sessions last 7 days by default, configurable via `sessionExpiryMs` in `OZSmartAccountConfig`.
+3. If no session exists or it has expired, `connectWallet()` returns `null`. The app can then show a "Connect" button and call `connectWallet(ConnectWalletOptions(prompt = true))` when the user taps it, which triggers a WebAuthn biometric prompt.
 4. After authentication, the SDK derives or looks up the contract address (via derivation or indexer) and verifies it exists on-chain by querying Soroban RPC.
 
 ---
