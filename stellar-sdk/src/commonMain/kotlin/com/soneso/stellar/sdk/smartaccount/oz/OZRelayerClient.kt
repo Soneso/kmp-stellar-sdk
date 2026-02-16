@@ -21,6 +21,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -180,11 +181,12 @@ class OZRelayerClient(
             )
         }
 
-        // Build request payload
-        val payload = mapOf(
-            "func" to funcBase64,
-            "auth" to authBase64Array
-        )
+        // Build request payload as JsonObject to avoid kotlinx-serialization
+        // errors with heterogeneous Map<String, Any> (String + List<String>)
+        val payload = JsonObject(mapOf(
+            "func" to JsonPrimitive(funcBase64),
+            "auth" to JsonArray(authBase64Array.map { JsonPrimitive(it) })
+        ))
 
         return performRequest(payload, perRequestTimeoutMs)
     }
@@ -215,10 +217,10 @@ class OZRelayerClient(
             )
         }
 
-        // Build request payload
-        val payload = mapOf(
-            "xdr" to xdrBase64
-        )
+        // Build request payload as JsonObject for consistent serialization
+        val payload = JsonObject(mapOf(
+            "xdr" to JsonPrimitive(xdrBase64)
+        ))
 
         return performRequest(payload, perRequestTimeoutMs)
     }
@@ -244,7 +246,7 @@ class OZRelayerClient(
      * @return The parsed relayer response (never throws)
      */
     private suspend fun performRequest(
-        payload: Map<String, Any>,
+        payload: JsonObject,
         perRequestTimeoutMs: Long? = null
     ): RelayerResponse {
         val effectiveTimeout = perRequestTimeoutMs ?: timeoutMs

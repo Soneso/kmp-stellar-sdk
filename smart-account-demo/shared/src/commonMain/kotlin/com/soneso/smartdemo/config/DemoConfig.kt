@@ -22,10 +22,14 @@ object DemoConfig {
     // Token Contracts
     const val NATIVE_TOKEN_CONTRACT = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 
-    // Relayer (optional fee sponsoring, empty = disabled)
-    const val DEFAULT_RELAYER_URL = ""
+    // Relayer (fee sponsoring via Cloudflare Workers proxy)
+    const val DEFAULT_RELAYER_URL = "https://smart-account-relayer-proxy.soneso.workers.dev"
+
+    // Indexer (credential-to-contract lookup)
+    const val DEFAULT_INDEXER_URL = "https://smart-account-indexer.sdf-ecosystem.workers.dev"
 
     // Relying Party for WebAuthn
+    const val DEFAULT_RP_ID = "soneso.com"
     const val RP_NAME = "Smart Account Kit Demo"
 
     // UI Constants

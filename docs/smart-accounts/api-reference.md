@@ -297,7 +297,7 @@ Creates a new smart account wallet with WebAuthn passkey authentication.
 
 **Parameters**:
 - `userName`: Display name for the user
-- `autoSubmit`: Whether to automatically submit the deploy transaction
+- `autoSubmit`: Whether to automatically submit the deploy transaction. When a relayer is configured, the transaction is submitted via the relayer which sponsors fees on behalf of the deployer. Without a relayer, the deployer account must be funded to pay fees directly.
 - `autoFund`: Whether to automatically fund the wallet after deployment (testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 

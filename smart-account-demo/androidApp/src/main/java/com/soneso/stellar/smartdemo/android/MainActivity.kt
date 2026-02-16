@@ -28,11 +28,10 @@ class MainActivity : ComponentActivity() {
                 val storage = AndroidStorageAdapter(this@MainActivity)
 
                 // Create WebAuthn provider for passkey authentication
-                // IMPORTANT: For production, replace "your-domain.example.com" with your actual domain
-                // and configure Digital Asset Links as documented in AndroidManifest.xml
+                // rpId must match the domain configured in assetlinks.json
                 val webauthnProvider = AndroidWebAuthnProvider(
                     context = this@MainActivity,
-                    rpId = "your-domain.example.com", // Must match assetlinks.json domain
+                    rpId = DemoConfig.DEFAULT_RP_ID,
                     rpName = DemoConfig.RP_NAME
                 )
 
@@ -44,6 +43,7 @@ class MainActivity : ComponentActivity() {
                     webauthnVerifierAddress = DemoState.webauthnVerifier,
                     rpName = DemoConfig.RP_NAME,
                     relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
+                    indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
                     webauthnProvider = webauthnProvider,
                     storage = storage
                 )

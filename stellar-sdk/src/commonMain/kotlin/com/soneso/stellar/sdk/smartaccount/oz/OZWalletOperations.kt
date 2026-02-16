@@ -18,6 +18,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.rpc.assembleTransaction
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
@@ -1061,7 +1062,10 @@ class OZWalletOperations internal constructor(
     /**
      * Deploys a smart account wallet contract.
      *
-     * Builds, simulates, signs, and submits a deployment transaction.
+     * Builds, simulates, and signs a deployment transaction. When a relayer is
+     * configured, submits the signed transaction via [OZRelayerClient.sendXdr]
+     * which fee-bumps it (relayer sponsors fees). When no relayer is configured,
+     * submits directly to Soroban RPC (deployer must be funded).
      * Polls for confirmation and returns the transaction hash on success.
      *
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
@@ -1110,15 +1114,6 @@ class OZWalletOperations internal constructor(
 
         val constructorArgs = listOf(signersScVal, policiesScVal)
 
-        // TODO: Build proper CreateContractArgsV2Xdr with WASM hash and constructor args
-        // This requires:
-        // 1. ContractIDPreimageXdr.FromAddress with deployer address and salt
-        // 2. ContractExecutableXdr.StellarAsset with WASM hash
-        // 3. Constructor arguments list
-        //
-        // For now, this is a placeholder showing the required structure.
-        // The proper implementation needs to match the iOS SDK's InvokeHostFunctionOperation.forCreatingContractWithConstructor
-
         val deployer = kit.getDeployer()
         val salt = SmartAccountUtils.getContractSalt(credentialId = credentialId)
 
@@ -1165,7 +1160,9 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Build transaction
+        // Build transaction.
+        // Relayer requires maxTime <= 30 seconds from now; use 300 for direct submission.
+        val timeoutSeconds = if (kit.relayerClient != null) 30L else 300L
         val transaction = try {
             TransactionBuilder(
                 sourceAccount = deployerAccount,
@@ -1174,7 +1171,7 @@ class OZWalletOperations internal constructor(
                 .setBaseFee(100)
                 .addOperation(operation)
                 .addMemo(MemoNone)
-                .setTimeout(300)
+                .setTimeout(timeoutSeconds)
                 .build()
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
@@ -1217,34 +1214,40 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Assemble transaction from simulation
-        val transactionData = simulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from simulation"
-            )
-
-        val minResourceFee = simulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from simulation"
-            )
-
-        // Build updated transaction with Soroban data and resource fee
-        val updatedTransaction = try {
-            TransactionBuilder(
-                sourceAccount = deployerAccount,
-                network = Network(networkPassphrase = kit.config.networkPassphrase)
-            )
-                .setBaseFee(100 + minResourceFee)
-                .addOperation(operation)
-                .addMemo(MemoNone)
-                .setSorobanData(transactionData)
-                .setTimeout(300)
-                .build()
+        // Assemble transaction from simulation. assembleTransaction handles:
+        // - Updating auth entries from simulation results
+        // - Setting soroban data (footprint, resource limits)
+        // - Calculating fee as classicFee + minResourceFee
+        val assembled = try {
+            assembleTransaction(transaction, simulation)
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
-                "Failed to build updated transaction: ${e.message}",
+                "Failed to assemble transaction: ${e.message}",
                 e
             )
+        }
+
+        // When using a relayer, the fee must equal exactly the resource fee
+        // (relayer wraps it in a fee-bump with the outer fee).
+        // assembleTransaction sets fee = classicFee + resourceFee, so reconstruct
+        // with fee = resourceFee only for the relayer path.
+        val updatedTransaction = if (kit.relayerClient != null) {
+            val minResourceFee = simulation.minResourceFee
+                ?: throw TransactionException.submissionFailed(
+                    "Failed to get min resource fee from simulation"
+                )
+            Transaction(
+                sourceAccount = assembled.sourceAccount,
+                fee = minResourceFee,
+                sequenceNumber = assembled.sequenceNumber,
+                operations = assembled.operations,
+                memo = assembled.memo,
+                preconditions = assembled.preconditions,
+                sorobanData = assembled.sorobanData,
+                network = assembled.network
+            )
+        } else {
+            assembled
         }
 
         // Sign with deployer
@@ -1257,44 +1260,80 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Submit transaction
-        val sendResult = try {
-            kit.sorobanServer.sendTransaction(transaction = updatedTransaction)
-        } catch (e: Exception) {
-            // Mark deployment as failed
-            try {
-                credentialManager.markDeploymentFailed(
-                    credentialId = credentialIdBase64url,
-                    error = "Failed to send transaction: ${e.message}"
-                )
-            } catch (markError: Exception) {
-                // Ignore
-            }
-            throw TransactionException.submissionFailed(
-                "Failed to send deployment transaction: ${e.message}",
-                e
-            )
-        }
+        // Submit transaction via relayer (fee-bump) or directly to Soroban RPC
+        val transactionHash: String
 
-        if (sendResult.errorResultXdr != null) {
-            // Mark deployment as failed
-            try {
-                credentialManager.markDeploymentFailed(
-                    credentialId = credentialIdBase64url,
-                    error = "Transaction error: ${sendResult.errorResultXdr}"
-                )
+        val relayer = kit.relayerClient
+        if (relayer != null) {
+            // Use relayer XDR mode: relayer fee-bumps the signed transaction
+            val txEnvelope = updatedTransaction.toEnvelopeXdr()
+            val relayerResponse = try {
+                relayer.sendXdr(txEnvelope)
             } catch (e: Exception) {
-                // Ignore
+                try {
+                    credentialManager.markDeploymentFailed(
+                        credentialId = credentialIdBase64url,
+                        error = "Relayer submission failed: ${e.message}"
+                    )
+                } catch (_: Exception) {}
+                throw TransactionException.submissionFailed(
+                    "Failed to submit deployment via relayer: ${e.message}",
+                    e
+                )
             }
-            throw TransactionException.submissionFailed(
-                "Deployment transaction error: ${sendResult.errorResultXdr}"
-            )
-        }
 
-        val transactionHash = sendResult.hash
-            ?: throw TransactionException.submissionFailed(
-                "No transaction hash returned from submission"
-            )
+            if (!relayerResponse.success) {
+                val errorMsg = relayerResponse.error ?: "Relayer submission failed"
+                try {
+                    credentialManager.markDeploymentFailed(
+                        credentialId = credentialIdBase64url,
+                        error = "Relayer error: $errorMsg"
+                    )
+                } catch (_: Exception) {}
+                throw TransactionException.submissionFailed(
+                    "Deployment relayer error: $errorMsg"
+                )
+            }
+
+            transactionHash = relayerResponse.hash
+                ?: throw TransactionException.submissionFailed(
+                    "No transaction hash returned from relayer"
+                )
+        } else {
+            // No relayer configured: submit directly to Soroban RPC
+            // NOTE: The deployer account must be funded with XLM to pay fees
+            val sendResult = try {
+                kit.sorobanServer.sendTransaction(transaction = updatedTransaction)
+            } catch (e: Exception) {
+                try {
+                    credentialManager.markDeploymentFailed(
+                        credentialId = credentialIdBase64url,
+                        error = "Failed to send transaction: ${e.message}"
+                    )
+                } catch (_: Exception) {}
+                throw TransactionException.submissionFailed(
+                    "Failed to send deployment transaction: ${e.message}",
+                    e
+                )
+            }
+
+            if (sendResult.errorResultXdr != null) {
+                try {
+                    credentialManager.markDeploymentFailed(
+                        credentialId = credentialIdBase64url,
+                        error = "Transaction error: ${sendResult.errorResultXdr}"
+                    )
+                } catch (_: Exception) {}
+                throw TransactionException.submissionFailed(
+                    "Deployment transaction error: ${sendResult.errorResultXdr}"
+                )
+            }
+
+            transactionHash = sendResult.hash
+                ?: throw TransactionException.submissionFailed(
+                    "No transaction hash returned from submission"
+                )
+        }
 
         // Poll for confirmation
         var confirmed = false

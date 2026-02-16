@@ -14,11 +14,22 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.*
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1339,8 +1350,163 @@ class SmartAccountKitTest {
         assertTrue(client.isConfigured)
     }
 
-    // Note: Full relayer tests would require a mock HTTP client
-    // That's beyond the scope of pure KMP common tests without platform-specific mocking
+    @Test
+    fun testRelayerClient_send_buildsCorrectJsonPayload() = runTest {
+        // Verify that send() builds a JsonObject payload with "func" (String)
+        // and "auth" (JsonArray of Strings). This confirms the fix for the bug
+        // where Map<String, Any> with mixed types caused serialization failure.
+
+        var capturedBody: String? = null
+
+        val mockClient = HttpClient(MockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+            engine {
+                addHandler { request ->
+                    capturedBody = request.body.toByteArray().decodeToString()
+                    respond(
+                        content = """{"success": true, "data": {"hash": "abc123"}}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+
+        val relayer = OZRelayerClient(
+            relayerUrl = "https://relayer.example.com",
+            httpClient = mockClient
+        )
+
+        // Build a minimal HostFunctionXdr.InvokeContract
+        val contractAddress = SCAddressXdr.ContractId(
+            ContractIDXdr(HashXdr(ByteArray(32)))
+        )
+        val hostFunction = HostFunctionXdr.InvokeContract(
+            InvokeContractArgsXdr(
+                contractAddress = contractAddress,
+                functionName = SCSymbolXdr("hello"),
+                args = listOf(SCValXdr.Sym(SCSymbolXdr("world")))
+            )
+        )
+
+        // Build a minimal SorobanAuthorizationEntryXdr
+        val authEntry = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Void,
+            rootInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.ContractFn(
+                    InvokeContractArgsXdr(
+                        contractAddress = contractAddress,
+                        functionName = SCSymbolXdr("hello"),
+                        args = emptyList()
+                    )
+                ),
+                subInvocations = emptyList()
+            )
+        )
+
+        val response = relayer.send(hostFunction, listOf(authEntry))
+
+        // Verify the response was parsed correctly
+        assertTrue(response.success)
+        assertEquals("abc123", response.hash)
+
+        // Verify the captured request body is valid JSON with correct structure
+        assertNotNull(capturedBody)
+        val json = Json.parseToJsonElement(capturedBody!!).jsonObject
+
+        // "func" must be a string (base64-encoded XDR)
+        assertTrue(json.containsKey("func"), "Payload must contain 'func' key")
+        val funcValue = json["func"]!!.jsonPrimitive.content
+        assertTrue(funcValue.isNotEmpty(), "func value must be non-empty base64 string")
+
+        // "auth" must be a JSON array of strings
+        assertTrue(json.containsKey("auth"), "Payload must contain 'auth' key")
+        val authArray = json["auth"]!!.jsonArray
+        assertEquals(1, authArray.size, "auth array should have 1 entry")
+        val authEntryBase64 = authArray[0].jsonPrimitive.content
+        assertTrue(authEntryBase64.isNotEmpty(), "auth entry must be non-empty base64 string")
+
+        mockClient.close()
+    }
+
+    @Test
+    fun testRelayerClient_sendXdr_buildsCorrectJsonPayload() = runTest {
+        // Verify that sendXdr() builds a JsonObject payload with "xdr" (String).
+        // This confirms the consistent JsonObject serialization approach.
+
+        var capturedBody: String? = null
+
+        val mockClient = HttpClient(MockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+            engine {
+                addHandler { request ->
+                    capturedBody = request.body.toByteArray().decodeToString()
+                    respond(
+                        content = """{"success": true, "data": {"hash": "def456"}}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+
+        val relayer = OZRelayerClient(
+            relayerUrl = "https://relayer.example.com",
+            httpClient = mockClient
+        )
+
+        // Build a minimal TransactionEnvelopeXdr.V1
+        val sourceAccount = MuxedAccountXdr.Ed25519(Uint256Xdr(ByteArray(32)))
+        val tx = TransactionXdr(
+            sourceAccount = sourceAccount,
+            fee = Uint32Xdr(100u),
+            seqNum = SequenceNumberXdr(Int64Xdr(1L)),
+            cond = PreconditionsXdr.Void,
+            memo = MemoXdr.Void,
+            operations = listOf(
+                OperationXdr(
+                    sourceAccount = null,
+                    body = OperationBodyXdr.BumpSequenceOp(
+                        BumpSequenceOpXdr(
+                            bumpTo = SequenceNumberXdr(Int64Xdr(1L))
+                        )
+                    )
+                )
+            ),
+            ext = TransactionExtXdr.Void
+        )
+        val envelope = TransactionEnvelopeXdr.V1(
+            TransactionV1EnvelopeXdr(
+                tx = tx,
+                signatures = emptyList()
+            )
+        )
+
+        val response = relayer.sendXdr(envelope)
+
+        // Verify the response was parsed correctly
+        assertTrue(response.success)
+        assertEquals("def456", response.hash)
+
+        // Verify the captured request body is valid JSON with correct structure
+        assertNotNull(capturedBody)
+        val json = Json.parseToJsonElement(capturedBody!!).jsonObject
+
+        // "xdr" must be a string (base64-encoded transaction envelope XDR)
+        assertTrue(json.containsKey("xdr"), "Payload must contain 'xdr' key")
+        val xdrValue = json["xdr"]!!.jsonPrimitive.content
+        assertTrue(xdrValue.isNotEmpty(), "xdr value must be non-empty base64 string")
+
+        // Verify the XDR round-trips: decode the base64 back to a TransactionEnvelopeXdr
+        val decoded = TransactionEnvelopeXdr.fromXdrBase64(xdrValue)
+        assertTrue(decoded is TransactionEnvelopeXdr.V1, "Decoded envelope should be V1")
+
+        mockClient.close()
+    }
 
     // MARK: - 11. Indexer Client Tests
 
@@ -1953,6 +2119,63 @@ class SmartAccountKitTest {
         )
 
         assertNotNull(result)
+    }
+
+    // MARK: - Deployment-via-relayer behavior tests
+
+    @Test
+    fun testCreateWallet_autoSubmitRequiresRelayerOrFundedDeployer() = runTest {
+        // When autoSubmit = true and no relayer is configured, the deploy path
+        // submits directly to Soroban RPC. Since the deployer has no XLM,
+        // this must fail gracefully with a TransactionException.
+        val mockProvider = MockWebAuthnProvider()
+        val deployer = KeyPair.random()
+        val config = createTestConfig(webauthnProvider = mockProvider, deployer = deployer)
+        val kit = OZSmartAccountKit.create(config)
+
+        // No relayer configured
+        assertNull(kit.relayerClient)
+
+        // autoSubmit = true triggers deployWallet(), which calls sorobanServer.getAccount()
+        // for the unfunded deployer. This network call fails because the deployer has
+        // no account on testnet, resulting in a TransactionException.
+        val exception = assertFailsWith<TransactionException> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = true
+            )
+        }
+        // The exception should indicate the deployment submission failed
+        assertTrue(
+            exception.message.contains("deploy", ignoreCase = true) ||
+            exception.message.contains("Failed", ignoreCase = true) ||
+            exception.message.contains("transaction", ignoreCase = true),
+            "Exception message should reference deployment failure, but was: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testCreateWallet_autoSubmitValidationStillWorks() = runTest {
+        // Even with autoSubmit = true, the early validation for autoFund requiring
+        // nativeTokenContract must fire before any deployment attempt is made.
+        val mockProvider = MockWebAuthnProvider()
+        val deployer = KeyPair.random()
+        val config = createTestConfig(webauthnProvider = mockProvider, deployer = deployer)
+        val kit = OZSmartAccountKit.create(config)
+
+        // autoFund = true but nativeTokenContract = null should throw immediately
+        val exception = assertFailsWith<ValidationException.InvalidInput> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = true,
+                autoFund = true,
+                nativeTokenContract = null
+            )
+        }
+        assertTrue(
+            exception.message.contains("nativeTokenContract"),
+            "Exception message should contain 'nativeTokenContract', but was: ${exception.message}"
+        )
     }
 
     // MARK: - Fix 4: connectWallet with options

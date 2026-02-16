@@ -35,6 +35,7 @@ object DemoState {
     var webauthnVerifier: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.WEBAUTHN_VERIFIER_ADDRESS)
     var ed25519Verifier: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.ED25519_VERIFIER_ADDRESS)
     var relayerUrl: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.DEFAULT_RELAYER_URL)
+    var indexerUrl: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.DEFAULT_INDEXER_URL)
 
     fun setKitInstance(newKit: OZSmartAccountKit) {
         kit = newKit

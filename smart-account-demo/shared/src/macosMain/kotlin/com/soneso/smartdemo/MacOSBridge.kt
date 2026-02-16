@@ -70,11 +70,9 @@ class MacOSBridge {
                 ActivityLogState.info("Initializing Smart Account Kit for macOS...")
 
                 // Create WebAuthn provider for passkey authentication with Touch ID
-                // rpId should match the domain in Associated Domains entitlement
-                // For development, use a test domain (e.g., "demo.stellar.org")
-                // For production, use your actual app domain
+                // rpId must match the domain in Associated Domains entitlement
                 val webauthnProvider = AppleWebAuthnProvider(
-                    rpId = "demo.stellar.org",  // TODO: Replace with actual domain
+                    rpId = DemoConfig.DEFAULT_RP_ID,
                     rpName = DemoConfig.RP_NAME
                 )
 
@@ -90,6 +88,8 @@ class MacOSBridge {
                     accountWasmHash = DemoConfig.ACCOUNT_WASM_HASH,
                     webauthnVerifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
                     rpName = DemoConfig.RP_NAME,
+                    relayerUrl = DemoConfig.DEFAULT_RELAYER_URL,
+                    indexerUrl = DemoConfig.DEFAULT_INDEXER_URL,
                     webauthnProvider = webauthnProvider,
                     storage = storage
                 )

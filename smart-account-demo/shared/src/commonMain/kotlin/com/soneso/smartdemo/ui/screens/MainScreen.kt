@@ -67,7 +67,7 @@ class MainScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
 
-        var configExpanded by remember { mutableStateOf(true) }
+        var configExpanded by remember { mutableStateOf(false) }
         var policiesExpanded by remember { mutableStateOf(false) }
         var isRefreshingBalance by remember { mutableStateOf(false) }
 
@@ -81,6 +81,7 @@ class MainScreen : Screen {
                         accountWasmHash = DemoState.accountWasmHash,
                         webauthnVerifierAddress = DemoState.webauthnVerifier,
                         relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
+                        indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
                         storage = InMemoryStorageAdapter()
                     )
                     val kit = OZSmartAccountKit.create(config)
@@ -88,6 +89,9 @@ class MainScreen : Screen {
                     ActivityLogState.success("SDK initialized with default configuration")
                     if (DemoState.relayerUrl.isNotBlank()) {
                         ActivityLogState.info("Relayer fee sponsoring enabled")
+                    }
+                    if (DemoState.indexerUrl.isNotBlank()) {
+                        ActivityLogState.info("Indexer lookup enabled")
                     }
                 } catch (e: Exception) {
                     ActivityLogState.error("Failed to initialize SDK: ${e.message}")
@@ -188,8 +192,19 @@ class MainScreen : Screen {
                             OutlinedTextField(
                                 value = DemoState.relayerUrl,
                                 onValueChange = { DemoState.relayerUrl = it },
-                                label = { Text("Relayer URL (Optional)") },
-                                placeholder = { Text("Optional - for fee sponsoring") },
+                                label = { Text("Relayer URL") },
+                                placeholder = { Text("Relayer proxy for fee sponsoring") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = DemoState.indexerUrl,
+                                onValueChange = { DemoState.indexerUrl = it },
+                                label = { Text("Indexer URL") },
+                                placeholder = { Text("Indexer for credential lookup") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -220,6 +235,7 @@ class MainScreen : Screen {
                                                 accountWasmHash = DemoState.accountWasmHash,
                                                 webauthnVerifierAddress = DemoState.webauthnVerifier,
                                                 relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
+                                                indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
                                                 storage = InMemoryStorageAdapter()
                                             )
                                             val kit = OZSmartAccountKit.create(config)
@@ -227,6 +243,9 @@ class MainScreen : Screen {
                                             ActivityLogState.success("SDK initialized")
                                             if (DemoState.relayerUrl.isNotBlank()) {
                                                 ActivityLogState.info("Relayer fee sponsoring enabled")
+                                            }
+                                            if (DemoState.indexerUrl.isNotBlank()) {
+                                                ActivityLogState.info("Indexer lookup enabled")
                                             }
                                         } catch (e: Exception) {
                                             ActivityLogState.error("Configuration failed: ${e.message}")
