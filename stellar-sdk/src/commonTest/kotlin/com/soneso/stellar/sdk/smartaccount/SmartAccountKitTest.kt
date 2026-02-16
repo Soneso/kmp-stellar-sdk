@@ -609,12 +609,14 @@ class SmartAccountKitTest {
     }
 
     @Test
-    fun testWalletOperations_connectWallet_withValidSession() = runTest {
+    fun testWalletOperations_connectWallet_withValidSession_noNetwork() = runTest {
+        // Session restore now verifies the contract on-chain (matching TS SDK).
+        // Without network access, verification fails and the stale session is cleared.
+        // With prompt=false (default), connectWallet returns null.
         val config = createTestConfig()
         val storage = InMemoryStorageAdapter()
         val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
-        // Save a valid session
         val session = StoredSession(
             credentialId = "test-credential-1",
             contractId = "CBCD1234" + "A".repeat(48),
@@ -623,12 +625,12 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
+        // On-chain verification fails -> session cleared -> returns null (prompt=false)
         val result = kit.walletOperations.connectWallet()
+        assertNull(result)
 
-        assertNotNull(result)
-        assertEquals("test-credential-1", result.credentialId)
-        assertEquals(session.contractId, result.contractId)
-        assertTrue(result.restoredFromSession)
+        // Session should have been cleared
+        assertNull(storage.getSession())
     }
 
     @Test
@@ -807,18 +809,13 @@ class SmartAccountKitTest {
     @Test
     fun testAddNewPasskeySigner_throwsWhenNoWebAuthnProvider() = runTest {
         val config = createTestConfig(webauthnProvider = null)
-        val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
+        val kit = OZSmartAccountKit.create(config)
 
-        // Connect the kit via a stored session so requireConnected() passes
-        val session = StoredSession(
+        // Set connected state directly (session restore requires network for on-chain verification)
+        kit.setConnectedState(
             credentialId = "test-credential-1",
-            contractId = "CBCD1234" + "A".repeat(48),
-            connectedAt = Clock.System.now().toEpochMilliseconds(),
-            expiresAt = Clock.System.now().toEpochMilliseconds() + 60000
+            contractId = "CBCD1234" + "A".repeat(48)
         )
-        storage.saveSession(session)
-        kit.walletOperations.connectWallet()
 
         assertTrue(kit.isConnected)
 
@@ -2244,6 +2241,8 @@ class SmartAccountKitTest {
 
     @Test
     fun testConnectWallet_withOptionsAcceptsParameter() = runTest {
+        // ConnectWalletOptions() with defaults (prompt=false, fresh=false) should work.
+        // Without network access, session verification fails and returns null.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
@@ -2257,13 +2256,11 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
+        // On-chain verification fails -> session cleared -> returns null (prompt=false)
         val result = kit.walletOperations.connectWallet(
             options = OZWalletOperations.ConnectWalletOptions()
         )
-
-        assertNotNull(result)
-        assertEquals("test-credential-1", result.credentialId)
-        assertTrue(result.restoredFromSession)
+        assertNull(result)
     }
 
     @Test

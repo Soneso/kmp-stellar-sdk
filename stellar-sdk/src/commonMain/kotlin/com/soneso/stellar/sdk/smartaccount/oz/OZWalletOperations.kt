@@ -10,7 +10,6 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.currentTimeMillis
-import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
@@ -18,18 +17,18 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.assembleTransaction
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
-import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
-import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SCVecXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
@@ -328,31 +327,31 @@ class OZWalletOperations internal constructor(
         // Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
 
-        // STEP 8: Build deploy transaction and optionally submit
+        // STEP 8: Set connected state and save session (before deployment, matching TS SDK)
+        kit.setConnectedState(
+            credentialId = credentialIdBase64url,
+            contractId = contractId
+        )
+
+        kit.events.emit(
+            SmartAccountEvent.WalletConnected(
+                contractId = contractId,
+                credentialId = credentialIdBase64url
+            )
+        )
+
+        saveSession(credentialId = credentialIdBase64url, contractId = contractId)
+
+        // STEP 9: Build deploy transaction and optionally submit
         var transactionHash: String? = null
 
         if (autoSubmit) {
             try {
-                // Build deployment transaction
                 transactionHash = deployWallet(
                     publicKey = publicKey,
                     credentialId = registrationResult.credentialId,
                     contractId = contractId,
                     credentialIdBase64url = credentialIdBase64url
-                )
-
-                // Set connected state after successful deployment
-                kit.setConnectedState(
-                    credentialId = credentialIdBase64url,
-                    contractId = contractId
-                )
-
-                // Emit wallet connected event
-                kit.events.emit(
-                    SmartAccountEvent.WalletConnected(
-                        contractId = contractId,
-                        credentialId = credentialIdBase64url
-                    )
                 )
 
                 // Fund wallet if requested
@@ -365,11 +364,11 @@ class OZWalletOperations internal constructor(
                     kit.transactionOperations.fundWallet(nativeTokenContract = tokenContract)
                 }
 
-                // Delete credential on successful deployment
+                // Delete credential on successful deployment (matching TS SDK)
                 try {
                     credentialManager.deleteCredential(credentialId = credentialIdBase64url)
                 } catch (e: Exception) {
-                    // Non-critical error - credential deletion failed but deployment succeeded
+                    // Non-critical - credential is transitional
                 }
             } catch (e: SmartAccountException) {
                 throw e
@@ -390,7 +389,7 @@ class OZWalletOperations internal constructor(
             }
         }
 
-        // STEP 9: Return result
+        // STEP 10: Return result
         return CreateWalletResult(
             credentialId = credentialIdBase64url,
             contractId = contractId,
@@ -490,7 +489,7 @@ class OZWalletOperations internal constructor(
      * 1. If credentialId/contractId provided: direct connect (always returns non-null)
      * 2. If fresh = true: skip session, trigger WebAuthn authentication
      * 3. Otherwise, check storage for a valid (non-expired) session
-     * 4. If valid session found: restore and return restoredFromSession = true
+     * 4. If valid session found: verify contract on-chain and reconnect (clears stale sessions)
      * 5. If no valid session and prompt = false: return null
      * 6. If no valid session and prompt = true: trigger WebAuthn authentication
      * 7. Look up contract address via storage, indexer, or on-chain derivation
@@ -567,25 +566,22 @@ class OZWalletOperations internal constructor(
             }
 
             if (session != null && !session.isExpired) {
-                // Valid session exists - silently reconnect
-                kit.setConnectedState(
-                    credentialId = session.credentialId,
-                    contractId = session.contractId
-                )
-
-                // Emit wallet connected event
-                kit.events.emit(
-                    SmartAccountEvent.WalletConnected(
-                        contractId = session.contractId,
-                        credentialId = session.credentialId
+                // Valid session exists - verify contract still exists on-chain
+                // (matching TS SDK which routes session restore through connectWithCredentials)
+                try {
+                    return connectWithCredentials(
+                        credentialId = session.credentialId,
+                        contractId = session.contractId
                     )
-                )
-
-                return ConnectWalletResult(
-                    credentialId = session.credentialId,
-                    contractId = session.contractId,
-                    restoredFromSession = true
-                )
+                } catch (e: WalletException.NotFound) {
+                    // Contract no longer exists on-chain (expired TTL) - clear stale session
+                    try {
+                        kit.getStorage().clearSession()
+                    } catch (clearError: Exception) {
+                        // Non-critical
+                    }
+                    // Fall through to prompt or return null
+                }
             }
 
             // If expired session, delete silently
@@ -679,32 +675,8 @@ class OZWalletOperations internal constructor(
                 )
             }
 
-            // Verify contract exists by simulating a read-only call
-            val contractAddress = try {
-                Address(derivedContractId).toSCAddress()
-            } catch (e: Exception) {
-                throw WalletException.notFound(
-                    "Invalid derived contract address: $derivedContractId"
-                )
-            }
-
-            val verifyArgs = InvokeContractArgsXdr(
-                contractAddress = contractAddress,
-                functionName = SCSymbolXdr("get_context_rules_count"),
-                args = emptyList()
-            )
-            val verifyFunction = HostFunctionXdr.InvokeContract(verifyArgs)
-
-            try {
-                SmartAccountSharedUtils.simulateAndExtractResult(
-                    hostFunction = verifyFunction,
-                    kit = kit
-                )
-            } catch (e: Exception) {
-                throw WalletException.notFound(
-                    "Contract not found at derived address: $derivedContractId"
-                )
-            }
+            // Verify contract exists by checking for its instance ledger entry
+            verifyContractExists(derivedContractId)
 
             contractId = derivedContractId
         }
@@ -714,28 +686,12 @@ class OZWalletOperations internal constructor(
                 "Failed to resolve contract address for credential ID: $credentialIdBase64url"
             )
 
-        // STEP 7: Save session
-        val expiresAt = currentTimeMillis() + kit.config.sessionExpiryMs
-        val newSession = StoredSession(
-            credentialId = credentialIdBase64url,
-            contractId = finalContractId,
-            connectedAt = currentTimeMillis(),
-            expiresAt = expiresAt
-        )
-
-        try {
-            kit.getStorage().saveSession(session = newSession)
-        } catch (e: Exception) {
-            // Session save failed - not critical, continue
-        }
-
-        // STEP 8: Set kit connected state
+        // Set connected state
         kit.setConnectedState(
             credentialId = credentialIdBase64url,
             contractId = finalContractId
         )
 
-        // Emit wallet connected event
         kit.events.emit(
             SmartAccountEvent.WalletConnected(
                 contractId = finalContractId,
@@ -743,7 +699,8 @@ class OZWalletOperations internal constructor(
             )
         )
 
-        // STEP 9: Return result
+        saveSession(credentialId = credentialIdBase64url, contractId = finalContractId)
+
         return ConnectWalletResult(
             credentialId = credentialIdBase64url,
             contractId = finalContractId,
@@ -993,55 +950,23 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Verify contract exists on-chain
-        val contractAddress = try {
-            Address(finalContractId).toSCAddress()
-        } catch (e: Exception) {
-            throw WalletException.notFound(
-                "Invalid contract address: $finalContractId"
-            )
-        }
+        // Verify contract exists on-chain by checking for its instance ledger entry
+        verifyContractExists(finalContractId)
 
-        val verifyArgs = InvokeContractArgsXdr(
-            contractAddress = contractAddress,
-            functionName = SCSymbolXdr("get_context_rules_count"),
-            args = emptyList()
-        )
-        val verifyFunction = HostFunctionXdr.InvokeContract(verifyArgs)
-
+        // Delete transitional credential from storage after on-chain verification
+        // (matching TS SDK which deletes credential after getContractData succeeds)
         try {
-            SmartAccountSharedUtils.simulateAndExtractResult(
-                hostFunction = verifyFunction,
-                kit = kit
-            )
+            credentialManager.deleteCredential(credentialId = finalCredentialId)
         } catch (e: Exception) {
-            throw WalletException.notFound(
-                "Contract not found at address: $finalContractId. The wallet may not be deployed yet."
-            )
+            // Non-critical - credential is transitional
         }
 
-        // Save new session
-        val expiresAt = currentTimeMillis() + kit.config.sessionExpiryMs
-        val newSession = StoredSession(
-            credentialId = finalCredentialId,
-            contractId = finalContractId,
-            connectedAt = currentTimeMillis(),
-            expiresAt = expiresAt
-        )
-
-        try {
-            kit.getStorage().saveSession(session = newSession)
-        } catch (e: Exception) {
-            // Session save failed - not critical, continue
-        }
-
-        // Set kit connected state
+        // Set connected state
         kit.setConnectedState(
             credentialId = finalCredentialId,
             contractId = finalContractId
         )
 
-        // Emit wallet connected event
         kit.events.emit(
             SmartAccountEvent.WalletConnected(
                 contractId = finalContractId,
@@ -1049,12 +974,63 @@ class OZWalletOperations internal constructor(
             )
         )
 
-        // Return result
+        saveSession(credentialId = finalCredentialId, contractId = finalContractId)
+
         return ConnectWalletResult(
             credentialId = finalCredentialId,
             contractId = finalContractId,
             restoredFromSession = false
         )
+    }
+
+    // MARK: - Shared Helpers
+
+    /**
+     * Verifies a smart account contract exists on-chain by checking its instance ledger entry.
+     *
+     * Uses `getContractData` with the contract instance key, matching the TS SDK's
+     * verification approach (`rpc.getContractData(contractId, scvLedgerKeyContractInstance())`).
+     *
+     * @param contractId The contract address to verify
+     * @throws WalletException.notFound if the contract does not exist
+     */
+    private suspend fun verifyContractExists(contractId: String) {
+        val instanceEntry = try {
+            kit.sorobanServer.getContractData(
+                contractId = contractId,
+                key = Scv.toLedgerKeyContractInstance(),
+                durability = SorobanServer.Durability.PERSISTENT
+            )
+        } catch (e: Exception) {
+            throw WalletException.notFound(
+                "Contract not found at address: $contractId (${e.message})"
+            )
+        }
+
+        if (instanceEntry == null) {
+            throw WalletException.notFound(
+                "Contract not found at address: $contractId"
+            )
+        }
+    }
+
+    /**
+     * Saves a session to storage for reconnection.
+     *
+     * Errors propagate to the caller (matching TS SDK behavior).
+     *
+     * @param credentialId The Base64URL-encoded credential ID
+     * @param contractId The smart account contract address
+     */
+    private suspend fun saveSession(credentialId: String, contractId: String) {
+        val now = currentTimeMillis()
+        val session = StoredSession(
+            credentialId = credentialId,
+            contractId = contractId,
+            connectedAt = now,
+            expiresAt = now + kit.config.sessionExpiryMs
+        )
+        kit.getStorage().saveSession(session = session)
     }
 
     // MARK: - Private Helpers

@@ -785,7 +785,9 @@ class OZTransactionOperations internal constructor(
 
         val response = httpClient.get(friendbotUrl)
         if (!response.status.isSuccess()) {
-            throw TransactionException.submissionFailed("Friendbot funding failed")
+            throw TransactionException.submissionFailed(
+                "Friendbot funding failed with HTTP ${response.status.value}"
+            )
         }
 
         // STEP 3: Wait for Friendbot funding to propagate to Soroban RPC state.
@@ -860,7 +862,7 @@ class OZTransactionOperations internal constructor(
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
 
         if (simulation.error != null) {
-            throw TransactionException.simulationFailed("Failed to simulate funding transfer")
+            throw TransactionException.simulationFailed("Failed to simulate funding transfer: ${simulation.error}")
         }
 
         // Extract auth entries from simulation

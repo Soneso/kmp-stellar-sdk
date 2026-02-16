@@ -109,12 +109,16 @@ class OZSmartAccountKit private constructor(
 
     /**
      * Currently connected credential ID (Base64URL-encoded).
+     * Volatile for thread-safe reads from non-suspend contexts (e.g., isConnected).
      */
+    @Volatile
     private var _credentialId: String? = null
 
     /**
      * Currently connected smart account contract address (C-address).
+     * Volatile for thread-safe reads from non-suspend contexts (e.g., isConnected).
      */
+    @Volatile
     private var _contractId: String? = null
 
     /**
