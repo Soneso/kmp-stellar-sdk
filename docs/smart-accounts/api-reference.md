@@ -69,18 +69,14 @@ kit.disconnect()
 
 ```kotlin
 suspend fun create(
-    config: OZSmartAccountConfig,
-    storage: StorageAdapter = InMemoryStorageAdapter(),
-    externalWallet: ExternalWalletAdapter? = null
+    config: OZSmartAccountConfig
 ): OZSmartAccountKit
 ```
 
-Creates a new OZSmartAccountKit instance with configuration and optional storage adapter.
+Creates a new OZSmartAccountKit instance. Storage and external wallet adapters are configured via `OZSmartAccountConfig`.
 
 **Parameters**:
-- `config`: Configuration defining network endpoints and contract addresses
-- `storage`: Storage adapter for credential persistence (defaults to in-memory)
-- `externalWallet`: Optional external wallet adapter for multi-signer support
+- `config`: Configuration defining network endpoints, contract addresses, storage, and optional external wallet adapter
 
 **Returns**: Initialized OZSmartAccountKit instance
 
@@ -214,7 +210,9 @@ data class OZSmartAccountConfig(
     val timeoutInSeconds: Int = 30,
     val relayerUrl: String? = null,
     val indexerUrl: String? = null,
-    val webauthnProvider: WebAuthnProvider? = null
+    val webauthnProvider: WebAuthnProvider? = null,
+    val storage: StorageAdapter = InMemoryStorageAdapter(),
+    val externalWallet: ExternalWalletAdapter? = null
 )
 ```
 
@@ -234,6 +232,8 @@ data class OZSmartAccountConfig(
 - `relayerUrl`: Optional relayer endpoint for fee sponsoring
 - `indexerUrl`: Optional indexer endpoint for credential-to-contract mapping
 - `webauthnProvider`: Platform-specific WebAuthn provider
+- `storage`: Storage adapter for credential persistence (defaults to `InMemoryStorageAdapter()`)
+- `externalWallet`: Optional external wallet adapter for multi-signer support
 
 **Factory Methods**:
 
@@ -261,6 +261,9 @@ val config = OZSmartAccountConfig.builder(
     .rpName("My Wallet")
     .sessionExpiryMs(86400000L)  // 1 day
     .relayerUrl("https://relayer.example.com")
+    .storage(myStorageAdapter)
+    .externalWallet(myWalletAdapter)
+    .webauthnProvider(platformWebAuthnProvider())
     .build()
 ```
 
@@ -1619,7 +1622,7 @@ data class ExternalSigner(
 
 ### StorageAdapter
 
-Interface for credential persistence.
+Interface for credential persistence. Configured via the `storage` field on `OZSmartAccountConfig` (defaults to `InMemoryStorageAdapter()`).
 
 ```kotlin
 interface StorageAdapter {
@@ -1676,7 +1679,7 @@ data class WebAuthnAuthenticationResult(
 
 ### ExternalWalletAdapter
 
-Interface for integrating external wallets (Freighter, LOBSTR, etc).
+Interface for integrating external wallets (Freighter, LOBSTR, etc). Configured via the `externalWallet` field on `OZSmartAccountConfig` (defaults to `null`).
 
 ```kotlin
 interface ExternalWalletAdapter {

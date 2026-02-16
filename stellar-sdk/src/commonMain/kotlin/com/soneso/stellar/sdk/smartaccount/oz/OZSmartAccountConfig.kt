@@ -38,8 +38,28 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  *     .rpName("My Custom Wallet")
  *     .sessionExpiryMs(86400000L) // 1 day
  *     .relayerUrl("https://relayer.example.com")
+ *     .storage(myPersistentStorage)
+ *     .externalWallet(freighterAdapter)
  *     .build()
  * ```
+ *
+ * | Field | Required | Default |
+ * |-------|----------|---------|
+ * | rpcUrl | Yes | - |
+ * | networkPassphrase | Yes | - |
+ * | accountWasmHash | Yes | - |
+ * | webauthnVerifierAddress | Yes | - |
+ * | deployerKeypair | No | Deterministic deployer |
+ * | rpId | No | Browser default |
+ * | rpName | No | "Smart Account" |
+ * | sessionExpiryMs | No | 604800000 (7 days) |
+ * | signatureExpirationLedgers | No | 720 (~1 hour) |
+ * | timeoutInSeconds | No | 30 |
+ * | relayerUrl | No | null |
+ * | indexerUrl | No | null |
+ * | webauthnProvider | No | null |
+ * | storage | No | InMemoryStorageAdapter |
+ * | externalWallet | No | null |
  */
 data class OZSmartAccountConfig(
     // Required Configuration
@@ -156,7 +176,22 @@ data class OZSmartAccountConfig(
      *
      * TODO: This should be properly integrated with platform-specific WebAuthn implementations
      */
-    val webauthnProvider: WebAuthnProvider? = null
+    val webauthnProvider: WebAuthnProvider? = null,
+
+    /**
+     * Storage adapter for persisting credentials and session data.
+     *
+     * Defaults to [InMemoryStorageAdapter] (non-persistent, suitable for testing).
+     */
+    val storage: StorageAdapter = InMemoryStorageAdapter(),
+
+    /**
+     * External wallet adapter for signing transactions with an external signer.
+     *
+     * When set, the kit delegates transaction signing to this adapter instead of
+     * using WebAuthn credentials.
+     */
+    val externalWallet: ExternalWalletAdapter? = null
 ) {
     init {
         // Validate required parameters
@@ -223,6 +258,8 @@ data class OZSmartAccountConfig(
          *     .rpName("My Wallet")
          *     .sessionExpiryMs(86400000L)
          *     .relayerUrl("https://relayer.example.com")
+         *     .storage(myPersistentStorage)
+         *     .externalWallet(freighterAdapter)
          *     .build()
          * ```
          *
@@ -298,6 +335,8 @@ data class OZSmartAccountConfig(
      *     .rpName("My Wallet")
      *     .sessionExpiryMs(86400000L)
      *     .relayerUrl("https://relayer.example.com")
+     *     .storage(myPersistentStorage)
+     *     .externalWallet(freighterAdapter)
      *     .build()
      * ```
      */
@@ -315,6 +354,9 @@ data class OZSmartAccountConfig(
         private var timeoutInSeconds: Int = SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS
         private var relayerUrl: String? = null
         private var indexerUrl: String? = null
+        private var webauthnProvider: WebAuthnProvider? = null
+        private var storage: StorageAdapter = InMemoryStorageAdapter()
+        private var externalWallet: ExternalWalletAdapter? = null
 
         /**
          * Sets the deployer keypair.
@@ -405,6 +447,30 @@ data class OZSmartAccountConfig(
         }
 
         /**
+         * Sets the WebAuthn provider.
+         *
+         * @param webauthnProvider The WebAuthn provider (null to disable passkey support)
+         * @return This builder for chaining
+         */
+        fun webauthnProvider(webauthnProvider: WebAuthnProvider?) = apply { this.webauthnProvider = webauthnProvider }
+
+        /**
+         * Sets the storage adapter.
+         *
+         * @param storage The storage adapter for persisting credentials and sessions
+         * @return This builder for chaining
+         */
+        fun storage(storage: StorageAdapter) = apply { this.storage = storage }
+
+        /**
+         * Sets the external wallet adapter.
+         *
+         * @param externalWallet The external wallet adapter (null to disable external signing)
+         * @return This builder for chaining
+         */
+        fun externalWallet(externalWallet: ExternalWalletAdapter?) = apply { this.externalWallet = externalWallet }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -423,7 +489,10 @@ data class OZSmartAccountConfig(
                 signatureExpirationLedgers = signatureExpirationLedgers,
                 timeoutInSeconds = timeoutInSeconds,
                 relayerUrl = relayerUrl,
-                indexerUrl = indexerUrl
+                indexerUrl = indexerUrl,
+                webauthnProvider = webauthnProvider,
+                storage = storage,
+                externalWallet = externalWallet
             )
         }
     }

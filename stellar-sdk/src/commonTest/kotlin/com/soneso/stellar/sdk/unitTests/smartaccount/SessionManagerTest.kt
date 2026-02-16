@@ -46,9 +46,10 @@ class SessionManagerTest {
             networkPassphrase = Network.TESTNET.networkPassphrase,
             accountWasmHash = "a" + "0".repeat(63),
             webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            sessionExpiryMs = sessionExpiryMs
+            sessionExpiryMs = sessionExpiryMs,
+            storage = storage
         )
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config)
         return Pair(kit, storage)
     }
 

@@ -368,6 +368,9 @@ class OZIndexerClient(
      * This method does not throw exceptions - it returns false for any error condition
      * (network failure, timeout, unhealthy response).
      *
+     * Note: Uses Throwable instead of Exception because on Kotlin/JS, Ktor network
+     * failures throw JavaScript Error objects that map to Throwable, not Exception.
+     *
      * @return true if the indexer is healthy and reachable, false otherwise
      */
     suspend fun isHealthy(): Boolean {
@@ -384,8 +387,9 @@ class OZIndexerClient(
 
             val healthCheck: HealthCheckResponse = response.body()
             healthCheck.status == "ok"
-        } catch (e: Exception) {
-            // Any error (network, timeout, parsing) means unhealthy
+        } catch (_: Throwable) {
+            // Catches all errors including JS Error ("Fail to fetch") which is
+            // a Throwable but not an Exception on Kotlin/JS.
             false
         }
     }

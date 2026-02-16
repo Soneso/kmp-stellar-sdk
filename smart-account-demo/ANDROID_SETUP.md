@@ -93,7 +93,7 @@ MainActivity.onCreate()
        │    └─> Uses Credential Manager API for passkeys
        ├─> OZSmartAccountConfig(...)
        │    └─> Includes network, contracts, and providers
-       └─> OZSmartAccountKit.create(config, storage)
+       └─> OZSmartAccountKit.create(config)
             ├─> Creates operation managers (wallet, transaction, signer, etc.)
             ├─> Initializes Soroban RPC server
             └─> Sets up relayer/indexer clients (if configured)

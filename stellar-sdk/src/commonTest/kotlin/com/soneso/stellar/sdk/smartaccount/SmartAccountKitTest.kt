@@ -26,6 +26,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -149,7 +150,7 @@ class SmartAccountKitTest {
     fun testKitInitialization_customStorageAdapter() = runTest {
         val config = createTestConfig()
         val customStorage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = customStorage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = customStorage))
 
         assertNotNull(kit)
         assertEquals(config.rpcUrl, kit.config.rpcUrl)
@@ -587,7 +588,7 @@ class SmartAccountKitTest {
     fun testWalletOperations_connectWallet_withValidSession() = runTest {
         val config = createTestConfig()
         val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
         // Save a valid session
         val session = StoredSession(
@@ -611,7 +612,7 @@ class SmartAccountKitTest {
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
         // Save an expired session
         val session = StoredSession(
@@ -1310,7 +1311,7 @@ class SmartAccountKitTest {
     fun testKitDisconnect() = runTest {
         val config = createTestConfig()
         val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
         // Manually set connected state
         kit.setConnectedState("test-credential-1", "CBCD1234" + "A".repeat(48))
@@ -1419,6 +1420,83 @@ class SmartAccountKitTest {
         assertEquals(86400000L, config.sessionExpiryMs)
         assertEquals("https://relayer.example.com", config.relayerUrl)
         assertEquals("https://indexer.example.com", config.indexerUrl)
+    }
+
+    @Test
+    fun testConfigBuilder_passesStorageAndProviders() = runTest {
+        // Create custom instances to verify reference equality
+        val customStorage = InMemoryStorageAdapter()
+
+        val customWebauthnProvider = object : WebAuthnProvider {
+            override suspend fun register(
+                challenge: ByteArray,
+                userId: ByteArray,
+                userName: String
+            ): WebAuthnRegistrationResult {
+                throw NotImplementedError()
+            }
+
+            override suspend fun authenticate(
+                challenge: ByteArray
+            ): WebAuthnAuthenticationResult {
+                throw NotImplementedError()
+            }
+        }
+
+        val customExternalWallet = object : ExternalWalletAdapter {
+            override suspend fun connect(): ConnectedWallet? {
+                throw NotImplementedError()
+            }
+
+            override suspend fun disconnect() {
+                throw NotImplementedError()
+            }
+
+            override suspend fun signAuthEntry(
+                authEntryXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult {
+                throw NotImplementedError()
+            }
+
+            override fun getConnectedWallets(): List<ConnectedWallet> {
+                throw NotImplementedError()
+            }
+
+            override fun canSignFor(address: String): Boolean {
+                throw NotImplementedError()
+            }
+        }
+
+        // Build config with custom storage, webauthnProvider, and externalWallet
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = "https://soroban-testnet.stellar.org",
+            networkPassphrase = Network.TESTNET.networkPassphrase,
+            accountWasmHash = "a" + "0".repeat(63),
+            webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+        )
+            .storage(customStorage)
+            .webauthnProvider(customWebauthnProvider)
+            .externalWallet(customExternalWallet)
+            .build()
+
+        // Verify the builder passes all three references through correctly
+        assertSame(customStorage, config.storage)
+        assertSame(customWebauthnProvider, config.webauthnProvider)
+        assertSame(customExternalWallet, config.externalWallet)
+
+        // Verify defaults when not explicitly set
+        val defaultConfig = OZSmartAccountConfig.builder(
+            rpcUrl = "https://soroban-testnet.stellar.org",
+            networkPassphrase = Network.TESTNET.networkPassphrase,
+            accountWasmHash = "a" + "0".repeat(63),
+            webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+        ).build()
+
+        assertNotNull(defaultConfig.storage)
+        assertTrue(defaultConfig.storage is InMemoryStorageAdapter)
+        assertNull(defaultConfig.webauthnProvider)
+        assertNull(defaultConfig.externalWallet)
     }
 
     @Test
@@ -1792,7 +1870,7 @@ class SmartAccountKitTest {
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
         val session = StoredSession(
             credentialId = "test-credential-1",
@@ -1816,7 +1894,7 @@ class SmartAccountKitTest {
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
-        val kit = OZSmartAccountKit.create(config, storage = storage)
+        val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
         val session = StoredSession(
             credentialId = "test-credential-1",

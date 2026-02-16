@@ -424,6 +424,10 @@ interface StorageAdapter {
  * Use platform-specific implementations for persistent storage (e.g., SharedPreferences
  * on Android, UserDefaults on iOS, localStorage on Web).
  *
+ * All [InMemoryStorageAdapter] instances are considered equal since they are
+ * interchangeable when freshly created (both start empty). This enables correct
+ * data class equality for configs that use [InMemoryStorageAdapter] as a default field.
+ *
  * Example:
  * ```kotlin
  * val storage = InMemoryStorageAdapter()
@@ -497,6 +501,19 @@ class InMemoryStorageAdapter : StorageAdapter {
     override suspend fun clearSession(): Unit = mutex.withLock {
         session = null
     }
+
+    /**
+     * All [InMemoryStorageAdapter] instances are considered equal.
+     *
+     * Two freshly created instances are functionally identical (both empty),
+     * so they are interchangeable as default values in data class fields.
+     */
+    override fun equals(other: Any?): Boolean = other is InMemoryStorageAdapter
+
+    /**
+     * Consistent hash code for all [InMemoryStorageAdapter] instances.
+     */
+    override fun hashCode(): Int = InMemoryStorageAdapter::class.hashCode()
 }
 
 // MARK: - Connected Wallet

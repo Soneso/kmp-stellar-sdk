@@ -324,7 +324,7 @@ class OZSmartAccountKit private constructor(
          *
          * Initializes all required components including:
          * - Soroban RPC server connection
-         * - Storage adapter (defaults to in-memory if not provided)
+         * - Storage adapter (from config, defaults to in-memory)
          * - Relayer client (if relayerUrl is configured)
          * - Indexer client (if indexerUrl is configured)
          *
@@ -333,8 +333,6 @@ class OZSmartAccountKit private constructor(
          * a previous connection.
          *
          * @param config The configuration for smart account operations
-         * @param storage The storage adapter (defaults to InMemoryStorageAdapter)
-         * @param externalWallet Optional external wallet adapter for multi-signer support
          * @return A new OZSmartAccountKit instance
          * @throws ConfigurationException.InvalidConfig if the configuration is invalid
          *
@@ -349,11 +347,7 @@ class OZSmartAccountKit private constructor(
          * val kit = OZSmartAccountKit.create(config)
          * ```
          */
-        suspend fun create(
-            config: OZSmartAccountConfig,
-            storage: StorageAdapter = InMemoryStorageAdapter(),
-            externalWallet: ExternalWalletAdapter? = null
-        ): OZSmartAccountKit {
+        suspend fun create(config: OZSmartAccountConfig): OZSmartAccountKit {
             // Initialize relayer client if configured
             val relayerClient = config.relayerUrl?.let { url ->
                 OZRelayerClient(
@@ -372,10 +366,10 @@ class OZSmartAccountKit private constructor(
 
             return OZSmartAccountKit(
                 config = config,
-                storage = storage,
+                storage = config.storage,
                 relayerClient = relayerClient,
                 indexerClient = indexerClient,
-                externalWallet = externalWallet
+                externalWallet = config.externalWallet
             )
         }
     }

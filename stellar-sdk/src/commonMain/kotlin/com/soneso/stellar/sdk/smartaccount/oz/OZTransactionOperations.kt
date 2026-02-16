@@ -87,7 +87,7 @@ data class TransactionResult(
  *
  * ## Fee Sponsoring
  *
- * When `kit.relayerClient` is configured, transactions can be fee-sponsored by the relayer.
+ * When a relayer URL is configured via `config.relayerUrl`, transactions can be fee-sponsored by the relayer.
  * Two modes are used depending on authorization entry types:
  *
  * - **Mode 1 (Host Function + Auth)**: Used when no source_account auth exists.
@@ -724,7 +724,7 @@ class OZTransactionOperations internal constructor(
      *
      * ## Fee Sponsoring
      *
-     * When `kit.relayerClient` is configured:
+     * When a relayer URL is configured via `config.relayerUrl`:
      * - **Mode 1**: Used when no source_account auth exists after conversion.
      *   Sends host function + signed auth entries without signing the transaction envelope.
      *
@@ -756,7 +756,7 @@ class OZTransactionOperations internal constructor(
      *
      * // Fund wallet with direct RPC submission (no relayer)
      * val kit = OZSmartAccountKit.create(
-     *     config = config.copy(relayerClient = null)
+     *     config = config.copy(relayerUrl = null)
      * )
      * val amount = kit.transactionOperations.fundWallet(nativeTokenContract)
      * println("Funded directly: $amount XLM")

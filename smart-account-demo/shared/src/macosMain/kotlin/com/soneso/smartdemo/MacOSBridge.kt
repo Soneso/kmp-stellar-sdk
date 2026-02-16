@@ -78,26 +78,24 @@ class MacOSBridge {
                     rpName = DemoConfig.RP_NAME
                 )
 
-                // Create configuration with the WebAuthn provider
+                // Create storage adapter using NSUserDefaults with macOS suite name
+                val storage = UserDefaultsStorageAdapter(
+                    suiteName = "com.soneso.stellar.smartdemo.macos"
+                )
+
+                // Create configuration with the WebAuthn provider and storage
                 val config = OZSmartAccountConfig(
                     rpcUrl = DemoConfig.RPC_URL,
                     networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
                     accountWasmHash = DemoConfig.ACCOUNT_WASM_HASH,
                     webauthnVerifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
                     rpName = DemoConfig.RP_NAME,
-                    webauthnProvider = webauthnProvider
-                )
-
-                // Create storage adapter using NSUserDefaults with macOS suite name
-                val storage = UserDefaultsStorageAdapter(
-                    suiteName = "com.soneso.stellar.smartdemo.macos"
+                    webauthnProvider = webauthnProvider,
+                    storage = storage
                 )
 
                 // Create the kit
-                val kit = OZSmartAccountKit.create(
-                    config = config,
-                    storage = storage
-                )
+                val kit = OZSmartAccountKit.create(config)
 
                 DemoState.setKitInstance(kit)
                 ActivityLogState.success("Smart Account Kit initialized successfully (macOS)")

@@ -132,10 +132,11 @@ val config = OZSmartAccountConfig(
     webauthnVerifierAddress = "CBCD1234...",
     rpId = "your-domain.com",
     rpName = "My Stellar Wallet",
-    webauthnProvider = webauthnProvider
+    webauthnProvider = webauthnProvider,
+    storage = storage
 )
 
-val kit = OZSmartAccountKit.create(config, storage)
+val kit = OZSmartAccountKit.create(config)
 ```
 
 ## Troubleshooting

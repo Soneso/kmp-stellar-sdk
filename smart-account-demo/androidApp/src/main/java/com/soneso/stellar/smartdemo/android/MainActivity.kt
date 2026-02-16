@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                     rpName = DemoConfig.RP_NAME
                 )
 
-                // Build config with Android providers
+                // Build config with Android providers (storage is part of config)
                 val config = OZSmartAccountConfig(
                     rpcUrl = DemoConfig.RPC_URL,
                     networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
@@ -44,13 +44,11 @@ class MainActivity : ComponentActivity() {
                     webauthnVerifierAddress = DemoState.webauthnVerifier,
                     rpName = DemoConfig.RP_NAME,
                     relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
-                    webauthnProvider = webauthnProvider
-                )
-
-                val kit = OZSmartAccountKit.create(
-                    config = config,
+                    webauthnProvider = webauthnProvider,
                     storage = storage
                 )
+
+                val kit = OZSmartAccountKit.create(config)
 
                 DemoState.setKitInstance(kit)
                 ActivityLogState.info("Smart Account Kit initialized (Android)")

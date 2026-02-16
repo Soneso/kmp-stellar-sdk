@@ -20,7 +20,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -81,9 +80,10 @@ class MainScreen : Screen {
                         networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
                         accountWasmHash = DemoState.accountWasmHash,
                         webauthnVerifierAddress = DemoState.webauthnVerifier,
-                        relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() }
+                        relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
+                        storage = InMemoryStorageAdapter()
                     )
-                    val kit = OZSmartAccountKit.create(config, InMemoryStorageAdapter())
+                    val kit = OZSmartAccountKit.create(config)
                     DemoState.setKitInstance(kit)
                     ActivityLogState.success("SDK initialized with default configuration")
                     if (DemoState.relayerUrl.isNotBlank()) {
@@ -219,9 +219,10 @@ class MainScreen : Screen {
                                                 networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
                                                 accountWasmHash = DemoState.accountWasmHash,
                                                 webauthnVerifierAddress = DemoState.webauthnVerifier,
-                                                relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() }
+                                                relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
+                                                storage = InMemoryStorageAdapter()
                                             )
-                                            val kit = OZSmartAccountKit.create(config, InMemoryStorageAdapter())
+                                            val kit = OZSmartAccountKit.create(config)
                                             DemoState.setKitInstance(kit)
                                             ActivityLogState.success("SDK initialized")
                                             if (DemoState.relayerUrl.isNotBlank()) {

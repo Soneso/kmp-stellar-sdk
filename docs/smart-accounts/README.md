@@ -11,7 +11,7 @@ A smart account is a Soroban contract that replaces traditional Stellar key mana
 - **Passkey authentication**: Users sign transactions with WebAuthn (secp256r1) instead of Ed25519 secret keys
 - **Multiple signers**: Combine passkeys, delegated Stellar accounts, and Ed25519 keys on a single account
 - **Context rules**: Define different authorization requirements for different operation types
-- **Policies**: Enforce spending limits, multi-signature thresholds, and time-based constraints
+- **Policies**: Enforce authorization constraints such as spending limits and multi-signature thresholds, or add custom policy contracts
 - **Fee sponsoring**: Submit transactions through a relayer so users never pay gas fees
 - **Session management**: Silent reconnection without re-authentication for 7 days (configurable)
 
@@ -27,32 +27,32 @@ The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The 
         v
 +-----------------------------------------------------------------------+
 |                       OZSmartAccountKit                               |
-|  Entry point. Created via OZSmartAccountKit.create(config, storage).  |
+|  Entry point. Created via OZSmartAccountKit.create(config).           |
 |  Provides sub-managers as lazy properties:                            |
 |                                                                       |
-|  +---------------------+  +-------------------------+                 |
-|  | walletOperations    |  | transactionOperations   |                 |
-|  | (OZWalletOperations)|  | (OZTransactionOperations)|                |
-|  +---------------------+  +-------------------------+                 |
-|  +---------------------+  +-------------------------+                 |
-|  | signerManager       |  | contextRuleManager      |                 |
-|  | (OZSignerManager)   |  | (OZContextRuleManager)  |                 |
-|  +---------------------+  +-------------------------+                 |
-|  +---------------------+  +-------------------------+                 |
-|  | policyManager       |  | multiSignerManager      |                 |
-|  | (OZPolicyManager)   |  | (OZMultiSignerManager)  |                 |
-|  +---------------------+  +-------------------------+                 |
-|  +---------------------+  +-------------------------+                 |
-|  | credentialManager   |  | events                  |                 |
-|  | (OZCredentialManager)|  | (SmartAccountEventEmitter)|              |
-|  +---------------------+  +-------------------------+                 |
+|  +-----------------------+  +----------------------------+            |
+|  | walletOperations      |  | transactionOperations      |            |
+|  | (OZWalletOperations)  |  | (OZTransactionOperations)  |            |
+|  +-----------------------+  +----------------------------+            |
+|  +-----------------------+  +----------------------------+            |
+|  | signerManager         |  | contextRuleManager         |            |
+|  | (OZSignerManager)     |  | (OZContextRuleManager)     |            |
+|  +-----------------------+  +----------------------------+            |
+|  +-----------------------+  +----------------------------+            |
+|  | policyManager         |  | multiSignerManager         |            |
+|  | (OZPolicyManager)     |  | (OZMultiSignerManager)     |            |
+|  +-----------------------+  +----------------------------+            |
+|  +-----------------------+  +----------------------------+            |
+|  | credentialManager     |  | events                     |            |
+|  | (OZCredentialManager) |  | (SmartAccountEventEmitter) |            |
+|  +-----------------------+  +----------------------------+            |
 +-----------------------------------------------------------------------+
         |                    |                      |
         v                    v                      v
-+----------------+  +------------------+  +---------------------+
-| WebAuthnProvider| | StorageAdapter   |  | ExternalWalletAdapter|
-| (platform impl)| | (platform impl)  |  | (optional)          |
-+----------------+  +------------------+  +---------------------+
++------------------+  +------------------+  +-----------------------+
+| WebAuthnProvider |  | StorageAdapter   |  | ExternalWalletAdapter |
+| (platform impl)  |  | (platform impl)  |  | (optional)            |
++------------------+  +------------------+  +-----------------------+
         |                    |
         v                    v
 +----------------+  +------------------+
@@ -103,14 +103,11 @@ val config = OZSmartAccountConfig(
 
 // Step 2: Create the kit
 //
-// Pass a StorageAdapter for credential persistence.
-// InMemoryStorageAdapter is for testing only; use a platform-specific
-// adapter (Keychain, SharedPreferences, etc.) in production.
+// Storage defaults to InMemoryStorageAdapter (for testing). For production,
+// set a platform-specific adapter (Keychain, SharedPreferences, etc.)
+// via the `storage` field in OZSmartAccountConfig.
 
-val kit = OZSmartAccountKit.create(
-    config = config,
-    storage = InMemoryStorageAdapter()
-)
+val kit = OZSmartAccountKit.create(config)
 
 // Step 3: Create a new wallet
 //
@@ -160,7 +157,14 @@ kit.disconnect()
 On app relaunch, call `connectWallet()` to restore the session or re-authenticate:
 
 ```kotlin
-val kit = OZSmartAccountKit.create(config = config, storage = myStorageAdapter)
+val config = OZSmartAccountConfig(
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = "Test SDF Network ; September 2015",
+    accountWasmHash = "a1b2c3d4e5f6...",
+    webauthnVerifierAddress = "CBCD1234...",
+    storage = myStorageAdapter  // platform-specific adapter for credential persistence
+)
+val kit = OZSmartAccountKit.create(config)
 
 val connection = kit.walletOperations.connectWallet()
 
@@ -304,6 +308,8 @@ try {
 | `relayerUrl` | `String?` | `null` | Relayer endpoint for fee-sponsored transactions. When set, users do not pay gas fees. |
 | `indexerUrl` | `String?` | `null` | Indexer endpoint for credential-to-contract discovery. Enables `connectWallet()` to find contracts by credential ID. |
 | `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform-specific WebAuthn implementation. Required for `createWallet()`, `connectWallet()`, and `transfer()`. |
+| `storage` | `StorageAdapter` | `InMemoryStorageAdapter()` | Credential and session persistence. Use a platform-specific adapter (Keychain, SharedPreferences, localStorage) in production. |
+| `externalWallet` | `ExternalWalletAdapter?` | `null` | Adapter for external wallet signing (e.g., Freighter, Lobstr). When set, enables delegated signing workflows. |
 
 ### Builder Pattern
 
@@ -321,6 +327,8 @@ val config = OZSmartAccountConfig.builder(
     .relayerUrl("https://relayer.example.com")
     .indexerUrl("https://indexer.example.com")
     .signatureExpirationLedgers(1440)  // ~2 hours
+    .storage(myStorageAdapter)
+    .externalWallet(myExternalWallet)
     .build()
 ```
 

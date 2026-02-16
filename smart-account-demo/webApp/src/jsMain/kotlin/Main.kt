@@ -30,21 +30,19 @@ fun main() {
                 rpName = DemoConfig.RP_NAME
             )
 
-            // Build configuration with WebAuthn provider
+            // Build configuration with WebAuthn provider and storage
             val config = OZSmartAccountConfig(
                 rpcUrl = DemoConfig.RPC_URL,
                 networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
                 accountWasmHash = DemoConfig.ACCOUNT_WASM_HASH,
                 webauthnVerifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
                 rpName = DemoConfig.RP_NAME,
-                webauthnProvider = webauthnProvider
+                webauthnProvider = webauthnProvider,
+                storage = storage
             )
 
             // Create the kit instance
-            val kit = OZSmartAccountKit.create(
-                config = config,
-                storage = storage
-            )
+            val kit = OZSmartAccountKit.create(config)
 
             DemoState.setKitInstance(kit)
             ActivityLogState.info("Smart Account Kit initialized (Web platform)")
