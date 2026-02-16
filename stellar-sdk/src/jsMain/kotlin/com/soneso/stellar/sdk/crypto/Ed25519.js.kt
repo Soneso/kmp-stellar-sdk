@@ -24,6 +24,14 @@ import org.khronos.webgl.Uint8Array
  * 3. **Coroutine-friendly**: Natural suspend function API
  * 4. **Test-friendly**: Works in test environments without manual setup
  *
+ * ## js() block safety
+ *
+ * Kotlin's `js()` block captures variable names at compile time. Inside `suspend`
+ * functions the coroutine state-machine compiler may rename local variables, causing
+ * the `js()` block to reference wrong/undefined variables at runtime (particularly in
+ * browser environments). To prevent this, every `js()` call that references Kotlin
+ * locals is extracted into a non-suspend helper function where variable names are stable.
+ *
  * @see <a href="https://github.com/jedisct1/libsodium.js">libsodium.js</a>
  */
 internal class JsEd25519Crypto : Ed25519Crypto {
@@ -47,11 +55,19 @@ internal class JsEd25519Crypto : Ed25519Crypto {
         // We don't need libsodium for random generation - use Web Crypto API
         return try {
             val array = Uint8Array(SEED_BYTES)
-            js("crypto.getRandomValues(array)")
+            generateRandomImpl(array)
             array.toByteArray()
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to generate random private key: ${e.message}", e)
         }
+    }
+
+    /**
+     * Non-suspend helper: fills [array] with cryptographically secure random bytes
+     * using the Web Crypto API.
+     */
+    private fun generateRandomImpl(array: Uint8Array) {
+        js("crypto.getRandomValues(array)")
     }
 
     /**
@@ -70,20 +86,26 @@ internal class JsEd25519Crypto : Ed25519Crypto {
             val sodium = LibsodiumInit.getSodium()
             val seedArray = privateKey.toUint8Array()
 
-            // Use libsodium to derive keypair from seed
-            val result = js(
-                """
-                (function() {
-                    var keypair = sodium.crypto_sign_seed_keypair(seedArray);
-                    return keypair.publicKey;
-                })()
-                """
-            ).unsafeCast<Uint8Array>()
-
-            result.toByteArray()
+            derivePublicKeyImpl(sodium, seedArray)
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to derive public key: ${e.message}", e)
         }
+    }
+
+    /**
+     * Non-suspend helper: derives the public key from a seed using libsodium.
+     */
+    private fun derivePublicKeyImpl(sodium: dynamic, seedArray: Uint8Array): ByteArray {
+        val result = js(
+            """
+            (function() {
+                var keypair = sodium.crypto_sign_seed_keypair(seedArray);
+                return keypair.publicKey;
+            })()
+            """
+        ).unsafeCast<Uint8Array>()
+
+        return result.toByteArray()
     }
 
     /**
@@ -104,21 +126,27 @@ internal class JsEd25519Crypto : Ed25519Crypto {
             val dataArray = data.toUint8Array()
             val seedArray = privateKey.toUint8Array()
 
-            // Derive keypair and sign
-            val result = js(
-                """
-                (function() {
-                    var keypair = sodium.crypto_sign_seed_keypair(seedArray);
-                    var signature = sodium.crypto_sign_detached(dataArray, keypair.privateKey);
-                    return signature;
-                })()
-                """
-            ).unsafeCast<Uint8Array>()
-
-            result.toByteArray()
+            signImpl(sodium, dataArray, seedArray)
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to sign data: ${e.message}", e)
         }
+    }
+
+    /**
+     * Non-suspend helper: signs data with a seed using libsodium.
+     */
+    private fun signImpl(sodium: dynamic, dataArray: Uint8Array, seedArray: Uint8Array): ByteArray {
+        val result = js(
+            """
+            (function() {
+                var keypair = sodium.crypto_sign_seed_keypair(seedArray);
+                var signature = sodium.crypto_sign_detached(dataArray, keypair.privateKey);
+                return signature;
+            })()
+            """
+        ).unsafeCast<Uint8Array>()
+
+        return result.toByteArray()
     }
 
     /**
@@ -142,23 +170,32 @@ internal class JsEd25519Crypto : Ed25519Crypto {
             val signatureArray = signature.toUint8Array()
             val publicKeyArray = publicKey.toUint8Array()
 
-            // Verify signature
-            val result = js(
-                """
-                (function() {
-                    try {
-                        return sodium.crypto_sign_verify_detached(signatureArray, dataArray, publicKeyArray);
-                    } catch (e) {
-                        return false;
-                    }
-                })()
-                """
-            ).unsafeCast<Boolean>()
-
-            result
+            verifyImpl(sodium, signatureArray, dataArray, publicKeyArray)
         } catch (e: Throwable) {
             false
         }
+    }
+
+    /**
+     * Non-suspend helper: verifies a signature using libsodium.
+     */
+    private fun verifyImpl(
+        sodium: dynamic,
+        signatureArray: Uint8Array,
+        dataArray: Uint8Array,
+        publicKeyArray: Uint8Array
+    ): Boolean {
+        return js(
+            """
+            (function() {
+                try {
+                    return sodium.crypto_sign_verify_detached(signatureArray, dataArray, publicKeyArray);
+                } catch (e) {
+                    return false;
+                }
+            })()
+            """
+        ).unsafeCast<Boolean>()
     }
 
     // Helper extension functions

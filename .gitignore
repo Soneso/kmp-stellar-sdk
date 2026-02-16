@@ -130,6 +130,9 @@ compatibility/horizon/data/
 compatibility/rpc/data/
 compatibility/sep/data/
 
+# Node modules (web app dependencies)
+node_modules/
+
 # Vite build cache (demo web apps)
 demo/webApp/.vite/
 smart-account-demo/webApp/.vite/

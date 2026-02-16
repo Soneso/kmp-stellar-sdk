@@ -21,19 +21,25 @@ internal class Sha256CryptoJs : Sha256Crypto {
             val sodium = LibsodiumInit.getSodium()
             val dataArray = data.toUint8Array()
 
-            // Call crypto_hash_sha256 via JS block to ensure proper type handling
-            val result = js(
-                """
-                (function() {
-                    return sodium.crypto_hash_sha256(dataArray);
-                })()
-                """
-            ).unsafeCast<Uint8Array>()
-
-            result.toByteArray()
+            // Delegate to a non-suspend helper. The js() block captures variable
+            // names at compile time, which can break in suspend functions where the
+            // coroutine state machine renames local variables. By calling a regular
+            // (non-suspend) function, we ensure the variable names are stable.
+            hashImpl(sodium, dataArray)
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to compute SHA-256 hash: ${e.message}", e)
         }
+    }
+
+    private fun hashImpl(sodium: dynamic, dataArray: Uint8Array): ByteArray {
+        val result = js(
+            """
+            (function() {
+                return sodium.crypto_hash_sha256(dataArray);
+            })()
+            """
+        ).unsafeCast<Uint8Array>()
+        return result.toByteArray()
     }
 
     // Helper extension functions

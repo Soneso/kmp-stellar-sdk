@@ -788,13 +788,16 @@ class OZTransactionOperations internal constructor(
             throw TransactionException.submissionFailed("Friendbot funding failed")
         }
 
-        // STEP 3: Wait for funding to confirm (2 seconds)
-        delay(2000)
+        // STEP 3: Wait for Friendbot funding to propagate to Soroban RPC state.
+        // Friendbot's HTTP response confirms the Horizon transaction, but the Soroban
+        // RPC simulation endpoint may not reflect the new account entry until the
+        // next ledger close (~5 seconds on testnet).
+        delay(5000)
 
         // STEP 4: Get temp account
         val tempAccount = kit.sorobanServer.getAccount(tempKeypair.getAccountId())
 
-        // STEP 5: Calculate transfer amount
+        // STEP 4: Calculate transfer amount
         // Reserve for account minimum balance
         val reserveStroops = SmartAccountConstants.FRIENDBOT_RESERVE_XLM * SmartAccountConstants.STROOPS_PER_XLM
 

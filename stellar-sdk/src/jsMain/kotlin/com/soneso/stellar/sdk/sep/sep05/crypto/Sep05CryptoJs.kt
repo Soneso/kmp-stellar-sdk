@@ -15,8 +15,16 @@ import org.khronos.webgl.Uint8Array
  * - **PBKDF2**: Custom implementation using HMAC-SHA512
  * - **NFKD**: String.prototype.normalize("NFKD")
  *
- * All cryptographic functions are suspend to properly handle libsodium
- * async initialization in JavaScript environments.
+ * All cryptographic functions that require libsodium are suspend to properly
+ * handle libsodium async initialization in JavaScript environments.
+ *
+ * ## js() block safety
+ *
+ * Kotlin's `js()` block captures variable names at compile time. Inside `suspend`
+ * functions the coroutine state-machine compiler may rename local variables, causing
+ * the `js()` block to reference wrong/undefined variables at runtime (particularly in
+ * browser environments). To prevent this, every `js()` call that references Kotlin
+ * locals is extracted into a non-suspend helper function where variable names are stable.
  */
 
 /**
@@ -42,7 +50,8 @@ internal actual fun secureRandomBytes(size: Int): ByteArray {
  * Computes SHA-256 hash using libsodium's crypto_hash_sha256.
  *
  * This function is suspend to properly handle libsodium async initialization
- * in JavaScript environments.
+ * in JavaScript environments. The actual `js()` call is delegated to a
+ * non-suspend helper to avoid coroutine variable renaming issues.
  */
 internal actual suspend fun sha256(data: ByteArray): ByteArray {
     // Ensure libsodium is initialized
@@ -51,17 +60,24 @@ internal actual suspend fun sha256(data: ByteArray): ByteArray {
 
     return try {
         val dataArray = data.toUint8Array()
-        val result = js(
-            """
-            (function() {
-                return sodium.crypto_hash_sha256(dataArray);
-            })()
-            """
-        ).unsafeCast<Uint8Array>()
-        result.toByteArray()
+        sha256Impl(sodium, dataArray)
     } catch (e: Throwable) {
         throw IllegalStateException("SHA-256 computation failed: ${e.message}", e)
     }
+}
+
+/**
+ * Non-suspend helper: computes SHA-256 using libsodium.
+ */
+private fun sha256Impl(sodium: dynamic, dataArray: Uint8Array): ByteArray {
+    val result = js(
+        """
+        (function() {
+            return sodium.crypto_hash_sha256(dataArray);
+        })()
+        """
+    ).unsafeCast<Uint8Array>()
+    return result.toByteArray()
 }
 
 /**
