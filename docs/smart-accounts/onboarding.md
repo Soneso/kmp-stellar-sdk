@@ -206,13 +206,13 @@ The deployer is the Stellar account that creates the smart account contract on-c
 
 After deployment, the deployer has no privileges over the contract. It cannot move funds, change signers, or modify policies. Only the configured signers can authorize operations.
 
-The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`, where the hash is used as the Ed25519 seed to generate a deterministic keypair. Because the deployer has no privileges after deployment, its publicly derivable key is not a security concern -- it only matters for address derivation and signing the deployment transaction. This default is shared with the TypeScript Smart Account Kit, so the same passkey credential produces the same contract address regardless of which SDK created the wallet. This enables cross-platform wallet discovery without an indexer.
+The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`, where the hash is used as the Ed25519 seed to generate a deterministic keypair. Because the deployer has no privileges after deployment, its publicly derivable key is not a security concern -- it only matters for address derivation and signing the deployment transaction. This default is suitable for testing and simple deployments. The TypeScript Smart Account Kit uses the same derivation, so both SDKs produce identical results from the same inputs, which is useful for verifying correctness. Production wallet applications will typically use a custom deployer (via `deployerKeypair` in the config) for attribution and traceability, since the deployer's public key is visible on-chain.
 
 When a relayer is configured, the SDK still uses the deployer to derive the contract address and build the deployment transaction, but submits it to the relayer, which wraps it in a fee bump transaction and pays the fees. The deployer account does not need to pay fees in this case, but it must still exist on the network with the minimum XLM reserve. On testnet, the default deployer is automatically funded via Friendbot.
 
 Without a relayer, the deployer pays the deployment fees directly, so you must provide your own funded deployer via `deployerKeypair` in `OZSmartAccountConfig`.
 
-If you use a custom deployer, both SDKs (and any indexer) must know about it for cross-platform wallet discovery to work.
+If you use a custom deployer, an indexer is recommended for wallet discovery, since clients that do not know the deployer keypair cannot derive the contract address independently.
 
 On testnet, accounts are funded via Friendbot at no cost. On mainnet, deployment and contract operations require XLM for transaction fees and contract storage rent.
 
@@ -265,7 +265,7 @@ val config = OZSmartAccountConfig(
 
 An indexer is an optional service that maps credential IDs to contract addresses. It solves a simple lookup problem: given a passkey credential, which smart account contract does it belong to?
 
-Without an indexer, the SDK derives the contract address from the credential ID and the deployer's public key. This works when using the default deployer (since both SDKs share the same default deployer key). But if a custom deployer was used, the SDK cannot derive the address without knowing the deployer.
+Without an indexer, the SDK derives the contract address from the credential ID and the deployer's public key. This works when the deployer keypair is known (including the default deployer). But if a custom deployer was used and the client does not have the deployer keypair, it cannot derive the address.
 
 With an indexer, `connectWallet()` queries the indexer to find the contract address for any credential, regardless of which deployer was used.
 

@@ -361,33 +361,46 @@ After deployment, the deployer has no privileges over the contract. Only the con
 
 **Fee payment**: The deployer account pays the deployment transaction fee. When a relayer is configured, the relayer can sponsor the fee instead. If you use the default deployer (derived from a well-known seed — see below), you need either a relayer for fee sponsoring or to fund the deployer account before deployment. You can also provide your own funded keypair via `deployerKeypair` in the config.
 
-## Cross-SDK Interoperability
+## Deterministic Address Derivation
 
-The KMP SDK produces identical on-chain results as the [TypeScript Smart Account Kit](https://github.com/kalepail/smart-account-kit). Wallets created by one SDK can be managed by the other.
+Contract address derivation is deterministic: given the same deployer keypair, credential ID, and network passphrase, the SDK always produces the same contract address. This is a correctness property, not a special feature -- it follows from how Soroban computes contract addresses.
 
-### Shared Deployer Keypair
+### Default Deployer
 
-Both SDKs derive the same default deployer from `SHA256("openzeppelin-smart-account-kit")`. Since contract addresses are computed from the deployer's public key and the credential ID, using the same deployer ensures that the same passkey credential maps to the same contract address in both SDKs. This allows a wallet created through a web app (TypeScript SDK) to be accessed from a mobile app (KMP SDK) without an indexer lookup.
-
-The default deployer's secret seed is publicly derivable. It is intended to be used with a relayer that sponsors transaction fees, or funded externally. To use a private deployer, set `deployerKeypair` in the config — but both SDKs must use the same deployer for cross-SDK wallet discovery to work.
+The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`. This default is suitable for testing and simple deployments. The [TypeScript Smart Account Kit](https://github.com/kalepail/smart-account-kit) uses the same derivation, so both SDKs produce identical results from the same inputs -- useful for verifying correctness across implementations.
 
 ```kotlin
-// The default deployer is deterministic across SDKs
 val deployer = OZSmartAccountConfig.createDefaultDeployer()
-// Produces the same keypair as the TS SDK's default deployer
 ```
+
+The default deployer's secret seed is publicly derivable. It is intended to be used with a relayer that sponsors transaction fees, or funded externally.
+
+### Custom Deployers
+
+Production wallet applications will typically use a custom deployer for attribution and traceability. The deployer signs the deployment transaction, so its public key is visible on-chain -- a custom deployer gives the wallet provider identity and allows distinguishing deployments by different providers.
+
+Set `deployerKeypair` in the config to use your own deployer:
+
+```kotlin
+val config = OZSmartAccountConfig(
+    // ...required fields...
+    deployerKeypair = myFundedKeypair
+)
+```
+
+When using a custom deployer, address derivation still works the same way: the same deployer + credential ID always produces the same contract address. An indexer is recommended for wallet discovery with custom deployers, since clients that do not know the deployer keypair cannot derive the address independently.
 
 ### Deterministic Contract Addresses
 
 Given the same credential ID and deployer, `SmartAccountUtils.deriveContractAddress()` computes the same C-address. This enables:
 
 - Wallet discovery without an indexer (derive the address, check if it exists on-chain)
-- Cross-platform wallet access (create on mobile, use on web)
 - Consistent address display across applications
+- Correctness verification (same inputs produce the same outputs regardless of SDK implementation)
 
 ### Signer Format Compatibility
 
-Signer representations (`DelegatedSigner`, `ExternalSigner`) encode to the same Soroban SCVal structure. Signers added by the TypeScript SDK are recognized by the KMP SDK and vice versa. The `ExternalSigner.webAuthn()` factory produces the same `keyData` format (65-byte public key + credential ID bytes) used by the TypeScript SDK.
+Signer representations (`DelegatedSigner`, `ExternalSigner`) encode to the same Soroban SCVal structure as the TypeScript Smart Account Kit. The `ExternalSigner.webAuthn()` factory produces the same `keyData` format (65-byte public key + credential ID bytes). Signers added by either SDK are recognized on-chain by both.
 
 ## Contract Limits
 

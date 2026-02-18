@@ -1,5 +1,6 @@
 package com.soneso.smartdemo.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -35,12 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.stellar.sdk.AssetTypeNative
@@ -55,6 +58,8 @@ class WalletCreationScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
+        val clipboard = remember { getClipboard() }
 
         var username by remember { mutableStateOf("Smart Account User") }
         var autoDeploy by remember { mutableStateOf(true) }
@@ -67,6 +72,7 @@ class WalletCreationScreen : Screen {
         var balance by remember { mutableStateOf<String?>(null) }
 
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text("Create Wallet") },
@@ -316,32 +322,47 @@ class WalletCreationScreen : Screen {
 
                             ResultField(
                                 label = "Credential ID",
-                                value = createResult!!.credentialId
+                                value = createResult!!.credentialId,
+                                clipboard = clipboard,
+                                snackbarHostState = snackbarHostState,
+                                scope = scope
                             )
 
                             ResultField(
                                 label = "Contract Address",
-                                value = createResult!!.contractId
+                                value = createResult!!.contractId,
+                                clipboard = clipboard,
+                                snackbarHostState = snackbarHostState,
+                                scope = scope
                             )
 
                             if (createResult!!.transactionHash != null) {
                                 ResultField(
                                     label = "Transaction Hash",
-                                    value = createResult!!.transactionHash!!
+                                    value = createResult!!.transactionHash!!,
+                                    clipboard = clipboard,
+                                    snackbarHostState = snackbarHostState,
+                                    scope = scope
                                 )
                             }
 
                             if (fundedAmount != null) {
                                 ResultField(
                                     label = "Funded Amount",
-                                    value = "$fundedAmount XLM"
+                                    value = "$fundedAmount XLM",
+                                    clipboard = clipboard,
+                                    snackbarHostState = snackbarHostState,
+                                    scope = scope
                                 )
                             }
 
                             if (balance != null) {
                                 ResultField(
                                     label = "Current Balance",
-                                    value = "$balance XLM"
+                                    value = "$balance XLM",
+                                    clipboard = clipboard,
+                                    snackbarHostState = snackbarHostState,
+                                    scope = scope
                                 )
                             }
                         }
@@ -421,7 +442,13 @@ class WalletCreationScreen : Screen {
     }
 
     @Composable
-    private fun ResultField(label: String, value: String) {
+    private fun ResultField(
+        label: String,
+        value: String,
+        clipboard: com.soneso.smartdemo.platform.Clipboard,
+        snackbarHostState: SnackbarHostState,
+        scope: kotlinx.coroutines.CoroutineScope
+    ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -435,8 +462,17 @@ class WalletCreationScreen : Screen {
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.clickable {
+                    scope.launch {
+                        clipboard.copyToClipboard(value)
+                        snackbarHostState.showSnackbar("$label copied to clipboard")
+                    }
+                }
+            )
+            Text(
+                text = "Tap to copy",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
             )
         }
     }

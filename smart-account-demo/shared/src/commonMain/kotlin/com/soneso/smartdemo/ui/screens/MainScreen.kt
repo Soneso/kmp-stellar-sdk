@@ -24,6 +24,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -46,6 +48,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.config.KNOWN_POLICIES
+import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogLevel
@@ -66,6 +69,8 @@ class MainScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
+        val clipboard = remember { getClipboard() }
 
         var configExpanded by remember { mutableStateOf(false) }
         var policiesExpanded by remember { mutableStateOf(false) }
@@ -100,6 +105,7 @@ class MainScreen : Screen {
         }
 
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = {
@@ -557,7 +563,12 @@ class MainScreen : Screen {
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 ActivityLogState.entries.forEach { entry ->
-                                    LogEntryRow(entry)
+                                    LogEntryRow(
+                                        entry = entry,
+                                        clipboard = clipboard,
+                                        snackbarHostState = snackbarHostState,
+                                        scope = scope
+                                    )
                                 }
                             }
                         }
@@ -569,7 +580,12 @@ class MainScreen : Screen {
 
     @OptIn(kotlin.time.ExperimentalTime::class)
     @Composable
-    private fun LogEntryRow(entry: com.soneso.smartdemo.state.LogEntry) {
+    private fun LogEntryRow(
+        entry: com.soneso.smartdemo.state.LogEntry,
+        clipboard: com.soneso.smartdemo.platform.Clipboard,
+        snackbarHostState: SnackbarHostState,
+        scope: kotlinx.coroutines.CoroutineScope
+    ) {
         val timeString = remember(entry.timestamp) {
             val localTime = entry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
             val h = localTime.hour.toString().padStart(2, '0')
@@ -581,6 +597,12 @@ class MainScreen : Screen {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable {
+                    scope.launch {
+                        clipboard.copyToClipboard(entry.message)
+                        snackbarHostState.showSnackbar("Log message copied to clipboard")
+                    }
+                }
                 .padding(vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

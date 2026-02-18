@@ -4,8 +4,8 @@ package com.soneso.smartdemo.config
  * Demo configuration with Stellar testnet defaults.
  *
  * These values point to shared testnet contracts deployed by the OpenZeppelin/Stellar team.
- * Using the same contracts ensures cross-SDK interoperability - wallets created with
- * the TypeScript SDK are accessible from the KMP SDK and vice versa.
+ * Using the same contracts and default deployer allows the demo to verify deterministic
+ * behavior: identical inputs produce identical results across SDK implementations.
  */
 object DemoConfig {
     // Network

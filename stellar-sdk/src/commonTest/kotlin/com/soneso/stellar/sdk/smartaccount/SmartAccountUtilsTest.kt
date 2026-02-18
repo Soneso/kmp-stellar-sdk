@@ -175,14 +175,14 @@ class SmartAccountUtilsTest {
         assertEquals(expected.toHex(), result.toHex(), "s > halfOrder should be normalized")
     }
 
-    // MARK: - Cross-SDK Verification Test Vectors
+    // MARK: - Verification Test Vectors
     //
     // These test vectors can be verified against the TypeScript Smart Account Kit's
     // compactSignature() function in src/utils.ts (lines 289-321).
     // Both implementations must produce identical output for the same DER input.
 
     /**
-     * Cross-SDK Test Vector: Realistic WebAuthn DER signature with high-S.
+     * Verification Test Vector: Realistic WebAuthn DER signature with high-S.
      *
      * This DER signature has structure typical of a real WebAuthn authenticator response:
      * - 33-byte r (leading 0x00 because high bit of r is set)
@@ -212,7 +212,7 @@ class SmartAccountUtilsTest {
      * s' = n - s = 0x28042dd35cd1e832f079d17c163bc1892e332e335a374d8dfc9a96d07f79a9af
      */
     @Test
-    fun testNormalizeSignature_crossSdk_realisticWebAuthnHighS() {
+    fun testNormalizeSignature_verification_realisticWebAuthnHighS() {
         val derSignature = hexToBytes(
             "3046" +
             "022100b23694f0367f3e621a8458fc24d1dce654be3e2e2c1bacea40cd7a5e7a134540" +
@@ -229,12 +229,12 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size, "Compact signature must be exactly 64 bytes")
         assertEquals(
             expected.toHex(), result.toHex(),
-            "Cross-SDK: high-S WebAuthn signature must be normalized identically to TypeScript SDK"
+            "High-S WebAuthn signature must be normalized identically to TypeScript SDK"
         )
     }
 
     /**
-     * Cross-SDK Test Vector: Realistic WebAuthn DER signature with low-S (no normalization).
+     * Verification Test Vector: Realistic WebAuthn DER signature with low-S (no normalization).
      *
      * DER breakdown:
      *   30 45       -- SEQUENCE, 69 bytes
@@ -249,7 +249,7 @@ class SmartAccountUtilsTest {
      * s (0x1c7a...) < n/2 (0x7fff...) => already low-S, no normalization
      */
     @Test
-    fun testNormalizeSignature_crossSdk_realisticWebAuthnLowS() {
+    fun testNormalizeSignature_verification_realisticWebAuthnLowS() {
         val derSignature = hexToBytes(
             "3045" +
             "022100e47b78d0e44411cf2c94d2e4f14dfc2b91cc8c18ae3d9141a2798cadc9c5c8aa" +
@@ -266,12 +266,12 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size, "Compact signature must be exactly 64 bytes")
         assertEquals(
             expected.toHex(), result.toHex(),
-            "Cross-SDK: low-S WebAuthn signature must pass through unchanged"
+            "Low-S WebAuthn signature must pass through unchanged"
         )
     }
 
     /**
-     * Cross-SDK Test Vector: s = exactly n - 1 (maximum high-S).
+     * Verification Test Vector: s = exactly n - 1 (maximum high-S).
      *
      * When s = n - 1, normalized s = n - (n - 1) = 1.
      * This tests the extreme high-S case.
@@ -283,7 +283,7 @@ class SmartAccountUtilsTest {
      * ```
      */
     @Test
-    fun testNormalizeSignature_crossSdk_maxHighS() {
+    fun testNormalizeSignature_verification_maxHighS() {
         // s = n - 1 (maximum possible s value in valid signature)
         val derSignature = hexToBytes(
             "3045" +
@@ -302,12 +302,12 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size)
         assertEquals(
             expected.toHex(), result.toHex(),
-            "Cross-SDK: s = n-1 must normalize to s = 1"
+            "s = n-1 must normalize to s = 1"
         )
     }
 
     /**
-     * Cross-SDK Test Vector: s = exactly n/2 + 1 (minimum high-S).
+     * Verification Test Vector: s = exactly n/2 + 1 (minimum high-S).
      *
      * When s = n/2 + 1 = halfOrder + 1, normalized s = n - (halfOrder + 1) = halfOrder.
      * This tests the boundary just above the normalization threshold.
@@ -318,7 +318,7 @@ class SmartAccountUtilsTest {
      * s'  = n - s = 0x7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8
      */
     @Test
-    fun testNormalizeSignature_crossSdk_minHighS() {
+    fun testNormalizeSignature_verification_minHighS() {
         val derSignature = hexToBytes(
             "3045" +
             "02207a2b3c4d5e6f708192a3b4c5d6e7f80112233445566778899aabbccddeeff00a" +
@@ -335,19 +335,19 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size)
         assertEquals(
             expected.toHex(), result.toHex(),
-            "Cross-SDK: s = halfOrder + 1 must normalize to halfOrder"
+            "s = halfOrder + 1 must normalize to halfOrder"
         )
     }
 
     /**
-     * Cross-SDK Test Vector: s = exactly n/2 (maximum low-S, boundary case).
+     * Verification Test Vector: s = exactly n/2 (maximum low-S, boundary case).
      *
      * When s = n/2 (halfOrder), it should NOT be normalized (s <= n/2 is fine).
      *
      * n/2 = 0x7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8
      */
     @Test
-    fun testNormalizeSignature_crossSdk_exactHalfOrder() {
+    fun testNormalizeSignature_verification_exactHalfOrder() {
         val derSignature = hexToBytes(
             "3045" +
             "02207a2b3c4d5e6f708192a3b4c5d6e7f80112233445566778899aabbccddeeff00a" +
@@ -364,7 +364,7 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size)
         assertEquals(
             expected.toHex(), result.toHex(),
-            "Cross-SDK: s = halfOrder (boundary) must NOT be normalized"
+            "s = halfOrder (boundary) must NOT be normalized"
         )
     }
 

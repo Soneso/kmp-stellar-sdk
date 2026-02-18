@@ -22,7 +22,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Cross-SDK interoperability tests for the Smart Account Kit.
+ * Deterministic derivation tests for the Smart Account Kit.
  *
  * Verifies that the KMP SDK derives identical values as the TypeScript Smart Account
  * Kit SDK for:
@@ -44,7 +44,7 @@ import kotlin.test.assertTrue
  * Reference: TypeScript SDK at /smart-account-kit/src/kit.ts (deployer) and
  *            /smart-account-kit/src/utils.ts (contract address derivation).
  */
-class CrossSdkInteropTest {
+class DeterministicDerivationTest {
 
     // MARK: - Deployer Keypair Constants
 
@@ -75,7 +75,7 @@ class CrossSdkInteropTest {
     /**
      * Expected deployer G-address derived from the seed hash.
      * This value must be identical across all SDK implementations (TypeScript, KMP, etc.)
-     * to ensure cross-SDK interoperability for contract address derivation.
+     * to verify deterministic derivation from the same inputs.
      *
      * Verified against the TypeScript SDK by computing:
      *   Keypair.fromRawEd25519Seed(hash(Buffer.from("openzeppelin-smart-account-kit"))).publicKey()
@@ -101,7 +101,7 @@ class CrossSdkInteropTest {
      */
     private val testDeployer3 = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
 
-    // MARK: - Deployer Keypair Interoperability Tests
+    // MARK: - Deployer Keypair Determinism Tests
 
     /**
      * Verifies that SHA-256 of the seed string produces the expected hash.
@@ -126,9 +126,9 @@ class CrossSdkInteropTest {
      * Verifies that the deployer keypair derived from the seed hash produces
      * the expected G-address, matching the TypeScript SDK's derivation.
      *
-     * This is the critical interoperability gate test: if this G-address differs
-     * between SDKs, contract address derivation will also differ, breaking
-     * cross-SDK wallet portability.
+     * This is a correctness test: if this G-address differs between SDKs,
+     * contract address derivation will also differ for the same inputs, indicating
+     * a bug in one of the implementations.
      */
     @Test
     fun testDeployerAddress_matchesTypeScriptSdk() = runTest {

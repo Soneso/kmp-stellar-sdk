@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * - URL-safe alphabet: `-` instead of `+`, `_` instead of `/`
  * - No padding `=` characters in output
  * - Correct round-trip for all input lengths (padding edge cases)
- * - Interoperability with the TypeScript SDK's `base64url` package
+ * - Compatibility with the TypeScript SDK's `base64url` package
  */
 class Base64UrlTest {
 
@@ -224,7 +224,7 @@ class Base64UrlTest {
         )
     }
 
-    // MARK: - Credential ID Interoperability Tests
+    // MARK: - Credential ID Compatibility Tests
 
     /**
      * Verifies that known credential ID bytes produce the expected base64url output.

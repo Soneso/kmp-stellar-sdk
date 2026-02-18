@@ -12,6 +12,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import kotlinx.coroutines.sync.Mutex
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.sync.withLock
 
 /**
@@ -308,7 +309,7 @@ class OZSmartAccountKit private constructor(
      *
      * The deployer keypair is used for deploying smart account contracts. If no deployer
      * was provided in the configuration, a deterministic deployer is derived from
-     * SHA256("openzeppelin-smart-account-kit") for interoperability with the TypeScript SDK.
+     * SHA256("openzeppelin-smart-account-kit") for deterministic address derivation.
      *
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
      *

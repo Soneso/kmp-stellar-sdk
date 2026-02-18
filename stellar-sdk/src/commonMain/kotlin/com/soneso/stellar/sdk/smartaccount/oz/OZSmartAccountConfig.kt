@@ -101,7 +101,7 @@ data class OZSmartAccountConfig(
      * The keypair used for deploying smart account contracts.
      *
      * If null, a deterministic deployer is derived from SHA256("openzeppelin-smart-account-kit").
-     * This ensures interoperability with other SDK implementations' default deployer.
+     * Production apps typically use a custom deployer for attribution and traceability.
      *
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
      */
@@ -224,9 +224,11 @@ data class OZSmartAccountConfig(
         /**
          * Creates a deterministic deployer keypair for smart account deployment.
          *
-         * Derives a keypair from SHA256("openzeppelin-smart-account-kit") to ensure
-         * interoperability with other SDK implementations' default deployer. This keypair
-         * only pays deployment fees and does not control user wallets.
+         * Derives a keypair from SHA256("openzeppelin-smart-account-kit"). The same derivation
+         * is used by the TypeScript Smart Account Kit, so identical inputs produce identical
+         * results across implementations. This keypair only pays deployment fees and does not
+         * control user wallets. Suitable for testing and simple deployments; production apps
+         * typically use a custom deployer for attribution and traceability.
          *
          * @return A deterministic KeyPair for contract deployment
          * @throws ConfigurationException if seed generation fails
