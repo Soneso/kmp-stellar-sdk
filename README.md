@@ -150,6 +150,7 @@ suspend fun sendPayment() {
     val destination = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
 
     val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
+        .setBaseFee(100) // stroops per operation
         .addOperation(
             PaymentOperation(destination, AssetTypeNative, "10.0")
         )
@@ -158,7 +159,7 @@ suspend fun sendPayment() {
 
     transaction.sign(sourceKeypair)
 
-    val response = server.submitTransaction(transaction)
+    val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
     println("Transaction successful: ${response.hash}")
 }
 ```
@@ -268,6 +269,10 @@ The [demo app](demo/README.md) showcases SDK usage across all platforms with 11 
 11. **Invoke Token Contract** - SEP-41 token contract interaction with multi-signature workflows
 
 See [demo/README.md](demo/README.md) for screenshots and platform-specific build instructions.
+
+## Agent Skill
+
+This repository includes an [Agent Skill](https://agentskills.io) that teaches AI coding agents how to use this SDK. See [skills/](skills/) for installation instructions.
 
 ## Documentation
 
