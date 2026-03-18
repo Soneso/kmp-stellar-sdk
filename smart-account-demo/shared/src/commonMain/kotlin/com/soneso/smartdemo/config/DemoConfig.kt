@@ -13,7 +13,7 @@ object DemoConfig {
     const val NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
 
     // Smart Account Contract
-    const val ACCOUNT_WASM_HASH = "a12e8fa9621efd20315753bd4007d974390e31fbcb4a7ddc4dd0a0dec728bf2e"
+    const val ACCOUNT_WASM_HASH = "64086253db59176c3bbbcf57fbb68c0a2fbe6fe9e0b05883ff1da44c5978ae4c"
 
     // Verifier Contracts
     const val WEBAUTHN_VERIFIER_ADDRESS = "CBSHV66WG7UV6FQVUTB67P3DZUEJ2KJ5X6JKQH5MFRAAFNFJUAJVXJYV"
