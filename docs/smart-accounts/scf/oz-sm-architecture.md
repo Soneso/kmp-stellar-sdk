@@ -71,7 +71,7 @@ The implementation has two layers:
 
 Infrastructure clients:
 +------------------+  +------------------+  +-----------------------+
-| SorobanServer    |  | RelayerClient    |  | IndexerClient         |
+| SorobanServer    |  | OZRelayerClient  |  | OZIndexerClient       |
 | (Soroban RPC)    |  | (fee sponsoring) |  | (credential lookup)   |
 +------------------+  +------------------+  +-----------------------+
 ```
@@ -86,7 +86,7 @@ Infrastructure clients:
 
 `ExternalWalletAdapter` is an interface for connecting external Stellar wallets as delegated signers in multi-signer workflows if needed. The interface is platform-agnostic; the existing reference implementation in the TypeScript kit wraps the Stellar Wallets Kit for browser extension wallets. The KMP SDK defines the interface but leaves concrete implementations to the application developer.
 
-The KMP SDK provides three infrastructure clients: `SorobanServer` for Soroban RPC calls, `RelayerClient` for fee-sponsored transaction submission, and `IndexerClient` for credential-to-contract address lookup. The relayer and indexer are optional.
+The KMP SDK provides three infrastructure clients: `SorobanServer` for Soroban RPC calls, `OZRelayerClient` for fee-sponsored transaction submission, and `OZIndexerClient` for credential-to-contract address lookup. The relayer and indexer are optional.
 
 ### 4. Platform integration
 
