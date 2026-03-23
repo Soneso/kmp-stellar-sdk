@@ -195,29 +195,19 @@ data class OZSmartAccountConfig(
 ) {
     init {
         // Validate required parameters
-        require(rpcUrl.isNotBlank()) {
-            throw ConfigurationException.missingConfig("rpcUrl")
-        }
+        if (rpcUrl.isBlank()) throw ConfigurationException.missingConfig("rpcUrl")
 
-        require(networkPassphrase.isNotBlank()) {
-            throw ConfigurationException.missingConfig("networkPassphrase")
-        }
+        if (networkPassphrase.isBlank()) throw ConfigurationException.missingConfig("networkPassphrase")
 
-        require(accountWasmHash.isNotBlank()) {
-            throw ConfigurationException.missingConfig("accountWasmHash")
-        }
+        if (accountWasmHash.isBlank()) throw ConfigurationException.missingConfig("accountWasmHash")
 
-        require(webauthnVerifierAddress.startsWith("C")) {
-            throw ConfigurationException.invalidConfig(
-                "webauthnVerifierAddress must start with 'C' (contract address), got: $webauthnVerifierAddress"
-            )
-        }
+        if (!webauthnVerifierAddress.startsWith("C")) throw ConfigurationException.invalidConfig(
+            "webauthnVerifierAddress must start with 'C' (contract address), got: $webauthnVerifierAddress"
+        )
 
-        require(webauthnVerifierAddress.length == 56) {
-            throw ConfigurationException.invalidConfig(
-                "webauthnVerifierAddress must be 56 characters long, got: ${webauthnVerifierAddress.length}"
-            )
-        }
+        if (webauthnVerifierAddress.length != 56) throw ConfigurationException.invalidConfig(
+            "webauthnVerifierAddress must be 56 characters long, got: ${webauthnVerifierAddress.length}"
+        )
     }
 
     companion object {
