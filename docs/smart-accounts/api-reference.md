@@ -686,11 +686,11 @@ Retrieves credentials with PENDING or FAILED deployment status.
 suspend fun sync(credentialId: String): Boolean
 ```
 
-Checks if a smart account contract exists on-chain and removes the credential if deployed.
+Checks whether a pending credential's contract has been deployed on-chain. If the contract exists, the credential is removed from storage (it is no longer needed as a pending record). Used to resolve credentials left in "pending" state when the app closed before deployment confirmation.
 
 **Parameters**: `credentialId` to check
 
-**Returns**: True if contract exists on-chain (credential removed), false otherwise
+**Returns**: True if the contract exists on-chain (credential removed from storage), false if not yet deployed
 
 **Throws**:
 - `CredentialException.NotFound`: Credential does not exist
