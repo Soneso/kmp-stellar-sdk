@@ -123,8 +123,8 @@ kit.contextRuleManager.addContextRule(
     signers = listOf(delegatedSigner, passkeySigner)
 )
 
-// Query rules of a specific type
-val rules = kit.contextRuleManager.getContextRules(ContextRuleType.Default)
+// Query rules of a specific type (returns raw SCValXdr)
+val rulesXdr = kit.contextRuleManager.getContextRules(ContextRuleType.Default)
 
 // Get count
 val count = kit.contextRuleManager.getContextRulesCount()
