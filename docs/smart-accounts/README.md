@@ -348,6 +348,33 @@ val config = OZSmartAccountConfig.builder(
     .build()
 ```
 
+## Testnet contract addresses
+
+The SDK needs two values that depend on the network: a WASM hash (`accountWasmHash`) for the uploaded smart account binary, and a verifier contract address (`webauthnVerifierAddress`). Both can change when contracts are upgraded, testnet is reset, or their TTL expires.
+
+Current testnet values are in `DemoConfig.kt` in the demo app:
+
+```
+smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt
+```
+
+### Uploading your own WASM
+
+If the testnet hash has expired or you need a custom contract, clone the [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) repository and build/upload:
+
+```bash
+# Build the smart account WASM
+stellar contract build --package multisig-account-example
+
+# Upload to testnet and capture the returned hash
+stellar contract upload \
+  --network testnet \
+  --source <deployer-secret> \
+  --wasm target/wasm32v1-none/release/multisig_account_example.wasm
+```
+
+The command prints a hex string. Use it as `accountWasmHash` in your `OZSmartAccountConfig`.
+
 ## How Wallet Deployment Works
 
 When `createWallet()` is called, the SDK deploys a Soroban smart account contract. The deployment involves two roles:

@@ -343,6 +343,8 @@ App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles t
 
 **Deployed contracts**: For testnet development, pre-deployed contracts are available and you just need their addresses and hashes. The smart account WASM binary is uploaded to the network once and referenced by its SHA-256 hash (a hex string). Individual smart account contracts are then deployed from this WASM. The WebAuthn verifier is a single contract instance shared by all accounts, so it is referenced by its deployed contract address (a `C...` string, 56 characters). The relayer and indexer are optional and can be added later. You do not need to deploy any contracts yourself if you use pre-deployed testnet contracts. Check the TypeScript Smart Account Kit demo configuration or the OpenZeppelin stellar-contracts repository (https://github.com/OpenZeppelin/stellar-contracts) for current testnet addresses.
 
+Testnet contract hashes can change when contracts are upgraded or testnet is reset. WASM entries may also expire if their TTL is not extended, though they can be restored. Current values are in `smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt`. See [Testnet contract addresses](README.md#testnet-contract-addresses) for upload instructions.
+
 **Optional infrastructure**: A relayer server if you want to sponsor transaction fees for users. An indexer server if you want credential-to-contract lookup beyond the default deployer derivation.
 
 **Platform-specific WebAuthn setup**: Each platform requires configuration for passkey support. See the platform guides:
