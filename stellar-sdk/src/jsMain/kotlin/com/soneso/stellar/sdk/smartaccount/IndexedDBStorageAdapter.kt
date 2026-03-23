@@ -16,6 +16,8 @@ import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -72,6 +74,8 @@ class IndexedDBStorageAdapter(
      * Typed as Any? to avoid dynamic null-safety issues with `?.let`.
      */
     private var cachedDb: Any? = null
+
+    private val mutex = Mutex()
 
     // MARK: - Database Lifecycle
 
@@ -184,7 +188,7 @@ class IndexedDBStorageAdapter(
 
     // MARK: - Credential Operations
 
-    override suspend fun save(credential: StoredCredential) {
+    override suspend fun save(credential: StoredCredential): Unit = mutex.withLock {
         val database = getDb()
         val obj = credentialToJs(credential)
         try {
@@ -199,7 +203,7 @@ class IndexedDBStorageAdapter(
         }
     }
 
-    override suspend fun get(credentialId: String): StoredCredential? {
+    override suspend fun get(credentialId: String): StoredCredential? = mutex.withLock {
         val database = getDb()
         val result = try {
             withObjectStore(database, STORE_CREDENTIALS, "readonly") { store ->
@@ -208,11 +212,11 @@ class IndexedDBStorageAdapter(
         } catch (e: Throwable) {
             throw StorageException.readFailed("credential:$credentialId", e)
         }
-        if (result == null || result == undefined) return null
-        return jsToCredential(result)
+        if (result == null || result == undefined) return@withLock null
+        jsToCredential(result)
     }
 
-    override suspend fun getByContract(contractId: String): List<StoredCredential> {
+    override suspend fun getByContract(contractId: String): List<StoredCredential> = mutex.withLock {
         val database = getDb()
         val results = try {
             withIndex(database, STORE_CREDENTIALS, INDEX_CONTRACT_ID, "readonly") { index ->
@@ -221,10 +225,10 @@ class IndexedDBStorageAdapter(
         } catch (e: Throwable) {
             throw StorageException.readFailed("credentials:contractId=$contractId", e)
         }
-        return jsArrayToCredentials(results)
+        jsArrayToCredentials(results)
     }
 
-    override suspend fun getAll(): List<StoredCredential> {
+    override suspend fun getAll(): List<StoredCredential> = mutex.withLock {
         val database = getDb()
         val results = try {
             withObjectStore(database, STORE_CREDENTIALS, "readonly") { store ->
@@ -233,10 +237,10 @@ class IndexedDBStorageAdapter(
         } catch (e: Throwable) {
             throw StorageException.readFailed("credentials:all", e)
         }
-        return jsArrayToCredentials(results)
+        jsArrayToCredentials(results)
     }
 
-    override suspend fun delete(credentialId: String) {
+    override suspend fun delete(credentialId: String): Unit = mutex.withLock {
         val database = getDb()
         try {
             withObjectStore(database, STORE_CREDENTIALS, "readwrite") { store ->
@@ -247,9 +251,19 @@ class IndexedDBStorageAdapter(
         }
     }
 
-    override suspend fun update(credentialId: String, updates: StoredCredentialUpdate) {
-        val existing = get(credentialId)
-            ?: throw CredentialException.notFound(credentialId)
+    override suspend fun update(credentialId: String, updates: StoredCredentialUpdate): Unit = mutex.withLock {
+        val database = getDb()
+        val result = try {
+            withObjectStore(database, STORE_CREDENTIALS, "readonly") { store ->
+                store.get(credentialId)
+            }
+        } catch (e: Throwable) {
+            throw StorageException.readFailed("credential:$credentialId", e)
+        }
+        if (result == null || result == undefined) {
+            throw CredentialException.notFound(credentialId)
+        }
+        val existing = jsToCredential(result)
 
         val updated = existing.copy(
             deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
@@ -263,10 +277,17 @@ class IndexedDBStorageAdapter(
             backedUp = updates.backedUp ?: existing.backedUp
         )
 
-        save(updated)
+        val obj = credentialToJs(updated)
+        try {
+            withObjectStore(database, STORE_CREDENTIALS, "readwrite") { store ->
+                store.put(obj)
+            }
+        } catch (e: Throwable) {
+            throw StorageException.writeFailed("credential:$credentialId", e)
+        }
     }
 
-    override suspend fun clear() {
+    override suspend fun clear(): Unit = mutex.withLock {
         val database = getDb()
         try {
             withObjectStore(database, STORE_CREDENTIALS, "readwrite") { store ->
@@ -275,12 +296,12 @@ class IndexedDBStorageAdapter(
         } catch (e: Throwable) {
             throw StorageException.writeFailed("credentials:clear", e)
         }
-        clearSession()
+        clearSessionUnlocked(database)
     }
 
     // MARK: - Session Operations
 
-    override suspend fun saveSession(session: StoredSession) {
+    override suspend fun saveSession(session: StoredSession): Unit = mutex.withLock {
         val database = getDb()
         val obj = sessionToJs(session)
         try {
@@ -292,7 +313,7 @@ class IndexedDBStorageAdapter(
         }
     }
 
-    override suspend fun getSession(): StoredSession? {
+    override suspend fun getSession(): StoredSession? = mutex.withLock {
         val database = getDb()
         val result = try {
             withObjectStore(database, STORE_SESSIONS, "readonly") { store ->
@@ -301,19 +322,29 @@ class IndexedDBStorageAdapter(
         } catch (e: Throwable) {
             throw StorageException.readFailed("session", e)
         }
-        if (result == null || result == undefined) return null
+        if (result == null || result == undefined) return@withLock null
 
         val session = jsToSession(result)
-        return if (session.isExpired) {
-            clearSession()
+        if (session.isExpired) {
+            clearSessionUnlocked(database)
             null
         } else {
             session
         }
     }
 
-    override suspend fun clearSession() {
+    override suspend fun clearSession(): Unit = mutex.withLock {
         val database = getDb()
+        clearSessionUnlocked(database)
+    }
+
+    /**
+     * Deletes the current session from IndexedDB without acquiring the mutex.
+     *
+     * Must only be called from within a [mutex]-locked context to avoid
+     * deadlocks when composed with other locked operations (e.g., [clear], [getSession]).
+     */
+    private suspend fun clearSessionUnlocked(database: dynamic) {
         try {
             withObjectStore(database, STORE_SESSIONS, "readwrite") { store ->
                 store.delete(SESSION_KEY)
