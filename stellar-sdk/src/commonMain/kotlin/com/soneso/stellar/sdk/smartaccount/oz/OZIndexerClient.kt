@@ -211,6 +211,17 @@ class OZIndexerClient(
     private val indexerUrl: String,
     timeoutMs: Long = SmartAccountConstants.DEFAULT_INDEXER_TIMEOUT_MS
 ) {
+    init {
+        if (indexerUrl.isBlank()) {
+            throw ConfigurationException.invalidConfig("Indexer URL is required")
+        }
+        if (!indexerUrl.startsWith("https://") && !indexerUrl.startsWith("http://localhost")) {
+            throw ConfigurationException.invalidConfig(
+                "Indexer URL must use HTTPS (or http://localhost for development): $indexerUrl"
+            )
+        }
+    }
+
     private val httpClient: HttpClient = createHttpClient(timeoutMs)
 
     companion object {

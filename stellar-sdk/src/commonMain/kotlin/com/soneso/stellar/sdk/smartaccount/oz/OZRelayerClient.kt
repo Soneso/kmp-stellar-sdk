@@ -125,6 +125,11 @@ class OZRelayerClient(
         if (relayerUrl.isBlank()) {
             throw ConfigurationException.invalidConfig("Relayer URL is required")
         }
+        if (!relayerUrl.startsWith("https://") && !relayerUrl.startsWith("http://localhost")) {
+            throw ConfigurationException.invalidConfig(
+                "Relayer URL must use HTTPS (or http://localhost for development): $relayerUrl"
+            )
+        }
         normalizedUrl = relayerUrl.trimEnd('/')
     }
 
