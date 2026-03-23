@@ -61,6 +61,7 @@ import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -465,7 +466,7 @@ class ContextRulesScreen : Screen {
 
                     // Context type
                     Text(
-                        text = SmartAccountBuilders.formatContextType(rule.contextType),
+                        text = OZBuilders.formatContextType(rule.contextType),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

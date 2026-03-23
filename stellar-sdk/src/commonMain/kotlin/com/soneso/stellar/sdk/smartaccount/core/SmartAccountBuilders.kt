@@ -8,8 +8,6 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
-import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
-import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 
 /**
  * Builder utilities for Smart Account Kit.
@@ -129,102 +127,6 @@ object SmartAccountBuilders {
         publicKey: ByteArray
     ): ExternalSigner {
         return ExternalSigner.ed25519(ed25519VerifierAddress, publicKey)
-    }
-
-    // ========================================================================
-    // Context Rule Type Builders
-    // ========================================================================
-
-    /**
-     * Creates a Default context rule type.
-     *
-     * Default rules apply to any operation that does not match a more specific
-     * CallContract or CreateContract rule.
-     *
-     * @return A [ContextRuleType.Default] for default authorization
-     *
-     * Example:
-     * ```kotlin
-     * val contextType = SmartAccountBuilders.createDefaultContext()
-     * ```
-     */
-    fun createDefaultContext(): ContextRuleType {
-        return ContextRuleType.Default
-    }
-
-    /**
-     * Creates a CallContract context rule type.
-     *
-     * CallContract rules apply only when calling a specific contract.
-     * Useful for restricting signers to specific dApps or operations.
-     *
-     * @param contractAddress The contract address this rule applies to (C-address)
-     * @return A [ContextRuleType.CallContract] for contract-specific authorization
-     * @throws ValidationException.InvalidAddress if the contract address format is invalid
-     *
-     * Example:
-     * ```kotlin
-     * val contextType = SmartAccountBuilders.createCallContractContext("CBCD1234...")
-     * ```
-     */
-    fun createCallContractContext(contractAddress: String): ContextRuleType {
-        // Validate address format
-        if (!contractAddress.startsWith("C") || contractAddress.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Invalid contract address. Must start with 'C' and be 56 characters, got: $contractAddress"
-            )
-        }
-        return ContextRuleType.CallContract(contractAddress)
-    }
-
-    /**
-     * Creates a CreateContract context rule type from a hex-encoded WASM hash.
-     *
-     * CreateContract rules apply only when deploying contracts with a specific WASM hash.
-     *
-     * @param wasmHashHex The WASM hash as a hex string (64 characters, optionally prefixed with "0x")
-     * @return A [ContextRuleType.CreateContract] for contract creation authorization
-     * @throws ValidationException.InvalidInput if the hex string is not 64 characters
-     *
-     * Example:
-     * ```kotlin
-     * val contextType = SmartAccountBuilders.createCreateContractContext("abc123...")
-     * ```
-     */
-    fun createCreateContractContext(wasmHashHex: String): ContextRuleType {
-        val cleanHash = if (wasmHashHex.startsWith("0x")) wasmHashHex.substring(2) else wasmHashHex
-        if (cleanHash.length != 64) {
-            throw ValidationException.invalidInput(
-                "wasmHash",
-                "WASM hash must be 32 bytes (64 hex characters), got: ${cleanHash.length} characters"
-            )
-        }
-        val hashBytes = hexToByteArray(cleanHash)
-        return ContextRuleType.CreateContract(hashBytes)
-    }
-
-    /**
-     * Creates a CreateContract context rule type from raw WASM hash bytes.
-     *
-     * CreateContract rules apply only when deploying contracts with a specific WASM hash.
-     *
-     * @param wasmHash The WASM hash (32 bytes)
-     * @return A [ContextRuleType.CreateContract] for contract creation authorization
-     * @throws ValidationException.InvalidInput if the byte array is not 32 bytes
-     *
-     * Example:
-     * ```kotlin
-     * val contextType = SmartAccountBuilders.createCreateContractContext(wasmHashBytes)
-     * ```
-     */
-    fun createCreateContractContext(wasmHash: ByteArray): ContextRuleType {
-        if (wasmHash.size != 32) {
-            throw ValidationException.invalidInput(
-                "wasmHash",
-                "WASM hash must be 32 bytes, got: ${wasmHash.size}"
-            )
-        }
-        return ContextRuleType.CreateContract(wasmHash)
     }
 
     // ========================================================================
@@ -635,25 +537,6 @@ object SmartAccountBuilders {
         return signerMap.values.toList()
     }
 
-    /**
-     * Collects unique signers from all context rules, removing duplicates across rules.
-     *
-     * Iterates through all context rules, collects their signers, and returns
-     * a deduplicated list.
-     *
-     * @param rules List of parsed context rules
-     * @return List of unique signers across all rules
-     *
-     * Example:
-     * ```kotlin
-     * val allUniqueSigners = SmartAccountBuilders.collectUniqueSignersFromRules(rules)
-     * ```
-     */
-    fun collectUniqueSignersFromRules(rules: List<ParsedContextRule>): List<SmartAccountSigner> {
-        val allSigners = rules.flatMap { it.signers }
-        return collectUniqueSigners(allSigners)
-    }
-
     // ========================================================================
     // Display Formatting
     // ========================================================================
@@ -676,33 +559,6 @@ object SmartAccountBuilders {
             return address
         }
         return "${address.take(chars)}...${address.takeLast(chars)}"
-    }
-
-    /**
-     * Formats a context rule type for human-readable display.
-     *
-     * @param contextType The context rule type to format
-     * @return Human-readable description such as "Default (Any Operation)",
-     *         "Call Contract: CABC...WXYZ", or "Create Contract: abc123..."
-     *
-     * Example:
-     * ```kotlin
-     * val label = SmartAccountBuilders.formatContextType(rule.contextType)
-     * // "Call Contract: CABC...WXYZ"
-     * ```
-     */
-    fun formatContextType(contextType: ContextRuleType): String {
-        return when (contextType) {
-            is ContextRuleType.Default -> "Default (Any Operation)"
-
-            is ContextRuleType.CallContract ->
-                "Call Contract: ${truncateAddress(contextType.contractAddress)}"
-
-            is ContextRuleType.CreateContract -> {
-                val hashHex = contextType.wasmHash.toHexString()
-                "Create Contract: ${hashHex.take(8)}..."
-            }
-        }
     }
 
     /**
