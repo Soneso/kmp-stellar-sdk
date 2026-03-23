@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.platformSynchronized
 import com.soneso.stellar.sdk.smartaccount.core.*
+import kotlin.concurrent.Volatile
 
 /**
  * Events emitted by the Smart Account Kit during wallet lifecycle operations.

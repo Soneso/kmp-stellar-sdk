@@ -16,6 +16,8 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Storage adapter backed by the browser's `localStorage` API.
@@ -59,9 +61,11 @@ class LocalStorageAdapter(
         private const val SESSION_KEY = "session"
     }
 
+    private val mutex = Mutex()
+
     // MARK: - Credential Operations
 
-    override suspend fun save(credential: StoredCredential) {
+    override suspend fun save(credential: StoredCredential): Unit = mutex.withLock {
         val storage = requireLocalStorage()
         try {
             val json = serializeCredential(credential)
@@ -85,11 +89,11 @@ class LocalStorageAdapter(
         }
     }
 
-    override suspend fun get(credentialId: String): StoredCredential? {
+    override suspend fun get(credentialId: String): StoredCredential? = mutex.withLock {
         val storage = requireLocalStorage()
         val key = credentialKey(credentialId)
-        val json = storage.getItem(key) ?: return null
-        return try {
+        val json = storage.getItem(key) ?: return@withLock null
+        return@withLock try {
             deserializeCredential(json)
         } catch (e: dynamic) {
             throw StorageException.readFailed(
@@ -99,11 +103,27 @@ class LocalStorageAdapter(
         }
     }
 
-    override suspend fun getByContract(contractId: String): List<StoredCredential> {
-        return getAll().filter { it.contractId == contractId }
+    override suspend fun getByContract(contractId: String): List<StoredCredential> = mutex.withLock {
+        val storage = requireLocalStorage()
+        val index = readIndex(storage)
+        val result = mutableListOf<StoredCredential>()
+        for (id in index) {
+            val key = credentialKey(id)
+            val json = storage.getItem(key)
+            if (json != null) {
+                try {
+                    val cred = deserializeCredential(json)
+                    if (cred.contractId == contractId) result.add(cred)
+                } catch (e: dynamic) {
+                    val message = e?.message?.toString() ?: "unknown error"
+                    consoleWarn("LocalStorageAdapter: corrupted credential data for '$id', skipping: $message")
+                }
+            }
+        }
+        result
     }
 
-    override suspend fun getAll(): List<StoredCredential> {
+    override suspend fun getAll(): List<StoredCredential> = mutex.withLock {
         val storage = requireLocalStorage()
         val index = readIndex(storage)
         val result = mutableListOf<StoredCredential>()
@@ -121,19 +141,29 @@ class LocalStorageAdapter(
                 }
             }
         }
-        return result
+        result
     }
 
-    override suspend fun delete(credentialId: String) {
+    override suspend fun delete(credentialId: String): Unit = mutex.withLock {
         val storage = requireLocalStorage()
         val key = credentialKey(credentialId)
         storage.removeItem(key)
         removeFromIndex(storage, credentialId)
     }
 
-    override suspend fun update(credentialId: String, updates: StoredCredentialUpdate) {
-        val existing = get(credentialId)
+    override suspend fun update(credentialId: String, updates: StoredCredentialUpdate): Unit = mutex.withLock {
+        val storage = requireLocalStorage()
+        val key = credentialKey(credentialId)
+        val json = storage.getItem(key)
             ?: throw CredentialException.notFound(credentialId)
+        val existing = try {
+            deserializeCredential(json)
+        } catch (e: dynamic) {
+            throw StorageException.readFailed(
+                "credential:$credentialId",
+                Exception(e?.message?.toString() ?: "Failed to deserialize credential")
+            )
+        }
 
         val updated = existing.copy(
             deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
@@ -147,22 +177,28 @@ class LocalStorageAdapter(
             backedUp = updates.backedUp ?: existing.backedUp
         )
 
-        save(updated)
+        val updatedJson = serializeCredential(updated)
+        try {
+            storage.setItem(key, updatedJson)
+        } catch (e: dynamic) {
+            val message = e?.message?.toString() ?: "Unknown error"
+            throw StorageException.writeFailed("credential:$credentialId", Exception(message))
+        }
     }
 
-    override suspend fun clear() {
+    override suspend fun clear(): Unit = mutex.withLock {
         val storage = requireLocalStorage()
         val index = readIndex(storage)
         for (credentialId in index) {
             storage.removeItem(credentialKey(credentialId))
         }
         storage.removeItem(prefixedKey(CRED_INDEX_KEY))
-        storage.removeItem(prefixedKey(SESSION_KEY))
+        clearSessionUnlocked(storage)
     }
 
     // MARK: - Session Operations
 
-    override suspend fun saveSession(session: StoredSession) {
+    override suspend fun saveSession(session: StoredSession): Unit = mutex.withLock {
         val storage = requireLocalStorage()
         try {
             val json = serializeSession(session)
@@ -173,14 +209,13 @@ class LocalStorageAdapter(
         }
     }
 
-    override suspend fun getSession(): StoredSession? {
+    override suspend fun getSession(): StoredSession? = mutex.withLock {
         val storage = requireLocalStorage()
-        val json = storage.getItem(prefixedKey(SESSION_KEY)) ?: return null
-        return try {
+        val json = storage.getItem(prefixedKey(SESSION_KEY)) ?: return@withLock null
+        return@withLock try {
             val session = deserializeSession(json)
             if (session.isExpired) {
-                // Clear expired session automatically
-                storage.removeItem(prefixedKey(SESSION_KEY))
+                clearSessionUnlocked(storage)
                 null
             } else {
                 session
@@ -193,8 +228,17 @@ class LocalStorageAdapter(
         }
     }
 
-    override suspend fun clearSession() {
-        val storage = requireLocalStorage()
+    override suspend fun clearSession(): Unit = mutex.withLock {
+        clearSessionUnlocked(requireLocalStorage())
+    }
+
+    /**
+     * Removes the session entry from localStorage without acquiring the mutex.
+     *
+     * Must only be called from within a [mutex]-locked context to avoid
+     * deadlocks when composed with other locked operations (e.g., [clear], [getSession]).
+     */
+    private fun clearSessionUnlocked(storage: dynamic) {
         storage.removeItem(prefixedKey(SESSION_KEY))
     }
 
