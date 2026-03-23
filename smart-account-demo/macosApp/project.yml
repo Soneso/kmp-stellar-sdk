@@ -20,6 +20,9 @@ targets:
         NSHumanReadableCopyright: Copyright 2025 Stellar Development Foundation
     entitlements:
       path: StellarSmartDemo/StellarSmartDemo.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - webcredentials:soneso.com?mode=developer
     resources:
       - path: StellarSmartDemo/Assets.xcassets
     settings:
