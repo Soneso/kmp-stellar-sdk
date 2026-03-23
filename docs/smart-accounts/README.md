@@ -448,3 +448,6 @@ These limits are defined in `SmartAccountConstants` and validated client-side be
 | [Onboarding Guide](onboarding.md) | Smart account concepts, passkeys, on-chain contract interface, end-to-end lifecycle |
 | [WebAuthn Setup: Android](webauthn-android.md) | Android Credential Manager integration, Digital Asset Links setup |
 | [WebAuthn Setup: iOS](webauthn-ios.md) | iOS AuthenticationServices integration, apple-app-site-association setup |
+| [WebAuthn Setup: macOS](webauthn-macos.md) | macOS AuthenticationServices integration, associated domains setup |
+| [WebAuthn Setup: Web](webauthn-web.md) | Browser WebAuthn API, localhost development setup |
+| [API Reference](api-reference.md) | Full API reference for all public classes and methods |
