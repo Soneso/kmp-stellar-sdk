@@ -217,7 +217,7 @@ kotlin {
                 implementation("androidx.credentials:credentials:1.3.0")
                 implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
                 // Encrypted SharedPreferences for secure credential/session storage
-                implementation("androidx.security:security-crypto:1.1.0-alpha06")
+                implementation("androidx.security:security-crypto:1.1.0")
             }
         }
 
