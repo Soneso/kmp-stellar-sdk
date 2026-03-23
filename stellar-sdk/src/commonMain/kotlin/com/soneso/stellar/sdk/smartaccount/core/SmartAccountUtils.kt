@@ -65,6 +65,16 @@ object SmartAccountUtils {
             )
         }
 
+        // Validate total length field: byte 1 encodes the length of the remaining contents,
+        // so the full signature must be exactly 2 + totalLength bytes.
+        val totalLength = derSignature[1].toInt() and 0xFF
+        if (2 + totalLength != derSignature.size) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature format: declared length does not match actual size"
+            )
+        }
+
         // Parse r component
         var offset = 2
         if (offset + 1 >= derSignature.size || derSignature[offset] != 0x02.toByte()) {
@@ -111,6 +121,15 @@ object SmartAccountUtils {
         // Strip leading 0x00 padding from s if present
         while (s.size > 1 && s[0] == 0x00.toByte()) {
             s = s.copyOfRange(1, s.size)
+        }
+
+        // Validate no trailing bytes after s component
+        val endOffset = offset + 2 + sLength
+        if (endOffset != derSignature.size) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature format: trailing bytes after s component"
+            )
         }
 
         // Convert r and s to BigInteger for low-S normalization
