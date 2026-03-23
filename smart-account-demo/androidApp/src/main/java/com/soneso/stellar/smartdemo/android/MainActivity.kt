@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 // Create storage adapter using encrypted SharedPreferences
-                val storage = AndroidStorageAdapter(this@MainActivity)
+                val storage = AndroidStorageAdapter(applicationContext)
 
                 // Create WebAuthn provider for passkey authentication
                 // rpId must match the domain configured in assetlinks.json
