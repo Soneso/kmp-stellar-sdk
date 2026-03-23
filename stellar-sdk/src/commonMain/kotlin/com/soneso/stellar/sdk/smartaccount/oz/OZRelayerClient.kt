@@ -295,9 +295,10 @@ class OZRelayerClient(
             val responseJson = try {
                 json.parseToJsonElement(responseBody).jsonObject
             } catch (e: Exception) {
+                val truncated = if (responseBody.length > 200) responseBody.take(200) + "..." else responseBody
                 return@withHttpClient RelayerResponse(
                     success = false,
-                    error = "Failed to parse relayer response as JSON: $responseBody"
+                    error = "Failed to parse relayer response as JSON: $truncated"
                 )
             }
 

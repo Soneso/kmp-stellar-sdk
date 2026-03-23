@@ -101,7 +101,7 @@ You can add rules that apply only to specific scenarios. For example, a rule tha
 
 Each context rule stores:
 - An ID (`u32`)
-- A type: `Default`, `CallContract(address)`, or `CreateContract(wasmHash)`. A WASM hash is the SHA-256 hash of a compiled smart contract binary. `CreateContract` matches contract creation operations targeting that specific binary.
+- A type: `Default`, `CallContract(address)`, or `CreateContract(wasmHash: ByteArray)`. `wasmHash` is a 32-byte `ByteArray` containing the SHA-256 hash of a compiled smart contract binary. `CreateContract` matches contract creation operations targeting that specific binary.
 - A name (human-readable string)
 - A list of signers (up to 15)
 - A list of policies (up to 5)

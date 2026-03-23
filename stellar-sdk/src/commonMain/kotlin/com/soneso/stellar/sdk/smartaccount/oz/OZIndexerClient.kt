@@ -439,8 +439,9 @@ class OZIndexerClient(
                 } catch (e: Exception) {
                     "(unable to decode response body)"
                 }
+                val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
                 throw ValidationException.InvalidInput(
-                    "Indexer returned HTTP ${response.status.value}: $errorBody"
+                    "Indexer returned HTTP ${response.status.value}: $truncatedBody"
                 )
             }
 

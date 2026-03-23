@@ -5,6 +5,8 @@ Platform-specific guide for configuring WebAuthn passkey authentication in iOS a
 ## Prerequisites
 
 - iOS 16.0+ (passkeys require AuthenticationServices with platform public key credential support)
+
+> The KMP Stellar SDK supports iOS 14.0+. Passkey features require iOS 16.0+.
 - Xcode 14+
 - An Apple Developer account with associated domains capability
 - A domain you control for apple-app-site-association

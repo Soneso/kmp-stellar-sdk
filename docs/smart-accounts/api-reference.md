@@ -614,7 +614,7 @@ data class TransactionResult(
 
 ### OZCredentialManager
 
-Manages the lifecycle of stored credentials (WebAuthn passphrases).
+Manages the lifecycle of stored credentials (WebAuthn passkeys).
 
 ```kotlin
 val credMgr = kit.credentialManager
