@@ -223,6 +223,7 @@ class SmartAccountEventEmitter {
      * }
      * ```
      */
+    @Volatile
     private var errorHandler: ((event: SmartAccountEvent, error: Throwable) -> Unit)? = null
 
     /**
