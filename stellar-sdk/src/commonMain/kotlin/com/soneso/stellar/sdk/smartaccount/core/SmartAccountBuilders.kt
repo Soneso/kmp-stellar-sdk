@@ -679,18 +679,6 @@ data class SignerDisplayInfo(
     val display: String
 )
 
-// ============================================================================
-// Private Extension Functions
-// ============================================================================
-
-/**
- * Converts a ByteArray to a lowercase hexadecimal string.
- */
-private fun ByteArray.toHexString(): String {
-    return joinToString("") { byte ->
-        (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-    }
-}
 
 /**
  * Converts a ByteArray to a Base64URL-encoded string (no padding).

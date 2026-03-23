@@ -220,7 +220,7 @@ data class ExternalSigner(
      * @return Unique key for this external signer
      */
     override val uniqueKey: String
-        get() = "external:$verifierAddress:${keyData.toHex()}"
+        get() = "external:$verifierAddress:${keyData.toHexString()}"
 
     /**
      * Custom equals implementation that properly compares ByteArray.
@@ -364,32 +364,3 @@ enum class SubmissionMethod {
     RPC
 }
 
-// MARK: - Extension Functions
-
-/**
- * Converts a ByteArray to a hexadecimal string representation.
- *
- * Each byte is converted to a two-character lowercase hexadecimal string.
- * For example: [0x0A, 0xFF] becomes "0aff".
- *
- * @receiver The ByteArray to convert
- * @return Hexadecimal string representation of the byte array (lowercase, no prefix)
- */
-private fun ByteArray.toHex(): String {
-    return joinToString("") { byte ->
-        (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-    }
-}
-
-/**
- * Converts a single byte to a hexadecimal string representation.
- *
- * The byte is converted to a two-character lowercase hexadecimal string.
- * For example: 0x0A becomes "0a", 0xFF becomes "ff".
- *
- * @receiver The Byte to convert
- * @return Two-character hexadecimal string (lowercase, zero-padded)
- */
-private fun Byte.toHexString(): String {
-    return (this.toInt() and 0xFF).toString(16).padStart(2, '0')
-}

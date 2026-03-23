@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.core.toHexString
 
 /**
  * Builder utilities for OpenZeppelin smart account context rules.

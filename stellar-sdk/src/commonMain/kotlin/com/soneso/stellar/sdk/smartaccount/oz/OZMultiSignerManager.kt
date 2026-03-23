@@ -348,7 +348,7 @@ class OZMultiSignerManager internal constructor(
 
                             val bytes = (signerParts[2] as? SCValXdr.Bytes)?.value?.value ?: continue
 
-                            signerKey = "external:$address:${bytes.toHex()}"
+                            signerKey = "external:$address:${bytes.toHexString()}"
                             parsed = ParsedContractSigner(
                                 tag = "External",
                                 address = address,
@@ -745,7 +745,7 @@ class OZMultiSignerManager internal constructor(
                     val writer = XdrWriter()
                     entry.key.encode(writer)
                     val keyBytes = writer.toByteArray()
-                    keyBytes.toHex()
+                    keyBytes.toHexString()
                 } catch (e: Exception) {
                     ""
                 }
@@ -885,16 +885,3 @@ class OZMultiSignerManager internal constructor(
     }
 }
 
-// MARK: - Extension Functions
-
-/**
- * Converts a ByteArray to a hexadecimal string representation.
- *
- * @receiver The ByteArray to convert
- * @return Hexadecimal string representation (lowercase, no prefix)
- */
-private fun ByteArray.toHex(): String {
-    return joinToString("") { byte ->
-        (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-    }
-}

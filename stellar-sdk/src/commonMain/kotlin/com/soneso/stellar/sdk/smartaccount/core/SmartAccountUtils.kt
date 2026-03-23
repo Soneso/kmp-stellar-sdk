@@ -654,3 +654,29 @@ object SmartAccountUtils {
         return -1
     }
 }
+
+// MARK: - Hex Encoding Utilities
+
+private val HEX_CHARS = "0123456789abcdef".toCharArray()
+
+/**
+ * Converts a [ByteArray] to a lowercase hex string.
+ */
+internal fun ByteArray.toHexString(): String {
+    if (isEmpty()) return ""
+    val sb = StringBuilder(size * 2)
+    for (byte in this) {
+        val i = byte.toInt() and 0xFF
+        sb.append(HEX_CHARS[i shr 4])
+        sb.append(HEX_CHARS[i and 0x0F])
+    }
+    return sb.toString()
+}
+
+/**
+ * Converts a single [Byte] to a two-character lowercase hex string.
+ */
+internal fun Byte.toHexString(): String {
+    val i = this.toInt() and 0xFF
+    return "${HEX_CHARS[i shr 4]}${HEX_CHARS[i and 0x0F]}"
+}

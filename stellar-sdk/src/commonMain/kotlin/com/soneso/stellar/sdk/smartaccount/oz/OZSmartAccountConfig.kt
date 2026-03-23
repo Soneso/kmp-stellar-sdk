@@ -173,8 +173,6 @@ data class OZSmartAccountConfig(
      *
      * Platform-specific implementation that handles WebAuthn registration and authentication.
      * This is required for signing transactions with passkeys.
-     *
-     * TODO: This should be properly integrated with platform-specific WebAuthn implementations
      */
     val webauthnProvider: WebAuthnProvider? = null,
 
