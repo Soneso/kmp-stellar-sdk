@@ -1076,10 +1076,13 @@ sealed class PolicyInstallParams {
         val threshold: UInt
     ) : PolicyInstallParams()
     data class SpendingLimit(
-        val spendingLimit: Long,
+        val spendingLimit: Long,  // in stroops (1 XLM = 10,000,000 stroops)
         val periodLedgers: UInt
     ) : PolicyInstallParams()
 }
+// Note: The addSpendingLimit() convenience method accepts XLM as Double
+// and converts to stroops internally. When using PolicyInstallParams.SpendingLimit
+// directly with addPolicy(), provide the amount in stroops.
 ```
 
 ---
