@@ -407,9 +407,10 @@ object SmartAccountAuth {
                     (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
                 }
             } catch (e: Exception) {
-                // If encoding fails, use empty string (should not happen)
-                // This will maintain original order for problematic entries
-                ""
+                throw TransactionException.signingFailed(
+                    "Failed to XDR-encode signature map key for sorting: ${e.message}",
+                    e
+                )
             }
         }
     }
