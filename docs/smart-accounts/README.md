@@ -176,7 +176,7 @@ if (result != null) {
 
 // Phase 2: User taps "Connect" -- triggers WebAuthn if no session
 val connected = kit.walletOperations.connectWallet(
-    ConnectWalletOptions(prompt = true)
+    OZWalletOperations.ConnectWalletOptions(prompt = true)
 )
 if (connected != null) {
     println("Connected to ${connected.contractId}")
@@ -187,7 +187,7 @@ Force fresh authentication when needed (e.g., before sensitive operations):
 
 ```kotlin
 val connection = kit.walletOperations.connectWallet(
-    ConnectWalletOptions(fresh = true)
+    OZWalletOperations.ConnectWalletOptions(fresh = true)
 )
 ```
 
@@ -195,7 +195,7 @@ Connect directly with known credentials (skips WebAuthn and session check, alway
 
 ```kotlin
 val connection = kit.walletOperations.connectWallet(
-    ConnectWalletOptions(
+    OZWalletOperations.ConnectWalletOptions(
         credentialId = "abc123...",
         contractId = "CABC..."
     )
