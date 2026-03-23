@@ -68,7 +68,7 @@ kit.disconnect()
 ### Factory Method
 
 ```kotlin
-suspend fun create(
+fun create(
     config: OZSmartAccountConfig
 ): OZSmartAccountKit
 ```

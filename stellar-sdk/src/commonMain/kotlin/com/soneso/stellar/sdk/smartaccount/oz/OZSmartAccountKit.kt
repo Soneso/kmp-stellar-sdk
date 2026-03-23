@@ -357,7 +357,7 @@ class OZSmartAccountKit private constructor(
          * val kit = OZSmartAccountKit.create(config)
          * ```
          */
-        suspend fun create(config: OZSmartAccountConfig): OZSmartAccountKit {
+        fun create(config: OZSmartAccountConfig): OZSmartAccountKit {
             // Initialize relayer client if configured
             val relayerClient = config.relayerUrl?.let { url ->
                 OZRelayerClient(
