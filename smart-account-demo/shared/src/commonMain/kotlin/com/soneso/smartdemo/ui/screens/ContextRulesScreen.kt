@@ -382,7 +382,8 @@ class ContextRulesScreen : Screen {
                             navigator.push(ContextRuleBuilderScreen(editRuleId = rule.id))
                         },
                         onRemove = { ruleToRemove = rule },
-                        isRemoving = isRemoving
+                        isRemoving = isRemoving,
+                        canRemove = rules.size > 1
                     )
                 }
 
@@ -407,7 +408,8 @@ class ContextRulesScreen : Screen {
         onToggleExpand: () -> Unit,
         onEdit: () -> Unit,
         onRemove: () -> Unit,
-        isRemoving: Boolean
+        isRemoving: Boolean,
+        canRemove: Boolean = true
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -554,14 +556,14 @@ class ContextRulesScreen : Screen {
                                 }
                                 Button(
                                     onClick = onRemove,
-                                    enabled = !isRemoving,
+                                    enabled = !isRemoving && canRemove,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.error,
                                         contentColor = MaterialTheme.colorScheme.onError
                                     ),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("Remove Rule")
+                                    Text(if (canRemove) "Remove Rule" else "Last Rule")
                                 }
                             }
                         }

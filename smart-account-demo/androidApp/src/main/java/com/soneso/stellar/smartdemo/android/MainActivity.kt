@@ -11,8 +11,6 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.stellar.sdk.smartaccount.AndroidStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.AndroidWebAuthnProvider
-import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
-import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -35,22 +33,10 @@ class MainActivity : ComponentActivity() {
                     rpName = DemoConfig.RP_NAME
                 )
 
-                // Build config with Android providers (storage is part of config)
-                val config = OZSmartAccountConfig(
-                    rpcUrl = DemoConfig.RPC_URL,
-                    networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
-                    accountWasmHash = DemoState.accountWasmHash,
-                    webauthnVerifierAddress = DemoState.webauthnVerifier,
-                    rpName = DemoConfig.RP_NAME,
-                    relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
-                    indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
-                    webauthnProvider = webauthnProvider,
-                    storage = storage
-                )
+                // Store platform providers in DemoState so shared code can use them
+                DemoState.webauthnProvider = webauthnProvider
+                DemoState.storage = storage
 
-                val kit = OZSmartAccountKit.create(config)
-
-                DemoState.setKitInstance(kit)
                 ActivityLogState.info("Smart Account Kit initialized (Android)")
             } catch (e: Exception) {
                 ActivityLogState.error("Failed to initialize kit: ${e.message}")

@@ -587,7 +587,7 @@ object SmartAccountBuilders {
         if (credentialId != null) {
             return SignerDisplayInfo(
                 type = "Passkey",
-                display = "cred:${credentialId.take(8)}..."
+                display = credentialId
             )
         }
 

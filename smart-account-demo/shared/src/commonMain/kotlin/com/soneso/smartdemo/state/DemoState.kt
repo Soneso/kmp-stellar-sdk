@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
+import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
+import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 
 /**
  * Shared demo state holding the OZSmartAccountKit instance and wallet connection status.
@@ -13,6 +15,12 @@ object DemoState {
     /** The OZSmartAccountKit instance, null until configuration is applied. */
     var kit: OZSmartAccountKit? by mutableStateOf(null)
         private set
+
+    /** Platform-specific WebAuthn provider, set by platform entry points (MainActivity, AppDelegate, etc.). */
+    var webauthnProvider: WebAuthnProvider? = null
+
+    /** Platform-specific storage adapter, set by platform entry points. */
+    var storage: StorageAdapter? = null
 
     /** Whether a wallet is currently connected. */
     var isConnected: Boolean by mutableStateOf(false)

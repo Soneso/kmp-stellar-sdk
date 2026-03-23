@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -76,9 +78,9 @@ class MainScreen : Screen {
         var policiesExpanded by remember { mutableStateOf(false) }
         var isRefreshingBalance by remember { mutableStateOf(false) }
 
-        // Auto-initialize SDK on first launch
-        LaunchedEffect(Unit) {
-            if (DemoState.kit == null) {
+        // Auto-initialize SDK on first launch (waits for platform providers)
+        LaunchedEffect(DemoState.webauthnProvider, DemoState.storage) {
+            if (DemoState.kit == null && DemoState.webauthnProvider != null) {
                 try {
                     val config = OZSmartAccountConfig(
                         rpcUrl = DemoConfig.RPC_URL,
@@ -87,11 +89,12 @@ class MainScreen : Screen {
                         webauthnVerifierAddress = DemoState.webauthnVerifier,
                         relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
                         indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
-                        storage = InMemoryStorageAdapter()
+                        webauthnProvider = DemoState.webauthnProvider,
+                        storage = DemoState.storage ?: InMemoryStorageAdapter()
                     )
                     val kit = OZSmartAccountKit.create(config)
                     DemoState.setKitInstance(kit)
-                    ActivityLogState.success("SDK initialized with default configuration")
+                    ActivityLogState.success("SDK initialized")
                     if (DemoState.relayerUrl.isNotBlank()) {
                         ActivityLogState.info("Relayer fee sponsoring enabled")
                     }
@@ -242,7 +245,8 @@ class MainScreen : Screen {
                                                 webauthnVerifierAddress = DemoState.webauthnVerifier,
                                                 relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
                                                 indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
-                                                storage = InMemoryStorageAdapter()
+                                                webauthnProvider = DemoState.webauthnProvider,
+                                                storage = DemoState.storage ?: InMemoryStorageAdapter()
                                             )
                                             val kit = OZSmartAccountKit.create(config)
                                             DemoState.setKitInstance(kit)
@@ -404,12 +408,30 @@ class MainScreen : Screen {
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                            Text(
-                                text = DemoState.contractId?.let { "${it.take(12)}...${it.takeLast(12)}" } ?: "Unknown",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = DemoState.contractId?.let { "${it.take(12)}...${it.takeLast(12)}" } ?: "Unknown",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (DemoState.contractId != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                clipboard.copyToClipboard(DemoState.contractId!!)
+                                                snackbarHostState.showSnackbar("Contract address copied")
+                                            }
+                                        },
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    ) {
+                                        Text("Copy", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -420,7 +442,7 @@ class MainScreen : Screen {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = DemoState.credentialId?.take(16) ?: "Unknown",
+                                text = DemoState.credentialId ?: "Unknown",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -503,7 +525,7 @@ class MainScreen : Screen {
                                     onClick = { navigator.push(KnownSignersScreen()) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Known Signers")
+                                    Text("Account Signers")
                                 }
                                 OutlinedButton(
                                     onClick = {

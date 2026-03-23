@@ -2,12 +2,14 @@ package com.soneso.smartdemo.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,12 +18,19 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -31,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +50,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.formatStroopsAsXlm
@@ -49,30 +60,50 @@ import com.soneso.stellar.sdk.rpc.SorobanServer
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
+
+    companion object {
+        private const val TOKEN_OPTION_XLM = "xlm"
+        private const val TOKEN_OPTION_CUSTOM = "custom"
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val clipboard = getClipboard()
+        val snackbarHostState = remember { SnackbarHostState() }
 
-        var tokenContract by remember { mutableStateOf(DemoConfig.NATIVE_TOKEN_CONTRACT) }
+        var selectedTokenOption by remember { mutableStateOf(TOKEN_OPTION_XLM) }
+        var customTokenContract by remember { mutableStateOf("") }
+        var tokenDropdownExpanded by remember { mutableStateOf(false) }
         var recipient by remember { mutableStateOf("") }
         var amount by remember { mutableStateOf("") }
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var txHash by remember { mutableStateOf<String?>(null) }
 
+        val tokenContract = if (selectedTokenOption == TOKEN_OPTION_XLM) {
+            DemoConfig.NATIVE_TOKEN_CONTRACT
+        } else {
+            customTokenContract
+        }
+
         // Validation
         val recipientError = validateRecipient(recipient)
         val amountError = validateAmount(amount)
-        val tokenContractError = validateTokenContract(tokenContract)
+        val customTokenContractError = if (selectedTokenOption == TOKEN_OPTION_CUSTOM) {
+            validateTokenContract(customTokenContract)
+        } else null
         val isFormValid = recipient.isNotBlank() &&
             amount.isNotBlank() &&
             recipientError == null &&
             amountError == null &&
-            tokenContractError == null
+            customTokenContractError == null &&
+            (selectedTokenOption == TOKEN_OPTION_XLM || customTokenContract.isNotBlank())
 
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text("Transfer") },
@@ -178,26 +209,72 @@ class TransferScreen : Screen {
                     }
                 }
 
-                // Token Contract Field
-                OutlinedTextField(
-                    value = tokenContract,
-                    onValueChange = {
-                        tokenContract = it
-                        errorMessage = null
+                // Token Selection
+                ExposedDropdownMenuBox(
+                    expanded = tokenDropdownExpanded && !isLoading && txHash == null,
+                    onExpandedChange = {
+                        if (!isLoading && txHash == null) tokenDropdownExpanded = it
                     },
-                    label = { Text("Token Contract") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading && txHash == null,
-                    singleLine = true,
-                    isError = tokenContract.isNotBlank() && tokenContractError != null,
-                    supportingText = {
-                        if (tokenContract.isNotBlank() && tokenContractError != null) {
-                            Text(tokenContractError)
-                        } else {
-                            Text("XLM native token contract (C-address)")
-                        }
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM (Native)" else "Custom Token",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Token") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tokenDropdownExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        enabled = !isLoading && txHash == null,
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = tokenDropdownExpanded && !isLoading && txHash == null,
+                        onDismissRequest = { tokenDropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("XLM (Native)") },
+                            onClick = {
+                                selectedTokenOption = TOKEN_OPTION_XLM
+                                tokenDropdownExpanded = false
+                                errorMessage = null
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Custom Token") },
+                            onClick = {
+                                selectedTokenOption = TOKEN_OPTION_CUSTOM
+                                tokenDropdownExpanded = false
+                                errorMessage = null
+                            }
+                        )
                     }
-                )
+                }
+
+                // Custom Token Contract Field (only shown when Custom Token is selected)
+                if (selectedTokenOption == TOKEN_OPTION_CUSTOM) {
+                    OutlinedTextField(
+                        value = customTokenContract,
+                        onValueChange = {
+                            customTokenContract = it
+                            errorMessage = null
+                        },
+                        label = { Text("Token Contract Address") },
+                        placeholder = { Text("C... address") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading && txHash == null,
+                        singleLine = true,
+                        isError = customTokenContract.isNotBlank() && customTokenContractError != null,
+                        supportingText = {
+                            if (customTokenContract.isNotBlank() && customTokenContractError != null) {
+                                Text(customTokenContractError!!)
+                            } else {
+                                Text("Stellar Asset Contract address (C...)")
+                            }
+                        }
+                    )
+                }
 
                 // Recipient Address Input
                 OutlinedTextField(
@@ -228,7 +305,7 @@ class TransferScreen : Screen {
                         amount = it
                         errorMessage = null
                     },
-                    label = { Text("Amount (XLM)") },
+                    label = { Text("Amount") },
                     placeholder = { Text("e.g. 10.0") },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading && txHash == null,
@@ -238,7 +315,7 @@ class TransferScreen : Screen {
                         if (amount.isNotBlank() && amountError != null) {
                             Text(amountError)
                         } else {
-                            Text("Amount in XLM to transfer")
+                            Text("Amount to transfer")
                         }
                     }
                 )
@@ -275,8 +352,9 @@ class TransferScreen : Screen {
                                     val parsedAmount = amount.toDoubleOrNull()
                                         ?: throw Exception("Invalid amount")
 
+                                    val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "tokens"
                                     ActivityLogState.info(
-                                        "Transferring $amount XLM to ${recipient.take(8)}..."
+                                        "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                     )
 
                                     val result = kit.transactionOperations.transfer(
@@ -319,12 +397,11 @@ class TransferScreen : Screen {
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .padding(end = 8.dp),
+                                modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
                         Text(if (isLoading) "Transferring..." else "Transfer")
                     }
@@ -355,14 +432,30 @@ class TransferScreen : Screen {
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                Text(
-                                    text = txHash!!,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = txHash!!,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                clipboard.copyToClipboard(txHash!!)
+                                                snackbarHostState.showSnackbar("Transaction hash copied")
+                                            }
+                                        },
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    ) {
+                                        Text("Copy", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
                             }
 
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -372,7 +465,7 @@ class TransferScreen : Screen {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = "$amount XLM",
+                                    text = if (selectedTokenOption == TOKEN_OPTION_XLM) "$amount XLM" else amount,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -418,6 +511,8 @@ class TransferScreen : Screen {
                             amount = ""
                             txHash = null
                             errorMessage = null
+                            selectedTokenOption = TOKEN_OPTION_XLM
+                            customTokenContract = ""
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
