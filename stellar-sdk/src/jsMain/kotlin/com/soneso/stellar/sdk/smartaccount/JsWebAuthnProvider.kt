@@ -187,7 +187,10 @@ class JsWebAuthnProvider(
 
         publicKey.authenticatorSelection = js("{}")
         publicKey.authenticatorSelection.residentKey = "preferred"
-        publicKey.authenticatorSelection.userVerification = "preferred"
+        // The OZ WebAuthn verifier contract requires the User Verified (UV) flag to be set
+        // in the authenticator data. "required" ensures the browser always verifies the user
+        // (biometric/PIN), which is needed on localhost where "preferred" may skip verification.
+        publicKey.authenticatorSelection.userVerification = "required"
 
         publicKey.timeout = timeout.toInt()
 
@@ -269,7 +272,9 @@ class JsWebAuthnProvider(
 
         publicKey.challenge = challengeBuffer
         publicKey.rpId = rpId
-        publicKey.userVerification = "preferred"
+        // The OZ WebAuthn verifier contract requires the User Verified (UV) flag to be set.
+        // "required" ensures the browser prompts for biometric/PIN verification on every assertion.
+        publicKey.userVerification = "required"
         publicKey.timeout = timeout.toInt()
 
         options.publicKey = publicKey

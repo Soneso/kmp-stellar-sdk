@@ -68,6 +68,8 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
+import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 class ContextRulesScreen : Screen {
@@ -121,7 +123,13 @@ class ContextRulesScreen : Screen {
                         onClick = {
                             val rule = ruleToRemove!!
                             ruleToRemove = null
-                            scope.launch {
+                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                val msg = throwable.message ?: "Unknown error"
+                                errorMessage = "Failed to remove rule: $msg"
+                                ActivityLogState.error("Failed to remove rule: $msg")
+                                isRemoving = false
+                            }
+                            scope.launch(handler) {
                                 isRemoving = true
                                 try {
                                     val result = removeContextRule(rule.id)
@@ -131,7 +139,7 @@ class ContextRulesScreen : Screen {
                                         errorMessage = null
                                         try {
                                             rules = loadContextRules()
-                                        } catch (e: Exception) {
+                                        } catch (e: Throwable) {
                                             errorMessage = "Failed to refresh rules: ${e.message}"
                                         } finally {
                                             isLoading = false
@@ -140,9 +148,10 @@ class ContextRulesScreen : Screen {
                                         val errMsg = result.error ?: "Unknown error"
                                         errorMessage = "Failed to remove rule: $errMsg"
                                     }
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     val msg = e.message ?: "Unknown error"
                                     errorMessage = "Failed to remove rule: $msg"
+                                    ActivityLogState.error("Failed to remove rule: $msg")
                                 } finally {
                                     isRemoving = false
                                 }
@@ -217,12 +226,18 @@ class ContextRulesScreen : Screen {
                 ) {
                     OutlinedButton(
                         onClick = {
-                            scope.launch {
+                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                val msg = throwable.message ?: "Unknown error"
+                                errorMessage = "Failed to fetch context rules: $msg"
+                                ActivityLogState.error("Failed to fetch context rules: $msg")
+                                isLoading = false
+                            }
+                            scope.launch(handler) {
                                 isLoading = true
                                 errorMessage = null
                                 try {
                                     rules = loadContextRules()
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     val msg = e.message ?: "Unknown error"
                                     errorMessage = "Failed to fetch context rules: $msg"
                                     ActivityLogState.error("Failed to fetch context rules: $msg")
@@ -255,12 +270,14 @@ class ContextRulesScreen : Screen {
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Text(
-                            text = errorMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = errorMessage!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
 

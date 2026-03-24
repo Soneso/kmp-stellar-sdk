@@ -60,6 +60,7 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 class WalletConnectionScreen : Screen {
@@ -75,7 +76,7 @@ class WalletConnectionScreen : Screen {
 
         // UI expand/collapse state for collapsible sections
         var manualExpanded by remember { mutableStateOf(false) }
-        var pendingExpanded by remember { mutableStateOf(true) }
+        var pendingExpanded by remember { mutableStateOf(false) }
 
         // Authenticated credential ID shown in the manual connect section
         var authenticatedCredentialId by remember { mutableStateOf<String?>(null) }
@@ -149,14 +150,23 @@ class WalletConnectionScreen : Screen {
 
                         Button(
                             onClick = {
-                                scope.launch {
+                                val handler = CoroutineExceptionHandler { _, throwable ->
+                                    val message = throwable.message ?: "Unknown error"
+                                    if (isUserCancellation(message)) {
+                                        ActivityLogState.info("Passkey authentication cancelled")
+                                    } else {
+                                        ActivityLogState.error("Connection failed: $message")
+                                    }
+                                    isConnecting = false
+                                }
+                                scope.launch(handler) {
                                     isConnecting = true
                                     try {
                                         val result = quickConnect()
                                         if (result != null) {
                                             navigator.pop()
                                         }
-                                    } catch (e: Exception) {
+                                    } catch (e: Throwable) {
                                         val message = e.message ?: "Unknown error"
                                         if (isUserCancellation(message)) {
                                             ActivityLogState.info("Passkey authentication cancelled")
@@ -224,7 +234,16 @@ class WalletConnectionScreen : Screen {
                             // Authenticate + connect in one step via manualConnect()
                             Button(
                                 onClick = {
-                                    scope.launch {
+                                    val handler = CoroutineExceptionHandler { _, throwable ->
+                                        val message = throwable.message ?: "Unknown error"
+                                        if (isUserCancellation(message)) {
+                                            ActivityLogState.info("Passkey authentication cancelled")
+                                        } else {
+                                            ActivityLogState.error("Authentication failed: $message")
+                                        }
+                                        isAuthenticating = false
+                                    }
+                                    scope.launch(handler) {
                                         isAuthenticating = true
                                         try {
                                             val result = manualConnect()
@@ -232,7 +251,7 @@ class WalletConnectionScreen : Screen {
                                                 authenticatedCredentialId = result.credentialId
                                                 navigator.pop()
                                             }
-                                        } catch (e: Exception) {
+                                        } catch (e: Throwable) {
                                             val message = e.message ?: "Unknown error"
                                             if (isUserCancellation(message)) {
                                                 ActivityLogState.info("Passkey authentication cancelled")
@@ -373,7 +392,10 @@ class WalletConnectionScreen : Screen {
                                                 ) {
                                                     Button(
                                                         onClick = {
-                                                            scope.launch {
+                                                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                                                ActivityLogState.error("Retry failed: ${throwable.message}")
+                                                            }
+                                                            scope.launch(handler) {
                                                                 try {
                                                                     val result = retryPendingDeploy(
                                                                         credential.credentialId,
@@ -386,7 +408,7 @@ class WalletConnectionScreen : Screen {
                                                                         pendingCredentials.addAll(updated)
                                                                         navigator.pop()
                                                                     }
-                                                                } catch (e: Exception) {
+                                                                } catch (e: Throwable) {
                                                                     ActivityLogState.error("Retry failed: ${e.message}")
                                                                 }
                                                             }
@@ -398,14 +420,17 @@ class WalletConnectionScreen : Screen {
 
                                                     OutlinedButton(
                                                         onClick = {
-                                                            scope.launch {
+                                                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                                                ActivityLogState.error("Delete failed: ${throwable.message}")
+                                                            }
+                                                            scope.launch(handler) {
                                                                 try {
                                                                     deletePendingCredential(credential.credentialId)
                                                                     // Refresh pending list after deletion
                                                                     val updated = loadPendingCredentials()
                                                                     pendingCredentials.clear()
                                                                     pendingCredentials.addAll(updated)
-                                                                } catch (e: Exception) {
+                                                                } catch (e: Throwable) {
                                                                     ActivityLogState.error("Delete failed: ${e.message}")
                                                                 }
                                                             }

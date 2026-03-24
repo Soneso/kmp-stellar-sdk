@@ -53,6 +53,7 @@ import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogLevel
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -228,11 +229,15 @@ class MainScreen : Screen {
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        scope.launch {
+                                        val handler = CoroutineExceptionHandler { _, throwable ->
+                                            ActivityLogState.error("Failed to refresh balance: ${throwable.message}")
+                                            isRefreshingBalance = false
+                                        }
+                                        scope.launch(handler) {
                                             isRefreshingBalance = true
                                             try {
                                                 refreshBalances()
-                                            } catch (e: Exception) {
+                                            } catch (e: Throwable) {
                                                 ActivityLogState.error("Failed to refresh balance: ${e.message}")
                                             } finally {
                                                 isRefreshingBalance = false
@@ -274,10 +279,13 @@ class MainScreen : Screen {
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        scope.launch {
+                                        val handler = CoroutineExceptionHandler { _, throwable ->
+                                            ActivityLogState.error("Disconnect failed: ${throwable.message}")
+                                        }
+                                        scope.launch(handler) {
                                             try {
                                                 disconnect()
-                                            } catch (e: Exception) {
+                                            } catch (e: Throwable) {
                                                 ActivityLogState.error("Disconnect failed: ${e.message}")
                                             }
                                         }

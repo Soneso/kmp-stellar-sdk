@@ -60,6 +60,8 @@ import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
+import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
@@ -312,12 +314,14 @@ class TransferScreen : Screen {
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Text(
-                            text = errorMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = errorMessage!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -325,7 +329,18 @@ class TransferScreen : Screen {
                 if (txHash == null) {
                     Button(
                         onClick = {
-                            scope.launch {
+                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                val message = throwable.message ?: "Unknown error"
+                                if (isUserCancellation(message)) {
+                                    errorMessage = "Passkey authentication cancelled"
+                                    ActivityLogState.info("Passkey authentication cancelled")
+                                } else {
+                                    errorMessage = "Transfer failed: $message"
+                                    ActivityLogState.error(message)
+                                }
+                                isLoading = false
+                            }
+                            scope.launch(handler) {
                                 isLoading = true
                                 errorMessage = null
 
@@ -349,7 +364,7 @@ class TransferScreen : Screen {
                                     } else {
                                         throw Exception(result.error ?: "Transfer failed")
                                     }
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     val message = e.message ?: "Unknown error"
                                     if (isUserCancellation(message)) {
                                         errorMessage = "Passkey authentication cancelled"

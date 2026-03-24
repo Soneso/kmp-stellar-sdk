@@ -61,6 +61,8 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
+import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 /**
@@ -83,14 +85,19 @@ class KnownSignersScreen : Screen {
         val signerEntries = remember { mutableStateListOf<SignerEntry>() }
 
         fun loadSigners() {
-            scope.launch {
+            val handler = CoroutineExceptionHandler { _, throwable ->
+                errorMessage = "Failed to load signers: ${throwable.message}"
+                ActivityLogState.error("Failed to load signers: ${throwable.message}")
+                isLoading = false
+            }
+            scope.launch(handler) {
                 isLoading = true
                 errorMessage = null
                 signerEntries.clear()
                 try {
                     val entries = loadAccountSigners()
                     signerEntries.addAll(entries)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     errorMessage = "Failed to load signers: ${e.message}"
                     ActivityLogState.error("Failed to load signers: ${e.message}")
                 } finally {
@@ -194,12 +201,14 @@ class KnownSignersScreen : Screen {
                                 containerColor = MaterialTheme.colorScheme.errorContainer
                             )
                         ) {
-                            Text(
-                                text = errorMessage!!,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(16.dp)
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = errorMessage!!,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
                         }
                     }
 

@@ -53,6 +53,7 @@ import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
+import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.launch
 
 class WalletCreationScreen : Screen {
@@ -142,12 +143,14 @@ class WalletCreationScreen : Screen {
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Text(
-                            text = errorMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = errorMessage!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -198,7 +201,17 @@ class WalletCreationScreen : Screen {
                 if (createResult == null && !isLoading) {
                     Button(
                         onClick = {
-                            scope.launch {
+                            val handler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+                                // Catches exceptions that escape the coroutine on JS (e.g., network CORS errors).
+                                val message = throwable.message ?: "Unknown error"
+                                errorMessage = "Failed to create wallet: $message\n\n" +
+                                    "If a passkey was registered before the failure, " +
+                                    "go to Connect Wallet and check Pending Deployments " +
+                                    "to retry the deployment."
+                                ActivityLogState.error(message)
+                                isLoading = false
+                            }
+                            scope.launch(handler) {
                                 isLoading = true
                                 errorMessage = null
                                 infoMessage = null
@@ -206,13 +219,16 @@ class WalletCreationScreen : Screen {
                                 try {
                                     val result = createWallet(username) { progressMessage = it }
                                     createResult = result
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     val message = e.message ?: "Unknown error"
                                     if (isUserCancellation(message)) {
                                         infoMessage = "Passkey registration cancelled by user"
                                         ActivityLogState.info("User cancelled passkey registration")
                                     } else {
-                                        errorMessage = "Failed to create wallet: $message"
+                                        errorMessage = "Failed to create wallet: $message\n\n" +
+                                            "If a passkey was registered before the failure, " +
+                                            "go to Connect Wallet and check Pending Deployments " +
+                                            "to retry the deployment."
                                         ActivityLogState.error(message)
                                     }
                                 } finally {

@@ -86,6 +86,8 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 /**
@@ -278,12 +280,14 @@ class ContextRuleBuilderScreen(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Text(
-                            text = errorMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = errorMessage!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -489,6 +493,11 @@ class ContextRuleBuilderScreen(
                         modifier = Modifier.padding(vertical = 4.dp),
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                     )
+
+                    // Signer and policy sections are only shown in create mode.
+                    // In edit mode, only name and expiry can be updated.
+                    // Signer/policy changes use separate SDK calls (addSigner, removeSigner, etc.)
+                    if (!isEditing) {
 
                     // ====================================================================
                     // Section 1B: Signer Management
@@ -1151,6 +1160,8 @@ class ContextRuleBuilderScreen(
                         }
                     }
 
+                    } // end if (!isEditing) — signer and policy sections
+
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 4.dp),
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
@@ -1161,22 +1172,9 @@ class ContextRuleBuilderScreen(
                     // ====================================================================
 
                     if (isEditing) {
-                        // Edit mode: update name and validUntil only
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFFF9800).copy(alpha = 0.08f)
-                            )
-                        ) {
-                            Text(
-                                text = "Edit mode updates name and expiry only. Signer and policy " +
-                                        "changes require individual add/remove operations via the " +
-                                        "Signer Manager and Policy Manager screens.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
+                        // Edit mode: only name and expiry can be updated via the contract's
+                        // updateName/updateValidUntil functions. Signer and policy changes
+                        // are separate on-chain operations (addSigner, removeSigner, etc.).
                     }
 
                     Button(
@@ -1202,7 +1200,15 @@ class ContextRuleBuilderScreen(
                             isSubmitting = true
                             submissionResult = null
 
-                            scope.launch {
+                            val handler = CoroutineExceptionHandler { _, throwable ->
+                                submissionResult = SubmissionResult(
+                                    success = false,
+                                    error = throwable.message ?: "Unknown error"
+                                )
+                                ActivityLogState.error("Transaction failed: ${throwable.message}")
+                                isSubmitting = false
+                            }
+                            scope.launch(handler) {
                                 try {
                                     if (isEditing) {
                                         // Edit mode: update name then validUntil via flow functions
@@ -1267,7 +1273,7 @@ class ContextRuleBuilderScreen(
                                             error = result.error
                                         )
                                     }
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     submissionResult = SubmissionResult(
                                         success = false,
                                         error = e.message ?: "Unknown error"

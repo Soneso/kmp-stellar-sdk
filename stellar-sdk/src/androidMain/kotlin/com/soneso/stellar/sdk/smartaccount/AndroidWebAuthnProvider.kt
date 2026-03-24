@@ -271,8 +271,9 @@ class AndroidWebAuthnProvider(
                         // Prefer resident keys for discoverable credentials
                         put("residentKey", JsonPrimitive("preferred"))
                         put("requireResidentKey", JsonPrimitive(false))
-                        // Prefer user verification (aligned with JS provider)
-                        put("userVerification", JsonPrimitive("preferred"))
+                        // Require user verification — the OZ WebAuthn verifier contract
+                        // checks the UV flag in authenticator data and rejects if not set.
+                        put("userVerification", JsonPrimitive("required"))
                     }
                 )
             )
@@ -300,7 +301,7 @@ class AndroidWebAuthnProvider(
                 "challenge" to JsonPrimitive(challengeB64),
                 "rpId" to JsonPrimitive(rpId),
                 "timeout" to JsonPrimitive(timeout),
-                "userVerification" to JsonPrimitive("preferred"),
+                "userVerification" to JsonPrimitive("required"),
                 // Empty allowCredentials = discoverable credential (passkey) selection
                 "allowCredentials" to JsonArray(emptyList())
             )
