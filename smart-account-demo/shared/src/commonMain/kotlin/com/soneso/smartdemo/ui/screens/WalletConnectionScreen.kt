@@ -44,18 +44,13 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.stellar.sdk.AssetTypeNative
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.smartdemo.util.isUserCancellation
+import com.soneso.smartdemo.util.refreshAllBalances
 import com.soneso.stellar.sdk.smartaccount.oz.AuthenticatePasskeyResult
 import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
-import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.launch
 
 class WalletConnectionScreen : Screen {
@@ -169,14 +164,12 @@ class WalletConnectionScreen : Screen {
                                         DemoState.setConnected(true, result.contractId, result.credentialId)
 
                                         // Fetch XLM and DEMO balances after connection
-                                        fetchBalance(result.contractId)
+                                        refreshAllBalances(result.contractId)
 
                                         navigator.pop()
                                     } catch (e: Exception) {
                                         val message = e.message ?: "Unknown error"
-                                        if (message.contains("user", ignoreCase = true) &&
-                                            (message.contains("cancel", ignoreCase = true) ||
-                                             message.contains("abort", ignoreCase = true))) {
+                                        if (isUserCancellation(message)) {
                                             ActivityLogState.info("Passkey authentication cancelled")
                                         } else {
                                             ActivityLogState.error("Connection failed: $message")
@@ -261,13 +254,11 @@ class WalletConnectionScreen : Screen {
 
                                             ActivityLogState.success("Connected to contract: ${result.contractId}")
                                             DemoState.setConnected(true, result.contractId, result.credentialId)
-                                            fetchBalance(result.contractId)
+                                            refreshAllBalances(result.contractId)
                                             navigator.pop()
                                         } catch (e: Exception) {
                                             val message = e.message ?: "Unknown error"
-                                            if (message.contains("user", ignoreCase = true) &&
-                                                (message.contains("cancel", ignoreCase = true) ||
-                                                 message.contains("abort", ignoreCase = true))) {
+                                            if (isUserCancellation(message)) {
                                                 ActivityLogState.info("Passkey authentication cancelled")
                                             } else {
                                                 ActivityLogState.error("Authentication failed: $message")
@@ -422,7 +413,7 @@ class WalletConnectionScreen : Screen {
 
                                                                     ActivityLogState.success("Successfully deployed contract")
                                                                     DemoState.setConnected(true, result.contractId, result.credentialId)
-                                                                    fetchBalance(result.contractId)
+                                                                    refreshAllBalances(result.contractId)
 
                                                                     // Refresh pending list
                                                                     val updated = kit.credentialManager.getPendingCredentials()
@@ -480,65 +471,4 @@ class WalletConnectionScreen : Screen {
 
     }
 
-    private suspend fun fetchBalance(contractId: String) {
-        // Fetch XLM balance via SAC
-        try {
-            val server = SorobanServer(DemoConfig.RPC_URL)
-            val balanceResult = server.getSACBalance(
-                contractId,
-                AssetTypeNative,
-                Network(DemoConfig.NETWORK_PASSPHRASE)
-            )
-            val xlmBalance = if (balanceResult.balanceEntry != null) {
-                com.soneso.smartdemo.util.formatStroopsAsXlm(balanceResult.balanceEntry!!.amount)
-            } else "0.0"
-            DemoState.updateBalance(xlmBalance)
-            ActivityLogState.success("Balance: $xlmBalance XLM")
-        } catch (e: Exception) {
-            ActivityLogState.error("Failed to fetch XLM balance: ${e.message}")
-        }
-
-        // Derive DEMO token contract address and fetch DEMO balance.
-        // Uses ContractClient.invoke() because DEMO is a custom Soroban token, not a SAC.
-        try {
-            val tokenAddress = DemoTokenService.deriveTokenContractAddress(DemoConfig.NETWORK_PASSPHRASE)
-            DemoState.updateDemoToken(tokenAddress)
-
-            val tokenClient = ContractClient.forContract(
-                contractId = tokenAddress,
-                rpcUrl = DemoConfig.RPC_URL,
-                network = Network(DemoConfig.NETWORK_PASSPHRASE)
-            )
-            // Read-only calls need a funded G-address as source for simulation.
-            // The token admin is always funded.
-            val sourceAccountId = DemoTokenService.getAdminAccountId()
-            val balanceResult = tokenClient.invoke<SCValXdr>(
-                functionName = "balance",
-                arguments = mapOf("id" to contractId),
-                source = sourceAccountId,
-                signer = null
-            )
-            val demoBalance = parseDemoBalance(balanceResult)
-            DemoState.updateDemoTokenBalance(demoBalance)
-        } catch (e: Exception) {
-            // DEMO contract not yet deployed — show zero, not an error
-            DemoState.updateDemoTokenBalance("0.0")
-        }
-    }
-
-    /**
-     * Parses an i128 SCVal from a token balance() call to a display string (7 decimals).
-     * DEMO uses 7 decimals (same as XLM), so [formatStroopsAsXlm] applies directly.
-     * Handles balances that fit within Long range (sufficient for the demo).
-     */
-    private fun parseDemoBalance(scVal: SCValXdr): String {
-        return when (scVal) {
-            is SCValXdr.I128 -> {
-                val hi = scVal.value.hi.value
-                if (hi != 0L) return "0.0" // Overflow guard — not expected in demo
-                com.soneso.smartdemo.util.formatStroopsAsXlm(scVal.value.lo.value.toLong())
-            }
-            else -> "0.0"
-        }
-    }
 }

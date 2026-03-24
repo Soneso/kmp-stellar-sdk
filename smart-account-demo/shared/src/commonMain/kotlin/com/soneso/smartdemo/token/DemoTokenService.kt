@@ -1,5 +1,6 @@
 package com.soneso.smartdemo.token
 
+import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.platform.loadWasmResource
 import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.KeyPair
@@ -31,9 +32,9 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * concurrently from multiple devices — only the first deployment goes through; subsequent
  * calls skip deployment and mint additional DEMO to the given recipient.
  *
- * NOTE: This keypair is completely separate from the smart account deployer
- * (SHA256("openzeppelin-smart-account-kit")). The smart account deployer pays for
- * smart account contract deployment; this token admin has nothing to do with that.
+ * NOTE: The token admin keypair (derived from [DemoConfig.DEMO_TOKEN_ADMIN_SEED]) is
+ * completely separate from the smart account deployer. The smart account deployer pays
+ * for smart account contract deployment; this token admin has nothing to do with that.
  * It only deploys and administers the DEMO token contract.
  *
  * @param rpcUrl Soroban RPC endpoint URL
@@ -92,17 +93,14 @@ class DemoTokenService(
             val wasmBytes = loadWasmResource("soroban_token_contract.wasm")
 
             // Deploy with deterministic salt so the address is always predictable.
-            // Constructor args match the standard Soroban token interface (SEP-41):
-            //   - admin: has mint authority (this same keypair)
-            //   - decimal: 7 (same as XLM — 10_000_000 stroops = 1 token)
-            //   - name/symbol: human-readable labels
+            // Constructor args from DemoConfig match the standard Soroban token interface (SEP-41).
             val deployedClient = ContractClient.deploy(
                 wasmBytes = wasmBytes,
                 constructorArgs = mapOf(
                     "admin" to adminId,
-                    "decimal" to 7,
-                    "name" to "Demo Token",
-                    "symbol" to "DEMO"
+                    "decimal" to DemoConfig.DEMO_TOKEN_DECIMALS,
+                    "name" to DemoConfig.DEMO_TOKEN_NAME,
+                    "symbol" to DemoConfig.DEMO_TOKEN_SYMBOL
                 ),
                 source = adminId,
                 signer = adminKeyPair,
@@ -170,8 +168,8 @@ class DemoTokenService(
 
     companion object {
 
-        /** Mint amount per call: 10,000 DEMO at 7 decimal places = 100,000,000,000 stroops. */
-        const val MINT_AMOUNT_STROOPS = 100_000_000_000L
+        /** Mint amount per call, from [DemoConfig.DEMO_TOKEN_MINT_AMOUNT]. */
+        const val MINT_AMOUNT_STROOPS = DemoConfig.DEMO_TOKEN_MINT_AMOUNT
 
         /**
          * Derives the deterministic DEMO token contract address from the network passphrase.
@@ -204,32 +202,31 @@ class DemoTokenService(
         }
 
         /**
-         * Derives the token admin keypair from a deterministic seed.
+         * Derives the token admin keypair from [DemoConfig.DEMO_TOKEN_ADMIN_SEED].
          *
-         * SHA256("KMP smart account demo token admin") produces a stable 32-byte seed that
-         * maps to the same Ed25519 keypair on every platform and every app restart. This
-         * means the admin account can be funded once and reused indefinitely.
+         * SHA256 of the seed string produces a stable 32-byte value that maps to the
+         * same Ed25519 keypair on every platform and every app restart. This means the
+         * admin account can be funded once and reused indefinitely.
          *
-         * This keypair is entirely separate from the smart account deployer keypair
-         * (SHA256("openzeppelin-smart-account-kit")). The two have no relationship.
+         * This keypair is entirely separate from the smart account deployer keypair.
          */
         private suspend fun deriveTokenAdminKeyPair(): KeyPair {
             val seedBytes = getSha256Crypto().hash(
-                "KMP smart account demo token admin".encodeToByteArray()
+                DemoConfig.DEMO_TOKEN_ADMIN_SEED.encodeToByteArray()
             )
             return KeyPair.fromSecretSeed(seedBytes)
         }
 
         /**
-         * Derives the deterministic salt used for deploying the DEMO token contract.
+         * Derives the deterministic salt from [DemoConfig.DEMO_TOKEN_SALT_SEED].
          *
-         * SHA256("KMP smart account demo token") produces a fixed 32-byte salt. Because
+         * SHA256 of the seed string produces a fixed 32-byte salt. Because
          * ContractClient.deploy() uses the same salt internally, the resulting contract
          * address is always identical — regardless of when or where the deployment runs.
          */
         private suspend fun deriveTokenSalt(): ByteArray {
             return getSha256Crypto().hash(
-                "KMP smart account demo token".encodeToByteArray()
+                DemoConfig.DEMO_TOKEN_SALT_SEED.encodeToByteArray()
             )
         }
 

@@ -47,9 +47,9 @@ import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.stellar.sdk.AssetTypeNative
+import com.soneso.smartdemo.util.fetchXlmBalance
+import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.stellar.sdk.FriendBot
-import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.smartaccount.oz.CreateWalletResult
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
@@ -244,15 +244,7 @@ class WalletCreationScreen : Screen {
 
                                     // Fetch XLM balance
                                     try {
-                                        val server = SorobanServer(DemoConfig.RPC_URL)
-                                        val balanceResponse = server.getSACBalance(
-                                            result.contractId,
-                                            AssetTypeNative,
-                                            Network(DemoConfig.NETWORK_PASSPHRASE)
-                                        )
-                                        balance = if (balanceResponse.balanceEntry != null) {
-                                            com.soneso.smartdemo.util.formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
-                                        } else "0.0"
+                                        balance = fetchXlmBalance(result.contractId)
                                         DemoState.updateBalance(balance)
                                         ActivityLogState.info("Balance: $balance XLM")
                                     } catch (e: Exception) {
@@ -284,8 +276,7 @@ class WalletCreationScreen : Screen {
 
                                 } catch (e: Exception) {
                                     val message = e.message ?: "Unknown error"
-                                    if (message.contains("cancelled", ignoreCase = true) ||
-                                        message.contains("user", ignoreCase = true)) {
+                                    if (isUserCancellation(message)) {
                                         infoMessage = "Passkey registration cancelled by user"
                                         ActivityLogState.info("User cancelled passkey registration")
                                     } else {

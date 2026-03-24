@@ -61,6 +61,10 @@ import com.soneso.smartdemo.config.KNOWN_POLICIES
 import com.soneso.smartdemo.config.PolicyInfo
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.util.parseContextType
+import com.soneso.smartdemo.util.parsePolicies
+import com.soneso.smartdemo.util.parseSigners
+import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
@@ -1545,12 +1549,7 @@ class ContextRuleBuilderScreen(
         val typeDescription = SmartAccountBuilders.describeSignerType(signer)
         val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
 
-        val chipColor = when (typeDescription) {
-            "Passkey (WebAuthn)" -> Color(0xFF9C27B0)
-            "Stellar Account" -> Color(0xFF2196F3)
-            "Ed25519" -> Color(0xFF009688)
-            else -> Color(0xFF607D8B)
-        }
+        val chipColor = signerTypeColor(typeDescription)
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1877,7 +1876,7 @@ class ContextRuleBuilderScreen(
     }
 
     // ========================================================================
-    // Edit Mode: ScVal Parsing (reuses patterns from ContextRulesScreen)
+    // Edit Mode: ScVal Parsing
     // ========================================================================
 
     private data class ParsedRuleData(
@@ -1944,96 +1943,6 @@ class ContextRuleBuilderScreen(
             policies = policies,
             validUntil = validUntil
         )
-    }
-
-    private fun parseContextType(scVal: SCValXdr): ContextRuleType {
-        val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return ContextRuleType.Default
-        if (vec.isEmpty()) return ContextRuleType.Default
-
-        val tag = (vec[0] as? SCValXdr.Sym)?.value?.value ?: return ContextRuleType.Default
-
-        return when (tag) {
-            "Default" -> ContextRuleType.Default
-            "CallContract" -> {
-                if (vec.size >= 2) {
-                    val address = (vec[1] as? SCValXdr.Address)?.value
-                    if (address != null) {
-                        val addressStr = SmartAccountSharedUtils.extractAddressString(address)
-                        if (addressStr != null) {
-                            ContextRuleType.CallContract(addressStr)
-                        } else ContextRuleType.Default
-                    } else ContextRuleType.Default
-                } else ContextRuleType.Default
-            }
-            "CreateContract" -> {
-                if (vec.size >= 2) {
-                    val bytes = (vec[1] as? SCValXdr.Bytes)?.value?.value
-                    if (bytes != null) {
-                        ContextRuleType.CreateContract(bytes)
-                    } else ContextRuleType.Default
-                } else ContextRuleType.Default
-            }
-            else -> ContextRuleType.Default
-        }
-    }
-
-    private fun parseSigners(scVal: SCValXdr): List<SmartAccountSigner> {
-        val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return emptyList()
-        return vec.mapNotNull { signerVal -> parseSingleSigner(signerVal) }
-    }
-
-    private fun parseSingleSigner(scVal: SCValXdr): SmartAccountSigner? {
-        val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return null
-        if (vec.isEmpty()) return null
-
-        val tag = (vec[0] as? SCValXdr.Sym)?.value?.value ?: return null
-
-        return when (tag) {
-            "Delegated" -> {
-                if (vec.size >= 2) {
-                    val address = (vec[1] as? SCValXdr.Address)?.value
-                    if (address != null) {
-                        val addressStr = SmartAccountSharedUtils.extractAddressString(address)
-                        if (addressStr != null) {
-                            try { DelegatedSigner(addressStr) } catch (_: Exception) { null }
-                        } else null
-                    } else null
-                } else null
-            }
-            "External" -> {
-                if (vec.size >= 3) {
-                    val verifier = (vec[1] as? SCValXdr.Address)?.value
-                    val keyData = (vec[2] as? SCValXdr.Bytes)?.value?.value
-                    if (verifier != null && keyData != null) {
-                        val verifierStr = SmartAccountSharedUtils.extractAddressString(verifier)
-                        if (verifierStr != null) {
-                            try { ExternalSigner(verifierStr, keyData) } catch (_: Exception) { null }
-                        } else null
-                    } else null
-                } else null
-            }
-            else -> null
-        }
-    }
-
-    private fun parsePolicies(scVal: SCValXdr): List<String> {
-        return when (scVal) {
-            is SCValXdr.Vec -> {
-                val vec = scVal.value?.value ?: return emptyList()
-                vec.mapNotNull { element ->
-                    val address = (element as? SCValXdr.Address)?.value
-                    if (address != null) SmartAccountSharedUtils.extractAddressString(address) else null
-                }
-            }
-            is SCValXdr.Map -> {
-                val entries = scVal.value?.value ?: return emptyList()
-                entries.mapNotNull { mapEntry ->
-                    val address = (mapEntry.key as? SCValXdr.Address)?.value
-                    if (address != null) SmartAccountSharedUtils.extractAddressString(address) else null
-                }
-            }
-            else -> emptyList()
-        }
     }
 
     // ========================================================================

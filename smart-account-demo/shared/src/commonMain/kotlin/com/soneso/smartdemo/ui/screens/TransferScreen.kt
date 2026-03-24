@@ -53,13 +53,8 @@ import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.smartdemo.util.formatStroopsAsXlm
-import com.soneso.stellar.sdk.AssetTypeNative
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.smartdemo.util.isUserCancellation
+import com.soneso.smartdemo.util.refreshAllBalances
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
@@ -74,7 +69,7 @@ class TransferScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
-        val clipboard = getClipboard()
+        val clipboard = remember { getClipboard() }
         val snackbarHostState = remember { SnackbarHostState() }
 
         var selectedTokenOption by remember { mutableStateOf(TOKEN_OPTION_XLM) }
@@ -351,17 +346,13 @@ class TransferScreen : Screen {
                                         )
 
                                         // Refresh balance
-                                        refreshBalance()
+                                        DemoState.contractId?.let { refreshAllBalances(it) }
                                     } else {
                                         throw Exception(result.error ?: "Transfer failed")
                                     }
                                 } catch (e: Exception) {
                                     val message = e.message ?: "Unknown error"
-                                    if (message.contains("cancelled", ignoreCase = true) ||
-                                        (message.contains("user", ignoreCase = true) &&
-                                            (message.contains("cancel", ignoreCase = true) ||
-                                                message.contains("abort", ignoreCase = true)))
-                                    ) {
+                                    if (isUserCancellation(message)) {
                                         errorMessage = "Passkey authentication cancelled"
                                         ActivityLogState.info("Passkey authentication cancelled")
                                     } else {
@@ -551,57 +542,4 @@ class TransferScreen : Screen {
         return null
     }
 
-    private suspend fun refreshBalance() {
-        val contractId = DemoState.contractId ?: return
-
-        // Refresh XLM balance
-        try {
-            val server = SorobanServer(DemoConfig.RPC_URL)
-            val balanceResponse = server.getSACBalance(
-                contractId,
-                AssetTypeNative,
-                Network(DemoConfig.NETWORK_PASSPHRASE)
-            )
-            val newBalance = if (balanceResponse.balanceEntry != null) {
-                formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
-            } else "0.0"
-            DemoState.updateBalance(newBalance)
-        } catch (e: Exception) {
-            ActivityLogState.error("Failed to refresh XLM balance: ${e.message}")
-        }
-
-        // Refresh DEMO balance
-        val demoTokenContractId = DemoState.demoTokenContractId
-        if (demoTokenContractId != null) {
-            try {
-                val tokenClient = ContractClient.forContract(
-                    contractId = demoTokenContractId,
-                    rpcUrl = DemoConfig.RPC_URL,
-                    network = Network(DemoConfig.NETWORK_PASSPHRASE)
-                )
-                val sourceAccountId = DemoTokenService.getAdminAccountId()
-                val balanceResult = tokenClient.invoke<SCValXdr>(
-                    functionName = "balance",
-                    arguments = mapOf("id" to contractId),
-                    source = sourceAccountId,
-                    signer = null
-                )
-                val demoBalance = parseDemoBalance(balanceResult)
-                DemoState.updateDemoTokenBalance(demoBalance)
-            } catch (e: Exception) {
-                DemoState.updateDemoTokenBalance("0.0")
-            }
-        }
-    }
-
-    private fun parseDemoBalance(scVal: SCValXdr): String {
-        return when (scVal) {
-            is SCValXdr.I128 -> {
-                val hi = scVal.value.hi.value
-                if (hi != 0L) return "0.0"
-                formatStroopsAsXlm(scVal.value.lo.value.toLong())
-            }
-            else -> "0.0"
-        }
-    }
 }

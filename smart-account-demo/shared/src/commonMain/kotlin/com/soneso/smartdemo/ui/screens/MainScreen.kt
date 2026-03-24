@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -48,15 +47,10 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogLevel
 import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.smartdemo.util.formatStroopsAsXlm
-import com.soneso.stellar.sdk.AssetTypeNative
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.smartdemo.util.refreshAllBalances
 import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
-import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -258,48 +252,10 @@ class MainScreen : Screen {
                                             try {
                                                 val contractId = DemoState.contractId
                                                 if (contractId != null) {
-                                                    val server = SorobanServer(DemoConfig.RPC_URL)
-
-                                                    // Refresh XLM balance via SAC
-                                                    val xlmResult = server.getSACBalance(
-                                                        contractId,
-                                                        AssetTypeNative,
-                                                        Network(DemoConfig.NETWORK_PASSPHRASE)
+                                                    refreshAllBalances(contractId)
+                                                    ActivityLogState.success(
+                                                        "Balances refreshed: ${DemoState.balance ?: "0.0"} XLM, ${DemoState.demoTokenBalance ?: "0.0"} DEMO"
                                                     )
-                                                    val xlmBalance = if (xlmResult.balanceEntry != null) {
-                                                        formatStroopsAsXlm(xlmResult.balanceEntry!!.amount)
-                                                    } else "0.0"
-                                                    DemoState.updateBalance(xlmBalance)
-
-                                                    // Refresh DEMO balance via ContractClient (custom token, not SAC)
-                                                    val demoTokenContractId = DemoState.demoTokenContractId
-                                                    if (demoTokenContractId != null) {
-                                                        try {
-                                                            val tokenClient = ContractClient.forContract(
-                                                                contractId = demoTokenContractId,
-                                                                rpcUrl = DemoConfig.RPC_URL,
-                                                                network = Network(DemoConfig.NETWORK_PASSPHRASE)
-                                                            )
-                                                            // Read-only calls need a funded G-address as source
-                                                            // for simulation. The token admin is always funded.
-                                                            val sourceAccountId = DemoTokenService.getAdminAccountId()
-                                                            val balanceResult = tokenClient.invoke<SCValXdr>(
-                                                                functionName = "balance",
-                                                                arguments = mapOf("id" to contractId),
-                                                                source = sourceAccountId,
-                                                                signer = null
-                                                            )
-                                                            val demoBalance = parseDemoBalance(balanceResult)
-                                                            DemoState.updateDemoTokenBalance(demoBalance)
-                                                        } catch (e: Exception) {
-                                                            // DEMO contract not deployed yet — show zero
-                                                            DemoState.updateDemoTokenBalance("0.0")
-                                                        }
-                                                    } else {
-                                                        DemoState.updateDemoTokenBalance("0.0")
-                                                    }
-
-                                                    ActivityLogState.success("Balances refreshed: $xlmBalance XLM, ${DemoState.demoTokenBalance ?: "0.0"} DEMO")
                                                 } else {
                                                     ActivityLogState.error("No contract ID available")
                                                 }
@@ -413,24 +369,6 @@ class MainScreen : Screen {
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * Parses an i128 SCVal result from a token balance() call to a display string.
-     * DEMO uses 7 decimals (same as XLM), so [formatStroopsAsXlm] applies directly.
-     * For the demo token, balances fit within Long range (hi is always 0).
-     */
-    private fun parseDemoBalance(scVal: SCValXdr): String {
-        return when (scVal) {
-            is SCValXdr.I128 -> {
-                val hi = scVal.value.hi.value
-                // For demo balances (up to ~100B stroops per mint), hi is always 0.
-                // Return zero for any unexpected overflow case.
-                if (hi != 0L) return "0.0"
-                formatStroopsAsXlm(scVal.value.lo.value.toLong())
-            }
-            else -> "0.0"
         }
     }
 
