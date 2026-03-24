@@ -1,5 +1,10 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Account signers screen: lists all unique signers registered across all context rules.
+ * Signer loading and deduplication are handled by AccountSignersFlow.
+ */
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,9 +52,10 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.SignerEntry
+import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
@@ -69,13 +75,11 @@ class KnownSignersScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
 
-        data class SignerEntry(
-            val signer: SmartAccountSigner,
-            val rules: List<ParsedContextRule>
-        )
-
+        // Loading / error state
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+
+        // SignerEntry is the flow's result type — used directly for display
         val signerEntries = remember { mutableStateListOf<SignerEntry>() }
 
         fun loadSigners() {
@@ -84,27 +88,8 @@ class KnownSignersScreen : Screen {
                 errorMessage = null
                 signerEntries.clear()
                 try {
-                    val rules = fetchAllContextRules()
-
-                    // Consolidate signers across all rules, grouped by unique key
-                    val signerMap = linkedMapOf<String, Pair<SmartAccountSigner, MutableList<ParsedContextRule>>>()
-                    for (rule in rules) {
-                        for (signer in rule.signers) {
-                            val key = SmartAccountBuilders.getSignerKey(signer)
-                            val existing = signerMap[key]
-                            if (existing == null) {
-                                signerMap[key] = Pair(signer, mutableListOf(rule))
-                            } else {
-                                existing.second.add(rule)
-                            }
-                        }
-                    }
-
-                    for ((_, pair) in signerMap) {
-                        signerEntries.add(SignerEntry(pair.first, pair.second))
-                    }
-
-                    ActivityLogState.info("Loaded ${signerEntries.size} unique signer(s) from ${rules.size} context rule(s)")
+                    val entries = loadAccountSigners()
+                    signerEntries.addAll(entries)
                 } catch (e: Exception) {
                     errorMessage = "Failed to load signers: ${e.message}"
                     ActivityLogState.error("Failed to load signers: ${e.message}")
@@ -284,7 +269,7 @@ class KnownSignersScreen : Screen {
                                             color = MaterialTheme.colorScheme.outlineVariant
                                         )
                                     }
-                                    SignerEntryItem(entry.signer, entry.rules)
+                                    SignerEntryItem(entry.signer, entry.contextRules)
                                 }
                             }
                         }
@@ -373,5 +358,4 @@ class KnownSignersScreen : Screen {
             }
         }
     }
-
 }

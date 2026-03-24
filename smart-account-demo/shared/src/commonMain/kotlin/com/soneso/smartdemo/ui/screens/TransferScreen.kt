@@ -1,5 +1,10 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Token transfer screen: select token, enter recipient and amount, submit transfer.
+ * Transfer logic is handled by TransferFlow.
+ */
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,11 +55,11 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.refreshAllBalances
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
@@ -72,10 +77,13 @@ class TransferScreen : Screen {
         val clipboard = remember { getClipboard() }
         val snackbarHostState = remember { SnackbarHostState() }
 
+        // Form state
         var selectedTokenOption by remember { mutableStateOf(TOKEN_OPTION_XLM) }
         var tokenDropdownExpanded by remember { mutableStateOf(false) }
         var recipient by remember { mutableStateOf("") }
         var amount by remember { mutableStateOf("") }
+
+        // Loading / result state
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var txHash by remember { mutableStateOf<String?>(null) }
@@ -322,9 +330,6 @@ class TransferScreen : Screen {
                                 errorMessage = null
 
                                 try {
-                                    val kit = DemoState.kit
-                                        ?: throw Exception("Smart Account Kit not initialized")
-
                                     val parsedAmount = amount.toDoubleOrNull()
                                         ?: throw Exception("Invalid amount")
 
@@ -333,7 +338,7 @@ class TransferScreen : Screen {
                                         "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                     )
 
-                                    val result = kit.transactionOperations.transfer(
+                                    val result = transfer(
                                         tokenContract = tokenContract,
                                         recipient = recipient,
                                         amount = parsedAmount
@@ -341,12 +346,6 @@ class TransferScreen : Screen {
 
                                     if (result.success) {
                                         txHash = result.hash
-                                        ActivityLogState.success(
-                                            "Transfer successful! Hash: ${result.hash ?: "unknown"}"
-                                        )
-
-                                        // Refresh balance
-                                        DemoState.contractId?.let { refreshAllBalances(it) }
                                     } else {
                                         throw Exception(result.error ?: "Transfer failed")
                                     }
@@ -541,5 +540,4 @@ class TransferScreen : Screen {
         }
         return null
     }
-
 }

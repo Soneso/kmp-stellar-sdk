@@ -1,5 +1,10 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Wallet creation screen: collects a username, triggers wallet creation via WalletCreationFlow,
+ * and displays the resulting credential, contract address, and initial balances.
+ */
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,17 +47,12 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.flows.WalletCreationResult
+import com.soneso.smartdemo.flows.createWallet
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.smartdemo.util.fetchXlmBalance
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.stellar.sdk.FriendBot
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.smartaccount.oz.CreateWalletResult
-import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import kotlinx.coroutines.launch
 
 class WalletCreationScreen : Screen {
@@ -64,14 +64,15 @@ class WalletCreationScreen : Screen {
         val snackbarHostState = remember { SnackbarHostState() }
         val clipboard = remember { getClipboard() }
 
+        // Form input state
         var username by remember { mutableStateOf("Smart Account User") }
+
+        // Loading / result state
         var isLoading by remember { mutableStateOf(false) }
         var progressMessage by remember { mutableStateOf("") }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var infoMessage by remember { mutableStateOf<String?>(null) }
-        var createResult by remember { mutableStateOf<CreateWalletResult?>(null) }
-        var balance by remember { mutableStateOf<String?>(null) }
-        var demoTokenBalance by remember { mutableStateOf<String?>(null) }
+        var createResult by remember { mutableStateOf<WalletCreationResult?>(null) }
 
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -203,77 +204,8 @@ class WalletCreationScreen : Screen {
                                 infoMessage = null
 
                                 try {
-                                    val kit = DemoState.kit
-                                    if (kit == null) {
-                                        errorMessage = "Smart Account Kit not initialized"
-                                        ActivityLogState.error("Kit not initialized")
-                                        return@launch
-                                    }
-
-                                    // Ensure the deployer account is funded. After a testnet reset
-                                    // the account no longer exists and deployment would fail.
-                                    progressMessage = "Creating wallet..."
-                                    val deployer = OZSmartAccountConfig.createDefaultDeployer()
-                                    try {
-                                        SorobanServer(DemoConfig.RPC_URL).getAccount(deployer.getAccountId())
-                                    } catch (e: Exception) {
-                                        ActivityLogState.info("Funding deployer account...")
-                                        FriendBot.fundTestnetAccount(deployer.getAccountId())
-                                        kotlinx.coroutines.delay(5000)
-                                    }
-
-                                    ActivityLogState.info("Creating wallet with username: $username")
-
-                                    val result = kit.walletOperations.createWallet(
-                                        userName = username,
-                                        autoSubmit = true,
-                                        autoFund = true,
-                                        nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
-                                    )
-
-                                    ActivityLogState.success("Wallet created successfully")
-                                    ActivityLogState.info("Credential ID: ${result.credentialId}")
-                                    ActivityLogState.info("Contract ID: ${result.contractId}")
-
-                                    if (result.transactionHash != null) {
-                                        ActivityLogState.info("Transaction Hash: ${result.transactionHash}")
-                                    }
-
-                                    // Update DemoState connection
-                                    DemoState.setConnected(true, result.contractId, result.credentialId)
-
-                                    // Fetch XLM balance
-                                    try {
-                                        balance = fetchXlmBalance(result.contractId)
-                                        DemoState.updateBalance(balance)
-                                        ActivityLogState.info("Balance: $balance XLM")
-                                    } catch (e: Exception) {
-                                        ActivityLogState.error("Failed to fetch balance: ${e.message}")
-                                    }
-
-                                    // Deploy demo token and mint DEMO to the new wallet.
-                                    // Failure here is non-fatal — wallet creation has already succeeded.
-                                    try {
-                                        progressMessage = "Deploying demo token..."
-                                        ActivityLogState.info("Deploying demo token...")
-                                        val tokenService = DemoTokenService(
-                                            DemoConfig.RPC_URL,
-                                            DemoConfig.NETWORK_PASSPHRASE
-                                        )
-                                        val tokenResult = tokenService.ensureTokenAndMint(result.contractId)
-                                        DemoState.updateDemoToken(tokenResult.tokenContractId)
-
-                                        val mintedFormatted = com.soneso.smartdemo.util.formatStroopsAsXlm(tokenResult.amountMinted)
-                                        demoTokenBalance = mintedFormatted
-                                        DemoState.updateDemoTokenBalance(mintedFormatted)
-                                        ActivityLogState.success("Minted 10,000 DEMO to wallet")
-                                    } catch (e: Exception) {
-                                        ActivityLogState.error("Demo token minting failed: ${e.message}")
-                                    }
-
-                                    // Show result only after everything completes
+                                    val result = createWallet(username) { progressMessage = it }
                                     createResult = result
-
                                 } catch (e: Exception) {
                                     val message = e.message ?: "Unknown error"
                                     if (isUserCancellation(message)) {
@@ -297,6 +229,7 @@ class WalletCreationScreen : Screen {
 
                 // Result Section
                 if (createResult != null) {
+                    val result = createResult!!
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -315,7 +248,7 @@ class WalletCreationScreen : Screen {
 
                             ResultField(
                                 label = "Credential ID",
-                                value = createResult!!.credentialId,
+                                value = result.credentialId,
                                 clipboard = clipboard,
                                 snackbarHostState = snackbarHostState,
                                 scope = scope
@@ -323,46 +256,42 @@ class WalletCreationScreen : Screen {
 
                             ResultField(
                                 label = "Contract Address",
-                                value = createResult!!.contractId,
+                                value = result.contractId,
                                 clipboard = clipboard,
                                 snackbarHostState = snackbarHostState,
                                 scope = scope
                             )
 
-                            if (createResult!!.transactionHash != null) {
+                            if (result.transactionHash != null) {
                                 ResultField(
                                     label = "Transaction Hash",
-                                    value = createResult!!.transactionHash!!,
+                                    value = result.transactionHash,
                                     clipboard = clipboard,
                                     snackbarHostState = snackbarHostState,
                                     scope = scope
                                 )
                             }
 
-                            if (balance != null || demoTokenBalance != null) {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Balance",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "${result.xlmBalance} XLM",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                if (result.demoTokenBalance != null) {
                                     Text(
-                                        text = "Balance",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        text = "${result.demoTokenBalance} DEMO",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
-                                    if (balance != null) {
-                                        Text(
-                                            text = "$balance XLM",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                    if (demoTokenBalance != null) {
-                                        Text(
-                                            text = "$demoTokenBalance DEMO",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
                                 }
                             }
                         }

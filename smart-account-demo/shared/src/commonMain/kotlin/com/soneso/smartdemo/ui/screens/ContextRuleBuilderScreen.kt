@@ -1,5 +1,12 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Context rule builder screen: form for creating or editing a context rule.
+ * SDK calls (add, update name, update expiry, load for edit) are handled by ContextRuleFlow.
+ * SDK type imports (ContextRuleType, DelegatedSigner, ExternalSigner, etc.) are retained
+ * because they are needed to construct form state and policy SCVal values.
+ */
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -59,6 +66,11 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.config.KNOWN_POLICIES
 import com.soneso.smartdemo.config.PolicyInfo
+import com.soneso.smartdemo.flows.addContextRule
+import com.soneso.smartdemo.flows.FlowPolicyEntry
+import com.soneso.smartdemo.flows.loadContextRule
+import com.soneso.smartdemo.flows.updateContextRuleName
+import com.soneso.smartdemo.flows.updateContextRuleValidUntil
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.parseContextType
@@ -138,8 +150,7 @@ class ContextRuleBuilderScreen(
                 isLoadingRule = true
                 errorMessage = null
                 try {
-                    val kit = DemoState.kit!!
-                    val ruleScVal = kit.contextRuleManager.getContextRule(editRuleId)
+                    val ruleScVal = loadContextRule(editRuleId)
                     val parsed = parseRuleFromScVal(ruleScVal, editRuleId)
                     if (parsed != null) {
                         ruleName = parsed.name
@@ -1193,39 +1204,26 @@ class ContextRuleBuilderScreen(
 
                             scope.launch {
                                 try {
-                                    val kit = DemoState.kit!!
-
                                     if (isEditing) {
-                                        // Edit mode: update name and validUntil
+                                        // Edit mode: update name then validUntil via flow functions
                                         ActivityLogState.info("Updating rule #$editRuleId...")
 
-                                        val nameResult = kit.contextRuleManager.updateName(
-                                            id = editRuleId!!,
-                                            name = ruleName.trim()
-                                        )
+                                        val nameResult = updateContextRuleName(editRuleId!!, ruleName.trim())
                                         if (!nameResult.success) {
                                             submissionResult = SubmissionResult(
                                                 success = false,
                                                 error = "Failed to update name: ${nameResult.error ?: "Unknown error"}"
                                             )
-                                            ActivityLogState.error("Failed to update rule name: ${nameResult.error}")
                                             return@launch
                                         }
 
-                                        val validUntilVal = if (hasExpiry) {
-                                            expiryLedger.toUIntOrNull()
-                                        } else null
-
-                                        val validUntilResult = kit.contextRuleManager.updateValidUntil(
-                                            id = editRuleId,
-                                            validUntil = validUntilVal
-                                        )
+                                        val validUntilVal = if (hasExpiry) expiryLedger.toUIntOrNull() else null
+                                        val validUntilResult = updateContextRuleValidUntil(editRuleId, validUntilVal)
                                         if (!validUntilResult.success) {
                                             submissionResult = SubmissionResult(
                                                 success = false,
                                                 error = "Name updated but failed to update expiry: ${validUntilResult.error ?: "Unknown error"}"
                                             )
-                                            ActivityLogState.error("Failed to update validUntil: ${validUntilResult.error}")
                                             return@launch
                                         }
 
@@ -1237,9 +1235,7 @@ class ContextRuleBuilderScreen(
                                             "Rule #$editRuleId updated successfully. Hash: ${validUntilResult.hash ?: "N/A"}"
                                         )
                                     } else {
-                                        // Create mode: add new context rule
-                                        ActivityLogState.info("Submitting new context rule...")
-
+                                        // Create mode: add new context rule via flow
                                         val selectedContextType = when (contextTypeOption) {
                                             ContextTypeOption.DEFAULT -> ContextRuleType.Default
                                             ContextTypeOption.CALL_CONTRACT ->
@@ -1250,26 +1246,19 @@ class ContextRuleBuilderScreen(
                                                 )
                                         }
 
-                                        val validUntilVal = if (hasExpiry) {
-                                            expiryLedger.toUIntOrNull()
-                                        } else null
+                                        val validUntilVal = if (hasExpiry) expiryLedger.toUIntOrNull() else null
 
-                                        // Build policies map: address -> SCValXdr
-                                        val policiesMap = mutableMapOf<String, SCValXdr>()
-                                        for (policy in policies) {
-                                            if (policy.scVal != null) {
-                                                policiesMap[policy.address] = policy.scVal
-                                            }
-                                            // Policies loaded from edit mode without scVal are skipped
-                                            // (they are already installed on-chain)
+                                        // Convert PolicyEntry list to FlowPolicyEntry for the flow
+                                        val flowPolicies = policies.map { policy ->
+                                            FlowPolicyEntry(address = policy.address, scVal = policy.scVal)
                                         }
 
-                                        val result = kit.contextRuleManager.addContextRule(
+                                        val result = addContextRule(
                                             contextType = selectedContextType,
                                             name = ruleName.trim(),
                                             validUntil = validUntilVal,
                                             signers = signers,
-                                            policies = policiesMap
+                                            policies = flowPolicies
                                         )
 
                                         submissionResult = SubmissionResult(
@@ -1277,16 +1266,6 @@ class ContextRuleBuilderScreen(
                                             hash = result.hash,
                                             error = result.error
                                         )
-
-                                        if (result.success) {
-                                            ActivityLogState.info(
-                                                "Context rule created successfully. Hash: ${result.hash ?: "N/A"}"
-                                            )
-                                        } else {
-                                            ActivityLogState.error(
-                                                "Failed to create context rule: ${result.error ?: "Unknown error"}"
-                                            )
-                                        }
                                     }
                                 } catch (e: Exception) {
                                     submissionResult = SubmissionResult(

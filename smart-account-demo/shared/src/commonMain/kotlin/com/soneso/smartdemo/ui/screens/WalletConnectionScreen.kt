@@ -1,10 +1,16 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Wallet connection screen: Quick Connect, Manual Connect, and Pending Deployments.
+ * All connection logic is handled by WalletConnectionFlow.
+ */
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +24,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,12 +51,14 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.deletePendingCredential
+import com.soneso.smartdemo.flows.loadPendingCredentials
+import com.soneso.smartdemo.flows.manualConnect
+import com.soneso.smartdemo.flows.quickConnect
+import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.refreshAllBalances
-import com.soneso.stellar.sdk.smartaccount.oz.AuthenticatePasskeyResult
-import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import kotlinx.coroutines.launch
 
@@ -60,20 +69,25 @@ class WalletConnectionScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
 
+        // Connection loading states
         var isConnecting by remember { mutableStateOf(false) }
         var isAuthenticating by remember { mutableStateOf(false) }
+
+        // UI expand/collapse state for collapsible sections
         var manualExpanded by remember { mutableStateOf(false) }
         var pendingExpanded by remember { mutableStateOf(true) }
 
+        // Authenticated credential ID shown in the manual connect section
         var authenticatedCredentialId by remember { mutableStateOf<String?>(null) }
 
+        // Pending deployments list (StoredCredential is a data type needed for display)
         val pendingCredentials = remember { mutableStateListOf<StoredCredential>() }
         var isLoadingPending by remember { mutableStateOf(true) }
 
         // Load pending credentials on screen entry
         LaunchedEffect(Unit) {
             try {
-                val pending = DemoState.kit?.credentialManager?.getPendingCredentials() ?: emptyList()
+                val pending = loadPendingCredentials()
                 pendingCredentials.clear()
                 pendingCredentials.addAll(pending)
             } catch (e: Exception) {
@@ -138,35 +152,10 @@ class WalletConnectionScreen : Screen {
                                 scope.launch {
                                     isConnecting = true
                                     try {
-                                        val kit = DemoState.kit
-                                        if (kit == null) {
-                                            ActivityLogState.error("SDK not initialized")
-                                            return@launch
+                                        val result = quickConnect()
+                                        if (result != null) {
+                                            navigator.pop()
                                         }
-
-                                        // Use prompt = true so WebAuthn is triggered if no session
-                                        val result = kit.walletOperations.connectWallet(
-                                            OZWalletOperations.ConnectWalletOptions(prompt = true)
-                                        )
-
-                                        if (result == null) {
-                                            // Should not happen with prompt = true, but handle defensively
-                                            ActivityLogState.info("No wallet session found")
-                                            return@launch
-                                        }
-
-                                        if (result.restoredFromSession) {
-                                            ActivityLogState.success("Restored from saved session")
-                                        } else {
-                                            ActivityLogState.success("Connected via passkey authentication")
-                                        }
-
-                                        DemoState.setConnected(true, result.contractId, result.credentialId)
-
-                                        // Fetch XLM and DEMO balances after connection
-                                        refreshAllBalances(result.contractId)
-
-                                        navigator.pop()
                                     } catch (e: Exception) {
                                         val message = e.message ?: "Unknown error"
                                         if (isUserCancellation(message)) {
@@ -182,6 +171,14 @@ class WalletConnectionScreen : Screen {
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isConnecting && DemoState.kit != null
                         ) {
+                            if (isConnecting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
                             Text(if (isConnecting) "Connecting..." else "Connect")
                         }
                     }
@@ -224,38 +221,17 @@ class WalletConnectionScreen : Screen {
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Step 1: Authenticate
+                            // Authenticate + connect in one step via manualConnect()
                             Button(
                                 onClick = {
                                     scope.launch {
                                         isAuthenticating = true
                                         try {
-                                            val kit = DemoState.kit
-                                            if (kit == null) {
-                                                ActivityLogState.error("SDK not initialized")
-                                                return@launch
+                                            val result = manualConnect()
+                                            if (result != null) {
+                                                authenticatedCredentialId = result.credentialId
+                                                navigator.pop()
                                             }
-
-                                            val authResult: AuthenticatePasskeyResult = kit.walletOperations.authenticatePasskey()
-                                            authenticatedCredentialId = authResult.credentialId
-                                            ActivityLogState.success("Authenticated with credential: ${authResult.credentialId.take(16)}...")
-
-                                            // Connect with credential ID - SDK will handle indexer lookup internally.
-                                            // Throws WalletException.NotFound if no contract is found for this credential.
-                                            ActivityLogState.info("Looking up contract for credential...")
-                                            val result = kit.walletOperations.connectWallet(
-                                                OZWalletOperations.ConnectWalletOptions(credentialId = authResult.credentialId)
-                                            )
-
-                                            if (result == null) {
-                                                ActivityLogState.error("Failed to resolve contract for credential")
-                                                return@launch
-                                            }
-
-                                            ActivityLogState.success("Connected to contract: ${result.contractId}")
-                                            DemoState.setConnected(true, result.contractId, result.credentialId)
-                                            refreshAllBalances(result.contractId)
-                                            navigator.pop()
                                         } catch (e: Exception) {
                                             val message = e.message ?: "Unknown error"
                                             if (isUserCancellation(message)) {
@@ -271,6 +247,14 @@ class WalletConnectionScreen : Screen {
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = !isAuthenticating && DemoState.kit != null
                             ) {
+                                if (isAuthenticating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
                                 Text(if (isAuthenticating) "Authenticating..." else "Authenticate Passkey")
                             }
 
@@ -391,36 +375,17 @@ class WalletConnectionScreen : Screen {
                                                         onClick = {
                                                             scope.launch {
                                                                 try {
-                                                                    val kit = DemoState.kit
-                                                                    if (kit == null) {
-                                                                        ActivityLogState.error("SDK not initialized")
-                                                                        return@launch
-                                                                    }
-
-                                                                    ActivityLogState.info("Retrying deployment for ${credential.credentialId.take(16)}...")
-                                                                    // connectWallet throws WalletException.NotFound if the credential cannot be resolved.
-                                                                    val result = kit.walletOperations.connectWallet(
-                                                                        OZWalletOperations.ConnectWalletOptions(
-                                                                            credentialId = credential.credentialId,
-                                                                            contractId = credential.contractId
-                                                                        )
+                                                                    val result = retryPendingDeploy(
+                                                                        credential.credentialId,
+                                                                        credential.contractId
                                                                     )
-
-                                                                    if (result == null) {
-                                                                        ActivityLogState.error("Failed to connect with pending credential")
-                                                                        return@launch
+                                                                    if (result != null) {
+                                                                        // Refresh pending list after successful deploy
+                                                                        val updated = loadPendingCredentials()
+                                                                        pendingCredentials.clear()
+                                                                        pendingCredentials.addAll(updated)
+                                                                        navigator.pop()
                                                                     }
-
-                                                                    ActivityLogState.success("Successfully deployed contract")
-                                                                    DemoState.setConnected(true, result.contractId, result.credentialId)
-                                                                    refreshAllBalances(result.contractId)
-
-                                                                    // Refresh pending list
-                                                                    val updated = kit.credentialManager.getPendingCredentials()
-                                                                    pendingCredentials.clear()
-                                                                    pendingCredentials.addAll(updated)
-
-                                                                    navigator.pop()
                                                                 } catch (e: Exception) {
                                                                     ActivityLogState.error("Retry failed: ${e.message}")
                                                                 }
@@ -435,17 +400,9 @@ class WalletConnectionScreen : Screen {
                                                         onClick = {
                                                             scope.launch {
                                                                 try {
-                                                                    val kit = DemoState.kit
-                                                                    if (kit == null) {
-                                                                        ActivityLogState.error("SDK not initialized")
-                                                                        return@launch
-                                                                    }
-
-                                                                    kit.credentialManager.deleteCredential(credential.credentialId)
-                                                                    ActivityLogState.info("Deleted pending credential")
-
-                                                                    // Refresh pending list
-                                                                    val updated = kit.credentialManager.getPendingCredentials()
+                                                                    deletePendingCredential(credential.credentialId)
+                                                                    // Refresh pending list after deletion
+                                                                    val updated = loadPendingCredentials()
                                                                     pendingCredentials.clear()
                                                                     pendingCredentials.addAll(updated)
                                                                 } catch (e: Exception) {
@@ -468,7 +425,5 @@ class WalletConnectionScreen : Screen {
                 }
             }
         }
-
     }
-
 }

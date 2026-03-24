@@ -1,5 +1,10 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Context rules screen: lists all on-chain authorization rules for the connected account.
+ * Rule loading and removal are handled by ContextRuleFlow.
+ */
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -54,9 +59,10 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.loadContextRules
+import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
@@ -72,9 +78,12 @@ class ContextRulesScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
 
+        // Rule list state
         var rules by remember { mutableStateOf<List<ParsedContextRule>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+
+        // UI expand/confirm state
         var expandedRuleId by remember { mutableStateOf<UInt?>(null) }
         var ruleToRemove by remember { mutableStateOf<ParsedContextRule?>(null) }
         var isRemoving by remember { mutableStateOf(false) }
@@ -85,8 +94,7 @@ class ContextRulesScreen : Screen {
                 isLoading = true
                 errorMessage = null
                 try {
-                    rules = fetchAllContextRules()
-                    ActivityLogState.info("Fetched ${rules.size} context rule(s)")
+                    rules = loadContextRules()
                 } catch (e: Exception) {
                     val msg = e.message ?: "Unknown error"
                     errorMessage = "Failed to fetch context rules: $msg"
@@ -116,20 +124,13 @@ class ContextRulesScreen : Screen {
                             scope.launch {
                                 isRemoving = true
                                 try {
-                                    val kit = DemoState.kit
-                                        ?: throw IllegalStateException("Kit not initialized")
-                                    ActivityLogState.info("Removing context rule #${rule.id}...")
-                                    val result = kit.contextRuleManager.removeContextRule(rule.id)
+                                    val result = removeContextRule(rule.id)
                                     if (result.success) {
-                                        ActivityLogState.success(
-                                            "Context rule #${rule.id} removed. Hash: ${result.hash ?: "N/A"}"
-                                        )
-                                        // Refresh rules
+                                        // Refresh rules after successful removal
                                         isLoading = true
                                         errorMessage = null
                                         try {
-                                            rules = fetchAllContextRules()
-                                            ActivityLogState.info("Refreshed: ${rules.size} context rule(s)")
+                                            rules = loadContextRules()
                                         } catch (e: Exception) {
                                             errorMessage = "Failed to refresh rules: ${e.message}"
                                         } finally {
@@ -137,12 +138,10 @@ class ContextRulesScreen : Screen {
                                         }
                                     } else {
                                         val errMsg = result.error ?: "Unknown error"
-                                        ActivityLogState.error("Failed to remove rule: $errMsg")
                                         errorMessage = "Failed to remove rule: $errMsg"
                                     }
                                 } catch (e: Exception) {
                                     val msg = e.message ?: "Unknown error"
-                                    ActivityLogState.error("Failed to remove rule: $msg")
                                     errorMessage = "Failed to remove rule: $msg"
                                 } finally {
                                     isRemoving = false
@@ -222,8 +221,7 @@ class ContextRulesScreen : Screen {
                                 isLoading = true
                                 errorMessage = null
                                 try {
-                                    rules = fetchAllContextRules()
-                                    ActivityLogState.info("Refreshed: ${rules.size} context rule(s)")
+                                    rules = loadContextRules()
                                 } catch (e: Exception) {
                                     val msg = e.message ?: "Unknown error"
                                     errorMessage = "Failed to fetch context rules: $msg"
@@ -693,5 +691,4 @@ class ContextRulesScreen : Screen {
             }
         }
     }
-
 }

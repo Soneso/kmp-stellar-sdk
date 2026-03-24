@@ -1,5 +1,10 @@
 package com.soneso.smartdemo.ui.screens
 
+/**
+ * Main screen: wallet status dashboard, navigation, and activity log.
+ * SDK initialization and balance refresh are handled by MainScreenFlow.
+ */
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,16 +46,13 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.flows.disconnect
+import com.soneso.smartdemo.flows.initializeKit
+import com.soneso.smartdemo.flows.refreshBalances
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogLevel
-import com.soneso.smartdemo.token.DemoTokenService
-import com.soneso.smartdemo.util.refreshAllBalances
-import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
-import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
-import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -65,35 +67,14 @@ class MainScreen : Screen {
         val snackbarHostState = remember { SnackbarHostState() }
         val clipboard = remember { getClipboard() }
 
+        // Controls the Refresh button loading state
         var isRefreshingBalance by remember { mutableStateOf(false) }
 
-        // Auto-initialize SDK on first launch (waits for platform providers)
+        // Auto-initialize the SDK when platform providers become available
         LaunchedEffect(DemoState.webauthnProvider, DemoState.storage) {
             if (DemoState.kit == null && DemoState.webauthnProvider != null) {
                 try {
-                    val config = OZSmartAccountConfig(
-                        rpcUrl = DemoConfig.RPC_URL,
-                        networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
-                        accountWasmHash = DemoConfig.ACCOUNT_WASM_HASH,
-                        webauthnVerifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
-                        relayerUrl = DemoConfig.DEFAULT_RELAYER_URL.takeIf { it.isNotBlank() },
-                        indexerUrl = DemoConfig.DEFAULT_INDEXER_URL.takeIf { it.isNotBlank() },
-                        webauthnProvider = DemoState.webauthnProvider,
-                        storage = DemoState.storage ?: InMemoryStorageAdapter()
-                    )
-                    val kit = OZSmartAccountKit.create(config)
-                    DemoState.setKitInstance(kit)
-                    ActivityLogState.success("SDK initialized")
-                    if (DemoConfig.DEFAULT_RELAYER_URL.isNotBlank()) {
-                        ActivityLogState.info("Relayer fee sponsoring enabled")
-                    }
-                    if (DemoConfig.DEFAULT_INDEXER_URL.isNotBlank()) {
-                        ActivityLogState.info("Indexer lookup enabled")
-                    }
-                    // Derive the deterministic DEMO token contract address and store it so
-                    // TransferScreen can use it immediately without running the full deploy flow.
-                    val tokenAddress = DemoTokenService.deriveTokenContractAddress(DemoConfig.NETWORK_PASSPHRASE)
-                    DemoState.updateDemoToken(tokenAddress)
+                    initializeKit(DemoState.webauthnProvider, DemoState.storage)
                 } catch (e: Exception) {
                     ActivityLogState.error("Failed to initialize SDK: ${e.message}")
                 }
@@ -250,15 +231,7 @@ class MainScreen : Screen {
                                         scope.launch {
                                             isRefreshingBalance = true
                                             try {
-                                                val contractId = DemoState.contractId
-                                                if (contractId != null) {
-                                                    refreshAllBalances(contractId)
-                                                    ActivityLogState.success(
-                                                        "Balances refreshed: ${DemoState.balance ?: "0.0"} XLM, ${DemoState.demoTokenBalance ?: "0.0"} DEMO"
-                                                    )
-                                                } else {
-                                                    ActivityLogState.error("No contract ID available")
-                                                }
+                                                refreshBalances()
                                             } catch (e: Exception) {
                                                 ActivityLogState.error("Failed to refresh balance: ${e.message}")
                                             } finally {
@@ -303,9 +276,7 @@ class MainScreen : Screen {
                                     onClick = {
                                         scope.launch {
                                             try {
-                                                DemoState.kit?.disconnect()
-                                                DemoState.setConnected(false)
-                                                ActivityLogState.info("Wallet disconnected")
+                                                disconnect()
                                             } catch (e: Exception) {
                                                 ActivityLogState.error("Disconnect failed: ${e.message}")
                                             }
