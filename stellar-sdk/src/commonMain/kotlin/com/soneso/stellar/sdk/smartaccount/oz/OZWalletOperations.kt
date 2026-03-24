@@ -51,7 +51,8 @@ data class CreateWalletResult(
     val credentialId: String,
     val contractId: String,
     val publicKey: ByteArray,
-    val transactionHash: String? = null
+    val transactionHash: String? = null,
+    val nickname: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -63,6 +64,7 @@ data class CreateWalletResult(
         if (contractId != other.contractId) return false
         if (!publicKey.contentEquals(other.publicKey)) return false
         if (transactionHash != other.transactionHash) return false
+        if (nickname != other.nickname) return false
 
         return true
     }
@@ -72,6 +74,7 @@ data class CreateWalletResult(
         result = 31 * result + contractId.hashCode()
         result = 31 * result + publicKey.contentHashCode()
         result = 31 * result + (transactionHash?.hashCode() ?: 0)
+        result = 31 * result + (nickname?.hashCode() ?: 0)
         return result
     }
 }
@@ -309,6 +312,7 @@ class OZWalletOperations internal constructor(
                 credentialId = credentialIdBase64url,
                 publicKey = publicKey,
                 contractId = contractId,
+                nickname = userName,
                 transports = registrationResult.transports,
                 deviceType = registrationResult.deviceType,
                 backedUp = registrationResult.backedUp
@@ -394,7 +398,8 @@ class OZWalletOperations internal constructor(
             credentialId = credentialIdBase64url,
             contractId = contractId,
             publicKey = publicKey,
-            transactionHash = transactionHash
+            transactionHash = transactionHash,
+            nickname = userName
         )
     }
 

@@ -301,7 +301,7 @@ Creates a new smart account wallet with WebAuthn passkey authentication.
 - `autoFund`: Whether to automatically fund the wallet after deployment (testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 
-**Returns**: `CreateWalletResult` containing credential ID, contract address, and optional transaction hash
+**Returns**: `CreateWalletResult` containing credential ID, contract address, optional transaction hash, and nickname
 
 **Throws**:
 - `WebAuthnException.NotSupported`: No WebAuthn provider configured
@@ -434,7 +434,8 @@ data class CreateWalletResult(
     val credentialId: String,
     val contractId: String,
     val publicKey: ByteArray,
-    val transactionHash: String? = null
+    val transactionHash: String? = null,
+    val nickname: String? = null
 )
 ```
 
@@ -443,6 +444,7 @@ data class CreateWalletResult(
 - `contractId`: Smart account contract address (C-address)
 - `publicKey`: Uncompressed secp256r1 public key (65 bytes)
 - `transactionHash`: Transaction hash if auto-submitted, null otherwise
+- `nickname`: Display name from the `userName` parameter, stored with the credential
 
 #### ConnectWalletResult
 ```kotlin
@@ -629,6 +631,7 @@ suspend fun createPendingCredential(
     credentialId: String,
     publicKey: ByteArray,
     contractId: String,
+    nickname: String? = null,
     transports: List<String>? = null,
     deviceType: String? = null,
     backedUp: Boolean? = null
@@ -641,6 +644,7 @@ Creates a new pending credential in storage.
 - `credentialId`: Base64URL-encoded credential ID (must be unique)
 - `publicKey`: Uncompressed secp256r1 public key (65 bytes)
 - `contractId`: Smart account contract address
+- `nickname`: Display name for the credential (e.g., from the userName passed to createWallet)
 - `transports`: Authenticator transport hints ("usb", "nfc", "ble", "internal")
 - `deviceType`: "singleDevice" or "multiDevice"
 - `backedUp`: Whether the passkey is backed up/synced

@@ -105,6 +105,7 @@ class OZCredentialManager internal constructor(
         credentialId: String,
         publicKey: ByteArray,
         contractId: String,
+        nickname: String? = null,
         transports: List<String>? = null,
         deviceType: String? = null,
         backedUp: Boolean? = null
@@ -139,6 +140,7 @@ class OZCredentialManager internal constructor(
             deploymentStatus = CredentialDeploymentStatus.PENDING,
             isPrimary = true,
             createdAt = currentTimeMillis(),
+            nickname = nickname,
             transports = transports,
             deviceType = deviceType,
             backedUp = backedUp

@@ -38,6 +38,7 @@ data class WalletCreationResult(
     val credentialId: String,
     val contractId: String,
     val transactionHash: String?,
+    val nickname: String?,
     val xlmBalance: String,
     val demoTokenBalance: String?
 )
@@ -157,6 +158,7 @@ suspend fun createWallet(
         credentialId = result.credentialId,
         contractId = result.contractId,
         transactionHash = result.transactionHash,
+        nickname = result.nickname,
         xlmBalance = xlmBalance,
         demoTokenBalance = demoTokenBalance
     )

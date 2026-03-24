@@ -66,7 +66,7 @@ class WalletCreationScreen : Screen {
         val clipboard = remember { getClipboard() }
 
         // Form input state
-        var username by remember { mutableStateOf("Smart Account User") }
+        var username by remember { mutableStateOf("") }
 
         // Loading / result state
         var isLoading by remember { mutableStateOf(false) }
@@ -129,7 +129,7 @@ class WalletCreationScreen : Screen {
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Passkey Display Name") },
+                    label = { Text("Passkey Name") },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading && createResult == null,
                     singleLine = true

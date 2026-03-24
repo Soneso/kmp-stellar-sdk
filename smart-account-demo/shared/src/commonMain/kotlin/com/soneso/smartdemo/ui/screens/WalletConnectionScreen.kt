@@ -366,7 +366,12 @@ class WalletConnectionScreen : Screen {
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                                 Text(
-                                                    text = "${credential.credentialId.take(12)}...${credential.credentialId.takeLast(8)}",
+                                                    text = buildString {
+                                                        append("${credential.credentialId.take(12)}...${credential.credentialId.takeLast(8)}")
+                                                        if (credential.nickname != null) {
+                                                            append(" (${credential.nickname})")
+                                                        }
+                                                    },
                                                     style = MaterialTheme.typography.bodySmall,
                                                     fontFamily = FontFamily.Monospace
                                                 )
