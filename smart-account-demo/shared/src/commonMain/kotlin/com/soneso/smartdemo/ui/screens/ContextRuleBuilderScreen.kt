@@ -378,8 +378,12 @@ class ContextRuleBuilderScreen(
                     // Context Type Selector
                     ContextTypeSelector(
                         selectedOption = contextTypeOption,
-                        onOptionSelected = {
-                            contextTypeOption = it
+                        onOptionSelected = { option ->
+                            contextTypeOption = option
+                            // Pre-select the first available contract when switching to CallContract
+                            if (option == ContextTypeOption.CALL_CONTRACT && contractAddress.isEmpty()) {
+                                contractAddress = DemoConfig.NATIVE_TOKEN_CONTRACT
+                            }
                             fieldErrors = fieldErrors - "contractAddress" - "wasmHash"
                         },
                         contractAddress = contractAddress,
@@ -913,7 +917,7 @@ class ContextRuleBuilderScreen(
                                                 }
                                                 fieldErrors = fieldErrors - "spendingAmount"
                                             },
-                                            label = { Text("Amount (XLM)") },
+                                            label = { Text("Amount") },
                                             placeholder = { Text("e.g., 100.0") },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
@@ -921,7 +925,7 @@ class ContextRuleBuilderScreen(
                                             supportingText = if (fieldErrors.containsKey("spendingAmount")) {
                                                 { Text(fieldErrors["spendingAmount"]!!) }
                                             } else {
-                                                { Text("Maximum XLM amount allowed per period") }
+                                                { Text("Maximum amount allowed per period") }
                                             }
                                         )
                                         OutlinedTextField(
@@ -966,7 +970,7 @@ class ContextRuleBuilderScreen(
                                                     val scVal = buildSpendingLimitScVal(stroops, periodLedgers)
                                                     policies = policies + PolicyEntry(
                                                         info = selectedPolicyType!!,
-                                                        label = "Limit: $amount XLM / $days day(s)",
+                                                        label = "Limit: $amount / $days day(s)",
                                                         address = selectedPolicyType!!.address,
                                                         scVal = scVal
                                                     )
@@ -974,7 +978,7 @@ class ContextRuleBuilderScreen(
                                                     spendingLimitPeriodDays = ""
                                                     selectedPolicyType = null
                                                     ActivityLogState.info(
-                                                        "Added spending limit policy ($amount XLM per $days day(s))"
+                                                        "Added spending limit policy ($amount per $days day(s))"
                                                     )
                                                 }
                                                 fieldErrors = errors
@@ -1345,12 +1349,27 @@ class ContextRuleBuilderScreen(
         wasmHashError: String?,
         enabled: Boolean = true
     ) {
-        var expanded by remember { mutableStateOf(false) }
+        var contextTypeExpanded by remember { mutableStateOf(false) }
+        var contractDropdownExpanded by remember { mutableStateOf(false) }
+
+        // Build the list of available contract options. The DEMO token option is only included
+        // when the token contract has been deployed and its address is known.
+        val contractOptions = buildList {
+            add(ContractOption("XLM Native Contract", DemoConfig.NATIVE_TOKEN_CONTRACT))
+            val demoTokenId = DemoState.demoTokenContractId
+            if (demoTokenId != null) {
+                add(ContractOption("Demo Token Contract", demoTokenId))
+            }
+        }
+
+        // Resolve the display label for the currently selected contract address.
+        val selectedContractLabel = contractOptions.find { it.address == contractAddress }?.label
+            ?: if (contractAddress.isNotEmpty()) contractAddress else contractOptions.firstOrNull()?.label ?: ""
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { if (enabled) expanded = it }
+                expanded = contextTypeExpanded,
+                onExpandedChange = { if (enabled) contextTypeExpanded = it }
             ) {
                 OutlinedTextField(
                     value = selectedOption.displayName,
@@ -1358,14 +1377,14 @@ class ContextRuleBuilderScreen(
                     readOnly = true,
                     enabled = enabled,
                     label = { Text("Context Type") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = contextTypeExpanded) },
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
                 )
                 ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = contextTypeExpanded,
+                    onDismissRequest = { contextTypeExpanded = false }
                 ) {
                     ContextTypeOption.entries.forEach { option ->
                         DropdownMenuItem(
@@ -1381,32 +1400,63 @@ class ContextRuleBuilderScreen(
                             },
                             onClick = {
                                 onOptionSelected(option)
-                                expanded = false
+                                contextTypeExpanded = false
                             }
                         )
                     }
                 }
             }
 
-            // Additional field for CallContract
+            // Contract selection dropdown for CallContract
             AnimatedVisibility(
                 visible = selectedOption == ContextTypeOption.CALL_CONTRACT,
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
-                OutlinedTextField(
-                    value = contractAddress,
-                    onValueChange = onContractAddressChanged,
-                    label = { Text("Contract Address (C-address)") },
-                    placeholder = { Text("CABC...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = enabled,
-                    isError = contractAddressError != null,
-                    supportingText = if (contractAddressError != null) {
-                        { Text(contractAddressError) }
-                    } else null
-                )
+                ExposedDropdownMenuBox(
+                    expanded = contractDropdownExpanded,
+                    onExpandedChange = { if (enabled) contractDropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedContractLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = enabled,
+                        label = { Text("Contract") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = contractDropdownExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
+                        isError = contractAddressError != null,
+                        supportingText = if (contractAddressError != null) {
+                            { Text(contractAddressError) }
+                        } else null
+                    )
+                    ExposedDropdownMenu(
+                        expanded = contractDropdownExpanded,
+                        onDismissRequest = { contractDropdownExpanded = false }
+                    ) {
+                        contractOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(option.label, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            option.address.take(12) + "...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onContractAddressChanged(option.address)
+                                    contractDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             // Additional field for CreateContract
@@ -1740,11 +1790,8 @@ class ContextRuleBuilderScreen(
         // Context type specific
         when (contextTypeOption) {
             ContextTypeOption.CALL_CONTRACT -> {
-                val addr = contractAddress.trim()
-                if (addr.isEmpty()) {
-                    errors["contractAddress"] = "Contract address is required"
-                } else if (!addr.startsWith("C") || addr.length != 56) {
-                    errors["contractAddress"] = "Must be a valid C-address (56 characters)"
+                if (contractAddress.isEmpty()) {
+                    errors["contractAddress"] = "A contract must be selected"
                 }
             }
             ContextTypeOption.CREATE_CONTRACT -> {
@@ -2017,6 +2064,14 @@ class ContextRuleBuilderScreen(
 // ============================================================================
 // Data Classes
 // ============================================================================
+
+/**
+ * A known contract available for selection in the CallContract context type dropdown.
+ */
+private data class ContractOption(
+    val label: String,
+    val address: String
+)
 
 /**
  * Represents a policy attached to the current rule being built.

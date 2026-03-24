@@ -13,18 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,17 +43,20 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
-import com.soneso.smartdemo.config.KNOWN_POLICIES
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogLevel
+import com.soneso.smartdemo.token.DemoTokenService
+import com.soneso.smartdemo.util.formatStroopsAsXlm
 import com.soneso.stellar.sdk.AssetTypeNative
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
+import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -74,8 +71,6 @@ class MainScreen : Screen {
         val snackbarHostState = remember { SnackbarHostState() }
         val clipboard = remember { getClipboard() }
 
-        var configExpanded by remember { mutableStateOf(false) }
-        var policiesExpanded by remember { mutableStateOf(false) }
         var isRefreshingBalance by remember { mutableStateOf(false) }
 
         // Auto-initialize SDK on first launch (waits for platform providers)
@@ -85,22 +80,26 @@ class MainScreen : Screen {
                     val config = OZSmartAccountConfig(
                         rpcUrl = DemoConfig.RPC_URL,
                         networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
-                        accountWasmHash = DemoState.accountWasmHash,
-                        webauthnVerifierAddress = DemoState.webauthnVerifier,
-                        relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
-                        indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
+                        accountWasmHash = DemoConfig.ACCOUNT_WASM_HASH,
+                        webauthnVerifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
+                        relayerUrl = DemoConfig.DEFAULT_RELAYER_URL.takeIf { it.isNotBlank() },
+                        indexerUrl = DemoConfig.DEFAULT_INDEXER_URL.takeIf { it.isNotBlank() },
                         webauthnProvider = DemoState.webauthnProvider,
                         storage = DemoState.storage ?: InMemoryStorageAdapter()
                     )
                     val kit = OZSmartAccountKit.create(config)
                     DemoState.setKitInstance(kit)
                     ActivityLogState.success("SDK initialized")
-                    if (DemoState.relayerUrl.isNotBlank()) {
+                    if (DemoConfig.DEFAULT_RELAYER_URL.isNotBlank()) {
                         ActivityLogState.info("Relayer fee sponsoring enabled")
                     }
-                    if (DemoState.indexerUrl.isNotBlank()) {
+                    if (DemoConfig.DEFAULT_INDEXER_URL.isNotBlank()) {
                         ActivityLogState.info("Indexer lookup enabled")
                     }
+                    // Derive the deterministic DEMO token contract address and store it so
+                    // TransferScreen can use it immediately without running the full deploy flow.
+                    val tokenAddress = DemoTokenService.deriveTokenContractAddress(DemoConfig.NETWORK_PASSPHRASE)
+                    DemoState.updateDemoToken(tokenAddress)
                 } catch (e: Exception) {
                     ActivityLogState.error("Failed to initialize SDK: ${e.message}")
                 }
@@ -136,229 +135,7 @@ class MainScreen : Screen {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Configuration Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { configExpanded = !configExpanded },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Configuration",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = if (configExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (configExpanded) "Collapse" else "Expand"
-                            )
-                        }
-
-                        if (configExpanded) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            OutlinedTextField(
-                                value = DemoState.accountWasmHash,
-                                onValueChange = { DemoState.accountWasmHash = it },
-                                label = { Text("Account WASM Hash") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                isError = DemoState.accountWasmHash.length != 64 || !DemoState.accountWasmHash.all { it.isLetterOrDigit() }
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = DemoState.webauthnVerifier,
-                                onValueChange = { DemoState.webauthnVerifier = it },
-                                label = { Text("WebAuthn Verifier") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                isError = !DemoState.webauthnVerifier.startsWith("C") || DemoState.webauthnVerifier.length != 56
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = DemoState.ed25519Verifier,
-                                onValueChange = { DemoState.ed25519Verifier = it },
-                                label = { Text("Ed25519 Verifier") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                isError = !DemoState.ed25519Verifier.startsWith("C") || DemoState.ed25519Verifier.length != 56
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = DemoState.relayerUrl,
-                                onValueChange = { DemoState.relayerUrl = it },
-                                label = { Text("Relayer URL") },
-                                placeholder = { Text("Relayer proxy for fee sponsoring") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = DemoState.indexerUrl,
-                                onValueChange = { DemoState.indexerUrl = it },
-                                label = { Text("Indexer URL") },
-                                placeholder = { Text("Indexer for credential lookup") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        try {
-                                            // Validate inputs
-                                            if (DemoState.accountWasmHash.length != 64 || !DemoState.accountWasmHash.all { it.isLetterOrDigit() }) {
-                                                ActivityLogState.error("Invalid WASM hash: must be 64 hex characters")
-                                                return@launch
-                                            }
-                                            if (!DemoState.webauthnVerifier.startsWith("C") || DemoState.webauthnVerifier.length != 56) {
-                                                ActivityLogState.error("Invalid WebAuthn verifier: must start with 'C' and be 56 characters")
-                                                return@launch
-                                            }
-                                            if (!DemoState.ed25519Verifier.startsWith("C") || DemoState.ed25519Verifier.length != 56) {
-                                                ActivityLogState.error("Invalid Ed25519 verifier: must start with 'C' and be 56 characters")
-                                                return@launch
-                                            }
-
-                                            val config = OZSmartAccountConfig(
-                                                rpcUrl = DemoConfig.RPC_URL,
-                                                networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
-                                                accountWasmHash = DemoState.accountWasmHash,
-                                                webauthnVerifierAddress = DemoState.webauthnVerifier,
-                                                relayerUrl = DemoState.relayerUrl.takeIf { it.isNotBlank() },
-                                                indexerUrl = DemoState.indexerUrl.takeIf { it.isNotBlank() },
-                                                webauthnProvider = DemoState.webauthnProvider,
-                                                storage = DemoState.storage ?: InMemoryStorageAdapter()
-                                            )
-                                            val kit = OZSmartAccountKit.create(config)
-                                            DemoState.setKitInstance(kit)
-                                            ActivityLogState.success("SDK initialized")
-                                            if (DemoState.relayerUrl.isNotBlank()) {
-                                                ActivityLogState.info("Relayer fee sponsoring enabled")
-                                            }
-                                            if (DemoState.indexerUrl.isNotBlank()) {
-                                                ActivityLogState.info("Indexer lookup enabled")
-                                            }
-                                        } catch (e: Exception) {
-                                            ActivityLogState.error("Configuration failed: ${e.message}")
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Apply Configuration")
-                            }
-                        }
-                    }
-                }
-
-                // 2. Known Policies Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { policiesExpanded = !policiesExpanded },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Known Policy Contracts",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = if (policiesExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (policiesExpanded) "Collapse" else "Expand"
-                            )
-                        }
-
-                        if (policiesExpanded) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            KNOWN_POLICIES.forEach { policy ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = when (policy.type) {
-                                            "threshold" -> Color(0xFF2196F3).copy(alpha = 0.1f)
-                                            "spending_limit" -> Color(0xFF4CAF50).copy(alpha = 0.1f)
-                                            "weighted_threshold" -> Color(0xFF9C27B0).copy(alpha = 0.1f)
-                                            else -> MaterialTheme.colorScheme.surface
-                                        }
-                                    )
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Surface(
-                                                color = when (policy.type) {
-                                                    "threshold" -> Color(0xFF2196F3)
-                                                    "spending_limit" -> Color(0xFF4CAF50)
-                                                    "weighted_threshold" -> Color(0xFF9C27B0)
-                                                    else -> MaterialTheme.colorScheme.primary
-                                                },
-                                                shape = MaterialTheme.shapes.small
-                                            ) {
-                                                Text(
-                                                    text = policy.type,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = policy.name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = policy.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "${policy.address.take(8)}...${policy.address.takeLast(8)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. Wallet Status Section
+                // 1. Wallet Status Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -450,7 +227,7 @@ class MainScreen : Screen {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Balance
+                            // Balances
                             Text(
                                 text = "Balance:",
                                 style = MaterialTheme.typography.labelMedium,
@@ -460,12 +237,20 @@ class MainScreen : Screen {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "${DemoState.balance ?: "Loading..."} XLM",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${DemoState.balance ?: "Loading..."} XLM",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "${DemoState.demoTokenBalance ?: "0.0"} DEMO",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
                                 OutlinedButton(
                                     onClick = {
                                         scope.launch {
@@ -474,16 +259,47 @@ class MainScreen : Screen {
                                                 val contractId = DemoState.contractId
                                                 if (contractId != null) {
                                                     val server = SorobanServer(DemoConfig.RPC_URL)
-                                                    val result = server.getSACBalance(
+
+                                                    // Refresh XLM balance via SAC
+                                                    val xlmResult = server.getSACBalance(
                                                         contractId,
                                                         AssetTypeNative,
                                                         Network(DemoConfig.NETWORK_PASSPHRASE)
                                                     )
-                                                    val xlmBalance = if (result.balanceEntry != null) {
-                                                        com.soneso.smartdemo.util.formatStroopsAsXlm(result.balanceEntry!!.amount)
+                                                    val xlmBalance = if (xlmResult.balanceEntry != null) {
+                                                        formatStroopsAsXlm(xlmResult.balanceEntry!!.amount)
                                                     } else "0.0"
                                                     DemoState.updateBalance(xlmBalance)
-                                                    ActivityLogState.success("Balance refreshed: $xlmBalance XLM")
+
+                                                    // Refresh DEMO balance via ContractClient (custom token, not SAC)
+                                                    val demoTokenContractId = DemoState.demoTokenContractId
+                                                    if (demoTokenContractId != null) {
+                                                        try {
+                                                            val tokenClient = ContractClient.forContract(
+                                                                contractId = demoTokenContractId,
+                                                                rpcUrl = DemoConfig.RPC_URL,
+                                                                network = Network(DemoConfig.NETWORK_PASSPHRASE)
+                                                            )
+                                                            // Read-only calls need a funded G-address as source
+                                                            // for simulation. The token admin is always funded.
+                                                            val sourceAccountId = DemoTokenService.getAdminAccountId()
+                                                            val balanceResult = tokenClient.invoke<SCValXdr>(
+                                                                functionName = "balance",
+                                                                arguments = mapOf("id" to contractId),
+                                                                source = sourceAccountId,
+                                                                signer = null
+                                                            )
+                                                            val demoBalance = parseDemoBalance(balanceResult)
+                                                            DemoState.updateDemoTokenBalance(demoBalance)
+                                                        } catch (e: Exception) {
+                                                            // DEMO contract not deployed yet — show zero
+                                                            DemoState.updateDemoTokenBalance("0.0")
+                                                        }
+                                                    } else {
+                                                        DemoState.updateDemoTokenBalance("0.0")
+                                                    }
+
+                                                    ActivityLogState.success("Balances refreshed: $xlmBalance XLM, ${DemoState.demoTokenBalance ?: "0.0"} DEMO")
                                                 } else {
                                                     ActivityLogState.error("No contract ID available")
                                                 }
@@ -548,7 +364,7 @@ class MainScreen : Screen {
                     }
                 }
 
-                // 4. Activity Log Section
+                // 2. Activity Log Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -597,6 +413,24 @@ class MainScreen : Screen {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Parses an i128 SCVal result from a token balance() call to a display string.
+     * DEMO uses 7 decimals (same as XLM), so [formatStroopsAsXlm] applies directly.
+     * For the demo token, balances fit within Long range (hi is always 0).
+     */
+    private fun parseDemoBalance(scVal: SCValXdr): String {
+        return when (scVal) {
+            is SCValXdr.I128 -> {
+                val hi = scVal.value.hi.value
+                // For demo balances (up to ~100B stroops per mint), hi is always 0.
+                // Return zero for any unexpected overflow case.
+                if (hi != 0L) return "0.0"
+                formatStroopsAsXlm(scVal.value.lo.value.toLong())
+            }
+            else -> "0.0"
         }
     }
 

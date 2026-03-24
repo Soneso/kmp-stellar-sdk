@@ -22,6 +22,12 @@ object DemoConfig {
     // Token Contracts
     const val NATIVE_TOKEN_CONTRACT = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 
+    // Demo Token
+    const val DEMO_TOKEN_NAME = "Demo Token"
+    const val DEMO_TOKEN_SYMBOL = "DEMO"
+    const val DEMO_TOKEN_DECIMALS = 7
+    const val DEMO_TOKEN_MINT_AMOUNT = 100_000_000_000L  // 10,000 DEMO in stroops (7 decimals)
+
     // Relayer (fee sponsoring via Cloudflare Workers proxy)
     const val DEFAULT_RELAYER_URL = "https://smart-account-relayer-proxy.soneso.workers.dev"
 

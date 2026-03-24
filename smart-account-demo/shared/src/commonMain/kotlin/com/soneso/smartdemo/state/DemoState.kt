@@ -38,12 +38,13 @@ object DemoState {
     var balance: String? by mutableStateOf(null)
         private set
 
-    /** Current editable configuration values. */
-    var accountWasmHash: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.ACCOUNT_WASM_HASH)
-    var webauthnVerifier: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.WEBAUTHN_VERIFIER_ADDRESS)
-    var ed25519Verifier: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.ED25519_VERIFIER_ADDRESS)
-    var relayerUrl: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.DEFAULT_RELAYER_URL)
-    var indexerUrl: String by mutableStateOf(com.soneso.smartdemo.config.DemoConfig.DEFAULT_INDEXER_URL)
+    /** The DEMO token contract ID, null if not yet deployed. */
+    var demoTokenContractId: String? by mutableStateOf(null)
+        private set
+
+    /** The connected wallet's DEMO token balance (display string), null if unknown. */
+    var demoTokenBalance: String? by mutableStateOf(null)
+        private set
 
     fun setKitInstance(newKit: OZSmartAccountKit) {
         kit = newKit
@@ -60,11 +61,21 @@ object DemoState {
         balance = newBalance
     }
 
+    fun updateDemoToken(contractId: String?) {
+        demoTokenContractId = contractId
+    }
+
+    fun updateDemoTokenBalance(balance: String?) {
+        demoTokenBalance = balance
+    }
+
     fun reset() {
         kit = null
         isConnected = false
         contractId = null
         credentialId = null
         balance = null
+        demoTokenContractId = null
+        demoTokenBalance = null
     }
 }

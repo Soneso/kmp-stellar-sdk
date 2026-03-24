@@ -53,17 +53,20 @@ import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.token.DemoTokenService
 import com.soneso.smartdemo.util.formatStroopsAsXlm
 import com.soneso.stellar.sdk.AssetTypeNative
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
 
     companion object {
         private const val TOKEN_OPTION_XLM = "xlm"
-        private const val TOKEN_OPTION_CUSTOM = "custom"
+        private const val TOKEN_OPTION_DEMO = "demo"
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -75,7 +78,6 @@ class TransferScreen : Screen {
         val snackbarHostState = remember { SnackbarHostState() }
 
         var selectedTokenOption by remember { mutableStateOf(TOKEN_OPTION_XLM) }
-        var customTokenContract by remember { mutableStateOf("") }
         var tokenDropdownExpanded by remember { mutableStateOf(false) }
         var recipient by remember { mutableStateOf("") }
         var amount by remember { mutableStateOf("") }
@@ -86,21 +88,17 @@ class TransferScreen : Screen {
         val tokenContract = if (selectedTokenOption == TOKEN_OPTION_XLM) {
             DemoConfig.NATIVE_TOKEN_CONTRACT
         } else {
-            customTokenContract
+            DemoState.demoTokenContractId ?: ""
         }
 
         // Validation
         val recipientError = validateRecipient(recipient)
         val amountError = validateAmount(amount)
-        val customTokenContractError = if (selectedTokenOption == TOKEN_OPTION_CUSTOM) {
-            validateTokenContract(customTokenContract)
-        } else null
         val isFormValid = recipient.isNotBlank() &&
             amount.isNotBlank() &&
             recipientError == null &&
             amountError == null &&
-            customTokenContractError == null &&
-            (selectedTokenOption == TOKEN_OPTION_XLM || customTokenContract.isNotBlank())
+            (selectedTokenOption == TOKEN_OPTION_XLM || DemoState.demoTokenContractId != null)
 
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -170,7 +168,7 @@ class TransferScreen : Screen {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Send XLM tokens from your smart account to another Stellar address. " +
+                            text = "Send tokens from your smart account to another Stellar address. " +
                                 "This requires passkey authentication to sign the transaction.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -190,22 +188,28 @@ class TransferScreen : Screen {
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "Current Balance",
+                            text = "Balance",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        Text(
-                            text = "${DemoState.balance ?: "Unknown"} XLM",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "From: ${DemoState.contractId?.let { "${it.take(8)}...${it.takeLast(8)}" } ?: "Unknown"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "${DemoState.balance ?: "0.0"} XLM",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            if (DemoState.demoTokenBalance != null) {
+                                Text(
+                                    text = "${DemoState.demoTokenBalance} DEMO",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -218,7 +222,7 @@ class TransferScreen : Screen {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM (Native)" else "Custom Token",
+                        value = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM (Native)" else "Demo Token (DEMO)",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Token") },
@@ -242,38 +246,15 @@ class TransferScreen : Screen {
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Custom Token") },
+                            text = { Text("Demo Token (DEMO)") },
                             onClick = {
-                                selectedTokenOption = TOKEN_OPTION_CUSTOM
+                                selectedTokenOption = TOKEN_OPTION_DEMO
                                 tokenDropdownExpanded = false
                                 errorMessage = null
-                            }
+                            },
+                            enabled = DemoState.demoTokenContractId != null
                         )
                     }
-                }
-
-                // Custom Token Contract Field (only shown when Custom Token is selected)
-                if (selectedTokenOption == TOKEN_OPTION_CUSTOM) {
-                    OutlinedTextField(
-                        value = customTokenContract,
-                        onValueChange = {
-                            customTokenContract = it
-                            errorMessage = null
-                        },
-                        label = { Text("Token Contract Address") },
-                        placeholder = { Text("C... address") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading && txHash == null,
-                        singleLine = true,
-                        isError = customTokenContract.isNotBlank() && customTokenContractError != null,
-                        supportingText = {
-                            if (customTokenContract.isNotBlank() && customTokenContractError != null) {
-                                Text(customTokenContractError!!)
-                            } else {
-                                Text("Stellar Asset Contract address (C...)")
-                            }
-                        }
-                    )
                 }
 
                 // Recipient Address Input
@@ -352,7 +333,7 @@ class TransferScreen : Screen {
                                     val parsedAmount = amount.toDoubleOrNull()
                                         ?: throw Exception("Invalid amount")
 
-                                    val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "tokens"
+                                    val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
                                     ActivityLogState.info(
                                         "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                     )
@@ -465,7 +446,7 @@ class TransferScreen : Screen {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = if (selectedTokenOption == TOKEN_OPTION_XLM) "$amount XLM" else amount,
+                                    text = if (selectedTokenOption == TOKEN_OPTION_XLM) "$amount XLM" else "$amount DEMO",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -494,12 +475,24 @@ class TransferScreen : Screen {
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                Text(
-                                    text = "${DemoState.balance ?: "Unknown"} XLM",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = "${DemoState.balance ?: "0.0"} XLM",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    if (DemoState.demoTokenBalance != null) {
+                                        Text(
+                                            text = "${DemoState.demoTokenBalance} DEMO",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -512,7 +505,6 @@ class TransferScreen : Screen {
                             txHash = null
                             errorMessage = null
                             selectedTokenOption = TOKEN_OPTION_XLM
-                            customTokenContract = ""
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -559,20 +551,11 @@ class TransferScreen : Screen {
         return null
     }
 
-    private fun validateTokenContract(value: String): String? {
-        if (value.isBlank()) return "Token contract is required"
-        if (!value.startsWith("C")) {
-            return "Must start with C"
-        }
-        if (value.length != 56) {
-            return "Must be 56 characters"
-        }
-        return null
-    }
-
     private suspend fun refreshBalance() {
+        val contractId = DemoState.contractId ?: return
+
+        // Refresh XLM balance
         try {
-            val contractId = DemoState.contractId ?: return
             val server = SorobanServer(DemoConfig.RPC_URL)
             val balanceResponse = server.getSACBalance(
                 contractId,
@@ -583,9 +566,42 @@ class TransferScreen : Screen {
                 formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
             } else "0.0"
             DemoState.updateBalance(newBalance)
-            ActivityLogState.info("Updated balance: $newBalance XLM")
         } catch (e: Exception) {
-            ActivityLogState.error("Failed to refresh balance: ${e.message}")
+            ActivityLogState.error("Failed to refresh XLM balance: ${e.message}")
+        }
+
+        // Refresh DEMO balance
+        val demoTokenContractId = DemoState.demoTokenContractId
+        if (demoTokenContractId != null) {
+            try {
+                val tokenClient = ContractClient.forContract(
+                    contractId = demoTokenContractId,
+                    rpcUrl = DemoConfig.RPC_URL,
+                    network = Network(DemoConfig.NETWORK_PASSPHRASE)
+                )
+                val sourceAccountId = DemoTokenService.getAdminAccountId()
+                val balanceResult = tokenClient.invoke<SCValXdr>(
+                    functionName = "balance",
+                    arguments = mapOf("id" to contractId),
+                    source = sourceAccountId,
+                    signer = null
+                )
+                val demoBalance = parseDemoBalance(balanceResult)
+                DemoState.updateDemoTokenBalance(demoBalance)
+            } catch (e: Exception) {
+                DemoState.updateDemoTokenBalance("0.0")
+            }
+        }
+    }
+
+    private fun parseDemoBalance(scVal: SCValXdr): String {
+        return when (scVal) {
+            is SCValXdr.I128 -> {
+                val hi = scVal.value.hi.value
+                if (hi != 0L) return "0.0"
+                formatStroopsAsXlm(scVal.value.lo.value.toLong())
+            }
+            else -> "0.0"
         }
     }
 }

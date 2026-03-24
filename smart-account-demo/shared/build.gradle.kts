@@ -152,4 +152,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // Android doesn't automatically include commonMain/resources in the APK.
+    // This makes WASM files accessible via ClassLoader.getResourceAsStream()
+    // at runtime (used by WasmResource.android.kt to load token contract WASM).
+    sourceSets {
+        getByName("main") {
+            resources.srcDirs("src/commonMain/resources")
+        }
+    }
 }

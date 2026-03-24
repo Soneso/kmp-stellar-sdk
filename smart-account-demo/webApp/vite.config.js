@@ -12,8 +12,34 @@ function prepareKotlinJSPlugin() {
       const mode = (isDev || !isPreview) ? 'developmentExecutable' : 'productionExecutable';
       const webpackDir = resolve(__dirname, `build/kotlin-webpack/js/${mode}`);
       const distDir = resolve(__dirname, `build/dist/js/${mode}`);
+      const publicDir = resolve(__dirname, 'public');
 
       console.log(`Vite: Preparing ${mode} build (command: ${config.command})...`);
+
+      // Copy contract WASM files from shared resources to the public directory.
+      // The JS fetch() implementation in WasmResource.js.kt expects WASM files to be
+      // served at /wasm/<filename> by the Vite dev server and production build.
+      const wasmSourceDir = resolve(__dirname, '../shared/src/commonMain/resources/wasm');
+      const wasmDestDir = resolve(publicDir, 'wasm');
+
+      if (existsSync(wasmSourceDir)) {
+        if (!existsSync(publicDir)) {
+          mkdirSync(publicDir, { recursive: true });
+        }
+        if (!existsSync(wasmDestDir)) {
+          mkdirSync(wasmDestDir, { recursive: true });
+        }
+
+        const wasmResourceFiles = readdirSync(wasmSourceDir);
+        let copiedCount = 0;
+        wasmResourceFiles.forEach(file => {
+          if (file.endsWith('.wasm')) {
+            copyFileSync(resolve(wasmSourceDir, file), resolve(wasmDestDir, file));
+            copiedCount++;
+          }
+        });
+        console.log(`Vite: Copied ${copiedCount} contract WASM files to public/wasm/`);
+      }
 
       if (existsSync(webpackDir)) {
         console.log('Vite: Copying webpack output to dist...');

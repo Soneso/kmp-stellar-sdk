@@ -3,12 +3,12 @@ package com.soneso.smartdemo.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,7 +16,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -46,10 +46,13 @@ import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.token.DemoTokenService
 import com.soneso.stellar.sdk.AssetTypeNative
+import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.smartaccount.oz.CreateWalletResult
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import kotlinx.coroutines.launch
 
 class WalletCreationScreen : Screen {
@@ -62,14 +65,13 @@ class WalletCreationScreen : Screen {
         val clipboard = remember { getClipboard() }
 
         var username by remember { mutableStateOf("Smart Account User") }
-        var autoDeploy by remember { mutableStateOf(true) }
-        var autoFund by remember { mutableStateOf(true) }
         var isLoading by remember { mutableStateOf(false) }
+        var progressMessage by remember { mutableStateOf("") }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var infoMessage by remember { mutableStateOf<String?>(null) }
         var createResult by remember { mutableStateOf<CreateWalletResult?>(null) }
-        var fundedAmount by remember { mutableStateOf<Double?>(null) }
         var balance by remember { mutableStateOf<String?>(null) }
+        var demoTokenBalance by remember { mutableStateOf<String?>(null) }
 
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -131,59 +133,6 @@ class WalletCreationScreen : Screen {
                     singleLine = true
                 )
 
-                // Options Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Options",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = autoDeploy,
-                                onCheckedChange = {
-                                    autoDeploy = it
-                                    if (!it) autoFund = false
-                                },
-                                enabled = !isLoading && createResult == null
-                            )
-                            Text(
-                                text = "Auto-deploy contract",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = autoFund,
-                                onCheckedChange = { autoFund = it },
-                                enabled = autoDeploy && !isLoading && createResult == null
-                            )
-                            Text(
-                                text = "Auto-fund with XLM",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                    }
-                }
-
                 // Error Message
                 if (errorMessage != null) {
                     Card(
@@ -218,8 +167,34 @@ class WalletCreationScreen : Screen {
                     }
                 }
 
+                // Progress indicator (shown during wallet creation)
+                if (isLoading) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 3.dp
+                            )
+                            Text(
+                                text = progressMessage.ifEmpty { "Creating..." },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 // Create Wallet Button
-                if (createResult == null) {
+                if (createResult == null && !isLoading) {
                     Button(
                         onClick = {
                             scope.launch {
@@ -235,16 +210,27 @@ class WalletCreationScreen : Screen {
                                         return@launch
                                     }
 
+                                    // Ensure the deployer account is funded. After a testnet reset
+                                    // the account no longer exists and deployment would fail.
+                                    progressMessage = "Creating wallet..."
+                                    val deployer = OZSmartAccountConfig.createDefaultDeployer()
+                                    try {
+                                        SorobanServer(DemoConfig.RPC_URL).getAccount(deployer.getAccountId())
+                                    } catch (e: Exception) {
+                                        ActivityLogState.info("Funding deployer account...")
+                                        FriendBot.fundTestnetAccount(deployer.getAccountId())
+                                        kotlinx.coroutines.delay(5000)
+                                    }
+
                                     ActivityLogState.info("Creating wallet with username: $username")
 
                                     val result = kit.walletOperations.createWallet(
                                         userName = username,
-                                        autoSubmit = autoDeploy,
-                                        autoFund = autoFund,
-                                        nativeTokenContract = if (autoFund) DemoConfig.NATIVE_TOKEN_CONTRACT else null
+                                        autoSubmit = true,
+                                        autoFund = true,
+                                        nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
                                     )
 
-                                    createResult = result
                                     ActivityLogState.success("Wallet created successfully")
                                     ActivityLogState.info("Credential ID: ${result.credentialId}")
                                     ActivityLogState.info("Contract ID: ${result.contractId}")
@@ -253,27 +239,48 @@ class WalletCreationScreen : Screen {
                                         ActivityLogState.info("Transaction Hash: ${result.transactionHash}")
                                     }
 
-                                    // Update DemoState
+                                    // Update DemoState connection
                                     DemoState.setConnected(true, result.contractId, result.credentialId)
 
-                                    // Fetch balance if deployed
-                                    if (autoDeploy) {
-                                        try {
-                                            val server = SorobanServer(DemoConfig.RPC_URL)
-                                            val balanceResponse = server.getSACBalance(
-                                                result.contractId,
-                                                AssetTypeNative,
-                                                Network(DemoConfig.NETWORK_PASSPHRASE)
-                                            )
-                                            balance = if (balanceResponse.balanceEntry != null) {
-                                                com.soneso.smartdemo.util.formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
-                                            } else "0.0"
-                                            DemoState.updateBalance(balance)
-                                            ActivityLogState.info("Balance: $balance XLM")
-                                        } catch (e: Exception) {
-                                            ActivityLogState.error("Failed to fetch balance: ${e.message}")
-                                        }
+                                    // Fetch XLM balance
+                                    try {
+                                        val server = SorobanServer(DemoConfig.RPC_URL)
+                                        val balanceResponse = server.getSACBalance(
+                                            result.contractId,
+                                            AssetTypeNative,
+                                            Network(DemoConfig.NETWORK_PASSPHRASE)
+                                        )
+                                        balance = if (balanceResponse.balanceEntry != null) {
+                                            com.soneso.smartdemo.util.formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
+                                        } else "0.0"
+                                        DemoState.updateBalance(balance)
+                                        ActivityLogState.info("Balance: $balance XLM")
+                                    } catch (e: Exception) {
+                                        ActivityLogState.error("Failed to fetch balance: ${e.message}")
                                     }
+
+                                    // Deploy demo token and mint DEMO to the new wallet.
+                                    // Failure here is non-fatal — wallet creation has already succeeded.
+                                    try {
+                                        progressMessage = "Deploying demo token..."
+                                        ActivityLogState.info("Deploying demo token...")
+                                        val tokenService = DemoTokenService(
+                                            DemoConfig.RPC_URL,
+                                            DemoConfig.NETWORK_PASSPHRASE
+                                        )
+                                        val tokenResult = tokenService.ensureTokenAndMint(result.contractId)
+                                        DemoState.updateDemoToken(tokenResult.tokenContractId)
+
+                                        val mintedFormatted = com.soneso.smartdemo.util.formatStroopsAsXlm(tokenResult.amountMinted)
+                                        demoTokenBalance = mintedFormatted
+                                        DemoState.updateDemoTokenBalance(mintedFormatted)
+                                        ActivityLogState.success("Minted 10,000 DEMO to wallet")
+                                    } catch (e: Exception) {
+                                        ActivityLogState.error("Demo token minting failed: ${e.message}")
+                                    }
+
+                                    // Show result only after everything completes
+                                    createResult = result
 
                                 } catch (e: Exception) {
                                     val message = e.message ?: "Unknown error"
@@ -291,14 +298,9 @@ class WalletCreationScreen : Screen {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading && username.isNotBlank() && DemoState.kit != null
+                        enabled = username.isNotBlank() && DemoState.kit != null
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                        }
-                        Text(if (isLoading) "Creating..." else "Create Wallet")
+                        Text("Create Wallet")
                     }
                 }
 
@@ -346,84 +348,32 @@ class WalletCreationScreen : Screen {
                                 )
                             }
 
-                            if (fundedAmount != null) {
-                                ResultField(
-                                    label = "Funded Amount",
-                                    value = "$fundedAmount XLM",
-                                    clipboard = clipboard,
-                                    snackbarHostState = snackbarHostState,
-                                    scope = scope
-                                )
-                            }
-
-                            if (balance != null) {
-                                ResultField(
-                                    label = "Current Balance",
-                                    value = "$balance XLM",
-                                    clipboard = clipboard,
-                                    snackbarHostState = snackbarHostState,
-                                    scope = scope
-                                )
-                            }
-                        }
-                    }
-
-                    // Fund Wallet Button (shown if created but not auto-funded)
-                    if (!autoFund && fundedAmount == null) {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    isLoading = true
-                                    errorMessage = null
-
-                                    try {
-                                        val kit = DemoState.kit
-                                        if (kit == null) {
-                                            errorMessage = "Smart Account Kit not initialized"
-                                            return@launch
-                                        }
-
-                                        ActivityLogState.info("Funding wallet...")
-                                        val amount = kit.transactionOperations.fundWallet(
-                                            nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
+                            if (balance != null || demoTokenBalance != null) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "Balance",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (balance != null) {
+                                        Text(
+                                            text = "$balance XLM",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
-                                        fundedAmount = amount
-                                        ActivityLogState.success("Wallet funded with $amount XLM")
-
-                                        // Fetch updated balance
-                                        try {
-                                            val server = SorobanServer(DemoConfig.RPC_URL)
-                                            val balanceResponse = server.getSACBalance(
-                                                createResult!!.contractId,
-                                                AssetTypeNative,
-                                                Network(DemoConfig.NETWORK_PASSPHRASE)
-                                            )
-                                            balance = if (balanceResponse.balanceEntry != null) {
-                                                com.soneso.smartdemo.util.formatStroopsAsXlm(balanceResponse.balanceEntry!!.amount)
-                                            } else "0.0"
-                                            DemoState.updateBalance(balance)
-                                            ActivityLogState.info("Balance: $balance XLM")
-                                        } catch (e: Exception) {
-                                            ActivityLogState.error("Failed to fetch balance: ${e.message}")
-                                        }
-
-                                    } catch (e: Exception) {
-                                        errorMessage = "Failed to fund wallet: ${e.message}"
-                                        ActivityLogState.error(e.message ?: "Failed to fund wallet")
-                                    } finally {
-                                        isLoading = false
+                                    }
+                                    if (demoTokenBalance != null) {
+                                        Text(
+                                            text = "$demoTokenBalance DEMO",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
                                     }
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
                             }
-                            Text(if (isLoading) "Funding..." else "Fund Wallet")
                         }
                     }
 
