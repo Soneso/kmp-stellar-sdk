@@ -69,10 +69,12 @@ import com.soneso.smartdemo.config.PolicyInfo
 import com.soneso.smartdemo.flows.addContextRule
 import com.soneso.smartdemo.flows.FlowPolicyEntry
 import com.soneso.smartdemo.flows.loadContextRule
+import com.soneso.smartdemo.flows.loadContextRules
 import com.soneso.smartdemo.flows.updateContextRuleName
 import com.soneso.smartdemo.flows.updateContextRuleValidUntil
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.parseContextType
 import com.soneso.smartdemo.util.parsePolicies
 import com.soneso.smartdemo.util.parseSigners
@@ -124,6 +126,11 @@ class ContextRuleBuilderScreen(
         var signerAddMode by remember { mutableStateOf(SignerAddMode.DELEGATED) }
         var delegatedAddress by remember { mutableStateOf("") }
         var ed25519PubKeyHex by remember { mutableStateOf("") }
+        var isLoadingPasskeys by remember { mutableStateOf(false) }
+        var isRegistering by remember { mutableStateOf(false) }
+        var availablePasskeys by remember { mutableStateOf<List<ExternalSigner>>(emptyList()) }
+        var passkeysLoaded by remember { mutableStateOf(false) }
+        var newPasskeyName by remember { mutableStateOf("") }
 
         // --- Policy management state ---
         var policies by remember { mutableStateOf<List<PolicyEntry>>(emptyList()) }
@@ -346,8 +353,8 @@ class ContextRuleBuilderScreen(
                     }
                 }
 
-                // --- Main form (visible when connected and not loading) ---
-                if (DemoState.isConnected && !isLoadingRule) {
+                // --- Main form (hidden after successful submission) ---
+                if (DemoState.isConnected && !isLoadingRule && submissionResult?.success != true) {
 
                     // ====================================================================
                     // Section 1A: Rule Configuration
@@ -447,7 +454,7 @@ class ContextRuleBuilderScreen(
                                     enabled = !isSubmitting
                                 )
                                 Text(
-                                    text = "Set Expiry (Valid Until Ledger)",
+                                    text = "Set Expiry",
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
@@ -457,30 +464,67 @@ class ContextRuleBuilderScreen(
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
                             ) {
+                                // Time-based expiry dropdown. The ledger number is computed
+                                // from the selected duration when the rule is submitted.
+                                var expiryDropdownExpanded by remember { mutableStateOf(false) }
+                                val expiryOptions = listOf(
+                                    "5 min" to (SmartAccountConstants.LEDGERS_PER_HOUR / 12),
+                                    "30 min" to (SmartAccountConstants.LEDGERS_PER_HOUR / 2),
+                                    "1 hour" to SmartAccountConstants.LEDGERS_PER_HOUR,
+                                    "1 day" to SmartAccountConstants.LEDGERS_PER_DAY,
+                                    "10 days" to (SmartAccountConstants.LEDGERS_PER_DAY * 10)
+                                )
+                                val selectedLabel = expiryOptions.find {
+                                    it.second.toString() == expiryLedger
+                                }?.first ?: if (expiryLedger.isNotEmpty()) "Custom" else "Select duration..."
+
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    OutlinedTextField(
-                                        value = expiryLedger,
-                                        onValueChange = { value ->
-                                            // Allow only digits
-                                            expiryLedger = value.filter { it.isDigit() }
-                                            fieldErrors = fieldErrors - "expiryLedger"
-                                        },
-                                        label = { Text("Ledger Number") },
-                                        placeholder = { Text("e.g., 12345678") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                        enabled = !isSubmitting,
-                                        isError = fieldErrors.containsKey("expiryLedger"),
-                                        supportingText = if (fieldErrors.containsKey("expiryLedger")) {
-                                            { Text(fieldErrors["expiryLedger"]!!) }
-                                        } else null
-                                    )
+                                    ExposedDropdownMenuBox(
+                                        expanded = expiryDropdownExpanded,
+                                        onExpandedChange = { if (!isSubmitting) expiryDropdownExpanded = it }
+                                    ) {
+                                        OutlinedTextField(
+                                            value = selectedLabel,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            label = { Text("Time from now") },
+                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expiryDropdownExpanded) },
+                                            modifier = Modifier
+                                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                                .fillMaxWidth(),
+                                            enabled = !isSubmitting,
+                                            isError = fieldErrors.containsKey("expiryLedger"),
+                                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                                        )
+                                        ExposedDropdownMenu(
+                                            expanded = expiryDropdownExpanded,
+                                            onDismissRequest = { expiryDropdownExpanded = false }
+                                        ) {
+                                            expiryOptions.forEach { (label, ledgers) ->
+                                                DropdownMenuItem(
+                                                    text = { Text(label) },
+                                                    onClick = {
+                                                        // Store the ledger offset; actual ledger number is
+                                                        // computed at submission time by adding to currentLedger.
+                                                        expiryLedger = ledgers.toString()
+                                                        expiryDropdownExpanded = false
+                                                        fieldErrors = fieldErrors - "expiryLedger"
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (fieldErrors.containsKey("expiryLedger")) {
+                                        Text(
+                                            text = fieldErrors["expiryLedger"]!!,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                     Text(
-                                        text = "Hint: ~${SmartAccountConstants.LEDGERS_PER_DAY} ledgers per day " +
-                                                "(~${SmartAccountConstants.LEDGERS_PER_HOUR} per hour). " +
-                                                "30 days = ~${SmartAccountConstants.LEDGERS_PER_DAY * 30} ledgers.",
+                                        text = "The rule will expire after the selected duration from the current ledger.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -734,28 +778,176 @@ class ContextRuleBuilderScreen(
                                                     color = Color(0xFF7B1FA2)
                                                 )
                                                 Text(
-                                                    text = "Passkey registration requires a WebAuthn ceremony on the " +
-                                                            "platform. The wallet's primary passkey was registered " +
-                                                            "during wallet creation. To add additional passkey signers, " +
-                                                            "use the wallet creation flow or the external signer manager.",
+                                                    text = "You can reuse an account signer that is already stored in an existing " +
+                                                            "context rule, or register a new passkey signer for this context rule.",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
-                                                Text(
-                                                    text = "Uses verifier: ${SmartAccountBuilders.truncateAddress(DemoConfig.WEBAUTHN_VERIFIER_ADDRESS, 6)}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                                OutlinedButton(
+
+                                                // Load passkey signers from on-chain context rules, excluding
+                                                // the wallet owner's passkey (it's on the Default rule and adding
+                                                // it to another rule has no effect — Default already authorizes it).
+                                                val connectedCredentialId = DemoState.credentialId
+                                                Button(
                                                     onClick = {
-                                                        ActivityLogState.info(
-                                                            "Passkey registration requires a platform-specific WebAuthn ceremony. " +
-                                                                    "Use the Wallet Creation screen or External Signer Manager to register new passkeys."
-                                                        )
+                                                        scope.launch {
+                                                            isLoadingPasskeys = true
+                                                            try {
+                                                                val rules = loadContextRules()
+                                                                availablePasskeys = rules
+                                                                    .flatMap { it.signers }
+                                                                    .filterIsInstance<ExternalSigner>()
+                                                                    .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+                                                                    .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+                                                                    .filter { signer ->
+                                                                        // Exclude the connected wallet's own passkey
+                                                                        val signerCredId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+                                                                        signerCredId != connectedCredentialId
+                                                                    }
+                                                                passkeysLoaded = true
+                                                                if (availablePasskeys.isEmpty()) {
+                                                                    ActivityLogState.info("No additional passkey signers found")
+                                                                }
+                                                            } catch (e: Throwable) {
+                                                                ActivityLogState.error("Failed to load passkeys: ${e.message}")
+                                                            } finally {
+                                                                isLoadingPasskeys = false
+                                                            }
+                                                        }
                                                     },
-                                                    modifier = Modifier.fillMaxWidth()
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    enabled = !isLoadingPasskeys && !isRegistering && !isSubmitting && !passkeysLoaded
                                                 ) {
-                                                    Text("Register New Passkey (Not Available Here)")
+                                                    if (isLoadingPasskeys) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(20.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                    }
+                                                    Text(if (isLoadingPasskeys) "Loading..." else "Reuse Signer")
+                                                }
+
+                                                // Show available passkeys (excluding wallet owner's) as selectable items
+                                                if (passkeysLoaded && availablePasskeys.isNotEmpty()) {
+                                                    Text(
+                                                        text = "Available signers from existing context rules:",
+                                                        style = MaterialTheme.typography.labelMedium
+                                                    )
+                                                    availablePasskeys.forEach { passkey ->
+                                                        val displayInfo = SmartAccountBuilders.formatSignerForDisplay(passkey)
+                                                        val alreadyAdded = signers.any { SmartAccountBuilders.signersEqual(it, passkey) }
+                                                        OutlinedButton(
+                                                            onClick = {
+                                                                if (!alreadyAdded) {
+                                                                    signers = signers + passkey
+                                                                    fieldErrors = fieldErrors - "signers"
+                                                                    ActivityLogState.success("Added passkey signer: ${displayInfo.display}")
+                                                                }
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            enabled = !alreadyAdded && !isSubmitting
+                                                        ) {
+                                                            Text(
+                                                                if (alreadyAdded) "${displayInfo.display} (already added)"
+                                                                else "Add: ${displayInfo.display}"
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                if (passkeysLoaded && availablePasskeys.isEmpty()) {
+                                                    Text(
+                                                        text = "No existing passkey signers found on this account.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(vertical = 4.dp),
+                                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                                )
+
+                                                // Register a new passkey signer via WebAuthn ceremony
+                                                Text(
+                                                    text = "Register a new passkey signer for this context rule:",
+                                                    style = MaterialTheme.typography.labelMedium
+                                                )
+                                                OutlinedTextField(
+                                                    value = newPasskeyName,
+                                                    onValueChange = { newPasskeyName = it },
+                                                    label = { Text("Passkey Name") },
+                                                    placeholder = { Text("e.g., Recovery Key") },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    singleLine = true,
+                                                    enabled = !isRegistering && !isSubmitting
+                                                )
+                                                Button(
+                                                    onClick = {
+                                                        scope.launch {
+                                                            isRegistering = true
+                                                            try {
+                                                                val webauthnProvider = DemoState.webauthnProvider
+                                                                    ?: throw IllegalStateException("WebAuthn provider not available")
+
+                                                                // Generate a random challenge and user ID for the registration ceremony.
+                                                                // These are only used for the WebAuthn protocol — the contract
+                                                                // doesn't store them. We just need the public key from the result.
+                                                                val challenge = kotlin.random.Random.nextBytes(32)
+                                                                val userId = kotlin.random.Random.nextBytes(16)
+
+                                                                ActivityLogState.info("Starting passkey registration...")
+                                                                val result = webauthnProvider.register(
+                                                                    challenge = challenge,
+                                                                    userId = userId,
+                                                                    userName = newPasskeyName
+                                                                )
+
+                                                                // Build an ExternalSigner from the registration result.
+                                                                // The signer uses the WebAuthn verifier contract to validate
+                                                                // secp256r1 signatures from this passkey on-chain.
+                                                                val newSigner = ExternalSigner.webAuthn(
+                                                                    verifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
+                                                                    publicKey = result.publicKey,
+                                                                    credentialId = result.credentialId
+                                                                )
+
+                                                                if (!signers.any { SmartAccountBuilders.signersEqual(it, newSigner) }) {
+                                                                    signers = signers + newSigner
+                                                                    fieldErrors = fieldErrors - "signers"
+                                                                    // Also add to available list so it shows as "already added"
+                                                                    availablePasskeys = availablePasskeys + newSigner
+                                                                    passkeysLoaded = true
+                                                                    ActivityLogState.success("Registered and added new passkey signer")
+                                                                } else {
+                                                                    ActivityLogState.info("This passkey is already added as a signer")
+                                                                }
+                                                            } catch (e: Throwable) {
+                                                                val message = e.message ?: "Unknown error"
+                                                                if (isUserCancellation(message)) {
+                                                                    ActivityLogState.info("Passkey registration cancelled")
+                                                                } else {
+                                                                    ActivityLogState.error("Failed to register passkey: $message")
+                                                                }
+                                                            } finally {
+                                                                isRegistering = false
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    enabled = !isRegistering && !isLoadingPasskeys && !isSubmitting && newPasskeyName.isNotBlank()
+                                                ) {
+                                                    if (isRegistering) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(20.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                    }
+                                                    Text(if (isRegistering) "Registering..." else "Register New")
                                                 }
                                             }
                                         }
@@ -972,7 +1164,7 @@ class ContextRuleBuilderScreen(
                                                     if (days > 0) {
                                                         Text("$days day(s) = $ledgers ledgers")
                                                     } else {
-                                                        Text("Number of days for the spending period")
+                                                        Text("The spending limit resets after this period. Example: amount 100 with period 1 means max 100 tokens per day.")
                                                     }
                                                 }
                                             }
@@ -1223,7 +1415,16 @@ class ContextRuleBuilderScreen(
                                             return@launch
                                         }
 
-                                        val validUntilVal = if (hasExpiry) expiryLedger.toUIntOrNull() else null
+                                        // expiryLedger stores a ledger offset (e.g., 720 for 1 hour).
+                                        // Convert to absolute ledger by fetching current ledger from RPC.
+                                        val validUntilVal = if (hasExpiry) {
+                                            val offset = expiryLedger.toUIntOrNull()
+                                            if (offset != null) {
+                                                val server = com.soneso.stellar.sdk.rpc.SorobanServer(DemoConfig.RPC_URL)
+                                                val currentLedger = server.getLatestLedger().sequence.toUInt()
+                                                currentLedger + offset
+                                            } else null
+                                        } else null
                                         val validUntilResult = updateContextRuleValidUntil(editRuleId, validUntilVal)
                                         if (!validUntilResult.success) {
                                             submissionResult = SubmissionResult(
@@ -1252,7 +1453,16 @@ class ContextRuleBuilderScreen(
                                                 )
                                         }
 
-                                        val validUntilVal = if (hasExpiry) expiryLedger.toUIntOrNull() else null
+                                        // expiryLedger stores a ledger offset (e.g., 720 for 1 hour).
+                                        // Convert to absolute ledger by fetching current ledger from RPC.
+                                        val validUntilVal = if (hasExpiry) {
+                                            val offset = expiryLedger.toUIntOrNull()
+                                            if (offset != null) {
+                                                val server = com.soneso.stellar.sdk.rpc.SorobanServer(DemoConfig.RPC_URL)
+                                                val currentLedger = server.getLatestLedger().sequence.toUInt()
+                                                currentLedger + offset
+                                            } else null
+                                        } else null
 
                                         // Convert PolicyEntry list to FlowPolicyEntry for the flow
                                         val flowPolicies = policies.map { policy ->
@@ -1794,7 +2004,7 @@ class ContextRuleBuilderScreen(
         // Expiry
         if (hasExpiry) {
             if (expiryLedger.isBlank()) {
-                errors["expiryLedger"] = "Ledger number is required when expiry is enabled"
+                errors["expiryLedger"] = "Please select an expiry duration"
             } else {
                 val ledgerNum = expiryLedger.toUIntOrNull()
                 if (ledgerNum == null || ledgerNum == 0u) {
