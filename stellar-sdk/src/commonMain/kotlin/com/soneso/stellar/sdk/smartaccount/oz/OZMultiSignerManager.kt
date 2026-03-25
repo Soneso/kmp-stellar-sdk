@@ -68,6 +68,36 @@ enum class SignerSource {
     EXTERNAL_WALLET
 }
 
+/**
+ * Specifies a signer to participate in a multi-signature operation.
+ *
+ * The caller explicitly lists every signer that should sign. There is no implicit
+ * connected passkey — if the connected passkey should sign, include
+ * [SelectedSigner.Passkey] in the list.
+ */
+sealed class SelectedSigner {
+    /**
+     * A passkey (WebAuthn) signer.
+     *
+     * Each instance triggers one OS WebAuthn authentication prompt.
+     *
+     * @property credentialId Base64URL-encoded credential ID to request from the
+     *   authenticator. If null, the OS shows the passkey picker without pre-selecting
+     *   a specific credential.
+     */
+    data class Passkey(val credentialId: String? = null) : SelectedSigner()
+
+    /**
+     * A delegated wallet signer identified by its Stellar G-address.
+     *
+     * The address must have been registered as a `Delegated` signer on the smart account
+     * contract and the external wallet adapter must be able to sign for it.
+     *
+     * @property address The Stellar G-address of the delegated signer.
+     */
+    data class Wallet(val address: String) : SelectedSigner()
+}
+
 // MARK: - Multi-Signer Manager
 
 /**
@@ -79,14 +109,18 @@ enum class SignerSource {
  * - Collecting signatures from both passkey and external wallets
  *
  * Multi-signature transactions require collecting signatures from multiple signers
- * sequentially to enable fail-fast behavior on user cancellation. The signature
- * collection order is:
- * 1. Connected passkey (if required)
- * 2. External wallet signers (delegated addresses)
+ * sequentially to enable fail-fast behavior on user cancellation.
+ *
+ * Signatures are collected in the order the caller supplies them via [SelectedSigner]:
+ * - Each [SelectedSigner.Passkey] triggers one OS WebAuthn authentication prompt.
+ * - Each [SelectedSigner.Wallet] signs via the configured external wallet adapter.
+ *
+ * The connected passkey is NOT added implicitly. If it should sign, include
+ * [SelectedSigner.Passkey] (optionally with its credential ID) in the list.
  *
  * Delegated signers produce their own auth entries with Address credentials that
  * reference the smart account's __check_auth function. The smart account's signature
- * map includes a placeholder for each delegated signer.
+ * map includes a placeholder entry for each delegated signer.
  *
  * Example usage:
  * ```kotlin
@@ -97,13 +131,15 @@ enum class SignerSource {
  * val signers = multiSigner.getAvailableSigners()
  * println("Available signers: ${signers.size}")
  *
- * // Execute multi-signature transfer
- * val additionalSigners = listOf(delegatedSigner)
+ * // Execute multi-signature transfer — caller lists ALL signers explicitly
  * val result = multiSigner.multiSignerTransfer(
  *     tokenContract = "CBCD...",
  *     recipient = "GA7Q...",
  *     amount = 100.0,
- *     additionalSigners = additionalSigners
+ *     selectedSigners = listOf(
+ *         SelectedSigner.Passkey(),           // connected passkey (OS picker)
+ *         SelectedSigner.Wallet("GA7Q...")    // delegated wallet signer
+ *     )
  * )
  * println("Transfer ${if (result.success) "succeeded" else "failed"}")
  * ```
@@ -374,15 +410,13 @@ class OZMultiSignerManager internal constructor(
     // MARK: - Multi-Signer Transfer
 
     /**
-     * Executes a token transfer with multiple signers.
+     * Executes a token transfer signed by an explicit list of signers.
      *
-     * Performs a multi-signature token transfer by collecting signatures from the connected
-     * passkey and any additional delegated signers. The signature collection is sequential:
-     * 1. Passkey signer (if WebAuthn provider is configured)
-     * 2. External wallet signers (for each delegated signer)
-     *
-     * This ordering enables fail-fast behavior: if the user cancels the passkey prompt,
-     * no external wallet signatures are collected.
+     * The caller supplies every signer that must sign via [selectedSigners]. There is no
+     * implicit connected passkey — include [SelectedSigner.Passkey] if the connected
+     * passkey should sign. Signatures are collected in list order:
+     * - [SelectedSigner.Passkey] — triggers one OS WebAuthn authentication prompt each.
+     * - [SelectedSigner.Wallet] — requests a delegated auth entry from the external wallet.
      *
      * Delegated signers produce their own auth entries with Address credentials that
      * invoke the smart account's __check_auth function. The smart account's signature
@@ -391,18 +425,22 @@ class OZMultiSignerManager internal constructor(
      * @param tokenContract The token contract address (C-address)
      * @param recipient The recipient address (G-address or C-address)
      * @param amount The amount to transfer in XLM units
-     * @param additionalSigners List of additional signers (delegated addresses)
+     * @param selectedSigners All signers that must sign, in collection order.
+     *   An empty list means no signatures are collected (only valid for read-only simulation).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails, signing fails, or submission fails
      *
      * Example:
      * ```kotlin
-     * val delegatedSigner = DelegatedSigner(address = "GA7Q...")
      * val result = multiSigner.multiSignerTransfer(
      *     tokenContract = nativeTokenAddress,
      *     recipient = "GBXYZ...",
      *     amount = 50.0,
-     *     additionalSigners = listOf(delegatedSigner)
+     *     selectedSigners = listOf(
+     *         SelectedSigner.Passkey(),             // connected passkey
+     *         SelectedSigner.Passkey("credBase64"), // a second specific passkey
+     *         SelectedSigner.Wallet("GA7Q...")      // delegated wallet signer
+     *     )
      * )
      * if (result.success) {
      *     println("Multi-sig transfer succeeded: ${result.hash ?: ""}")
@@ -413,7 +451,7 @@ class OZMultiSignerManager internal constructor(
         tokenContract: String,
         recipient: String,
         amount: Double,
-        additionalSigners: List<SmartAccountSigner>
+        selectedSigners: List<SelectedSigner>
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
         val (credentialId, contractId) = kit.requireConnected()
@@ -448,13 +486,29 @@ class OZMultiSignerManager internal constructor(
             )
         }
 
-        // Check for delegated signers requiring external wallet
-        val hasDelegatedSigners = additionalSigners.any { it is DelegatedSigner }
-        if (hasDelegatedSigners && kit.externalWallet == null) {
+        // Validate: wallet signers require an external wallet adapter
+        val walletSigners = selectedSigners.filterIsInstance<SelectedSigner.Wallet>()
+        if (walletSigners.isNotEmpty() && kit.externalWallet == null) {
             throw ValidationException.invalidInput(
-                "additionalSigners",
-                "Delegated signers require an external wallet adapter to be configured"
+                "selectedSigners",
+                "Wallet signers require an external wallet adapter to be configured"
             )
+        }
+
+        // Validate: each wallet signer must be reachable via the external wallet
+        for (walletSigner in walletSigners) {
+            val canSign = try {
+                kit.externalWallet!!.canSignFor(walletSigner.address)
+            } catch (e: Exception) {
+                false
+            }
+            if (!canSign) {
+                throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "No signer available for address: ${walletSigner.address}. " +
+                        "Use externalWallet.addFromSecret() or externalWallet.addFromWallet() to add a signer."
+                )
+            }
         }
 
         // STEP 2: Build host function for token transfer
@@ -538,179 +592,174 @@ class OZMultiSignerManager internal constructor(
                 networkPassphrase = kit.config.networkPassphrase
             )
 
-            // STEP 6b: Collect signatures sequentially
+            // STEP 6b: Collect signatures from all selected signers in order
             val collectedSignatures = mutableListOf<Triple<SmartAccountSigner, SCValXdr, Boolean>>()
 
-            // Check if connected passkey is required as a signer
-            val availableSigners = try {
-                getAvailableSigners()
-            } catch (e: Exception) {
-                // If query fails, return empty list
-                emptyList()
-            }
-
-            val passkeyRequired = availableSigners.any { it.canSign && it.source == SignerSource.PASSKEY }
-
-            // Fallback: if getAvailableSigners returned empty (network query failed),
-            // assume passkey is needed to avoid silent transfer failure
-            val shouldPromptPasskey = passkeyRequired || availableSigners.isEmpty()
-
-            // First, collect passkey signature if required and WebAuthn provider is configured
-            if (shouldPromptPasskey) {
-                val webauthnProvider = kit.config.webauthnProvider
-                    ?: throw ValidationException.invalidInput(
-                        "webauthnProvider",
-                        "WebAuthn provider is required for signing auth entries but is not configured"
-                    )
-
-                // Trigger WebAuthn authentication
-                val authResult = try {
-                    webauthnProvider.authenticate(payloadHash)
-                } catch (e: Exception) {
-                    throw WebAuthnException.authenticationFailed(
-                        "WebAuthn authentication failed: ${e.message}",
-                        e
-                    )
-                }
-
-                // Normalize signature (DER to compact, low-S)
-                val normalizedSignature = SmartAccountUtils.normalizeSignature(authResult.signature)
-
-                // Build WebAuthnSignature
-                val webAuthnSignature = WebAuthnSignature(
-                    authenticatorData = authResult.authenticatorData,
-                    clientData = authResult.clientDataJSON,
-                    signature = normalizedSignature
-                )
-
-                val webAuthnSignatureScVal = webAuthnSignature.toScVal()
-
-                // Build key_data: publicKey (65 bytes) + credentialIdBytes
-                val credentialIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
-                    ?: throw ValidationException.invalidInput(
-                        "credentialId",
-                        "Failed to decode credential ID"
-                    )
-
-                // Try local storage first, fall back to on-chain available signers
-                val keyData: ByteArray
-                val storage = kit.getStorage()
-                val storedCredential = storage.get(credentialId)
-                if (storedCredential != null) {
-                    keyData = storedCredential.publicKey + credentialIdBytes
-                } else {
-                    // Look up from available signers (already queried from on-chain context rules)
-                    val matchingSigner = availableSigners.firstOrNull { signer ->
-                        signer.source == SignerSource.PASSKEY &&
-                        signer.signer is ExternalSigner &&
-                        (signer.signer as ExternalSigner).keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE &&
-                        (signer.signer as ExternalSigner).keyData.copyOfRange(
-                            SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
-                            (signer.signer as ExternalSigner).keyData.size
-                        ).contentEquals(credentialIdBytes)
-                    }
-                    if (matchingSigner != null) {
-                        keyData = (matchingSigner.signer as ExternalSigner).keyData
-                    } else {
-                        throw CredentialException.notFound(
-                            "No signer found for credential ID: $credentialId (not in local storage or on-chain context rules)"
-                        )
-                    }
-                }
-
-                // Build ExternalSigner with WebAuthn verifier and full key data
-                val passkeySigner = ExternalSigner(
-                    verifierAddress = kit.config.webauthnVerifierAddress,
-                    keyData = keyData
-                )
-
-                collectedSignatures.add(
-                    Triple(passkeySigner, webAuthnSignatureScVal, false)
-                )
-            }
-
-            // STEP 6b: Collect signatures from delegated signers
-            for (additionalSigner in additionalSigners) {
-                if (additionalSigner is DelegatedSigner) {
-                    val externalWallet = kit.externalWallet
-                        ?: throw ValidationException.invalidInput(
-                            "externalWallet",
-                            "External wallet adapter is required for delegated signers"
-                        )
-
-                    // Build delegated signer auth entry
-                    val delegatedAuthEntry = buildDelegatedSignerAuthEntry(
-                        payloadHash = payloadHash,
-                        delegatedAddress = additionalSigner.address,
-                        expirationLedger = expirationLedger
-                    )
-
-                    // XDR encode the auth entry for signing
-                    val authEntryXdr = try {
-                        val writer = XdrWriter()
-                        delegatedAuthEntry.encode(writer)
-                        writer.toByteArray()
+            // Lazily fetch available signers only when needed for passkey key-data lookup
+            var cachedAvailableSigners: List<AvailableSigner>? = null
+            suspend fun getAvailableSignersCached(): List<AvailableSigner> {
+                if (cachedAvailableSigners == null) {
+                    cachedAvailableSigners = try {
+                        getAvailableSigners()
                     } catch (e: Exception) {
-                        throw TransactionException.signingFailed(
-                            "Failed to XDR encode delegated auth entry",
-                            e
-                        )
+                        emptyList()
                     }
+                }
+                return cachedAvailableSigners!!
+            }
 
-                    // Convert to base64 for external wallet interface
-                    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-                    val authEntryXdrBase64 = kotlin.io.encoding.Base64.encode(authEntryXdr)
-
-                    // Request signature from external wallet
-                    val signResult: SignAuthEntryResult = try {
-                        externalWallet.signAuthEntry(
-                            authEntryXdrBase64,
-                            SignAuthEntryOptions(
-                                networkPassphrase = kit.config.networkPassphrase,
-                                address = additionalSigner.address
+            for ((signerIndex, selectedSigner) in selectedSigners.withIndex()) {
+                when (selectedSigner) {
+                    is SelectedSigner.Passkey -> {
+                        val webauthnProvider = kit.config.webauthnProvider
+                            ?: throw ValidationException.invalidInput(
+                                "webauthnProvider",
+                                "WebAuthn provider is required for passkey signers but is not configured"
                             )
+
+                        // Trigger WebAuthn authentication (one OS prompt per passkey signer)
+                        val authResult = try {
+                            webauthnProvider.authenticate(payloadHash)
+                        } catch (e: Exception) {
+                            throw WebAuthnException.authenticationFailed(
+                                "WebAuthn authentication failed for passkey signer ${signerIndex + 1}/${selectedSigners.size}: ${e.message}",
+                                e
+                            )
+                        }
+
+                        // Normalize signature (DER to compact, low-S)
+                        val normalizedSignature = SmartAccountUtils.normalizeSignature(authResult.signature)
+
+                        val webAuthnSignature = WebAuthnSignature(
+                            authenticatorData = authResult.authenticatorData,
+                            clientData = authResult.clientDataJSON,
+                            signature = normalizedSignature
                         )
-                    } catch (e: Exception) {
-                        throw TransactionException.signingFailed(
-                            "External wallet signing failed: ${e.message}",
-                            e
+                        val webAuthnSignatureScVal = webAuthnSignature.toScVal()
+
+                        // Resolve the credential ID to use for key-data lookup.
+                        // If the caller specified a credentialId, use it; otherwise fall back
+                        // to the connected credential ID stored in kit state.
+                        val resolvedCredentialId = selectedSigner.credentialId ?: credentialId
+
+                        val credentialIdBytes = SmartAccountSharedUtils.base64urlDecode(resolvedCredentialId)
+                            ?: throw ValidationException.invalidInput(
+                                "selectedSigners[$signerIndex].credentialId",
+                                "Failed to decode credential ID"
+                            )
+
+                        // Resolve key data: local storage first, then on-chain context rules
+                        val keyData: ByteArray
+                        val storage = kit.getStorage()
+                        val storedCredential = storage.get(resolvedCredentialId)
+                        if (storedCredential != null) {
+                            keyData = storedCredential.publicKey + credentialIdBytes
+                        } else {
+                            val availableSigners = getAvailableSignersCached()
+                            val matchingSigner = availableSigners.firstOrNull { signer ->
+                                signer.source == SignerSource.PASSKEY &&
+                                signer.signer is ExternalSigner &&
+                                (signer.signer as ExternalSigner).keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE &&
+                                (signer.signer as ExternalSigner).keyData.copyOfRange(
+                                    SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
+                                    (signer.signer as ExternalSigner).keyData.size
+                                ).contentEquals(credentialIdBytes)
+                            }
+                            keyData = (matchingSigner?.signer as? ExternalSigner)?.keyData
+                                ?: throw CredentialException.notFound(
+                                    "No signer found for credential ID at index $signerIndex: $resolvedCredentialId " +
+                                        "(not in local storage or on-chain context rules)"
+                                )
+                        }
+
+                        val passkeySigner = ExternalSigner(
+                            verifierAddress = kit.config.webauthnVerifierAddress,
+                            keyData = keyData
                         )
+
+                        collectedSignatures.add(Triple(passkeySigner, webAuthnSignatureScVal, false))
                     }
 
-                    // Decode from base64
-                    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-                    val signedAuthEntryXdr = try {
-                        kotlin.io.encoding.Base64.decode(signResult.signedAuthEntry)
-                    } catch (e: Exception) {
-                        throw TransactionException.signingFailed(
-                            "Failed to decode base64 from external wallet",
-                            e
+                    is SelectedSigner.Wallet -> {
+                        val externalWallet = kit.externalWallet
+                            ?: throw ValidationException.invalidInput(
+                                "externalWallet",
+                                "External wallet adapter is required for wallet signers"
+                            )
+
+                        // Build delegated signer auth entry
+                        val delegatedAuthEntry = buildDelegatedSignerAuthEntry(
+                            payloadHash = payloadHash,
+                            delegatedAddress = selectedSigner.address,
+                            expirationLedger = expirationLedger
                         )
+
+                        // XDR encode the auth entry for signing
+                        val authEntryXdr = try {
+                            val writer = XdrWriter()
+                            delegatedAuthEntry.encode(writer)
+                            writer.toByteArray()
+                        } catch (e: Exception) {
+                            throw TransactionException.signingFailed(
+                                "Failed to XDR encode delegated auth entry",
+                                e
+                            )
+                        }
+
+                        // Convert to base64 for external wallet interface
+                        @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+                        val authEntryXdrBase64 = kotlin.io.encoding.Base64.encode(authEntryXdr)
+
+                        // Request signature from external wallet
+                        val signResult: SignAuthEntryResult = try {
+                            externalWallet.signAuthEntry(
+                                authEntryXdrBase64,
+                                SignAuthEntryOptions(
+                                    networkPassphrase = kit.config.networkPassphrase,
+                                    address = selectedSigner.address
+                                )
+                            )
+                        } catch (e: Exception) {
+                            throw TransactionException.signingFailed(
+                                "External wallet signing failed: ${e.message}",
+                                e
+                            )
+                        }
+
+                        // Decode from base64
+                        @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+                        val signedAuthEntryXdr = try {
+                            kotlin.io.encoding.Base64.decode(signResult.signedAuthEntry)
+                        } catch (e: Exception) {
+                            throw TransactionException.signingFailed(
+                                "Failed to decode base64 from external wallet",
+                                e
+                            )
+                        }
+
+                        // Decode the signed auth entry
+                        val signedDelegatedAuthEntry = try {
+                            val reader = com.soneso.stellar.sdk.xdr.XdrReader(signedAuthEntryXdr)
+                            SorobanAuthorizationEntryXdr.decode(reader)
+                        } catch (e: Exception) {
+                            throw TransactionException.signingFailed(
+                                "Failed to decode signed auth entry from external wallet",
+                                e
+                            )
+                        }
+
+                        // Add the signed delegated auth entry to our list
+                        signedAuthEntries.add(signedDelegatedAuthEntry)
+
+                        // Add placeholder to the smart account's signature map
+                        val delegatedSigner = DelegatedSigner(address = selectedSigner.address)
+                        val placeholderSignature = SCValXdr.Bytes(com.soneso.stellar.sdk.xdr.SCBytesXdr(byteArrayOf()))
+                        collectedSignatures.add(Triple(delegatedSigner, placeholderSignature, true))
                     }
-
-                    // Decode the signed auth entry
-                    val signedDelegatedAuthEntry = try {
-                        val reader = com.soneso.stellar.sdk.xdr.XdrReader(signedAuthEntryXdr)
-                        SorobanAuthorizationEntryXdr.decode(reader)
-                    } catch (e: Exception) {
-                        throw TransactionException.signingFailed(
-                            "Failed to decode signed auth entry from external wallet",
-                            e
-                        )
-                    }
-
-                    // Add the signed delegated auth entry to our list
-                    signedAuthEntries.add(signedDelegatedAuthEntry)
-
-                    // Add placeholder to smart account's signature map
-                    val placeholderSignature = SCValXdr.Bytes(com.soneso.stellar.sdk.xdr.SCBytesXdr(byteArrayOf()))
-                    collectedSignatures.add(
-                        Triple(additionalSigner, placeholderSignature, true)
-                    )
                 }
             }
 
-            // STEP 6c: Build signature map with ALL collected signatures
+            // STEP 6d: Build signature map with ALL collected signatures
             val mapEntries = mutableListOf<SCMapEntryXdr>()
 
             for ((signer, signatureScVal, isPlaceholder) in collectedSignatures) {

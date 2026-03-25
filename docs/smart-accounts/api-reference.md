@@ -1270,31 +1270,34 @@ suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
     amount: Double,
-    additionalSigners: List<SmartAccountSigner>
+    selectedSigners: List<SelectedSigner>
 ): TransactionResult
 ```
 
 Executes a multi-signature token transfer.
 
-Collects signatures from connected passkey and any additional delegated signers.
+The caller explicitly lists every signer. There is no implicit connected passkey — include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` entry requests a delegated auth entry from the external wallet.
 
 **Parameters**:
-- `tokenContract`: Token contract address
-- `recipient`: Recipient address
+- `tokenContract`: Token contract address (C-address)
+- `recipient`: Recipient address (G-address or C-address)
 - `amount`: Amount in XLM
-- `additionalSigners`: Additional signers to collect signatures from
+- `selectedSigners`: All signers that must sign, in collection order
 
 **Returns**: `TransactionResult`
 
 **Example**:
 
 ```kotlin
-val delegatedSigner = DelegatedSigner(address = "GA7Q...")
 val result = kit.multiSignerManager.multiSignerTransfer(
     tokenContract = "CBCD...",
     recipient = "GBXYZ...",
     amount = 50.0,
-    additionalSigners = listOf(delegatedSigner)
+    selectedSigners = listOf(
+        SelectedSigner.Passkey(),             // connected passkey (OS picker)
+        SelectedSigner.Passkey("credBase64"), // a second specific passkey
+        SelectedSigner.Wallet("GA7Q...")      // delegated wallet signer
+    )
 )
 ```
 
@@ -1661,6 +1664,22 @@ sealed class SignerException : SmartAccountException {
 ---
 
 ## Types
+
+### SelectedSigner
+
+Sealed class that specifies which signers should participate in a multi-signature operation. The caller lists every signer explicitly — there is no implicit connected passkey.
+
+```kotlin
+sealed class SelectedSigner {
+    /** Passkey (WebAuthn) signer. Each instance triggers one OS authentication prompt. */
+    data class Passkey(val credentialId: String? = null) : SelectedSigner()
+
+    /** Delegated wallet signer identified by its Stellar G-address. */
+    data class Wallet(val address: String) : SelectedSigner()
+}
+```
+
+---
 
 ### SmartAccountSigner
 
