@@ -86,6 +86,13 @@ object DemoConfig {
 
     /** Display name shown to users during passkey registration prompts. */
     const val RP_NAME = "Smart Account Kit Demo"
+
+    // -- Context Rule Discovery --
+
+    /** Maximum context rule ID to scan when iterating over rules by ID.
+     *  Acts as a safety cap to prevent unbounded iteration if the active count is stale.
+     *  The contract uses monotonically increasing IDs with gaps from removed rules. */
+    val MAX_CONTEXT_RULE_SCAN_ID = 25u
 }
 
 /**

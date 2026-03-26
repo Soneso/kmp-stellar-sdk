@@ -8,6 +8,7 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
+import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 
 /**
  * Builder utilities for Smart Account Kit.
@@ -332,7 +333,7 @@ object SmartAccountBuilders {
      */
     fun getCredentialIdStringFromSigner(signer: SmartAccountSigner): String? {
         val credentialId = getCredentialIdFromSigner(signer) ?: return null
-        return credentialId.toBase64Url()
+        return SmartAccountSharedUtils.base64urlEncode(credentialId)
     }
 
     /**
@@ -536,88 +537,6 @@ object SmartAccountBuilders {
         }
         return signerMap.values.toList()
     }
-
-    // ========================================================================
-    // Display Formatting
-    // ========================================================================
-
-    /**
-     * Truncates an address for display purposes.
-     *
-     * @param address Full address string
-     * @param chars Number of characters to show on each end (default: 4)
-     * @return Truncated address like "GABC...WXYZ"
-     *
-     * Example:
-     * ```kotlin
-     * val display = SmartAccountBuilders.truncateAddress("GABCDEFGHIJKLMNOP...", 4)
-     * // "GABC...MNOP"
-     * ```
-     */
-    fun truncateAddress(address: String, chars: Int = 4): String {
-        if (address.length <= chars * 2 + 3) {
-            return address
-        }
-        return "${address.take(chars)}...${address.takeLast(chars)}"
-    }
-
-    /**
-     * Formats a signer for display, returning both the type label and a display identifier.
-     *
-     * @param signer The signer to format
-     * @return A [SignerDisplayInfo] with the type label and display identifier
-     *
-     * Example:
-     * ```kotlin
-     * val info = SmartAccountBuilders.formatSignerForDisplay(signer)
-     * // info.type = "Passkey"
-     * // info.display = "cred:abc123..."
-     * ```
-     */
-    fun formatSignerForDisplay(signer: SmartAccountSigner): SignerDisplayInfo {
-        if (signer is DelegatedSigner) {
-            return SignerDisplayInfo(
-                type = "G-Address",
-                display = truncateAddress(signer.address, 6)
-            )
-        }
-
-        val external = signer as ExternalSigner
-        val credentialId = getCredentialIdStringFromSigner(signer)
-        if (credentialId != null) {
-            return SignerDisplayInfo(
-                type = "Passkey",
-                display = credentialId
-            )
-        }
-
-        if (external.keyData.size == 32) {
-            return SignerDisplayInfo(
-                type = "Ed25519",
-                display = "key:${external.keyData.toHexString().take(8)}..."
-            )
-        }
-
-        return SignerDisplayInfo(
-            type = "External",
-            display = truncateAddress(external.verifierAddress, 4)
-        )
-    }
-
-    // ========================================================================
-    // Private Helpers
-    // ========================================================================
-
-    /**
-     * Converts a hex string to a ByteArray.
-     */
-    private fun hexToByteArray(hex: String): ByteArray {
-        require(hex.length % 2 == 0) { "Hex string must have even length" }
-        return ByteArray(hex.length / 2) { i ->
-            val index = i * 2
-            hex.substring(index, index + 2).toInt(16).toByte()
-        }
-    }
 }
 
 // ============================================================================
@@ -664,53 +583,3 @@ data class SpendingLimitParams(
     val periodLedgers: Int
 )
 
-// ============================================================================
-// Display Info Data Class
-// ============================================================================
-
-/**
- * Display information for a signer.
- *
- * @property type The signer type label (e.g., "G-Address", "Passkey", "Ed25519", "External")
- * @property display A truncated/formatted identifier for display
- */
-data class SignerDisplayInfo(
-    val type: String,
-    val display: String
-)
-
-
-/**
- * Converts a ByteArray to a Base64URL-encoded string (no padding).
- *
- * Uses the URL-safe Base64 alphabet (+ -> -, / -> _) with padding removed.
- */
-private fun ByteArray.toBase64Url(): String {
-    // Standard Base64 alphabet
-    val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-    val result = StringBuilder()
-    var i = 0
-    while (i < size) {
-        val b0 = this[i].toInt() and 0xFF
-        val b1 = if (i + 1 < size) this[i + 1].toInt() and 0xFF else 0
-        val b2 = if (i + 2 < size) this[i + 2].toInt() and 0xFF else 0
-
-        result.append(alphabet[b0 shr 2])
-        result.append(alphabet[((b0 and 0x03) shl 4) or (b1 shr 4)])
-
-        if (i + 1 < size) {
-            result.append(alphabet[((b1 and 0x0F) shl 2) or (b2 shr 6)])
-        }
-        if (i + 2 < size) {
-            result.append(alphabet[b2 and 0x3F])
-        }
-
-        i += 3
-    }
-
-    // Convert to URL-safe alphabet and remove padding
-    return result.toString()
-        .replace('+', '-')
-        .replace('/', '_')
-}

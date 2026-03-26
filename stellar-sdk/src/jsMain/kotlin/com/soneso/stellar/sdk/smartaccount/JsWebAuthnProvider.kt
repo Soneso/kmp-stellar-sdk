@@ -256,7 +256,8 @@ class JsWebAuthnProvider(
      * @throws WebAuthnException.AuthenticationFailed for any other authentication error
      */
     override suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
         val credentials = getNavigatorCredentials()
             ?: throw WebAuthnException.notSupported(
@@ -276,6 +277,14 @@ class JsWebAuthnProvider(
         // "required" ensures the browser prompts for biometric/PIN verification on every assertion.
         publicKey.userVerification = "required"
         publicKey.timeout = timeout.toInt()
+
+        // Constrain which passkey the authenticator uses. Without this, the browser
+        // may pick a different passkey than intended when multiple exist for this RP.
+        if (allowCredentialIds != null && allowCredentialIds.isNotEmpty()) {
+            val idBuffers = allowCredentialIds.map { it.toArrayBuffer() }.toTypedArray()
+            val jsAllowCreds = js("(function(buffers) { return buffers.map(function(buf) { return { type: 'public-key', id: buf }; }); })")
+            publicKey.allowCredentials = jsAllowCreds(idBuffers)
+        }
 
         options.publicKey = publicKey
 
@@ -339,21 +348,15 @@ class JsWebAuthnProvider(
     private fun extractPublicKey(response: dynamic, attestationObjectBytes: ByteArray): ByteArray {
         // Strategy 1: response.getPublicKey() (preferred, supported in modern browsers)
         val spkiKey = tryGetPublicKeyFromResponse(response)
-        if (spkiKey != null) {
-            return spkiKey
-        }
+        if (spkiKey != null) return spkiKey
 
         // Strategy 2: Parse authenticator data from CBOR attestation object
         val authDataKey = tryExtractFromAuthenticatorData(attestationObjectBytes)
-        if (authDataKey != null) {
-            return authDataKey
-        }
+        if (authDataKey != null) return authDataKey
 
         // Strategy 3: Pattern match for COSE key in attestation object
         val patternKey = tryExtractFromAttestationPattern(attestationObjectBytes)
-        if (patternKey != null) {
-            return patternKey
-        }
+        if (patternKey != null) return patternKey
 
         throw WebAuthnException.registrationFailed(
             "Could not extract secp256r1 public key from attestation response. " +

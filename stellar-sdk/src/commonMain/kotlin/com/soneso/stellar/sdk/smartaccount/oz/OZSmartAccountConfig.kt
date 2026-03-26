@@ -189,7 +189,17 @@ data class OZSmartAccountConfig(
      * When set, the kit delegates transaction signing to this adapter instead of
      * using WebAuthn credentials.
      */
-    val externalWallet: ExternalWalletAdapter? = null
+    val externalWallet: ExternalWalletAdapter? = null,
+
+    /**
+     * Maximum rule ID to scan when iterating context rules.
+     *
+     * The contract assigns monotonically increasing IDs to context rules. When rules are
+     * removed, their IDs leave gaps. [OZContextRuleManager.getAllContextRules] iterates
+     * from ID 0 up to this value to find all active rules. Increase if the account has
+     * had many add/remove cycles.
+     */
+    val maxContextRuleScanId: UInt = 50u
 ) {
     init {
         // Validate required parameters

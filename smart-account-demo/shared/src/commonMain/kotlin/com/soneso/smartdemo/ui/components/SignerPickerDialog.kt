@@ -55,6 +55,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import kotlinx.coroutines.launch
@@ -160,8 +162,9 @@ fun SignerPickerDialog(
             secretKeyError = null
             secretKeyInputAddress = null
             secretKeyVisible = false
-            // Clear stored keypairs on dialog close
+            // Clear stored keypairs and selection state on dialog close
             delegatedKeyPairs.clear()
+            selectedSignerKeys.clear()
         }
     }
 
@@ -303,7 +306,7 @@ fun SignerPickerDialog(
                                                 secretKeyInputAddress = null
                                                 secretKeyValue = ""
                                                 secretKeyVisible = false
-                                            } catch (e: Exception) {
+                                            } catch (e: Throwable) {
                                                 secretKeyError = "Invalid secret key: ${e.message}"
                                             } finally {
                                                 isValidatingKey = false
@@ -322,7 +325,7 @@ fun SignerPickerDialog(
                         ed25519Signers.forEach { signer ->
                             val external = signer as ExternalSigner
                             val isSelected = selectedSignerKeys[signer.uniqueKey] == true
-                            val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
+                            val displayInfo = formatSignerForDisplay(signer)
 
                             Ed25519SignerRow(
                                 verifierAddress = external.verifierAddress,
@@ -556,7 +559,7 @@ private fun DelegatedSignerRow(
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = SmartAccountBuilders.truncateAddress(signer.address, 6),
+                    text = truncateAddress(signer.address, 6),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     fontFamily = FontFamily.Monospace,
@@ -646,7 +649,7 @@ private fun SecretKeyInputForm(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Secret key for ${SmartAccountBuilders.truncateAddress(address, 6)}",
+                    text = "Secret key for ${truncateAddress(address, 6)}",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
@@ -786,7 +789,7 @@ private fun Ed25519SignerRow(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Verifier: ${SmartAccountBuilders.truncateAddress(verifierAddress, 6)}",
+                    text = "Verifier: ${truncateAddress(verifierAddress, 6)}",
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

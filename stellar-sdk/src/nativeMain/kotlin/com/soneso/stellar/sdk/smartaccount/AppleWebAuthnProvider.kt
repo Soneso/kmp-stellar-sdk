@@ -205,7 +205,8 @@ class AppleWebAuthnProvider(
      */
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
         val challengeData = challenge.toNSData()
 

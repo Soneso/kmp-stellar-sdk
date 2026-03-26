@@ -8,7 +8,6 @@
 
 package com.soneso.stellar.sdk.smartaccount
 
-import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.smartaccount.core.CredentialException
 import com.soneso.stellar.sdk.smartaccount.core.StorageException
 import com.soneso.stellar.sdk.smartaccount.oz.CredentialDeploymentStatus

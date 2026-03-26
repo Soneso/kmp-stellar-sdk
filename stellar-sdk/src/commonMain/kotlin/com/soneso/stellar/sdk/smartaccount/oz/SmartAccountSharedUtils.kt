@@ -10,7 +10,6 @@ package com.soneso.stellar.sdk.smartaccount.oz
 
 import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
-import com.soneso.stellar.sdk.Memo
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
@@ -22,7 +21,6 @@ import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.Uint64Xdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
-import io.ktor.utils.io.core.toByteArray
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -299,14 +297,4 @@ object SmartAccountSharedUtils {
             else -> null
         }
     }
-}
-
-/**
- * Encodes a contract ID hash to a C-address string.
- *
- * @receiver The contract ID hash (32 bytes)
- * @return The C-address string
- */
-private fun ByteArray.encodeContractId(): String {
-    return com.soneso.stellar.sdk.StrKey.encodeContract(this)
 }

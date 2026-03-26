@@ -4,62 +4,56 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+import com.soneso.stellar.sdk.smartaccount.oz.ExternalWalletAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
+ * Represents a signer extracted from context rules with its signing capability.
+ *
+ * @property signer The smart account signer (ExternalSigner or DelegatedSigner)
+ * @property canSign Whether this signer can currently sign transactions
+ */
+data class SignerInfo(
+    val signer: SmartAccountSigner,
+    val canSign: Boolean
+)
+
+/**
  * Fetches all context rules from the connected smart account.
  *
- * Queries the total rule count and fetches each rule individually by ID. Falls back
- * to fetching Default context rules directly if the count returns zero. Rules are
- * returned sorted by ID with duplicates removed.
+ * Iterates rule IDs from 0 upward using [OZContextRuleManager.getContextRule], stopping
+ * once all active rules (per [OZContextRuleManager.getContextRulesCount]) are found or
+ * [OZSmartAccountConfig.maxContextRuleScanId] is reached. Gaps from removed rules are skipped.
  *
  * @param kit The initialized [OZSmartAccountKit] instance.
  * @throws IllegalStateException if kit is not initialized.
  */
 suspend fun fetchAllContextRules(kit: OZSmartAccountKit): List<ParsedContextRule> {
-    val contextMgr = kit.contextRuleManager
+    val allRuleScVals = try {
+        kit.contextRuleManager.getAllContextRules()
+    } catch (e: Exception) {
+        ActivityLogState.error("Failed to fetch context rules: ${e.message}")
+        emptyList()
+    }
 
-    val allRules = mutableListOf<ParsedContextRule>()
+    val result = mutableListOf<ParsedContextRule>()
     val seenIds = mutableSetOf<UInt>()
 
-    val totalCount = try {
-        contextMgr.getContextRulesCount()
-    } catch (e: Exception) {
-        ActivityLogState.error("Failed to get rule count: ${e.message}")
-        0u
-    }
-
-    if (totalCount == 0u) {
-        try {
-            val defaultScVal = contextMgr.getContextRules(ContextRuleType.Default)
-            val defaultRules = parseContextRulesFromScVal(defaultScVal)
-            for (rule in defaultRules) {
-                if (seenIds.add(rule.id)) allRules.add(rule)
-            }
-        } catch (_: Exception) {
-            // No default rules or contract doesn't support this call
-        }
-        return allRules.sortedBy { it.id }
-    }
-
-    for (id in 0u until totalCount) {
-        try {
-            val ruleScVal = contextMgr.getContextRule(id)
-            val parsed = parseSingleContextRuleFromScVal(ruleScVal, id)
-            if (parsed != null && seenIds.add(parsed.id)) {
-                allRules.add(parsed)
-            }
-        } catch (e: Exception) {
-            ActivityLogState.info("Rule #$id not found or could not be parsed")
+    for ((index, ruleScVal) in allRuleScVals.withIndex()) {
+        val parsed = parseSingleContextRuleFromScVal(ruleScVal, index.toUInt())
+        if (parsed != null && seenIds.add(parsed.id)) {
+            result.add(parsed)
         }
     }
 
-    return allRules.sortedBy { it.id }
+    return result.sortedBy { it.id }
 }
 
 /**
@@ -73,15 +67,54 @@ suspend fun fetchAllContextRules(): List<ParsedContextRule> {
 }
 
 /**
- * Parses a Vec of context rules returned by get_context_rules.
+ * Extracts unique signers from a list of parsed context rules and determines
+ * whether each signer can currently sign transactions.
  *
- * The returned SCVal is a Vec where each element is a Map (struct) with fields:
- * context_type, id, name, policies, signers, valid_until.
+ * For [ExternalSigner] with WebAuthn key data (keyData > 65 bytes): canSign is true
+ * when the signer's credential ID matches [connectedCredentialId].
+ * For [DelegatedSigner]: canSign is true when [externalWallet]?.canSignFor(address) returns true.
+ *
+ * Signers are deduplicated across rules using [SmartAccountBuilders.collectUniqueSigners].
+ *
+ * @param rules Parsed context rules to extract signers from.
+ * @param connectedCredentialId Base64URL-encoded credential ID of the connected passkey.
+ * @param externalWallet Optional external wallet adapter for delegated signer check.
+ * @return List of [SignerInfo] with canSign status for each unique signer.
  */
-fun parseContextRulesFromScVal(scVal: SCValXdr): List<ParsedContextRule> {
-    val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return emptyList()
-    return vec.mapNotNull { element ->
-        parseSingleContextRuleFromScVal(element, null)
+fun extractSignersFromRules(
+    rules: List<ParsedContextRule>,
+    connectedCredentialId: String?,
+    externalWallet: ExternalWalletAdapter?
+): List<SignerInfo> {
+    val allSigners = rules.flatMap { it.signers }
+    val unique = SmartAccountBuilders.collectUniqueSigners(allSigners)
+
+    return unique.map { signer ->
+        val canSign = when (signer) {
+            is ExternalSigner -> {
+                val keyData = signer.keyData
+                if (keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
+                    // WebAuthn signer: compare credential ID suffix against connected credential
+                    val credIdBytes = keyData.copyOfRange(
+                        SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
+                        keyData.size
+                    )
+                    val credIdEncoded = SmartAccountSharedUtils.base64urlEncode(credIdBytes)
+                    credIdEncoded == connectedCredentialId
+                } else {
+                    false
+                }
+            }
+            is DelegatedSigner -> {
+                try {
+                    externalWallet?.canSignFor(signer.address) ?: false
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            else -> false
+        }
+        SignerInfo(signer = signer, canSign = canSign)
     }
 }
 

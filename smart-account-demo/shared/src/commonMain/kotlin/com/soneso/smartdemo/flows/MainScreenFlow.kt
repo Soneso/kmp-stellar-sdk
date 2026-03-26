@@ -16,6 +16,7 @@ import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.token.DemoTokenService
+import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
 import com.soneso.smartdemo.util.refreshAllBalances
 import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
@@ -46,8 +47,15 @@ suspend fun initializeKit(
     webauthnProvider: WebAuthnProvider?,
     storage: StorageAdapter?
 ) {
+    // Create the external signer adapter for keypair-based delegated signers.
+    // This bridges the ExternalWalletAdapter interface to in-memory Ed25519 keypairs,
+    // enabling multi-signer transfers where a delegated Stellar account co-signs.
+    val externalSignerManagerAdapter = ExternalSignerManagerAdapter()
+
     // Build the SDK configuration from DemoConfig constants.
     // takeIf { isNotBlank() } ensures blank strings are treated as absent (no relayer/indexer).
+    // externalWallet bridges OZExternalSignerManager to the ExternalWalletAdapter interface
+    // required by multiSignerTransfer() for delegated signer support.
     val config = OZSmartAccountConfig(
         rpcUrl = DemoConfig.RPC_URL,
         networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
@@ -56,12 +64,15 @@ suspend fun initializeKit(
         relayerUrl = DemoConfig.DEFAULT_RELAYER_URL.takeIf { it.isNotBlank() },
         indexerUrl = DemoConfig.DEFAULT_INDEXER_URL.takeIf { it.isNotBlank() },
         webauthnProvider = webauthnProvider,
-        storage = storage ?: InMemoryStorageAdapter()
+        storage = storage ?: InMemoryStorageAdapter(),
+        externalWallet = externalSignerManagerAdapter,
+        maxContextRuleScanId = DemoConfig.MAX_CONTEXT_RULE_SCAN_ID.toUInt()
     )
 
     // Create the kit instance. This is the main entry point to all SDK operations.
     val kit = OZSmartAccountKit.create(config)
     DemoState.setKitInstance(kit)
+    DemoState.externalSignerManager = externalSignerManagerAdapter
 
     ActivityLogState.success("SDK initialized")
 

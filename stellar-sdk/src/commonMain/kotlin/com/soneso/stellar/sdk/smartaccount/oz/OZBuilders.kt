@@ -7,9 +7,9 @@
 
 package com.soneso.stellar.sdk.smartaccount.oz
 
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
-import com.soneso.stellar.sdk.smartaccount.core.toHexString
 
 /**
  * Builder utilities for OpenZeppelin smart account context rules.
@@ -87,7 +87,7 @@ object OZBuilders {
                 "WASM hash must be 32 bytes (64 hex characters), got: ${cleanHash.length} characters"
             )
         }
-        val hashBytes = hexToByteArray(cleanHash)
+        val hashBytes = cleanHash.hexToByteArray()
         return ContextRuleType.CreateContract(hashBytes)
     }
 
@@ -135,67 +135,7 @@ object OZBuilders {
      */
     fun collectUniqueSignersFromRules(rules: List<ParsedContextRule>): List<SmartAccountSigner> {
         val allSigners = rules.flatMap { it.signers }
-        return collectUniqueSigners(allSigners)
+        return SmartAccountBuilders.collectUniqueSigners(allSigners)
     }
 
-    // ========================================================================
-    // Display Formatting
-    // ========================================================================
-
-    /**
-     * Formats a context rule type for human-readable display.
-     *
-     * @param contextType The context rule type to format
-     * @return Human-readable description such as "Default (Any Operation)",
-     *         "Call Contract: CABC...WXYZ", or "Create Contract: abc123..."
-     *
-     * Example:
-     * ```kotlin
-     * val label = OZBuilders.formatContextType(rule.contextType)
-     * // "Call Contract: CABC...WXYZ"
-     * ```
-     */
-    fun formatContextType(contextType: ContextRuleType): String {
-        return when (contextType) {
-            is ContextRuleType.Default -> "Default (Any Operation)"
-
-            is ContextRuleType.CallContract ->
-                "Call Contract: ${truncateAddress(contextType.contractAddress)}"
-
-            is ContextRuleType.CreateContract -> {
-                val hashHex = contextType.wasmHash.toHexString()
-                "Create Contract: ${hashHex.take(8)}..."
-            }
-        }
-    }
-
-    // ========================================================================
-    // Private Helpers
-    // ========================================================================
-
-    private fun collectUniqueSigners(signers: List<SmartAccountSigner>): List<SmartAccountSigner> {
-        val signerMap = linkedMapOf<String, SmartAccountSigner>()
-        for (signer in signers) {
-            val key = signer.uniqueKey
-            if (!signerMap.containsKey(key)) {
-                signerMap[key] = signer
-            }
-        }
-        return signerMap.values.toList()
-    }
-
-    private fun truncateAddress(address: String, chars: Int = 4): String {
-        if (address.length <= chars * 2 + 3) {
-            return address
-        }
-        return "${address.take(chars)}...${address.takeLast(chars)}"
-    }
-
-    private fun hexToByteArray(hex: String): ByteArray {
-        require(hex.length % 2 == 0) { "Hex string must have even length" }
-        return ByteArray(hex.length / 2) { i ->
-            val index = i * 2
-            hex.substring(index, index + 2).toInt(16).toByte()
-        }
-    }
 }

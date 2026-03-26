@@ -57,9 +57,10 @@ import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.signerTypeColor
+import com.soneso.smartdemo.util.formatContextType
+import com.soneso.smartdemo.util.formatSignerForDisplay
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
-import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -301,7 +302,7 @@ class KnownSignersScreen : Screen {
     @Composable
     private fun SignerEntryItem(signer: SmartAccountSigner, rules: List<ParsedContextRule>) {
         val typeDescription = SmartAccountBuilders.describeSignerType(signer)
-        val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
+        val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)
 
@@ -358,7 +359,7 @@ class KnownSignersScreen : Screen {
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = OZBuilders.formatContextType(rule.contextType),
+                            text = formatContextType(rule.contextType),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

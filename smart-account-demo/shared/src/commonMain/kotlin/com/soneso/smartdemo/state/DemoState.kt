@@ -3,6 +3,7 @@ package com.soneso.smartdemo.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -15,6 +16,12 @@ object DemoState {
     /** The OZSmartAccountKit instance, null until configuration is applied. */
     var kit: OZSmartAccountKit? by mutableStateOf(null)
         private set
+
+    /**
+     * The external signer manager adapter used for delegated (keypair) signers.
+     * Set during kit initialization so TransferScreen can register secret keys.
+     */
+    var externalSignerManager: ExternalSignerManagerAdapter? = null
 
     /** Platform-specific WebAuthn provider, set by platform entry points (MainActivity, AppDelegate, etc.). */
     var webauthnProvider: WebAuthnProvider? = null
@@ -71,6 +78,7 @@ object DemoState {
 
     fun reset() {
         kit = null
+        externalSignerManager = null
         isConnected = false
         contractId = null
         credentialId = null

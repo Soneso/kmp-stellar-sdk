@@ -4,7 +4,7 @@ package com.soneso.smartdemo.flows
  * Business logic for managing context rules on a smart account.
  *
  * Demonstrates the [OZSmartAccountKit.contextRuleManager] API:
- * - Loading rules: [getContextRulesCount], [getContextRule], [getContextRules]
+ * - Loading rules: [getContextRulesCount], [getContextRule]
  * - Modifying rules: [addContextRule], [removeContextRule], [updateName], [updateValidUntil]
  *
  * Context rules define on-chain authorization: each rule specifies which signers can
@@ -56,10 +56,9 @@ data class FlowPolicyEntry(
  *
  * SDK workflow:
  * 1. Call [contextRuleManager.getContextRulesCount] to get the total rule count.
- * 2. Iterate and call [contextRuleManager.getContextRule] for each rule ID.
- * 3. Falls back to [getContextRules(ContextRuleType.Default)] if count is zero
- *    (handles contracts that do not support count queries yet).
- * 4. Parse each SCVal result using [parseSingleContextRuleFromScVal] from ContextRuleParser.
+ * 2. Iterate IDs from 0 upward, calling [contextRuleManager.getContextRule] for each.
+ *    Gaps from removed rules are skipped.
+ * 3. Parse each SCVal result using [parseSingleContextRuleFromScVal] from ContextRuleParser.
  *
  * @return List of [ParsedContextRule], sorted by ID with duplicates removed.
  * @throws IllegalStateException if the kit is not initialized.

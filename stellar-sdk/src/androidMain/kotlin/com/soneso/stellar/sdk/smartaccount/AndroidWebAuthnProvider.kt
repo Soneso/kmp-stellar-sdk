@@ -173,7 +173,8 @@ class AndroidWebAuthnProvider(
      *   credential is found or if the assertion fails.
      */
     override suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
         val requestJson = buildAuthenticationRequestJson(challenge)
 

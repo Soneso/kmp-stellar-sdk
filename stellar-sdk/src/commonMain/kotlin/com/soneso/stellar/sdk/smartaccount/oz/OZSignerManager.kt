@@ -13,7 +13,6 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
-import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr

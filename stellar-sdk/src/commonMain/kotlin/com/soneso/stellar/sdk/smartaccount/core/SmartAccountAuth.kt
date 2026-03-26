@@ -14,6 +14,9 @@ import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
+import com.soneso.stellar.sdk.xdr.SCMapXdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SCVecXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
@@ -379,6 +382,64 @@ object SmartAccountAuth {
         return SorobanAuthorizationEntryXdr(
             credentials = SorobanCredentialsXdr.Address(credentials),
             rootInvocation = entryCopy.rootInvocation
+        )
+    }
+
+    // MARK: - Signature Map Manipulation
+
+    /**
+     * Adds a raw key/value entry to the auth entry's signature map.
+     *
+     * Used for delegated signer placeholders where the value is `Bytes(empty)`
+     * rather than a double-XDR-encoded signature. The entry is cloned, the map
+     * entry is appended, and the map is re-sorted.
+     *
+     * @param entry The auth entry to modify
+     * @param signerKey The signer identity ScVal (map key)
+     * @param signatureValue The raw ScVal to use as the map value
+     * @return A new auth entry with the map entry added
+     */
+    fun addRawSignatureMapEntry(
+        entry: SorobanAuthorizationEntryXdr,
+        signerKey: SCValXdr,
+        signatureValue: SCValXdr
+    ): SorobanAuthorizationEntryXdr {
+        val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+            ?: throw TransactionException.signingFailed(
+                "Credentials must be of type address to add signature map entry"
+            )
+
+        val mapEntries = mutableListOf<SCMapEntryXdr>()
+
+        // Collect existing map entries
+        if (credentials.signature is SCValXdr.Vec) {
+            val existingVecXdr = (credentials.signature as SCValXdr.Vec).value
+            if (existingVecXdr != null && existingVecXdr.value.isNotEmpty()) {
+                val firstElement = existingVecXdr.value[0]
+                if (firstElement is SCValXdr.Map) {
+                    firstElement.value?.let { mapXdr ->
+                        mapEntries.addAll(mapXdr.value)
+                    }
+                }
+            }
+        }
+
+        // Add the new entry
+        mapEntries.add(SCMapEntryXdr(key = signerKey, `val` = signatureValue))
+
+        // Sort and rebuild
+        val sortedEntries = sortMapEntries(mapEntries)
+        val signatureMap = SCValXdr.Map(SCMapXdr(sortedEntries))
+        val updatedCredentials = SorobanAddressCredentialsXdr(
+            address = credentials.address,
+            nonce = credentials.nonce,
+            signatureExpirationLedger = credentials.signatureExpirationLedger,
+            signature = SCValXdr.Vec(SCVecXdr(listOf(signatureMap)))
+        )
+
+        return SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            rootInvocation = entry.rootInvocation
         )
     }
 

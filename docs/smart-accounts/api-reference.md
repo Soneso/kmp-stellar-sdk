@@ -212,7 +212,8 @@ data class OZSmartAccountConfig(
     val indexerUrl: String? = null,
     val webauthnProvider: WebAuthnProvider? = null,
     val storage: StorageAdapter = InMemoryStorageAdapter(),
-    val externalWallet: ExternalWalletAdapter? = null
+    val externalWallet: ExternalWalletAdapter? = null,
+    val maxContextRuleScanId: UInt = 50u
 )
 ```
 
@@ -234,6 +235,7 @@ data class OZSmartAccountConfig(
 - `webauthnProvider`: Platform-specific WebAuthn provider
 - `storage`: Storage adapter for credential persistence (defaults to `InMemoryStorageAdapter()`)
 - `externalWallet`: Optional external wallet adapter for multi-signer support
+- `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
 
 **Factory Methods**:
 
@@ -1125,7 +1127,6 @@ Adds a new context rule to the smart account.
 - `policies`: Map of policy address to installation parameters
 
 **Contract limits**:
-- Max 15 context rules per account
 - Max 15 signers per rule
 - Max 5 policies per rule
 
@@ -1156,9 +1157,24 @@ val result = kit.contextRuleManager.addContextRule(
 suspend fun getContextRulesCount(): UInt
 ```
 
-Retrieves the total number of context rules.
+Retrieves the total number of active context rules.
 
-**Returns**: Count of configured rules
+**Returns**: Count of active rules
+
+---
+
+#### getAllContextRules
+
+```kotlin
+suspend fun getAllContextRules(maxScanId: UInt = config.maxContextRuleScanId): List<SCValXdr>
+```
+
+Retrieves all active context rules as raw ScVal objects. Iterates rule IDs from 0 upward, skipping gaps from removed rules, until all active rules are found or `maxScanId` is reached.
+
+**Parameters**:
+- `maxScanId`: Upper bound on rule IDs to scan. Defaults to `OZSmartAccountConfig.maxContextRuleScanId`.
+
+**Returns**: List of raw ScVal objects, one per active context rule.
 
 ---
 
@@ -1221,44 +1237,10 @@ ContextRuleType.CreateContract(wasmHashBytes)
 
 ### OZMultiSignerManager
 
-Manages multi-signature operations and available signer discovery.
+Manages multi-signature token transfers. The caller is responsible for discovering signers from context rules and passing complete signer data via `SelectedSigner`.
 
 ```kotlin
 val multiMgr = kit.multiSignerManager
-```
-
----
-
-#### getAvailableSigners
-
-```kotlin
-suspend fun getAvailableSigners(): List<AvailableSigner>
-
-data class AvailableSigner(
-    val signer: SmartAccountSigner,
-    val canSign: Boolean,
-    val source: SignerSource
-)
-
-enum class SignerSource {
-    PASSKEY,
-    EXTERNAL_WALLET
-}
-```
-
-Retrieves signers available for the connected smart account and their signing capabilities.
-
-**Returns**: List of available signers with signing capabilities
-
-**Example**:
-
-```kotlin
-val signers = kit.multiSignerManager.getAvailableSigners()
-for (availableSigner in signers) {
-    if (availableSigner.canSign) {
-        println("Can sign with: ${availableSigner.source}")
-    }
-}
 ```
 
 ---
@@ -1289,14 +1271,18 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 **Example**:
 
 ```kotlin
+// Signers are obtained from context rule discovery (client-side)
 val result = kit.multiSignerManager.multiSignerTransfer(
     tokenContract = "CBCD...",
     recipient = "GBXYZ...",
     amount = 50.0,
     selectedSigners = listOf(
-        SelectedSigner.Passkey(),             // connected passkey (OS picker)
-        SelectedSigner.Passkey("credBase64"), // a second specific passkey
-        SelectedSigner.Wallet("GA7Q...")      // delegated wallet signer
+        SelectedSigner.Passkey(
+            credentialId = credIdStr,
+            credentialIdBytes = credIdBytes,
+            keyData = signer.keyData
+        ),
+        SelectedSigner.Wallet("GA7Q...")
     )
 )
 ```
@@ -1672,12 +1658,20 @@ Sealed class that specifies which signers should participate in a multi-signatur
 ```kotlin
 sealed class SelectedSigner {
     /** Passkey (WebAuthn) signer. Each instance triggers one OS authentication prompt. */
-    data class Passkey(val credentialId: String? = null) : SelectedSigner()
+    data class Passkey(
+        val credentialId: String? = null,
+        val credentialIdBytes: ByteArray? = null,
+        val keyData: ByteArray? = null
+    ) : SelectedSigner()
 
     /** Delegated wallet signer identified by its Stellar G-address. */
     data class Wallet(val address: String) : SelectedSigner()
 }
 ```
+
+- `credentialId`: Base64URL-encoded credential ID for display/logging.
+- `credentialIdBytes`: Raw credential ID bytes for the WebAuthn allowCredentials constraint.
+- `keyData`: Full key data (secp256r1 public key + credentialId bytes). Required for multi-signer transfers. Populated from the signer data obtained during context rule discovery.
 
 ---
 

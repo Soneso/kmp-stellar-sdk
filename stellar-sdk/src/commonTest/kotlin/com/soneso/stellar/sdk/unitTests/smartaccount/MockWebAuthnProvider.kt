@@ -105,7 +105,8 @@ class MockWebAuthnProvider : WebAuthnProvider {
     }
 
     override suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
         authenticateCallCount++
         lastAuthenticateChallenge = challenge.copyOf()

@@ -64,9 +64,11 @@ import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.signerTypeColor
+import com.soneso.smartdemo.util.formatContextType
+import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
-import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -480,7 +482,7 @@ class ContextRulesScreen : Screen {
 
                     // Context type
                     Text(
-                        text = OZBuilders.formatContextType(rule.contextType),
+                        text = formatContextType(rule.contextType),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -611,7 +613,7 @@ class ContextRulesScreen : Screen {
     @Composable
     private fun SignerChip(signer: SmartAccountSigner) {
         val typeDescription = SmartAccountBuilders.describeSignerType(signer)
-        val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
+        val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)
 
@@ -696,7 +698,7 @@ class ContextRulesScreen : Screen {
                                 )
                             }
                             Text(
-                                text = SmartAccountBuilders.truncateAddress(policyAddress, 8),
+                                text = truncateAddress(policyAddress, 8),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 maxLines = 1,

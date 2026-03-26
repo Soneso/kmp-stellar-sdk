@@ -216,10 +216,15 @@ interface WebAuthnProvider {
      * be signed to authorize the transaction.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, 32 bytes)
+     * @param allowCredentialIds Optional list of raw credential ID byte arrays to set
+     *   as allowCredentials in the WebAuthn request. Constrains which passkey the
+     *   authenticator uses. Required on web where the browser may otherwise pick
+     *   a different passkey than intended.
      * @return WebAuthnAuthenticationResult with signature and attestation data
      * @throws WebAuthnException if authentication fails or user cancels
      */
     suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>? = null
     ): WebAuthnAuthenticationResult
 }

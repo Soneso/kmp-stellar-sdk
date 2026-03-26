@@ -82,6 +82,8 @@ import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
@@ -676,7 +678,7 @@ class ContextRuleBuilderScreen(
                                                             signers = signers + newSigner
                                                             delegatedAddress = ""
                                                             ActivityLogState.info(
-                                                                "Added delegated signer: ${SmartAccountBuilders.truncateAddress(addr, 6)}"
+                                                                "Added delegated signer: ${truncateAddress(addr, 6)}"
                                                             )
                                                         }
                                                     }
@@ -707,7 +709,7 @@ class ContextRuleBuilderScreen(
                                             } else null
                                         )
                                         Text(
-                                            text = "Uses verifier: ${SmartAccountBuilders.truncateAddress(DemoConfig.ED25519_VERIFIER_ADDRESS, 6)}",
+                                            text = "Uses verifier: ${truncateAddress(DemoConfig.ED25519_VERIFIER_ADDRESS, 6)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -836,7 +838,7 @@ class ContextRuleBuilderScreen(
                                                         style = MaterialTheme.typography.labelMedium
                                                     )
                                                     availablePasskeys.forEach { passkey ->
-                                                        val displayInfo = SmartAccountBuilders.formatSignerForDisplay(passkey)
+                                                        val displayInfo = formatSignerForDisplay(passkey)
                                                         val alreadyAdded = signers.any { SmartAccountBuilders.signersEqual(it, passkey) }
                                                         OutlinedButton(
                                                             onClick = {
@@ -1064,7 +1066,7 @@ class ContextRuleBuilderScreen(
                                     "threshold" -> {
                                         // Simple Threshold
                                         Text(
-                                            text = "Contract: ${SmartAccountBuilders.truncateAddress(selectedPolicyType!!.address, 8)}",
+                                            text = "Contract: ${truncateAddress(selectedPolicyType!!.address, 8)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1118,7 +1120,7 @@ class ContextRuleBuilderScreen(
                                     "spending_limit" -> {
                                         // Spending Limit
                                         Text(
-                                            text = "Contract: ${SmartAccountBuilders.truncateAddress(selectedPolicyType!!.address, 8)}",
+                                            text = "Contract: ${truncateAddress(selectedPolicyType!!.address, 8)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1210,7 +1212,7 @@ class ContextRuleBuilderScreen(
                                     "weighted_threshold" -> {
                                         // Weighted Threshold
                                         Text(
-                                            text = "Contract: ${SmartAccountBuilders.truncateAddress(selectedPolicyType!!.address, 8)}",
+                                            text = "Contract: ${truncateAddress(selectedPolicyType!!.address, 8)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1248,7 +1250,7 @@ class ContextRuleBuilderScreen(
                                             )
                                             signers.forEach { signer ->
                                                 val key = SmartAccountBuilders.getSignerKey(signer)
-                                                val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
+                                                val displayInfo = formatSignerForDisplay(signer)
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     verticalAlignment = Alignment.CenterVertically,
@@ -1314,7 +1316,7 @@ class ContextRuleBuilderScreen(
                                                     }
                                                     val scVal = buildWeightedThresholdScVal(weightsMap, threshold)
                                                     val weightsDesc = weightsMap.entries.joinToString(", ") { (s, w) ->
-                                                        val info = SmartAccountBuilders.formatSignerForDisplay(s)
+                                                        val info = formatSignerForDisplay(s)
                                                         "${info.type}=$w"
                                                     }
                                                     policies = policies + PolicyEntry(
@@ -1742,7 +1744,7 @@ class ContextRuleBuilderScreen(
         enabled: Boolean = true
     ) {
         val typeDescription = SmartAccountBuilders.describeSignerType(signer)
-        val displayInfo = SmartAccountBuilders.formatSignerForDisplay(signer)
+        val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)
 
@@ -1947,7 +1949,7 @@ class ContextRuleBuilderScreen(
                 }
                 // Address
                 Text(
-                    text = SmartAccountBuilders.truncateAddress(policy.address, 8),
+                    text = truncateAddress(policy.address, 8),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -573,14 +573,17 @@ data class SignAuthEntryOptions(
 )
 
 /**
- * Result of signing an authorization entry with an external wallet.
+ * Result of signing an authorization preimage with an external wallet.
  *
- * Contains the signed auth entry and optionally the signer address, which
+ * Contains the raw Ed25519 signature and optionally the signer address, which
  * may differ from the requested address in some wallet implementations.
  */
 data class SignAuthEntryResult(
     /**
-     * The base64-encoded signed authorization entry (raw Ed25519 signature).
+     * The base64-encoded raw Ed25519 signature (64 bytes).
+     *
+     * The wallet hashes the preimage with SHA-256 and signs the resulting
+     * 32-byte payload with Ed25519. This field contains the 64-byte signature.
      */
     val signedAuthEntry: String,
 
@@ -607,18 +610,20 @@ data class SignAuthEntryResult(
  * class FreighterAdapter : ExternalWalletAdapter {
  *     override suspend fun connect(): ConnectedWallet? {
  *         // Show wallet selection modal
- *         // Return ConnectedWallet with address, walletId, walletName
- *         // Return null if the user cancelled
+ *         return ConnectedWallet(address = "G...", walletId = "freighter", walletName = "Freighter")
  *     }
  *
  *     override suspend fun signAuthEntry(
- *         authEntryXdr: String,
+ *         preimageXdr: String,
  *         options: SignAuthEntryOptions?
  *     ): SignAuthEntryResult {
- *         // Request signature from Freighter
+ *         // Decode preimage, hash with SHA-256, sign with Ed25519
+ *         val preimageBytes = Base64.decode(preimageXdr)
+ *         val hash = sha256(preimageBytes)
+ *         val signature = freighterSign(hash, options?.address)
  *         return SignAuthEntryResult(
- *             signedAuthEntry = "base64-encoded-signature",
- *             signerAddress = "GABC123..."
+ *             signedAuthEntry = Base64.encode(signature),
+ *             signerAddress = options?.address
  *         )
  *     }
  * }
@@ -644,18 +649,24 @@ interface ExternalWalletAdapter {
     suspend fun disconnect()
 
     /**
-     * Signs an authorization entry with the external wallet.
+     * Signs an authorization preimage with the external wallet.
      *
-     * The auth entry is a base64-encoded XDR (typically a HashIdPreimage) that the
-     * wallet should sign with Ed25519.
+     * The SDK sends a base64-encoded HashIDPreimage XDR. The wallet should:
+     * 1. Base64-decode the preimage bytes
+     * 2. SHA-256 hash the preimage bytes
+     * 3. Ed25519-sign the 32-byte hash
+     * 4. Return the 64-byte raw signature as base64
      *
-     * @param authEntryXdr The base64-encoded XDR of the auth entry
+     * The SDK handles auth entry construction and signature format — the wallet
+     * only needs to produce the raw Ed25519 signature.
+     *
+     * @param preimageXdr The base64-encoded HashIDPreimage XDR to sign
      * @param options Optional signing options (network passphrase, specific address)
-     * @return The signing result containing the signature and optionally the signer address
+     * @return The signing result with base64-encoded raw Ed25519 signature (64 bytes)
      * @throws TransactionException.SigningFailed if signing fails or is rejected
      */
     suspend fun signAuthEntry(
-        authEntryXdr: String,
+        preimageXdr: String,
         options: SignAuthEntryOptions? = null
     ): SignAuthEntryResult
 

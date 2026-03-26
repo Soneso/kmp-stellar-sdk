@@ -13,8 +13,6 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
-import com.soneso.stellar.sdk.xdr.SCAddressXdr
-import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
@@ -377,60 +375,6 @@ class OZContextRuleManager internal constructor(
         return SmartAccountSharedUtils.simulateAndExtractResult(hostFunction = hostFunction, kit = kit)
     }
 
-    // MARK: - Get Context Rules
-
-    /**
-     * Retrieves all context rules matching the specified context type.
-     *
-     * Queries the smart account contract for all context rules that match the given
-     * context type pattern. The raw SCVal response is returned, containing an array
-     * of rule details.
-     *
-     * This is a query operation (read-only, no authorization required). It uses simulation
-     * to extract the return value without submitting a transaction.
-     *
-     * The returned ScVal is a Vec containing multiple context rule structures.
-     *
-     * NOTE: Parsing the full context rules list from ScVal is complex. For initial
-     * implementation, this method returns the raw ScVal. Applications can extract
-     * specific fields as needed.
-     *
-     * @param contextType The context type to filter by
-     * @return The raw SCVal response containing the array of matching context rules
-     * @throws TransactionException if simulation fails
-     *
-     * Example:
-     * ```kotlin
-     * // Get all default rules
-     * val defaultRules = contextMgr.getContextRules(
-     *     contextType = ContextRuleType.Default
-     * )
-     *
-     * // Get all rules for a specific contract
-     * val tokenRules = contextMgr.getContextRules(
-     *     contextType = ContextRuleType.CallContract("CBCD1234...")
-     * )
-     * ```
-     */
-    suspend fun getContextRules(contextType: ContextRuleType): SCValXdr {
-        val (_, contractId) = kit.requireConnected()
-
-        // Build invocation
-        val contextTypeScVal = contextType.toScVal()
-        val functionArgs: List<SCValXdr> = listOf(contextTypeScVal)
-
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = Address(contractId).toSCAddress(),
-            functionName = SCSymbolXdr("get_context_rules"),
-            args = functionArgs
-        )
-
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-
-        // Query operation - simulate to get return value
-        return SmartAccountSharedUtils.simulateAndExtractResult(hostFunction = hostFunction, kit = kit)
-    }
-
     // MARK: - Get Context Rules Count
 
     /**
@@ -480,6 +424,44 @@ class OZContextRuleManager internal constructor(
                 "Expected U32 result from get_context_rules_count, got: $resultScVal"
             )
         }
+    }
+
+    // MARK: - Get All Context Rules
+
+    /**
+     * Retrieves all active context rules as raw ScVal objects.
+     *
+     * The contract uses monotonically increasing IDs. When a rule is removed, its
+     * ID slot becomes empty but is never reused, creating gaps. This method iterates
+     * IDs from 0 upward until all active rules (per [getContextRulesCount]) have been
+     * found, with [maxScanId] as a safety bound.
+     *
+     * @param maxScanId Upper bound on rule IDs to scan. Defaults to
+     *   [OZSmartAccountConfig.maxContextRuleScanId].
+     * @return List of raw ScVal objects, one per active context rule.
+     */
+    suspend fun getAllContextRules(maxScanId: UInt = kit.config.maxContextRuleScanId): List<SCValXdr> {
+        val activeCount = try {
+            getContextRulesCount()
+        } catch (_: Exception) {
+            0u
+        }
+
+        if (activeCount == 0u) return emptyList()
+
+        val result = mutableListOf<SCValXdr>()
+
+        for (id in 0u until maxScanId) {
+            if (result.size.toUInt() >= activeCount) break
+            try {
+                val ruleScVal = getContextRule(id)
+                result.add(ruleScVal)
+            } catch (_: Exception) {
+                // Gap from removed rule — skip
+            }
+        }
+
+        return result
     }
 
     // MARK: - Update Context Rule Name

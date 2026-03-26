@@ -17,6 +17,7 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 
 /**
  * Result of a token transfer.
@@ -74,6 +75,61 @@ suspend fun transfer(
 
     if (result.success) {
         ActivityLogState.success("Transfer successful! Hash: ${result.hash ?: "unknown"}")
+
+        // Refresh both XLM and DEMO balances so the UI shows the updated amounts.
+        DemoState.contractId?.let { refreshAllBalances(it) }
+    }
+
+    return TransferResult(
+        success = result.success,
+        hash = result.hash,
+        error = result.error
+    )
+}
+
+/**
+ * Transfers tokens from the connected smart account using an explicit list of signers.
+ *
+ * SDK workflow:
+ * 1. Get the connected [OZSmartAccountKit] from [DemoState].
+ * 2. Call [OZSmartAccountKit.multiSignerManager.multiSignerTransfer] with the token contract,
+ *    recipient, amount, and the explicit signer list. The SDK:
+ *    a. Simulates the transaction to compute Soroban auth entries.
+ *    b. For each [SelectedSigner.Passkey]: triggers one OS WebAuthn authentication prompt.
+ *    c. For each [SelectedSigner.Wallet]: signs via the configured ExternalWalletAdapter.
+ *    d. Submits the transaction to the network (via the relayer if configured).
+ * 3. On success, refresh XLM and DEMO balances in [DemoState].
+ *
+ * The caller is responsible for registering any delegated signer keypairs in
+ * [DemoState.externalSignerManager] before calling this function.
+ *
+ * @param tokenContract The contract address (C-address) of the token to transfer.
+ * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
+ * @param amount The amount to transfer as a human-readable number (e.g. 10.0).
+ * @param selectedSigners All signers that must participate, in signing order.
+ * @return [TransferResult] with success/failure status, transaction hash, and optional error.
+ */
+suspend fun multiSignerTransfer(
+    tokenContract: String,
+    recipient: String,
+    amount: Double,
+    selectedSigners: List<SelectedSigner>
+): TransferResult {
+    val kit = DemoState.kit
+        ?: throw IllegalStateException("Smart Account Kit not initialized")
+
+    // multiSignerTransfer collects signatures from all listed signers in order,
+    // then submits the transaction. Passkey signers trigger WebAuthn prompts;
+    // wallet signers sign via the ExternalWalletAdapter registered in the kit config.
+    val result = kit.multiSignerManager.multiSignerTransfer(
+        tokenContract = tokenContract,
+        recipient = recipient,
+        amount = amount,
+        selectedSigners = selectedSigners
+    )
+
+    if (result.success) {
+        ActivityLogState.success("Multi-signer transfer successful! Hash: ${result.hash ?: "unknown"}")
 
         // Refresh both XLM and DEMO balances so the UI shows the updated amounts.
         DemoState.contractId?.let { refreshAllBalances(it) }
