@@ -53,6 +53,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.flows.deletePendingCredential
 import com.soneso.smartdemo.flows.loadPendingCredentials
+import com.soneso.smartdemo.flows.connectWithAddress
 import com.soneso.smartdemo.flows.manualConnect
 import com.soneso.smartdemo.flows.quickConnect
 import com.soneso.smartdemo.flows.retryPendingDeploy
@@ -305,7 +306,115 @@ class WalletConnectionScreen : Screen {
                     }
                 }
 
-                // 3. Pending Credentials Section
+                // 3. Connect with Contract Address (Recovery)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    var addressExpanded by remember { mutableStateOf(false) }
+                    var contractAddressInput by remember { mutableStateOf("") }
+                    var isConnectingWithAddress by remember { mutableStateOf(false) }
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { addressExpanded = !addressExpanded },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Connect with Contract Address",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = if (addressExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (addressExpanded) "Collapse" else "Expand"
+                            )
+                        }
+
+                        if (addressExpanded) {
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "Connect using a known contract address and any registered passkey. " +
+                                    "Use this to reconnect with a recovery passkey.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            androidx.compose.material3.OutlinedTextField(
+                                value = contractAddressInput,
+                                onValueChange = { contractAddressInput = it },
+                                label = { Text("Contract Address") },
+                                placeholder = { Text("C...") },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isConnectingWithAddress,
+                                singleLine = true,
+                                isError = contractAddressInput.isNotBlank() &&
+                                    (!contractAddressInput.startsWith("C") || contractAddressInput.length != 56)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    val handler = CoroutineExceptionHandler { _, throwable ->
+                                        val message = throwable.message ?: "Unknown error"
+                                        if (isUserCancellation(message)) {
+                                            ActivityLogState.info("Passkey authentication cancelled")
+                                        } else {
+                                            ActivityLogState.error("Connection failed: $message")
+                                        }
+                                        isConnectingWithAddress = false
+                                    }
+                                    scope.launch(handler) {
+                                        isConnectingWithAddress = true
+                                        try {
+                                            val result = connectWithAddress(contractAddressInput.trim())
+                                            if (result != null) {
+                                                navigator.pop()
+                                            } else {
+                                                ActivityLogState.error("Could not connect to the provided contract address")
+                                            }
+                                        } catch (e: Throwable) {
+                                            val message = e.message ?: "Unknown error"
+                                            if (isUserCancellation(message)) {
+                                                ActivityLogState.info("Passkey authentication cancelled")
+                                            } else {
+                                                ActivityLogState.error("Connection failed: $message")
+                                            }
+                                        } finally {
+                                            isConnectingWithAddress = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isConnectingWithAddress &&
+                                    DemoState.kit != null &&
+                                    contractAddressInput.startsWith("C") &&
+                                    contractAddressInput.length == 56
+                            ) {
+                                if (isConnectingWithAddress) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(if (isConnectingWithAddress) "Connecting..." else "Connect with Address (Recovery)")
+                            }
+                        }
+                    }
+                }
+
+                // 4. Pending Credentials Section
                 if (pendingCredentials.isNotEmpty() || isLoadingPending) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),

@@ -21,12 +21,12 @@ WebAuthn passkeys require a trust relationship between the app and a domain. The
 
 On the web, the RP ID defaults to the current page's hostname if not explicitly set. For example, if the demo runs at `http://localhost:8081`, the RP ID is `localhost`.
 
-When constructing `SmartAccountConfig`, the `rpId` parameter can be omitted for web apps. The browser's WebAuthn API will use the current origin's effective domain.
+When constructing `OZSmartAccountConfig`, the `rpId` parameter can be omitted for web apps. The browser's WebAuthn API will use the current origin's effective domain.
 
 ```kotlin
-val config = SmartAccountConfig(
+val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = Networks.TESTNET,
+    networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
     rpName = "My Stellar App",
@@ -66,9 +66,9 @@ Android uses the Credential Manager API (API level 28+) for passkey operations. 
 Pass the RP ID explicitly in the SDK configuration:
 
 ```kotlin
-val config = SmartAccountConfig(
+val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = Networks.TESTNET,
+    networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
     rpId = "example.com",
@@ -145,9 +145,9 @@ iOS uses the AuthenticationServices framework (`ASAuthorizationPlatformPublicKey
 Pass the RP ID explicitly in the SDK configuration:
 
 ```kotlin
-val config = SmartAccountConfig(
+val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = Networks.TESTNET,
+    networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
     rpId = "example.com",
@@ -289,9 +289,9 @@ When deploying to production, replace `localhost` or test domains with your prod
 
 2. **Obtain a TLS certificate** (e.g., via Let's Encrypt) for the domain.
 
-3. **Set the RP ID** in your `SmartAccountConfig`:
+3. **Set the RP ID** in your `OZSmartAccountConfig`:
    ```kotlin
-   val config = SmartAccountConfig(
+   val config = OZSmartAccountConfig(
        // ...
        rpId = "myapp.example.com",
        rpName = "My Stellar Wallet",

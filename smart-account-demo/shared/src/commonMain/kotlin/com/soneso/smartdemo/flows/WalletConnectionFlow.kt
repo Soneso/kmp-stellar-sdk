@@ -142,6 +142,51 @@ suspend fun manualConnect(): WalletConnectionResult? {
 }
 
 /**
+ * Connects to a smart account using a known contract address and any registered passkey.
+ *
+ * This is the recovery flow: the user knows the contract address (saved during wallet
+ * creation) and authenticates with a passkey that is registered as a signer on the
+ * contract (e.g., a recovery passkey added via a Default context rule).
+ *
+ * The indexer is not needed — the contract address is provided directly.
+ *
+ * @param contractAddress The C-address of the smart account contract.
+ * @return [WalletConnectionResult] on success, or null if connection failed.
+ */
+suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult? {
+    val kit = DemoState.kit
+        ?: throw IllegalStateException("SDK not initialized")
+
+    // Step 1: Authenticate with any passkey for this RP.
+    val authResult = kit.walletOperations.authenticatePasskey()
+    ActivityLogState.success("Authenticated with credential: ${authResult.credentialId.take(16)}...")
+
+    // Step 2: Connect using both the credential ID and the provided contract address.
+    ActivityLogState.info("Connecting to contract: ${contractAddress.take(8)}...")
+    val result = kit.walletOperations.connectWallet(
+        OZWalletOperations.ConnectWalletOptions(
+            credentialId = authResult.credentialId,
+            contractId = contractAddress
+        )
+    )
+
+    if (result == null) {
+        ActivityLogState.error("Failed to connect to contract: $contractAddress")
+        return null
+    }
+
+    ActivityLogState.success("Connected to contract: ${result.contractId}")
+    DemoState.setConnected(true, result.contractId, result.credentialId)
+    refreshAllBalances(result.contractId)
+
+    return WalletConnectionResult(
+        contractId = result.contractId,
+        credentialId = result.credentialId,
+        restoredFromSession = result.restoredFromSession
+    )
+}
+
+/**
  * Retries a pending wallet deployment for a stored credential.
  *
  * A "pending" credential exists when a previous wallet creation registered the passkey

@@ -450,25 +450,27 @@ class OZTransactionOperations internal constructor(
                         "WebAuthn provider is required for signing auth entries but is not configured"
                     )
 
-                // (c) Authenticate with passkey (triggers biometric prompt)
-                val authResult = webauthnProvider.authenticate(payloadHash)
+                // (c) Decode credential ID bytes for allowCredentials constraint
+                val credIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
+                    ?: throw CredentialException.invalid(
+                        "Failed to decode credentialId from Base64URL: $credentialId"
+                    )
 
-                // (d) Normalize DER signature to compact format with low-S
+                // (d) Authenticate with passkey (triggers biometric prompt)
+                val authResult = webauthnProvider.authenticate(
+                    payloadHash,
+                    allowCredentialIds = listOf(credIdBytes)
+                )
+
+                // (e) Normalize DER signature to compact format with low-S
                 val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
 
-                // (e) Build WebAuthn signature
+                // (f) Build WebAuthn signature
                 val webAuthnSig = WebAuthnSignature(
                     authenticatorData = authResult.authenticatorData,
                     clientData = authResult.clientDataJSON,
                     signature = compactSig
                 )
-
-                // (f) Look up key data for the connected passkey.
-                // Try local storage first, fall back to on-chain context rules.
-                val credIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
-                    ?: throw CredentialException.invalid(
-                        "Failed to decode credentialId from Base64URL: $credentialId"
-                    )
 
                 val keyData: ByteArray
                 val storage = kit.getStorage()
