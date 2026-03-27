@@ -13,16 +13,17 @@ import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
-import com.soneso.stellar.sdk.xdr.Int64Xdr
-import com.soneso.stellar.sdk.xdr.Int128PartsXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.Uint64Xdr
 import com.soneso.stellar.sdk.xdr.PublicKeyXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.StrKey
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.decimal.RoundingMode
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -100,26 +101,61 @@ object SmartAccountSharedUtils {
     // MARK: - Amount Conversion
 
     /**
-     * Converts an XLM amount to stroops.
+     * Converts a decimal XLM amount string to stroops.
      *
-     * Uses Double precision for arithmetic with proper rounding.
-     * Validates that the resulting stroops value is positive and within Long range.
+     * Parses the string as a decimal number, multiplies by 10,000,000 (stroops per XLM),
+     * and rounds to the nearest integer using BigDecimal arithmetic to avoid floating-point
+     * precision loss. Supports up to 7 decimal places (e.g. "10.5" → 105000000).
      *
-     * @param amount The amount in XLM (must be positive)
-     * @return The amount in stroops (1 XLM = 10,000,000 stroops)
-     * @throws ValidationException.InvalidInput if conversion would overflow or result is invalid
+     * @param amount The amount in XLM as a decimal string (must be non-empty and positive)
+     * @return The amount in stroops as a BigInteger (1 XLM = 10,000,000 stroops)
+     * @throws ValidationException.InvalidInput if the string is empty, not a valid number,
+     *         or the resulting value is not positive
      */
-    fun amountToStroops(amount: Double): Long {
-        val stroopsDouble = amount * SmartAccountConstants.STROOPS_PER_XLM
-
-        // Round to nearest integer
-        val stroops = stroopsDouble.toLong()
-
-        // Validate range
-        if (stroops <= 0 || stroops > Long.MAX_VALUE) {
+    fun amountToStroops(amount: String): BigInteger {
+        if (amount.isBlank()) {
             throw ValidationException.invalidInput(
                 "amount",
-                "Amount out of valid range, got: $amount"
+                "Amount must not be empty"
+            )
+        }
+
+        if (amount.contains('e', ignoreCase = true)) {
+            throw ValidationException.invalidInput(
+                "amount",
+                "Scientific notation is not supported, got: $amount"
+            )
+        }
+
+        val decimal = try {
+            BigDecimal.parseString(amount)
+        } catch (e: Exception) {
+            throw ValidationException.invalidInput(
+                "amount",
+                "Amount is not a valid number, got: $amount"
+            )
+        }
+
+        if (decimal <= BigDecimal.ZERO) {
+            throw ValidationException.invalidInput(
+                "amount",
+                "Amount must be greater than zero, got: $amount"
+            )
+        }
+
+        val stroopsPerXlm = BigDecimal.fromLong(SmartAccountConstants.STROOPS_PER_XLM)
+        val stroopsDecimal = decimal.multiply(stroopsPerXlm)
+
+        // Round to nearest integer (7 decimal places max precision for stroops)
+        val stroops = stroopsDecimal.roundToDigitPositionAfterDecimalPoint(
+            0,
+            RoundingMode.ROUND_HALF_AWAY_FROM_ZERO
+        ).toBigInteger()
+
+        if (stroops <= BigInteger.ZERO) {
+            throw ValidationException.invalidInput(
+                "amount",
+                "Amount too small; minimum is 0.0000001 (1 stroop), got: $amount"
             )
         }
 
@@ -127,17 +163,24 @@ object SmartAccountSharedUtils {
     }
 
     /**
-     * Converts stroops (Long) to I128 ScVal.
+     * Converts stroops (BigInteger) to I128 ScVal.
      *
-     * For positive values within Long range, the high part is 0 and the low part
-     * contains the value as ULong.
+     * Delegates to [Scv.toInt128] which handles the full 128-bit range correctly,
+     * including values larger than Long.MAX_VALUE.
      *
-     * @param stroops The amount in stroops
+     * @param stroops The amount in stroops (must be within I128 range)
      * @return ScVal::I128 representation
+     * @throws IllegalArgumentException if the value is outside the I128 range
      */
-    fun stroopsToI128ScVal(stroops: Long): SCValXdr {
-        val i128Parts = Int128PartsXdr(hi = Int64Xdr(0L), lo = Uint64Xdr(stroops.toULong()))
-        return SCValXdr.I128(i128Parts)
+    fun stroopsToI128ScVal(stroops: BigInteger): SCValXdr {
+        return try {
+            Scv.toInt128(stroops)
+        } catch (e: IllegalArgumentException) {
+            throw ValidationException.invalidInput(
+                "stroops",
+                "Amount exceeds I128 range: $stroops"
+            )
+        }
     }
 
     // MARK: - Base64URL Encoding/Decoding

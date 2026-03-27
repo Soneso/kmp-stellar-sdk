@@ -100,7 +100,7 @@ sealed class SelectedSigner {
  * val result = multiSigner.multiSignerTransfer(
  *     tokenContract = "CBCD...",
  *     recipient = "GA7Q...",
- *     amount = 100.0,
+ *     amount = "100",
  *     selectedSigners = listOf(
  *         SelectedSigner.Passkey(
  *             credentialId = credIdStr,
@@ -144,7 +144,7 @@ class OZMultiSignerManager internal constructor(
      * val result = multiSigner.multiSignerTransfer(
      *     tokenContract = nativeTokenAddress,
      *     recipient = "GBXYZ...",
-     *     amount = 50.0,
+     *     amount = "50",
      *     selectedSigners = listOf(
      *         SelectedSigner.Passkey(),             // connected passkey
      *         SelectedSigner.Passkey("credBase64"), // a second specific passkey
@@ -159,7 +159,7 @@ class OZMultiSignerManager internal constructor(
     suspend fun multiSignerTransfer(
         tokenContract: String,
         recipient: String,
-        amount: Double,
+        amount: String,
         selectedSigners: List<SelectedSigner>
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
@@ -176,14 +176,6 @@ class OZMultiSignerManager internal constructor(
         if ((!recipient.startsWith("G") && !recipient.startsWith("C")) || recipient.length != 56) {
             throw ValidationException.invalidAddress(
                 "Recipient must be a valid G-address or C-address, got: $recipient"
-            )
-        }
-
-        // Validate amount
-        if (amount <= 0) {
-            throw ValidationException.invalidInput(
-                "amount",
-                "Amount must be greater than zero, got: $amount"
             )
         }
 

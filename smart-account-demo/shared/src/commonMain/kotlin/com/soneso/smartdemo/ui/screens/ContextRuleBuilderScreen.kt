@@ -90,6 +90,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
@@ -1174,21 +1175,26 @@ class ContextRuleBuilderScreen(
                                         Button(
                                             onClick = {
                                                 val errors = mutableMapOf<String, String>()
-                                                val amount = spendingLimitAmount.toDoubleOrNull()
+                                                val amountValidation = try {
+                                                    SmartAccountSharedUtils.amountToStroops(spendingLimitAmount)
+                                                    true
+                                                } catch (e: Exception) {
+                                                    false
+                                                }
                                                 val days = spendingLimitPeriodDays.toIntOrNull()
-                                                if (amount == null || amount <= 0.0) {
+                                                if (!amountValidation) {
                                                     errors["spendingAmount"] = "Must be a positive number"
                                                 }
                                                 if (days == null || days <= 0) {
                                                     errors["spendingPeriod"] = "Must be at least 1 day"
                                                 }
                                                 if (errors.isEmpty()) {
-                                                    val stroops = SmartAccountSharedUtils.amountToStroops(amount!!)
+                                                    val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimitAmount)
                                                     val periodLedgers = (days!! * SmartAccountConstants.LEDGERS_PER_DAY).toUInt()
                                                     val scVal = buildSpendingLimitScVal(stroops, periodLedgers)
                                                     policies = policies + PolicyEntry(
                                                         info = selectedPolicyType!!,
-                                                        label = "Limit: $amount / $days day(s)",
+                                                        label = "Limit: $spendingLimitAmount / $days day(s)",
                                                         address = selectedPolicyType!!.address,
                                                         scVal = scVal
                                                     )
@@ -1196,7 +1202,7 @@ class ContextRuleBuilderScreen(
                                                     spendingLimitPeriodDays = ""
                                                     selectedPolicyType = null
                                                     ActivityLogState.info(
-                                                        "Added spending limit policy ($amount per $days day(s))"
+                                                        "Added spending limit policy ($spendingLimitAmount per $days day(s))"
                                                     )
                                                 }
                                                 fieldErrors = errors
@@ -2042,7 +2048,7 @@ class ContextRuleBuilderScreen(
      * Builds the SCValXdr for a spending limit policy.
      * Map structure: { "period_ledgers": U32(periodLedgers), "spending_limit": I128(stroops) }
      */
-    private fun buildSpendingLimitScVal(stroops: Long, periodLedgers: UInt): SCValXdr {
+    private fun buildSpendingLimitScVal(stroops: BigInteger, periodLedgers: UInt): SCValXdr {
         val limitI128 = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
         val map = linkedMapOf(
             Scv.toSymbol("period_ledgers") to Scv.toUint32(periodLedgers),

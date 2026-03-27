@@ -32,6 +32,7 @@ import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
@@ -111,7 +112,7 @@ data class TransactionResult(
  * val result = txOps.transfer(
  *     tokenContract = nativeTokenAddress,
  *     recipient = "GA7Q...",
- *     amount = 100.0
+ *     amount = "100"
  * )
  * println("Transfer ${if (result.success) "succeeded" else "failed"}")
  *
@@ -161,7 +162,7 @@ class OZTransactionOperations internal constructor(
      * val result = txOps.transfer(
      *     tokenContract = "CBCD1234...",
      *     recipient = "GA7QYNF7...",
-     *     amount = 10.5
+     *     amount = "10.5"
      * )
      *
      * if (result.success) {
@@ -174,7 +175,7 @@ class OZTransactionOperations internal constructor(
     suspend fun transfer(
         tokenContract: String,
         recipient: String,
-        amount: Double,
+        amount: String,
         forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // STEP 1: Validate inputs
@@ -194,14 +195,6 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // Validate amount
-        if (amount <= 0) {
-            throw ValidationException.invalidInput(
-                "amount",
-                "Amount must be greater than zero, got: $amount"
-            )
-        }
-
         // Prevent self-transfer
         if (recipient == contractId) {
             throw ValidationException.invalidInput(
@@ -210,7 +203,7 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 2: Convert amount to stroops
+        // STEP 2: Convert amount to stroops — validates non-empty and positive
         val stroops = SmartAccountSharedUtils.amountToStroops(amount)
 
         // STEP 3: Build host function for token transfer
@@ -821,7 +814,7 @@ class OZTransactionOperations internal constructor(
     suspend fun fundWallet(
         nativeTokenContract: String,
         forceMethod: SubmissionMethod? = null
-    ): Double {
+    ): String {
         val (_, contractId) = kit.requireConnected()
 
         // Validate native token contract address
@@ -855,7 +848,7 @@ class OZTransactionOperations internal constructor(
 
         // STEP 4: Calculate transfer amount
         // Reserve for account minimum balance
-        val reserveStroops = SmartAccountConstants.FRIENDBOT_RESERVE_XLM * SmartAccountConstants.STROOPS_PER_XLM
+        val reserveStroops = BigInteger.fromLong(SmartAccountConstants.FRIENDBOT_RESERVE_XLM.toLong() * SmartAccountConstants.STROOPS_PER_XLM)
 
         // Query temp account balance via contract simulation
         val balanceArgs = listOf(
@@ -872,18 +865,18 @@ class OZTransactionOperations internal constructor(
             kit = kit
         )
 
-        // Parse I128 result to Int64 stroops
+        // Parse I128 result to BigInteger stroops (handles full 128-bit range)
         val i128Parts = (balanceResult as? SCValXdr.I128)?.value
             ?: throw TransactionException.submissionFailed("Failed to query temp account balance")
 
-        // For typical Friendbot amounts (10,000 XLM), the hi part is zero and lo fits in Long
-        val balanceStroops = i128Parts.lo.value.toLong()
+        val balanceStroops = BigInteger.fromULong(i128Parts.lo.value) +
+            (BigInteger.fromLong(i128Parts.hi.value) shl 64)
 
         if (balanceStroops <= reserveStroops) {
             throw TransactionException.submissionFailed("Insufficient balance after Friendbot funding")
         }
 
-        val transferStroops = balanceStroops - reserveStroops
+        val transferStroops: BigInteger = balanceStroops - reserveStroops
 
         // STEP 6: Build transfer from temp account to smart account
         val fromAddress = SCAddressXdr.AccountId(tempKeypair.getXdrAccountId())
@@ -1033,8 +1026,15 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 13: Return funded amount in XLM
-        return transferStroops.toDouble() / SmartAccountConstants.STROOPS_PER_XLM
+        // STEP 13: Return funded amount as XLM string
+        val xlmWhole = transferStroops / BigInteger.fromLong(SmartAccountConstants.STROOPS_PER_XLM)
+        val xlmFraction = transferStroops % BigInteger.fromLong(SmartAccountConstants.STROOPS_PER_XLM)
+        return if (xlmFraction == BigInteger.ZERO) {
+            xlmWhole.toString()
+        } else {
+            val fractionStr = xlmFraction.toString().padStart(7, '0').trimEnd('0')
+            "$xlmWhole.$fractionStr"
+        }
     }
 
     // MARK: - Private Helpers

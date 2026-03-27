@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * Builder utilities for Smart Account Kit.
@@ -226,29 +227,27 @@ object SmartAccountBuilders {
      * Spending limit restricts how much can be transferred within a given time period.
      * Useful for rate limiting or daily limits.
      *
-     * @param spendingLimit Maximum amount allowed in the period (in stroops, must be >= 1)
+     * @param spendingLimit Maximum amount allowed in the period as a decimal XLM string
+     *   (e.g. "100" or "10.5"). Converted to stroops internally.
      * @param periodLedgers Number of ledgers in the period (must be >= 1).
      *        Use [SmartAccountConstants.LEDGERS_PER_HOUR] or [SmartAccountConstants.LEDGERS_PER_DAY]
      *        for common periods.
      * @return Policy parameters for spending limit
-     * @throws ValidationException.InvalidInput if spending limit is less than 1 or period is less than 1
+     * @throws ValidationException.InvalidInput if spending limit is not a valid positive number
+     *         or period is less than 1
      *
      * Example:
      * ```kotlin
      * // 100 XLM per day (~17280 ledgers at 5 seconds per ledger)
      * val params = SmartAccountBuilders.createSpendingLimitParams(
-     *     spendingLimit = 1_000_000_000L,
+     *     spendingLimit = "100",
      *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY
      * )
      * ```
      */
-    fun createSpendingLimitParams(spendingLimit: Long, periodLedgers: Int): SpendingLimitParams {
-        if (spendingLimit < 1L) {
-            throw ValidationException.invalidInput(
-                "spendingLimit",
-                "Spending limit must be positive, got: $spendingLimit"
-            )
-        }
+    fun createSpendingLimitParams(spendingLimit: String, periodLedgers: Int): SpendingLimitParams {
+        // Delegate to amountToStroops which validates non-empty and positive
+        val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimit)
         if (periodLedgers < 1) {
             throw ValidationException.invalidInput(
                 "periodLedgers",
@@ -256,7 +255,7 @@ object SmartAccountBuilders {
             )
         }
         return SpendingLimitParams(
-            spendingLimit = spendingLimit,
+            spendingLimit = stroops,
             periodLedgers = periodLedgers
         )
     }
@@ -574,12 +573,12 @@ data class WeightedThresholdParams(
  *
  * Restricts how much can be transferred within a given time period.
  *
- * @property spendingLimit Maximum amount allowed in the period (in stroops, >= 1)
+ * @property spendingLimit Maximum amount allowed in the period (in stroops as BigInteger, >= 1)
  * @property periodLedgers Number of ledgers in the period (>= 1).
  *           Approximately 5 seconds per ledger on the Stellar network.
  */
 data class SpendingLimitParams(
-    val spendingLimit: Long,
+    val spendingLimit: BigInteger,
     val periodLedgers: Int
 )
 

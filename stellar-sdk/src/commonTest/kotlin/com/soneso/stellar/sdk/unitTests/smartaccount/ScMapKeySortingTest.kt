@@ -13,6 +13,7 @@ import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -305,7 +306,7 @@ class ScMapKeySortingTest {
         // SpendingLimit has keys "period_ledgers" and "spending_limit"
         // Both are 14 chars, so XDR byte ordering and alphabetical ordering are equivalent
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L, // 1 XLM in stroops
+            spendingLimit = BigInteger.fromLong(10_000_000L), // 1 XLM in stroops
             periodLedgers = 17280u        // ~1 day
         )
         val scVal = params.toScVal()
@@ -323,11 +324,11 @@ class ScMapKeySortingTest {
     fun testSpendingLimitXdrEncoding() {
         // Verify deterministic encoding
         val params1 = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 50_000_000L,
+            spendingLimit = BigInteger.fromLong(50_000_000L),
             periodLedgers = 34560u
         )
         val params2 = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 50_000_000L,
+            spendingLimit = BigInteger.fromLong(50_000_000L),
             periodLedgers = 34560u
         )
 

@@ -10,10 +10,12 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.Int128PartsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
@@ -327,7 +329,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_createsMapWithCorrectKeys() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L, // 1 XLM
+            spendingLimit = BigInteger.fromLong(10_000_000L), // 1 XLM
             periodLedgers = 17280u        // ~1 day
         )
         val scVal = params.toScVal()
@@ -345,7 +347,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_periodLedgersIsU32() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L,
+            spendingLimit = BigInteger.fromLong(10_000_000L),
             periodLedgers = 17280u
         )
         val scVal = params.toScVal()
@@ -361,7 +363,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_spendingLimitIsI128() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L, // 1 XLM in stroops
+            spendingLimit = BigInteger.fromLong(10_000_000L), // 1 XLM in stroops
             periodLedgers = 17280u
         )
         val scVal = params.toScVal()
@@ -380,7 +382,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_largeI128Value() {
         // Test with a large stroops value (e.g. 1 billion XLM = 10^16 stroops)
-        val largeStroops = 10_000_000_000_000_000L // 1 billion XLM
+        val largeStroops = BigInteger.fromLong(10_000_000_000_000_000L) // 1 billion XLM
         val params = PolicyInstallParams.SpendingLimit(
             spendingLimit = largeStroops,
             periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
@@ -394,13 +396,13 @@ class PolicyManagerTest {
 
         val parts = (limitValue as SCValXdr.I128).value
         assertEquals(0L, parts.hi.value)
-        assertEquals(largeStroops.toULong(), parts.lo.value)
+        assertEquals(largeStroops.ulongValue(), parts.lo.value)
     }
 
     @Test
     fun testSpendingLimit_zeroSpendingLimitThrows() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 0L,
+            spendingLimit = BigInteger.ZERO,
             periodLedgers = 17280u
         )
 
@@ -416,7 +418,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_negativeSpendingLimitThrows() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = -100L,
+            spendingLimit = BigInteger.fromLong(-100L),
             periodLedgers = 17280u
         )
 
@@ -432,7 +434,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_zeroPeriodLedgersThrows() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L,
+            spendingLimit = BigInteger.fromLong(10_000_000L),
             periodLedgers = 0u
         )
 
@@ -448,11 +450,11 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_deterministicXdrEncoding() {
         val params1 = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 50_000_000L,
+            spendingLimit = BigInteger.fromLong(50_000_000L),
             periodLedgers = 34560u
         )
         val params2 = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 50_000_000L,
+            spendingLimit = BigInteger.fromLong(50_000_000L),
             periodLedgers = 34560u
         )
 
@@ -465,7 +467,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_oneLedgerPeriod() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 1L,
+            spendingLimit = BigInteger.ONE,
             periodLedgers = 1u
         )
         val scVal = params.toScVal()
@@ -484,7 +486,7 @@ class PolicyManagerTest {
     @Test
     fun testSpendingLimit_maxUIntPeriodLedgers() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 1_000_000L,
+            spendingLimit = BigInteger.fromLong(1_000_000L),
             periodLedgers = UInt.MAX_VALUE
         )
         val scVal = params.toScVal()
@@ -511,7 +513,7 @@ class PolicyManagerTest {
         assertIs<SCValXdr.Map>(weighted)
 
         val spending = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 10_000_000L,
+            spendingLimit = BigInteger.fromLong(10_000_000L),
             periodLedgers = 17280u
         ).toScVal()
         assertIs<SCValXdr.Map>(spending)
@@ -534,7 +536,7 @@ class PolicyManagerTest {
         )
         val spendingXdr = encodeToXdrHex(
             PolicyInstallParams.SpendingLimit(
-                spendingLimit = 10_000_000L,
+                spendingLimit = BigInteger.fromLong(10_000_000L),
                 periodLedgers = 17280u
             ).toScVal()
         )
@@ -548,27 +550,99 @@ class PolicyManagerTest {
 
     @Test
     fun testAmountToStroops_oneXlm() {
-        val stroops = SmartAccountSharedUtils.amountToStroops(1.0)
-        assertEquals(10_000_000L, stroops)
+        val stroops = SmartAccountSharedUtils.amountToStroops("1")
+        assertEquals(BigInteger.fromLong(10_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_fractionalAmount() {
-        val stroops = SmartAccountSharedUtils.amountToStroops(0.5)
-        assertEquals(5_000_000L, stroops)
+        val stroops = SmartAccountSharedUtils.amountToStroops("0.5")
+        assertEquals(BigInteger.fromLong(5_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_largeAmount() {
-        val stroops = SmartAccountSharedUtils.amountToStroops(1000.0)
-        assertEquals(10_000_000_000L, stroops)
+        val stroops = SmartAccountSharedUtils.amountToStroops("1000")
+        assertEquals(BigInteger.fromLong(10_000_000_000L), stroops)
+    }
+
+    @Test
+    fun testAmountToStroops_emptyString() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountSharedUtils.amountToStroops("")
+        }
+    }
+
+    @Test
+    fun testAmountToStroops_whitespace() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountSharedUtils.amountToStroops("   ")
+        }
+    }
+
+    @Test
+    fun testAmountToStroops_nonNumeric() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountSharedUtils.amountToStroops("abc")
+        }
+    }
+
+    @Test
+    fun testAmountToStroops_scientificNotation() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountSharedUtils.amountToStroops("1e7")
+        }
+    }
+
+    @Test
+    fun testAmountToStroops_subStroopAmount() {
+        // 0.00000001 is less than 1 stroop (0.0000001), rounds to 0
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountSharedUtils.amountToStroops("0.00000001")
+        }
+    }
+
+    @Test
+    fun testAmountToStroops_decimalPrecision() {
+        val stroops = SmartAccountSharedUtils.amountToStroops("10.5")
+        assertEquals(BigInteger.fromLong(105_000_000L), stroops)
+    }
+
+    @Test
+    fun testAmountToStroops_maxPrecision() {
+        // 0.0000001 = 1 stroop (minimum)
+        val stroops = SmartAccountSharedUtils.amountToStroops("0.0000001")
+        assertEquals(BigInteger.fromLong(1L), stroops)
+    }
+
+    // MARK: - createSpendingLimitParams Tests
+
+    @Test
+    fun testCreateSpendingLimitParams_valid() {
+        val params = SmartAccountBuilders.createSpendingLimitParams("100", 720)
+        assertEquals(BigInteger.fromLong(1_000_000_000L), params.spendingLimit)
+        assertEquals(720, params.periodLedgers)
+    }
+
+    @Test
+    fun testCreateSpendingLimitParams_invalidAmount() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountBuilders.createSpendingLimitParams("", 720)
+        }
+    }
+
+    @Test
+    fun testCreateSpendingLimitParams_zeroPeriod() {
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountBuilders.createSpendingLimitParams("100", 0)
+        }
     }
 
     // MARK: - stroopsToI128ScVal Tests
 
     @Test
     fun testStroopsToI128ScVal_basicValue() {
-        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(10_000_000L)
+        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(BigInteger.fromLong(10_000_000L))
 
         assertIs<SCValXdr.I128>(scVal)
         val parts = (scVal as SCValXdr.I128).value
@@ -578,7 +652,7 @@ class PolicyManagerTest {
 
     @Test
     fun testStroopsToI128ScVal_maxLongValue() {
-        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(Long.MAX_VALUE)
+        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(BigInteger.fromLong(Long.MAX_VALUE))
 
         assertIs<SCValXdr.I128>(scVal)
         val parts = (scVal as SCValXdr.I128).value

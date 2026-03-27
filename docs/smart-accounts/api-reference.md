@@ -496,12 +496,12 @@ val txOps = kit.transactionOperations
 suspend fun transfer(
     tokenContract: String,
     recipient: String,
-    amount: Double,
+    amount: String,
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
-Transfers tokens from the smart account to a recipient.
+Transfers tokens from the smart account to a recipient. The amount is a decimal string (e.g., "100" or "10.5") converted to stroops internally using BigInteger arithmetic.
 
 **Parameters**:
 - `tokenContract`: Token contract address (C-address)
@@ -1082,13 +1082,13 @@ sealed class PolicyInstallParams {
         val threshold: UInt
     ) : PolicyInstallParams()
     data class SpendingLimit(
-        val spendingLimit: Long,  // in stroops (1 XLM = 10,000,000 stroops)
+        val spendingLimit: BigInteger,  // in stroops (1 XLM = 10,000,000 stroops)
         val periodLedgers: UInt
     ) : PolicyInstallParams()
 }
-// Note: The addSpendingLimit() convenience method accepts XLM as Double
-// and converts to stroops internally. When using PolicyInstallParams.SpendingLimit
-// directly with addPolicy(), provide the amount in stroops.
+// Note: The addSpendingLimit() convenience method accepts amount as a String
+// (e.g., "100" or "10.5") and converts to stroops internally. When using
+// PolicyInstallParams.SpendingLimit directly with addPolicy(), provide stroops as BigInteger.
 ```
 
 ---
@@ -1251,12 +1251,12 @@ val multiMgr = kit.multiSignerManager
 suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
-    amount: Double,
+    amount: String,
     selectedSigners: List<SelectedSigner>
 ): TransactionResult
 ```
 
-Executes a multi-signature token transfer.
+Executes a multi-signature token transfer. The amount is a decimal string (e.g., "100" or "10.5").
 
 The caller explicitly lists every signer. There is no implicit connected passkey — include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` entry requests a delegated auth entry from the external wallet.
 

@@ -13,6 +13,7 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
@@ -48,7 +49,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  *
  * // Create a spending limit (1000 XLM per day)
  * val spendingPolicy = PolicyInstallParams.SpendingLimit(
- *     spendingLimit = 1000L * 10_000_000L, // Convert XLM to stroops
+ *     spendingLimit = BigInteger.fromLong(1000L * 10_000_000L), // Convert XLM to stroops
  *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
  * )
  * ```
@@ -141,11 +142,11 @@ sealed class PolicyInstallParams {
      * Limits the total amount that can be spent within a rolling time window.
      * The period is specified in ledgers (approximately 5 seconds per ledger).
      *
-     * @property spendingLimit Maximum amount in stroops for the period
+     * @property spendingLimit Maximum amount in stroops for the period (as BigInteger)
      * @property periodLedgers Time window in ledgers (e.g., 17,280 for one day)
      */
     data class SpendingLimit(
-        val spendingLimit: Long,
+        val spendingLimit: BigInteger,
         val periodLedgers: UInt
     ) : PolicyInstallParams() {
         /**
@@ -162,7 +163,7 @@ sealed class PolicyInstallParams {
          */
         internal fun toScVal(): SCValXdr {
             // Validate inputs
-            if (spendingLimit <= 0) {
+            if (spendingLimit <= BigInteger.ZERO) {
                 throw ValidationException.invalidInput(
                     "spendingLimit",
                     "Spending limit must be greater than zero, got: $spendingLimit"
@@ -399,7 +400,8 @@ class OZPolicyManager internal constructor(
      *
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
-     * @param spendingLimit Maximum amount per period in XLM (will be converted to stroops)
+     * @param spendingLimit Maximum amount per period in XLM as a decimal string
+     *   (e.g. "100" or "10.5"). Converted to stroops internally.
      * @param periodLedgers Period duration in ledgers (17,280 = approximately 1 day)
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
@@ -411,7 +413,7 @@ class OZPolicyManager internal constructor(
      * val result = policyManager.addSpendingLimit(
      *     contextRuleId = 0u,
      *     policyAddress = "CBCD1234...",
-     *     spendingLimit = 1000.0,
+     *     spendingLimit = "1000",
      *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
      * )
      *
@@ -425,7 +427,7 @@ class OZPolicyManager internal constructor(
     suspend fun addSpendingLimit(
         contextRuleId: UInt,
         policyAddress: String,
-        spendingLimit: Double,
+        spendingLimit: String,
         periodLedgers: UInt
     ): TransactionResult {
         val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimit)

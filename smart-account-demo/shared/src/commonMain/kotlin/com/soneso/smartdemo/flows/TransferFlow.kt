@@ -51,8 +51,8 @@ data class TransferResult(
  * @param tokenContract The contract address (C-address) of the token to transfer.
  *   Use [DemoConfig.NATIVE_TOKEN_CONTRACT] for XLM or [DemoState.demoTokenContractId] for DEMO.
  * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
- * @param amount The amount to transfer as a human-readable number (e.g. 10.0).
- *   The SDK converts this to stroops internally using the token's decimal places.
+ * @param amount The amount to transfer as a decimal string (e.g. "10" or "10.5").
+ *   The SDK converts this to stroops internally.
  * @return [TransferResult] with success/failure status, transaction hash, and optional error.
  * @throws Exception if the kit is not initialized, amount is invalid, or the passkey
  *   ceremony is cancelled. Check [isUserCancellation] to distinguish user cancellations.
@@ -60,7 +60,7 @@ data class TransferResult(
 suspend fun transfer(
     tokenContract: String,
     recipient: String,
-    amount: Double
+    amount: String
 ): TransferResult {
     val kit = DemoState.kit
         ?: throw IllegalStateException("Smart Account Kit not initialized")
@@ -105,14 +105,14 @@ suspend fun transfer(
  *
  * @param tokenContract The contract address (C-address) of the token to transfer.
  * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
- * @param amount The amount to transfer as a human-readable number (e.g. 10.0).
+ * @param amount The amount to transfer as a decimal string (e.g. "10" or "10.5").
  * @param selectedSigners All signers that must participate, in signing order.
  * @return [TransferResult] with success/failure status, transaction hash, and optional error.
  */
 suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
-    amount: Double,
+    amount: String,
     selectedSigners: List<SelectedSigner>
 ): TransferResult {
     val kit = DemoState.kit

@@ -75,6 +75,7 @@ import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
@@ -390,9 +391,6 @@ class TransferScreen : Screen {
                                     errorMessage = null
 
                                     try {
-                                        val parsedAmount = amount.toDoubleOrNull()
-                                            ?: throw Exception("Invalid amount")
-
                                         val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
                                         ActivityLogState.info(
                                             "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
@@ -401,7 +399,7 @@ class TransferScreen : Screen {
                                         val result = transfer(
                                             tokenContract = tokenContract,
                                             recipient = recipient,
-                                            amount = parsedAmount
+                                            amount = amount
                                         )
 
                                         if (result.success) {
@@ -621,9 +619,6 @@ class TransferScreen : Screen {
                         errorMessage = null
 
                         try {
-                            val parsedAmount = amount.toDoubleOrNull()
-                                ?: throw Exception("Invalid amount")
-
                             val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
 
                             if (isSinglePasskey) {
@@ -635,7 +630,7 @@ class TransferScreen : Screen {
                                 val result = transfer(
                                     tokenContract = tokenContract,
                                     recipient = recipient,
-                                    amount = parsedAmount
+                                    amount = amount
                                 )
 
                                 if (result.success) {
@@ -669,7 +664,7 @@ class TransferScreen : Screen {
                                 val result = multiSignerTransfer(
                                     tokenContract = tokenContract,
                                     recipient = recipient,
-                                    amount = parsedAmount,
+                                    amount = amount,
                                     selectedSigners = selected
                                 )
 
@@ -745,11 +740,15 @@ class TransferScreen : Screen {
 
     private fun validateAmount(value: String): String? {
         if (value.isBlank()) return null
-        val parsed = value.toDoubleOrNull()
-        if (parsed == null) {
+        if (value.contains('e', ignoreCase = true)) {
+            return "Scientific notation is not supported"
+        }
+        val parsed = try {
+            BigDecimal.parseString(value)
+        } catch (e: Exception) {
             return "Must be a valid number"
         }
-        if (parsed <= 0) {
+        if (parsed <= BigDecimal.ZERO) {
             return "Must be greater than zero"
         }
         return null

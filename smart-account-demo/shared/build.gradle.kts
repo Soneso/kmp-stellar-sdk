@@ -67,6 +67,11 @@ kotlin {
                 api(project(":stellar-sdk"))
 
                 // ============================================================
+                // BigInteger / BigDecimal (same version as stellar-sdk)
+                // ============================================================
+                implementation("com.ionspin.kotlin:bignum:0.3.10")
+
+                // ============================================================
                 // Coroutines
                 // ============================================================
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")

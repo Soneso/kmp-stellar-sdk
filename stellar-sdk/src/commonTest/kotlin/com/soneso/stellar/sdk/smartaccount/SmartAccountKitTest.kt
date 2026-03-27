@@ -11,6 +11,7 @@ package com.soneso.stellar.sdk.smartaccount
 import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import com.soneso.stellar.sdk.KeyPair
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.scval.Scv
@@ -697,21 +698,21 @@ class SmartAccountKitTest {
     fun testTransactionOperations_validateTransfer_zeroAmount() = runTest {
         // Test amount validation
         assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops(0.0)
+            SmartAccountSharedUtils.amountToStroops("0")
         }
     }
 
     @Test
     fun testTransactionOperations_validateTransfer_negativeAmount() = runTest {
         assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops(-10.0)
+            SmartAccountSharedUtils.amountToStroops("-10")
         }
     }
 
     @Test
     fun testTransactionOperations_amountConversion() = runTest {
-        val stroops = SmartAccountSharedUtils.amountToStroops(10.0)
-        assertEquals(100_000_000L, stroops)
+        val stroops = SmartAccountSharedUtils.amountToStroops("10")
+        assertEquals(BigInteger.fromLong(100_000_000L), stroops)
     }
 
     // MARK: - 6. Signer Manager Tests
@@ -1087,7 +1088,7 @@ class SmartAccountKitTest {
     @Test
     fun testPolicyInstallParams_spendingLimit_valid() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 1000_0000000L, // 1000 XLM in stroops
+            spendingLimit = BigInteger.fromLong(1000_0000000L), // 1000 XLM in stroops
             periodLedgers = 17280u // 1 day
         )
 
@@ -1117,7 +1118,7 @@ class SmartAccountKitTest {
     @Test
     fun testPolicyInstallParams_spendingLimit_zeroLimit() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 0L,
+            spendingLimit = BigInteger.ZERO,
             periodLedgers = 17280u
         )
 
@@ -1129,7 +1130,7 @@ class SmartAccountKitTest {
     @Test
     fun testPolicyInstallParams_spendingLimit_negativeLimit() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = -100L,
+            spendingLimit = BigInteger.fromLong(-100L),
             periodLedgers = 17280u
         )
 
@@ -1141,7 +1142,7 @@ class SmartAccountKitTest {
     @Test
     fun testPolicyInstallParams_spendingLimit_zeroPeriod() {
         val params = PolicyInstallParams.SpendingLimit(
-            spendingLimit = 1000_0000000L,
+            spendingLimit = BigInteger.fromLong(1000_0000000L),
             periodLedgers = 0u
         )
 
@@ -1558,7 +1559,7 @@ class SmartAccountKitTest {
 
     @Test
     fun testStroopsConversion() {
-        val stroops = 100_000_000L
+        val stroops = BigInteger.fromLong(100_000_000L)
         val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
 
         assertNotNull(scVal)
