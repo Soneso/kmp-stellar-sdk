@@ -8,10 +8,7 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
-import com.soneso.stellar.sdk.xdr.SCBytesXdr
-import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
-import com.soneso.stellar.sdk.xdr.SCMapXdr
-import com.soneso.stellar.sdk.xdr.SCSymbolXdr
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
@@ -111,24 +108,12 @@ data class WebAuthnSignature(
      * @return SCValXdr.Map with signature components
      */
     override fun toScVal(): SCValXdr {
-        // Build map entries in ALPHABETICAL order
-        // CRITICAL: Keys must be in alphabetical order for contract compatibility
-        val entries = listOf(
-            SCMapEntryXdr(
-                key = SCValXdr.Sym(SCSymbolXdr("authenticator_data")),
-                `val` = SCValXdr.Bytes(SCBytesXdr(authenticatorData))
-            ),
-            SCMapEntryXdr(
-                key = SCValXdr.Sym(SCSymbolXdr("client_data")),
-                `val` = SCValXdr.Bytes(SCBytesXdr(clientData))
-            ),
-            SCMapEntryXdr(
-                key = SCValXdr.Sym(SCSymbolXdr("signature")),
-                `val` = SCValXdr.Bytes(SCBytesXdr(signature))
-            )
-        )
-
-        return SCValXdr.Map(SCMapXdr(entries))
+        // Keys must be in alphabetical order for contract compatibility
+        return Scv.toMap(linkedMapOf(
+            Scv.toSymbol("authenticator_data") to Scv.toBytes(authenticatorData),
+            Scv.toSymbol("client_data") to Scv.toBytes(clientData),
+            Scv.toSymbol("signature") to Scv.toBytes(signature)
+        ))
     }
 
     /**
@@ -226,19 +211,11 @@ data class Ed25519Signature(
      * @return SCValXdr.Map with public key and signature bytes
      */
     override fun toScVal(): SCValXdr {
-        // Build map entries in ALPHABETICAL order
-        val entries = listOf(
-            SCMapEntryXdr(
-                key = SCValXdr.Sym(SCSymbolXdr("public_key")),
-                `val` = SCValXdr.Bytes(SCBytesXdr(publicKey))
-            ),
-            SCMapEntryXdr(
-                key = SCValXdr.Sym(SCSymbolXdr("signature")),
-                `val` = SCValXdr.Bytes(SCBytesXdr(signature))
-            )
-        )
-
-        return SCValXdr.Map(SCMapXdr(entries))
+        // Keys must be in alphabetical order for contract compatibility
+        return Scv.toMap(linkedMapOf(
+            Scv.toSymbol("public_key") to Scv.toBytes(publicKey),
+            Scv.toSymbol("signature") to Scv.toBytes(signature)
+        ))
     }
 
     /**
@@ -307,6 +284,6 @@ object PolicySignature : SmartAccountSignature() {
      * @return Empty SCValXdr.Map
      */
     override fun toScVal(): SCValXdr {
-        return SCValXdr.Map(SCMapXdr(emptyList()))
+        return Scv.toMap(linkedMapOf())
     }
 }

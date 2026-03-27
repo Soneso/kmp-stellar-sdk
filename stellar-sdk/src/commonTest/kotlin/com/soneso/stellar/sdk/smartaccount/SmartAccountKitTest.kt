@@ -2236,7 +2236,8 @@ class MockWebAuthnProvider(
     }
 
     override suspend fun authenticate(
-        challenge: ByteArray
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
         if (shouldCancel) {
             throw Exception("User cancelled")

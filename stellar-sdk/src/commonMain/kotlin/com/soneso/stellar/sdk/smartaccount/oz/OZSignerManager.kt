@@ -11,11 +11,10 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
-import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.Uint32Xdr
 
 /**
  * Result of the [OZSignerManager.addNewPasskeySigner] operation.
@@ -441,7 +440,7 @@ class OZSignerManager internal constructor(
         val signerScVal = signer.toScVal()
 
         val functionArgs = listOf(
-            SCValXdr.U32(Uint32Xdr(contextRuleId)),
+            Scv.toUint32(contextRuleId),
             signerScVal
         )
 
@@ -480,7 +479,7 @@ class OZSignerManager internal constructor(
         val signerScVal = signer.toScVal()
 
         val functionArgs = listOf(
-            SCValXdr.U32(Uint32Xdr(contextRuleId)),
+            Scv.toUint32(contextRuleId),
             signerScVal
         )
 

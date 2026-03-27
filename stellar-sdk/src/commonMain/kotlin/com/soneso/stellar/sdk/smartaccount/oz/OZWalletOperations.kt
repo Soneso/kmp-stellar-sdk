@@ -28,9 +28,6 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
-import com.soneso.stellar.sdk.xdr.SCMapXdr
-import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.SCVecXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import kotlinx.coroutines.delay
 
@@ -1082,7 +1079,7 @@ class OZWalletOperations internal constructor(
         // - signers: Vec([External signer])
         // - policies: Map([])
         val signersScVal = try {
-            SCValXdr.Vec(SCVecXdr(listOf(webauthnSigner.toScVal())))
+            Scv.toVec(listOf(webauthnSigner.toScVal()))
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
                 "Failed to convert signer to ScVal: ${e.message}",
@@ -1091,7 +1088,7 @@ class OZWalletOperations internal constructor(
         }
 
         // Empty policies map
-        val policiesScVal = SCValXdr.Map(SCMapXdr(emptyList()))
+        val policiesScVal = Scv.toMap(linkedMapOf())
 
         val constructorArgs = listOf(signersScVal, policiesScVal)
 

@@ -18,15 +18,16 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
-import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 
 /**
@@ -241,8 +242,8 @@ class OZMultiSignerManager internal constructor(
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
 
         val functionArgs = listOf(
-            SCValXdr.Address(fromAddress),
-            SCValXdr.Address(toAddress),
+            Scv.toAddress(fromAddress),
+            Scv.toAddress(toAddress),
             amountScVal
         )
 
@@ -406,7 +407,7 @@ class OZMultiSignerManager internal constructor(
                         InvokeContractArgsXdr(
                             contractAddress = Address(contractId).toSCAddress(),
                             functionName = SCSymbolXdr("__check_auth"),
-                            args = listOf(SCValXdr.Bytes(com.soneso.stellar.sdk.xdr.SCBytesXdr(payloadHash)))
+                            args = listOf(Scv.toBytes(payloadHash))
                         )
                     ),
                     subInvocations = emptyList()
@@ -459,7 +460,7 @@ class OZMultiSignerManager internal constructor(
                 signedEntry = SmartAccountAuth.addRawSignatureMapEntry(
                     entry = signedEntry,
                     signerKey = delegatedSigner.toScVal(),
-                    signatureValue = SCValXdr.Bytes(com.soneso.stellar.sdk.xdr.SCBytesXdr(byteArrayOf()))
+                    signatureValue = Scv.toBytes(byteArrayOf())
                 )
             }
 
@@ -528,7 +529,7 @@ class OZMultiSignerManager internal constructor(
         // XDR round-trip clone
         val writer = XdrWriter()
         entry.encode(writer)
-        val reader = com.soneso.stellar.sdk.xdr.XdrReader(writer.toByteArray())
+        val reader = XdrReader(writer.toByteArray())
         val cloned = SorobanAuthorizationEntryXdr.decode(reader)
 
         // Set expiration on the cloned entry

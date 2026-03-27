@@ -13,17 +13,15 @@ import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
-import com.soneso.stellar.sdk.xdr.SCMapXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.SCVecXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
-import com.soneso.stellar.sdk.scval.Scv
 
 /**
  * Authentication utilities for Smart Account authorization entries.
@@ -339,11 +337,11 @@ object SmartAccountAuth {
         val mapEntries: MutableList<SCMapEntryXdr> = mutableListOf()
 
         // Check if credentials.signature already has a Vec with a Map
-        if (credentials.signature is com.soneso.stellar.sdk.xdr.SCValXdr.Vec) {
-            val existingVecXdr = (credentials.signature as com.soneso.stellar.sdk.xdr.SCValXdr.Vec).value
+        if (credentials.signature is SCValXdr.Vec) {
+            val existingVecXdr = (credentials.signature as SCValXdr.Vec).value
             if (existingVecXdr != null && existingVecXdr.value.isNotEmpty()) {
                 val firstElement = existingVecXdr.value[0]
-                if (firstElement is com.soneso.stellar.sdk.xdr.SCValXdr.Map) {
+                if (firstElement is SCValXdr.Map) {
                     // Append to existing map
                     firstElement.value?.let { mapXdr ->
                         mapEntries.addAll(mapXdr.value)
@@ -359,23 +357,15 @@ object SmartAccountAuth {
         val sortedMapEntries = sortMapEntries(mapEntries)
 
         // Build the final signature structure: ScVal::Vec([ScVal::Map([entries...])])
-        val signatureMap = try {
-            val mapXdr = com.soneso.stellar.sdk.xdr.SCMapXdr(sortedMapEntries)
-            com.soneso.stellar.sdk.xdr.SCValXdr.Map(mapXdr)
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to create signature map",
-                e
-            )
-        }
-
-        val vecXdr = com.soneso.stellar.sdk.xdr.SCVecXdr(listOf(signatureMap))
+        val signatureMap = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {
+            sortedMapEntries.forEach { entry -> put(entry.key, entry.`val`) }
+        })
 
         credentials = SorobanAddressCredentialsXdr(
             address = credentials.address,
             nonce = credentials.nonce,
             signatureExpirationLedger = credentials.signatureExpirationLedger,
-            signature = com.soneso.stellar.sdk.xdr.SCValXdr.Vec(vecXdr)
+            signature = Scv.toVec(listOf(signatureMap))
         )
 
         // STEP 6: Create and return the signed entry
@@ -429,12 +419,14 @@ object SmartAccountAuth {
 
         // Sort and rebuild
         val sortedEntries = sortMapEntries(mapEntries)
-        val signatureMap = SCValXdr.Map(SCMapXdr(sortedEntries))
+        val signatureMap = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {
+            sortedEntries.forEach { entry -> put(entry.key, entry.`val`) }
+        })
         val updatedCredentials = SorobanAddressCredentialsXdr(
             address = credentials.address,
             nonce = credentials.nonce,
             signatureExpirationLedger = credentials.signatureExpirationLedger,
-            signature = SCValXdr.Vec(SCVecXdr(listOf(signatureMap)))
+            signature = Scv.toVec(listOf(signatureMap))
         )
 
         return SorobanAuthorizationEntryXdr(

@@ -22,13 +22,15 @@ import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
-import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanTransactionDataXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.XdrReader
+import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -224,8 +226,8 @@ class OZTransactionOperations internal constructor(
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
 
         val functionArgs = listOf(
-            SCValXdr.Address(fromAddress),
-            SCValXdr.Address(toAddress),
+            Scv.toAddress(fromAddress),
+            Scv.toAddress(toAddress),
             amountScVal
         )
 
@@ -857,7 +859,7 @@ class OZTransactionOperations internal constructor(
 
         // Query temp account balance via contract simulation
         val balanceArgs = listOf(
-            SCValXdr.Address(SCAddressXdr.AccountId(tempKeypair.getXdrAccountId()))
+            Scv.toAddress(SCAddressXdr.AccountId(tempKeypair.getXdrAccountId()))
         )
         val balanceInvokeArgs = InvokeContractArgsXdr(
             contractAddress = Address(nativeTokenContract).toSCAddress(),
@@ -889,8 +891,8 @@ class OZTransactionOperations internal constructor(
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(transferStroops)
 
         val functionArgs = listOf(
-            SCValXdr.Address(fromAddress),
-            SCValXdr.Address(toAddress),
+            Scv.toAddress(fromAddress),
+            Scv.toAddress(toAddress),
             amountScVal
         )
 
@@ -1073,28 +1075,19 @@ class OZTransactionOperations internal constructor(
                 // Sign with temp keypair
                 val signature = tempKeypair.sign(payloadHash)
 
-                // Build signature map (public_key -> signature)
-                val publicKeyEntry = SCMapEntryXdr(
-                    key = Scv.toSymbol("public_key"),
-                    `val` = Scv.toBytes(tempKeypair.getPublicKey())
-                )
-                val signatureEntry = SCMapEntryXdr(
-                    key = Scv.toSymbol("signature"),
-                    `val` = Scv.toBytes(signature)
-                )
-
                 // Create signature map and vec
-                val signatureMap = com.soneso.stellar.sdk.xdr.SCMapXdr(listOf(publicKeyEntry, signatureEntry))
-                val signatureVec = com.soneso.stellar.sdk.xdr.SCVecXdr(listOf(
-                    com.soneso.stellar.sdk.xdr.SCValXdr.Map(signatureMap)
+                val signatureMapScVal = Scv.toMap(linkedMapOf(
+                    Scv.toSymbol("public_key") to Scv.toBytes(tempKeypair.getPublicKey()),
+                    Scv.toSymbol("signature") to Scv.toBytes(signature)
                 ))
+                val signatureVecScVal = Scv.toVec(listOf(signatureMapScVal))
 
                 // Create new Address credentials entry to replace source_account
-                val addressCredentials = com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr(
+                val addressCredentials = SorobanAddressCredentialsXdr(
                     address = SCAddressXdr.AccountId(tempKeypair.getXdrAccountId()),
                     nonce = nonce,
                     signatureExpirationLedger = Uint32Xdr(expirationLedger),
-                    signature = com.soneso.stellar.sdk.xdr.SCValXdr.Vec(signatureVec)
+                    signature = signatureVecScVal
                 )
 
                 SorobanAuthorizationEntryXdr(
@@ -1104,8 +1097,8 @@ class OZTransactionOperations internal constructor(
             } else if (credType is SorobanCredentialsXdr.Address) {
                 // For Address credentials, sign them
                 // Clone the entry to avoid mutating the original
-                val entryBytes = com.soneso.stellar.sdk.xdr.XdrWriter().also { entry.encode(it) }.toByteArray()
-                val entryCopy = SorobanAuthorizationEntryXdr.decode(com.soneso.stellar.sdk.xdr.XdrReader(entryBytes))
+                val entryBytes = XdrWriter().also { entry.encode(it) }.toByteArray()
+                val entryCopy = SorobanAuthorizationEntryXdr.decode(XdrReader(entryBytes))
 
                 val credentials = (entryCopy.credentials as SorobanCredentialsXdr.Address).value
 
@@ -1119,28 +1112,19 @@ class OZTransactionOperations internal constructor(
                 // Sign with temp keypair
                 val signature = tempKeypair.sign(payloadHash)
 
-                // Build signature map
-                val publicKeyEntry = SCMapEntryXdr(
-                    key = Scv.toSymbol("public_key"),
-                    `val` = Scv.toBytes(tempKeypair.getPublicKey())
-                )
-                val signatureEntry = SCMapEntryXdr(
-                    key = Scv.toSymbol("signature"),
-                    `val` = Scv.toBytes(signature)
-                )
-
                 // Create signature map and vec
-                val signatureMap = com.soneso.stellar.sdk.xdr.SCMapXdr(listOf(publicKeyEntry, signatureEntry))
-                val signatureVec = com.soneso.stellar.sdk.xdr.SCVecXdr(listOf(
-                    com.soneso.stellar.sdk.xdr.SCValXdr.Map(signatureMap)
+                val signatureMapScVal = Scv.toMap(linkedMapOf(
+                    Scv.toSymbol("public_key") to Scv.toBytes(tempKeypair.getPublicKey()),
+                    Scv.toSymbol("signature") to Scv.toBytes(signature)
                 ))
+                val signatureVecScVal = Scv.toVec(listOf(signatureMapScVal))
 
                 // Create new credentials with updated signature
-                val updatedCredentials = com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr(
+                val updatedCredentials = SorobanAddressCredentialsXdr(
                     address = credentials.address,
                     nonce = credentials.nonce,
                     signatureExpirationLedger = Uint32Xdr(expirationLedger),
-                    signature = com.soneso.stellar.sdk.xdr.SCValXdr.Vec(signatureVec)
+                    signature = signatureVecScVal
                 )
 
                 SorobanAuthorizationEntryXdr(

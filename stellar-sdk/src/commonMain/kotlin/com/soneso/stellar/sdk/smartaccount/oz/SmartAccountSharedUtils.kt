@@ -20,7 +20,9 @@ import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.Uint64Xdr
+import com.soneso.stellar.sdk.xdr.PublicKeyXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
+import com.soneso.stellar.sdk.StrKey
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -278,8 +280,8 @@ object SmartAccountSharedUtils {
                 try {
                     val publicKey = address.value.value
                     when (publicKey) {
-                        is com.soneso.stellar.sdk.xdr.PublicKeyXdr.Ed25519 -> {
-                            com.soneso.stellar.sdk.StrKey.encodeEd25519PublicKey(publicKey.value.value)
+                        is PublicKeyXdr.Ed25519 -> {
+                            StrKey.encodeEd25519PublicKey(publicKey.value.value)
                         }
                     }
                 } catch (e: Exception) {
