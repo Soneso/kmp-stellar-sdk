@@ -1,7 +1,8 @@
 package com.soneso.smartdemo.ui.screens
 
 /**
- * Wallet connection screen: Quick Connect, Manual Connect, and Pending Deployments.
+ * Wallet connection screen: Auto Connect, Connect via Indexer,
+ * Connect with Address (Recovery), and Pending Deployments.
  * All connection logic is handled by WalletConnectionFlow.
  */
 
@@ -9,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -47,10 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.WalletConnectionResult
 import com.soneso.smartdemo.flows.deletePendingCredential
 import com.soneso.smartdemo.flows.loadPendingCredentials
 import com.soneso.smartdemo.flows.connectWithAddress
@@ -60,9 +65,41 @@ import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
+import com.soneso.smartdemo.util.isValidContractAddress
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
+private enum class ConnectionSection { AUTO, INDEXER, ADDRESS }
+
+@Composable
+private fun RowScope.LoadingButtonContent(
+    text: String,
+    isLoading: Boolean,
+    indicatorSize: Dp = 20.dp,
+    gap: Dp = 8.dp
+) {
+    if (isLoading) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(indicatorSize),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.onPrimary
+        )
+        Spacer(modifier = Modifier.width(gap))
+    }
+    Text(text)
+}
+
+@Composable
+private fun InlineError(message: String?) {
+    message?.let { error ->
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = error,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+}
 
 class WalletConnectionScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -71,31 +108,75 @@ class WalletConnectionScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
 
-        // Connection loading states
-        var isConnecting by remember { mutableStateOf(false) }
-        var isAuthenticating by remember { mutableStateOf(false) }
+        // Tracks which section is currently connecting (null = idle).
+        // Prevents concurrent connection attempts and shows the spinner on the active button.
+        var activeConnection by remember { mutableStateOf<ConnectionSection?>(null) }
+
+        // Inline error messages for each section
+        var autoConnectError by remember { mutableStateOf<String?>(null) }
+        var indexerConnectError by remember { mutableStateOf<String?>(null) }
+        var addressConnectError by remember { mutableStateOf<String?>(null) }
 
         // UI expand/collapse state for collapsible sections
-        var manualExpanded by remember { mutableStateOf(false) }
+        var indexerExpanded by remember { mutableStateOf(false) }
+        var addressExpanded by remember { mutableStateOf(false) }
         var pendingExpanded by remember { mutableStateOf(false) }
 
-        // Authenticated credential ID shown in the manual connect section
-        var authenticatedCredentialId by remember { mutableStateOf<String?>(null) }
+        // Recovery connect input
+        var contractAddressInput by remember { mutableStateOf("") }
 
-        // Pending deployments list (StoredCredential is a data type needed for display)
+        // Pending deployments
         val pendingCredentials = remember { mutableStateListOf<StoredCredential>() }
-        var isLoadingPending by remember { mutableStateOf(true) }
+        var pendingActionInProgress by remember { mutableStateOf(false) }
+
+        fun clearAllErrors() {
+            autoConnectError = null
+            indexerConnectError = null
+            addressConnectError = null
+        }
+
+        suspend fun refreshPendingList() {
+            val updated = loadPendingCredentials()
+            pendingCredentials.clear()
+            pendingCredentials.addAll(updated)
+        }
+
+        fun launchConnection(
+            section: ConnectionSection,
+            setError: (String) -> Unit,
+            nullResultMessage: String,
+            connect: suspend () -> WalletConnectionResult?
+        ) {
+            clearAllErrors()
+            scope.launch {
+                activeConnection = section
+                try {
+                    val result = connect()
+                    if (result != null) {
+                        navigator.pop()
+                    } else {
+                        setError(nullResultMessage)
+                    }
+                } catch (e: Throwable) {
+                    val message = e.message ?: "Unknown error"
+                    if (isUserCancellation(message)) {
+                        ActivityLogState.info("Passkey authentication cancelled")
+                    } else {
+                        setError(message)
+                        ActivityLogState.error("Connection failed: $message")
+                    }
+                } finally {
+                    activeConnection = null
+                }
+            }
+        }
 
         // Load pending credentials on screen entry
         LaunchedEffect(Unit) {
             try {
-                val pending = loadPendingCredentials()
-                pendingCredentials.clear()
-                pendingCredentials.addAll(pending)
+                refreshPendingList()
             } catch (e: Exception) {
                 ActivityLogState.error("Failed to load pending credentials: ${e.message}")
-            } finally {
-                isLoadingPending = false
             }
         }
 
@@ -124,7 +205,7 @@ class WalletConnectionScreen : Screen {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Auto-Connect Section
+                // 1. Auto Connect
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -133,7 +214,7 @@ class WalletConnectionScreen : Screen {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Quick Connect",
+                            text = "Auto Connect",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -142,7 +223,9 @@ class WalletConnectionScreen : Screen {
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "Connect with automatic session restoration or passkey authentication.",
+                            text = "Restores the last connected session if available. " +
+                                "If no session exists, triggers passkey authentication " +
+                                "and tries to resolve the contract address automatically via indexer.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -151,51 +234,27 @@ class WalletConnectionScreen : Screen {
 
                         Button(
                             onClick = {
-                                val handler = CoroutineExceptionHandler { _, throwable ->
-                                    val message = throwable.message ?: "Unknown error"
-                                    if (isUserCancellation(message)) {
-                                        ActivityLogState.info("Passkey authentication cancelled")
-                                    } else {
-                                        ActivityLogState.error("Connection failed: $message")
-                                    }
-                                    isConnecting = false
-                                }
-                                scope.launch(handler) {
-                                    isConnecting = true
-                                    try {
-                                        val result = quickConnect()
-                                        if (result != null) {
-                                            navigator.pop()
-                                        }
-                                    } catch (e: Throwable) {
-                                        val message = e.message ?: "Unknown error"
-                                        if (isUserCancellation(message)) {
-                                            ActivityLogState.info("Passkey authentication cancelled")
-                                        } else {
-                                            ActivityLogState.error("Connection failed: $message")
-                                        }
-                                    } finally {
-                                        isConnecting = false
-                                    }
-                                }
+                                launchConnection(
+                                    section = ConnectionSection.AUTO,
+                                    setError = { autoConnectError = it },
+                                    nullResultMessage = "No wallet found for this passkey",
+                                    connect = { quickConnect() }
+                                )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = !isConnecting && DemoState.kit != null
+                            enabled = activeConnection == null && DemoState.kit != null
                         ) {
-                            if (isConnecting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(if (isConnecting) "Connecting..." else "Connect")
+                            LoadingButtonContent(
+                                text = "Auto Connect",
+                                isLoading = activeConnection == ConnectionSection.AUTO
+                            )
                         }
+
+                        InlineError(autoConnectError)
                     }
                 }
 
-                // 2. Manual Connect Section
+                // 2. Connect via Indexer
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -206,117 +265,63 @@ class WalletConnectionScreen : Screen {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { manualExpanded = !manualExpanded },
+                                .clickable { indexerExpanded = !indexerExpanded },
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Manual Connect (Advanced)",
+                                text = "Connect via Indexer",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Icon(
-                                imageVector = if (manualExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (manualExpanded) "Collapse" else "Expand"
+                                imageVector = if (indexerExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (indexerExpanded) "Collapse" else "Expand"
                             )
                         }
 
-                        if (manualExpanded) {
+                        if (indexerExpanded) {
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = "Authenticate first, then discover and select from multiple contracts.",
+                                text = "Authenticates with a passkey, then uses the indexer service " +
+                                    "to look up the smart account contract associated with that credential.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Authenticate + connect in one step via manualConnect()
                             Button(
                                 onClick = {
-                                    val handler = CoroutineExceptionHandler { _, throwable ->
-                                        val message = throwable.message ?: "Unknown error"
-                                        if (isUserCancellation(message)) {
-                                            ActivityLogState.info("Passkey authentication cancelled")
-                                        } else {
-                                            ActivityLogState.error("Authentication failed: $message")
-                                        }
-                                        isAuthenticating = false
-                                    }
-                                    scope.launch(handler) {
-                                        isAuthenticating = true
-                                        try {
-                                            val result = manualConnect()
-                                            if (result != null) {
-                                                authenticatedCredentialId = result.credentialId
-                                                navigator.pop()
-                                            }
-                                        } catch (e: Throwable) {
-                                            val message = e.message ?: "Unknown error"
-                                            if (isUserCancellation(message)) {
-                                                ActivityLogState.info("Passkey authentication cancelled")
-                                            } else {
-                                                ActivityLogState.error("Authentication failed: $message")
-                                            }
-                                        } finally {
-                                            isAuthenticating = false
-                                        }
-                                    }
+                                    launchConnection(
+                                        section = ConnectionSection.INDEXER,
+                                        setError = { indexerConnectError = it },
+                                        nullResultMessage = "No contract found for this credential",
+                                        connect = { manualConnect() }
+                                    )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = !isAuthenticating && DemoState.kit != null
+                                enabled = activeConnection == null && DemoState.kit != null
                             ) {
-                                if (isAuthenticating) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                Text(if (isAuthenticating) "Authenticating..." else "Authenticate Passkey")
+                                LoadingButtonContent(
+                                    text = "Connect via Indexer",
+                                    isLoading = activeConnection == ConnectionSection.INDEXER
+                                )
                             }
 
-                            // Show authenticated credential
-                            if (authenticatedCredentialId != null) {
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = "Authenticated Credential:",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = authenticatedCredentialId!!.take(24) + "...",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
+                            InlineError(indexerConnectError)
                         }
                     }
                 }
 
-                // 3. Connect with Contract Address (Recovery)
+                // 3. Connect with Address (Recovery)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
-                    var addressExpanded by remember { mutableStateOf(false) }
-                    var contractAddressInput by remember { mutableStateOf("") }
-                    var isConnectingWithAddress by remember { mutableStateOf(false) }
-
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier
@@ -326,7 +331,7 @@ class WalletConnectionScreen : Screen {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Connect with Contract Address",
+                                text = "Connect with Address (Recovery)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -340,82 +345,60 @@ class WalletConnectionScreen : Screen {
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = "Connect using a known contract address and any registered passkey. " +
-                                    "Use this to reconnect with a recovery passkey.",
+                                text = "Connect to a smart account using a known contract address. " +
+                                    "Authenticates with a passkey that is registered as a signer on the contract. " +
+                                    "Use this to reconnect with a recovery signer.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            androidx.compose.material3.OutlinedTextField(
+                            val isAddressValid = isValidContractAddress(contractAddressInput.trim())
+
+                            OutlinedTextField(
                                 value = contractAddressInput,
-                                onValueChange = { contractAddressInput = it },
+                                onValueChange = {
+                                    contractAddressInput = it
+                                    addressConnectError = null
+                                },
                                 label = { Text("Contract Address") },
                                 placeholder = { Text("C...") },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = !isConnectingWithAddress,
+                                enabled = activeConnection == null,
                                 singleLine = true,
-                                isError = contractAddressInput.isNotBlank() &&
-                                    (!contractAddressInput.startsWith("C") || contractAddressInput.length != 56)
+                                isError = contractAddressInput.isNotBlank() && !isAddressValid
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Button(
                                 onClick = {
-                                    val handler = CoroutineExceptionHandler { _, throwable ->
-                                        val message = throwable.message ?: "Unknown error"
-                                        if (isUserCancellation(message)) {
-                                            ActivityLogState.info("Passkey authentication cancelled")
-                                        } else {
-                                            ActivityLogState.error("Connection failed: $message")
-                                        }
-                                        isConnectingWithAddress = false
-                                    }
-                                    scope.launch(handler) {
-                                        isConnectingWithAddress = true
-                                        try {
-                                            val result = connectWithAddress(contractAddressInput.trim())
-                                            if (result != null) {
-                                                navigator.pop()
-                                            } else {
-                                                ActivityLogState.error("Could not connect to the provided contract address")
-                                            }
-                                        } catch (e: Throwable) {
-                                            val message = e.message ?: "Unknown error"
-                                            if (isUserCancellation(message)) {
-                                                ActivityLogState.info("Passkey authentication cancelled")
-                                            } else {
-                                                ActivityLogState.error("Connection failed: $message")
-                                            }
-                                        } finally {
-                                            isConnectingWithAddress = false
-                                        }
-                                    }
+                                    launchConnection(
+                                        section = ConnectionSection.ADDRESS,
+                                        setError = { addressConnectError = it },
+                                        nullResultMessage = "Could not connect to the provided contract address",
+                                        connect = { connectWithAddress(contractAddressInput.trim()) }
+                                    )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = !isConnectingWithAddress &&
+                                enabled = activeConnection == null &&
                                     DemoState.kit != null &&
-                                    contractAddressInput.startsWith("C") &&
-                                    contractAddressInput.length == 56
+                                    isAddressValid
                             ) {
-                                if (isConnectingWithAddress) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                Text(if (isConnectingWithAddress) "Connecting..." else "Connect with Address (Recovery)")
+                                LoadingButtonContent(
+                                    text = "Connect",
+                                    isLoading = activeConnection == ConnectionSection.ADDRESS
+                                )
                             }
+
+                            InlineError(addressConnectError)
                         }
                     }
                 }
 
-                // 4. Pending Credentials Section
-                if (pendingCredentials.isNotEmpty() || isLoadingPending) {
+                // 4. Pending Deployments
+                if (pendingCredentials.isNotEmpty()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -431,7 +414,7 @@ class WalletConnectionScreen : Screen {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Pending Deployments (${pendingCredentials.count()})",
+                                    text = "Pending Deployments (${pendingCredentials.size})",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -446,113 +429,93 @@ class WalletConnectionScreen : Screen {
                             if (pendingExpanded) {
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                if (isLoadingPending) {
-                                    Text(
-                                        text = "Loading pending credentials...",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                } else if (pendingCredentials.isEmpty()) {
-                                    Text(
-                                        text = "No pending deployments",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                } else {
-                                    pendingCredentials.forEach { credential ->
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface
+                                pendingCredentials.forEach { credential ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                text = "Credential ID:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Text(
-                                                    text = "Credential ID:",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                                Text(
-                                                    text = buildString {
-                                                        append("${credential.credentialId.take(12)}...${credential.credentialId.takeLast(8)}")
-                                                        if (credential.nickname != null) {
-                                                            append(" (${credential.nickname})")
+                                            Text(
+                                                text = "${credential.credentialId.take(12)}...${credential.credentialId.takeLast(8)}" +
+                                                    (credential.nickname?.let { " ($it)" } ?: ""),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Text(
+                                                text = "Contract ID:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = credential.contractId?.let { "${it.take(12)}...${it.takeLast(12)}" } ?: "Unknown",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        scope.launch {
+                                                            pendingActionInProgress = true
+                                                            try {
+                                                                val result = retryPendingDeploy(
+                                                                    credential.credentialId,
+                                                                    credential.contractId
+                                                                )
+                                                                if (result != null) {
+                                                                    refreshPendingList()
+                                                                    navigator.pop()
+                                                                } else {
+                                                                    ActivityLogState.error("Retry failed: could not deploy contract")
+                                                                }
+                                                            } catch (e: Throwable) {
+                                                                ActivityLogState.error("Retry failed: ${e.message}")
+                                                            } finally {
+                                                                pendingActionInProgress = false
+                                                            }
                                                         }
                                                     },
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-
-                                                Spacer(modifier = Modifier.height(4.dp))
-
-                                                Text(
-                                                    text = "Contract ID:",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                                Text(
-                                                    text = credential.contractId?.let { "${it.take(12)}...${it.takeLast(12)}" } ?: "Unknown",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-
-                                                Spacer(modifier = Modifier.height(8.dp))
-
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    modifier = Modifier.weight(1f),
+                                                    enabled = !pendingActionInProgress
                                                 ) {
-                                                    Button(
-                                                        onClick = {
-                                                            val handler = CoroutineExceptionHandler { _, throwable ->
-                                                                ActivityLogState.error("Retry failed: ${throwable.message}")
-                                                            }
-                                                            scope.launch(handler) {
-                                                                try {
-                                                                    val result = retryPendingDeploy(
-                                                                        credential.credentialId,
-                                                                        credential.contractId
-                                                                    )
-                                                                    if (result != null) {
-                                                                        // Refresh pending list after successful deploy
-                                                                        val updated = loadPendingCredentials()
-                                                                        pendingCredentials.clear()
-                                                                        pendingCredentials.addAll(updated)
-                                                                        navigator.pop()
-                                                                    }
-                                                                } catch (e: Throwable) {
-                                                                    ActivityLogState.error("Retry failed: ${e.message}")
-                                                                }
-                                                            }
-                                                        },
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Text("Retry Deploy")
-                                                    }
+                                                    Text("Retry Deploy")
+                                                }
 
-                                                    OutlinedButton(
-                                                        onClick = {
-                                                            val handler = CoroutineExceptionHandler { _, throwable ->
-                                                                ActivityLogState.error("Delete failed: ${throwable.message}")
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        scope.launch {
+                                                            pendingActionInProgress = true
+                                                            try {
+                                                                deletePendingCredential(credential.credentialId)
+                                                                refreshPendingList()
+                                                            } catch (e: Throwable) {
+                                                                ActivityLogState.error("Delete failed: ${e.message}")
+                                                            } finally {
+                                                                pendingActionInProgress = false
                                                             }
-                                                            scope.launch(handler) {
-                                                                try {
-                                                                    deletePendingCredential(credential.credentialId)
-                                                                    // Refresh pending list after deletion
-                                                                    val updated = loadPendingCredentials()
-                                                                    pendingCredentials.clear()
-                                                                    pendingCredentials.addAll(updated)
-                                                                } catch (e: Throwable) {
-                                                                    ActivityLogState.error("Delete failed: ${e.message}")
-                                                                }
-                                                            }
-                                                        },
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Text("Delete")
-                                                    }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.weight(1f),
+                                                    enabled = !pendingActionInProgress
+                                                ) {
+                                                    Text("Delete")
                                                 }
                                             }
                                         }

@@ -6,9 +6,9 @@
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.oz
+package com.soneso.stellar.sdk.smartaccount.core
 import com.soneso.stellar.sdk.platformSynchronized
-import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import kotlin.concurrent.Volatile
 
 /**

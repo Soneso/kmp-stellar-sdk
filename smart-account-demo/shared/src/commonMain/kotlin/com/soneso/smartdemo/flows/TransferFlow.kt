@@ -3,7 +3,7 @@ package com.soneso.smartdemo.flows
 /**
  * Business logic for token transfers from a smart account.
  *
- * Demonstrates how to transfer tokens using [OZSmartAccountKit.transactionOperations.transfer]:
+ * Demonstrates how to transfer tokens using OZSmartAccountKit.transactionOperations.transfer:
  * - XLM via the Stellar Asset Contract (SAC): pass the SAC address as [tokenContract].
  * - Custom Soroban tokens (e.g., DEMO): pass the token contract address.
  *
@@ -15,8 +15,15 @@ package com.soneso.smartdemo.flows
 
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.isUserCancellation
+import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
+import com.soneso.smartdemo.util.SignerInfo
+import com.soneso.smartdemo.util.extractSignersFromRules
+import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
+import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 
 /**
@@ -37,7 +44,7 @@ data class TransferResult(
  *
  * SDK workflow:
  * 1. Get the connected [OZSmartAccountKit] from [DemoState].
- * 2. Call [OZSmartAccountKit.transactionOperations.transfer] with the token contract,
+ * 2. Call OZSmartAccountKit.transactionOperations.transfer with the token contract,
  *    recipient, and amount. The SDK:
  *    a. Simulates the transaction to compute the Soroban auth entry.
  *    b. Triggers a WebAuthn authentication ceremony to sign the auth entry with the passkey.
@@ -92,7 +99,7 @@ suspend fun transfer(
  *
  * SDK workflow:
  * 1. Get the connected [OZSmartAccountKit] from [DemoState].
- * 2. Call [OZSmartAccountKit.multiSignerManager.multiSignerTransfer] with the token contract,
+ * 2. Call OZSmartAccountKit.multiSignerManager.multiSignerTransfer with the token contract,
  *    recipient, amount, and the explicit signer list. The SDK:
  *    a. Simulates the transaction to compute Soroban auth entries.
  *    b. For each [SelectedSigner.Passkey]: triggers one OS WebAuthn authentication prompt.
@@ -140,4 +147,103 @@ suspend fun multiSignerTransfer(
         hash = result.hash,
         error = result.error
     )
+}
+
+/**
+ * Loads the available signers for the connected smart account by fetching context rules.
+ *
+ * On failure, returns an empty list so the caller can fall back to single-signer mode.
+ *
+ * @return List of [SignerInfo] with signing capability flags, or empty list on error.
+ */
+suspend fun loadAvailableSigners(): List<SignerInfo> {
+    val kit = DemoState.kit ?: return emptyList()
+    return try {
+        val rules = fetchAllContextRules(kit)
+        extractSignersFromRules(
+            rules = rules,
+            connectedCredentialId = DemoState.credentialId,
+            externalWallet = DemoState.externalSignerManager
+        )
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+/**
+ * Converts a list of selected [SmartAccountSigner] objects from the signer picker into
+ * the [SelectedSigner] list required by [multiSignerTransfer].
+ *
+ * - [ExternalSigner] with a credential ID → [SelectedSigner.Passkey] with full keyData.
+ * - [DelegatedSigner] → [SelectedSigner.Wallet] identified by G-address.
+ * - [ExternalSigner] without a credential ID → skipped (not supported in multi-signer flow).
+ *
+ * @param signers Selected signers from the signer picker dialog.
+ * @return Mapped list of [SelectedSigner] ready for [multiSignerTransfer].
+ */
+fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner> {
+    val result = mutableListOf<SelectedSigner>()
+    for (signer in signers) {
+        when (signer) {
+            is ExternalSigner -> {
+                val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+                val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer)
+                if (credIdStr != null) {
+                    result.add(
+                        SelectedSigner.Passkey(
+                            credentialId = credIdStr,
+                            credentialIdBytes = credIdBytes,
+                            keyData = signer.keyData
+                        )
+                    )
+                }
+            }
+            is DelegatedSigner -> {
+                result.add(SelectedSigner.Wallet(address = signer.address))
+            }
+        }
+    }
+    return result
+}
+
+/**
+ * Determines whether a single-passkey transfer can be used instead of the multi-signer path.
+ *
+ * Returns true only when exactly one passkey is selected AND it is the currently connected
+ * passkey. The simple [transfer] path always signs with the connected passkey, so it cannot
+ * be used for other passkeys from context rules or for any delegated signers.
+ *
+ * @param selectedSigners Signers chosen in the signer picker dialog.
+ * @return True if the single-signer [transfer] path should be used; false for [multiSignerTransfer].
+ */
+fun isSinglePasskeyTransfer(selectedSigners: List<SmartAccountSigner>): Boolean {
+    if (selectedSigners.size != 1) return false
+    val signer = selectedSigners[0]
+    if (signer !is ExternalSigner) return false
+    val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+    return credIdStr != null && credIdStr == DemoState.credentialId
+}
+
+/**
+ * Registers delegated signer keypairs in [DemoState.externalSignerManager] so that
+ * [multiSignerTransfer] can sign authorization entries for [SelectedSigner.Wallet] signers.
+ *
+ * The SDK's multiSignerTransfer calls [ExternalWalletAdapter.canSignFor] and
+ * [ExternalWalletAdapter.signAuthEntry] for each wallet signer — these rely on the
+ * keypairs being registered in the adapter before the call.
+ *
+ * Any previously registered keypairs are cleared before adding the new set to prevent
+ * stale keys from accumulating across transfers.
+ *
+ * @param delegatedKeyPairs Map of G-address to [com.soneso.stellar.sdk.KeyPair].
+ */
+suspend fun registerDelegatedKeypairs(
+    delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>
+) {
+    val externalManager = DemoState.externalSignerManager as? ExternalSignerManagerAdapter ?: return
+    externalManager.removeAll()
+    for ((_, keyPair) in delegatedKeyPairs) {
+        val secretSeed = keyPair.getSecretSeed() ?: continue
+        externalManager.addFromSecret(secretSeed.concatToString())
+    }
 }

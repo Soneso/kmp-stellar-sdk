@@ -8,7 +8,6 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

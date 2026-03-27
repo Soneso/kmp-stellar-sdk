@@ -5,13 +5,13 @@ package com.soneso.smartdemo.flows
  *
  * Demonstrates three connection strategies provided by the Smart Account SDK:
  *
- * 1. Quick Connect — [OZWalletOperations.connectWallet] with prompt=true.
- *    Tries to restore from a saved session first; falls back to a WebAuthn ceremony
- *    if no session exists. The simplest connection path for end users.
+ * 1. Auto Connect — [OZWalletOperations.connectWallet] with prompt=true.
+ *    Restores the last connected session if available. If no session exists,
+ *    triggers passkey authentication and resolves the contract address via indexer.
  *
- * 2. Manual Connect — Two-step: [authenticatePasskey] then [connectWallet] with credentialId.
- *    Gives the user explicit control: authenticate first, then the SDK resolves the
- *    contract address via the indexer using the credential ID.
+ * 2. Connect via Indexer — Two-step: [authenticatePasskey] then [connectWallet] with credentialId.
+ *    Authenticates with a passkey, then uses the indexer service to look up the
+ *    smart account contract associated with that credential.
  *
  * 3. Retry Pending Deploy — [connectWallet] with both credentialId and contractId.
  *    Used when a previous wallet creation registered the passkey but the on-chain
@@ -41,7 +41,7 @@ data class WalletConnectionResult(
 )
 
 /**
- * Connects to an existing wallet using Quick Connect.
+ * Connects to an existing wallet using Auto Connect.
  *
  * SDK workflow:
  * 1. Call [OZSmartAccountKit.walletOperations.connectWallet] with prompt=true.
@@ -91,7 +91,7 @@ suspend fun quickConnect(): WalletConnectionResult? {
 }
 
 /**
- * Connects to a wallet using the two-step Manual Connect flow.
+ * Connects to a wallet using the two-step Connect via Indexer flow.
  *
  * SDK workflow:
  * 1. Call [OZSmartAccountKit.walletOperations.authenticatePasskey] to perform a

@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -27,7 +28,6 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
-import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import kotlinx.coroutines.delay
 
@@ -1096,7 +1096,7 @@ class OZWalletOperations internal constructor(
         val salt = SmartAccountUtils.getContractSalt(credentialId = credentialId)
 
         // Build contract ID preimage
-        val deployerSCAddress = SCAddressXdr.AccountId(deployer.getXdrAccountId())
+        val deployerSCAddress = Address(deployer.getAccountId()).toSCAddress()
         val contractIdPreimage = ContractIDPreimageXdr.FromAddress(
             ContractIDPreimageFromAddressXdr(
                 address = deployerSCAddress,

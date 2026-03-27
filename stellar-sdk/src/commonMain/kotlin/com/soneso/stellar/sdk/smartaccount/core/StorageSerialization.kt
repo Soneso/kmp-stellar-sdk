@@ -5,9 +5,11 @@
 //  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.oz
+package com.soneso.stellar.sdk.smartaccount.core
 
-import com.soneso.stellar.sdk.smartaccount.core.toHexString
+import com.soneso.stellar.sdk.smartaccount.oz.CredentialDeploymentStatus
+import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
+import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
 import kotlinx.serialization.Serializable
 
 // MARK: - Internal Serializable Data Transfer Objects

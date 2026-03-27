@@ -14,7 +14,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.Int128PartsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr

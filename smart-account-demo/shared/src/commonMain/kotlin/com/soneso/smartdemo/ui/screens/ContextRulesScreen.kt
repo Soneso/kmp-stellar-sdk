@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -63,15 +64,13 @@ import com.soneso.smartdemo.flows.loadContextRules
 import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.signerTypeColor
+import com.soneso.smartdemo.util.describeSignerType
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.truncateAddress
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
-import androidx.compose.foundation.text.selection.SelectionContainer
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 class ContextRulesScreen : Screen {
@@ -125,30 +124,22 @@ class ContextRulesScreen : Screen {
                         onClick = {
                             val rule = ruleToRemove!!
                             ruleToRemove = null
-                            val handler = CoroutineExceptionHandler { _, throwable ->
-                                val msg = throwable.message ?: "Unknown error"
-                                errorMessage = "Failed to remove rule: $msg"
-                                ActivityLogState.error("Failed to remove rule: $msg")
-                                isRemoving = false
-                            }
-                            scope.launch(handler) {
+                            scope.launch {
                                 isRemoving = true
                                 try {
                                     val result = removeContextRule(rule.id)
                                     if (result.success) {
-                                        // Refresh rules after successful removal
                                         isLoading = true
                                         errorMessage = null
                                         try {
                                             rules = loadContextRules()
                                         } catch (e: Throwable) {
-                                            errorMessage = "Failed to refresh rules: ${e.message}"
+                                            errorMessage = "Failed to refresh rules: ${e.message ?: "Unknown error"}"
                                         } finally {
                                             isLoading = false
                                         }
                                     } else {
-                                        val errMsg = result.error ?: "Unknown error"
-                                        errorMessage = "Failed to remove rule: $errMsg"
+                                        errorMessage = "Failed to remove rule: ${result.error ?: "Unknown error"}"
                                     }
                                 } catch (e: Throwable) {
                                     val msg = e.message ?: "Unknown error"
@@ -228,13 +219,7 @@ class ContextRulesScreen : Screen {
                 ) {
                     OutlinedButton(
                         onClick = {
-                            val handler = CoroutineExceptionHandler { _, throwable ->
-                                val msg = throwable.message ?: "Unknown error"
-                                errorMessage = "Failed to fetch context rules: $msg"
-                                ActivityLogState.error("Failed to fetch context rules: $msg")
-                                isLoading = false
-                            }
-                            scope.launch(handler) {
+                            scope.launch {
                                 isLoading = true
                                 errorMessage = null
                                 try {
@@ -612,7 +597,7 @@ class ContextRulesScreen : Screen {
 
     @Composable
     private fun SignerChip(signer: SmartAccountSigner) {
-        val typeDescription = SmartAccountBuilders.describeSignerType(signer)
+        val typeDescription = describeSignerType(signer)
         val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)

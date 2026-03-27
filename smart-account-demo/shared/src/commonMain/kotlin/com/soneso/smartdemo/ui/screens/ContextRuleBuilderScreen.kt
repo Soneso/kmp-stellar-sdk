@@ -2,9 +2,16 @@ package com.soneso.smartdemo.ui.screens
 
 /**
  * Context rule builder screen: form for creating or editing a context rule.
- * SDK calls (add, update name, update expiry, load for edit) are handled by ContextRuleFlow.
- * SDK type imports (ContextRuleType, DelegatedSigner, ExternalSigner, etc.) are retained
- * because they are needed to construct form state and policy SCVal values.
+ *
+ * Business logic is delegated to ContextRuleFlow.kt:
+ * - Network calls (add, remove, update, load rules, resolve ledger)
+ * - Signer construction (delegated, Ed25519, passkey registration)
+ *
+ * Policy SCVal encoding is handled by PolicyScValBuilders.kt.
+ *
+ * The screen imports SDK data types (ContextRuleType, SmartAccountSigner, etc.)
+ * for rendering and form state representation, and also calls SmartAccountBuilders
+ * utility methods for signer comparison and display.
  */
 
 import androidx.compose.animation.AnimatedVisibility
@@ -21,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -66,33 +74,37 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.config.KNOWN_POLICIES
 import com.soneso.smartdemo.config.PolicyInfo
-import com.soneso.smartdemo.flows.addContextRule
+import com.soneso.smartdemo.flows.ContextRuleResult
 import com.soneso.smartdemo.flows.FlowPolicyEntry
+import com.soneso.smartdemo.flows.addContextRule
+import com.soneso.smartdemo.flows.buildDelegatedSigner
+import com.soneso.smartdemo.flows.buildEd25519Signer
+import com.soneso.smartdemo.flows.loadAvailablePasskeySigners
 import com.soneso.smartdemo.flows.loadContextRule
-import com.soneso.smartdemo.flows.loadContextRules
+import com.soneso.smartdemo.flows.registerPasskeySigner
+import com.soneso.smartdemo.flows.resolveAbsoluteLedger
 import com.soneso.smartdemo.flows.updateContextRuleName
 import com.soneso.smartdemo.flows.updateContextRuleValidUntil
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.parseContextType
-import com.soneso.smartdemo.util.parsePolicies
-import com.soneso.smartdemo.util.parseSigners
-import com.soneso.smartdemo.util.signerTypeColor
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
-import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.smartdemo.util.buildSimpleThresholdScVal
+import com.soneso.smartdemo.util.describeSignerType
+import com.soneso.smartdemo.util.buildSpendingLimitScVal
+import com.soneso.smartdemo.util.buildWeightedThresholdScVal
 import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.hexToByteArray
+import com.soneso.smartdemo.util.isUserCancellation
+import com.soneso.smartdemo.util.isValidSpendingAmount
+import com.soneso.smartdemo.util.parseSingleContextRuleFromScVal
+import com.soneso.smartdemo.util.signerTypeColor
+import com.soneso.smartdemo.util.toHexString
 import com.soneso.smartdemo.util.truncateAddress
+import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.ionspin.kotlin.bignum.integer.BigInteger
-import androidx.compose.foundation.text.selection.SelectionContainer
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 /**
@@ -122,7 +134,14 @@ class ContextRuleBuilderScreen(
         var contractAddress by remember { mutableStateOf("") }
         var wasmHashHex by remember { mutableStateOf("") }
         var hasExpiry by remember { mutableStateOf(false) }
+        // expiryLedger always stores a ledger offset selected from the dropdown.
+        // In edit mode the on-chain absolute ledger is shown as read-only info text;
+        // the user must re-select a duration offset to submit a new expiry.
         var expiryLedger by remember { mutableStateOf("") }
+        var existingExpiryLedger by remember { mutableStateOf<UInt?>(null) }
+        // Tracks whether the user modified the expiry from its loaded state in edit mode.
+        // Only true after the user toggles the checkbox or selects a new duration.
+        var expiryModified by remember { mutableStateOf(false) }
 
         // --- Signer management state ---
         var signers by remember { mutableStateOf<List<SmartAccountSigner>>(emptyList()) }
@@ -149,7 +168,7 @@ class ContextRuleBuilderScreen(
 
         // --- Submission state ---
         var isSubmitting by remember { mutableStateOf(false) }
-        var submissionResult by remember { mutableStateOf<SubmissionResult?>(null) }
+        var submissionResult by remember { mutableStateOf<ContextRuleResult?>(null) }
 
         // --- UI state ---
         var isLoadingRule by remember { mutableStateOf(false) }
@@ -163,7 +182,7 @@ class ContextRuleBuilderScreen(
                 errorMessage = null
                 try {
                     val ruleScVal = loadContextRule(editRuleId)
-                    val parsed = parseRuleFromScVal(ruleScVal, editRuleId)
+                    val parsed = parseSingleContextRuleFromScVal(ruleScVal, editRuleId)
                     if (parsed != null) {
                         ruleName = parsed.name
                         when (val ct = parsed.contextType) {
@@ -181,7 +200,10 @@ class ContextRuleBuilderScreen(
                         }
                         if (parsed.validUntil != null) {
                             hasExpiry = true
-                            expiryLedger = parsed.validUntil.toString()
+                            // Do not pre-populate expiryLedger: the value from on-chain
+                            // is an absolute ledger number and must not be treated as an
+                            // offset at submission time. Show it as informational text only.
+                            existingExpiryLedger = parsed.validUntil
                         }
                         signers = parsed.signers
                         // Pre-populate policies from existing rule (addresses only, params not available)
@@ -449,6 +471,7 @@ class ContextRuleBuilderScreen(
                                     checked = hasExpiry,
                                     onCheckedChange = {
                                         hasExpiry = it
+                                        expiryModified = true
                                         if (!it) {
                                             expiryLedger = ""
                                             fieldErrors = fieldErrors - "expiryLedger"
@@ -513,6 +536,7 @@ class ContextRuleBuilderScreen(
                                                         // computed at submission time by adding to currentLedger.
                                                         expiryLedger = ledgers.toString()
                                                         expiryDropdownExpanded = false
+                                                        expiryModified = true
                                                         fieldErrors = fieldErrors - "expiryLedger"
                                                     }
                                                 )
@@ -531,6 +555,14 @@ class ContextRuleBuilderScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    if (isEditing && existingExpiryLedger != null) {
+                                        Text(
+                                            text = "Current on-chain expiry: ledger $existingExpiryLedger. " +
+                                                "Select a duration above to replace it.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -571,6 +603,13 @@ class ContextRuleBuilderScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (fieldErrors.containsKey("signers")) {
+                                Text(
+                                    text = fieldErrors["signers"]!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
 
@@ -659,22 +698,16 @@ class ContextRuleBuilderScreen(
                                                 } else if (!addr.startsWith("G") || addr.length != 56) {
                                                     errors["delegatedAddress"] = "Must be a valid G-address (56 characters)"
                                                 } else {
-                                                    // Check for duplicates
                                                     val newSigner = try {
-                                                        DelegatedSigner(addr)
+                                                        buildDelegatedSigner(addr)
                                                     } catch (e: Exception) {
                                                         errors["delegatedAddress"] = "Invalid address: ${e.message}"
                                                         null
                                                     }
                                                     if (newSigner != null) {
-                                                        val isDuplicate = signers.any {
-                                                            SmartAccountBuilders.signersEqual(it, newSigner)
-                                                        }
-                                                        if (isDuplicate) {
-                                                            errors["delegatedAddress"] = "This signer is already added"
-                                                        } else if (signers.size >= SmartAccountConstants.MAX_SIGNERS) {
-                                                            errors["delegatedAddress"] =
-                                                                "Maximum ${SmartAccountConstants.MAX_SIGNERS} signers allowed"
+                                                        val signerError = validateNewSigner(newSigner, signers)
+                                                        if (signerError != null) {
+                                                            errors["delegatedAddress"] = signerError
                                                         } else {
                                                             signers = signers + newSigner
                                                             delegatedAddress = ""
@@ -684,7 +717,7 @@ class ContextRuleBuilderScreen(
                                                         }
                                                     }
                                                 }
-                                                fieldErrors = errors
+                                                fieldErrors = fieldErrors - "delegatedAddress" + errors
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             enabled = delegatedAddress.isNotBlank()
@@ -698,15 +731,15 @@ class ContextRuleBuilderScreen(
                                             value = ed25519PubKeyHex,
                                             onValueChange = {
                                                 ed25519PubKeyHex = it
-                                                fieldErrors = fieldErrors - "ed25519PubKey"
+                                                fieldErrors = fieldErrors - "ed25519PublicKey"
                                             },
                                             label = { Text("Ed25519 Public Key (hex)") },
                                             placeholder = { Text("64 hex characters") },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
-                                            isError = fieldErrors.containsKey("ed25519PubKey"),
-                                            supportingText = if (fieldErrors.containsKey("ed25519PubKey")) {
-                                                { Text(fieldErrors["ed25519PubKey"]!!) }
+                                            isError = fieldErrors.containsKey("ed25519PublicKey"),
+                                            supportingText = if (fieldErrors.containsKey("ed25519PublicKey")) {
+                                                { Text(fieldErrors["ed25519PublicKey"]!!) }
                                             } else null
                                         )
                                         Text(
@@ -719,32 +752,24 @@ class ContextRuleBuilderScreen(
                                                 val errors = mutableMapOf<String, String>()
                                                 val hex = ed25519PubKeyHex.trim().lowercase()
                                                 if (hex.isEmpty()) {
-                                                    errors["ed25519PubKey"] = "Public key is required"
+                                                    errors["ed25519PublicKey"] = "Public key is required"
                                                 } else if (hex.length != 64) {
-                                                    errors["ed25519PubKey"] =
+                                                    errors["ed25519PublicKey"] =
                                                         "Must be 64 hex characters (32 bytes), got ${hex.length}"
                                                 } else if (!hex.all { it in '0'..'9' || it in 'a'..'f' }) {
-                                                    errors["ed25519PubKey"] = "Invalid hex characters"
+                                                    errors["ed25519PublicKey"] = "Invalid hex characters"
                                                 } else {
                                                     val pubKeyBytes = hexToByteArray(hex)
                                                     val newSigner = try {
-                                                        ExternalSigner.ed25519(
-                                                            verifierAddress = DemoConfig.ED25519_VERIFIER_ADDRESS,
-                                                            publicKey = pubKeyBytes
-                                                        )
+                                                        buildEd25519Signer(pubKeyBytes)
                                                     } catch (e: Exception) {
-                                                        errors["ed25519PubKey"] = "Invalid key: ${e.message}"
+                                                        errors["ed25519PublicKey"] = "Invalid key: ${e.message}"
                                                         null
                                                     }
                                                     if (newSigner != null) {
-                                                        val isDuplicate = signers.any {
-                                                            SmartAccountBuilders.signersEqual(it, newSigner)
-                                                        }
-                                                        if (isDuplicate) {
-                                                            errors["ed25519PubKey"] = "This signer is already added"
-                                                        } else if (signers.size >= SmartAccountConstants.MAX_SIGNERS) {
-                                                            errors["ed25519PubKey"] =
-                                                                "Maximum ${SmartAccountConstants.MAX_SIGNERS} signers allowed"
+                                                        val signerError = validateNewSigner(newSigner, signers)
+                                                        if (signerError != null) {
+                                                            errors["ed25519PublicKey"] = signerError
                                                         } else {
                                                             signers = signers + newSigner
                                                             ed25519PubKeyHex = ""
@@ -754,7 +779,7 @@ class ContextRuleBuilderScreen(
                                                         }
                                                     }
                                                 }
-                                                fieldErrors = errors
+                                                fieldErrors = fieldErrors - "ed25519PublicKey" + errors
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             enabled = ed25519PubKeyHex.isNotBlank()
@@ -796,17 +821,9 @@ class ContextRuleBuilderScreen(
                                                         scope.launch {
                                                             isLoadingPasskeys = true
                                                             try {
-                                                                val rules = loadContextRules()
-                                                                availablePasskeys = rules
-                                                                    .flatMap { it.signers }
-                                                                    .filterIsInstance<ExternalSigner>()
-                                                                    .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-                                                                    .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-                                                                    .filter { signer ->
-                                                                        // Exclude the connected wallet's own passkey
-                                                                        val signerCredId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                                                                        signerCredId != connectedCredentialId
-                                                                    }
+                                                                availablePasskeys = loadAvailablePasskeySigners(
+                                                                    excludeCredentialId = connectedCredentialId
+                                                                )
                                                                 passkeysLoaded = true
                                                                 if (availablePasskeys.isEmpty()) {
                                                                     ActivityLogState.info("No additional passkey signers found")
@@ -840,13 +857,18 @@ class ContextRuleBuilderScreen(
                                                     )
                                                     availablePasskeys.forEach { passkey ->
                                                         val displayInfo = formatSignerForDisplay(passkey)
-                                                        val alreadyAdded = signers.any { SmartAccountBuilders.signersEqual(it, passkey) }
+                                                        val alreadyAdded = isDuplicateSigner(signers, passkey)
                                                         OutlinedButton(
                                                             onClick = {
                                                                 if (!alreadyAdded) {
-                                                                    signers = signers + passkey
-                                                                    fieldErrors = fieldErrors - "signers"
-                                                                    ActivityLogState.success("Added passkey signer: ${displayInfo.display}")
+                                                                    val signerError = validateNewSigner(passkey, signers)
+                                                                    if (signerError != null) {
+                                                                        fieldErrors = fieldErrors + ("signers" to signerError)
+                                                                    } else {
+                                                                        signers = signers + passkey
+                                                                        fieldErrors = fieldErrors - "signers"
+                                                                        ActivityLogState.success("Added passkey signer: ${displayInfo.display}")
+                                                                    }
                                                                 }
                                                             },
                                                             modifier = Modifier.fillMaxWidth(),
@@ -892,40 +914,19 @@ class ContextRuleBuilderScreen(
                                                         scope.launch {
                                                             isRegistering = true
                                                             try {
-                                                                val webauthnProvider = DemoState.webauthnProvider
-                                                                    ?: throw IllegalStateException("WebAuthn provider not available")
+                                                                val newSigner = registerPasskeySigner(newPasskeyName)
 
-                                                                // Generate a random challenge and user ID for the registration ceremony.
-                                                                // These are only used for the WebAuthn protocol — the contract
-                                                                // doesn't store them. We just need the public key from the result.
-                                                                val challenge = kotlin.random.Random.nextBytes(32)
-                                                                val userId = kotlin.random.Random.nextBytes(16)
-
-                                                                ActivityLogState.info("Starting passkey registration...")
-                                                                val result = webauthnProvider.register(
-                                                                    challenge = challenge,
-                                                                    userId = userId,
-                                                                    userName = newPasskeyName
-                                                                )
-
-                                                                // Build an ExternalSigner from the registration result.
-                                                                // The signer uses the WebAuthn verifier contract to validate
-                                                                // secp256r1 signatures from this passkey on-chain.
-                                                                val newSigner = ExternalSigner.webAuthn(
-                                                                    verifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
-                                                                    publicKey = result.publicKey,
-                                                                    credentialId = result.credentialId
-                                                                )
-
-                                                                if (!signers.any { SmartAccountBuilders.signersEqual(it, newSigner) }) {
+                                                                val signerError = validateNewSigner(newSigner, signers)
+                                                                if (signerError != null) {
+                                                                    fieldErrors = fieldErrors + ("signers" to signerError)
+                                                                    ActivityLogState.info(signerError)
+                                                                } else {
                                                                     signers = signers + newSigner
                                                                     fieldErrors = fieldErrors - "signers"
                                                                     // Also add to available list so it shows as "already added"
                                                                     availablePasskeys = availablePasskeys + newSigner
                                                                     passkeysLoaded = true
                                                                     ActivityLogState.success("Registered and added new passkey signer")
-                                                                } else {
-                                                                    ActivityLogState.info("This passkey is already added as a signer")
                                                                 }
                                                             } catch (e: Throwable) {
                                                                 val message = e.message ?: "Unknown error"
@@ -1019,7 +1020,7 @@ class ContextRuleBuilderScreen(
                             )
                         }
                         Text(
-                            text = "${policies.size} policy/policies attached",
+                            text = "${policies.size} ${if (policies.size == 1) "policy" else "policies"} attached",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1109,7 +1110,7 @@ class ContextRuleBuilderScreen(
                                                     selectedPolicyType = null
                                                     ActivityLogState.info("Added simple threshold policy (threshold=$t)")
                                                 }
-                                                fieldErrors = errors
+                                                fieldErrors = fieldErrors - "threshold" + errors
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             enabled = thresholdValue.isNotBlank()
@@ -1175,23 +1176,18 @@ class ContextRuleBuilderScreen(
                                         Button(
                                             onClick = {
                                                 val errors = mutableMapOf<String, String>()
-                                                val amountValidation = try {
-                                                    SmartAccountSharedUtils.amountToStroops(spendingLimitAmount)
-                                                    true
-                                                } catch (e: Exception) {
-                                                    false
-                                                }
                                                 val days = spendingLimitPeriodDays.toIntOrNull()
-                                                if (!amountValidation) {
+                                                if (!isValidSpendingAmount(spendingLimitAmount)) {
                                                     errors["spendingAmount"] = "Must be a positive number"
                                                 }
                                                 if (days == null || days <= 0) {
                                                     errors["spendingPeriod"] = "Must be at least 1 day"
                                                 }
                                                 if (errors.isEmpty()) {
-                                                    val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimitAmount)
                                                     val periodLedgers = (days!! * SmartAccountConstants.LEDGERS_PER_DAY).toUInt()
-                                                    val scVal = buildSpendingLimitScVal(stroops, periodLedgers)
+                                                    val scVal = buildSpendingLimitScVal(spendingLimitAmount, periodLedgers)
+                                                    // Capture values before clearing state so the log message is correct.
+                                                    val logAmount = spendingLimitAmount
                                                     policies = policies + PolicyEntry(
                                                         info = selectedPolicyType!!,
                                                         label = "Limit: $spendingLimitAmount / $days day(s)",
@@ -1202,10 +1198,10 @@ class ContextRuleBuilderScreen(
                                                     spendingLimitPeriodDays = ""
                                                     selectedPolicyType = null
                                                     ActivityLogState.info(
-                                                        "Added spending limit policy ($spendingLimitAmount per $days day(s))"
+                                                        "Added spending limit policy ($logAmount per $days day(s))"
                                                     )
                                                 }
-                                                fieldErrors = errors
+                                                fieldErrors = fieldErrors - "spendingAmount" - "spendingPeriod" + errors
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             enabled = spendingLimitAmount.isNotBlank() &&
@@ -1338,7 +1334,7 @@ class ContextRuleBuilderScreen(
                                                         "Added weighted threshold policy (threshold=$threshold)"
                                                     )
                                                 }
-                                                fieldErrors = errors
+                                                fieldErrors = fieldErrors - "weightedThreshold" - "signerWeights" + errors
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             enabled = weightedThresholdValue.isNotBlank() && signers.isNotEmpty()
@@ -1371,12 +1367,6 @@ class ContextRuleBuilderScreen(
                     // Section 2B: Submission
                     // ====================================================================
 
-                    if (isEditing) {
-                        // Edit mode: only name and expiry can be updated via the contract's
-                        // updateName/updateValidUntil functions. Signer and policy changes
-                        // are separate on-chain operations (addSigner, removeSigner, etc.).
-                    }
-
                     Button(
                         onClick = {
                             // Validate the form before submission
@@ -1387,7 +1377,9 @@ class ContextRuleBuilderScreen(
                                 wasmHashHex = wasmHashHex,
                                 hasExpiry = hasExpiry,
                                 expiryLedger = expiryLedger,
-                                signers = signers
+                                signers = signers,
+                                isEditing = isEditing,
+                                expiryModified = expiryModified
                             )
                             if (errors.isNotEmpty()) {
                                 fieldErrors = errors
@@ -1400,55 +1392,52 @@ class ContextRuleBuilderScreen(
                             isSubmitting = true
                             submissionResult = null
 
-                            val handler = CoroutineExceptionHandler { _, throwable ->
-                                submissionResult = SubmissionResult(
-                                    success = false,
-                                    error = throwable.message ?: "Unknown error"
-                                )
-                                ActivityLogState.error("Transaction failed: ${throwable.message}")
-                                isSubmitting = false
-                            }
-                            scope.launch(handler) {
+                            scope.launch {
                                 try {
                                     if (isEditing) {
-                                        // Edit mode: update name then validUntil via flow functions
+                                        // Edit mode: update name then validUntil via flow functions.
+                                        // Signer and policy changes require separate SDK calls.
                                         ActivityLogState.info("Updating rule #$editRuleId...")
 
                                         val nameResult = updateContextRuleName(editRuleId!!, ruleName.trim())
                                         if (!nameResult.success) {
-                                            submissionResult = SubmissionResult(
+                                            submissionResult = ContextRuleResult(
                                                 success = false,
+                                                hash = null,
                                                 error = "Failed to update name: ${nameResult.error ?: "Unknown error"}"
                                             )
                                             return@launch
                                         }
 
-                                        // expiryLedger stores a ledger offset (e.g., 720 for 1 hour).
-                                        // Convert to absolute ledger by fetching current ledger from RPC.
-                                        val validUntilVal = if (hasExpiry) {
-                                            val offset = expiryLedger.toUIntOrNull()
-                                            if (offset != null) {
-                                                val server = com.soneso.stellar.sdk.rpc.SorobanServer(DemoConfig.RPC_URL)
-                                                val currentLedger = server.getLatestLedger().sequence.toUInt()
-                                                currentLedger + offset
-                                            } else null
-                                        } else null
-                                        val validUntilResult = updateContextRuleValidUntil(editRuleId, validUntilVal)
-                                        if (!validUntilResult.success) {
-                                            submissionResult = SubmissionResult(
-                                                success = false,
-                                                error = "Name updated but failed to update expiry: ${validUntilResult.error ?: "Unknown error"}"
+                                        if (expiryModified) {
+                                            val validUntilVal = resolveExpiryLedger(hasExpiry, expiryLedger)
+                                            val validUntilResult = updateContextRuleValidUntil(editRuleId, validUntilVal)
+                                            if (!validUntilResult.success) {
+                                                submissionResult = ContextRuleResult(
+                                                    success = false,
+                                                    hash = null,
+                                                    error = "Name updated but failed to update expiry: ${validUntilResult.error ?: "Unknown error"}"
+                                                )
+                                                return@launch
+                                            }
+                                            submissionResult = ContextRuleResult(
+                                                success = true,
+                                                hash = validUntilResult.hash,
+                                                error = null
                                             )
-                                            return@launch
+                                            ActivityLogState.info(
+                                                "Rule #$editRuleId updated successfully. Hash: ${validUntilResult.hash ?: "N/A"}"
+                                            )
+                                        } else {
+                                            submissionResult = ContextRuleResult(
+                                                success = true,
+                                                hash = nameResult.hash,
+                                                error = null
+                                            )
+                                            ActivityLogState.info(
+                                                "Rule #$editRuleId updated successfully. Hash: ${nameResult.hash ?: "N/A"}"
+                                            )
                                         }
-
-                                        submissionResult = SubmissionResult(
-                                            success = true,
-                                            hash = validUntilResult.hash
-                                        )
-                                        ActivityLogState.info(
-                                            "Rule #$editRuleId updated successfully. Hash: ${validUntilResult.hash ?: "N/A"}"
-                                        )
                                     } else {
                                         // Create mode: add new context rule via flow
                                         val selectedContextType = when (contextTypeOption) {
@@ -1461,16 +1450,7 @@ class ContextRuleBuilderScreen(
                                                 )
                                         }
 
-                                        // expiryLedger stores a ledger offset (e.g., 720 for 1 hour).
-                                        // Convert to absolute ledger by fetching current ledger from RPC.
-                                        val validUntilVal = if (hasExpiry) {
-                                            val offset = expiryLedger.toUIntOrNull()
-                                            if (offset != null) {
-                                                val server = com.soneso.stellar.sdk.rpc.SorobanServer(DemoConfig.RPC_URL)
-                                                val currentLedger = server.getLatestLedger().sequence.toUInt()
-                                                currentLedger + offset
-                                            } else null
-                                        } else null
+                                        val validUntilVal = resolveExpiryLedger(hasExpiry, expiryLedger)
 
                                         // Convert PolicyEntry list to FlowPolicyEntry for the flow
                                         val flowPolicies = policies.map { policy ->
@@ -1485,15 +1465,12 @@ class ContextRuleBuilderScreen(
                                             policies = flowPolicies
                                         )
 
-                                        submissionResult = SubmissionResult(
-                                            success = result.success,
-                                            hash = result.hash,
-                                            error = result.error
-                                        )
+                                        submissionResult = result
                                     }
                                 } catch (e: Throwable) {
-                                    submissionResult = SubmissionResult(
+                                    submissionResult = ContextRuleResult(
                                         success = false,
+                                        hash = null,
                                         error = e.message ?: "Unknown error"
                                     )
                                     ActivityLogState.error("Transaction failed: ${e.message}")
@@ -1504,7 +1481,7 @@ class ContextRuleBuilderScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = DemoState.isConnected && !isSubmitting &&
-                                ruleName.isNotBlank() && signers.isNotEmpty() &&
+                                ruleName.isNotBlank() && (isEditing || signers.isNotEmpty()) &&
                                 submissionResult?.success != true
                     ) {
                         if (isSubmitting) {
@@ -1749,7 +1726,7 @@ class ContextRuleBuilderScreen(
         onRemove: () -> Unit,
         enabled: Boolean = true
     ) {
-        val typeDescription = SmartAccountBuilders.describeSignerType(signer)
+        val typeDescription = describeSignerType(signer)
         val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)
@@ -1966,6 +1943,56 @@ class ContextRuleBuilderScreen(
     }
 
     // ========================================================================
+    // Helpers
+    // ========================================================================
+
+    /**
+     * Returns true if [newSigner] is already present in [signers] by identity,
+     * using [SmartAccountBuilders.signersEqual] for comparison.
+     */
+    private fun isDuplicateSigner(
+        signers: List<SmartAccountSigner>,
+        newSigner: SmartAccountSigner
+    ): Boolean = signers.any { SmartAccountBuilders.signersEqual(it, newSigner) }
+
+    /**
+     * Validates that [signer] can be added to [signers].
+     *
+     * Checks the maximum signer limit and duplicate identity in a single call.
+     * Returns an error message string, or null if the signer is valid to add.
+     */
+    private fun validateNewSigner(
+        signer: SmartAccountSigner,
+        signers: List<SmartAccountSigner>
+    ): String? {
+        if (signers.size >= SmartAccountConstants.MAX_SIGNERS) {
+            return "Maximum ${SmartAccountConstants.MAX_SIGNERS} signers allowed"
+        }
+        if (isDuplicateSigner(signers, signer)) {
+            return "This signer is already added"
+        }
+        return null
+    }
+
+    /**
+     * Converts the expiry form state to an absolute ledger number, or returns null
+     * if no expiry is set.
+     *
+     * [expiryLedger] always holds a ledger offset selected from the duration dropdown.
+     * The absolute ledger is resolved by fetching the current ledger from the RPC and
+     * adding the offset.
+     *
+     * @param hasExpiry Whether the expiry checkbox is enabled.
+     * @param expiryLedger Ledger offset string from the dropdown, or empty if none selected.
+     * @return Absolute ledger number, or null if [hasExpiry] is false or the field is empty.
+     */
+    private suspend fun resolveExpiryLedger(hasExpiry: Boolean, expiryLedger: String): UInt? {
+        if (!hasExpiry) return null
+        val offset = expiryLedger.toUIntOrNull() ?: return null
+        return resolveAbsoluteLedger(offset)
+    }
+
+    // ========================================================================
     // Validation
     // ========================================================================
 
@@ -1980,7 +2007,9 @@ class ContextRuleBuilderScreen(
         wasmHashHex: String,
         hasExpiry: Boolean,
         expiryLedger: String,
-        signers: List<SmartAccountSigner>
+        signers: List<SmartAccountSigner>,
+        isEditing: Boolean = false,
+        expiryModified: Boolean = true
     ): Map<String, String> {
         val errors = mutableMapOf<String, String>()
 
@@ -2009,8 +2038,9 @@ class ContextRuleBuilderScreen(
             ContextTypeOption.DEFAULT -> { /* no extra validation */ }
         }
 
-        // Expiry
-        if (hasExpiry) {
+        // Expiry: skip validation in edit mode when the user hasn't changed the expiry,
+        // since the existing on-chain value will be kept as-is.
+        if (hasExpiry && !(isEditing && !expiryModified)) {
             if (expiryLedger.isBlank()) {
                 errors["expiryLedger"] = "Please select an expiry duration"
             } else {
@@ -2021,156 +2051,14 @@ class ContextRuleBuilderScreen(
             }
         }
 
-        // Signers
-        if (signers.isEmpty()) {
+        // Signers: in edit mode the signer section is hidden, so skip this check.
+        if (!isEditing && signers.isEmpty()) {
             errors["signers"] = "At least one signer is required"
         }
 
         return errors
     }
 
-    // ========================================================================
-    // Policy ScVal Builders
-    // ========================================================================
-
-    /**
-     * Builds the SCValXdr for a simple threshold policy.
-     * Map structure: { "threshold": U32(threshold) }
-     */
-    private fun buildSimpleThresholdScVal(threshold: UInt): SCValXdr {
-        val map = linkedMapOf(
-            Scv.toSymbol("threshold") to Scv.toUint32(threshold)
-        )
-        return Scv.toMap(map)
-    }
-
-    /**
-     * Builds the SCValXdr for a spending limit policy.
-     * Map structure: { "period_ledgers": U32(periodLedgers), "spending_limit": I128(stroops) }
-     */
-    private fun buildSpendingLimitScVal(stroops: BigInteger, periodLedgers: UInt): SCValXdr {
-        val limitI128 = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
-        val map = linkedMapOf(
-            Scv.toSymbol("period_ledgers") to Scv.toUint32(periodLedgers),
-            Scv.toSymbol("spending_limit") to limitI128
-        )
-        return Scv.toMap(map)
-    }
-
-    /**
-     * Builds the SCValXdr for a weighted threshold policy.
-     * Map structure: { "signer_weights": Map[Signer => U32], "threshold": U32(threshold) }
-     */
-    private fun buildWeightedThresholdScVal(
-        weights: Map<SmartAccountSigner, UInt>,
-        threshold: UInt
-    ): SCValXdr {
-        val weightsMap = linkedMapOf<SCValXdr, SCValXdr>()
-        for ((signer, weight) in weights) {
-            weightsMap[signer.toScVal()] = Scv.toUint32(weight)
-        }
-        val sortedWeightsMap = SmartAccountSharedUtils.sortMapByKeyXdr(weightsMap)
-
-        val map = linkedMapOf(
-            Scv.toSymbol("signer_weights") to Scv.toMap(sortedWeightsMap),
-            Scv.toSymbol("threshold") to Scv.toUint32(threshold)
-        )
-        return Scv.toMap(map)
-    }
-
-    // ========================================================================
-    // Edit Mode: ScVal Parsing
-    // ========================================================================
-
-    private data class ParsedRuleData(
-        val id: UInt,
-        val contextType: ContextRuleType,
-        val name: String,
-        val signers: List<SmartAccountSigner>,
-        val policies: List<String>,
-        val validUntil: UInt?
-    )
-
-    /**
-     * Parses a single context rule from its ScVal map representation.
-     */
-    private fun parseRuleFromScVal(scVal: SCValXdr, fallbackId: UInt): ParsedRuleData? {
-        val map = (scVal as? SCValXdr.Map)?.value?.value ?: return null
-
-        var id: UInt = fallbackId
-        var contextType: ContextRuleType = ContextRuleType.Default
-        var name = ""
-        var signers = listOf<SmartAccountSigner>()
-        var policies = listOf<String>()
-        var validUntil: UInt? = null
-
-        for (entry in map) {
-            val fieldName = (entry.key as? SCValXdr.Sym)?.value?.value ?: continue
-            val fieldValue = entry.`val`
-
-            when (fieldName) {
-                "id" -> {
-                    id = (fieldValue as? SCValXdr.U32)?.value?.value ?: fallbackId
-                }
-                "context_type" -> {
-                    contextType = parseContextType(fieldValue)
-                }
-                "name" -> {
-                    name = when (fieldValue) {
-                        is SCValXdr.Str -> fieldValue.value.value
-                        is SCValXdr.Sym -> fieldValue.value.value
-                        else -> ""
-                    }
-                }
-                "signers" -> {
-                    signers = parseSigners(fieldValue)
-                }
-                "policies" -> {
-                    policies = parsePolicies(fieldValue)
-                }
-                "valid_until" -> {
-                    validUntil = when (fieldValue) {
-                        is SCValXdr.U32 -> fieldValue.value.value
-                        is SCValXdr.Void -> null
-                        else -> null
-                    }
-                }
-            }
-        }
-
-        return ParsedRuleData(
-            id = id,
-            contextType = contextType,
-            name = name,
-            signers = signers,
-            policies = policies,
-            validUntil = validUntil
-        )
-    }
-
-    // ========================================================================
-    // Utility Functions
-    // ========================================================================
-
-    /**
-     * Converts a hex string to a ByteArray.
-     */
-    private fun hexToByteArray(hex: String): ByteArray {
-        require(hex.length % 2 == 0) { "Hex string must have even length" }
-        return ByteArray(hex.length / 2) { i ->
-            val index = i * 2
-            hex.substring(index, index + 2).toInt(16).toByte()
-        }
-    }
-
-    /**
-     * Converts a ByteArray to a lowercase hex string.
-     */
-    private fun ByteArray.toHexString(): String {
-        return joinToString("") { byte ->
-            (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-        }
-    }
 }
 
 // ============================================================================
@@ -2195,14 +2083,7 @@ private data class PolicyEntry(
     val scVal: SCValXdr? = null
 )
 
-/**
- * Result of a submission attempt.
- */
-private data class SubmissionResult(
-    val success: Boolean,
-    val hash: String? = null,
-    val error: String? = null
-)
+
 
 // ============================================================================
 // Enums

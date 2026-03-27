@@ -6,9 +6,9 @@
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.oz
+package com.soneso.stellar.sdk.smartaccount.core
 
-import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
@@ -18,9 +18,8 @@ import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.PublicKeyXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
-import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.Address
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import com.ionspin.kotlin.bignum.decimal.RoundingMode
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -317,29 +316,10 @@ object SmartAccountSharedUtils {
      * @return The string address, or null if extraction fails
      */
     fun extractAddressString(address: SCAddressXdr): String? {
-        return when (address) {
-            is SCAddressXdr.AccountId -> {
-                // Account address: G-address
-                try {
-                    val publicKey = address.value.value
-                    when (publicKey) {
-                        is PublicKeyXdr.Ed25519 -> {
-                            StrKey.encodeEd25519PublicKey(publicKey.value.value)
-                        }
-                    }
-                } catch (e: Exception) {
-                    null
-                }
-            }
-            is SCAddressXdr.ContractId -> {
-                // Contract address: C-address
-                try {
-                    com.soneso.stellar.sdk.StrKey.encodeContract(address.value.value.value)
-                } catch (e: Exception) {
-                    null
-                }
-            }
-            else -> null
+        return try {
+            Address.fromSCAddress(address).toString()
+        } catch (_: Exception) {
+            null
         }
     }
 }

@@ -7,6 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
+import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex

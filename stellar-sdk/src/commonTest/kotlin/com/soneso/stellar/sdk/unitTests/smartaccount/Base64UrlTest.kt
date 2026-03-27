@@ -7,7 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

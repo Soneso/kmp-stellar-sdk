@@ -1,5 +1,6 @@
 package com.soneso.smartdemo.util
 
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.token.DemoTokenService
@@ -7,20 +8,21 @@ import com.soneso.stellar.sdk.AssetTypeNative
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
  * Parses an i128 SCVal result from a token balance() call to a display string.
  *
  * DEMO uses 7 decimals (same as XLM), so [formatStroopsAsXlm] applies directly.
- * Balances that overflow Long (hi != 0) are returned as "0.0" — not expected in the demo.
+ * Balances that exceed Long range are returned as "0.0" — not expected in the demo.
  */
 fun parseDemoBalance(scVal: SCValXdr): String {
     return when (scVal) {
         is SCValXdr.I128 -> {
-            val hi = scVal.value.hi.value
-            if (hi != 0L) return "0.0"
-            formatStroopsAsXlm(scVal.value.lo.value.toLong())
+            val bigInt = try { Scv.fromInt128(scVal) } catch (_: Exception) { return "0.0" }
+            if (bigInt > BigInteger.fromLong(Long.MAX_VALUE) || bigInt < BigInteger.fromLong(Long.MIN_VALUE)) return "0.0"
+            formatStroopsAsXlm(bigInt.longValue())
         }
         else -> "0.0"
     }
@@ -34,16 +36,17 @@ fun parseDemoBalance(scVal: SCValXdr): String {
  * account has no balance entry.
  */
 suspend fun fetchXlmBalance(contractId: String): String {
-    val server = SorobanServer(DemoConfig.RPC_URL)
-    val result = server.getSACBalance(
-        contractId,
-        AssetTypeNative,
-        Network(DemoConfig.NETWORK_PASSPHRASE)
-    )
-    return if (result.balanceEntry != null) {
-        formatStroopsAsXlm(result.balanceEntry!!.amount)
-    } else {
-        "0.0"
+    return SorobanServer(DemoConfig.RPC_URL).use { server ->
+        val result = server.getSACBalance(
+            contractId,
+            AssetTypeNative,
+            Network(DemoConfig.NETWORK_PASSPHRASE)
+        )
+        if (result.balanceEntry != null) {
+            formatStroopsAsXlm(result.balanceEntry!!.amount)
+        } else {
+            "0.0"
+        }
     }
 }
 
@@ -57,12 +60,16 @@ suspend fun fetchXlmBalance(contractId: String): String {
  */
 suspend fun fetchDemoBalance(walletContractId: String): String {
     val demoTokenContractId = DemoState.demoTokenContractId ?: return "0.0"
-    return try {
-        val tokenClient = ContractClient.forContract(
+    val tokenClient = try {
+        ContractClient.forContract(
             contractId = demoTokenContractId,
             rpcUrl = DemoConfig.RPC_URL,
             network = Network(DemoConfig.NETWORK_PASSPHRASE)
         )
+    } catch (e: Exception) {
+        return "0.0"
+    }
+    return try {
         val sourceAccountId = DemoTokenService.getAdminAccountId()
         val balanceResult = tokenClient.invoke<SCValXdr>(
             functionName = "balance",
@@ -73,6 +80,8 @@ suspend fun fetchDemoBalance(walletContractId: String): String {
         parseDemoBalance(balanceResult)
     } catch (e: Exception) {
         "0.0"
+    } finally {
+        tokenClient.close()
     }
 }
 

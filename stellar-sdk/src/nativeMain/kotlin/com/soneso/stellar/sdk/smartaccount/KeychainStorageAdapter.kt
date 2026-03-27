@@ -15,16 +15,16 @@ package com.soneso.stellar.sdk.smartaccount
 
 import com.soneso.stellar.sdk.smartaccount.core.CredentialException
 import com.soneso.stellar.sdk.smartaccount.core.StorageException
-import com.soneso.stellar.sdk.smartaccount.oz.CredentialIndex
-import com.soneso.stellar.sdk.smartaccount.oz.SerializableCredential
-import com.soneso.stellar.sdk.smartaccount.oz.SerializableSession
+import com.soneso.stellar.sdk.smartaccount.core.CredentialIndex
+import com.soneso.stellar.sdk.smartaccount.core.SerializableCredential
+import com.soneso.stellar.sdk.smartaccount.core.SerializableSession
+import com.soneso.stellar.sdk.smartaccount.core.toSerializable
+import com.soneso.stellar.sdk.smartaccount.core.toStoredCredential
+import com.soneso.stellar.sdk.smartaccount.core.toStoredSession
 import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
-import com.soneso.stellar.sdk.smartaccount.oz.toSerializable
-import com.soneso.stellar.sdk.smartaccount.oz.toStoredCredential
-import com.soneso.stellar.sdk.smartaccount.oz.toStoredSession
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc

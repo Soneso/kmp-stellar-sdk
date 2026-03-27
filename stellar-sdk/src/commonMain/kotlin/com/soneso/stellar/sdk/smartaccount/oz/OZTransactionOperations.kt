@@ -21,7 +21,6 @@ import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
-import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
@@ -209,12 +208,7 @@ class OZTransactionOperations internal constructor(
         // STEP 3: Build host function for token transfer
         // Contract call: token.transfer(from: smartAccount, to: recipient, amount: stroops)
         val fromAddress = Address(contractId).toSCAddress()
-        val toAddress = if (recipient.startsWith("G")) {
-            val keyPair = KeyPair.fromAccountId(recipient)
-            SCAddressXdr.AccountId(keyPair.getXdrAccountId())
-        } else {
-            Address(recipient).toSCAddress()
-        }
+        val toAddress = Address(recipient).toSCAddress()
 
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
 
@@ -438,7 +432,6 @@ class OZTransactionOperations internal constructor(
                 )
 
                 // (b) Require WebAuthn provider
-                // TODO: WebAuthn provider needs to be added to OZSmartAccountKit or config
                 val webauthnProvider = kit.config.webauthnProvider
                     ?: throw ValidationException.invalidInput(
                         "webauthnProvider",
@@ -852,7 +845,7 @@ class OZTransactionOperations internal constructor(
 
         // Query temp account balance via contract simulation
         val balanceArgs = listOf(
-            Scv.toAddress(SCAddressXdr.AccountId(tempKeypair.getXdrAccountId()))
+            Scv.toAddress(Address(tempKeypair.getAccountId()).toSCAddress())
         )
         val balanceInvokeArgs = InvokeContractArgsXdr(
             contractAddress = Address(nativeTokenContract).toSCAddress(),
@@ -866,11 +859,11 @@ class OZTransactionOperations internal constructor(
         )
 
         // Parse I128 result to BigInteger stroops (handles full 128-bit range)
-        val i128Parts = (balanceResult as? SCValXdr.I128)?.value
-            ?: throw TransactionException.submissionFailed("Failed to query temp account balance")
-
-        val balanceStroops = BigInteger.fromULong(i128Parts.lo.value) +
-            (BigInteger.fromLong(i128Parts.hi.value) shl 64)
+        val balanceStroops = try {
+            Scv.fromInt128(balanceResult)
+        } catch (_: Exception) {
+            throw TransactionException.submissionFailed("Failed to query temp account balance")
+        }
 
         if (balanceStroops <= reserveStroops) {
             throw TransactionException.submissionFailed("Insufficient balance after Friendbot funding")
@@ -879,7 +872,7 @@ class OZTransactionOperations internal constructor(
         val transferStroops: BigInteger = balanceStroops - reserveStroops
 
         // STEP 6: Build transfer from temp account to smart account
-        val fromAddress = SCAddressXdr.AccountId(tempKeypair.getXdrAccountId())
+        val fromAddress = Address(tempKeypair.getAccountId()).toSCAddress()
         val toAddress = Address(contractId).toSCAddress()
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(transferStroops)
 
@@ -1084,7 +1077,7 @@ class OZTransactionOperations internal constructor(
 
                 // Create new Address credentials entry to replace source_account
                 val addressCredentials = SorobanAddressCredentialsXdr(
-                    address = SCAddressXdr.AccountId(tempKeypair.getXdrAccountId()),
+                    address = Address(tempKeypair.getAccountId()).toSCAddress(),
                     nonce = nonce,
                     signatureExpirationLedger = Uint32Xdr(expirationLedger),
                     signature = signatureVecScVal

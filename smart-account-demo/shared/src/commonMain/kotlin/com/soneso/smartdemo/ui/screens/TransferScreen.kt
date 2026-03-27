@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,10 +31,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -59,24 +60,19 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.flows.buildSelectedSigners
+import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
+import com.soneso.smartdemo.flows.loadAvailableSigners
 import com.soneso.smartdemo.flows.multiSignerTransfer
+import com.soneso.smartdemo.flows.registerDelegatedKeypairs
 import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.ui.components.SignerPickerDialog
 import com.soneso.smartdemo.util.SignerInfo
-import com.soneso.smartdemo.util.extractSignersFromRules
-import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.isUserCancellation
-import androidx.compose.foundation.text.selection.SelectionContainer
-import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
-import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
-import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 class TransferScreen : Screen {
@@ -112,6 +108,8 @@ class TransferScreen : Screen {
         // Signer picker dialog visibility
         var showSignerPicker by remember { mutableStateOf(false) }
 
+        val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
+
         val tokenContract = if (selectedTokenOption == TOKEN_OPTION_XLM) {
             DemoConfig.NATIVE_TOKEN_CONTRACT
         } else {
@@ -127,23 +125,22 @@ class TransferScreen : Screen {
             amountError == null &&
             (selectedTokenOption == TOKEN_OPTION_XLM || DemoState.demoTokenContractId != null)
 
+        fun handleTransferError(message: String) {
+            if (isUserCancellation(message)) {
+                errorMessage = "Passkey authentication cancelled"
+                ActivityLogState.info("Passkey authentication cancelled")
+            } else {
+                errorMessage = "Transfer failed: $message"
+                ActivityLogState.error(message)
+            }
+        }
+
         // Load available signers from context rules when the wallet is connected.
         // This determines whether to show the single-signer or multi-signer path.
         LaunchedEffect(DemoState.isConnected, DemoState.kit) {
             if (DemoState.isConnected && DemoState.kit != null) {
-                try {
-                    val rules = fetchAllContextRules(DemoState.kit!!)
-                    val signers = extractSignersFromRules(
-                        rules = rules,
-                        connectedCredentialId = DemoState.credentialId,
-                        externalWallet = DemoState.externalSignerManager
-                    )
-                    availableSigners = signers
-                    signersLoaded = true
-                } catch (_: Exception) {
-                    // Graceful fallback: treat as single-signer
-                    signersLoaded = true
-                }
+                availableSigners = loadAvailableSigners()
+                signersLoaded = true
             }
         }
 
@@ -375,23 +372,11 @@ class TransferScreen : Screen {
                             // If multiple signers are available, show the signer picker first.
                             if (!signersLoaded || availableSigners.size <= 1) {
                                 // Single-signer path: trigger passkey auth and submit directly
-                                val handler = CoroutineExceptionHandler { _, throwable ->
-                                    val message = throwable.message ?: "Unknown error"
-                                    if (isUserCancellation(message)) {
-                                        errorMessage = "Passkey authentication cancelled"
-                                        ActivityLogState.info("Passkey authentication cancelled")
-                                    } else {
-                                        errorMessage = "Transfer failed: $message"
-                                        ActivityLogState.error(message)
-                                    }
-                                    isLoading = false
-                                }
-                                scope.launch(handler) {
+                                scope.launch {
                                     isLoading = true
                                     errorMessage = null
 
                                     try {
-                                        val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
                                         ActivityLogState.info(
                                             "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                         )
@@ -408,14 +393,7 @@ class TransferScreen : Screen {
                                             throw Exception(result.error ?: "Transfer failed")
                                         }
                                     } catch (e: Throwable) {
-                                        val message = e.message ?: "Unknown error"
-                                        if (isUserCancellation(message)) {
-                                            errorMessage = "Passkey authentication cancelled"
-                                            ActivityLogState.info("Passkey authentication cancelled")
-                                        } else {
-                                            errorMessage = "Transfer failed: $message"
-                                            ActivityLogState.error(message)
-                                        }
+                                        handleTransferError(e.message ?: "Unknown error")
                                     } finally {
                                         isLoading = false
                                     }
@@ -498,7 +476,7 @@ class TransferScreen : Screen {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = if (selectedTokenOption == TOKEN_OPTION_XLM) "$amount XLM" else "$amount DEMO",
+                                    text = "$amount $tokenLabel",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -578,8 +556,8 @@ class TransferScreen : Screen {
 
         // Signer picker dialog — shown when multiple signers are available.
         // The dialog handles secret key entry for delegated signers (Stellar keypairs).
-        // On confirm, keypairs are registered in the external signer manager, then
-        // multiSignerTransfer() is called with the selected signer list.
+        // On confirm, keypairs are registered in the external signer manager via
+        // registerDelegatedKeypairs(), then multiSignerTransfer() is called.
         if (showSignerPicker) {
             SignerPickerDialog(
                 isOpen = true,
@@ -592,37 +570,13 @@ class TransferScreen : Screen {
                 onConfirm = { selectedSigners, delegatedKeyPairs ->
                     showSignerPicker = false
 
-                    // Use the simple single-signer transfer path only when exactly
-                    // one passkey is selected AND it is the active/connected passkey.
-                    // The simple path always signs with the connected passkey, so it
-                    // cannot be used for non-active passkeys from context rules.
-                    val hasDelegatedSigners = selectedSigners.any { it is DelegatedSigner }
-                    val isSinglePasskey = selectedSigners.size == 1 &&
-                        !hasDelegatedSigners &&
-                        selectedSigners[0] is ExternalSigner &&
-                        SmartAccountBuilders.getCredentialIdStringFromSigner(selectedSigners[0]) ==
-                            DemoState.credentialId
-
-                    val handler = CoroutineExceptionHandler { _, throwable ->
-                        val message = throwable.message ?: "Unknown error"
-                        if (isUserCancellation(message)) {
-                            errorMessage = "Passkey authentication cancelled"
-                            ActivityLogState.info("Passkey authentication cancelled")
-                        } else {
-                            errorMessage = "Transfer failed: $message"
-                            ActivityLogState.error(message)
-                        }
-                        isLoading = false
-                    }
-                    scope.launch(handler) {
+                    scope.launch {
                         isLoading = true
                         errorMessage = null
 
                         try {
-                            val tokenLabel = if (selectedTokenOption == TOKEN_OPTION_XLM) "XLM" else "DEMO"
-
-                            if (isSinglePasskey) {
-                                // Single passkey selected — use the standard transfer path
+                            if (isSinglePasskeyTransfer(selectedSigners)) {
+                                // Single connected passkey selected — use the standard transfer path
                                 ActivityLogState.info(
                                     "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                 )
@@ -641,18 +595,9 @@ class TransferScreen : Screen {
                             } else {
                                 // Multiple signers or delegated signers — use multi-signer path
 
-                                // Register delegated signer keypairs in the external signer manager
-                                // before calling multiSignerTransfer. The adapter's canSignFor()
-                                // and signAuthEntry() rely on these registrations.
-                                val externalManager = DemoState.externalSignerManager
-                                if (externalManager != null && delegatedKeyPairs.isNotEmpty()) {
-                                    for ((address, keyPair) in delegatedKeyPairs) {
-                                        val secretSeed = keyPair.getSecretSeed()
-                                        if (secretSeed != null) {
-                                            externalManager.addFromSecret(secretSeed.concatToString())
-                                        }
-                                    }
-                                }
+                                // Register delegated signer keypairs before calling
+                                // multiSignerTransfer so the ExternalWalletAdapter can sign.
+                                registerDelegatedKeypairs(delegatedKeyPairs)
 
                                 val selected = buildSelectedSigners(selectedSigners)
 
@@ -675,14 +620,7 @@ class TransferScreen : Screen {
                                 }
                             }
                         } catch (e: Throwable) {
-                            val message = e.message ?: "Unknown error"
-                            if (isUserCancellation(message)) {
-                                errorMessage = "Passkey authentication cancelled"
-                                ActivityLogState.info("Passkey authentication cancelled")
-                            } else {
-                                errorMessage = "Transfer failed: $message"
-                                ActivityLogState.error(message)
-                            }
+                            handleTransferError(e.message ?: "Unknown error")
                         } finally {
                             isLoading = false
                         }
@@ -690,38 +628,6 @@ class TransferScreen : Screen {
                 }
             )
         }
-    }
-
-    /**
-     * Converts a list of selected SmartAccountSigner objects (from SignerPickerDialog)
-     * into the SelectedSigner list required by multiSignerTransfer().
-     *
-     * - ExternalSigner with a credential ID → SelectedSigner.Passkey with full keyData
-     * - DelegatedSigner → SelectedSigner.Wallet(address)
-     * - Other ExternalSigner (no credential ID) → skipped (not yet supported)
-     */
-    private fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner> {
-        val result = mutableListOf<SelectedSigner>()
-        for (signer in signers) {
-            when {
-                signer is ExternalSigner -> {
-                    val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                    val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer)
-                    if (credIdStr != null) {
-                        result.add(SelectedSigner.Passkey(
-                            credentialId = credIdStr,
-                            credentialIdBytes = credIdBytes,
-                            keyData = signer.keyData
-                        ))
-                    }
-                }
-                signer is DelegatedSigner -> {
-                    // Delegated (keypair) signer: identified by G-address
-                    result.add(SelectedSigner.Wallet(address = signer.address))
-                }
-            }
-        }
-        return result
     }
 
     private fun validateRecipient(value: String): String? {

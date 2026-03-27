@@ -417,9 +417,10 @@ class OZContextRuleManager internal constructor(
         val resultScVal = SmartAccountSharedUtils.simulateAndExtractResult(hostFunction = hostFunction, kit = kit)
 
         // Parse U32 result
-        return when (resultScVal) {
-            is SCValXdr.U32 -> resultScVal.value.value
-            else -> throw ValidationException.invalidInput(
+        return try {
+            Scv.fromUint32(resultScVal)
+        } catch (_: Exception) {
+            throw ValidationException.invalidInput(
                 "result",
                 "Expected U32 result from get_context_rules_count, got: $resultScVal"
             )

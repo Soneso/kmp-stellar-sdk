@@ -12,14 +12,12 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
-import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
@@ -224,12 +222,7 @@ class OZMultiSignerManager internal constructor(
         val stroops = SmartAccountSharedUtils.amountToStroops(amount)
 
         val fromAddress = Address(contractId).toSCAddress()
-        val toAddress: SCAddressXdr = if (recipient.startsWith("G")) {
-            val keyPair = KeyPair.fromAccountId(recipient)
-            SCAddressXdr.AccountId(keyPair.getXdrAccountId())
-        } else {
-            Address(recipient).toSCAddress()
-        }
+        val toAddress = Address(recipient).toSCAddress()
 
         val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
 

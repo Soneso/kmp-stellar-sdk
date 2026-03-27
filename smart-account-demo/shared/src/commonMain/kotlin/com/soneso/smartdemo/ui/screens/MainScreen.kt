@@ -49,11 +49,14 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.flows.disconnect
 import com.soneso.smartdemo.flows.initializeKit
 import com.soneso.smartdemo.flows.refreshBalances
+import com.soneso.smartdemo.platform.Clipboard
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.state.LogEntry
 import com.soneso.smartdemo.state.LogLevel
-import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -229,11 +232,7 @@ class MainScreen : Screen {
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        val handler = CoroutineExceptionHandler { _, throwable ->
-                                            ActivityLogState.error("Failed to refresh balance: ${throwable.message}")
-                                            isRefreshingBalance = false
-                                        }
-                                        scope.launch(handler) {
+                                        scope.launch {
                                             isRefreshingBalance = true
                                             try {
                                                 refreshBalances()
@@ -279,10 +278,7 @@ class MainScreen : Screen {
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        val handler = CoroutineExceptionHandler { _, throwable ->
-                                            ActivityLogState.error("Disconnect failed: ${throwable.message}")
-                                        }
-                                        scope.launch(handler) {
+                                        scope.launch {
                                             try {
                                                 disconnect()
                                             } catch (e: Throwable) {
@@ -351,13 +347,13 @@ class MainScreen : Screen {
         }
     }
 
-    @OptIn(kotlin.time.ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class)
     @Composable
     private fun LogEntryRow(
-        entry: com.soneso.smartdemo.state.LogEntry,
-        clipboard: com.soneso.smartdemo.platform.Clipboard,
+        entry: LogEntry,
+        clipboard: Clipboard,
         snackbarHostState: SnackbarHostState,
-        scope: kotlinx.coroutines.CoroutineScope
+        scope: CoroutineScope
     ) {
         val timeString = remember(entry.timestamp) {
             val localTime = entry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())

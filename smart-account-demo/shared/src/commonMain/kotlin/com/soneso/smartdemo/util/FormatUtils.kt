@@ -1,10 +1,21 @@
 package com.soneso.smartdemo.util
 
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+
+// ============================================================================
+// Input Validation
+// ============================================================================
+
+/**
+ * Returns true if [input] is a non-blank, valid Stellar contract address (C...).
+ */
+fun isValidContractAddress(input: String): Boolean =
+    input.isNotBlank() && StrKey.isValidContract(input)
 
 // ============================================================================
 // Address and Signer Display Formatting
@@ -36,33 +47,29 @@ data class SignerDisplayInfo(
  * Formats a signer for display, returning both the type label and a display identifier.
  */
 fun formatSignerForDisplay(signer: SmartAccountSigner): SignerDisplayInfo {
-    if (signer is DelegatedSigner) {
-        return SignerDisplayInfo(
+    return when (signer) {
+        is DelegatedSigner -> SignerDisplayInfo(
             type = "G-Address",
             display = truncateAddress(signer.address, 6)
         )
+        is ExternalSigner -> {
+            val credentialId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+            when {
+                credentialId != null -> SignerDisplayInfo(
+                    type = "Passkey",
+                    display = credentialId
+                )
+                signer.keyData.size == 32 -> SignerDisplayInfo(
+                    type = "Ed25519",
+                    display = "key:${signer.keyData.toHexString().take(8)}..."
+                )
+                else -> SignerDisplayInfo(
+                    type = "External",
+                    display = truncateAddress(signer.verifierAddress, 4)
+                )
+            }
+        }
     }
-
-    val external = signer as ExternalSigner
-    val credentialId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-    if (credentialId != null) {
-        return SignerDisplayInfo(
-            type = "Passkey",
-            display = credentialId
-        )
-    }
-
-    if (external.keyData.size == 32) {
-        return SignerDisplayInfo(
-            type = "Ed25519",
-            display = "key:${external.keyData.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }.take(8)}..."
-        )
-    }
-
-    return SignerDisplayInfo(
-        type = "External",
-        display = truncateAddress(external.verifierAddress, 4)
-    )
 }
 
 /**
@@ -74,11 +81,21 @@ fun formatContextType(contextType: ContextRuleType): String {
         is ContextRuleType.CallContract ->
             "Call Contract: ${truncateAddress(contextType.contractAddress)}"
         is ContextRuleType.CreateContract -> {
-            val hashHex = contextType.wasmHash.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+            val hashHex = contextType.wasmHash.toHexString()
             "Create Contract: ${hashHex.take(8)}..."
         }
     }
 }
+
+/**
+ * Returns a human-readable description of the signer type.
+ *
+ * Delegates to [SmartAccountBuilders.describeSignerType] so screens do not import
+ * SDK internals directly. Possible values: "Stellar Account", "Passkey (WebAuthn)",
+ * "Ed25519", "External Verifier".
+ */
+fun describeSignerType(signer: SmartAccountSigner): String =
+    SmartAccountBuilders.describeSignerType(signer)
 
 // ============================================================================
 // Numeric Formatting
@@ -92,6 +109,7 @@ fun formatContextType(contextType: ContextRuleType): String {
  * @return Formatted string like "100.0", "0.5", "10.1234567"
  */
 fun formatStroopsAsXlm(stroops: Long): String {
+    if (stroops == Long.MIN_VALUE) return "-922337203685.4775808"
     val negative = stroops < 0
     val absStroops = if (negative) -stroops else stroops
     val wholePart = absStroops / 10_000_000L
@@ -110,4 +128,34 @@ fun formatStroopsAsXlm(stroops: Long): String {
 fun formatStroopsAsXlm(stroopsStr: String): String {
     val stroops = stroopsStr.toLongOrNull() ?: return "0.0"
     return formatStroopsAsXlm(stroops)
+}
+
+// ============================================================================
+// Hex Encoding
+// ============================================================================
+
+/**
+ * Converts a hex string to a [ByteArray].
+ *
+ * @param hex Even-length hex string (e.g., "deadbeef" or "DEADBEEF").
+ * @return Decoded byte array.
+ * @throws IllegalArgumentException if [hex] has odd length or invalid characters.
+ */
+fun hexToByteArray(hex: String): ByteArray {
+    require(hex.length % 2 == 0) { "Hex string must have even length" }
+    return ByteArray(hex.length / 2) { i ->
+        val index = i * 2
+        hex.substring(index, index + 2).toInt(16).toByte()
+    }
+}
+
+/**
+ * Converts a [ByteArray] to a lowercase hex string.
+ *
+ * @return Lowercase hex representation of each byte.
+ */
+fun ByteArray.toHexString(): String {
+    return joinToString("") { byte ->
+        (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
+    }
 }

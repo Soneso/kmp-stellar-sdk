@@ -12,7 +12,7 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr

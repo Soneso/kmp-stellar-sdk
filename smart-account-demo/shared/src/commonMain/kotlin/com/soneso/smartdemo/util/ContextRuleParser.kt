@@ -2,6 +2,7 @@ package com.soneso.smartdemo.util
 
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
@@ -11,7 +12,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.ExternalWalletAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
-import com.soneso.stellar.sdk.smartaccount.oz.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
@@ -112,7 +113,6 @@ fun extractSignersFromRules(
                     false
                 }
             }
-            else -> false
         }
         SignerInfo(signer = signer, canSign = canSign)
     }
@@ -142,12 +142,12 @@ fun parseSingleContextRuleFromScVal(
     var validUntil: UInt? = null
 
     for (entry in map) {
-        val fieldName = (entry.key as? SCValXdr.Sym)?.value?.value ?: continue
+        val fieldName = try { Scv.fromSymbol(entry.key) } catch (_: Exception) { continue }
         val fieldValue = entry.`val`
 
         when (fieldName) {
             "id" -> {
-                id = (fieldValue as? SCValXdr.U32)?.value?.value ?: (fallbackId ?: 0u)
+                id = try { Scv.fromUint32(fieldValue) } catch (_: Exception) { fallbackId ?: 0u }
             }
             "context_type" -> {
                 contextType = parseContextType(fieldValue)
@@ -167,7 +167,7 @@ fun parseSingleContextRuleFromScVal(
             }
             "valid_until" -> {
                 validUntil = when (fieldValue) {
-                    is SCValXdr.U32 -> fieldValue.value.value
+                    is SCValXdr.U32 -> try { Scv.fromUint32(fieldValue) } catch (_: Exception) { null }
                     is SCValXdr.Void -> null
                     else -> null
                 }
@@ -197,7 +197,7 @@ fun parseContextType(scVal: SCValXdr): ContextRuleType {
     val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return ContextRuleType.Default
     if (vec.isEmpty()) return ContextRuleType.Default
 
-    val tag = (vec[0] as? SCValXdr.Sym)?.value?.value ?: return ContextRuleType.Default
+    val tag = try { Scv.fromSymbol(vec[0]) } catch (_: Exception) { return ContextRuleType.Default }
 
     return when (tag) {
         "Default" -> ContextRuleType.Default
@@ -222,7 +222,7 @@ fun parseContextType(scVal: SCValXdr): ContextRuleType {
 
         "CreateContract" -> {
             if (vec.size >= 2) {
-                val bytes = (vec[1] as? SCValXdr.Bytes)?.value?.value
+                val bytes = try { Scv.fromBytes(vec[1]) } catch (_: Exception) { null }
                 if (bytes != null) {
                     ContextRuleType.CreateContract(bytes)
                 } else {
@@ -258,7 +258,7 @@ fun parseSingleSigner(scVal: SCValXdr): SmartAccountSigner? {
     val vec = (scVal as? SCValXdr.Vec)?.value?.value ?: return null
     if (vec.isEmpty()) return null
 
-    val tag = (vec[0] as? SCValXdr.Sym)?.value?.value ?: return null
+    val tag = try { Scv.fromSymbol(vec[0]) } catch (_: Exception) { return null }
 
     return when (tag) {
         "Delegated" -> {
@@ -280,7 +280,7 @@ fun parseSingleSigner(scVal: SCValXdr): SmartAccountSigner? {
         "External" -> {
             if (vec.size >= 3) {
                 val verifier = (vec[1] as? SCValXdr.Address)?.value
-                val keyData = (vec[2] as? SCValXdr.Bytes)?.value?.value
+                val keyData = try { Scv.fromBytes(vec[2]) } catch (_: Exception) { null }
                 if (verifier != null && keyData != null) {
                     val verifierStr = SmartAccountSharedUtils.extractAddressString(verifier)
                     if (verifierStr != null) {

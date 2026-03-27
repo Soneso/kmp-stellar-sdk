@@ -82,7 +82,9 @@ suspend fun createWallet(
     // OZSmartAccountConfig.createDefaultDeployer() returns the well-known testnet deployer keypair.
     val deployer = OZSmartAccountConfig.createDefaultDeployer()
     try {
-        SorobanServer(DemoConfig.RPC_URL).getAccount(deployer.getAccountId())
+        SorobanServer(DemoConfig.RPC_URL).use { server ->
+            server.getAccount(deployer.getAccountId())
+        }
     } catch (e: Exception) {
         // Deployer account does not exist — fund it via Friendbot and wait for network confirmation.
         ActivityLogState.info("Funding deployer account...")

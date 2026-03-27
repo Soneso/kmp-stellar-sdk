@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,11 +50,12 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.flows.WalletCreationResult
 import com.soneso.smartdemo.flows.createWallet
+import com.soneso.smartdemo.platform.Clipboard
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
-import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 class WalletCreationScreen : Screen {
@@ -201,17 +203,7 @@ class WalletCreationScreen : Screen {
                 if (createResult == null && !isLoading) {
                     Button(
                         onClick = {
-                            val handler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
-                                // Catches exceptions that escape the coroutine on JS (e.g., network CORS errors).
-                                val message = throwable.message ?: "Unknown error"
-                                errorMessage = "Failed to create wallet: $message\n\n" +
-                                    "If a passkey was registered before the failure, " +
-                                    "go to Connect Wallet and check Pending Deployments " +
-                                    "to retry the deployment."
-                                ActivityLogState.error(message)
-                                isLoading = false
-                            }
-                            scope.launch(handler) {
+                            scope.launch {
                                 isLoading = true
                                 errorMessage = null
                                 infoMessage = null
@@ -331,9 +323,9 @@ class WalletCreationScreen : Screen {
     private fun ResultField(
         label: String,
         value: String,
-        clipboard: com.soneso.smartdemo.platform.Clipboard,
+        clipboard: Clipboard,
         snackbarHostState: SnackbarHostState,
-        scope: kotlinx.coroutines.CoroutineScope
+        scope: CoroutineScope
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp)

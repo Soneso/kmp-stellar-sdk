@@ -3,21 +3,29 @@ package com.soneso.smartdemo.flows
 /**
  * Business logic for managing context rules on a smart account.
  *
- * Demonstrates the [OZSmartAccountKit.contextRuleManager] API:
- * - Loading rules: [getContextRulesCount], [getContextRule]
- * - Modifying rules: [addContextRule], [removeContextRule], [updateName], [updateValidUntil]
+ * Functions provided by this file:
+ * - Loading rules: [loadContextRules], [loadContextRule]
+ * - Modifying rules: [addContextRule], [removeContextRule], [updateContextRuleName], [updateContextRuleValidUntil]
+ * - Signer construction: [registerPasskeySigner], [buildDelegatedSigner], [buildEd25519Signer]
+ * - Helpers: [resolveAbsoluteLedger], [loadAvailablePasskeySigners]
  *
  * Context rules define on-chain authorization: each rule specifies which signers can
  * authorize which operations (Default, CallContract, or CreateContract) and which
  * policy contracts are enforced. All modifying operations require passkey authentication.
  *
  * Rule data is stored on-chain as Soroban SCVal maps and parsed by [fetchAllContextRules]
- * and [parseSingleContextRuleFromScVal] from ContextRuleParser.kt.
+ * from ContextRuleParser.kt. Individual rule parsing is done via parseSingleContextRuleFromScVal
+ * (defined in ContextRuleParser.kt) by the calling screen.
  */
 
+import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.fetchAllContextRules
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
+import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
@@ -39,8 +47,8 @@ data class ContextRuleResult(
 /**
  * A policy entry for passing to [addContextRule].
  *
- * The [ContextRuleBuilderScreen] builds these from its form state (policy address + SCVal params).
- * The flow converts them into the [Map<String, SCValXdr?>] format the SDK expects.
+ * The calling screen builds these from its form state (policy address + SCVal params).
+ * The flow converts them into the [Map<String, SCValXdr>] format the SDK expects.
  *
  * @property address The policy contract's C-address.
  * @property scVal The encoded policy parameters as an SCVal, or null if the policy was
@@ -147,7 +155,7 @@ suspend fun removeContextRule(ruleId: UInt): ContextRuleResult {
  *   3. Triggers a WebAuthn authentication ceremony for passkey signing.
  *   4. Submits the transaction.
  *
- * The [policies] parameter is converted from [FlowPolicyEntry] to [Map<String, SCValXdr?>]
+ * The [policies] parameter is converted from [FlowPolicyEntry] to [Map<String, SCValXdr>]
  * as required by the SDK. Entries with a null SCVal are skipped (already installed on-chain).
  *
  * @param contextType The context type for this rule (Default, CallContract, or CreateContract).
@@ -176,6 +184,10 @@ suspend fun addContextRule(
     for (policy in policies) {
         if (policy.scVal != null) {
             policiesMap[policy.address] = policy.scVal
+        } else {
+            ActivityLogState.info(
+                "Policy ${policy.address} has no SCVal params and will be skipped (params already on-chain)"
+            )
         }
     }
 
@@ -290,4 +302,108 @@ suspend fun updateContextRuleValidUntil(ruleId: UInt, validUntil: UInt?): Contex
         ActivityLogState.error("Transaction failed: $msg")
         ContextRuleResult(success = false, hash = null, error = msg)
     }
+}
+
+/**
+ * Resolves a ledger offset to an absolute ledger number by fetching the current ledger
+ * from the Soroban RPC.
+ *
+ * @param offset Number of ledgers from now (e.g., 720 for approximately 1 hour).
+ * @return Absolute ledger number = current ledger sequence + offset.
+ * @throws Exception if the RPC call fails.
+ */
+suspend fun resolveAbsoluteLedger(offset: UInt): UInt {
+    return SorobanServer(DemoConfig.RPC_URL).use { server ->
+        val currentLedger = server.getLatestLedger().sequence.toUInt()
+        currentLedger + offset
+    }
+}
+
+/**
+ * Registers a new passkey signer via the WebAuthn ceremony and returns the constructed
+ * [ExternalSigner].
+ *
+ * Workflow:
+ * 1. Generates a random 32-byte challenge and 16-byte user ID (WebAuthn protocol only —
+ *    not stored on-chain).
+ * 2. Calls [WebAuthnProvider.register] to trigger the platform passkey registration UI.
+ * 3. Constructs an [ExternalSigner] from the registration result using the configured
+ *    WebAuthn verifier contract address.
+ *
+ * @param name Display name shown to the user during the passkey registration prompt.
+ * @return The constructed [ExternalSigner] ready to be added to a context rule.
+ * @throws IllegalStateException if the WebAuthn provider is not available.
+ * @throws Exception if the registration ceremony fails or is cancelled.
+ */
+suspend fun registerPasskeySigner(name: String): ExternalSigner {
+    val provider = DemoState.webauthnProvider
+        ?: throw IllegalStateException("WebAuthn provider not available")
+
+    val challenge = kotlin.random.Random.nextBytes(32)
+    val userId = kotlin.random.Random.nextBytes(16)
+
+    ActivityLogState.info("Starting passkey registration...")
+    val result = provider.register(
+        challenge = challenge,
+        userId = userId,
+        userName = name
+    )
+
+    return ExternalSigner.webAuthn(
+        verifierAddress = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS,
+        publicKey = result.publicKey,
+        credentialId = result.credentialId
+    )
+}
+
+/**
+ * Constructs a [DelegatedSigner] from a Stellar G-address.
+ *
+ * @param address Full G-address of the delegated signer.
+ * @return The constructed [DelegatedSigner].
+ * @throws Exception if the address is invalid.
+ */
+fun buildDelegatedSigner(address: String): DelegatedSigner {
+    return DelegatedSigner(address)
+}
+
+/**
+ * Constructs an Ed25519 [ExternalSigner] from a raw public key byte array.
+ *
+ * Uses the configured Ed25519 verifier contract address from [DemoConfig].
+ *
+ * @param publicKey 32-byte Ed25519 public key.
+ * @return The constructed [ExternalSigner].
+ * @throws Exception if the key is invalid.
+ */
+fun buildEd25519Signer(publicKey: ByteArray): ExternalSigner {
+    return ExternalSigner.ed25519(
+        verifierAddress = DemoConfig.ED25519_VERIFIER_ADDRESS,
+        publicKey = publicKey
+    )
+}
+
+/**
+ * Loads passkey signers from all on-chain context rules, excluding the currently
+ * connected wallet's own passkey.
+ *
+ * Passkey signers are [ExternalSigner] instances whose verifier address matches the
+ * configured WebAuthn verifier contract. They are deduplicated by signer key.
+ *
+ * @param excludeCredentialId Base64URL credential ID of the passkey to exclude (the
+ *   connected wallet owner). Pass null to include all passkeys.
+ * @return Deduplicated list of available [ExternalSigner] instances.
+ * @throws IllegalStateException if the kit is not initialized.
+ */
+suspend fun loadAvailablePasskeySigners(excludeCredentialId: String?): List<ExternalSigner> {
+    val rules = loadContextRules()
+    return rules
+        .flatMap { it.signers }
+        .filterIsInstance<ExternalSigner>()
+        .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+        .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+        .filter { signer ->
+            val signerCredId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+            signerCredId != excludeCredentialId
+        }
 }

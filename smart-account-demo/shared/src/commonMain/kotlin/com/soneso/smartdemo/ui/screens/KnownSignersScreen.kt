@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -56,14 +57,12 @@ import com.soneso.smartdemo.flows.SignerEntry
 import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.signerTypeColor
+import com.soneso.smartdemo.util.describeSignerType
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.formatSignerForDisplay
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
-import androidx.compose.foundation.text.selection.SelectionContainer
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 /**
@@ -86,12 +85,7 @@ class KnownSignersScreen : Screen {
         val signerEntries = remember { mutableStateListOf<SignerEntry>() }
 
         fun loadSigners() {
-            val handler = CoroutineExceptionHandler { _, throwable ->
-                errorMessage = "Failed to load signers: ${throwable.message}"
-                ActivityLogState.error("Failed to load signers: ${throwable.message}")
-                isLoading = false
-            }
-            scope.launch(handler) {
+            scope.launch {
                 isLoading = true
                 errorMessage = null
                 signerEntries.clear()
@@ -301,7 +295,7 @@ class KnownSignersScreen : Screen {
 
     @Composable
     private fun SignerEntryItem(signer: SmartAccountSigner, rules: List<ParsedContextRule>) {
-        val typeDescription = SmartAccountBuilders.describeSignerType(signer)
+        val typeDescription = describeSignerType(signer)
         val displayInfo = formatSignerForDisplay(signer)
 
         val chipColor = signerTypeColor(typeDescription)
