@@ -1,15 +1,11 @@
 //
-//  StorageSerialization.kt
+//  OZStorageSerialization.kt
 //  Stellar SDK Kotlin Multiplatform
 //
 //  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.core
-
-import com.soneso.stellar.sdk.smartaccount.oz.CredentialDeploymentStatus
-import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
-import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+package com.soneso.stellar.sdk.smartaccount.oz
 import kotlinx.serialization.Serializable
 
 // MARK: - Internal Serializable Data Transfer Objects

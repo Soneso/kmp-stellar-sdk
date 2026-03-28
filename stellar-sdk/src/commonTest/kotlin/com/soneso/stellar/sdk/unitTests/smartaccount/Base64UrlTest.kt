@@ -7,22 +7,20 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.Util
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Tests for Base64URL encode/decode utilities in [SmartAccountSharedUtils].
+ * Tests for Base64URL encode/decode utilities in [Util].
  *
  * Verifies RFC 4648 Section 5 compliance:
  * - URL-safe alphabet: `-` instead of `+`, `_` instead of `/`
  * - No padding `=` characters in output
  * - Correct round-trip for all input lengths (padding edge cases)
- * - Compatibility with the TypeScript SDK's `base64url` package
  */
 class Base64UrlTest {
 
@@ -30,28 +28,28 @@ class Base64UrlTest {
 
     @Test
     fun testEncodeEmptyByteArray() {
-        val result = SmartAccountSharedUtils.base64urlEncode(ByteArray(0))
+        val result = Util.base64urlEncode(ByteArray(0))
         assertEquals("", result, "Empty byte array should encode to empty string")
     }
 
     @Test
     fun testEncodeSingleByte() {
         // 0x00 -> standard base64 "AA==" -> base64url "AA"
-        val result = SmartAccountSharedUtils.base64urlEncode(byteArrayOf(0x00))
+        val result = Util.base64urlEncode(byteArrayOf(0x00))
         assertEquals("AA", result)
     }
 
     @Test
     fun testEncodeTwoBytes() {
         // 2 bytes -> 3 base64url chars (would need 1 padding in standard base64)
-        val result = SmartAccountSharedUtils.base64urlEncode(byteArrayOf(0x00, 0x01))
+        val result = Util.base64urlEncode(byteArrayOf(0x00, 0x01))
         assertEquals("AAE", result)
     }
 
     @Test
     fun testEncodeThreeBytes() {
         // 3 bytes -> 4 base64url chars (no padding needed)
-        val result = SmartAccountSharedUtils.base64urlEncode(byteArrayOf(0x00, 0x01, 0x02))
+        val result = Util.base64urlEncode(byteArrayOf(0x00, 0x01, 0x02))
         assertEquals("AAEC", result)
     }
 
@@ -60,7 +58,7 @@ class Base64UrlTest {
         // Test multiple lengths to verify padding is never present
         for (len in 0..20) {
             val data = ByteArray(len) { it.toByte() }
-            val encoded = SmartAccountSharedUtils.base64urlEncode(data)
+            val encoded = Util.base64urlEncode(data)
             assertFalse(
                 encoded.contains("="),
                 "Base64URL output must not contain padding for length $len"
@@ -73,7 +71,7 @@ class Base64UrlTest {
         // Test that + and / never appear in output
         for (len in 1..50) {
             val data = ByteArray(len) { (it * 7 + 0xAB).toByte() }
-            val encoded = SmartAccountSharedUtils.base64urlEncode(data)
+            val encoded = Util.base64urlEncode(data)
             assertFalse(encoded.contains("+"), "Base64URL must not contain '+'")
             assertFalse(encoded.contains("/"), "Base64URL must not contain '/'")
         }
@@ -84,7 +82,7 @@ class Base64UrlTest {
         // 0xfb, 0xef, 0xbe -> binary: 111110 111110 111110 111110
         // Standard base64 indices all 62 -> "++++" -> base64url "----"
         val data = byteArrayOf(0xfb.toByte(), 0xef.toByte(), 0xbe.toByte())
-        val result = SmartAccountSharedUtils.base64urlEncode(data)
+        val result = Util.base64urlEncode(data)
         assertEquals("----", result, "Index 62 should map to '-' in base64url")
     }
 
@@ -93,7 +91,7 @@ class Base64UrlTest {
         // 0xff, 0xff, 0xff -> binary: 111111 111111 111111 111111
         // Standard base64 indices all 63 -> "////" -> base64url "____"
         val data = byteArrayOf(0xff.toByte(), 0xff.toByte(), 0xff.toByte())
-        val result = SmartAccountSharedUtils.base64urlEncode(data)
+        val result = Util.base64urlEncode(data)
         assertEquals("____", result, "Index 63 should map to '_' in base64url")
     }
 
@@ -102,7 +100,7 @@ class Base64UrlTest {
         // 0xfb, 0xff, 0xfe -> binary: 111110 111111 111111 111110
         // Standard base64 indices: 62, 63, 63, 62 -> "+//+" -> base64url "-__-"
         val data = byteArrayOf(0xfb.toByte(), 0xff.toByte(), 0xfe.toByte())
-        val result = SmartAccountSharedUtils.base64urlEncode(data)
+        val result = Util.base64urlEncode(data)
         assertEquals("-__-", result, "Mixed + and / should be replaced with - and _")
     }
 
@@ -110,16 +108,14 @@ class Base64UrlTest {
 
     @Test
     fun testDecodeEmptyString() {
-        val result = SmartAccountSharedUtils.base64urlDecode("")
-        assertNotNull(result)
+        val result = Util.base64urlDecode("")
         assertEquals(0, result.size, "Empty string should decode to empty byte array")
     }
 
     @Test
     fun testDecodeSingleChar() {
         // "AA" -> 0x00
-        val result = SmartAccountSharedUtils.base64urlDecode("AA")
-        assertNotNull(result)
+        val result = Util.base64urlDecode("AA")
         assertEquals(1, result.size)
         assertEquals(0x00.toByte(), result[0])
     }
@@ -127,8 +123,7 @@ class Base64UrlTest {
     @Test
     fun testDecodeWithDash() {
         // "----" -> indices 62,62,62,62 -> 0xfb, 0xef, 0xbe
-        val result = SmartAccountSharedUtils.base64urlDecode("----")
-        assertNotNull(result)
+        val result = Util.base64urlDecode("----")
         assertEquals(3, result.size)
         assertEquals(0xfb.toByte(), result[0])
         assertEquals(0xef.toByte(), result[1])
@@ -138,8 +133,7 @@ class Base64UrlTest {
     @Test
     fun testDecodeWithUnderscore() {
         // "____" -> indices 63,63,63,63 -> 0xff, 0xff, 0xff
-        val result = SmartAccountSharedUtils.base64urlDecode("____")
-        assertNotNull(result)
+        val result = Util.base64urlDecode("____")
         assertEquals(3, result.size)
         assertEquals(0xff.toByte(), result[0])
         assertEquals(0xff.toByte(), result[1])
@@ -149,10 +143,8 @@ class Base64UrlTest {
     @Test
     fun testDecodeWithPaddingAccepted() {
         // base64url decoders should accept input with or without padding
-        val withoutPadding = SmartAccountSharedUtils.base64urlDecode("AA")
-        val withPadding = SmartAccountSharedUtils.base64urlDecode("AA==")
-        assertNotNull(withoutPadding)
-        assertNotNull(withPadding)
+        val withoutPadding = Util.base64urlDecode("AA")
+        val withPadding = Util.base64urlDecode("AA==")
         assertTrue(
             withoutPadding.contentEquals(withPadding),
             "Decoding should work with or without padding"
@@ -160,10 +152,9 @@ class Base64UrlTest {
     }
 
     @Test
-    fun testDecodeInvalidInputReturnsNull() {
-        // Invalid base64url characters should cause decode to return null
-        val result = SmartAccountSharedUtils.base64urlDecode("!!!invalid!!!")
-        assertNull(result, "Invalid input should return null")
+    fun testDecodeInvalidInputThrows() {
+        // Invalid base64url characters should cause decode to throw
+        assertFailsWith<IllegalArgumentException> { Util.base64urlDecode("!!!invalid!!!") }
     }
 
     // MARK: - Round-Trip Tests
@@ -171,18 +162,16 @@ class Base64UrlTest {
     @Test
     fun testRoundTripEmpty() {
         val data = ByteArray(0)
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
-        assertNotNull(decoded)
+        val encoded = Util.base64urlEncode(data)
+        val decoded = Util.base64urlDecode(encoded)
         assertTrue(data.contentEquals(decoded), "Round-trip failed for empty array")
     }
 
     @Test
     fun testRoundTripSingleByte() {
         val data = byteArrayOf(0x42)
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
-        assertNotNull(decoded)
+        val encoded = Util.base64urlEncode(data)
+        val decoded = Util.base64urlDecode(encoded)
         assertTrue(data.contentEquals(decoded), "Round-trip failed for single byte")
     }
 
@@ -191,9 +180,8 @@ class Base64UrlTest {
         // Test lengths 0..64 to cover all padding edge cases (mod 3 = 0, 1, 2)
         for (len in 0..64) {
             val data = ByteArray(len) { (it * 17 + 0x5A).toByte() }
-            val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-            val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
-            assertNotNull(decoded, "Decode returned null for length $len")
+            val encoded = Util.base64urlEncode(data)
+            val decoded = Util.base64urlDecode(encoded)
             assertTrue(
                 data.contentEquals(decoded),
                 "Round-trip failed for length $len"
@@ -205,9 +193,8 @@ class Base64UrlTest {
     fun testRoundTripAllByteValues() {
         // All 256 byte values in a single array
         val data = ByteArray(256) { it.toByte() }
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
-        assertNotNull(decoded)
+        val encoded = Util.base64urlEncode(data)
+        val decoded = Util.base64urlDecode(encoded)
         assertTrue(data.contentEquals(decoded), "Round-trip failed for all byte values")
     }
 
@@ -215,9 +202,8 @@ class Base64UrlTest {
     fun testRoundTripUrlSafeChars() {
         // Bytes that produce + and / in standard base64
         val data = byteArrayOf(0xfb.toByte(), 0xff.toByte(), 0xfe.toByte())
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
-        assertNotNull(decoded)
+        val encoded = Util.base64urlEncode(data)
+        val decoded = Util.base64urlDecode(encoded)
         assertTrue(
             data.contentEquals(decoded),
             "Round-trip failed for URL-safe character data"
@@ -229,40 +215,35 @@ class Base64UrlTest {
     /**
      * Verifies that known credential ID bytes produce the expected base64url output.
      *
-     * These test vectors match what the TypeScript `base64url` package
-     * (used by the Stellar smart-account-kit) produces for the same byte inputs.
-     *
-     * TypeScript: `base64url.encode(Buffer.from([0xfb, 0xef, 0xbe]))` -> `"----"`
-     * TypeScript: `base64url.encode(Buffer.from([0xff, 0xff, 0xff]))` -> `"____"`
-     * TypeScript: `base64url.encode(Buffer.from([0xfb, 0xff, 0xfe]))` -> `"-__-"`
+     * These test vectors verify cross-SDK compatibility for base64url encoding:
+     * - [0xfb, 0xef, 0xbe] -> `"----"`
+     * - [0xff, 0xff, 0xff] -> `"____"`
+     * - [0xfb, 0xff, 0xfe] -> `"-__-"`
      */
     @Test
     fun testInteropWithTypeScriptSdk_dashChars() {
         val data = byteArrayOf(0xfb.toByte(), 0xef.toByte(), 0xbe.toByte())
-        assertEquals("----", SmartAccountSharedUtils.base64urlEncode(data))
+        assertEquals("----", Util.base64urlEncode(data))
     }
 
     @Test
     fun testInteropWithTypeScriptSdk_underscoreChars() {
         val data = byteArrayOf(0xff.toByte(), 0xff.toByte(), 0xff.toByte())
-        assertEquals("____", SmartAccountSharedUtils.base64urlEncode(data))
+        assertEquals("____", Util.base64urlEncode(data))
     }
 
     @Test
     fun testInteropWithTypeScriptSdk_mixedChars() {
         val data = byteArrayOf(0xfb.toByte(), 0xff.toByte(), 0xfe.toByte())
-        assertEquals("-__-", SmartAccountSharedUtils.base64urlEncode(data))
+        assertEquals("-__-", Util.base64urlEncode(data))
     }
 
     /**
-     * Simulates the TypeScript SDK's `normalizeCredentialIdToHex` function.
+     * Verifies that base64url decode followed by hex conversion is lossless.
      *
-     * In the TypeScript SDK (indexer-ops.ts), credential IDs are converted from
-     * base64url to hex for indexer lookups:
-     *   `base64url.toBuffer(credentialId).toString("hex")`
-     *
-     * This test verifies that our base64urlDecode produces the same bytes,
-     * ensuring hex conversion would yield the same result.
+     * Credential IDs are stored as base64url strings and converted to hex for
+     * indexer lookups. This test verifies that encode/decode and hex conversion
+     * round-trips without data loss.
      */
     @Test
     fun testCredentialIdBase64urlToHexInterop() {
@@ -279,10 +260,9 @@ class Base64UrlTest {
         )
 
         // Encode then decode should produce the same bytes
-        val encoded = SmartAccountSharedUtils.base64urlEncode(credentialIdBytes)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
+        val encoded = Util.base64urlEncode(credentialIdBytes)
+        val decoded = Util.base64urlDecode(encoded)
 
-        assertNotNull(decoded)
         assertTrue(
             credentialIdBytes.contentEquals(decoded),
             "Credential ID round-trip must be lossless"
@@ -293,7 +273,7 @@ class Base64UrlTest {
         assertFalse(encoded.contains("/"))
         assertFalse(encoded.contains("="))
 
-        // Verify hex conversion matches (same as TypeScript normalizeCredentialIdToHex)
+        // Verify hex conversion is lossless
         val hexFromDecoded = decoded.joinToString("") { byte ->
             (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
         }
@@ -314,10 +294,9 @@ class Base64UrlTest {
             0xe7.toByte(), 0xf8.toByte(), 0xa9.toByte(), 0xb0.toByte()
         )
 
-        val encoded = SmartAccountSharedUtils.base64urlEncode(credentialIdBytes)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
+        val encoded = Util.base64urlEncode(credentialIdBytes)
+        val decoded = Util.base64urlDecode(encoded)
 
-        assertNotNull(decoded)
         assertTrue(
             credentialIdBytes.contentEquals(decoded),
             "20-byte credential ID round-trip must be lossless"
@@ -341,25 +320,25 @@ class Base64UrlTest {
     fun testPaddingEdgeCases() {
         // mod 3 = 0: 3 bytes -> 4 base64 chars, no padding
         val data3 = byteArrayOf(0x01, 0x02, 0x03)
-        val enc3 = SmartAccountSharedUtils.base64urlEncode(data3)
+        val enc3 = Util.base64urlEncode(data3)
         assertEquals(4, enc3.length, "3 bytes -> 4 base64url chars")
         assertFalse(enc3.contains("="))
 
         // mod 3 = 1: 4 bytes -> 6 base64 chars (would have == padding)
         val data4 = byteArrayOf(0x01, 0x02, 0x03, 0x04)
-        val enc4 = SmartAccountSharedUtils.base64urlEncode(data4)
+        val enc4 = Util.base64urlEncode(data4)
         assertEquals(6, enc4.length, "4 bytes -> 6 base64url chars (no padding)")
         assertFalse(enc4.contains("="))
 
         // mod 3 = 2: 5 bytes -> 7 base64 chars (would have = padding)
         val data5 = byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05)
-        val enc5 = SmartAccountSharedUtils.base64urlEncode(data5)
+        val enc5 = Util.base64urlEncode(data5)
         assertEquals(7, enc5.length, "5 bytes -> 7 base64url chars (no padding)")
         assertFalse(enc5.contains("="))
 
         // Verify all round-trip correctly
-        assertTrue(data3.contentEquals(SmartAccountSharedUtils.base64urlDecode(enc3)!!))
-        assertTrue(data4.contentEquals(SmartAccountSharedUtils.base64urlDecode(enc4)!!))
-        assertTrue(data5.contentEquals(SmartAccountSharedUtils.base64urlDecode(enc5)!!))
+        assertTrue(data3.contentEquals(Util.base64urlDecode(enc3)))
+        assertTrue(data4.contentEquals(Util.base64urlDecode(enc4)))
+        assertTrue(data5.contentEquals(Util.base64urlDecode(enc5)))
     }
 }

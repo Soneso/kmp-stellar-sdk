@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.Util
 
 /**
  * Builder utilities for Smart Account Kit.
@@ -246,7 +247,7 @@ object SmartAccountBuilders {
      */
     fun createSpendingLimitParams(spendingLimit: String, periodLedgers: Int): SpendingLimitParams {
         // Delegate to amountToStroops which validates non-empty and positive
-        val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimit)
+        val stroops = Util.amountToStroops(spendingLimit)
         if (periodLedgers < 1) {
             throw ValidationException.invalidInput(
                 "periodLedgers",
@@ -331,7 +332,7 @@ object SmartAccountBuilders {
      */
     fun getCredentialIdStringFromSigner(signer: SmartAccountSigner): String? {
         val credentialId = getCredentialIdFromSigner(signer) ?: return null
-        return SmartAccountSharedUtils.base64urlEncode(credentialId)
+        return Util.base64urlEncode(credentialId)
     }
 
     /**

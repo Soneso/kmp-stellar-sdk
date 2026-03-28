@@ -12,7 +12,9 @@ import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.ExternalWalletAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
@@ -100,7 +102,7 @@ fun extractSignersFromRules(
                         SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
                         keyData.size
                     )
-                    val credIdEncoded = SmartAccountSharedUtils.base64urlEncode(credIdBytes)
+                    val credIdEncoded = Util.base64urlEncode(credIdBytes)
                     credIdEncoded == connectedCredentialId
                 } else {
                     false
@@ -206,7 +208,7 @@ fun parseContextType(scVal: SCValXdr): ContextRuleType {
             if (vec.size >= 2) {
                 val address = (vec[1] as? SCValXdr.Address)?.value
                 if (address != null) {
-                    val addressStr = SmartAccountSharedUtils.extractAddressString(address)
+                    val addressStr = extractAddressString(address)
                     if (addressStr != null) {
                         ContextRuleType.CallContract(addressStr)
                     } else {
@@ -265,7 +267,7 @@ fun parseSingleSigner(scVal: SCValXdr): SmartAccountSigner? {
             if (vec.size >= 2) {
                 val address = (vec[1] as? SCValXdr.Address)?.value
                 if (address != null) {
-                    val addressStr = SmartAccountSharedUtils.extractAddressString(address)
+                    val addressStr = extractAddressString(address)
                     if (addressStr != null) {
                         try {
                             DelegatedSigner(addressStr)
@@ -282,7 +284,7 @@ fun parseSingleSigner(scVal: SCValXdr): SmartAccountSigner? {
                 val verifier = (vec[1] as? SCValXdr.Address)?.value
                 val keyData = try { Scv.fromBytes(vec[2]) } catch (_: Exception) { null }
                 if (verifier != null && keyData != null) {
-                    val verifierStr = SmartAccountSharedUtils.extractAddressString(verifier)
+                    val verifierStr = extractAddressString(verifier)
                     if (verifierStr != null) {
                         try {
                             ExternalSigner(verifierStr, keyData)
@@ -311,16 +313,24 @@ fun parsePolicies(scVal: SCValXdr): List<String> {
             val vec = scVal.value?.value ?: return emptyList()
             vec.mapNotNull { element ->
                 val address = (element as? SCValXdr.Address)?.value
-                if (address != null) SmartAccountSharedUtils.extractAddressString(address) else null
+                if (address != null) extractAddressString(address) else null
             }
         }
         is SCValXdr.Map -> {
             val entries = scVal.value?.value ?: return emptyList()
             entries.mapNotNull { mapEntry ->
                 val address = (mapEntry.key as? SCValXdr.Address)?.value
-                if (address != null) SmartAccountSharedUtils.extractAddressString(address) else null
+                if (address != null) extractAddressString(address) else null
             }
         }
         else -> emptyList()
+    }
+}
+
+private fun extractAddressString(address: SCAddressXdr): String? {
+    return try {
+        Address.fromSCAddress(address).toString()
+    } catch (_: Exception) {
+        null
     }
 }

@@ -1,9 +1,10 @@
 package com.soneso.smartdemo.util
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -37,7 +38,7 @@ fun buildSimpleThresholdScVal(threshold: UInt): SCValXdr {
  * @return Encoded SCVal map for the spending limit policy.
  */
 fun buildSpendingLimitScVal(stroops: BigInteger, periodLedgers: UInt): SCValXdr {
-    val limitI128 = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
+    val limitI128 = Util.stroopsToI128ScVal(stroops)
     val map = linkedMapOf(
         Scv.toSymbol("period_ledgers") to Scv.toUint32(periodLedgers),
         Scv.toSymbol("spending_limit") to limitI128
@@ -66,13 +67,13 @@ fun buildSpendingLimitScVal(amountStr: String, periodLedgers: UInt): SCValXdr {
 
 /**
  * Returns true if [amountStr] is a valid spending limit amount (parseable by
- * [SmartAccountSharedUtils.amountToStroops] without throwing).
+ * [Util.amountToStroops] without throwing).
  *
  * @param amountStr The amount string to validate.
  */
 fun isValidSpendingAmount(amountStr: String): Boolean {
     return try {
-        SmartAccountSharedUtils.amountToStroops(amountStr)
+        Util.amountToStroops(amountStr)
         true
     } catch (_: Exception) {
         false
@@ -109,7 +110,7 @@ fun buildWeightedThresholdScVal(
     for ((signer, weight) in weights) {
         weightsMap[signer.toScVal()] = Scv.toUint32(weight)
     }
-    val sortedWeightsMap = SmartAccountSharedUtils.sortMapByKeyXdr(weightsMap)
+    val sortedWeightsMap = OZPolicyManager.sortMapByKeyXdr(weightsMap)
 
     val map = linkedMapOf(
         Scv.toSymbol("signer_weights") to Scv.toMap(sortedWeightsMap),

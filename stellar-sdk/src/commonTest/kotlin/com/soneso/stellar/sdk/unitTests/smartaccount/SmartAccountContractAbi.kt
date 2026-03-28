@@ -7,7 +7,6 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
  * including all functions, types, storage keys, error codes, and constants.
  *
  * Source: OpenZeppelin stellar-contracts (packages/accounts/)
- * Reference: TypeScript SDK at /Users/chris/projects/Stellar/smart-account-kit
  */
 object SmartAccountContractAbi {
 

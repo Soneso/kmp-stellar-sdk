@@ -300,7 +300,7 @@ class OZContextRuleManager internal constructor(
             val policyAddress = Address(address).toSCAddress()
             policiesMap[Scv.toAddress(policyAddress)] = installParam
         }
-        val sortedPoliciesMap = SmartAccountSharedUtils.sortMapByKeyXdr(policiesMap)
+        val sortedPoliciesMap = OZPolicyManager.sortMapByKeyXdr(policiesMap)
         val policiesScVal = Scv.toMap(sortedPoliciesMap)
 
         // Build invocation
@@ -372,7 +372,7 @@ class OZContextRuleManager internal constructor(
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
         // Query operation - simulate to get return value
-        return SmartAccountSharedUtils.simulateAndExtractResult(hostFunction = hostFunction, kit = kit)
+        return kit.transactionOperations.simulateAndExtractResult(hostFunction = hostFunction)
     }
 
     // MARK: - Get Context Rules Count
@@ -414,7 +414,7 @@ class OZContextRuleManager internal constructor(
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
         // Query operation - simulate to get return value
-        val resultScVal = SmartAccountSharedUtils.simulateAndExtractResult(hostFunction = hostFunction, kit = kit)
+        val resultScVal = kit.transactionOperations.simulateAndExtractResult(hostFunction = hostFunction)
 
         // Parse U32 result
         return try {

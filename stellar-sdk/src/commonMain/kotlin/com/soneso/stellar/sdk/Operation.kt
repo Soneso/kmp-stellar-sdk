@@ -72,6 +72,8 @@ sealed class Operation {
     }
 
     companion object {
+        private const val ONE = 10_000_000L // 10^7 stroops per XLM
+
         /**
          * Converts an XDR Amount (Int64) to a decimal amount string.
          *
@@ -79,7 +81,9 @@ sealed class Operation {
          * @return The decimal amount string with 7 decimal places
          */
         internal fun fromXdrAmount(value: Long): String {
-            return Util.toAmountString(value)
+            val wholePart = value / ONE
+            val fractionalPart = value % ONE
+            return "$wholePart.${fractionalPart.toString().padStart(7, '0')}"
         }
 
         /**
@@ -90,7 +94,31 @@ sealed class Operation {
          * @throws IllegalArgumentException if the amount has more than 7 decimal places
          */
         internal fun toXdrAmount(value: String): Long {
-            return Util.toStroops(value)
+            require(value.isNotBlank()) { "Amount cannot be blank" }
+            val parts = value.split(".")
+            require(parts.size <= 2) { "Invalid amount format: '$value'" }
+
+            val wholePart = try {
+                if (parts[0].isEmpty()) 0L else parts[0].toLong()
+            } catch (e: NumberFormatException) {
+                throw IllegalArgumentException("Invalid amount format: '$value'", e)
+            }
+
+            val fractionalPart = if (parts.size == 2) {
+                val fraction = parts[1]
+                require(fraction.length <= 7) {
+                    "Amount cannot have more than 7 decimal places, got ${fraction.length}"
+                }
+                try {
+                    fraction.padEnd(7, '0').toLong()
+                } catch (e: NumberFormatException) {
+                    throw IllegalArgumentException("Invalid amount format: '$value'", e)
+                }
+            } else {
+                0L
+            }
+
+            return wholePart * ONE + fractionalPart
         }
 
         /**
@@ -101,7 +129,20 @@ sealed class Operation {
          * @throws IllegalArgumentException if the amount has more than 7 decimal places
          */
         internal fun formatAmountScale(value: String): String {
-            return Util.formatAmountScale(value)
+            require(value.isNotBlank()) { "Amount cannot be blank" }
+            val parts = value.split(".")
+            require(parts.size <= 2) { "Invalid amount format: '$value'" }
+
+            val fractionalPart = if (parts.size == 2) {
+                require(parts[1].length <= 7) {
+                    "The scale of the amount must be less than or equal to 7, got ${parts[1].length}"
+                }
+                parts[1].padEnd(7, '0')
+            } else {
+                "0000000"
+            }
+
+            return "${parts[0]}.$fractionalPart"
         }
 
         /**

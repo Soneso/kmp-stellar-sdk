@@ -10,12 +10,14 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.XdrWriter
 
 // MARK: - Policy Type Definitions
 
@@ -125,7 +127,7 @@ sealed class PolicyInstallParams {
             }
 
             // Sort signer weights map keys by XDR bytes (Soroban requirement)
-            val sortedWeightsMap = SmartAccountSharedUtils.sortMapByKeyXdr(weightsMap)
+            val sortedWeightsMap = OZPolicyManager.sortMapByKeyXdr(weightsMap)
 
             // Map with alphabetically sorted keys: ["signer_weights", "threshold"]
             val map = linkedMapOf(
@@ -178,7 +180,7 @@ sealed class PolicyInstallParams {
             }
 
             // Convert limit to I128 ScVal
-            val limitI128 = SmartAccountSharedUtils.stroopsToI128ScVal(spendingLimit)
+            val limitI128 = Util.stroopsToI128ScVal(spendingLimit)
 
             // Map with alphabetically sorted keys: ["period_ledgers", "spending_limit"]
             val map = linkedMapOf(
@@ -430,7 +432,7 @@ class OZPolicyManager internal constructor(
         spendingLimit: String,
         periodLedgers: UInt
     ): TransactionResult {
-        val stroops = SmartAccountSharedUtils.amountToStroops(spendingLimit)
+        val stroops = Util.amountToStroops(spendingLimit)
         val params = PolicyInstallParams.SpendingLimit(stroops, periodLedgers)
         return addPolicy(contextRuleId, policyAddress, params.toScVal())
     }
@@ -637,5 +639,53 @@ class OZPolicyManager internal constructor(
             )
         )
         return HostFunctionXdr.InvokeContract(invokeArgs)
+    }
+
+    companion object {
+        /**
+         * Sorts ScMap entries by lexicographic comparison of their keys' XDR byte representation.
+         *
+         * Soroban mandates that ScMap keys are sorted lexicographically by their XDR-encoded
+         * bytes. This function takes a LinkedHashMap of ScVal entries and returns a new
+         * LinkedHashMap with entries sorted by their key's XDR encoding.
+         *
+         * @param map The unsorted map of ScVal key-value pairs
+         * @return A new LinkedHashMap with entries sorted by XDR-encoded key bytes
+         */
+        fun sortMapByKeyXdr(map: LinkedHashMap<SCValXdr, SCValXdr>): LinkedHashMap<SCValXdr, SCValXdr> {
+            val sorted = LinkedHashMap<SCValXdr, SCValXdr>()
+            map.entries
+                .sortedWith(Comparator { a, b ->
+                    val aBytes = scValToXdrBytes(a.key)
+                    val bBytes = scValToXdrBytes(b.key)
+                    compareByteArraysLexicographically(aBytes, bBytes)
+                })
+                .forEach { (key, value) ->
+                    sorted[key] = value
+                }
+            return sorted
+        }
+
+        /**
+         * Encodes an SCValXdr to its XDR byte representation.
+         * Used for deterministic key comparison when sorting ScMap entries.
+         */
+        internal fun scValToXdrBytes(scVal: SCValXdr): ByteArray {
+            val writer = XdrWriter()
+            scVal.encode(writer)
+            return writer.toByteArray()
+        }
+
+        private fun compareByteArraysLexicographically(a: ByteArray, b: ByteArray): Int {
+            val minLength = minOf(a.size, b.size)
+            for (i in 0 until minLength) {
+                val aByte = a[i].toInt() and 0xFF
+                val bByte = b[i].toInt() and 0xFF
+                if (aByte != bByte) {
+                    return aByte - bByte
+                }
+            }
+            return a.size - b.size
+        }
     }
 }

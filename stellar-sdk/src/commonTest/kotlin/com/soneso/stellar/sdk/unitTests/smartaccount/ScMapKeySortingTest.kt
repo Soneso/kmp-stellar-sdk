@@ -12,7 +12,7 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -85,7 +85,7 @@ class ScMapKeySortingTest {
             Scv.toSymbol("middle") to Scv.toUint32(3u)
         )
 
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(unsorted)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(unsorted)
         val keys = sorted.keys.toList()
 
         assertEquals(3, keys.size)
@@ -108,13 +108,13 @@ class ScMapKeySortingTest {
             Scv.toAddress(Address(addr3).toSCAddress()) to Scv.toVoid()
         )
 
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(unsorted)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(unsorted)
         val sortedKeys = sorted.keys.toList()
 
         // Verify entries are sorted by XDR bytes
         for (i in 0 until sortedKeys.size - 1) {
-            val currentXdr = SmartAccountSharedUtils.scValToXdrBytes(sortedKeys[i])
-            val nextXdr = SmartAccountSharedUtils.scValToXdrBytes(sortedKeys[i + 1])
+            val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
+            val nextXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i + 1])
             val hexCurrent = currentXdr.toHexString()
             val hexNext = nextXdr.toHexString()
             assertTrue(
@@ -122,30 +122,6 @@ class ScMapKeySortingTest {
                 "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
             )
         }
-    }
-
-    @Test
-    fun testSortMapEntriesByKeyXdr() {
-        // Entries are sorted by XDR bytes of the key. XDR encodes symbols with a
-        // length prefix, so different-length symbols sort by length first.
-        //
-        // "z_last"   (6 chars) -> length prefix 00000006
-        // "a_first"  (7 chars) -> length prefix 00000007
-        // "m_middle" (8 chars) -> length prefix 00000008
-        //
-        // XDR sort order: z_last (6) < a_first (7) < m_middle (8)
-        val entries = listOf(
-            SCMapEntryXdr(key = Scv.toSymbol("z_last"), `val` = Scv.toUint32(1u)),
-            SCMapEntryXdr(key = Scv.toSymbol("a_first"), `val` = Scv.toUint32(2u)),
-            SCMapEntryXdr(key = Scv.toSymbol("m_middle"), `val` = Scv.toUint32(3u))
-        )
-
-        val sorted = SmartAccountSharedUtils.sortMapEntriesByKeyXdr(entries)
-
-        assertEquals(3, sorted.size)
-        assertEquals("z_last", extractSymbolName(sorted[0].key))
-        assertEquals("a_first", extractSymbolName(sorted[1].key))
-        assertEquals("m_middle", extractSymbolName(sorted[2].key))
     }
 
     // MARK: - SimpleThreshold Policy Tests
@@ -357,7 +333,7 @@ class ScMapKeySortingTest {
         }
 
         // Sort using the same utility
-        val sortedMap = SmartAccountSharedUtils.sortMapByKeyXdr(policiesMap)
+        val sortedMap = OZPolicyManager.sortMapByKeyXdr(policiesMap)
 
         // Verify all entries are present
         assertEquals(3, sortedMap.size)
@@ -365,8 +341,8 @@ class ScMapKeySortingTest {
         // Verify keys are sorted by XDR hex
         val sortedKeys = sortedMap.keys.toList()
         for (i in 0 until sortedKeys.size - 1) {
-            val currentXdr = SmartAccountSharedUtils.scValToXdrBytes(sortedKeys[i])
-            val nextXdr = SmartAccountSharedUtils.scValToXdrBytes(sortedKeys[i + 1])
+            val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
+            val nextXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i + 1])
             val hexCurrent = currentXdr.toHexString()
             val hexNext = nextXdr.toHexString()
             assertTrue(
@@ -391,8 +367,8 @@ class ScMapKeySortingTest {
         mapOrderB[Scv.toAddress(Address(addr2).toSCAddress())] = Scv.toVoid()
         mapOrderB[Scv.toAddress(Address(addr1).toSCAddress())] = Scv.toVoid()
 
-        val sortedA = SmartAccountSharedUtils.sortMapByKeyXdr(mapOrderA)
-        val sortedB = SmartAccountSharedUtils.sortMapByKeyXdr(mapOrderB)
+        val sortedA = OZPolicyManager.sortMapByKeyXdr(mapOrderA)
+        val sortedB = OZPolicyManager.sortMapByKeyXdr(mapOrderB)
 
         val xdrA = encodeToXdrHex(Scv.toMap(sortedA))
         val xdrB = encodeToXdrHex(Scv.toMap(sortedB))
@@ -415,7 +391,7 @@ class ScMapKeySortingTest {
             Scv.toBytes(byteArrayOf(0x01)) to Scv.toUint32(3u) // discriminant = SCV_BYTES
         )
 
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(unsorted)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(unsorted)
         val sortedKeys = sorted.keys.toList()
 
         assertEquals(3, sortedKeys.size)
@@ -436,7 +412,7 @@ class ScMapKeySortingTest {
     @Test
     fun testSortEmptyMap() {
         val empty = linkedMapOf<SCValXdr, SCValXdr>()
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(empty)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(empty)
         assertEquals(0, sorted.size)
     }
 
@@ -445,7 +421,7 @@ class ScMapKeySortingTest {
         val single = linkedMapOf(
             Scv.toSymbol("only") to Scv.toUint32(1u)
         )
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(single)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(single)
         assertEquals(1, sorted.size)
         assertEquals("only", extractSymbolName(sorted.keys.first()))
     }
@@ -459,7 +435,7 @@ class ScMapKeySortingTest {
             Scv.toSymbol("bbb") to Scv.toUint32(2u),
             Scv.toSymbol("ccc") to Scv.toUint32(3u)
         )
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(alreadySorted)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(alreadySorted)
         val keys = sorted.keys.toList()
 
         assertEquals("aaa", extractSymbolName(keys[0]))
@@ -476,7 +452,7 @@ class ScMapKeySortingTest {
             Scv.toSymbol("a") to Scv.toUint32(200u),
             Scv.toSymbol("m") to Scv.toUint32(300u)
         )
-        val sorted = SmartAccountSharedUtils.sortMapByKeyXdr(map)
+        val sorted = OZPolicyManager.sortMapByKeyXdr(map)
         val entries = sorted.entries.toList()
 
         assertEquals("a", extractSymbolName(entries[0].key))
@@ -530,8 +506,8 @@ class ScMapKeySortingTest {
      */
     private fun assertKeysAreSortedByXdrHex(entries: List<SCMapEntryXdr>) {
         for (i in 0 until entries.size - 1) {
-            val currentXdr = SmartAccountSharedUtils.scValToXdrBytes(entries[i].key)
-            val nextXdr = SmartAccountSharedUtils.scValToXdrBytes(entries[i + 1].key)
+            val currentXdr = OZPolicyManager.scValToXdrBytes(entries[i].key)
+            val nextXdr = OZPolicyManager.scValToXdrBytes(entries[i + 1].key)
             val hexCurrent = currentXdr.toHexString()
             val hexNext = nextXdr.toHexString()
             assertTrue(
@@ -543,7 +519,7 @@ class ScMapKeySortingTest {
 
     /**
      * Compares two byte arrays lexicographically with unsigned byte comparison.
-     * Mirrors the logic in SmartAccountSharedUtils.compareByteArraysLexicographically.
+     * Mirrors the logic in OZPolicyManager.compareByteArraysLexicographically.
      */
     private fun compareByteArraysForTest(a: ByteArray, b: ByteArray): Int {
         val minLength = minOf(a.size, b.size)

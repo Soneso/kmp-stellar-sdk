@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
@@ -178,7 +179,7 @@ class OZSignerManager internal constructor(
         }
 
         // Step 5: Base64URL-encode credential ID for storage
-        val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(registrationResult.credentialId)
+        val credentialIdBase64url = Util.base64urlEncode(registrationResult.credentialId)
 
         // Step 6: Save credential locally as pending
         val credential = kit.credentialManager.createPendingCredential(

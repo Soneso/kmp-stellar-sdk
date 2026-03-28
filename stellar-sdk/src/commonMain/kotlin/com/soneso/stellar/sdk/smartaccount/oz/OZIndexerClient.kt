@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Util
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -474,10 +475,13 @@ class OZIndexerClient(
      * @throws ValidationException.InvalidInput if the input is not valid base64url
      */
     private fun base64UrlToHex(base64url: String): String {
-        val bytes = SmartAccountSharedUtils.base64urlDecode(base64url)
-            ?: throw ValidationException.InvalidInput(
+        val bytes = try {
+            Util.base64urlDecode(base64url)
+        } catch (e: IllegalArgumentException) {
+            throw ValidationException.InvalidInput(
                 "Failed to decode base64url credential ID: $base64url"
             )
+        }
 
         return bytes.joinToString("") { byte ->
             (byte.toInt() and 0xFF).toString(16).padStart(2, '0')

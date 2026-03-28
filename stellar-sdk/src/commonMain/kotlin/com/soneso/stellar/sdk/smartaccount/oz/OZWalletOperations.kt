@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -301,7 +302,7 @@ class OZWalletOperations internal constructor(
         }
 
         // STEP 6: Base64URL-encode credential ID
-        val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(registrationResult.credentialId)
+        val credentialIdBase64url = Util.base64urlEncode(registrationResult.credentialId)
 
         // STEP 7: Save credential as pending (with metadata from registration)
         val credential = try {
@@ -328,7 +329,7 @@ class OZWalletOperations internal constructor(
         // Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
 
-        // STEP 8: Set connected state and save session (before deployment, matching TS SDK)
+        // STEP 8: Set connected state and save session (before deployment)
         kit.setConnectedState(
             credentialId = credentialIdBase64url,
             contractId = contractId
@@ -365,7 +366,7 @@ class OZWalletOperations internal constructor(
                     kit.transactionOperations.fundWallet(nativeTokenContract = tokenContract)
                 }
 
-                // Delete credential on successful deployment (matching TS SDK)
+                // Delete credential on successful deployment
                 try {
                     credentialManager.deleteCredential(credentialId = credentialIdBase64url)
                 } catch (e: Exception) {
@@ -569,7 +570,6 @@ class OZWalletOperations internal constructor(
 
             if (session != null && !session.isExpired) {
                 // Valid session exists - verify contract still exists on-chain
-                // (matching TS SDK which routes session restore through connectWithCredentials)
                 try {
                     return connectWithCredentials(
                         credentialId = session.credentialId,
@@ -632,7 +632,7 @@ class OZWalletOperations internal constructor(
         }
 
         // STEP 5: Base64URL-encode credential ID
-        val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(authenticationResult.credentialId)
+        val credentialIdBase64url = Util.base64urlEncode(authenticationResult.credentialId)
 
         // STEP 6: Look up contract ID
         var contractId: String? = null
@@ -801,7 +801,7 @@ class OZWalletOperations internal constructor(
         }
 
         // STEP 4: Base64URL-encode credential ID
-        val credentialIdBase64url = SmartAccountSharedUtils.base64urlEncode(authenticationResult.credentialId)
+        val credentialIdBase64url = Util.base64urlEncode(authenticationResult.credentialId)
 
         // STEP 5: Normalize signature (DER to compact, low-S)
         val normalizedSignature = try {
@@ -925,11 +925,14 @@ class OZWalletOperations internal constructor(
                 val deployer = kit.getDeployer()
 
                 // Decode Base64URL credential ID to raw bytes
-                val credentialIdBytes = SmartAccountSharedUtils.base64urlDecode(finalCredentialId)
-                    ?: throw ValidationException.invalidInput(
+                val credentialIdBytes = try {
+                    Util.base64urlDecode(finalCredentialId)
+                } catch (e: IllegalArgumentException) {
+                    throw ValidationException.invalidInput(
                         "credentialId",
                         "Invalid Base64URL-encoded credential ID"
                     )
+                }
 
                 finalContractId = try {
                     SmartAccountUtils.deriveContractAddress(
@@ -956,7 +959,6 @@ class OZWalletOperations internal constructor(
         verifyContractExists(finalContractId)
 
         // Delete transitional credential from storage after on-chain verification
-        // (matching TS SDK which deletes credential after getContractData succeeds)
         try {
             credentialManager.deleteCredential(credentialId = finalCredentialId)
         } catch (e: Exception) {
@@ -990,8 +992,7 @@ class OZWalletOperations internal constructor(
     /**
      * Verifies a smart account contract exists on-chain by checking its instance ledger entry.
      *
-     * Uses `getContractData` with the contract instance key, matching the TS SDK's
-     * verification approach (`rpc.getContractData(contractId, scvLedgerKeyContractInstance())`).
+     * Uses `getContractData` with the contract instance key.
      *
      * @param contractId The contract address to verify
      * @throws WalletException.notFound if the contract does not exist
@@ -1018,8 +1019,6 @@ class OZWalletOperations internal constructor(
 
     /**
      * Saves a session to storage for reconnection.
-     *
-     * Errors propagate to the caller (matching TS SDK behavior).
      *
      * @param credentialId The Base64URL-encoded credential ID
      * @param contractId The smart account contract address

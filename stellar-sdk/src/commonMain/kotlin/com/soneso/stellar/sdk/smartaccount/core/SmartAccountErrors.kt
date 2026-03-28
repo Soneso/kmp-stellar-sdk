@@ -658,8 +658,7 @@ sealed class SessionException(
  * Otherwise, a new [ValidationException.InvalidInput] is created using the
  * given [defaultCode], preserving the original throwable as [cause].
  *
- * This mirrors the TypeScript SDK's `wrapError()` function and ensures all
- * errors surfaced from the Smart Account Kit are consistently typed.
+ * Ensures all errors surfaced from the Smart Account Kit are consistently typed.
  *
  * @param err The throwable to wrap
  * @param defaultCode The error code to use when wrapping non-SmartAccountException errors.

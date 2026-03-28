@@ -11,6 +11,7 @@ package com.soneso.stellar.sdk.smartaccount
 import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Util
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
@@ -611,7 +612,7 @@ class SmartAccountKitTest {
 
     @Test
     fun testWalletOperations_connectWallet_withValidSession_noNetwork() = runTest {
-        // Session restore now verifies the contract on-chain (matching TS SDK).
+        // Session restore verifies the contract on-chain.
         // Without network access, verification fails and the stale session is cleared.
         // With prompt=false (default), connectWallet returns null.
         val config = createTestConfig()
@@ -697,21 +698,21 @@ class SmartAccountKitTest {
     @Test
     fun testTransactionOperations_validateTransfer_zeroAmount() = runTest {
         // Test amount validation
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("0")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("0")
         }
     }
 
     @Test
     fun testTransactionOperations_validateTransfer_negativeAmount() = runTest {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("-10")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("-10")
         }
     }
 
     @Test
     fun testTransactionOperations_amountConversion() = runTest {
-        val stroops = SmartAccountSharedUtils.amountToStroops("10")
+        val stroops = Util.amountToStroops("10")
         assertEquals(BigInteger.fromLong(100_000_000L), stroops)
     }
 
@@ -1536,7 +1537,7 @@ class SmartAccountKitTest {
     @Test
     fun testBase64UrlEncoding() {
         val data = ByteArray(16) { it.toByte() }
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
+        val encoded = Util.base64urlEncode(data)
 
         // Should not contain + or / or =
         assertFalse(encoded.contains("+"))
@@ -1550,17 +1551,16 @@ class SmartAccountKitTest {
     @Test
     fun testBase64UrlDecoding() {
         val data = ByteArray(16) { it.toByte() }
-        val encoded = SmartAccountSharedUtils.base64urlEncode(data)
-        val decoded = SmartAccountSharedUtils.base64urlDecode(encoded)
+        val encoded = Util.base64urlEncode(data)
+        val decoded = Util.base64urlDecode(encoded)
 
-        assertNotNull(decoded)
         assertTrue(data.contentEquals(decoded))
     }
 
     @Test
     fun testStroopsConversion() {
         val stroops = BigInteger.fromLong(100_000_000L)
-        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
+        val scVal = Util.stroopsToI128ScVal(stroops)
 
         assertNotNull(scVal)
     }

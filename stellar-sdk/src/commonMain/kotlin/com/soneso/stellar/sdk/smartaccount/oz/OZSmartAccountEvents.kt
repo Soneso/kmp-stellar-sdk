@@ -1,14 +1,12 @@
 //
-//  SmartAccountEvents.kt
+//  OZSmartAccountEvents.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.core
+package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.platformSynchronized
-import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import kotlin.concurrent.Volatile
 
 /**

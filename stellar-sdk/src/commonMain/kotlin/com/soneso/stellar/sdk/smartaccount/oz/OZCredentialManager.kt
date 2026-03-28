@@ -170,8 +170,6 @@ class OZCredentialManager internal constructor(
      * PENDING deployment status by default. Unlike [createPendingCredential], this
      * method does not validate or modify the credential -- it performs a direct save.
      *
-     * Corresponds to TypeScript SDK's `CredentialManager.save()`.
-     *
      * @param credentialId The Base64URL-encoded credential ID (must not be empty)
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
      * @param nickname Optional user-friendly name for the credential
@@ -239,8 +237,7 @@ class OZCredentialManager internal constructor(
      * Marks a credential as deployed by removing it from storage.
      *
      * After successful deployment, credentials are deleted from storage because
-     * reconnection works via sessions or the indexer. This matches the TypeScript
-     * SDK's `CredentialManager.markDeployed()` behavior.
+     * reconnection works via sessions or the indexer.
      *
      * @param credentialId The ID of the credential that was successfully deployed
      * @throws StorageException.WriteFailed if deletion fails
@@ -324,8 +321,6 @@ class OZCredentialManager internal constructor(
      * transaction is submitted but the app closes before confirmation, sync() allows
      * the app to discover on next launch whether the deployment actually succeeded.
      *
-     * Corresponds to TypeScript SDK's `CredentialManager.sync()`.
-     *
      * @param credentialId The ID of the credential to sync
      * @return true if the contract exists on-chain (credential was deployed), false otherwise
      * @throws CredentialException.NotFound if the credential does not exist in storage
@@ -385,8 +380,6 @@ class OZCredentialManager internal constructor(
      * state. Deployed credentials are removed from storage. Returns a summary of
      * deployment statuses.
      *
-     * Corresponds to TypeScript SDK's `CredentialManager.syncAll()`.
-     *
      * @return A [SyncResult] containing counts of deployed, pending, and failed credentials
      * @throws StorageException.ReadFailed if reading credentials fails
      *
@@ -438,8 +431,6 @@ class OZCredentialManager internal constructor(
      * Before deleting, checks whether the contract exists on-chain by calling [sync].
      * If the contract is already deployed, the deletion is rejected because the wallet
      * exists on-chain and the credential has already been removed by sync.
-     *
-     * Corresponds to TypeScript SDK's `CredentialManager.delete()`.
      *
      * @param credentialId The ID of the credential to delete
      * @throws CredentialException.NotFound if the credential does not exist
@@ -580,8 +571,6 @@ class OZCredentialManager internal constructor(
      * Returns credentials where the contractId matches the kit's currently connected
      * contract ID. Returns an empty list if no wallet is connected.
      *
-     * Corresponds to TypeScript SDK's `CredentialManager.getForWallet()`.
-     *
      * @return List of credentials for the connected wallet (empty if not connected or none found)
      * @throws StorageException.ReadFailed if reading fails
      *
@@ -602,8 +591,6 @@ class OZCredentialManager internal constructor(
      * Returns all credentials with deployment status PENDING or FAILED. These are
      * credentials that have not been confirmed on-chain and may need attention
      * (retry, sync, or delete).
-     *
-     * Corresponds to TypeScript SDK's `CredentialManager.getPending()`.
      *
      * @return List of pending and failed credentials (empty if none exist)
      * @throws StorageException.ReadFailed if reading fails

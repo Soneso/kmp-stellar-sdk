@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.MemoNone
@@ -219,12 +220,12 @@ class OZMultiSignerManager internal constructor(
         }
 
         // STEP 2: Build host function for token transfer
-        val stroops = SmartAccountSharedUtils.amountToStroops(amount)
+        val stroops = Util.amountToStroops(amount)
 
         val fromAddress = Address(contractId).toSCAddress()
         val toAddress = Address(recipient).toSCAddress()
 
-        val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
+        val amountScVal = Util.stroopsToI128ScVal(stroops)
 
         val functionArgs = listOf(
             Scv.toAddress(fromAddress),
@@ -269,9 +270,8 @@ class OZMultiSignerManager internal constructor(
                 SmartAccountConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
         // STEP 6: Sign auth entries.
-        // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow,
-        // matching the TS SDK pattern where signAuthEntry is called once per passkey
-        // and the entry accumulates signatures across calls.
+        // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow.
+        // signAuthEntry is called once per passkey and the entry accumulates signatures across calls.
         val signedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
         for (entry in authEntries) {
@@ -282,14 +282,13 @@ class OZMultiSignerManager internal constructor(
                 continue
             }
 
-            val entryAddress = SmartAccountSharedUtils.extractAddressString(credentials.address)
+            val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
             if (entryAddress != contractId) {
                 signedAuthEntries.add(entry)
                 continue
             }
 
-            // Clone the entry and set the expiration ledger before signing,
-            // matching the TS SDK: signedEntry.credentials().address().signatureExpirationLedger(expiration)
+            // Clone the entry and set the expiration ledger before signing
             var signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
 
             // STEP 6a: Sign with each passkey signer using SmartAccountAuth.signAuthEntry().
@@ -499,13 +498,6 @@ class OZMultiSignerManager internal constructor(
 
     /**
      * Clones an auth entry via XDR round-trip and sets the signatureExpirationLedger.
-     *
-     * This matches the TS SDK pattern where the entry is cloned and the expiration
-     * is set before signing:
-     * ```typescript
-     * let signedEntry = xdr.SorobanAuthorizationEntry.fromXDR(entry.toXDR());
-     * signedEntry.credentials().address().signatureExpirationLedger(expiration);
-     * ```
      */
     private fun cloneEntryWithExpiration(
         entry: SorobanAuthorizationEntryXdr,

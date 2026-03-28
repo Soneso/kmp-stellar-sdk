@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.currentTimeMillis
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -203,14 +204,14 @@ class OZTransactionOperations internal constructor(
         }
 
         // STEP 2: Convert amount to stroops — validates non-empty and positive
-        val stroops = SmartAccountSharedUtils.amountToStroops(amount)
+        val stroops = Util.amountToStroops(amount)
 
         // STEP 3: Build host function for token transfer
         // Contract call: token.transfer(from: smartAccount, to: recipient, amount: stroops)
         val fromAddress = Address(contractId).toSCAddress()
         val toAddress = Address(recipient).toSCAddress()
 
-        val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(stroops)
+        val amountScVal = Util.stroopsToI128ScVal(stroops)
 
         val functionArgs = listOf(
             Scv.toAddress(fromAddress),
@@ -284,7 +285,7 @@ class OZTransactionOperations internal constructor(
                 ?: return@map entry // Not an address credential, skip
 
             // Check if the address matches our contract
-            val entryAddress = SmartAccountSharedUtils.extractAddressString(credentials.address)
+            val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
             if (entryAddress == contractId) {
                 // This entry is for our smart account - sign it
                 SmartAccountAuth.signAuthEntry(
@@ -415,7 +416,7 @@ class OZTransactionOperations internal constructor(
                 }
 
                 // Check if the address matches our contract
-                val entryAddress = SmartAccountSharedUtils.extractAddressString(addressCreds.address)
+                val entryAddress = try { Address.fromSCAddress(addressCreds.address).toString() } catch (_: Exception) { null }
                 if (entryAddress != contractId) {
                     // Not our contract's entry, pass through unchanged
                     signed.add(entry)
@@ -439,10 +440,13 @@ class OZTransactionOperations internal constructor(
                     )
 
                 // (c) Decode credential ID bytes for allowCredentials constraint
-                val credIdBytes = SmartAccountSharedUtils.base64urlDecode(credentialId)
-                    ?: throw CredentialException.invalid(
+                val credIdBytes = try {
+                    Util.base64urlDecode(credentialId)
+                } catch (e: IllegalArgumentException) {
+                    throw CredentialException.invalid(
                         "Failed to decode credentialId from Base64URL: $credentialId"
                     )
+                }
 
                 // (d) Authenticate with passkey (triggers biometric prompt)
                 val authResult = webauthnProvider.authenticate(
@@ -625,9 +629,8 @@ class OZTransactionOperations internal constructor(
      * Submits a multi-signer transaction using the same Mode 1 / Mode 2 routing
      * as single-signer [submit].
      *
-     * This mirrors the TypeScript SDK's approach: multi-signer transfers extract
-     * the host function and signed auth entries from the assembled transaction and
-     * submit them via the relayer's Mode 1 endpoint (relayer builds the envelope).
+     * Extracts the host function and signed auth entries from the assembled transaction
+     * and submits them via the relayer's Mode 1 endpoint (relayer builds the envelope).
      * Mode 2 (signed XDR) is used only when source_account auth entries are present.
      *
      * Called by [OZMultiSignerManager.multiSignerTransfer] after collecting all
@@ -853,9 +856,8 @@ class OZTransactionOperations internal constructor(
             args = balanceArgs
         )
         val balanceHostFunction = HostFunctionXdr.InvokeContract(balanceInvokeArgs)
-        val balanceResult = SmartAccountSharedUtils.simulateAndExtractResult(
-            hostFunction = balanceHostFunction,
-            kit = kit
+        val balanceResult = simulateAndExtractResult(
+            hostFunction = balanceHostFunction
         )
 
         // Parse I128 result to BigInteger stroops (handles full 128-bit range)
@@ -874,7 +876,7 @@ class OZTransactionOperations internal constructor(
         // STEP 6: Build transfer from temp account to smart account
         val fromAddress = Address(tempKeypair.getAccountId()).toSCAddress()
         val toAddress = Address(contractId).toSCAddress()
-        val amountScVal = SmartAccountSharedUtils.stroopsToI128ScVal(transferStroops)
+        val amountScVal = Util.stroopsToI128ScVal(transferStroops)
 
         val functionArgs = listOf(
             Scv.toAddress(fromAddress),
@@ -1030,6 +1032,49 @@ class OZTransactionOperations internal constructor(
         }
     }
 
+    // MARK: - Simulation
+
+    /**
+     * Simulates a host function and extracts the return value.
+     *
+     * Builds a transaction with the given host function, simulates it via
+     * Soroban RPC, and returns the result SCVal. Used for query operations
+     * that don't require transaction submission.
+     *
+     * @param hostFunction The host function to simulate
+     * @return The SCVal return value from the simulation
+     * @throws TransactionException if simulation fails or result extraction fails
+     */
+    internal suspend fun simulateAndExtractResult(
+        hostFunction: HostFunctionXdr
+    ): SCValXdr {
+        val deployer = kit.getDeployer()
+        val deployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
+
+        val operation = InvokeHostFunctionOperation(hostFunction, emptyList())
+
+        val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
+            .setBaseFee(100)
+            .addOperation(operation)
+            .addMemo(MemoNone)
+            .setTimeout(300)
+            .build()
+
+        val simulation = kit.sorobanServer.simulateTransaction(transaction)
+
+        if (simulation.error != null) {
+            throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
+        }
+
+        val results = simulation.results
+        if (results.isNullOrEmpty()) {
+            throw TransactionException.simulationFailed("No results returned from simulation")
+        }
+
+        return results[0].parseXdr()
+            ?: throw TransactionException.simulationFailed("No return value in simulation result")
+    }
+
     // MARK: - Private Helpers
 
     /**
@@ -1139,8 +1184,6 @@ class OZTransactionOperations internal constructor(
      * 2. If a relayer is configured, use relayer
      * 3. Otherwise, use RPC
      *
-     * This matches the TypeScript SDK's `getSubmissionMethod()` logic.
-     *
      * @param forceMethod Optional override to force a specific submission method
      * @return The submission method to use
      */
@@ -1160,8 +1203,6 @@ class OZTransactionOperations internal constructor(
      *
      * Mode 2 (signed transaction XDR) is required when any auth entry has
      * source_account credentials rather than address credentials.
-     *
-     * This is equivalent to the TypeScript SDK's `hasSourceAccountAuth()`.
      *
      * @param authEntries The authorization entries to check
      * @return True if Mode 2 should be used, false for Mode 1
@@ -1214,7 +1255,7 @@ class OZTransactionOperations internal constructor(
 
         throw CredentialException.notFound(
             "No signer found on-chain for credential ID: " +
-                SmartAccountSharedUtils.base64urlEncode(credentialIdBytes)
+                Util.base64urlEncode(credentialIdBytes)
         )
     }
 

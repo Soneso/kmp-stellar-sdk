@@ -235,16 +235,14 @@ class OZRelayerClient(
     /**
      * Performs the HTTP request to the relayer.
      *
-     * Matches the TypeScript SDK behavior:
      * - Sends X-Client-Name and X-Client-Version headers
      * - On success: extracts fields from nested `data` wrapper if present
      * - On error (including non-2xx): parses error code from multiple locations
      * - On timeout: returns a response with TIMEOUT error code
      * - On network failure: returns a response with the error message
      *
-     * Unlike the previous version that threw exceptions for HTTP and network errors,
-     * this now returns a RelayerResponse for all cases, matching the TypeScript SDK
-     * pattern. Only XDR encoding failures (before the request) return early responses.
+     * Returns a RelayerResponse for all cases. Only XDR encoding failures
+     * (before the request) return early responses.
      *
      * @param payload The JSON payload to send
      * @param perRequestTimeoutMs Optional per-request timeout override
@@ -334,7 +332,7 @@ class OZRelayerClient(
     /**
      * Extracts the error code from a relayer error response.
      *
-     * Checks multiple locations in order, matching the TypeScript SDK:
+     * Checks multiple locations in order:
      * 1. Top-level `code` field
      * 2. Top-level `errorCode` field
      * 3. Nested `data.code` field

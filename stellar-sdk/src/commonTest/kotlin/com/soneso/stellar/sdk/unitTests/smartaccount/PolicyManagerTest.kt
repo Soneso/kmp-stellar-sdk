@@ -7,6 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
@@ -14,7 +15,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSharedUtils
+import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.xdr.Int128PartsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
@@ -550,68 +551,68 @@ class PolicyManagerTest {
 
     @Test
     fun testAmountToStroops_oneXlm() {
-        val stroops = SmartAccountSharedUtils.amountToStroops("1")
+        val stroops = Util.amountToStroops("1")
         assertEquals(BigInteger.fromLong(10_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_fractionalAmount() {
-        val stroops = SmartAccountSharedUtils.amountToStroops("0.5")
+        val stroops = Util.amountToStroops("0.5")
         assertEquals(BigInteger.fromLong(5_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_largeAmount() {
-        val stroops = SmartAccountSharedUtils.amountToStroops("1000")
+        val stroops = Util.amountToStroops("1000")
         assertEquals(BigInteger.fromLong(10_000_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_emptyString() {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("")
         }
     }
 
     @Test
     fun testAmountToStroops_whitespace() {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("   ")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("   ")
         }
     }
 
     @Test
     fun testAmountToStroops_nonNumeric() {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("abc")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("abc")
         }
     }
 
     @Test
     fun testAmountToStroops_scientificNotation() {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("1e7")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("1e7")
         }
     }
 
     @Test
     fun testAmountToStroops_subStroopAmount() {
         // 0.00000001 is less than 1 stroop (0.0000001), rounds to 0
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountSharedUtils.amountToStroops("0.00000001")
+        assertFailsWith<IllegalArgumentException> {
+            Util.amountToStroops("0.00000001")
         }
     }
 
     @Test
     fun testAmountToStroops_decimalPrecision() {
-        val stroops = SmartAccountSharedUtils.amountToStroops("10.5")
+        val stroops = Util.amountToStroops("10.5")
         assertEquals(BigInteger.fromLong(105_000_000L), stroops)
     }
 
     @Test
     fun testAmountToStroops_maxPrecision() {
         // 0.0000001 = 1 stroop (minimum)
-        val stroops = SmartAccountSharedUtils.amountToStroops("0.0000001")
+        val stroops = Util.amountToStroops("0.0000001")
         assertEquals(BigInteger.fromLong(1L), stroops)
     }
 
@@ -626,7 +627,7 @@ class PolicyManagerTest {
 
     @Test
     fun testCreateSpendingLimitParams_invalidAmount() {
-        assertFailsWith<ValidationException.InvalidInput> {
+        assertFailsWith<IllegalArgumentException> {
             SmartAccountBuilders.createSpendingLimitParams("", 720)
         }
     }
@@ -642,7 +643,7 @@ class PolicyManagerTest {
 
     @Test
     fun testStroopsToI128ScVal_basicValue() {
-        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(BigInteger.fromLong(10_000_000L))
+        val scVal = Util.stroopsToI128ScVal(BigInteger.fromLong(10_000_000L))
 
         assertIs<SCValXdr.I128>(scVal)
         val parts = (scVal as SCValXdr.I128).value
@@ -652,7 +653,7 @@ class PolicyManagerTest {
 
     @Test
     fun testStroopsToI128ScVal_maxLongValue() {
-        val scVal = SmartAccountSharedUtils.stroopsToI128ScVal(BigInteger.fromLong(Long.MAX_VALUE))
+        val scVal = Util.stroopsToI128ScVal(BigInteger.fromLong(Long.MAX_VALUE))
 
         assertIs<SCValXdr.I128>(scVal)
         val parts = (scVal as SCValXdr.I128).value
@@ -693,8 +694,8 @@ class PolicyManagerTest {
      */
     private fun assertKeysAreSortedByXdrHex(entries: List<SCMapEntryXdr>) {
         for (i in 0 until entries.size - 1) {
-            val currentXdr = SmartAccountSharedUtils.scValToXdrBytes(entries[i].key)
-            val nextXdr = SmartAccountSharedUtils.scValToXdrBytes(entries[i + 1].key)
+            val currentXdr = OZPolicyManager.scValToXdrBytes(entries[i].key)
+            val nextXdr = OZPolicyManager.scValToXdrBytes(entries[i + 1].key)
             val hexCurrent = currentXdr.toHexString()
             val hexNext = nextXdr.toHexString()
             assertTrue(

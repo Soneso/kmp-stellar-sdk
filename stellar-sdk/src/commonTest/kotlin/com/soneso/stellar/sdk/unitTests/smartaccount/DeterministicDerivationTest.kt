@@ -24,8 +24,7 @@ import kotlin.test.assertTrue
 /**
  * Deterministic derivation tests for the Smart Account Kit.
  *
- * Verifies that the KMP SDK derives identical values as the TypeScript Smart Account
- * Kit SDK for:
+ * Verifies deployer keypair and contract address derivation using the algorithm:
  *
  * 1. Deployer keypair derivation from the shared seed string
  *    ("openzeppelin-smart-account-kit")
@@ -40,24 +39,15 @@ import kotlin.test.assertTrue
  *           ContractIdPreimage::FromAddress { address: deployer, salt }
  *       }
  *    e. contractId = StrKey.encodeContract(SHA-256(XDR(preimage)))
- *
- * Reference: TypeScript SDK at /smart-account-kit/src/kit.ts (deployer) and
- *            /smart-account-kit/src/utils.ts (contract address derivation).
  */
 class DeterministicDerivationTest {
 
     // MARK: - Deployer Keypair Constants
 
     /**
-     * The fixed seed string used by both the TypeScript and KMP SDKs to derive
-     * the deterministic deployer keypair.
+     * The fixed seed string used to derive the deterministic deployer keypair.
      *
-     * TypeScript SDK (kit.ts line 407-409):
-     *   this.deployerKeypair = Keypair.fromRawEd25519Seed(
-     *       hash(Buffer.from("openzeppelin-smart-account-kit"))
-     *   );
-     *
-     * KMP SDK (OZSmartAccountConfig.createDefaultDeployer()):
+     * OZSmartAccountConfig.createDefaultDeployer():
      *   val seedHash = getSha256Crypto().hash("openzeppelin-smart-account-kit".encodeToByteArray())
      *   KeyPair.fromSecretSeed(seedHash)
      */
@@ -74,11 +64,9 @@ class DeterministicDerivationTest {
 
     /**
      * Expected deployer G-address derived from the seed hash.
-     * This value must be identical across all SDK implementations (TypeScript, KMP, etc.)
-     * to verify deterministic derivation from the same inputs.
+     * This value is used to verify deterministic derivation from the seed string.
      *
-     * Verified against the TypeScript SDK by computing:
-     *   Keypair.fromRawEd25519Seed(hash(Buffer.from("openzeppelin-smart-account-kit"))).publicKey()
+     * Derived by: SHA-256("openzeppelin-smart-account-kit") -> fromSecretSeed -> publicKey
      */
     private val expectedDeployerAddress =
         "GAAH4OT36RRCCAGKARGPN2HLHT2NOBVFHO4GUHA6CF7UKQ4MMV24WQ4N"
@@ -124,11 +112,11 @@ class DeterministicDerivationTest {
 
     /**
      * Verifies that the deployer keypair derived from the seed hash produces
-     * the expected G-address, matching the TypeScript SDK's derivation.
+     * the expected G-address.
      *
-     * This is a correctness test: if this G-address differs between SDKs,
-     * contract address derivation will also differ for the same inputs, indicating
-     * a bug in one of the implementations.
+     * This is a correctness test: the deployer G-address is a fixed point derived
+     * deterministically from the seed string. Contract address derivation depends
+     * on this value being stable.
      */
     @Test
     fun testDeployerAddress_matchesTypeScriptSdk() = runTest {
@@ -139,7 +127,7 @@ class DeterministicDerivationTest {
         assertEquals(
             expectedDeployerAddress,
             deployer.getAccountId(),
-            "Deployer G-address must match TypeScript SDK derivation"
+            "Deployer G-address must match expected derivation"
         )
     }
 
@@ -546,23 +534,13 @@ class DeterministicDerivationTest {
     // MARK: - Private Helpers
 
     /**
-     * Manually derives a contract address using raw XDR construction and SHA-256,
-     * implementing the exact same algorithm as the TypeScript SDK:
+     * Manually derives a contract address using raw XDR construction and SHA-256.
      *
-     * ```typescript
-     * const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
-     *   new xdr.HashIdPreimageContractId({
-     *     networkId: hash(Buffer.from(networkPassphrase)),
-     *     contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
-     *       new xdr.ContractIdPreimageFromAddress({
-     *         address: Address.fromString(deployerPublicKey).toScAddress(),
-     *         salt: hash(credentialId),
-     *       })
-     *     ),
-     *   })
-     * );
-     * return StrKey.encodeContract(hash(preimage.toXDR()));
-     * ```
+     * Algorithm:
+     * 1. salt = SHA-256(credentialId)
+     * 2. networkId = SHA-256(networkPassphrase)
+     * 3. Construct HashIdPreimage::ContractId { networkId, FromAddress { deployer, salt } }
+     * 4. contractId = StrKey.encodeContract(SHA-256(XDR(preimage)))
      */
     private suspend fun manuallyDeriveContractAddress(
         credentialId: ByteArray,

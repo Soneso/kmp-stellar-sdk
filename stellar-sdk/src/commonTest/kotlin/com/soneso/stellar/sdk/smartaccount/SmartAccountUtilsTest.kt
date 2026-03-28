@@ -176,10 +176,6 @@ class SmartAccountUtilsTest {
     }
 
     // MARK: - Verification Test Vectors
-    //
-    // These test vectors can be verified against the TypeScript Smart Account Kit's
-    // compactSignature() function in src/utils.ts (lines 289-321).
-    // Both implementations must produce identical output for the same DER input.
 
     /**
      * Verification Test Vector: Realistic WebAuthn DER signature with high-S.
@@ -187,13 +183,6 @@ class SmartAccountUtilsTest {
      * This DER signature has structure typical of a real WebAuthn authenticator response:
      * - 33-byte r (leading 0x00 because high bit of r is set)
      * - 33-byte s (leading 0x00 because high bit of s is set, and s > n/2)
-     *
-     * TypeScript verification:
-     * ```
-     * const der = Buffer.from("3046022100b23694f0367f3e621a845..." , "hex");
-     * const compact = compactSignature(der);
-     * // compact hex should equal expected below
-     * ```
      *
      * DER breakdown:
      *   30 46       -- SEQUENCE, 70 bytes total
@@ -229,7 +218,7 @@ class SmartAccountUtilsTest {
         assertEquals(64, result.size, "Compact signature must be exactly 64 bytes")
         assertEquals(
             expected.toHex(), result.toHex(),
-            "High-S WebAuthn signature must be normalized identically to TypeScript SDK"
+            "High-S WebAuthn signature must be normalized to low-S compact form"
         )
     }
 
@@ -276,11 +265,8 @@ class SmartAccountUtilsTest {
      * When s = n - 1, normalized s = n - (n - 1) = 1.
      * This tests the extreme high-S case.
      *
-     * TypeScript verification:
-     * ```
-     * // s = n - 1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550
-     * // normalized s = n - s = 1
-     * ```
+     * s = n - 1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550
+     * normalized s = n - s = 1
      */
     @Test
     fun testNormalizeSignature_verification_maxHighS() {
@@ -487,9 +473,7 @@ class SmartAccountUtilsTest {
     /**
      * Strategy 1: Public key wrapped in COSE/SPKI encoding (longer than 65 bytes).
      *
-     * The TypeScript SDK slices the last 65 bytes:
-     *   publicKey = publicKey.slice(publicKey.length - SECP256R1_PUBLIC_KEY_SIZE)
-     *
+     * The last 65 bytes contain the uncompressed public key (0x04 prefix + X + Y).
      * This simulates a COSE-wrapped key with extra header bytes.
      */
     @Test

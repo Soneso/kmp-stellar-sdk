@@ -165,8 +165,7 @@ object SmartAccountUtils {
      * Extracts the secp256r1 public key from a WebAuthn registration response using
      * multiple fallback strategies.
      *
-     * This method mirrors the TypeScript SDK's `extractPublicKeyFromAttestation()` and
-     * tries three strategies in order:
+     * Tries three strategies in order:
      *
      * 1. **Direct public key**: If [publicKey] is provided, validate it as a 65-byte
      *    uncompressed secp256r1 key (0x04 prefix). This is the primary path --

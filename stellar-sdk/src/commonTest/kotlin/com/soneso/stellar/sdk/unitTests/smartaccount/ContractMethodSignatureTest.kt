@@ -27,8 +27,7 @@ import kotlin.test.assertTrue
  * 6. WebAuthn signature struct field names match ABI definitions
  * 7. Policy install parameter field names match ABI definitions
  *
- * Source of truth: Contract spec XDR from TypeScript SDK bindings at
- * /smart-account-kit/packages/smart-account-kit-bindings/src/index.ts
+ * Source of truth: OpenZeppelin smart account contract spec XDR.
  */
 class ContractMethodSignatureTest {
 
@@ -230,7 +229,7 @@ class ContractMethodSignatureTest {
         // The contract ABI specifies `name: String` (SC_SPEC_TYPE_STRING, type code 0x10).
         // This must be encoded as SCValXdr.Str (SCV_STRING), NOT SCValXdr.Sym (SCV_SYMBOL).
         //
-        // Verified from contract spec XDR in TypeScript bindings:
+        // Verified from contract spec XDR:
         // - add_context_rule: name parameter has type code 0x10 = SC_SPEC_TYPE_STRING
         // - update_context_rule_name: name parameter has type code 0x10 = SC_SPEC_TYPE_STRING
         //
