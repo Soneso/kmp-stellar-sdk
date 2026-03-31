@@ -53,7 +53,9 @@ object SmartAccountUtils {
         16
     )
 
-    // MARK: - Signature Normalization
+    // ========================================================================
+    // Signature Normalization
+    // ========================================================================
 
     /**
      * Parses a DER-encoded secp256r1 signature and returns R and S as BigIntegers.
@@ -230,7 +232,9 @@ object SmartAccountUtils {
         return rPadded + sPadded
     }
 
-    // MARK: - Public Key Extraction
+    // ========================================================================
+    // Public Key Extraction
+    // ========================================================================
 
     /**
      * Extracts the secp256r1 public key from a WebAuthn registration response using
@@ -550,7 +554,9 @@ object SmartAccountUtils {
         return publicKey
     }
 
-    // MARK: - Contract Salt
+    // ========================================================================
+    // Contract Salt
+    // ========================================================================
 
     /**
      * Computes the contract salt from a WebAuthn credential ID.
@@ -572,7 +578,9 @@ object SmartAccountUtils {
         return getSha256Crypto().hash(credentialId)
     }
 
-    // MARK: - Contract Address Derivation
+    // ========================================================================
+    // Contract Address Derivation
+    // ========================================================================
 
     /**
      * Derives the smart account contract address from a credential ID and deployer.
@@ -684,7 +692,9 @@ object SmartAccountUtils {
         }
     }
 
-    // MARK: - Private Helper Functions
+    // ========================================================================
+    // Private Helper Functions
+    // ========================================================================
 
     /**
      * Validates the 3-byte COSE Y-coordinate separator at the given offset.
@@ -867,28 +877,3 @@ object SmartAccountUtils {
     }
 }
 
-// MARK: - Hex Encoding Utilities
-
-private val HEX_CHARS = "0123456789abcdef".toCharArray()
-
-/**
- * Converts a [ByteArray] to a lowercase hex string.
- */
-internal fun ByteArray.toHexString(): String {
-    if (isEmpty()) return ""
-    val sb = StringBuilder(size * 2)
-    for (byte in this) {
-        val i = byte.toInt() and 0xFF
-        sb.append(HEX_CHARS[i shr 4])
-        sb.append(HEX_CHARS[i and 0x0F])
-    }
-    return sb.toString()
-}
-
-/**
- * Converts a single [Byte] to a two-character lowercase hex string.
- */
-internal fun Byte.toHexString(): String {
-    val i = this.toInt() and 0xFF
-    return "${HEX_CHARS[i shr 4]}${HEX_CHARS[i and 0x0F]}"
-}

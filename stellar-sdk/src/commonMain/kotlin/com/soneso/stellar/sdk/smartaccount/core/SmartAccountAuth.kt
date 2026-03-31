@@ -20,6 +20,7 @@ import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 
@@ -56,7 +57,9 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  */
 object SmartAccountAuth {
 
-    // MARK: - Payload Hash Building
+    // ========================================================================
+    // Payload Hash Building
+    // ========================================================================
 
     /**
      * Builds the authorization payload hash for signing.
@@ -154,7 +157,9 @@ object SmartAccountAuth {
         )
     }
 
-    // MARK: - Entry Signing
+    // ========================================================================
+    // Entry Signing
+    // ========================================================================
 
     /**
      * Attaches a pre-computed signature to an authorization entry.
@@ -303,7 +308,9 @@ object SmartAccountAuth {
         )
     }
 
-    // MARK: - Signature Map Manipulation
+    // ========================================================================
+    // Signature Map Manipulation
+    // ========================================================================
 
     /**
      * Adds a raw key/value entry to the auth entry's signature map.
@@ -334,7 +341,9 @@ object SmartAccountAuth {
         )
     }
 
-    // MARK: - Helper Functions
+    // ========================================================================
+    // Helper Functions
+    // ========================================================================
 
     /**
      * Hashes a Soroban authorization preimage.
@@ -451,9 +460,7 @@ object SmartAccountAuth {
                 val keyBytes = writer.toByteArray()
 
                 // Convert to lowercase hex string
-                keyBytes.joinToString("") { byte ->
-                    (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-                }
+                Util.bytesToHex(keyBytes)
             } catch (e: Exception) {
                 throw TransactionException.signingFailed(
                     "Failed to XDR-encode signature map key for sorting: ${e.message}",

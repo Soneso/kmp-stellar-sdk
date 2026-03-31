@@ -573,11 +573,14 @@ data class WeightedThresholdParams(
  *
  * Restricts how much can be transferred within a given time period.
  *
+ * Construct instances using [SmartAccountBuilders.createSpendingLimitParams], which validates
+ * inputs and converts the spending limit from a decimal XLM string to stroops.
+ *
  * @property spendingLimit Maximum amount allowed in the period (in stroops as BigInteger, >= 1)
  * @property periodLedgers Number of ledgers in the period (>= 1).
  *           Approximately 5 seconds per ledger on the Stellar network.
  */
-data class SpendingLimitParams(
+data class SpendingLimitParams internal constructor(
     val spendingLimit: BigInteger,
     val periodLedgers: Int
 )

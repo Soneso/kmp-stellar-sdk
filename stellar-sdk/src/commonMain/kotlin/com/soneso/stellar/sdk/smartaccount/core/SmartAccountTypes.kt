@@ -2,8 +2,7 @@
 //  SmartAccountTypes.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.core
@@ -13,7 +12,9 @@ import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
-// MARK: - Signer Types
+// ============================================================================
+// Signer Types
+// ============================================================================
 
 /**
  * Represents a signer that can authorize smart account transactions.
@@ -221,7 +222,7 @@ data class ExternalSigner(
      * @return Unique key for this external signer
      */
     override val uniqueKey: String
-        get() = "external:$verifierAddress:${keyData.toHexString()}"
+        get() = "external:$verifierAddress:${Util.bytesToHex(keyData)}"
 
     /**
      * Constant-time equals to prevent timing side-channel attacks on key data.
@@ -282,7 +283,7 @@ data class ExternalSigner(
             if (publicKey[0] != SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX) {
                 throw ValidationException.invalidInput(
                     "publicKey",
-                    "WebAuthn public key must start with 0x04 (uncompressed format), got: 0x${publicKey[0].toHexString()}"
+                    "WebAuthn public key must start with 0x04 (uncompressed format), got: 0x${Util.bytesToHex(byteArrayOf(publicKey[0]))}"
                 )
             }
 
@@ -311,11 +312,10 @@ data class ExternalSigner(
             verifierAddress: String,
             publicKey: ByteArray
         ): ExternalSigner {
-            val expectedSize = 32
-            if (publicKey.size != expectedSize) {
+            if (publicKey.size != SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
                 throw ValidationException.invalidInput(
                     "publicKey",
-                    "Ed25519 public key must be $expectedSize bytes, got: ${publicKey.size}"
+                    "Ed25519 public key must be ${SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE} bytes, got: ${publicKey.size}"
                 )
             }
 
@@ -324,7 +324,9 @@ data class ExternalSigner(
     }
 }
 
-// MARK: - Submission Method
+// ============================================================================
+// Submission Method
+// ============================================================================
 
 /**
  * Determines how a transaction is submitted to the network.

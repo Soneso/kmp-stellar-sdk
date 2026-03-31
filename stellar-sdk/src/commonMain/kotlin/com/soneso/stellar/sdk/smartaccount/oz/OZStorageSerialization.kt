@@ -6,6 +6,8 @@
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
+
+import com.soneso.stellar.sdk.Util
 import kotlinx.serialization.Serializable
 
 // MARK: - Internal Serializable Data Transfer Objects
@@ -82,7 +84,7 @@ private fun hexCharToInt(char: Char): Int = when (char) {
  */
 internal fun StoredCredential.toSerializable(): SerializableCredential = SerializableCredential(
     credentialId = credentialId,
-    publicKeyHex = publicKey.toHexString(),
+    publicKeyHex = Util.bytesToHex(publicKey),
     contractId = contractId,
     deploymentStatus = deploymentStatus.name,
     deploymentError = deploymentError,

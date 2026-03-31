@@ -2,8 +2,7 @@
 //  SmartAccountVersion.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 14.02.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.core
