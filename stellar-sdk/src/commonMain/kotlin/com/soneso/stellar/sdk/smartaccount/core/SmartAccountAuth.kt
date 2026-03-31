@@ -19,6 +19,7 @@ import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 
@@ -100,39 +101,17 @@ object SmartAccountAuth {
         expirationLedger: UInt,
         networkPassphrase: String
     ): ByteArray {
-        // Validate credentials type
         val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
             ?: throw TransactionException.signingFailed(
                 "Credentials must be of type address to build auth payload hash"
             )
 
-        // Step 1: Compute network ID (SHA-256 of network passphrase)
-        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
-
-        // Step 2: Build HashIDPreimage::SorobanAuthorization
-        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
-            networkId = HashXdr(networkId),
+        return hashAuthPreimage(
             nonce = credentials.nonce,
-            signatureExpirationLedger = Uint32Xdr(expirationLedger),
-            invocation = entry.rootInvocation
+            expirationLedger = expirationLedger,
+            invocation = entry.rootInvocation,
+            networkPassphrase = networkPassphrase
         )
-
-        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
-
-        // Step 3: XDR encode the preimage
-        val encodedPreimage: ByteArray = try {
-            val writer = XdrWriter()
-            preimage.encode(writer)
-            writer.toByteArray()
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to XDR encode auth payload preimage",
-                e
-            )
-        }
-
-        // Step 4: Hash the encoded preimage
-        return getSha256Crypto().hash(encodedPreimage)
     }
 
     /**
@@ -167,33 +146,12 @@ object SmartAccountAuth {
         expirationLedger: UInt,
         networkPassphrase: String
     ): ByteArray {
-        // Step 1: Compute network ID (SHA-256 of network passphrase)
-        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
-
-        // Step 2: Build HashIDPreimage::SorobanAuthorization
-        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
-            networkId = HashXdr(networkId),
+        return hashAuthPreimage(
             nonce = nonce,
-            signatureExpirationLedger = Uint32Xdr(expirationLedger),
-            invocation = entry.rootInvocation
+            expirationLedger = expirationLedger,
+            invocation = entry.rootInvocation,
+            networkPassphrase = networkPassphrase
         )
-
-        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
-
-        // Step 3: XDR encode the preimage
-        val encodedPreimage: ByteArray = try {
-            val writer = XdrWriter()
-            preimage.encode(writer)
-            writer.toByteArray()
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to XDR encode source account auth payload preimage",
-                e
-            )
-        }
-
-        // Step 4: Hash the encoded preimage
-        return getSha256Crypto().hash(encodedPreimage)
     }
 
     // MARK: - Entry Signing
@@ -337,45 +295,11 @@ object SmartAccountAuth {
         // Create map entry
         val mapEntry = SCMapEntryXdr(key = signerKey, `val` = signatureValue)
 
-        // STEP 4: Add to signatures map
-        val mapEntries: MutableList<SCMapEntryXdr> = mutableListOf()
-
-        // Check if credentials.signature already has a Vec with a Map
-        if (credentials.signature is SCValXdr.Vec) {
-            val existingVecXdr = (credentials.signature as SCValXdr.Vec).value
-            if (existingVecXdr != null && existingVecXdr.value.isNotEmpty()) {
-                val firstElement = existingVecXdr.value[0]
-                if (firstElement is SCValXdr.Map) {
-                    // Append to existing map
-                    firstElement.value?.let { mapXdr ->
-                        mapEntries.addAll(mapXdr.value)
-                    }
-                }
-            }
-        }
-
-        // Add new entry
-        mapEntries.add(mapEntry)
-
-        // STEP 5: Sort map entries by XDR-encoded key bytes (as lowercase hex, lexicographic)
-        val sortedMapEntries = sortMapEntries(mapEntries)
-
-        // Build the final signature structure: ScVal::Vec([ScVal::Map([entries...])])
-        val signatureMap = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {
-            sortedMapEntries.forEach { entry -> put(entry.key, entry.`val`) }
-        })
-
-        credentials = SorobanAddressCredentialsXdr(
-            address = credentials.address,
-            nonce = credentials.nonce,
-            signatureExpirationLedger = credentials.signatureExpirationLedger,
-            signature = Scv.toVec(listOf(signatureMap))
-        )
-
-        // STEP 6: Create and return the signed entry
-        return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(credentials),
-            rootInvocation = entryCopy.rootInvocation
+        // STEP 4-6: Add to signatures map and return updated entry
+        return appendSignatureMapEntry(
+            entry = entryCopy,
+            credentials = credentials,
+            mapEntry = mapEntry
         )
     }
 
@@ -403,9 +327,80 @@ object SmartAccountAuth {
                 "Credentials must be of type address to add signature map entry"
             )
 
+        return appendSignatureMapEntry(
+            entry = entry,
+            credentials = credentials,
+            mapEntry = SCMapEntryXdr(key = signerKey, `val` = signatureValue)
+        )
+    }
+
+    // MARK: - Helper Functions
+
+    /**
+     * Hashes a Soroban authorization preimage.
+     *
+     * Constructs a `HashIDPreimage::SorobanAuthorization` from the given parameters,
+     * XDR-encodes it, and returns SHA-256(encoded bytes). Used by both
+     * [buildAuthPayloadHash] and [buildSourceAccountAuthPayloadHash].
+     *
+     * @param nonce The nonce from the address credentials
+     * @param expirationLedger The signature expiration ledger number
+     * @param invocation The root invocation from the authorization entry
+     * @param networkPassphrase The network passphrase
+     * @return The 32-byte SHA-256 hash of the encoded preimage
+     * @throws TransactionException.SigningFailed if XDR encoding fails
+     */
+    private suspend fun hashAuthPreimage(
+        nonce: Int64Xdr,
+        expirationLedger: UInt,
+        invocation: SorobanAuthorizedInvocationXdr,
+        networkPassphrase: String
+    ): ByteArray {
+        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
+
+        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
+            networkId = HashXdr(networkId),
+            nonce = nonce,
+            signatureExpirationLedger = Uint32Xdr(expirationLedger),
+            invocation = invocation
+        )
+
+        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
+
+        val encodedPreimage: ByteArray = try {
+            val writer = XdrWriter()
+            preimage.encode(writer)
+            writer.toByteArray()
+        } catch (e: Exception) {
+            throw TransactionException.signingFailed(
+                "Failed to XDR encode auth payload preimage",
+                e
+            )
+        }
+
+        return getSha256Crypto().hash(encodedPreimage)
+    }
+
+    /**
+     * Appends a signature map entry to an authorization entry's credential signature map.
+     *
+     * Collects existing map entries from the credentials signature field (if any),
+     * appends the new entry, sorts all entries by XDR-encoded key bytes (lowercase hex,
+     * lexicographic), rebuilds the signature Vec/Map structure, and returns a new
+     * [SorobanAuthorizationEntryXdr] with updated credentials. The input [entry] is not mutated.
+     *
+     * @param entry The authorization entry whose root invocation is preserved
+     * @param credentials The address credentials containing the existing signature map
+     * @param mapEntry The new map entry to append
+     * @return A new authorization entry with the map entry added and the map re-sorted
+     */
+    private fun appendSignatureMapEntry(
+        entry: SorobanAuthorizationEntryXdr,
+        credentials: SorobanAddressCredentialsXdr,
+        mapEntry: SCMapEntryXdr
+    ): SorobanAuthorizationEntryXdr {
         val mapEntries = mutableListOf<SCMapEntryXdr>()
 
-        // Collect existing map entries
         if (credentials.signature is SCValXdr.Vec) {
             val existingVecXdr = (credentials.signature as SCValXdr.Vec).value
             if (existingVecXdr != null && existingVecXdr.value.isNotEmpty()) {
@@ -418,13 +413,11 @@ object SmartAccountAuth {
             }
         }
 
-        // Add the new entry
-        mapEntries.add(SCMapEntryXdr(key = signerKey, `val` = signatureValue))
+        mapEntries.add(mapEntry)
 
-        // Sort and rebuild
         val sortedEntries = sortMapEntries(mapEntries)
         val signatureMap = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {
-            sortedEntries.forEach { entry -> put(entry.key, entry.`val`) }
+            sortedEntries.forEach { e -> put(e.key, e.`val`) }
         })
         val updatedCredentials = SorobanAddressCredentialsXdr(
             address = credentials.address,
@@ -438,8 +431,6 @@ object SmartAccountAuth {
             rootInvocation = entry.rootInvocation
         )
     }
-
-    // MARK: - Helper Functions
 
     /**
      * Sorts map entries by XDR-encoded key bytes (lowercase hex, lexicographic).
