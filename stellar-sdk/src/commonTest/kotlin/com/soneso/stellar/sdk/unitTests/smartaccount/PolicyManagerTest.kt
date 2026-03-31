@@ -12,7 +12,6 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
@@ -386,7 +385,7 @@ class PolicyManagerTest {
         val largeStroops = BigInteger.fromLong(10_000_000_000_000_000L) // 1 billion XLM
         val params = PolicyInstallParams.SpendingLimit(
             spendingLimit = largeStroops,
-            periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
+            periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
         )
         val scVal = params.toScVal()
 

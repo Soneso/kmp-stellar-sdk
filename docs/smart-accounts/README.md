@@ -256,8 +256,8 @@ val thresholdResult = kit.policyManager.addSimpleThreshold(
 val limitResult = kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
     policyAddress = "CPOLICY5678...",
-    spendingLimit = 1000.0,
-    periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
+    spendingLimit = "1000",
+    periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
 )
 ```
 
@@ -439,7 +439,7 @@ The OpenZeppelin smart account contract enforces these limits:
 | Maximum signers per context rule | 15 |
 | Maximum policies per context rule | 5 |
 
-These limits are defined in `SmartAccountConstants` and validated client-side before submitting transactions.
+These limits are defined in `OZConstants` and validated client-side before submitting transactions.
 
 ## Sub-Pages
 

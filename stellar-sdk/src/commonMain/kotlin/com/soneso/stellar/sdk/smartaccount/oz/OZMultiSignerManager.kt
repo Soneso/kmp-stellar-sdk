@@ -2,8 +2,7 @@
 //  OZMultiSignerManager.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -267,7 +266,7 @@ class OZMultiSignerManager internal constructor(
 
         // STEP 5: Calculate expiration
         val expirationLedger = latestLedger.sequence.toUInt() +
-                SmartAccountConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+                OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
         // STEP 6: Sign auth entries.
         // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow.

@@ -2,8 +2,7 @@
 //  OZTransactionOperations.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -15,6 +14,7 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
+import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.TransactionBuilderAccount
@@ -275,7 +275,7 @@ class OZTransactionOperations internal constructor(
         val expiration = expirationLedger ?: run {
             // Fetch latest ledger and add buffer
             val latestLedger = kit.sorobanServer.getLatestLedger()
-            latestLedger.sequence.toUInt() + SmartAccountConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+            latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
         }
 
         // Sign all matching auth entries
@@ -401,7 +401,7 @@ class OZTransactionOperations internal constructor(
         val signedAuthEntries = if (simulatedAuthEntries.isNotEmpty()) {
             // Get latest ledger ONCE before the signing loop
             val latestLedger = kit.sorobanServer.getLatestLedger()
-            val expiration = latestLedger.sequence.toUInt() + SmartAccountConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+            val expiration = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
             val signed = mutableListOf<SorobanAuthorizationEntryXdr>()
 
@@ -822,13 +822,9 @@ class OZTransactionOperations internal constructor(
         val tempKeypair = KeyPair.random()
 
         // STEP 2: Fund via Friendbot
-        val friendbotUrl = "${SmartAccountConstants.FRIENDBOT_URL}?addr=${tempKeypair.getAccountId()}"
-
-        val response = httpClient.get(friendbotUrl)
-        if (!response.status.isSuccess()) {
-            throw TransactionException.submissionFailed(
-                "Friendbot funding failed with HTTP ${response.status.value}"
-            )
+        val funded = FriendBot.fundTestnetAccount(tempKeypair.getAccountId())
+        if (!funded) {
+            throw TransactionException.submissionFailed("Friendbot funding failed")
         }
 
         // STEP 3: Wait for Friendbot funding to propagate to Soroban RPC state.
@@ -842,7 +838,7 @@ class OZTransactionOperations internal constructor(
 
         // STEP 4: Calculate transfer amount
         // Reserve for account minimum balance
-        val reserveStroops = BigInteger.fromLong(SmartAccountConstants.FRIENDBOT_RESERVE_XLM.toLong() * SmartAccountConstants.STROOPS_PER_XLM)
+        val reserveStroops = BigInteger.fromLong(OZConstants.FRIENDBOT_RESERVE_XLM.toLong() * Util.STROOPS_PER_XLM)
 
         // Query temp account balance via contract simulation
         val balanceArgs = listOf(
@@ -911,7 +907,7 @@ class OZTransactionOperations internal constructor(
         // STEP 8: Convert source_account auth entries to Address credentials
         // This allows the Relayer to use its own channel accounts for fee sponsoring
         val latestLedger = kit.sorobanServer.getLatestLedger()
-        val expirationLedger = latestLedger.sequence.toUInt() + SmartAccountConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+        val expirationLedger = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
         val signedAuthEntries = convertAndSignAuthEntries(
             authEntries = simulatedAuthEntries,
@@ -1020,8 +1016,8 @@ class OZTransactionOperations internal constructor(
         }
 
         // STEP 13: Return funded amount as XLM string
-        val xlmWhole = transferStroops / BigInteger.fromLong(SmartAccountConstants.STROOPS_PER_XLM)
-        val xlmFraction = transferStroops % BigInteger.fromLong(SmartAccountConstants.STROOPS_PER_XLM)
+        val xlmWhole = transferStroops / BigInteger.fromLong(Util.STROOPS_PER_XLM)
+        val xlmFraction = transferStroops % BigInteger.fromLong(Util.STROOPS_PER_XLM)
         return if (xlmFraction == BigInteger.ZERO) {
             xlmWhole.toString()
         } else {

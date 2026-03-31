@@ -2,14 +2,13 @@
 //  AppleWebAuthnProvider.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 14.02.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
 
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -71,12 +70,12 @@ import kotlin.coroutines.resumeWithException
  *           credentials are registered. For iOS apps, this must be an associated domain.
  * @property rpName Human-readable name displayed during authentication prompts.
  * @property timeout Operation timeout in milliseconds. Defaults to
- *           [SmartAccountConstants.WEBAUTHN_TIMEOUT_MS] (60 seconds).
+ *           [OZConstants.WEBAUTHN_TIMEOUT_MS] (60 seconds).
  */
 class AppleWebAuthnProvider(
     private val rpId: String,
     private val rpName: String,
-    private val timeout: Long = SmartAccountConstants.WEBAUTHN_TIMEOUT_MS
+    private val timeout: Long = OZConstants.WEBAUTHN_TIMEOUT_MS
 ) : WebAuthnProvider {
 
     /**
@@ -444,13 +443,13 @@ class AppleWebAuthnProvider(
          * @param rpId The WebAuthn Relying Party identifier (domain)
          * @param rpName Human-readable name for the relying party
          * @param timeout Operation timeout in milliseconds (default:
-         *        [SmartAccountConstants.WEBAUTHN_TIMEOUT_MS])
+         *        [OZConstants.WEBAUTHN_TIMEOUT_MS])
          * @return A configured [AppleWebAuthnProvider] instance
          */
         fun create(
             rpId: String,
             rpName: String,
-            timeout: Long = SmartAccountConstants.WEBAUTHN_TIMEOUT_MS
+            timeout: Long = OZConstants.WEBAUTHN_TIMEOUT_MS
         ): AppleWebAuthnProvider = AppleWebAuthnProvider(rpId, rpName, timeout)
     }
 }

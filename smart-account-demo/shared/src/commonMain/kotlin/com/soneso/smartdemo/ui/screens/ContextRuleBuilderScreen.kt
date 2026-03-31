@@ -100,10 +100,11 @@ import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.toHexString
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.launch
 
@@ -494,11 +495,11 @@ class ContextRuleBuilderScreen(
                                 // from the selected duration when the rule is submitted.
                                 var expiryDropdownExpanded by remember { mutableStateOf(false) }
                                 val expiryOptions = listOf(
-                                    "5 min" to (SmartAccountConstants.LEDGERS_PER_HOUR / 12),
-                                    "30 min" to (SmartAccountConstants.LEDGERS_PER_HOUR / 2),
-                                    "1 hour" to SmartAccountConstants.LEDGERS_PER_HOUR,
-                                    "1 day" to SmartAccountConstants.LEDGERS_PER_DAY,
-                                    "10 days" to (SmartAccountConstants.LEDGERS_PER_DAY * 10)
+                                    "5 min" to (Util.LEDGERS_PER_HOUR / 12),
+                                    "30 min" to (Util.LEDGERS_PER_HOUR / 2),
+                                    "1 hour" to Util.LEDGERS_PER_HOUR,
+                                    "1 day" to Util.LEDGERS_PER_DAY,
+                                    "10 days" to (Util.LEDGERS_PER_DAY * 10)
                                 )
                                 val selectedLabel = expiryOptions.find {
                                     it.second.toString() == expiryLedger
@@ -599,7 +600,7 @@ class ContextRuleBuilderScreen(
                             )
                             Text(
                                 text = "Add signers who can authorize operations matching this context. " +
-                                        "At least one signer is required. Maximum ${SmartAccountConstants.MAX_SIGNERS}.",
+                                        "At least one signer is required. Maximum ${OZConstants.MAX_SIGNERS}.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -987,7 +988,7 @@ class ContextRuleBuilderScreen(
                             )
                             Text(
                                 text = "Attach policies to constrain how operations are authorized. " +
-                                        "Policies are optional. Maximum ${SmartAccountConstants.MAX_POLICIES} per rule.",
+                                        "Policies are optional. Maximum ${OZConstants.MAX_POLICIES} per rule.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1027,7 +1028,7 @@ class ContextRuleBuilderScreen(
                     }
 
                     // Add Policy Section
-                    if (!isSubmitting && policies.size < SmartAccountConstants.MAX_POLICIES) {
+                    if (!isSubmitting && policies.size < OZConstants.MAX_POLICIES) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
@@ -1164,7 +1165,7 @@ class ContextRuleBuilderScreen(
                                             } else {
                                                 {
                                                     val days = spendingLimitPeriodDays.toIntOrNull() ?: 0
-                                                    val ledgers = days * SmartAccountConstants.LEDGERS_PER_DAY
+                                                    val ledgers = days * Util.LEDGERS_PER_DAY
                                                     if (days > 0) {
                                                         Text("$days day(s) = $ledgers ledgers")
                                                     } else {
@@ -1184,7 +1185,7 @@ class ContextRuleBuilderScreen(
                                                     errors["spendingPeriod"] = "Must be at least 1 day"
                                                 }
                                                 if (errors.isEmpty()) {
-                                                    val periodLedgers = (days!! * SmartAccountConstants.LEDGERS_PER_DAY).toUInt()
+                                                    val periodLedgers = (days!! * Util.LEDGERS_PER_DAY).toUInt()
                                                     val scVal = buildSpendingLimitScVal(spendingLimitAmount, periodLedgers)
                                                     // Capture values before clearing state so the log message is correct.
                                                     val logAmount = spendingLimitAmount
@@ -1965,8 +1966,8 @@ class ContextRuleBuilderScreen(
         signer: SmartAccountSigner,
         signers: List<SmartAccountSigner>
     ): String? {
-        if (signers.size >= SmartAccountConstants.MAX_SIGNERS) {
-            return "Maximum ${SmartAccountConstants.MAX_SIGNERS} signers allowed"
+        if (signers.size >= OZConstants.MAX_SIGNERS) {
+            return "Maximum ${OZConstants.MAX_SIGNERS} signers allowed"
         }
         if (isDuplicateSigner(signers, signer)) {
             return "This signer is already added"

@@ -230,7 +230,7 @@ object SmartAccountBuilders {
      * @param spendingLimit Maximum amount allowed in the period as a decimal XLM string
      *   (e.g. "100" or "10.5"). Converted to stroops internally.
      * @param periodLedgers Number of ledgers in the period (must be >= 1).
-     *        Use [SmartAccountConstants.LEDGERS_PER_HOUR] or [SmartAccountConstants.LEDGERS_PER_DAY]
+     *        Use [Util.LEDGERS_PER_HOUR] or [Util.LEDGERS_PER_DAY]
      *        for common periods.
      * @return Policy parameters for spending limit
      * @throws ValidationException.InvalidInput if spending limit is not a valid positive number
@@ -241,7 +241,7 @@ object SmartAccountBuilders {
      * // 100 XLM per day (~17280 ledgers at 5 seconds per ledger)
      * val params = SmartAccountBuilders.createSpendingLimitParams(
      *     spendingLimit = "100",
-     *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY
+     *     periodLedgers = Util.LEDGERS_PER_DAY
      * )
      * ```
      */

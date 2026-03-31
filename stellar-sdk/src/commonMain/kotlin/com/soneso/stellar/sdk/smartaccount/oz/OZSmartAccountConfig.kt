@@ -2,14 +2,14 @@
 //  OZSmartAccountConfig.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 
 /**
@@ -130,7 +130,7 @@ data class OZSmartAccountConfig(
      * Sessions enable silent reconnection without re-authentication.
      * Default: 604800000 (7 days)
      */
-    val sessionExpiryMs: Long = SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS,
+    val sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS,
 
     /**
      * Signature expiration in ledgers for auth entries.
@@ -138,7 +138,7 @@ data class OZSmartAccountConfig(
      * Auth entries expire after this many ledgers to prevent replay attacks.
      * Default: 720 (approximately 1 hour, since approximately 5 seconds per ledger)
      */
-    val signatureExpirationLedgers: Int = SmartAccountConstants.LEDGERS_PER_HOUR,
+    val signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR,
 
     /**
      * Default timeout for operations in seconds.
@@ -146,7 +146,7 @@ data class OZSmartAccountConfig(
      * Used for network requests and transaction submission.
      * Default: 30 seconds
      */
-    val timeoutInSeconds: Int = SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS,
+    val timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS,
 
     /**
      * Optional relayer endpoint URL for fee sponsoring.
@@ -316,7 +316,7 @@ data class OZSmartAccountConfig(
      * }
      * ```
      */
-    fun createIndexerClient(timeoutMs: Long = SmartAccountConstants.DEFAULT_INDEXER_TIMEOUT_MS): OZIndexerClient? {
+    fun createIndexerClient(timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS): OZIndexerClient? {
         val url = effectiveIndexerUrl() ?: return null
         return OZIndexerClient(url, timeoutMs)
     }
@@ -349,9 +349,9 @@ data class OZSmartAccountConfig(
         private var deployerKeypair: KeyPair? = null
         private var rpId: String? = null
         private var rpName: String = "Smart Account"
-        private var sessionExpiryMs: Long = SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS
-        private var signatureExpirationLedgers: Int = SmartAccountConstants.LEDGERS_PER_HOUR
-        private var timeoutInSeconds: Int = SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS
+        private var sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS
+        private var signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR
+        private var timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS
         private var relayerUrl: String? = null
         private var indexerUrl: String? = null
         private var webauthnProvider: WebAuthnProvider? = null

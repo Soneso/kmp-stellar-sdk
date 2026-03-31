@@ -38,7 +38,7 @@ class SessionManagerTest {
     // MARK: - Test Fixtures
 
     private suspend fun createKit(
-        sessionExpiryMs: Long = SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS
+        sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS
     ): Pair<OZSmartAccountKit, InMemoryStorageAdapter> {
         val storage = InMemoryStorageAdapter()
         val config = OZSmartAccountConfig(
@@ -322,7 +322,7 @@ class SessionManagerTest {
             webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
         )
 
-        assertEquals(SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
+        assertEquals(OZConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
     }
 
     @Test

@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import kotlinx.coroutines.test.runTest
@@ -68,9 +69,9 @@ class ConfigValidationTest {
         assertNull(config.deployerKeypair)
         assertNull(config.rpId)
         assertEquals("Smart Account", config.rpName)
-        assertEquals(SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
-        assertEquals(SmartAccountConstants.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
-        assertEquals(SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
+        assertEquals(OZConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
+        assertEquals(Util.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
+        assertEquals(OZConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
         assertNull(config.relayerUrl)
         assertNull(config.indexerUrl)
         assertNull(config.webauthnProvider)
@@ -217,9 +218,9 @@ class ConfigValidationTest {
 
         assertEquals("Smart Account", config.rpName)
         assertNull(config.rpId)
-        assertEquals(SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
-        assertEquals(SmartAccountConstants.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
-        assertEquals(SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
+        assertEquals(OZConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
+        assertEquals(Util.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
+        assertEquals(OZConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
         assertNull(config.relayerUrl)
         assertNull(config.indexerUrl)
         assertNull(config.deployerKeypair)
@@ -468,22 +469,22 @@ class ConfigValidationTest {
         assertEquals(customPassphrase, config.networkPassphrase)
     }
 
-    // MARK: - SmartAccountConstants Tests
+    // MARK: - Constants Tests
 
     @Test
-    fun testSmartAccountConstants_defaultSessionExpiryMs() {
+    fun testOZConstants_defaultSessionExpiryMs() {
         // 7 days in milliseconds
-        assertEquals(7 * 24 * 60 * 60 * 1000L, SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS)
+        assertEquals(7 * 24 * 60 * 60 * 1000L, OZConstants.DEFAULT_SESSION_EXPIRY_MS)
     }
 
     @Test
-    fun testSmartAccountConstants_ledgersPerHour() {
+    fun testUtil_ledgersPerHour() {
         // ~720 ledgers per hour (5 seconds per ledger)
-        assertEquals(720, SmartAccountConstants.LEDGERS_PER_HOUR)
+        assertEquals(720, Util.LEDGERS_PER_HOUR)
     }
 
     @Test
-    fun testSmartAccountConstants_defaultTimeoutSeconds() {
-        assertEquals(30, SmartAccountConstants.DEFAULT_TIMEOUT_SECONDS)
+    fun testOZConstants_defaultTimeoutSeconds() {
+        assertEquals(30, OZConstants.DEFAULT_TIMEOUT_SECONDS)
     }
 }

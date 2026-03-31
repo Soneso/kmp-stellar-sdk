@@ -2,8 +2,7 @@
 //  OZPolicyManager.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -52,7 +51,7 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * // Create a spending limit (1000 XLM per day)
  * val spendingPolicy = PolicyInstallParams.SpendingLimit(
  *     spendingLimit = BigInteger.fromLong(1000L * 10_000_000L), // Convert XLM to stroops
- *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
+ *     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
  * )
  * ```
  */
@@ -200,7 +199,7 @@ sealed class PolicyInstallParams {
  * Provides functionality to add and remove policies on context rules. Policies
  * define authorization rules that must be satisfied for transactions to execute.
  *
- * A context rule can have multiple policies (up to [SmartAccountConstants.MAX_POLICIES]),
+ * A context rule can have multiple policies (up to [OZConstants.MAX_POLICIES]),
  * and all policies must be satisfied for a transaction to succeed.
  *
  * Policy lifecycle:
@@ -275,7 +274,7 @@ class OZPolicyManager internal constructor(
      * to sign the transaction.
      *
      * Contract limits:
-     * - Maximum [SmartAccountConstants.MAX_POLICIES] policies per context rule
+     * - Maximum [OZConstants.MAX_POLICIES] policies per context rule
      * - Policy address must be a valid C-address
      * - Threshold must be greater than zero
      *
@@ -330,7 +329,7 @@ class OZPolicyManager internal constructor(
      * to sign the transaction.
      *
      * Contract limits:
-     * - Maximum [SmartAccountConstants.MAX_POLICIES] policies per context rule
+     * - Maximum [OZConstants.MAX_POLICIES] policies per context rule
      * - Policy address must be a valid C-address
      * - At least one signer weight must be specified
      * - Threshold must be greater than zero
@@ -395,7 +394,7 @@ class OZPolicyManager internal constructor(
      * to sign the transaction.
      *
      * Contract limits:
-     * - Maximum [SmartAccountConstants.MAX_POLICIES] policies per context rule
+     * - Maximum [OZConstants.MAX_POLICIES] policies per context rule
      * - Policy address must be a valid C-address
      * - Spending limit must be greater than zero
      * - Period ledgers must be greater than zero
@@ -416,7 +415,7 @@ class OZPolicyManager internal constructor(
      *     contextRuleId = 0u,
      *     policyAddress = "CBCD1234...",
      *     spendingLimit = "1000",
-     *     periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt()
+     *     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
      * )
      *
      * if (result.success) {
@@ -520,7 +519,7 @@ class OZPolicyManager internal constructor(
      * to sign the transaction.
      *
      * Contract limits:
-     * - Maximum [SmartAccountConstants.MAX_POLICIES] policies per context rule
+     * - Maximum [OZConstants.MAX_POLICIES] policies per context rule
      * - Policy address must be a valid C-address
      *
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)

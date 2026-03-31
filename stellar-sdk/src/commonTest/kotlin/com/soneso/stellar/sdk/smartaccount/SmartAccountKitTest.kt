@@ -2,8 +2,7 @@
 //  SmartAccountKitTest.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
@@ -911,7 +910,7 @@ class SmartAccountKitTest {
     @Test
     fun testContextRules_maxRulesLimit() {
         // Test that the constant is defined correctly
-        assertEquals(15, SmartAccountConstants.MAX_CONTEXT_RULES)
+        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
     }
 
     @Test
@@ -991,7 +990,7 @@ class SmartAccountKitTest {
     @Test
     fun testPolicies_maxPoliciesLimit() {
         // Test that the constant is defined correctly
-        assertEquals(5, SmartAccountConstants.MAX_POLICIES)
+        assertEquals(5, OZConstants.MAX_POLICIES)
     }
 
     @Test
@@ -1169,7 +1168,7 @@ class SmartAccountKitTest {
     @Test
     fun testMultiSigner_maxSignersLimit() {
         // Test that the constant is defined correctly
-        assertEquals(15, SmartAccountConstants.MAX_SIGNERS)
+        assertEquals(15, OZConstants.MAX_SIGNERS)
     }
 
     // MARK: - 10. Relayer Client Tests
@@ -1710,32 +1709,32 @@ class SmartAccountKitTest {
 
     @Test
     fun testConstants_stroopsPerXlm() {
-        assertEquals(10_000_000L, SmartAccountConstants.STROOPS_PER_XLM)
+        assertEquals(10_000_000L, Util.STROOPS_PER_XLM)
     }
 
     @Test
     fun testConstants_maxSigners() {
-        assertEquals(15, SmartAccountConstants.MAX_SIGNERS)
+        assertEquals(15, OZConstants.MAX_SIGNERS)
     }
 
     @Test
     fun testConstants_maxPolicies() {
-        assertEquals(5, SmartAccountConstants.MAX_POLICIES)
+        assertEquals(5, OZConstants.MAX_POLICIES)
     }
 
     @Test
     fun testConstants_maxContextRules() {
-        assertEquals(15, SmartAccountConstants.MAX_CONTEXT_RULES)
+        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
     }
 
     @Test
     fun testConstants_sessionExpiry() {
-        assertEquals(604_800_000L, SmartAccountConstants.DEFAULT_SESSION_EXPIRY_MS)
+        assertEquals(604_800_000L, OZConstants.DEFAULT_SESSION_EXPIRY_MS)
     }
 
     @Test
     fun testConstants_ledgersPerHour() {
-        assertEquals(720, SmartAccountConstants.LEDGERS_PER_HOUR)
+        assertEquals(720, Util.LEDGERS_PER_HOUR)
     }
 
     // MARK: - GAP-01: Default Indexer URLs Tests

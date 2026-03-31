@@ -172,7 +172,14 @@ object Util {
         return Base64.UrlSafe.decode(padded)
     }
 
-    private const val STROOPS_PER_XLM = 10_000_000L
+    /** Number of stroops in one XLM (1 XLM = 10,000,000 stroops). */
+    const val STROOPS_PER_XLM = 10_000_000L
+
+    /** Average number of ledgers closed per hour on the Stellar network (~5s per ledger). */
+    const val LEDGERS_PER_HOUR = 720
+
+    /** Average number of ledgers closed per day on the Stellar network (~5s per ledger). */
+    const val LEDGERS_PER_DAY = 17_280
 
     /**
      * Converts a decimal XLM amount string to stroops using BigDecimal arithmetic.

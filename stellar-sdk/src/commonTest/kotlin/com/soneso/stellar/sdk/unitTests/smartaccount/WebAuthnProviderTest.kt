@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
 import com.soneso.stellar.sdk.xdr.SCMapXdr
@@ -1109,7 +1110,7 @@ class WebAuthnProviderTest {
 
     @Test
     fun testWebAuthnTimeoutMs_is60000() {
-        assertEquals(60_000L, SmartAccountConstants.WEBAUTHN_TIMEOUT_MS)
+        assertEquals(60_000L, OZConstants.WEBAUTHN_TIMEOUT_MS)
     }
 
     // =========================================================================

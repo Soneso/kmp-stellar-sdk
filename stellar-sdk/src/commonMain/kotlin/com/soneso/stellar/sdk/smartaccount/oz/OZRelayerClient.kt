@@ -2,8 +2,7 @@
 //  OZRelayerClient.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -113,7 +112,7 @@ data class RelayerResponse(
  */
 class OZRelayerClient(
     relayerUrl: String,
-    private val timeoutMs: Long = SmartAccountConstants.DEFAULT_RELAYER_TIMEOUT_MS,
+    private val timeoutMs: Long = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS,
     private val httpClient: HttpClient? = null
 ) {
     /**

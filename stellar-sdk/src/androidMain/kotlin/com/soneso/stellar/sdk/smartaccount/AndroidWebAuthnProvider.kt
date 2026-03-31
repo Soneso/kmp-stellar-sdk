@@ -23,6 +23,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -75,7 +76,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property rpName Human-readable relying party name displayed to the user during
  *   registration.
  * @property timeout Timeout in milliseconds for WebAuthn operations. Defaults to
- *   [SmartAccountConstants.WEBAUTHN_TIMEOUT_MS] (60 seconds).
+ *   [OZConstants.WEBAUTHN_TIMEOUT_MS] (60 seconds).
  * @property authenticatorAttachment Optional authenticator attachment preference.
  *   When null (default), both platform and cross-platform authenticators are allowed,
  *   matching the JS provider behavior. Set to "platform" to restrict to built-in
@@ -86,7 +87,7 @@ class AndroidWebAuthnProvider(
     private val context: Context,
     private val rpId: String,
     private val rpName: String,
-    private val timeout: Long = SmartAccountConstants.WEBAUTHN_TIMEOUT_MS,
+    private val timeout: Long = OZConstants.WEBAUTHN_TIMEOUT_MS,
     private val authenticatorAttachment: String? = null
 ) : WebAuthnProvider {
 

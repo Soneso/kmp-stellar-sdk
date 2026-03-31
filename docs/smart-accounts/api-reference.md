@@ -1045,7 +1045,7 @@ Adds a spending limit policy.
 val result = kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
     policyAddress = "CBCD1234...",
-    spendingLimit = 1000.0,
+    spendingLimit = "1000",
     periodLedgers = 17280u
 )
 ```
@@ -1820,26 +1820,46 @@ Controls how transactions are submitted (fee-sponsored or direct).
 
 ## Constants
 
+### SmartAccountConstants
+
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Contains crypto constants used across the core layer.
+
 ```kotlin
 object SmartAccountConstants {
-    const val SECP256R1_PUBLIC_KEY_SIZE = 65
-    const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04
-    const val STROOPS_PER_XLM = 10_000_000L
-    const val BASE_FEE = 100L
+    const val SECP256R1_PUBLIC_KEY_SIZE = 65       // Size in bytes of an uncompressed secp256r1 public key
+    const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04  // Uncompressed point prefix byte as defined in SEC 1
+}
+```
+
+### OZConstants
+
+Defined in `smartaccount/oz/OZConstants.kt`. Contains OZ-specific configuration defaults and contract limits.
+
+```kotlin
+object OZConstants {
+    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100     // ledgers
+    const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L  // 7 days
+    const val DEFAULT_INDEXER_TIMEOUT_MS = 10_000L   // 10 seconds
+    const val DEFAULT_RELAYER_TIMEOUT_MS = 360_000L  // 6 minutes
+    const val WEBAUTHN_TIMEOUT_MS = 60_000L          // 60 seconds
+    const val FRIENDBOT_RESERVE_XLM = 5
+    const val DEFAULT_TIMEOUT_SECONDS = 30
     const val MAX_SIGNERS = 15
     const val MAX_POLICIES = 5
     const val MAX_CONTEXT_RULES = 15
-    const val LEDGERS_PER_HOUR = 720
-    const val LEDGERS_PER_DAY = 17_280
-    const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L  // 7 days
-    const val DEFAULT_TIMEOUT_SECONDS = 30
-    const val DEFAULT_INDEXER_TIMEOUT_MS = 10_000L  // 10 seconds
-    const val DEFAULT_RELAYER_TIMEOUT_MS = 360_000L  // 6 minutes
-    const val WEBAUTHN_TIMEOUT_MS = 60_000L  // 60 seconds
-    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100  // ledgers
-    const val FRIENDBOT_RESERVE_XLM = 5
-    const val FRIENDBOT_URL = "https://friendbot.stellar.org"
     const val MAX_HISTORY_ENTRIES = 1000
+}
+```
+
+### Util
+
+Defined in `Util.kt`. Contains general-purpose Stellar network constants available SDK-wide.
+
+```kotlin
+object Util {
+    const val STROOPS_PER_XLM = 10_000_000L  // Number of stroops in one XLM
+    const val LEDGERS_PER_HOUR = 720          // Average ledgers per hour (~5s per ledger)
+    const val LEDGERS_PER_DAY = 17_280        // Average ledgers per day (~5s per ledger)
 }
 ```
 

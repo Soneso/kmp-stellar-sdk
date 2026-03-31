@@ -2,8 +2,7 @@
 //  OZContextRuleManager.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -245,17 +244,17 @@ class OZContextRuleManager internal constructor(
             throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
         }
 
-        if (signers.isEmpty() || signers.size > SmartAccountConstants.MAX_SIGNERS) {
+        if (signers.isEmpty() || signers.size > OZConstants.MAX_SIGNERS) {
             throw ValidationException.invalidInput(
                 "signers",
-                "Context rule must have between 1 and ${SmartAccountConstants.MAX_SIGNERS} signers, got: ${signers.size}"
+                "Context rule must have between 1 and ${OZConstants.MAX_SIGNERS} signers, got: ${signers.size}"
             )
         }
 
-        if (policies.size > SmartAccountConstants.MAX_POLICIES) {
+        if (policies.size > OZConstants.MAX_POLICIES) {
             throw ValidationException.invalidInput(
                 "policies",
-                "Context rule cannot have more than ${SmartAccountConstants.MAX_POLICIES} policies, got: ${policies.size}"
+                "Context rule cannot have more than ${OZConstants.MAX_POLICIES} policies, got: ${policies.size}"
             )
         }
 
@@ -268,10 +267,10 @@ class OZContextRuleManager internal constructor(
 
         // Check MAX_CONTEXT_RULES limit
         val currentCount = getContextRulesCount()
-        if (currentCount >= SmartAccountConstants.MAX_CONTEXT_RULES.toUInt()) {
+        if (currentCount >= OZConstants.MAX_CONTEXT_RULES.toUInt()) {
             throw ValidationException.invalidInput(
                 "contextRules",
-                "Cannot add context rule: maximum of ${SmartAccountConstants.MAX_CONTEXT_RULES} rules already reached"
+                "Cannot add context rule: maximum of ${OZConstants.MAX_CONTEXT_RULES} rules already reached"
             )
         }
 
@@ -396,7 +395,7 @@ class OZContextRuleManager internal constructor(
      * val count = contextMgr.getContextRulesCount()
      * println("Smart account has $count context rules")
      *
-     * if (count < SmartAccountConstants.MAX_CONTEXT_RULES.toUInt()) {
+     * if (count < OZConstants.MAX_CONTEXT_RULES.toUInt()) {
      *     // Can add more rules
      * }
      * ```

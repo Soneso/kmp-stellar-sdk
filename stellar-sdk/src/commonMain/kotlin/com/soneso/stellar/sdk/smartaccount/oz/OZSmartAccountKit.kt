@@ -2,8 +2,7 @@
 //  OZSmartAccountKit.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -362,7 +361,7 @@ class OZSmartAccountKit private constructor(
             val relayerClient = config.relayerUrl?.let { url ->
                 OZRelayerClient(
                     relayerUrl = url,
-                    timeoutMs = SmartAccountConstants.DEFAULT_RELAYER_TIMEOUT_MS
+                    timeoutMs = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS
                 )
             }
 
@@ -370,7 +369,7 @@ class OZSmartAccountKit private constructor(
             val indexerClient = config.indexerUrl?.let { url ->
                 OZIndexerClient(
                     indexerUrl = url,
-                    timeoutMs = SmartAccountConstants.DEFAULT_INDEXER_TIMEOUT_MS
+                    timeoutMs = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
                 )
             }
 

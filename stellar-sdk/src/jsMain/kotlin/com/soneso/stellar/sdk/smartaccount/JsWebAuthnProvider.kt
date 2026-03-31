@@ -2,13 +2,13 @@
 //  JsWebAuthnProvider.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 05.10.25.
 //  Copyright (c) 2025 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
 
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
@@ -131,7 +131,7 @@ private fun ArrayBuffer.toByteArray(): ByteArray {
 class JsWebAuthnProvider(
     private val rpId: String,
     private val rpName: String,
-    private val timeout: Long = SmartAccountConstants.WEBAUTHN_TIMEOUT_MS
+    private val timeout: Long = OZConstants.WEBAUTHN_TIMEOUT_MS
 ) : WebAuthnProvider {
 
     /**

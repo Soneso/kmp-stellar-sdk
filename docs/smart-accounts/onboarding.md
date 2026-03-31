@@ -160,8 +160,8 @@ SDK method:
 kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
     policyAddress = "CPOLICY5678...",
-    spendingLimit = 1000.0,
-    periodLedgers = SmartAccountConstants.LEDGERS_PER_DAY.toUInt() // 17,280
+    spendingLimit = "1000",
+    periodLedgers = Util.LEDGERS_PER_DAY.toUInt() // 17,280
 )
 ```
 

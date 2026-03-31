@@ -2,8 +2,7 @@
 //  SmartAccountErrors.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.core
@@ -732,60 +731,16 @@ fun wrapError(
 // MARK: - Smart Account Constants
 
 /**
- * Constants used throughout Smart Account operations.
+ * Cryptographic and protocol-level constants for Smart Account operations.
  */
 object SmartAccountConstants {
-    /** Size in bytes of an uncompressed secp256r1 public key. */
+    /**
+     * Size in bytes of an uncompressed secp256r1 public key (1 prefix byte + 32 x-coordinate + 32 y-coordinate).
+     */
     const val SECP256R1_PUBLIC_KEY_SIZE = 65
 
-    /** Prefix byte for uncompressed public keys (0x04). */
+    /**
+     * Uncompressed point prefix byte (0x04) as defined in SEC 1 for secp256r1 public keys.
+     */
     const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04
-
-    /** Number of stroops (smallest unit) per XLM. */
-    const val STROOPS_PER_XLM = 10_000_000L
-
-    /** Base fee in stroops for Stellar transactions. */
-    const val BASE_FEE = 100L
-
-    /** Average number of ledgers closed per hour on the Stellar network. */
-    const val LEDGERS_PER_HOUR = 720
-
-    /** Average number of ledgers closed per day on the Stellar network. */
-    const val LEDGERS_PER_DAY = 17_280
-
-    /** Buffer (in ledgers) to add when calculating auth entry expiration. */
-    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100
-
-    /** Default session expiry time in milliseconds (7 days). */
-    const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L
-
-    /** Default timeout for indexer requests in milliseconds (10 seconds). */
-    const val DEFAULT_INDEXER_TIMEOUT_MS = 10_000L
-
-    /** Default timeout for relayer requests in milliseconds (6 minutes). */
-    const val DEFAULT_RELAYER_TIMEOUT_MS = 360_000L
-
-    /** WebAuthn operation timeout in milliseconds (60 seconds). */
-    const val WEBAUTHN_TIMEOUT_MS = 60_000L
-
-    /** Amount of XLM reserved by Friendbot for test accounts. */
-    const val FRIENDBOT_RESERVE_XLM = 5
-
-    /** URL of the Stellar Friendbot service for testnet funding. */
-    const val FRIENDBOT_URL = "https://friendbot.stellar.org"
-
-    /** Default timeout for general operations in seconds. */
-    const val DEFAULT_TIMEOUT_SECONDS = 30
-
-    /** Maximum number of signers allowed per context rule. */
-    const val MAX_SIGNERS = 15
-
-    /** Maximum number of policies allowed per context rule. */
-    const val MAX_POLICIES = 5
-
-    /** Maximum number of context rules allowed per smart account. */
-    const val MAX_CONTEXT_RULES = 15
-
-    /** Maximum number of transaction history entries to keep in storage. */
-    const val MAX_HISTORY_ENTRIES = 1000
 }

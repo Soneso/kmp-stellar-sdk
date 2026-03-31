@@ -2,8 +2,7 @@
 //  OZIndexerClient.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
@@ -210,7 +209,7 @@ data class HealthCheckResponse(
  */
 class OZIndexerClient(
     private val indexerUrl: String,
-    timeoutMs: Long = SmartAccountConstants.DEFAULT_INDEXER_TIMEOUT_MS
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
 ) {
     init {
         if (indexerUrl.isBlank()) {
@@ -266,7 +265,7 @@ class OZIndexerClient(
          */
         fun forNetwork(
             networkPassphrase: String,
-            timeoutMs: Long = SmartAccountConstants.DEFAULT_INDEXER_TIMEOUT_MS
+            timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
         ): OZIndexerClient? {
             val url = getDefaultUrl(networkPassphrase) ?: return null
             return OZIndexerClient(url, timeoutMs)
