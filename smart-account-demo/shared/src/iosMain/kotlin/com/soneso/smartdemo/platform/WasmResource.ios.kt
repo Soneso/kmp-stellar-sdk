@@ -1,10 +1,7 @@
 package com.soneso.smartdemo.platform
 
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
-import platform.Foundation.NSBundle
-import platform.Foundation.NSData
+import kotlinx.cinterop.*
+import platform.Foundation.*
 import platform.posix.memcpy
 
 /**
