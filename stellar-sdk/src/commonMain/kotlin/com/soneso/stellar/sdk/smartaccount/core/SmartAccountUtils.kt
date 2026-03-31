@@ -36,6 +36,23 @@ object SmartAccountUtils {
     )
     private val halfCurveOrder = curveOrder / BigInteger.TWO
 
+    // secp256r1 curve parameters for point-on-curve validation (FIPS 186-4 / SEC 2).
+    // p:  the prime field modulus
+    // a:  curve coefficient a = p - 3
+    // b:  curve coefficient b
+    private val curveP = BigInteger.parseString(
+        "ffffffff00000001000000000000000000000000ffffffffffffffffffffffff",
+        16
+    )
+    private val curveA = BigInteger.parseString(
+        "ffffffff00000001000000000000000000000000fffffffffffffffffffffffc",
+        16
+    )
+    private val curveB = BigInteger.parseString(
+        "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b",
+        16
+    )
+
     // MARK: - Signature Normalization
 
     /**
@@ -222,9 +239,9 @@ object SmartAccountUtils {
      * Tries three strategies in order:
      *
      * 1. **Direct public key**: If [publicKey] is provided, validate it as a 65-byte
-     *    uncompressed secp256r1 key (0x04 prefix). This is the primary path --
-     *    WebAuthnProvider implementations should return the public key directly in
-     *    [WebAuthnRegistrationResult.publicKey].
+     *    uncompressed secp256r1 key (0x04 prefix) and verify the point lies on the
+     *    secp256r1 curve. This is the primary path -- WebAuthnProvider implementations
+     *    should return the public key directly in [WebAuthnRegistrationResult.publicKey].
      *
      * 2. **Authenticator data parsing**: If [authenticatorData] is provided, parse the
      *    attested credential data structure to extract X/Y coordinates from the COSE key.
@@ -234,13 +251,17 @@ object SmartAccountUtils {
      *
      * At least one of the three parameters must be non-null.
      *
+     * **Compressed keys (0x02/0x03 prefix) are not supported.** WebAuthn platforms must
+     * provide uncompressed keys. If a compressed key is detected, an exception is thrown
+     * immediately and no fallback is attempted.
+     *
      * @param publicKey Optional direct public key bytes (may include COSE/SPKI wrapping;
      *        the last 65 bytes are used if longer than 65 bytes)
      * @param authenticatorData Optional raw authenticator data from WebAuthn registration
      * @param attestationObject Optional raw attestation object from WebAuthn registration
      * @return Uncompressed secp256r1 public key (65 bytes: 0x04 prefix + X + Y)
-     * @throws ValidationException.InvalidInput if the public key cannot be extracted
-     *         from any of the provided sources
+     * @throws ValidationException.InvalidInput if a compressed key prefix (0x02 or 0x03)
+     *         is detected, or if the public key cannot be extracted from any provided source
      *
      * Example:
      * ```kotlin
@@ -280,9 +301,28 @@ object SmartAccountUtils {
             if (candidate.size == SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE &&
                 candidate[0] == SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
             ) {
+                // Validate the extracted point before accepting it.
+                // This ensures even directly-supplied keys are rejected when off-curve,
+                // consistent with the validation applied by Strategies 2 and 3.
+                validatePointOnCurve(
+                    candidate.copyOfRange(1, 33),
+                    candidate.copyOfRange(33, 65)
+                )
                 return candidate
             }
-            // If validation fails, fall through to other strategies
+
+            // Compressed point formats (0x02 even-Y, 0x03 odd-Y) are not supported.
+            // Soroban expects uncompressed keys and WebAuthn platforms must provide them.
+            // Throw immediately — do not silently fall through to other strategies.
+            if (candidate[0] == 0x02.toByte() || candidate[0] == 0x03.toByte()) {
+                throw ValidationException.invalidInput(
+                    "publicKey",
+                    "Compressed secp256r1 key format (prefix 0x${candidate[0].toInt().and(0xFF).toString(16).padStart(2, '0')}) " +
+                        "is not supported; the platform must provide an uncompressed key (0x04 prefix)"
+                )
+            }
+
+            // Non-key data (e.g. CBOR/attestation bytes): fall through to other strategies.
         }
 
         // Strategy 2: Try authenticator data parsing
@@ -333,9 +373,20 @@ object SmartAccountUtils {
      * [32 bytes Y coordinate]
      * ```
      *
+     * **Validation performed:**
+     * - The 10-byte ES256 COSE key prefix is verified at the credential data offset before
+     *   reading coordinates. A prefix mismatch causes null to be returned (not an exception),
+     *   consistent with the early-exit pattern for non-ES256 or missing credential data.
+     * - The 3-byte Y-coordinate separator (0x22, 0x58, 0x20) is verified at the exact
+     *   offset following the 32-byte X coordinate.
+     * - The extracted (X, Y) point is verified to lie on the secp256r1 curve.
+     *
      * @param authenticatorData Raw authenticator data bytes
      * @return Uncompressed secp256r1 public key (65 bytes), or null if the data
-     *         is too short or does not contain attested credential data
+     *         is too short, does not contain attested credential data, or does not carry
+     *         an ES256 COSE key at the expected offset
+     * @throws ValidationException.InvalidInput if the COSE Y-marker is malformed or
+     *         the extracted key coordinates do not lie on the secp256r1 curve
      */
     internal fun extractPublicKeyFromAuthenticatorData(authenticatorData: ByteArray): ByteArray? {
         // Minimum size: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen)
@@ -360,17 +411,46 @@ object SmartAccountUtils {
         // COSE key starts at offset 55 + credentialIdLength
         // The COSE prefix is 10 bytes, then X is 32 bytes, separator is 3 bytes, Y is 32 bytes
         val coseKeyStart = 55 + credentialIdLength
+
+        // Validate the 10-byte ES256 COSE key prefix before reading X and Y.
+        // The prefix [0xA5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20] encodes
+        // the CBOR map header and the kty, alg, and crv parameters for an ES256 P-256 key.
+        // If the prefix does not match, this is not an ES256 COSE key; return null so the
+        // caller can fall through to the next extraction strategy.
+        val expectedCosePrefix = byteArrayOf(
+            0xA5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20,
+            0x01, 0x21, 0x58, 0x20
+        )
+        if (authenticatorData.size < coseKeyStart + 10) {
+            return null
+        }
+        val actualPrefix = authenticatorData.copyOfRange(coseKeyStart, coseKeyStart + 10)
+        if (!actualPrefix.contentEquals(expectedCosePrefix)) {
+            return null  // Not an ES256 COSE key
+        }
+
         val xStart = coseKeyStart + 10 // After the 10-byte COSE prefix
-        val yStart = xStart + 32 + 3    // After X (32 bytes) + separator (3 bytes)
+        val separatorStart = xStart + 32
+        val yStart = separatorStart + 3
         val requiredLength = yStart + 32
 
         if (authenticatorData.size < requiredLength) {
             return null
         }
 
+        // Validate the Y-coordinate marker bytes at the expected position.
+        // These must be exactly [0x22, 0x58, 0x20] (CBOR map key -3, bstr, length 32).
+        // Validating the separator confirms the X-coordinate starts at the correct offset
+        // and guards against coincidental prefix matches in credential ID or other data.
+        validateCoseYMarker(authenticatorData, separatorStart, "authenticatorData")
+
         // Extract X and Y coordinates
         val x = authenticatorData.copyOfRange(xStart, xStart + 32)
         val y = authenticatorData.copyOfRange(yStart, yStart + 32)
+
+        // Verify the extracted point lies on the secp256r1 curve.
+        // This prevents accepting garbage coordinates that happen to follow the COSE prefix.
+        validatePointOnCurve(x, y)
 
         // Construct uncompressed public key: 0x04 || X || Y
         val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
@@ -399,15 +479,22 @@ object SmartAccountUtils {
      * ```
      * Prefix: [0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20]
      * X coordinate: next 32 bytes
-     * Skip: 3 bytes (0x22, 0x58, 0x20)
+     * Y marker:  3 bytes [0x22, 0x58, 0x20]
      * Y coordinate: next 32 bytes
      * Result: 0x04 || X (32 bytes) || Y (32 bytes) = 65 bytes total
      * ```
      *
+     * **Validation performed:**
+     * - The 3-byte Y-coordinate marker (0x22, 0x58, 0x20) is verified at the exact
+     *   offset following the 32-byte X coordinate.
+     * - The extracted (X, Y) point is verified to lie on the secp256r1 curve.
+     *
      * @param attestationObject Raw attestation object data from WebAuthn registration
      * @return Uncompressed secp256r1 public key (65 bytes: 0x04 prefix + X + Y)
-     * @throws ValidationException.InvalidInput if the COSE key structure is not found
-     *         or if there is insufficient data after the prefix
+     * @throws ValidationException.InvalidInput if the COSE key structure is not found,
+     *         if there is insufficient data after the prefix, if the Y-coordinate marker
+     *         is not present at the expected offset, or if the extracted coordinates do
+     *         not lie on the secp256r1 curve
      */
     internal fun extractPublicKeyFromAttestationObject(attestationObject: ByteArray): ByteArray {
         // COSE key prefix for secp256r1 public keys in WebAuthn attestation
@@ -426,9 +513,11 @@ object SmartAccountUtils {
         }
 
         val xStart = prefixIndex + prefix.size
+        val separatorStart = xStart + 32
+        val yStart = separatorStart + 3
 
         // Ensure we have enough data for X (32 bytes) + separator (3 bytes) + Y (32 bytes)
-        val requiredLength = xStart + 32 + 3 + 32
+        val requiredLength = yStart + 32
         if (attestationObject.size < requiredLength) {
             throw ValidationException.invalidInput(
                 "attestationObject",
@@ -436,12 +525,21 @@ object SmartAccountUtils {
             )
         }
 
+        // Validate the Y-coordinate marker bytes at the expected position.
+        // These must be exactly [0x22, 0x58, 0x20] (CBOR map key -3, bstr, length 32).
+        // Validating the separator confirms the prefix match corresponds to a real COSE key
+        // and not a coincidental byte sequence in other parts of the attestation object.
+        validateCoseYMarker(attestationObject, separatorStart, "attestationObject")
+
         // Extract X coordinate (32 bytes after prefix)
         val x = attestationObject.copyOfRange(xStart, xStart + 32)
 
-        // Skip 3 bytes (0x22, 0x58, 0x20) and extract Y coordinate (32 bytes)
-        val yStart = xStart + 32 + 3
+        // Extract Y coordinate (32 bytes after separator)
         val y = attestationObject.copyOfRange(yStart, yStart + 32)
+
+        // Verify the extracted point lies on the secp256r1 curve.
+        // This prevents accepting garbage coordinates that happen to surround the COSE prefix.
+        validatePointOnCurve(x, y)
 
         // Construct uncompressed public key: 0x04 || X || Y
         val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
@@ -587,6 +685,98 @@ object SmartAccountUtils {
     }
 
     // MARK: - Private Helper Functions
+
+    /**
+     * Validates the 3-byte COSE Y-coordinate separator at the given offset.
+     *
+     * The separator bytes [0x22, 0x58, 0x20] are the CBOR encoding of map key -3 (Y),
+     * a byte string of length 32. Their presence at the exact offset after the X coordinate
+     * confirms that the surrounding structure is a valid ES256 COSE key and not a coincidental
+     * byte match in credential ID data or other attestation fields.
+     *
+     * @param data The byte array to validate against
+     * @param offset The starting offset of the 3-byte separator
+     * @param sourceName The parameter name to include in the error message (e.g., "authenticatorData")
+     * @throws ValidationException.InvalidInput if the bytes at [offset..offset+2] do not equal
+     *         [0x22, 0x58, 0x20]
+     */
+    private fun validateCoseYMarker(data: ByteArray, offset: Int, sourceName: String) {
+        val sep0 = data[offset].toInt() and 0xFF
+        val sep1 = data[offset + 1].toInt() and 0xFF
+        val sep2 = data[offset + 2].toInt() and 0xFF
+        if (sep0 != 0x22 || sep1 != 0x58 || sep2 != 0x20) {
+            throw ValidationException.invalidInput(
+                sourceName,
+                "COSE key structure is invalid: Y-coordinate marker [0x22, 0x58, 0x20] " +
+                    "not found at expected offset $offset " +
+                    "(found [0x${sep0.toString(16).padStart(2, '0')}, " +
+                    "0x${sep1.toString(16).padStart(2, '0')}, " +
+                    "0x${sep2.toString(16).padStart(2, '0')}])"
+            )
+        }
+    }
+
+    /**
+     * Validates that the point (x, y) lies on the secp256r1 curve.
+     *
+     * Verifies the short Weierstrass equation: y^2 ≡ x^3 + a*x + b (mod p)
+     *
+     * Constants used (FIPS 186-4 / SEC 2):
+     * - p  = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
+     * - a  = p - 3 = 0xffffffff00000001000000000000000000000000fffffffffffffffffffffffc
+     * - b  = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
+     *
+     * This check prevents accepting coordinates extracted from malformed or adversarially
+     * crafted COSE structures that happen to match the expected byte patterns.
+     *
+     * Also verifies that both coordinates are strictly less than the field prime p.
+     * Values >= p are not valid field elements and must be rejected to prevent
+     * multiple byte-encodings from being accepted for the same logical point.
+     *
+     * @param x 32-byte big-endian X coordinate
+     * @param y 32-byte big-endian Y coordinate
+     * @throws ValidationException.InvalidInput if the coordinates exceed the field prime
+     *         or if the point does not lie on the secp256r1 curve
+     */
+    private fun validatePointOnCurve(x: ByteArray, y: ByteArray) {
+        val xBig = bytesToUnsignedBigInteger(x)
+        val yBig = bytesToUnsignedBigInteger(y)
+
+        // Reject the point at infinity and trivially invalid coordinates.
+        if (xBig == BigInteger.ZERO || yBig == BigInteger.ZERO) {
+            throw ValidationException.invalidInput(
+                "publicKey",
+                "Extracted secp256r1 coordinates contain a zero component; " +
+                    "the point is not a valid curve point"
+            )
+        }
+
+        // Coordinates must be strictly less than the field prime.
+        // Values >= p are not valid field elements; accepting them would silently reduce
+        // them mod p and could admit multiple encodings of the same logical point.
+        if (xBig >= curveP || yBig >= curveP) {
+            throw ValidationException.invalidInput(
+                "publicKey",
+                "Extracted secp256r1 coordinates exceed the field prime"
+            )
+        }
+
+        // Compute left side: y^2 mod p
+        val lhs = (yBig * yBig).mod(curveP)
+
+        // Compute right side: x^3 + a*x + b mod p
+        val x3 = (xBig * xBig * xBig).mod(curveP)
+        val ax = (curveA * xBig).mod(curveP)
+        val rhs = (x3 + ax + curveB).mod(curveP)
+
+        if (lhs != rhs) {
+            throw ValidationException.invalidInput(
+                "publicKey",
+                "Extracted secp256r1 public key coordinates are not on the P-256 curve; " +
+                    "the attestation data may be malformed or corrupted"
+            )
+        }
+    }
 
     /**
      * Converts an unsigned byte array to BigInteger.

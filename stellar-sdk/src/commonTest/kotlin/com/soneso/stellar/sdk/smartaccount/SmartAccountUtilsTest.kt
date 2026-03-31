@@ -20,6 +20,43 @@ import kotlin.test.assertTrue
 
 class SmartAccountUtilsTest {
 
+    // MARK: - secp256r1 Curve Test Vectors
+
+    /**
+     * secp256r1 generator point G (SEC 2 / FIPS 186-4).
+     *
+     * This is a known-valid point on the P-256 curve used as a test vector for all
+     * extraction tests that require on-curve coordinates. Using G ensures the point
+     * validation check in [SmartAccountUtils.extractPublicKeyFromAuthenticatorData] and
+     * [SmartAccountUtils.extractPublicKeyFromAttestationObject] does not reject the input.
+     *
+     * Gx = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296
+     * Gy = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5
+     */
+    private val GENERATOR_X = hexToBytes(
+        "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"
+    )
+    private val GENERATOR_Y = hexToBytes(
+        "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"
+    )
+
+    /**
+     * A second known-valid secp256r1 public key used when two distinct points are needed.
+     *
+     * This is the public key Q from the NIST P-256 ECDSA test vector in RFC 6979 section A.2.5.
+     * The corresponding private key is
+     * d = C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721
+     *
+     * Qx = 60FED4BA255A9D31C961EB74C6356D68C049B8923B61FA6CE669622E60F29FB6
+     * Qy = 7903FE1008B8BC99A41AE9E95628BC64F2F1B20C2D7E9F5177A3C294D4462299
+     */
+    private val KNOWN_VALID_X2 = hexToBytes(
+        "60fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6"
+    )
+    private val KNOWN_VALID_Y2 = hexToBytes(
+        "7903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299"
+    )
+
     // MARK: - Test Vectors
 
     /**
@@ -454,12 +491,12 @@ class SmartAccountUtilsTest {
 
     /**
      * Strategy 1: Valid 65-byte uncompressed secp256r1 key passed directly.
+     *
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromRegistration_directPublicKey() {
-        val xCoord = ByteArray(32) { 0xAA.toByte() }
-        val yCoord = ByteArray(32) { 0xBB.toByte() }
-        val directKey = byteArrayOf(0x04) + xCoord + yCoord
+        val directKey = byteArrayOf(0x04) + GENERATOR_X + GENERATOR_Y
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(
             publicKey = directKey
@@ -467,21 +504,20 @@ class SmartAccountUtilsTest {
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
      * Strategy 1: Public key wrapped in COSE/SPKI encoding (longer than 65 bytes).
      *
      * The last 65 bytes contain the uncompressed public key (0x04 prefix + X + Y).
-     * This simulates a COSE-wrapped key with extra header bytes.
+     * This simulates a COSE-wrapped key with extra header bytes. Uses the secp256r1
+     * generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromRegistration_wrappedPublicKey() {
-        val xCoord = ByteArray(32) { 0xCC.toByte() }
-        val yCoord = ByteArray(32) { 0xDD.toByte() }
-        val rawKey = byteArrayOf(0x04) + xCoord + yCoord
+        val rawKey = byteArrayOf(0x04) + GENERATOR_X + GENERATOR_Y
 
         // Prepend COSE/SPKI header bytes (simulated)
         val wrappedKey = byteArrayOf(
@@ -496,8 +532,8 @@ class SmartAccountUtilsTest {
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
@@ -517,35 +553,38 @@ class SmartAccountUtilsTest {
     }
 
     /**
-     * Strategy 1 fallthrough to Strategy 3: Invalid direct key falls through to
+     * Strategy 1 fallthrough to Strategy 3: Non-key data in publicKey falls through to
      * attestation object extraction.
+     *
+     * A byte sequence that does not start with 0x04, 0x02, or 0x03 is treated as non-key
+     * data (e.g. raw CBOR bytes accidentally passed in the wrong field) and the function
+     * falls through to the attestation object strategy.
      */
     @Test
-    fun testExtractPublicKeyFromRegistration_invalidDirectKeyFallsToAttestationObject() {
-        val xCoord = ByteArray(32) { 0xEE.toByte() }
-        val yCoord = ByteArray(32) { 0xFF.toByte() }
+    fun testExtractPublicKeyFromRegistration_nonKeyDataFallsToAttestationObject() {
+        // Valid attestation object with COSE key using the secp256r1 generator point
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
 
-        // Invalid direct key (wrong prefix)
-        val invalidKey = byteArrayOf(0x02) + ByteArray(64) { 0x11 }
-
-        // Valid attestation object with COSE key
-        val attestationObject = buildAttestationObject(xCoord, yCoord)
+        // Non-key data starting with 0xA3 (CBOR map marker) — not a compressed/uncompressed key
+        val nonKeyData = byteArrayOf(0xA3.toByte()) + ByteArray(64) { 0x11 }
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(
-            publicKey = invalidKey,
+            publicKey = nonKeyData,
             attestationObject = attestationObject
         )
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     // -- Strategy 2: Authenticator data parsing --
 
     /**
      * Strategy 2: Extract public key from authenticator data.
+     *
+     * Uses the secp256r1 generator point G as the test key to satisfy on-curve validation.
      *
      * Authenticator data structure:
      *   [0..31]   rpIdHash       (32 bytes)
@@ -558,13 +597,10 @@ class SmartAccountUtilsTest {
      */
     @Test
     fun testExtractPublicKeyFromRegistration_fromAuthenticatorData() {
-        val xCoord = ByteArray(32) { (it + 1).toByte() }
-        val yCoord = ByteArray(32) { (it + 33).toByte() }
-
         val authData = buildAuthenticatorData(
             credentialId = ByteArray(16) { 0x42 },
-            xCoord = xCoord,
-            yCoord = yCoord
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
         )
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(
@@ -573,23 +609,21 @@ class SmartAccountUtilsTest {
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
      * Strategy 2: Authenticator data with a longer credential ID (32 bytes).
      * Verifies that the credential ID length field is correctly parsed.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromAuthenticatorData_longCredentialId() {
-        val xCoord = ByteArray(32) { 0xAA.toByte() }
-        val yCoord = ByteArray(32) { 0xBB.toByte() }
-
         val authData = buildAuthenticatorData(
             credentialId = ByteArray(32) { 0x55 },
-            xCoord = xCoord,
-            yCoord = yCoord
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
         )
 
         val result = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
@@ -597,23 +631,21 @@ class SmartAccountUtilsTest {
         assertNotNull(result)
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
      * Strategy 2: Authenticator data with a very long credential ID (128 bytes).
      * Tests that the 16-bit big-endian length field handles larger values.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromAuthenticatorData_veryLongCredentialId() {
-        val xCoord = ByteArray(32) { 0x11 }
-        val yCoord = ByteArray(32) { 0x22 }
-
         val authData = buildAuthenticatorData(
             credentialId = ByteArray(128) { 0x77 },
-            xCoord = xCoord,
-            yCoord = yCoord
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
         )
 
         val result = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
@@ -621,8 +653,8 @@ class SmartAccountUtilsTest {
         assertNotNull(result)
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
@@ -680,20 +712,18 @@ class SmartAccountUtilsTest {
     /**
      * Strategy 3: Extract public key from attestation object by pattern matching
      * the COSE key prefix.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromAttestationObject_validCOSEPrefix() {
-        val xCoord = ByteArray(32) { 0xAA.toByte() }
-        val yCoord = ByteArray(32) { 0xBB.toByte() }
-
-        val attestationObject = buildAttestationObject(xCoord, yCoord)
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
 
         val result = SmartAccountUtils.extractPublicKeyFromAttestationObject(attestationObject)
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
@@ -729,40 +759,36 @@ class SmartAccountUtilsTest {
     /**
      * extractPublicKeyFromRegistration with only attestationObject delegates to
      * extractPublicKeyFromAttestationObject and returns the same result.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromRegistration_attestationObjectOnly() {
-        val xCoord = ByteArray(32) { 0xAA.toByte() }
-        val yCoord = ByteArray(32) { 0xBB.toByte() }
-
-        val attestationObject = buildAttestationObject(xCoord, yCoord)
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationObject)
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     // -- extractPublicKeyFromRegistration fallback chain --
 
     /**
      * Full fallback chain: invalid direct key -> authenticator data -> success.
-     * Strategy 1 fails, Strategy 2 succeeds.
+     * Strategy 1 fails (wrong size, no valid prefix), Strategy 2 succeeds.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromRegistration_fallbackToAuthenticatorData() {
-        val xCoord = ByteArray(32) { 0x11 }
-        val yCoord = ByteArray(32) { 0x22 }
-
-        // Invalid direct key (wrong size)
+        // Invalid direct key (wrong size, does not start with 0x04/0x02/0x03)
         val invalidKey = ByteArray(32) { 0x00 }
 
         val authData = buildAuthenticatorData(
             credentialId = ByteArray(20) { 0x33 },
-            xCoord = xCoord,
-            yCoord = yCoord
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
         )
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(
@@ -772,26 +798,24 @@ class SmartAccountUtilsTest {
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
      * Full fallback chain: invalid direct key -> invalid authenticator data -> attestation object -> success.
      * Strategy 1 and 2 fail, Strategy 3 succeeds.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromRegistration_fallbackToAttestationObject() {
-        val xCoord = ByteArray(32) { 0x44 }
-        val yCoord = ByteArray(32) { 0x55 }
-
-        // Invalid direct key
+        // Invalid direct key (wrong size, no valid prefix)
         val invalidKey = ByteArray(10) { 0x00 }
 
         // Authenticator data without AT flag
         val invalidAuthData = ByteArray(37) { 0x00 } // flags = 0x00, no AT
 
-        val attestationObject = buildAttestationObject(xCoord, yCoord)
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
 
         val result = SmartAccountUtils.extractPublicKeyFromRegistration(
             publicKey = invalidKey,
@@ -801,8 +825,8 @@ class SmartAccountUtilsTest {
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     /**
@@ -834,17 +858,15 @@ class SmartAccountUtilsTest {
     /**
      * Strategy 2 via extractPublicKeyFromRegistration: authenticator data with
      * credential ID length encoded in big-endian across both bytes.
-     * credentialIdLength = 0x01 << 8 | 0x00 = 256 bytes
+     * credentialIdLength = 0x01 << 8 | 0x00 = 256 bytes.
+     * Uses the secp256r1 generator point G to satisfy on-curve validation.
      */
     @Test
     fun testExtractPublicKeyFromAuthenticatorData_bigEndianCredIdLength() {
-        val xCoord = ByteArray(32) { 0xDE.toByte() }
-        val yCoord = ByteArray(32) { 0xAD.toByte() }
-
         val authData = buildAuthenticatorData(
             credentialId = ByteArray(256) { 0x88.toByte() },
-            xCoord = xCoord,
-            yCoord = yCoord
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
         )
 
         val result = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
@@ -852,8 +874,430 @@ class SmartAccountUtilsTest {
         assertNotNull(result)
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])
-        assertTrue(xCoord.contentEquals(result.copyOfRange(1, 33)))
-        assertTrue(yCoord.contentEquals(result.copyOfRange(33, 65)))
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
+    }
+
+    // ========================================================================
+    // MARK: - S2: COSE Separator Validation Tests
+    // ========================================================================
+
+    /**
+     * S2: Y-coordinate marker at the wrong offset in authenticator data throws.
+     *
+     * Constructs authenticator data with valid COSE prefix and valid X coordinate but
+     * with the Y-coordinate marker bytes corrupted. The separator is at the right
+     * structural offset but contains incorrect byte values.
+     */
+    @Test
+    fun testExtractPublicKeyFromAuthenticatorData_wrongYMarkerThrows() {
+        val rpIdHash = ByteArray(32) { 0x00 }
+        val flags = byteArrayOf(0x41) // UP + AT
+        val signCount = ByteArray(4) { 0x00 }
+        val aaguid = ByteArray(16) { 0x00 }
+        val credId = ByteArray(16) { 0x42 }
+        val credIdLen = byteArrayOf(0x00, 0x10)
+
+        val cosePrefix = byteArrayOf(
+            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
+            0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        // Wrong separator bytes (0xFF instead of 0x22, 0x58, 0x20)
+        val badSeparator = byteArrayOf(0xFF.toByte(), 0x58, 0x20.toByte())
+        val authData = rpIdHash + flags + signCount + aaguid + credIdLen +
+            credId + cosePrefix + GENERATOR_X + badSeparator + GENERATOR_Y
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    /**
+     * S2: Authenticator data truncated immediately after X coordinate (no separator/Y) throws.
+     *
+     * The AT flag is set and the data is long enough to reach the X coordinate start,
+     * but the 3 separator bytes and 32 Y bytes are missing — the size check returns null
+     * before the separator check is reached.
+     */
+    @Test
+    fun testExtractPublicKeyFromAuthenticatorData_truncatedAfterXReturnsNull() {
+        val rpIdHash = ByteArray(32) { 0x00 }
+        val flags = byteArrayOf(0x41) // UP + AT
+        val signCount = ByteArray(4) { 0x00 }
+        val aaguid = ByteArray(16) { 0x00 }
+        val credId = ByteArray(16) { 0x42 }
+        val credIdLen = byteArrayOf(0x00, 0x10)
+
+        val cosePrefix = byteArrayOf(
+            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
+            0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        // Include only part of the X coordinate — no separator or Y
+        val partialX = GENERATOR_X.copyOfRange(0, 16)
+        val authData = rpIdHash + flags + signCount + aaguid + credIdLen +
+            credId + cosePrefix + partialX
+
+        // Size check fires before separator check, so null is returned
+        val result = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        assertNull(result)
+    }
+
+    /**
+     * S2: Y-coordinate marker at the wrong offset in attestation object throws.
+     *
+     * Constructs an attestation object with the COSE prefix present but with the
+     * Y-coordinate separator bytes (0x22, 0x58, 0x20) replaced by garbage values.
+     */
+    @Test
+    fun testExtractPublicKeyFromAttestationObject_wrongYMarkerThrows() {
+        val cosePrefix = byteArrayOf(
+            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
+            0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        // Wrong Y-coordinate separator
+        val badSeparator = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte())
+        val attestationObject = ByteArray(20) + cosePrefix + GENERATOR_X + badSeparator + GENERATOR_Y + ByteArray(10)
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAttestationObject(attestationObject)
+        }
+    }
+
+    // ========================================================================
+    // MARK: - S3: On-Curve Validation Tests
+    // ========================================================================
+
+    /**
+     * S3: A valid secp256r1 public key (generator point G) is accepted by both
+     * extraction functions.
+     *
+     * This test uses a well-known point that is guaranteed to be on the curve.
+     * It serves as the positive test vector for on-curve validation.
+     */
+    @Test
+    fun testOnCurveValidation_generatorPointAccepted() {
+        // Via authenticator data
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x01 },
+            xCoord = GENERATOR_X,
+            yCoord = GENERATOR_Y
+        )
+        val authResult = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        assertNotNull(authResult)
+        assertEquals(65, authResult.size)
+
+        // Via attestation object
+        val attestResult = SmartAccountUtils.extractPublicKeyFromAttestationObject(
+            buildAttestationObject(GENERATOR_X, GENERATOR_Y)
+        )
+        assertEquals(65, attestResult.size)
+    }
+
+    /**
+     * S3: A second known-valid secp256r1 point (from RFC 6979 test vectors) is accepted.
+     *
+     * Uses the public key Q from the NIST P-256 ECDSA test vector in RFC 6979 section A.2.5
+     * to confirm that on-curve validation works for multiple valid points, not just G.
+     */
+    @Test
+    fun testOnCurveValidation_rfc6979TestVectorAccepted() {
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x02 },
+            xCoord = KNOWN_VALID_X2,
+            yCoord = KNOWN_VALID_Y2
+        )
+        val authResult = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        assertNotNull(authResult)
+        assertTrue(KNOWN_VALID_X2.contentEquals(authResult.copyOfRange(1, 33)))
+        assertTrue(KNOWN_VALID_Y2.contentEquals(authResult.copyOfRange(33, 65)))
+    }
+
+    /**
+     * S3: An off-curve point (generator X with Y incremented by 1) is rejected.
+     *
+     * Incrementing Y by one produces a coordinate pair that does not satisfy the
+     * secp256r1 curve equation.
+     */
+    @Test
+    fun testOnCurveValidation_offCurvePointRejected_authData() {
+        // Corrupt the last byte of the Y coordinate to produce an off-curve point
+        val invalidY = GENERATOR_Y.copyOf()
+        invalidY[31] = (invalidY[31] + 1).toByte()
+
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x03 },
+            xCoord = GENERATOR_X,
+            yCoord = invalidY
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    /**
+     * S3: An off-curve point is rejected by the attestation object extraction path.
+     *
+     * Same off-curve point as the authenticator data test, exercised through the
+     * attestation object code path.
+     */
+    @Test
+    fun testOnCurveValidation_offCurvePointRejected_attestationObject() {
+        val invalidY = GENERATOR_Y.copyOf()
+        invalidY[31] = (invalidY[31] + 1).toByte()
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAttestationObject(
+                buildAttestationObject(GENERATOR_X, invalidY)
+            )
+        }
+    }
+
+    /**
+     * S3: X coordinate of zero is rejected via authenticator data.
+     *
+     * The point at infinity and points with zero coordinates are not valid
+     * secp256r1 public keys.
+     */
+    @Test
+    fun testOnCurveValidation_zeroXRejected() {
+        val zeroX = ByteArray(32)
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x04 },
+            xCoord = zeroX,
+            yCoord = GENERATOR_Y
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    /**
+     * S3: Y coordinate of zero is rejected via authenticator data.
+     */
+    @Test
+    fun testOnCurveValidation_zeroYRejected() {
+        val zeroY = ByteArray(32)
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x05 },
+            xCoord = GENERATOR_X,
+            yCoord = zeroY
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    // ========================================================================
+    // MARK: - S8: Compressed Key Prefix Rejection Tests
+    // ========================================================================
+
+    /**
+     * S8: A compressed key with prefix 0x02 (even Y) throws immediately.
+     *
+     * Compressed keys cannot be expanded without a point decompression step that
+     * is not performed here. The platform must supply the uncompressed key.
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_compressedKey_prefix02_throws() {
+        val compressedKey = byteArrayOf(0x02) + GENERATOR_X
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromRegistration(publicKey = compressedKey)
+        }
+        assertTrue(
+            ex.message.contains("0x02") || ex.message.contains("compressed"),
+            "Error message must mention the compressed prefix or 'compressed'"
+        )
+    }
+
+    /**
+     * S8: A compressed key with prefix 0x03 (odd Y) throws immediately.
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_compressedKey_prefix03_throws() {
+        val compressedKey = byteArrayOf(0x03) + GENERATOR_X
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromRegistration(publicKey = compressedKey)
+        }
+        assertTrue(
+            ex.message.contains("0x03") || ex.message.contains("compressed"),
+            "Error message must mention the compressed prefix or 'compressed'"
+        )
+    }
+
+    /**
+     * S8: A compressed key prefix throws even when other valid strategies are provided.
+     *
+     * Compressed keys are rejected immediately — the attestation object fallback must
+     * NOT be reached when a compressed key is detected in publicKey.
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_compressedKey_noFallthrough() {
+        val compressedKey = byteArrayOf(0x02) + GENERATOR_X
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
+
+        // Must throw despite a valid attestationObject being present
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromRegistration(
+                publicKey = compressedKey,
+                attestationObject = attestationObject
+            )
+        }
+    }
+
+    /**
+     * S8: Non-key data starting with 0xA3 (CBOR map) falls through to attestation object.
+     *
+     * Byte sequences that do not match an uncompressed (0x04) or compressed (0x02/0x03)
+     * key prefix are treated as non-key data and the next strategy is attempted.
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_cborPrefixFallsThrough() {
+        // 0xA3 is a CBOR map header — clearly not a key prefix
+        val nonKeyData = byteArrayOf(0xA3.toByte()) + ByteArray(64) { 0x00 }
+        val attestationObject = buildAttestationObject(GENERATOR_X, GENERATOR_Y)
+
+        val result = SmartAccountUtils.extractPublicKeyFromRegistration(
+            publicKey = nonKeyData,
+            attestationObject = attestationObject
+        )
+
+        assertEquals(65, result.size)
+        assertEquals(0x04.toByte(), result[0])
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
+    }
+
+    // ========================================================================
+    // MARK: - S9: Range Check Tests (coordinate >= p)
+    // ========================================================================
+
+    /**
+     * S9: X coordinate >= field prime p is rejected by validatePointOnCurve.
+     *
+     * A coordinate whose byte representation is all 0xFF (2^256 - 1) exceeds the
+     * secp256r1 field prime p = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff.
+     * The value 2^256 - 1 > p, so it must be rejected before the curve equation check.
+     *
+     * Tested via extractPublicKeyFromAuthenticatorData so the full extraction pipeline
+     * (COSE prefix + separator + on-curve check) is exercised.
+     */
+    @Test
+    fun testOnCurveValidation_xExceedsFieldPrimeRejected() {
+        // 0xFF...FF (32 bytes) = 2^256 - 1, which is greater than the field prime p
+        val xExceedsP = ByteArray(32) { 0xFF.toByte() }
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x10 },
+            xCoord = xExceedsP,
+            yCoord = GENERATOR_Y
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    /**
+     * S9: Y coordinate >= field prime p is rejected by validatePointOnCurve.
+     *
+     * Same as the X test but applied to the Y coordinate. All-0xFF bytes represent
+     * 2^256 - 1, which exceeds p.
+     */
+    @Test
+    fun testOnCurveValidation_yExceedsFieldPrimeRejected() {
+        val yExceedsP = ByteArray(32) { 0xFF.toByte() }
+        val authData = buildAuthenticatorData(
+            credentialId = ByteArray(16) { 0x11 },
+            xCoord = GENERATOR_X,
+            yCoord = yExceedsP
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        }
+    }
+
+    // ========================================================================
+    // MARK: - S10: COSE Prefix Validation Tests (authenticator data path)
+    // ========================================================================
+
+    /**
+     * S10: Wrong COSE prefix in authenticator data causes extractPublicKeyFromAuthenticatorData
+     * to return null rather than throw.
+     *
+     * The function returns null when the COSE prefix does not match [0xA5, 0x01, 0x02, 0x03,
+     * 0x26, 0x20, 0x01, 0x21, 0x58, 0x20], which signals to the caller that no ES256 key
+     * was found at this location and the next extraction strategy should be tried.
+     */
+    @Test
+    fun testExtractPublicKeyFromAuthenticatorData_wrongCosePrefixReturnsNull() {
+        val rpIdHash = ByteArray(32) { 0x00 }
+        val flags = byteArrayOf(0x41) // UP + AT
+        val signCount = ByteArray(4) { 0x00 }
+        val aaguid = ByteArray(16) { 0x00 }
+        val credId = ByteArray(16) { 0x42 }
+        val credIdLen = byteArrayOf(0x00, 0x10)
+
+        // Invalid COSE prefix: first byte changed from 0xA5 to 0xA4 (wrong map length)
+        val wrongCosePrefix = byteArrayOf(
+            0xA4.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
+            0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        val separator = byteArrayOf(0x22, 0x58, 0x20.toByte())
+        val authData = rpIdHash + flags + signCount + aaguid + credIdLen +
+            credId + wrongCosePrefix + GENERATOR_X + separator + GENERATOR_Y
+
+        val result = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+
+        assertNull(result, "Wrong COSE prefix must cause null return, not an exception")
+    }
+
+    // ========================================================================
+    // MARK: - S11: Strategy 1 On-Curve Validation Tests
+    // ========================================================================
+
+    /**
+     * S11: A 65-byte direct key with 0x04 prefix but off-curve coordinates is rejected.
+     *
+     * Strategy 1 now applies validatePointOnCurve before returning the key. Passing
+     * a point that has the correct size and prefix but lies off the secp256r1 curve
+     * must result in a ValidationException.InvalidInput, not a successful return.
+     *
+     * The off-curve point is constructed by taking a valid X coordinate (generator point X)
+     * and incrementing the last byte of Y by one, producing a Y value that does not satisfy
+     * the secp256r1 curve equation.
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_strategy1OffCurveThrows() {
+        val invalidY = GENERATOR_Y.copyOf()
+        invalidY[31] = (invalidY[31] + 1).toByte()
+        val offCurveKey = byteArrayOf(0x04) + GENERATOR_X + invalidY
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.extractPublicKeyFromRegistration(publicKey = offCurveKey)
+        }
+    }
+
+    /**
+     * S11: A valid 65-byte direct key (0x04 prefix + generator point G) is accepted.
+     *
+     * Confirms that Strategy 1 on-curve validation does not reject a correctly formed key.
+     * This is the positive counterpart to [testExtractPublicKeyFromRegistration_strategy1OffCurveThrows].
+     */
+    @Test
+    fun testExtractPublicKeyFromRegistration_strategy1ValidKeyAccepted() {
+        val validKey = byteArrayOf(0x04) + GENERATOR_X + GENERATOR_Y
+
+        val result = SmartAccountUtils.extractPublicKeyFromRegistration(publicKey = validKey)
+
+        assertEquals(65, result.size)
+        assertEquals(0x04.toByte(), result[0])
+        assertTrue(GENERATOR_X.contentEquals(result.copyOfRange(1, 33)))
+        assertTrue(GENERATOR_Y.contentEquals(result.copyOfRange(33, 65)))
     }
 
     // ========================================================================
