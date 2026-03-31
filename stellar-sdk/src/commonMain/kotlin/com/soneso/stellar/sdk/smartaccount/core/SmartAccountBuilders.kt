@@ -2,7 +2,6 @@
 //  SmartAccountBuilders.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
@@ -19,10 +18,11 @@ import com.soneso.stellar.sdk.Util
  *
  * Includes:
  * - Signer builder functions for delegated, external, WebAuthn, and Ed25519 signers
- * - Context rule type builder functions
  * - Policy parameter data classes
- * - Display and formatting utilities
- * - Signer comparison and deduplication utilities
+ * - Signer parsing (address string to signer)
+ * - Signer inspection (type checks, type description, credential/address extraction)
+ * - Signer matching (by credential ID, by address, equality)
+ * - Signer deduplication
  */
 object SmartAccountBuilders {
 
@@ -441,7 +441,7 @@ object SmartAccountBuilders {
      * Useful for finding a specific delegated signer among a list of signers.
      *
      * @param signer The signer to check
-     * @param address The Stellar address to match (G-address)
+     * @param address The Stellar address to match (G-address or C-address)
      * @return true if the signer is a [DelegatedSigner] with the matching address
      *
      * Example:
@@ -463,7 +463,7 @@ object SmartAccountBuilders {
     /**
      * Checks if two signers are equal.
      *
-     * Compares signers by their tag and values. For delegated signers, compares the
+     * Compares signers by their type and field values. For delegated signers, compares the
      * address. For external signers, compares verifier address and key data bytes.
      *
      * @param a First signer
