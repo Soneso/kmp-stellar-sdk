@@ -2,7 +2,6 @@
 //  SmartAccountUtils.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
@@ -29,35 +28,33 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  */
 object SmartAccountUtils {
 
+    // secp256r1 curve order and half-order, pre-computed as companion-level constants.
+    // Reference: https://github.com/stellar/stellar-protocol/discussions/1435#discussioncomment-8809175
+    private val curveOrder = BigInteger.parseString(
+        "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
+        16
+    )
+    private val halfCurveOrder = curveOrder / BigInteger.TWO
+
     // MARK: - Signature Normalization
 
     /**
-     * Normalizes a DER-encoded secp256r1 signature to compact format with low-S normalization.
+     * Parses a DER-encoded secp256r1 signature and returns R and S as BigIntegers.
      *
-     * This function performs the following steps:
-     * 1. Parses DER format: `0x30 [total_len] 0x02 [r_len] [r_bytes] 0x02 [s_len] [s_bytes]`
-     * 2. Extracts r and s components (stripping leading 0x00 padding if present)
-     * 3. Converts s to BigInteger and normalizes to low-S form if needed
-     * 4. Pads both r and s to exactly 32 bytes
-     * 5. Returns concatenated r || s (64 bytes total)
+     * Validates the full DER structure, strips leading 0x00 padding bytes from both
+     * components, and enforces secp256r1-specific constraints:
+     * - R and S must each be at most 32 bytes after stripping
+     * - R and S must not be all-zero (invalid ECDSA values)
+     * - R and S must each be strictly less than the curve order
      *
-     * Low-S normalization ensures that s values greater than half the curve order
-     * are converted to their complements (n - s), which is required for Stellar/Soroban
-     * signature verification.
+     * DER format: `0x30 [total_len] 0x02 [r_len] [r_bytes] 0x02 [s_len] [s_bytes]`
      *
      * @param derSignature DER-encoded signature bytes
-     * @return Compact 64-byte signature (32-byte r || 32-byte s)
-     * @throws ValidationException.InvalidInput if the DER format is invalid
-     *
-     * Example:
-     * ```kotlin
-     * val derSig = byteArrayOf(...)  // DER-encoded signature from WebAuthn
-     * val compactSig = SmartAccountUtils.normalizeSignature(derSig)
-     * // compactSig is now 64 bytes: r (32 bytes) || s (32 bytes)
-     * ```
+     * @return Pair of (r, s) as validated BigIntegers in [1, n-1]
+     * @throws ValidationException.InvalidInput if the DER structure is malformed or
+     *         the R/S values violate secp256r1 constraints
      */
-    fun normalizeSignature(derSignature: ByteArray): ByteArray {
-        // Validate DER signature header
+    internal fun parseDerSignature(derSignature: ByteArray): Pair<BigInteger, BigInteger> {
         if (derSignature.size < 8 || derSignature[0] != 0x30.toByte()) {
             throw ValidationException.invalidInput(
                 "derSignature",
@@ -75,7 +72,7 @@ object SmartAccountUtils {
             )
         }
 
-        // Parse r component
+        // Parse R component
         var offset = 2
         if (offset + 1 >= derSignature.size || derSignature[offset] != 0x02.toByte()) {
             throw ValidationException.invalidInput(
@@ -85,7 +82,7 @@ object SmartAccountUtils {
         }
 
         val rLength = derSignature[offset + 1].toInt() and 0xFF
-        if (offset + 2 + rLength > derSignature.size) {
+        if (rLength == 0 || offset + 2 + rLength > derSignature.size) {
             throw ValidationException.invalidInput(
                 "derSignature",
                 "Invalid DER signature format: truncated r component"
@@ -94,12 +91,12 @@ object SmartAccountUtils {
 
         var r = derSignature.copyOfRange(offset + 2, offset + 2 + rLength)
 
-        // Strip leading 0x00 padding from r if present
+        // Strip leading 0x00 padding from R
         while (r.size > 1 && r[0] == 0x00.toByte()) {
             r = r.copyOfRange(1, r.size)
         }
 
-        // Parse s component
+        // Parse S component
         offset = offset + 2 + rLength
         if (offset + 1 >= derSignature.size || derSignature[offset] != 0x02.toByte()) {
             throw ValidationException.invalidInput(
@@ -109,7 +106,7 @@ object SmartAccountUtils {
         }
 
         val sLength = derSignature[offset + 1].toInt() and 0xFF
-        if (offset + 2 + sLength > derSignature.size) {
+        if (sLength == 0 || offset + 2 + sLength > derSignature.size) {
             throw ValidationException.invalidInput(
                 "derSignature",
                 "Invalid DER signature format: truncated s component"
@@ -118,12 +115,12 @@ object SmartAccountUtils {
 
         var s = derSignature.copyOfRange(offset + 2, offset + 2 + sLength)
 
-        // Strip leading 0x00 padding from s if present
+        // Strip leading 0x00 padding from S
         while (s.size > 1 && s[0] == 0x00.toByte()) {
             s = s.copyOfRange(1, s.size)
         }
 
-        // Validate no trailing bytes after s component
+        // Validate no trailing bytes after S component
         val endOffset = offset + 2 + sLength
         if (endOffset != derSignature.size) {
             throw ValidationException.invalidInput(
@@ -132,30 +129,87 @@ object SmartAccountUtils {
             )
         }
 
-        // Convert r and s to BigInteger for low-S normalization
-        val rBigInt = bytesToUnsignedBigInteger(r)
-        var sBigInt = bytesToUnsignedBigInteger(s)
-
-        // Normalize s to low-S form
-        // secp256r1 curve order: 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
-        // Reference: https://github.com/stellar/stellar-protocol/discussions/1435#discussioncomment-8809175
-        val curveOrder = BigInteger.parseString(
-            "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
-            16
-        )
-
-        val halfCurveOrder = curveOrder / BigInteger.TWO
-
-        // If s > halfOrder, normalize: s = n - s
-        if (sBigInt > halfCurveOrder) {
-            sBigInt = curveOrder - sBigInt
+        // secp256r1 is a 256-bit curve: R and S must each fit in 32 bytes
+        if (r.size > 32) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: r component exceeds 32 bytes after stripping (${r.size} bytes)"
+            )
+        }
+        if (s.size > 32) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: s component exceeds 32 bytes after stripping (${s.size} bytes)"
+            )
         }
 
-        // Convert back to byte arrays and pad to 32 bytes
-        val rPadded = bigIntegerToUnsignedBytes(rBigInt, 32)
-        val sPadded = bigIntegerToUnsignedBytes(sBigInt, 32)
+        // R = 0 and S = 0 are invalid ECDSA values
+        if (r.size == 1 && r[0] == 0x00.toByte()) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: r component is zero (invalid ECDSA value)"
+            )
+        }
+        if (s.size == 1 && s[0] == 0x00.toByte()) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: s component is zero (invalid ECDSA value)"
+            )
+        }
 
-        // Concatenate r || s (64 bytes total)
+        // R and S must be in [1, n-1]; validate the upper bound here.
+        // The zero check above already guarantees the lower bound (> 0).
+        val rBigInt = bytesToUnsignedBigInteger(r)
+        if (rBigInt >= curveOrder) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: r component exceeds curve order"
+            )
+        }
+        val sBigInt = bytesToUnsignedBigInteger(s)
+        if (sBigInt >= curveOrder) {
+            throw ValidationException.invalidInput(
+                "derSignature",
+                "Invalid DER signature: s component exceeds curve order"
+            )
+        }
+
+        return Pair(rBigInt, sBigInt)
+    }
+
+    /**
+     * Normalizes a DER-encoded secp256r1 signature to compact format with low-S normalization.
+     *
+     * This function performs the following steps:
+     * 1. Parses DER format via [parseDerSignature], which returns R and S as BigIntegers
+     * 2. Normalizes S to low-S form if S > halfOrder
+     * 3. Pads both R and S to exactly 32 bytes
+     * 4. Returns concatenated R || S (64 bytes total)
+     *
+     * Low-S normalization ensures that s values greater than half the curve order
+     * are converted to their complements (n - s), which is required for Stellar/Soroban
+     * signature verification.
+     *
+     * @param derSignature DER-encoded signature bytes
+     * @return Compact 64-byte signature (32-byte r || 32-byte s)
+     * @throws ValidationException.InvalidInput if the DER format is invalid
+     *
+     * Example:
+     * ```kotlin
+     * val derSig = byteArrayOf(...)  // DER-encoded signature from WebAuthn
+     * val compactSig = SmartAccountUtils.normalizeSignature(derSig)
+     * // compactSig is now 64 bytes: r (32 bytes) || s (32 bytes)
+     * ```
+     */
+    fun normalizeSignature(derSignature: ByteArray): ByteArray {
+        val (rBigInt, sBigInt) = parseDerSignature(derSignature)
+
+        // If s > halfOrder, normalize: s = n - s
+        val sNormalized = if (sBigInt > halfCurveOrder) curveOrder - sBigInt else sBigInt
+
+        val rPadded = bigIntegerToUnsignedBytes(rBigInt, 32)
+        val sPadded = bigIntegerToUnsignedBytes(sNormalized, 32)
+
         return rPadded + sPadded
     }
 
@@ -568,7 +622,6 @@ object SmartAccountUtils {
      * Converts an unsigned byte array to BigInteger.
      *
      * This function interprets the byte array as an unsigned big-endian integer.
-     * Leading zeros are significant for proper interpretation.
      *
      * @param bytes Unsigned byte array (big-endian)
      * @return BigInteger representation
@@ -587,6 +640,7 @@ object SmartAccountUtils {
      * @param value BigInteger value (must be non-negative)
      * @param byteCount Target byte count (left-padded with zeros if needed)
      * @return Unsigned byte array of exact length byteCount
+     * @throws IllegalArgumentException if value is negative or requires more than [byteCount] bytes
      */
     private fun bigIntegerToUnsignedBytes(value: BigInteger, byteCount: Int): ByteArray {
         require(value >= BigInteger.ZERO) {
@@ -605,7 +659,7 @@ object SmartAccountUtils {
             paddedHex.substring(index, index + 2).toInt(16).toByte()
         }
 
-        // Pad or trim to exact size
+        // Left-pad with zeros or throw if too large
         return when {
             bytes.size == byteCount -> bytes
             bytes.size < byteCount -> {
@@ -614,10 +668,9 @@ object SmartAccountUtils {
                 bytes.copyInto(padded, byteCount - bytes.size)
                 padded
             }
-            else -> {
-                // Trim from left (keep rightmost bytes)
-                bytes.copyOfRange(bytes.size - byteCount, bytes.size)
-            }
+            else -> throw IllegalArgumentException(
+                "BigInteger value requires ${bytes.size} bytes, exceeds target size of $byteCount"
+            )
         }
     }
 

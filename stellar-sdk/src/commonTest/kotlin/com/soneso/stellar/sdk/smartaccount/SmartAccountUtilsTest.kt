@@ -8,6 +8,7 @@
 
 package com.soneso.stellar.sdk.smartaccount
 
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import kotlin.test.Test
@@ -919,6 +920,11 @@ class SmartAccountUtilsTest {
     // MARK: - Hex Helper Functions
 
     /**
+     * Parses a lowercase hex string to a BigInteger (unsigned, base 16).
+     */
+    private fun bigIntFromHex(hex: String): BigInteger = BigInteger.parseString(hex, 16)
+
+    /**
      * Converts hex string to byte array.
      */
     private fun hexToBytes(hex: String): ByteArray {
@@ -934,5 +940,442 @@ class SmartAccountUtilsTest {
      */
     private fun ByteArray.toHex(): String = joinToString("") { byte ->
         (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
+    }
+
+    // ========================================================================
+    // MARK: - parseDerSignature Tests
+    // ========================================================================
+
+    /**
+     * Valid DER signature: standard 32-byte R and S (no leading zero padding).
+     * Verifies that R and S are returned verbatim when no stripping is needed.
+     */
+    @Test
+    fun testParseDerSignature_validStandard() {
+        // r = 32 bytes, s = 32 bytes — no 0x00 prefix needed (high bits are 0)
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+
+        val der = buildDer(rBytes, sBytes)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        val expectedR = bigIntFromHex("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val expectedS = bigIntFromHex("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        assertEquals(expectedR, r, "R should match input exactly")
+        assertEquals(expectedS, s, "S should match input exactly")
+    }
+
+    /**
+     * Valid DER signature: R has a leading 0x00 padding byte.
+     * The padding must be stripped, leaving a 32-byte R.
+     */
+    @Test
+    fun testParseDerSignature_leadingZeroStrippedFromR() {
+        // DER encodes r with 0x00 prefix when high bit is set (to keep it positive in ASN.1)
+        val rBytesRaw = hexToBytes("b23694f0367f3e621a8458fc24d1dce654be3e2e2c1bacea40cd7a5e7a134540")
+        val sBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+
+        // Build DER with 0x00-padded r (33 bytes)
+        val rDerBytes = byteArrayOf(0x00) + rBytesRaw
+        val der = buildDer(rDerBytes, sBytes)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        val expectedR = bigIntFromHex("b23694f0367f3e621a8458fc24d1dce654be3e2e2c1bacea40cd7a5e7a134540")
+        val expectedS = bigIntFromHex("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        assertEquals(expectedR, r, "Leading 0x00 must be stripped from R")
+        assertEquals(expectedS, s, "S should be unchanged")
+    }
+
+    /**
+     * Valid DER signature: S has a leading 0x00 padding byte.
+     * The padding must be stripped, leaving a 32-byte S.
+     */
+    @Test
+    fun testParseDerSignature_leadingZeroStrippedFromS() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytesRaw = hexToBytes("d7fbd22ba32e17ce0f862e83e9c43e768eb3cc7a4ce050f6f71f33f27ce97ba2")
+
+        // Build DER with 0x00-padded s (33 bytes)
+        val sDerBytes = byteArrayOf(0x00) + sBytesRaw
+        val der = buildDer(rBytes, sDerBytes)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        val expectedR = bigIntFromHex("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val expectedS = bigIntFromHex("d7fbd22ba32e17ce0f862e83e9c43e768eb3cc7a4ce050f6f71f33f27ce97ba2")
+        assertEquals(expectedR, r, "R should be unchanged")
+        assertEquals(expectedS, s, "Leading 0x00 must be stripped from S")
+    }
+
+    /**
+     * Minimum valid DER signature: 1-byte R and 1-byte S.
+     * Both components are small positive integers with no padding needed.
+     */
+    @Test
+    fun testParseDerSignature_minimumValid() {
+        val rBytes = byteArrayOf(0x01)
+        val sBytes = byteArrayOf(0x02)
+
+        val der = buildDer(rBytes, sBytes)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        assertEquals(BigInteger.ONE, r, "1-byte R should be parsed correctly")
+        assertEquals(BigInteger.TWO, s, "1-byte S should be parsed correctly")
+    }
+
+    /**
+     * Invalid header: first byte is not 0x30.
+     */
+    @Test
+    fun testParseDerSignature_invalidHeader() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // Replace header byte 0x30 with 0x31
+        val invalidDer = validDer.copyOf()
+        invalidDer[0] = 0x31
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Wrong total length: declared length is one less than actual content.
+     */
+    @Test
+    fun testParseDerSignature_wrongTotalLength() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // Decrement the length byte so it no longer matches the actual data
+        val invalidDer = validDer.copyOf()
+        invalidDer[1] = (invalidDer[1] - 1).toByte()
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Missing R marker: byte at offset 2 is 0x03 instead of 0x02.
+     */
+    @Test
+    fun testParseDerSignature_missingRMarker() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        val invalidDer = validDer.copyOf()
+        invalidDer[2] = 0x03 // wrong tag for R
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Missing S marker: byte at the start of the S component is 0x03 instead of 0x02.
+     */
+    @Test
+    fun testParseDerSignature_missingSMarker() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // Offset of S marker: 2 (header+len) + 2 (R tag+len) + rBytes.size
+        val sMarkerOffset = 2 + 2 + rBytes.size
+        val invalidDer = validDer.copyOf()
+        invalidDer[sMarkerOffset] = 0x03 // wrong tag for S
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Truncated R: R length field claims more bytes than are present.
+     */
+    @Test
+    fun testParseDerSignature_truncatedR() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // Inflate the R length byte to exceed the buffer
+        val invalidDer = validDer.copyOf()
+        invalidDer[3] = (rBytes.size + 10).toByte() // R length now exceeds available bytes
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Truncated S: S length field claims more bytes than are present.
+     */
+    @Test
+    fun testParseDerSignature_truncatedS() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // S length byte is at offset: 2 (header+len) + 2 (R tag+len) + rBytes.size + 1 (S tag)
+        val sLenOffset = 2 + 2 + rBytes.size + 1
+        val invalidDer = validDer.copyOf()
+        invalidDer[sLenOffset] = (sBytes.size + 10).toByte() // S length now exceeds available bytes
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(invalidDer)
+        }
+    }
+
+    /**
+     * Trailing bytes: extra bytes after the S component.
+     * The total length byte is patched to match, but the DER structure has trailing garbage.
+     */
+    @Test
+    fun testParseDerSignature_trailingBytes() {
+        val rBytes = hexToBytes("1c7ab8e46f91d3f9dbff8c50a37a0d13bbf835ac31c5d0da2dbf1e8a91c10521")
+        val sBytes = hexToBytes("2a3b4c5d6e7f8091a2b3c4d5e6f70819283746556677889900aabbccddeeff01")
+        val validDer = buildDer(rBytes, sBytes)
+
+        // Append 2 extra bytes and update the total length field
+        val withTrailing = validDer + byteArrayOf(0xDE.toByte(), 0xAD.toByte())
+        withTrailing[1] = (withTrailing[1].toInt() and 0xFF + 2).toByte()
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(withTrailing)
+        }
+    }
+
+    /**
+     * R too short: the DER header is present but R length is 0 (empty R component).
+     */
+    @Test
+    fun testParseDerSignature_emptyR() {
+        // Manually build a DER with 0-length R: 30 04 02 00 02 01 05
+        val der = byteArrayOf(
+            0x30, 0x05,       // SEQUENCE, 5 bytes
+            0x02, 0x00,       // INTEGER R, length 0  -- invalid
+            0x02, 0x01, 0x05  // INTEGER S = 5
+        )
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+    }
+
+    /**
+     * R all zeros after stripping: R = 0x00 is an invalid ECDSA value.
+     */
+    @Test
+    fun testParseDerSignature_rAllZeros() {
+        // Manually build: R = 0x00, S = 0x01
+        val der = byteArrayOf(
+            0x30, 0x06,       // SEQUENCE, 6 bytes
+            0x02, 0x01, 0x00, // INTEGER R = 0
+            0x02, 0x01, 0x01  // INTEGER S = 1
+        )
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+        assertTrue(
+            ex.message?.contains("r component is zero") == true,
+            "Exception message should mention r component is zero"
+        )
+    }
+
+    /**
+     * S all zeros after stripping: S = 0x00 is an invalid ECDSA value.
+     */
+    @Test
+    fun testParseDerSignature_sAllZeros() {
+        // Manually build: R = 0x01, S = 0x00
+        val der = byteArrayOf(
+            0x30, 0x06,       // SEQUENCE, 6 bytes
+            0x02, 0x01, 0x01, // INTEGER R = 1
+            0x02, 0x01, 0x00  // INTEGER S = 0
+        )
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+        assertTrue(
+            ex.message?.contains("s component is zero") == true,
+            "Exception message should mention s component is zero"
+        )
+    }
+
+    /**
+     * R exceeds 32 bytes after stripping: secp256r1 R must fit in 32 bytes.
+     *
+     * We build a DER where R encodes 33 significant bytes (no leading zero),
+     * which exceeds the 256-bit curve field size.
+     */
+    @Test
+    fun testParseDerSignature_rExceeds32Bytes() {
+        // 33 non-zero bytes for R (no leading 0x00, so all 33 are significant)
+        val rBytes = ByteArray(33) { (it + 1).toByte() }
+        val sBytes = byteArrayOf(0x01)
+
+        val der = buildDer(rBytes, sBytes)
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+    }
+
+    /**
+     * S exceeds 32 bytes after stripping: secp256r1 S must fit in 32 bytes.
+     */
+    @Test
+    fun testParseDerSignature_sExceeds32Bytes() {
+        val rBytes = byteArrayOf(0x01)
+        // 33 non-zero bytes for S (no leading 0x00)
+        val sBytes = ByteArray(33) { (it + 1).toByte() }
+
+        val der = buildDer(rBytes, sBytes)
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+    }
+
+    // secp256r1 curve order n used in range validation tests:
+    // n = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+
+    /**
+     * R equals the curve order n: parseDerSignature must reject it.
+     *
+     * Valid R values are in [1, n-1]. R = n is out of range.
+     */
+    @Test
+    fun testParseDerSignature_rEqualsCurveOrder() {
+        // n = ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+        // High bit is set, so DER requires a 0x00 prefix to keep the integer positive (33 bytes).
+        val nWithPrefix = hexToBytes("00ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
+        val sBytes = hexToBytes("0000000000000000000000000000000000000000000000000000000000000001")
+
+        val der = buildDer(nWithPrefix, sBytes)
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+        assertTrue(
+            ex.message?.contains("r component exceeds curve order") == true,
+            "Exception message should mention r component exceeds curve order"
+        )
+    }
+
+    /**
+     * S equals the curve order n: parseDerSignature must reject it.
+     *
+     * Valid S values are in [1, n-1]. S = n is out of range.
+     */
+    @Test
+    fun testParseDerSignature_sEqualsCurveOrder() {
+        val rBytes = hexToBytes("0000000000000000000000000000000000000000000000000000000000000001")
+        // n with 0x00 prefix (33 bytes in DER)
+        val nWithPrefix = hexToBytes("00ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
+
+        val der = buildDer(rBytes, nWithPrefix)
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+        assertTrue(
+            ex.message?.contains("s component exceeds curve order") == true,
+            "Exception message should mention s component exceeds curve order"
+        )
+    }
+
+    /**
+     * R = n + 1: parseDerSignature must reject it.
+     *
+     * n + 1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632552
+     * This value fits in 32 bytes (high bit is set, so DER needs a 0x00 prefix — 33 bytes total).
+     */
+    @Test
+    fun testParseDerSignature_rExceedsCurveOrder() {
+        // n + 1 = ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632552
+        val nPlusOneWithPrefix = hexToBytes("00ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632552")
+        val sBytes = hexToBytes("0000000000000000000000000000000000000000000000000000000000000001")
+
+        val der = buildDer(nPlusOneWithPrefix, sBytes)
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            SmartAccountUtils.parseDerSignature(der)
+        }
+        assertTrue(
+            ex.message?.contains("r component exceeds curve order") == true,
+            "Exception message should mention r component exceeds curve order"
+        )
+    }
+
+    /**
+     * R = n - 1: parseDerSignature must accept it (valid upper boundary).
+     *
+     * n - 1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550
+     * High bit is set, so DER encoding requires a 0x00 prefix (33 bytes).
+     * After stripping the prefix, the 32-byte value is returned.
+     * S is encoded as a small integer; parseDerSignature strips its leading zeros.
+     */
+    @Test
+    fun testParseDerSignature_rJustBelowCurveOrder() {
+        // n - 1 = ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550
+        val nMinusOneRaw = hexToBytes("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550")
+        val nMinusOneWithPrefix = byteArrayOf(0x00) + nMinusOneRaw
+        val sBytes = byteArrayOf(0x01)
+
+        val der = buildDer(nMinusOneWithPrefix, sBytes)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        val expectedR = bigIntFromHex("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550")
+        assertEquals(expectedR, r, "R = n-1 should be accepted and returned as BigInteger")
+        assertEquals(BigInteger.ONE, s, "S should be returned as-is")
+    }
+
+    /**
+     * S = n - 1: parseDerSignature must accept it (valid upper boundary).
+     *
+     * Although normalizeSignature would then fold this high-S value down to 1,
+     * parseDerSignature itself only enforces the range constraint [1, n-1].
+     * R is encoded as a small integer; parseDerSignature strips its leading zeros.
+     */
+    @Test
+    fun testParseDerSignature_sJustBelowCurveOrder() {
+        val rBytes = byteArrayOf(0x01)
+        // n - 1 = ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550
+        val nMinusOneRaw = hexToBytes("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550")
+        val nMinusOneWithPrefix = byteArrayOf(0x00) + nMinusOneRaw
+
+        val der = buildDer(rBytes, nMinusOneWithPrefix)
+        val (r, s) = SmartAccountUtils.parseDerSignature(der)
+
+        val expectedS = bigIntFromHex("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550")
+        assertEquals(BigInteger.ONE, r, "R should be returned as-is")
+        assertEquals(expectedS, s, "S = n-1 should be accepted and returned as BigInteger")
+    }
+
+    /**
+     * Builds a minimal DER-encoded signature from raw R and S byte arrays.
+     *
+     * Format: `0x30 [total_len] 0x02 [r_len] [r_bytes] 0x02 [s_len] [s_bytes]`
+     *
+     * Note: this helper does NOT add a leading 0x00 byte even when the high bit of
+     * the first byte of R or S is set. That is intentional — tests that need the
+     * 0x00 padding pass in the pre-padded bytes explicitly.
+     */
+    private fun buildDer(rBytes: ByteArray, sBytes: ByteArray): ByteArray {
+        val totalLen = 2 + rBytes.size + 2 + sBytes.size
+        return byteArrayOf(
+            0x30, totalLen.toByte(),
+            0x02, rBytes.size.toByte()
+        ) + rBytes + byteArrayOf(
+            0x02, sBytes.size.toByte()
+        ) + sBytes
     }
 }

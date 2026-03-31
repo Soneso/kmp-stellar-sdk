@@ -700,8 +700,10 @@ class WebAuthnProviderTest {
 
     @Test
     fun testNormalizeSignature_rWithLeadingZeroPadding() {
-        // DER encoding adds a 0x00 prefix when the first byte has the high bit set
-        val r = ByteArray(32) { 0xFF.toByte() } // All 0xFF, high bit set
+        // DER encoding adds a 0x00 prefix when the first byte has the high bit set.
+        // Use a value with high bit set but below the curve order.
+        val r = ByteArray(32) { 0x80.toByte() }
+        r[31] = 0x01 // 0x808080...8001, well below curve order
         val s = ByteArray(32)
         s[31] = 0x01
 
