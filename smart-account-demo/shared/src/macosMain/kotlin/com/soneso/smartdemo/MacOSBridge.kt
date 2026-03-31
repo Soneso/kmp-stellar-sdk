@@ -13,8 +13,6 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.stellar.sdk.smartaccount.AppleWebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.UserDefaultsStorageAdapter
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
 
 /**
  * Bridge between native macOS SwiftUI and Kotlin Smart Account Kit.
@@ -63,32 +61,21 @@ class MacOSBridge {
      * ```
      */
     fun initializeKit() {
-        MainScope().launch {
-            try {
-                ActivityLogState.info("Initializing Smart Account Kit for macOS...")
+        try {
+            val webauthnProvider = AppleWebAuthnProvider(
+                rpId = DemoConfig.DEFAULT_RP_ID,
+                rpName = DemoConfig.RP_NAME
+            )
 
-                // Create WebAuthn provider for passkey authentication with Touch ID
-                // rpId must match the domain in Associated Domains entitlement
-                val webauthnProvider = AppleWebAuthnProvider(
-                    rpId = DemoConfig.DEFAULT_RP_ID,
-                    rpName = DemoConfig.RP_NAME
-                )
+            val storage = UserDefaultsStorageAdapter(
+                suiteName = "com.soneso.stellar.smartdemo.macos"
+            )
 
-                // Create storage adapter using NSUserDefaults with macOS suite name
-                val storage = UserDefaultsStorageAdapter(
-                    suiteName = "com.soneso.stellar.smartdemo.macos"
-                )
-
-                // Store platform providers in DemoState so shared code can use them
-                DemoState.webauthnProvider = webauthnProvider
-                DemoState.storage = storage
-                ActivityLogState.info("Smart Account Kit initialized (macOS)")
-                ActivityLogState.info("WebAuthn provider: AppleWebAuthnProvider")
-                ActivityLogState.info("Storage: UserDefaultsStorageAdapter")
-            } catch (e: Exception) {
-                ActivityLogState.error("Failed to initialize Smart Account Kit: ${e.message}")
-                e.printStackTrace()
-            }
+            DemoState.webauthnProvider = webauthnProvider
+            DemoState.storage = storage
+            ActivityLogState.info("macOS providers initialized")
+        } catch (e: Exception) {
+            ActivityLogState.error("Failed to initialize macOS providers: ${e.message}")
         }
     }
 }

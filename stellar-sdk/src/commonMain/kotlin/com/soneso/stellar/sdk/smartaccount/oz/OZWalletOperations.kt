@@ -363,6 +363,10 @@ class OZWalletOperations internal constructor(
                             "nativeTokenContract",
                             "nativeTokenContract is required when autoFund is true"
                         )
+                    // Wait for the deployment transaction to propagate to Soroban RPC.
+                    // The deploy may be confirmed on Horizon but not yet visible to
+                    // RPC simulation until the next ledger close (~5s on testnet).
+                    delay(5000)
                     kit.transactionOperations.fundWallet(nativeTokenContract = tokenContract)
                 }
 
