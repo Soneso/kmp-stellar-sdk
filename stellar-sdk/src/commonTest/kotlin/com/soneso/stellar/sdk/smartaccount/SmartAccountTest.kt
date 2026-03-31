@@ -637,7 +637,7 @@ class SmartAccountTest {
     }
 
     @Test
-    fun testExtractPublicKey_validCOSE() {
+    fun testExtractPublicKeyFromRegistration_validCOSE() {
         // Create valid COSE structure
         val cosePrefix = byteArrayOf(
             0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
@@ -649,7 +649,7 @@ class SmartAccountTest {
 
         val attestationData = ByteArray(10) + cosePrefix + xCoord + separator + yCoord + ByteArray(10)
 
-        val publicKey = SmartAccountUtils.extractPublicKey(attestationData)
+        val publicKey = SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationData)
 
         assertEquals(65, publicKey.size)
         assertEquals(SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX, publicKey[0])
@@ -658,16 +658,16 @@ class SmartAccountTest {
     }
 
     @Test
-    fun testExtractPublicKey_missingCOSEPrefix() {
+    fun testExtractPublicKeyFromRegistration_missingCOSEPrefix() {
         val attestationData = ByteArray(100) { 0xFF.toByte() }
 
         assertFailsWith<ValidationException> {
-            SmartAccountUtils.extractPublicKey(attestationData)
+            SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationData)
         }
     }
 
     @Test
-    fun testExtractPublicKey_truncatedData() {
+    fun testExtractPublicKeyFromRegistration_truncatedData() {
         val cosePrefix = byteArrayOf(
             0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
             0x01, 0x21, 0x58, 0x20.toByte()
@@ -675,7 +675,7 @@ class SmartAccountTest {
         val attestationData = cosePrefix + ByteArray(10) // Not enough data
 
         assertFailsWith<ValidationException> {
-            SmartAccountUtils.extractPublicKey(attestationData)
+            SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationData)
         }
     }
 

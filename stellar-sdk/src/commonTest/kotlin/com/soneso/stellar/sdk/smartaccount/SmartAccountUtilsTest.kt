@@ -724,19 +724,20 @@ class SmartAccountUtilsTest {
         }
     }
 
-    // -- extractPublicKey (backward compat) --
+    // -- extractPublicKeyFromRegistration with attestation object only --
 
     /**
-     * Backward compatibility: extractPublicKey delegates to extractPublicKeyFromAttestationObject.
+     * extractPublicKeyFromRegistration with only attestationObject delegates to
+     * extractPublicKeyFromAttestationObject and returns the same result.
      */
     @Test
-    fun testExtractPublicKey_backwardCompatibility() {
+    fun testExtractPublicKeyFromRegistration_attestationObjectOnly() {
         val xCoord = ByteArray(32) { 0xAA.toByte() }
         val yCoord = ByteArray(32) { 0xBB.toByte() }
 
         val attestationObject = buildAttestationObject(xCoord, yCoord)
 
-        val result = SmartAccountUtils.extractPublicKey(attestationObject)
+        val result = SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationObject)
 
         assertEquals(65, result.size)
         assertEquals(0x04.toByte(), result[0])

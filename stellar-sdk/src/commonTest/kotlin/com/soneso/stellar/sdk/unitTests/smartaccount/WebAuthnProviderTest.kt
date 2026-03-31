@@ -237,15 +237,15 @@ class WebAuthnProviderTest {
     }
 
     @Test
-    fun testExtractPublicKey_convenienceAlias_matchesDirectCall() {
+    fun testExtractPublicKeyFromRegistration_attestationObjectOnly_matchesDirectCall() {
         val attestationObject = buildAttestationObject()
 
         val direct = SmartAccountUtils.extractPublicKeyFromAttestationObject(attestationObject)
-        val alias = SmartAccountUtils.extractPublicKey(attestationObject)
+        val fromRegistration = SmartAccountUtils.extractPublicKeyFromRegistration(attestationObject = attestationObject)
 
         assertContentEquals(
-            direct, alias,
-            "extractPublicKey() alias must produce the same result as extractPublicKeyFromAttestationObject()"
+            direct, fromRegistration,
+            "extractPublicKeyFromRegistration(attestationObject) must produce the same result as extractPublicKeyFromAttestationObject()"
         )
     }
 

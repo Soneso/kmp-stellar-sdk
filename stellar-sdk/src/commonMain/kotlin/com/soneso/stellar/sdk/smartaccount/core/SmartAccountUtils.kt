@@ -311,6 +311,9 @@ object SmartAccountUtils {
      * Parses the authenticator data structure (defined in the WebAuthn specification)
      * to locate and extract the COSE public key from the attested credential data.
      *
+     * This is an internal extraction strategy used by [extractPublicKeyFromRegistration].
+     * Callers should use [extractPublicKeyFromRegistration] instead of calling this directly.
+     *
      * Authenticator data layout:
      * ```
      * [0..31]   rpIdHash          (32 bytes)
@@ -333,17 +336,8 @@ object SmartAccountUtils {
      * @param authenticatorData Raw authenticator data bytes
      * @return Uncompressed secp256r1 public key (65 bytes), or null if the data
      *         is too short or does not contain attested credential data
-     *
-     * Example:
-     * ```kotlin
-     * val authData = ... // from WebAuthn registration
-     * val publicKey = SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
-     * if (publicKey != null) {
-     *     println("Extracted public key from authenticator data")
-     * }
-     * ```
      */
-    fun extractPublicKeyFromAuthenticatorData(authenticatorData: ByteArray): ByteArray? {
+    internal fun extractPublicKeyFromAuthenticatorData(authenticatorData: ByteArray): ByteArray? {
         // Minimum size: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen)
         // = 55, plus at least the COSE key prefix (10) + X (32) + separator (3) + Y (32) = 77
         // Total minimum: 132 bytes
@@ -394,6 +388,9 @@ object SmartAccountUtils {
      * the X and Y coordinates of the public key. The result is formatted as an
      * uncompressed public key with the 0x04 prefix.
      *
+     * This is an internal extraction strategy used by [extractPublicKeyFromRegistration].
+     * Callers should use [extractPublicKeyFromRegistration] instead of calling this directly.
+     *
      * This is a pattern-matching approach that works regardless of the CBOR structure
      * surrounding the key. It searches for the known 10-byte COSE key prefix for ES256
      * (P-256) keys.
@@ -411,15 +408,8 @@ object SmartAccountUtils {
      * @return Uncompressed secp256r1 public key (65 bytes: 0x04 prefix + X + Y)
      * @throws ValidationException.InvalidInput if the COSE key structure is not found
      *         or if there is insufficient data after the prefix
-     *
-     * Example:
-     * ```kotlin
-     * val attestationData = ... // from WebAuthn registration
-     * val publicKey = SmartAccountUtils.extractPublicKeyFromAttestationObject(attestationData)
-     * println("Public key: ${publicKey.toHexString()}")
-     * ```
      */
-    fun extractPublicKeyFromAttestationObject(attestationObject: ByteArray): ByteArray {
+    internal fun extractPublicKeyFromAttestationObject(attestationObject: ByteArray): ByteArray {
         // COSE key prefix for secp256r1 public keys in WebAuthn attestation
         val prefix = byteArrayOf(
             0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
@@ -460,26 +450,6 @@ object SmartAccountUtils {
         y.copyInto(publicKey, 33)
 
         return publicKey
-    }
-
-    /**
-     * Extracts the secp256r1 public key from WebAuthn attestation data.
-     *
-     * This is a convenience alias for [extractPublicKeyFromAttestationObject] that
-     * maintains backward compatibility. It searches for the COSE key structure
-     * prefix in the raw attestation object and extracts the X/Y coordinates.
-     *
-     * For new code, prefer [extractPublicKeyFromRegistration] which supports all
-     * three extraction strategies (direct public key, authenticator data, and
-     * attestation object).
-     *
-     * @param attestationObject Raw attestation object data from WebAuthn registration
-     * @return Uncompressed secp256r1 public key (65 bytes: 0x04 prefix + X + Y)
-     * @throws ValidationException.InvalidInput if the COSE key structure is not found
-     *         or if there is insufficient data after the prefix
-     */
-    fun extractPublicKey(attestationObject: ByteArray): ByteArray {
-        return extractPublicKeyFromAttestationObject(attestationObject)
     }
 
     // MARK: - Contract Salt
@@ -684,7 +654,7 @@ object SmartAccountUtils {
      * @param subarray The subarray to search for
      * @return Index of first occurrence, or -1 if not found
      */
-    fun findSubarray(array: ByteArray, subarray: ByteArray): Int {
+    internal fun findSubarray(array: ByteArray, subarray: ByteArray): Int {
         if (subarray.isEmpty() || array.size < subarray.size) {
             return -1
         }
