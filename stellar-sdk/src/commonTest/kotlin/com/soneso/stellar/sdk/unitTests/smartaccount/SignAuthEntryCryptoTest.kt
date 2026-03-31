@@ -38,10 +38,10 @@ import kotlin.test.assertTrue
 /**
  * Cryptographic verification tests for [SmartAccountAuth.signAuthEntry].
  *
- * These tests verify that the signature produced by [SmartAccountAuth.signAuthEntry]
- * using an Ed25519 [KeyPair] is cryptographically valid: the 64-byte signature in the
- * signed entry can be verified against the payload hash computed by
- * [SmartAccountAuth.buildAuthPayloadHash] using [KeyPair.verify].
+ * These tests verify that the signature attached by [SmartAccountAuth.signAuthEntry]
+ * is correctly embedded in the auth entry structure: the 64-byte Ed25519 signature
+ * can be extracted from the signed entry and verified against the payload hash
+ * computed by [SmartAccountAuth.buildAuthPayloadHash] using [KeyPair.verify].
  *
  * The contract format for Ed25519 external signers stores the signature inside a double
  * XDR-encoded [SCValXdr.Bytes] value inside a [SCValXdr.Map]. This test unpacks that
@@ -113,8 +113,7 @@ class SignAuthEntryCryptoTest {
             entry = authEntry,
             signer = signer,
             signature = ed25519Sig,
-            expirationLedger = expirationLedger,
-            networkPassphrase = networkPassphrase
+            expirationLedger = expirationLedger
         )
 
         // Unpack the signature from the signed entry
@@ -180,8 +179,7 @@ class SignAuthEntryCryptoTest {
             entry = authEntry,
             signer = signer,
             signature = ed25519Sig,
-            expirationLedger = expirationLedger,
-            networkPassphrase = networkPassphrase
+            expirationLedger = expirationLedger
         )
 
         // Unpack signature bytes
@@ -242,7 +240,7 @@ class SignAuthEntryCryptoTest {
         val ed25519Sig = Ed25519Signature(keypair.getPublicKey(), rawSig)
         val signer = ExternalSigner.ed25519(contractAddress, keypair.getPublicKey())
 
-        SmartAccountAuth.signAuthEntry(authEntry, signer, ed25519Sig, expirationLedger, networkPassphrase)
+        SmartAccountAuth.signAuthEntry(authEntry, signer, ed25519Sig, expirationLedger)
 
         // Original entry expiration must still be 0 (the value we set in createTestAuthEntry)
         val originalCredentials = (authEntry.credentials as SorobanCredentialsXdr.Address).value

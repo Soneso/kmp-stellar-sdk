@@ -2,7 +2,6 @@
 //  SmartAccountAuth.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 27.01.26.
 //  Copyright © 2026 Soneso. All rights reserved.
 //
 
@@ -45,13 +44,12 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  *     networkPassphrase = Network.TESTNET.networkPassphrase
  * )
  *
- * // Sign the entry with a WebAuthn signature
+ * // Compute the signature over the payload hash, then attach it to the entry
  * val signedEntry = SmartAccountAuth.signAuthEntry(
  *     entry = authEntry,
  *     signer = webAuthnSigner,
  *     signature = webAuthnSignature,
- *     expirationLedger = currentLedger + 100u,
- *     networkPassphrase = Network.TESTNET.networkPassphrase
+ *     expirationLedger = currentLedger + 100u
  * )
  * ```
  */
@@ -201,22 +199,25 @@ object SmartAccountAuth {
     // MARK: - Entry Signing
 
     /**
-     * Signs an authorization entry with a Smart Account signer.
+     * Attaches a pre-computed signature to an authorization entry.
      *
-     * Creates a new authorization entry with the provided signature added to the
-     * signature map. This function performs the following steps:
+     * This method does NOT perform cryptographic signing. The caller is responsible
+     * for computing the signature over the correct payload hash. Use
+     * [buildAuthPayloadHash] with the same [expirationLedger] value to obtain
+     * the hash before calling this method.
      *
+     * Attaching the signature involves the following steps:
      * 1. Clones the entry via XDR round-trip (encode then decode)
-     * 2. Sets the signature expiration ledger
+     * 2. Sets the signature expiration ledger on the credentials
      * 3. Builds the signer key ScVal from the signer
      * 4. Double XDR-encodes the signature value (CRITICAL)
      * 5. Creates a map entry with key=signer, value=double-encoded-signature
-     * 6. Adds to or creates the signature map
+     * 6. Merges with any existing signatures (multi-signer accumulation)
      * 7. Sorts map entries by XDR-encoded key bytes (lowercase hex, lexicographic)
+     * 8. Returns the entry with the updated signature map
      *
      * CRITICAL DETAILS:
-     * - The entry is cloned to avoid mutating the input
-     * - Expiration MUST be set BEFORE building payload hash (done externally)
+     * - The input entry is never mutated; a deep clone is returned
      * - Signature value uses DOUBLE XDR encoding: encode the ScVal to bytes,
      *   then wrap those bytes in a new ScVal::Bytes
      * - Map entries MUST be sorted by their XDR-encoded key bytes as lowercase hex
@@ -232,29 +233,33 @@ object SmartAccountAuth {
      * ])
      * ```
      *
-     * @param entry The authorization entry to sign
+     * @param entry The authorization entry to attach the signature to
      * @param signer The Smart Account signer (delegated or external)
-     * @param signature The signature object (WebAuthn, Ed25519, or Policy)
-     * @param expirationLedger The ledger number at which the signature expires
-     * @param networkPassphrase The network passphrase (unused but kept for API consistency)
-     * @return A new signed authorization entry
+     * @param signature The pre-computed signature object (WebAuthn, Ed25519, or Policy)
+     * @param expirationLedger The ledger number at which the signature expires.
+     *        Must match the value passed to [buildAuthPayloadHash] when producing the signature.
+     * @return A new authorization entry with the signature attached
      * @throws TransactionException.SigningFailed if credentials is not `.Address`
      *         type, if XDR encoding/decoding fails, or if map construction fails
      *
      * Example:
      * ```kotlin
+     * val expirationLedger = currentLedger + 100u
+     * val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+     *     entry = unsignedEntry,
+     *     expirationLedger = expirationLedger,
+     *     networkPassphrase = Network.TESTNET.networkPassphrase
+     * )
      * val webAuthnSig = WebAuthnSignature(
      *     authenticatorData = authData,
      *     clientData = clientData,
-     *     signature = signature
+     *     signature = signOverPayloadHash(payloadHash)
      * )
-     *
      * val signedEntry = SmartAccountAuth.signAuthEntry(
      *     entry = unsignedEntry,
      *     signer = externalSigner,
      *     signature = webAuthnSig,
-     *     expirationLedger = currentLedger + 100u,
-     *     networkPassphrase = Network.TESTNET.networkPassphrase
+     *     expirationLedger = expirationLedger
      * )
      * ```
      */
@@ -262,8 +267,7 @@ object SmartAccountAuth {
         entry: SorobanAuthorizationEntryXdr,
         signer: SmartAccountSigner,
         signature: SmartAccountSignature,
-        expirationLedger: UInt,
-        networkPassphrase: String
+        expirationLedger: UInt
     ): SorobanAuthorizationEntryXdr {
         // STEP 1: Clone entry via XDR round-trip to avoid mutating input
         val entryBytes: ByteArray = try {

@@ -292,8 +292,7 @@ class OZTransactionOperations internal constructor(
                     entry = entry,
                     signer = signer,
                     signature = signature,
-                    expirationLedger = expiration,
-                    networkPassphrase = kit.config.networkPassphrase
+                    expirationLedger = expiration
                 )
             } else {
                 // Not our entry, pass through unchanged
@@ -478,13 +477,12 @@ class OZTransactionOperations internal constructor(
                     keyData = keyData
                 )
 
-                // (h) Sign the auth entry
+                // (h) Attach the signature to the auth entry
                 val signedEntry = SmartAccountAuth.signAuthEntry(
                     entry = entry,
                     signer = signer,
                     signature = webAuthnSig,
-                    expirationLedger = expiration,
-                    networkPassphrase = kit.config.networkPassphrase
+                    expirationLedger = expiration
                 )
 
                 signed.add(signedEntry)

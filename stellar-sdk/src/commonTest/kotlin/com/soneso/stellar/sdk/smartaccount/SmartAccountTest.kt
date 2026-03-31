@@ -844,8 +844,7 @@ class SmartAccountTest {
             authEntry,
             signer,
             signature,
-            expirationLedger,
-            Network.TESTNET.networkPassphrase
+            expirationLedger
         )
 
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
@@ -875,8 +874,7 @@ class SmartAccountTest {
             authEntry,
             signer,
             signature,
-            expirationLedger,
-            Network.TESTNET.networkPassphrase
+            expirationLedger
         )
 
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
@@ -915,8 +913,7 @@ class SmartAccountTest {
             authEntry,
             signer,
             signature,
-            expirationLedger,
-            Network.TESTNET.networkPassphrase
+            expirationLedger
         )
 
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
@@ -966,8 +963,7 @@ class SmartAccountTest {
                 authEntry,
                 signer,
                 signature,
-                expirationLedger,
-                Network.TESTNET.networkPassphrase
+                expirationLedger
             )
         }
     }

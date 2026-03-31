@@ -348,14 +348,13 @@ class OZMultiSignerManager internal constructor(
                             keyData = keyData
                         )
 
-                        // Sign the entry using the same function as single-signer transfer.
+                        // Attach the signature to the entry.
                         // This appends to the existing signature map if one exists.
                         signedEntry = SmartAccountAuth.signAuthEntry(
                             entry = signedEntry,
                             signer = passkeySigner,
                             signature = webAuthnSig,
-                            expirationLedger = expirationLedger,
-                            networkPassphrase = kit.config.networkPassphrase
+                            expirationLedger = expirationLedger
                         )
                     }
 
