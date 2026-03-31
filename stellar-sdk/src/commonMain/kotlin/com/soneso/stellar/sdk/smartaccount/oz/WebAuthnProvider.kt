@@ -9,6 +9,8 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Util
+
 /**
  * WebAuthn authentication result from a passkey ceremony.
  *
@@ -35,12 +37,11 @@ data class WebAuthnAuthenticationResult(
 
         other as WebAuthnAuthenticationResult
 
-        if (!credentialId.contentEquals(other.credentialId)) return false
-        if (!authenticatorData.contentEquals(other.authenticatorData)) return false
-        if (!clientDataJSON.contentEquals(other.clientDataJSON)) return false
-        if (!signature.contentEquals(other.signature)) return false
-
-        return true
+        val a = Util.constantTimeEquals(credentialId, other.credentialId)
+        val b = Util.constantTimeEquals(authenticatorData, other.authenticatorData)
+        val c = Util.constantTimeEquals(clientDataJSON, other.clientDataJSON)
+        val d = Util.constantTimeEquals(signature, other.signature)
+        return a and b and c and d
     }
 
     /**
@@ -108,14 +109,14 @@ data class WebAuthnRegistrationResult(
 
         other as WebAuthnRegistrationResult
 
-        if (!credentialId.contentEquals(other.credentialId)) return false
-        if (!publicKey.contentEquals(other.publicKey)) return false
-        if (!attestationObject.contentEquals(other.attestationObject)) return false
-        if (transports != other.transports) return false
-        if (deviceType != other.deviceType) return false
-        if (backedUp != other.backedUp) return false
-
-        return true
+        val a = Util.constantTimeEquals(credentialId, other.credentialId)
+        val b = Util.constantTimeEquals(publicKey, other.publicKey)
+        val c = Util.constantTimeEquals(attestationObject, other.attestationObject)
+        val bytesMatch = a and b and c
+        return bytesMatch
+            && transports == other.transports
+            && deviceType == other.deviceType
+            && backedUp == other.backedUp
     }
 
     /**

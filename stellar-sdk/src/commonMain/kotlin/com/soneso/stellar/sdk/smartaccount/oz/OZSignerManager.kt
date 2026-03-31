@@ -43,7 +43,7 @@ data class AddPasskeySignerResult(
         other as AddPasskeySignerResult
 
         if (credentialId != other.credentialId) return false
-        if (!publicKey.contentEquals(other.publicKey)) return false
+        if (!Util.constantTimeEquals(publicKey, other.publicKey)) return false
         if (transactionResult != other.transactionResult) return false
 
         return true

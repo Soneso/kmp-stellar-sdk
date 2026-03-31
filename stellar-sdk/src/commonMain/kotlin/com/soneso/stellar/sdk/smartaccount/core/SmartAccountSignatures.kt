@@ -8,6 +8,7 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
@@ -42,6 +43,7 @@ sealed class SmartAccountSignature {
      * @return The signature encoded as an SCValXdr.Map
      */
     abstract fun toScVal(): SCValXdr
+
 }
 
 /**
@@ -117,13 +119,7 @@ data class WebAuthnSignature(
     }
 
     /**
-     * Custom equals implementation that properly compares ByteArray fields.
-     *
-     * Standard data class equals would not correctly compare ByteArray fields
-     * by content, so this override ensures proper content-based comparison.
-     *
-     * @param other The object to compare with
-     * @return true if the objects are equal, false otherwise
+     * Constant-time equals to prevent timing side-channel attacks on signature data.
      */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -131,11 +127,10 @@ data class WebAuthnSignature(
 
         other as WebAuthnSignature
 
-        if (!authenticatorData.contentEquals(other.authenticatorData)) return false
-        if (!clientData.contentEquals(other.clientData)) return false
-        if (!signature.contentEquals(other.signature)) return false
-
-        return true
+        val a = Util.constantTimeEquals(authenticatorData, other.authenticatorData)
+        val b = Util.constantTimeEquals(clientData, other.clientData)
+        val c = Util.constantTimeEquals(signature, other.signature)
+        return a and b and c
     }
 
     /**
@@ -219,13 +214,7 @@ data class Ed25519Signature(
     }
 
     /**
-     * Custom equals implementation that properly compares ByteArray fields.
-     *
-     * Standard data class equals would not correctly compare ByteArray fields
-     * by content, so this override ensures proper content-based comparison.
-     *
-     * @param other The object to compare with
-     * @return true if the objects are equal, false otherwise
+     * Constant-time equals to prevent timing side-channel attacks on signature data.
      */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -233,10 +222,9 @@ data class Ed25519Signature(
 
         other as Ed25519Signature
 
-        if (!publicKey.contentEquals(other.publicKey)) return false
-        if (!signature.contentEquals(other.signature)) return false
-
-        return true
+        val a = Util.constantTimeEquals(publicKey, other.publicKey)
+        val b = Util.constantTimeEquals(signature, other.signature)
+        return a and b
     }
 
     /**

@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 
@@ -223,14 +224,7 @@ data class ExternalSigner(
         get() = "external:$verifierAddress:${keyData.toHexString()}"
 
     /**
-     * Custom equals implementation that properly compares ByteArray.
-     *
-     * Standard data class equals would not correctly compare the ByteArray field
-     * by content, so this override ensures proper content-based comparison using
-     * contentEquals().
-     *
-     * @param other The object to compare with
-     * @return true if the objects are equal, false otherwise
+     * Constant-time equals to prevent timing side-channel attacks on key data.
      */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -238,10 +232,9 @@ data class ExternalSigner(
 
         other as ExternalSigner
 
-        if (verifierAddress != other.verifierAddress) return false
-        if (!keyData.contentEquals(other.keyData)) return false
-
-        return true
+        val addressMatch = verifierAddress == other.verifierAddress
+        val keyMatch = Util.constantTimeEquals(keyData, other.keyData)
+        return addressMatch and keyMatch
     }
 
     /**

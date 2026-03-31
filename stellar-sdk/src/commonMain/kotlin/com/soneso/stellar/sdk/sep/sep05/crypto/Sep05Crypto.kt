@@ -107,25 +107,6 @@ internal expect suspend fun hmacSha512(key: ByteArray, data: ByteArray): ByteArr
 internal expect fun normalizeNfkd(input: String): String
 
 /**
- * Constant-time byte array comparison.
- *
- * Compares two byte arrays in constant time to prevent timing attacks.
- * Returns true only if both arrays have the same length and contents.
- *
- * @param a First byte array
- * @param b Second byte array
- * @return true if arrays are equal, false otherwise
- */
-internal fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
-    if (a.size != b.size) return false
-    var result = 0
-    for (i in a.indices) {
-        result = result or (a[i].toInt() xor b[i].toInt())
-    }
-    return result == 0
-}
-
-/**
  * Securely zeros out a byte array.
  *
  * Should be called on sensitive data (seeds, private keys) when no longer needed.

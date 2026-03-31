@@ -9,6 +9,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -156,7 +157,7 @@ data class StoredCredential(
         other as StoredCredential
 
         if (credentialId != other.credentialId) return false
-        if (!publicKey.contentEquals(other.publicKey)) return false
+        if (!Util.constantTimeEquals(publicKey, other.publicKey)) return false
         if (contractId != other.contractId) return false
         if (deploymentStatus != other.deploymentStatus) return false
         if (deploymentError != other.deploymentError) return false

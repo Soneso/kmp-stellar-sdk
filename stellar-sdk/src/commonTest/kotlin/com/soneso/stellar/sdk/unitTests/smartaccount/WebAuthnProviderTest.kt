@@ -51,14 +51,36 @@ class WebAuthnProviderTest {
     // =========================================================================
 
     /**
-     * Known X coordinate for test public key (32 bytes).
+     * secp256r1 generator point G X coordinate (SEC 2 / FIPS 186-4).
+     *
+     * Gx = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296
      */
-    private val testXCoordinate = ByteArray(32) { (it + 0x10).toByte() }
+    private val testXCoordinate = byteArrayOf(
+        0x6B.toByte(), 0x17.toByte(), 0xD1.toByte(), 0xF2.toByte(),
+        0xE1.toByte(), 0x2C.toByte(), 0x42.toByte(), 0x47.toByte(),
+        0xF8.toByte(), 0xBC.toByte(), 0xE6.toByte(), 0xE5.toByte(),
+        0x63.toByte(), 0xA4.toByte(), 0x40.toByte(), 0xF2.toByte(),
+        0x77.toByte(), 0x03.toByte(), 0x7D.toByte(), 0x81.toByte(),
+        0x2D.toByte(), 0xEB.toByte(), 0x33.toByte(), 0xA0.toByte(),
+        0xF4.toByte(), 0xA1.toByte(), 0x39.toByte(), 0x45.toByte(),
+        0xD8.toByte(), 0x98.toByte(), 0xC2.toByte(), 0x96.toByte()
+    )
 
     /**
-     * Known Y coordinate for test public key (32 bytes).
+     * secp256r1 generator point G Y coordinate (SEC 2 / FIPS 186-4).
+     *
+     * Gy = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5
      */
-    private val testYCoordinate = ByteArray(32) { (it + 0x30).toByte() }
+    private val testYCoordinate = byteArrayOf(
+        0x4F.toByte(), 0xE3.toByte(), 0x42.toByte(), 0xE2.toByte(),
+        0xFE.toByte(), 0x1A.toByte(), 0x7F.toByte(), 0x9B.toByte(),
+        0x8E.toByte(), 0xE7.toByte(), 0xEB.toByte(), 0x4A.toByte(),
+        0x7C.toByte(), 0x0F.toByte(), 0x9E.toByte(), 0x16.toByte(),
+        0x2B.toByte(), 0xCE.toByte(), 0x33.toByte(), 0x57.toByte(),
+        0x6B.toByte(), 0x31.toByte(), 0x5E.toByte(), 0xCE.toByte(),
+        0xCB.toByte(), 0xB6.toByte(), 0x40.toByte(), 0x68.toByte(),
+        0x37.toByte(), 0xBF.toByte(), 0x51.toByte(), 0xF5.toByte()
+    )
 
     /**
      * Expected uncompressed public key: 0x04 || X || Y (65 bytes).

@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
@@ -59,7 +60,7 @@ sealed class ContextRuleType {
 
             other as CreateContract
 
-            return wasmHash.contentEquals(other.wasmHash)
+            return Util.constantTimeEquals(wasmHash, other.wasmHash)
         }
 
         override fun hashCode(): Int {

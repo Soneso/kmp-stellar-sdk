@@ -172,6 +172,26 @@ object Util {
         return Base64.UrlSafe.decode(padded)
     }
 
+    /**
+     * Constant-time byte array comparison to prevent timing side-channel attacks.
+     *
+     * Unlike [ByteArray.contentEquals], this always compares every byte regardless
+     * of where the first mismatch occurs, preventing an attacker from inferring
+     * how many leading bytes match by measuring comparison time.
+     *
+     * @param a First byte array
+     * @param b Second byte array
+     * @return true if both arrays have identical length and contents, false otherwise
+     */
+    fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+        if (a.size != b.size) return false
+        var result = 0
+        for (i in a.indices) {
+            result = result or (a[i].toInt() xor b[i].toInt())
+        }
+        return result == 0
+    }
+
     /** Number of stroops in one XLM (1 XLM = 10,000,000 stroops). */
     const val STROOPS_PER_XLM = 10_000_000L
 

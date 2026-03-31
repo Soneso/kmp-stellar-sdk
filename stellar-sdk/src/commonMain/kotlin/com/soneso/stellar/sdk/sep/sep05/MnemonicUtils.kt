@@ -16,7 +16,7 @@
 
 package com.soneso.stellar.sdk.sep.sep05
 
-import com.soneso.stellar.sdk.sep.sep05.crypto.constantTimeEquals
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.sep.sep05.crypto.normalizeNfkd
 import com.soneso.stellar.sdk.sep.sep05.crypto.pbkdf2HmacSha512
 import com.soneso.stellar.sdk.sep.sep05.crypto.secureRandomBytes
@@ -228,7 +228,7 @@ public object MnemonicUtils {
 
         // Verify checksum using constant-time comparison
         val expectedChecksum = deriveChecksumBits(entropyBytes)
-        if (!constantTimeEquals(checksumBits.encodeToByteArray(), expectedChecksum.encodeToByteArray())) {
+        if (!Util.constantTimeEquals(checksumBits.encodeToByteArray(), expectedChecksum.encodeToByteArray())) {
             throw InvalidChecksumException()
         }
 

@@ -60,7 +60,7 @@ data class CreateWalletResult(
 
         if (credentialId != other.credentialId) return false
         if (contractId != other.contractId) return false
-        if (!publicKey.contentEquals(other.publicKey)) return false
+        if (!Util.constantTimeEquals(publicKey, other.publicKey)) return false
         if (transactionHash != other.transactionHash) return false
         if (nickname != other.nickname) return false
 
@@ -116,9 +116,10 @@ data class AuthenticatePasskeyResult(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AuthenticatePasskeyResult) return false
-        return credentialId == other.credentialId &&
-               signature == other.signature &&
-               publicKey.contentEquals(other.publicKey)
+        val keyMatch = Util.constantTimeEquals(publicKey, other.publicKey)
+        return credentialId == other.credentialId
+            && signature == other.signature
+            && keyMatch
     }
     override fun hashCode(): Int {
         var result = credentialId.hashCode()
