@@ -186,6 +186,41 @@ class SmartAccountKitTest {
         assertNotNull(kit.indexerClient)
     }
 
+    // MARK: - close() Tests
+
+    @Test
+    fun testClose_canBeCalledOnFreshKit() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+        // sorobanServer has never been accessed — _sorobanServer is still null
+        kit.close()
+    }
+
+    @Test
+    fun testClose_canBeCalledTwice() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+        kit.close()
+        // Second call must not throw even though _sorobanServer is already null
+        kit.close()
+    }
+
+    @Test
+    fun testClose_withIndexerClient() = runTest {
+        val config = createTestConfig(indexerUrl = "https://indexer.example.com")
+        val kit = OZSmartAccountKit.create(config)
+        assertNotNull(kit.indexerClient)
+        kit.close()
+    }
+
+    @Test
+    fun testClose_withoutIndexerClient() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+        assertNull(kit.indexerClient)
+        kit.close()
+    }
+
     // MARK: - 2. Storage Adapter Tests
 
     @Test

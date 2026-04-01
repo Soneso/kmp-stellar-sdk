@@ -212,14 +212,22 @@ class OZSmartAccountKit private constructor(
     // MARK: - Soroban Server Access
 
     /**
+     * Backing field for the lazily initialized Soroban RPC server.
+     * Null until first access. Set to null again after [close] is called.
+     */
+    private var _sorobanServer: SorobanServer? = null
+
+    /**
      * Provides access to the Soroban RPC server for contract operations.
      *
+     * Initialized on first access and reused for subsequent calls.
      * Used by operation modules to simulate transactions, submit transactions,
      * query ledger state, and fetch account information.
      */
-    internal val sorobanServer: SorobanServer by lazy {
-        SorobanServer(config.rpcUrl)
-    }
+    internal val sorobanServer: SorobanServer
+        get() {
+            return _sorobanServer ?: SorobanServer(config.rpcUrl).also { _sorobanServer = it }
+        }
 
     // MARK: - Connection Management
 
@@ -270,6 +278,33 @@ class OZSmartAccountKit private constructor(
         contractIdToEmit?.let { cId ->
             events.emit(SmartAccountEvent.WalletDisconnected(contractId = cId))
         }
+    }
+
+    // MARK: - Resource Management
+
+    /**
+     * Closes this kit and releases all held HTTP client resources.
+     *
+     * Closes the Soroban RPC server connection and the indexer HTTP client if present.
+     * The relayer client manages its own per-request connections and requires no explicit cleanup.
+     *
+     * The kit must not be used after calling this method. To disconnect the wallet session
+     * without releasing resources, call [disconnect] instead.
+     *
+     * Example:
+     * ```kotlin
+     * val kit = OZSmartAccountKit.create(config)
+     * try {
+     *     // use kit
+     * } finally {
+     *     kit.close()
+     * }
+     * ```
+     */
+    fun close() {
+        _sorobanServer?.close()
+        _sorobanServer = null
+        indexerClient?.close()
     }
 
     // MARK: - Internal Helpers

@@ -33,7 +33,6 @@ import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
@@ -127,8 +126,6 @@ data class TransactionResult(
 class OZTransactionOperations internal constructor(
     private val kit: OZSmartAccountKit
 ) {
-    private val httpClient = HttpClient()
-
     // MARK: - Token Transfer
 
     /**

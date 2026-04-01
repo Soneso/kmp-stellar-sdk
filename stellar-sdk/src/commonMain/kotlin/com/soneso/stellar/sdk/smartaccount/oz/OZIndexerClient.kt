@@ -482,8 +482,6 @@ class OZIndexerClient(
             )
         }
 
-        return bytes.joinToString("") { byte ->
-            (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
-        }
+        return Util.bytesToHex(bytes)
     }
 }

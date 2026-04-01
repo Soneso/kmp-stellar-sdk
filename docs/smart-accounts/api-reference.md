@@ -189,6 +189,19 @@ Disconnects the currently connected wallet, clearing the in-memory connection st
 
 ---
 
+#### close
+```kotlin
+fun close()
+```
+
+Closes the kit and releases all held HTTP client resources. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup.
+
+The kit must not be used after calling this method. To log out without releasing resources, call `disconnect()` instead.
+
+**Throws**: None
+
+---
+
 ## OZSmartAccountConfig
 
 Configuration data class for smart account operations.
