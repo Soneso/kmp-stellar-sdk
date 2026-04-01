@@ -1860,7 +1860,6 @@ object OZConstants {
     const val MAX_SIGNERS = 15
     const val MAX_POLICIES = 5
     const val MAX_CONTEXT_RULES = 15
-    const val MAX_HISTORY_ENTRIES = 1000
 }
 ```
 

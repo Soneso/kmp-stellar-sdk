@@ -61,9 +61,4 @@ object OZConstants {
      * Maximum context rules per smart account (OZ contract limit).
      */
     const val MAX_CONTEXT_RULES = 15
-
-    /**
-     * Maximum transaction history entries retained in local storage.
-     */
-    const val MAX_HISTORY_ENTRIES = 1000
 }
