@@ -719,33 +719,20 @@ class OZCredentialManager internal constructor(
 
         // First, unset any existing primary credentials for the same contract
         val contractId = credential.contractId
-        if (contractId != null) {
-            val allCredentials = storage.getByContract(contractId)
-            for (cred in allCredentials) {
-                if (cred.isPrimary && cred.credentialId != credentialId) {
-                    try {
-                        storage.update(
-                            cred.credentialId,
-                            StoredCredentialUpdate(isPrimary = false)
-                        )
-                    } catch (e: Exception) {
-                        // Continue even if unsetting fails
-                    }
-                }
-            }
+        val allCredentials = if (contractId != null) {
+            storage.getByContract(contractId)
         } else {
-            // No contract ID - unset all primary credentials
-            val allCredentials = storage.getAll()
-            for (cred in allCredentials) {
-                if (cred.isPrimary && cred.credentialId != credentialId) {
-                    try {
-                        storage.update(
-                            cred.credentialId,
-                            StoredCredentialUpdate(isPrimary = false)
-                        )
-                    } catch (e: Exception) {
-                        // Continue even if unsetting fails
-                    }
+            storage.getAll()
+        }
+        for (cred in allCredentials) {
+            if (cred.isPrimary && cred.credentialId != credentialId) {
+                try {
+                    storage.update(
+                        cred.credentialId,
+                        StoredCredentialUpdate(isPrimary = false)
+                    )
+                } catch (e: Exception) {
+                    // Continue even if unsetting fails
                 }
             }
         }

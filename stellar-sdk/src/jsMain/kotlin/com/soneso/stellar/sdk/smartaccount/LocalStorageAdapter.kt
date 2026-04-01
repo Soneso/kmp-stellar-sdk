@@ -2,7 +2,6 @@
 //  LocalStorageAdapter.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Claude on 05.10.25.
 //  Copyright (c) 2025 Soneso. All rights reserved.
 //
 

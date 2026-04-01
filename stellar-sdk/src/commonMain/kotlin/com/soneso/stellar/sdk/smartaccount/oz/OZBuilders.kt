@@ -2,11 +2,12 @@
 //  OZBuilders.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Copyright © 2026 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
@@ -87,7 +88,7 @@ object OZBuilders {
                 "WASM hash must be 32 bytes (64 hex characters), got: ${cleanHash.length} characters"
             )
         }
-        val hashBytes = cleanHash.hexToByteArray()
+        val hashBytes = Util.hexToBytes(cleanHash)
         return ContextRuleType.CreateContract(hashBytes)
     }
 

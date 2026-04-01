@@ -54,29 +54,6 @@ internal data class CredentialIndex(
     val ids: List<String>
 )
 
-/**
- * Converts a hex string to a [ByteArray].
- *
- * @throws IllegalArgumentException if the string has odd length or contains invalid hex characters.
- */
-internal fun String.hexToByteArray(): ByteArray {
-    val normalized = this.lowercase()
-    require(normalized.length % 2 == 0) {
-        "Hex string must have even length, got ${normalized.length}"
-    }
-    return ByteArray(normalized.length / 2) { i ->
-        val high = hexCharToInt(normalized[i * 2])
-        val low = hexCharToInt(normalized[i * 2 + 1])
-        ((high shl 4) or low).toByte()
-    }
-}
-
-private fun hexCharToInt(char: Char): Int = when (char) {
-    in '0'..'9' -> char - '0'
-    in 'a'..'f' -> char - 'a' + 10
-    else -> throw IllegalArgumentException("Invalid hex character: '$char'")
-}
-
 // MARK: - Conversion Helpers
 
 /**
@@ -104,7 +81,7 @@ internal fun StoredCredential.toSerializable(): SerializableCredential = Seriali
  */
 internal fun SerializableCredential.toStoredCredential(): StoredCredential = StoredCredential(
     credentialId = credentialId,
-    publicKey = publicKeyHex.hexToByteArray(),
+    publicKey = Util.hexToBytes(publicKeyHex),
     contractId = contractId,
     deploymentStatus = CredentialDeploymentStatus.valueOf(deploymentStatus),
     deploymentError = deploymentError,
