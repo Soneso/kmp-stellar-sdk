@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -86,19 +87,10 @@ data class DelegatedSigner(
 ) : SmartAccountSigner() {
 
     init {
-        // Validate address format
-        if (!address.startsWith("G") && !address.startsWith("C")) {
-            throw ValidationException.invalidAddress("Address must start with 'G' (account) or 'C' (contract), got: $address")
-        }
-        if (address.length != 56) {
-            throw ValidationException.invalidAddress("Address must be 56 characters long, got: ${address.length}")
-        }
-
-        // Validate it's a valid StrKey address
-        try {
-            Address(address)
-        } catch (e: Exception) {
-            throw ValidationException.invalidAddress("Invalid address format: $address", e)
+        if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
+            throw ValidationException.invalidAddress(
+                "Address must be a valid Stellar address (G... or C...), got: $address"
+            )
         }
     }
 
@@ -171,22 +163,11 @@ data class ExternalSigner(
 ) : SmartAccountSigner() {
 
     init {
-        // Validate verifier address
-        if (!verifierAddress.startsWith("C")) {
-            throw ValidationException.invalidAddress("Verifier address must start with 'C' (contract), got: $verifierAddress")
+        if (!StrKey.isValidContract(verifierAddress)) {
+            throw ValidationException.invalidAddress(
+                "Verifier address must be a valid contract address (C...), got: $verifierAddress"
+            )
         }
-        if (verifierAddress.length != 56) {
-            throw ValidationException.invalidAddress("Verifier address must be 56 characters long, got: ${verifierAddress.length}")
-        }
-
-        // Validate it's a valid contract address
-        try {
-            Address(verifierAddress)
-        } catch (e: Exception) {
-            throw ValidationException.invalidAddress("Invalid verifier address format: $verifierAddress", e)
-        }
-
-        // Validate key data
         if (keyData.isEmpty()) {
             throw ValidationException.invalidInput("keyData", "Key data cannot be empty")
         }

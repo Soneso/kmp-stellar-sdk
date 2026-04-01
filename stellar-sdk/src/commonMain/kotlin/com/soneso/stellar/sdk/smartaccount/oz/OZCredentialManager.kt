@@ -731,8 +731,10 @@ class OZCredentialManager internal constructor(
                         cred.credentialId,
                         StoredCredentialUpdate(isPrimary = false)
                     )
-                } catch (e: Exception) {
-                    // Continue even if unsetting fails
+                } catch (_: Exception) {
+                    // Non-fatal: the new primary is set regardless. Having two
+                    // credentials briefly marked as primary only affects which
+                    // one is picked during auto-connect (first match wins).
                 }
             }
         }

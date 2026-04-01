@@ -179,18 +179,10 @@ class OZTransactionOperations internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate token contract address (must be C-address)
-        if (!tokenContract.startsWith("C") || tokenContract.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Token contract must be a valid C-address, got: $tokenContract"
-            )
-        }
+        requireContractAddress(tokenContract, "tokenContract")
 
         // Validate recipient address (G or C)
-        if ((!recipient.startsWith("G") && !recipient.startsWith("C")) || recipient.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Recipient must be a valid G-address or C-address, got: $recipient"
-            )
-        }
+        requireStellarAddress(recipient, "recipient")
 
         // Prevent self-transfer
         if (recipient == contractId) {
@@ -549,9 +541,7 @@ class OZTransactionOperations internal constructor(
             val relayer = kit.relayerClient
                 ?: throw TransactionException.submissionFailed("Relayer is not configured")
 
-            val useMode2 = shouldUseRelayerMode2(signedAuthEntries)
-
-            if (useMode2) {
+            if (hasSourceAuth) {
                 // Mode 2: Submit signed transaction XDR
                 val txXdr = finalTransaction.toEnvelopeXdr()
                 val relayerResponse = relayer.sendXdr(txXdr)
@@ -809,11 +799,7 @@ class OZTransactionOperations internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate native token contract address
-        if (!nativeTokenContract.startsWith("C") || nativeTokenContract.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Native token contract must be a valid C-address, got: $nativeTokenContract"
-            )
-        }
+        requireContractAddress(nativeTokenContract, "nativeTokenContract")
 
         // STEP 1: Create temporary keypair
         val tempKeypair = KeyPair.random()
@@ -833,7 +819,7 @@ class OZTransactionOperations internal constructor(
         // STEP 4: Get temp account
         val tempAccount = kit.sorobanServer.getAccount(tempKeypair.getAccountId())
 
-        // STEP 4: Calculate transfer amount
+        // STEP 5: Calculate transfer amount
         // Reserve for account minimum balance
         val reserveStroops = BigInteger.fromLong(OZConstants.FRIENDBOT_RESERVE_XLM.toLong() * Util.STROOPS_PER_XLM)
 

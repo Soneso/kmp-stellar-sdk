@@ -161,21 +161,13 @@ class OZMultiSignerManager internal constructor(
         selectedSigners: List<SelectedSigner>
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
-        val (credentialId, contractId) = kit.requireConnected()
+        val (_, contractId) = kit.requireConnected()
 
         // Validate token contract address (must be C-address)
-        if (!tokenContract.startsWith("C") || tokenContract.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Token contract must be a valid C-address, got: $tokenContract"
-            )
-        }
+        requireContractAddress(tokenContract, "tokenContract")
 
         // Validate recipient address (G or C)
-        if ((!recipient.startsWith("G") && !recipient.startsWith("C")) || recipient.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Recipient must be a valid G-address or C-address, got: $recipient"
-            )
-        }
+        requireStellarAddress(recipient, "recipient")
 
         // Prevent self-transfer
         if (recipient == contractId) {

@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 
@@ -209,12 +210,8 @@ data class OZSmartAccountConfig(
 
         if (accountWasmHash.isBlank()) throw ConfigurationException.missingConfig("accountWasmHash")
 
-        if (!webauthnVerifierAddress.startsWith("C")) throw ConfigurationException.invalidConfig(
-            "webauthnVerifierAddress must start with 'C' (contract address), got: $webauthnVerifierAddress"
-        )
-
-        if (webauthnVerifierAddress.length != 56) throw ConfigurationException.invalidConfig(
-            "webauthnVerifierAddress must be 56 characters long, got: ${webauthnVerifierAddress.length}"
+        if (!StrKey.isValidContract(webauthnVerifierAddress)) throw ConfigurationException.invalidConfig(
+            "webauthnVerifierAddress must be a valid contract address (C...), got: $webauthnVerifierAddress"
         )
     }
 

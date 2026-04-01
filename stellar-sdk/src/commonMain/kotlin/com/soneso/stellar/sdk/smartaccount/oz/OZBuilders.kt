@@ -58,11 +58,7 @@ object OZBuilders {
      * ```
      */
     fun createCallContractContext(contractAddress: String): ContextRuleType {
-        if (!contractAddress.startsWith("C") || contractAddress.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Invalid contract address. Must start with 'C' and be 56 characters, got: $contractAddress"
-            )
-        }
+        requireContractAddress(contractAddress, "contractAddress")
         return ContextRuleType.CallContract(contractAddress)
     }
 

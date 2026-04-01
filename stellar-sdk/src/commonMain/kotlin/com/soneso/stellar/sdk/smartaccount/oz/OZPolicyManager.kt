@@ -483,11 +483,7 @@ class OZPolicyManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate policy address (must be C-address)
-        if (!policyAddress.startsWith("C") || policyAddress.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Policy address must be a valid C-address, got: $policyAddress"
-            )
-        }
+        requireContractAddress(policyAddress, "policyAddress")
 
         // Build host function
         val hostFunction = buildRemovePolicyFunction(
@@ -565,11 +561,7 @@ class OZPolicyManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate policy address (must be C-address)
-        if (!policyAddress.startsWith("C") || policyAddress.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Policy address must be a valid C-address, got: $policyAddress"
-            )
-        }
+        requireContractAddress(policyAddress, "policyAddress")
 
         // Build host function
         val hostFunction = buildAddPolicyFunction(

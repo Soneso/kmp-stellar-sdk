@@ -261,9 +261,7 @@ class OZContextRuleManager internal constructor(
 
         // Validate policy addresses
         for ((address, _) in policies) {
-            if (!address.startsWith("C") || address.length != 56) {
-                throw ValidationException.invalidAddress("Policy address must be a valid C-address, got: $address")
-            }
+            requireContractAddress(address, "contractAddress")
         }
 
         // Check MAX_CONTEXT_RULES limit
