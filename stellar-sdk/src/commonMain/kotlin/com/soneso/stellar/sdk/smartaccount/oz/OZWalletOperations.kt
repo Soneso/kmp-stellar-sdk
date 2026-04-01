@@ -789,13 +789,14 @@ class OZWalletOperations internal constructor(
         }
 
         // STEP 3: Call WebAuthn authentication
-        // Note: The WebAuthnProvider interface doesn't currently support credential filtering
-        // via credentialIds parameter. This would need to be added to the interface if required.
-        // For now, we ignore the credentialIds parameter as the TS implementation also doesn't
-        // use it in the simple authenticatePasskey() call.
+        // Decode base64url credential IDs to byte arrays for the WebAuthn provider.
+        // When provided, the OS/browser only offers these specific passkeys.
+        val allowCredentialIds = credentialIds?.map { Util.base64urlDecode(it) }
+
         val authenticationResult = try {
             webauthnProvider.authenticate(
-                challenge = challengeData
+                challenge = challengeData,
+                allowCredentialIds = allowCredentialIds
             )
         } catch (e: Exception) {
             throw WebAuthnException.authenticationFailed(
