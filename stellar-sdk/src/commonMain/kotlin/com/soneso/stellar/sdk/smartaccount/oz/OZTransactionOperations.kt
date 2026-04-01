@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
@@ -526,86 +527,17 @@ class OZTransactionOperations internal constructor(
             .setSorobanData(transactionData)
             .build()
 
-        // STEP 12: Determine submission method and conditionally sign with deployer keypair
+        // STEP 12: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
-        val shouldUseFeeSponsoring = submissionMethod == SubmissionMethod.RELAYER
-        val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
+        val useRelayer = submissionMethod == SubmissionMethod.RELAYER
 
-        // Only sign when NOT using fee sponsoring OR when has source_account auth
-        if (!shouldUseFeeSponsoring || hasSourceAuth) {
-            finalTransaction.sign(deployer)
-        }
-
-        // STEP 13: Submit using the determined method
-        return if (submissionMethod == SubmissionMethod.RELAYER) {
-            val relayer = kit.relayerClient
-                ?: throw TransactionException.submissionFailed("Relayer is not configured")
-
-            if (hasSourceAuth) {
-                // Mode 2: Submit signed transaction XDR
-                val txXdr = finalTransaction.toEnvelopeXdr()
-                val relayerResponse = relayer.sendXdr(txXdr)
-
-                // Emit transaction submitted event
-                if (relayerResponse.hash != null) {
-                    kit.events.emit(
-                        SmartAccountEvent.TransactionSubmitted(
-                            hash = relayerResponse.hash,
-                            success = relayerResponse.success
-                        )
-                    )
-                }
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            } else {
-                // Mode 1: Submit host function and signed auth entries
-                val relayerResponse = relayer.send(hostFunction, signedAuthEntries)
-
-                // Emit transaction submitted event
-                if (relayerResponse.hash != null) {
-                    kit.events.emit(
-                        SmartAccountEvent.TransactionSubmitted(
-                            hash = relayerResponse.hash,
-                            success = relayerResponse.success
-                        )
-                    )
-                }
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            }
-        } else {
-            // Submit via RPC
-            val sendResult = kit.sorobanServer.sendTransaction(finalTransaction)
-
-            val hash = sendResult.hash
-                ?: throw TransactionException.submissionFailed(
-                    "Failed to get transaction hash from send result: ${sendResult.errorResultXdr ?: "unknown error"}"
-                )
-
-            // Emit transaction submitted event
-            kit.events.emit(
-                SmartAccountEvent.TransactionSubmitted(
-                    hash = hash,
-                    success = true
-                )
-            )
-
-            pollForConfirmation(hash)
-        }
+        return submitOrRelay(
+            transaction = finalTransaction,
+            hostFunction = hostFunction,
+            signedAuthEntries = signedAuthEntries,
+            signer = deployer,
+            useRelayer = useRelayer
+        )
     }
 
     // MARK: - Multi-Signer Transaction Submission
@@ -651,80 +583,18 @@ class OZTransactionOperations internal constructor(
             .setSorobanData(transactionData)
             .build()
 
-        val shouldUseFeeSponsoring = kit.relayerClient != null
-        val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
+        // submitMultiSignerTransaction intentionally uses relayerClient presence directly
+        // rather than getSubmissionMethod(), because multi-signer transfers do not support
+        // forceMethod override.
+        val useRelayer = kit.relayerClient != null
 
-        // Only sign with deployer when NOT using fee sponsoring OR when has source_account auth
-        if (!shouldUseFeeSponsoring || hasSourceAuth) {
-            finalTransaction.sign(deployer)
-        }
-
-        return if (shouldUseFeeSponsoring) {
-            val relayer = kit.relayerClient
-                ?: throw TransactionException.submissionFailed("Relayer is not configured")
-
-            if (hasSourceAuth) {
-                // Mode 2: source_account auth present — submit signed transaction XDR
-                val txXdr = finalTransaction.toEnvelopeXdr()
-                val relayerResponse = relayer.sendXdr(txXdr)
-
-                if (relayerResponse.hash != null) {
-                    kit.events.emit(
-                        SmartAccountEvent.TransactionSubmitted(
-                            hash = relayerResponse.hash,
-                            success = relayerResponse.success
-                        )
-                    )
-                }
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            } else {
-                // Mode 1: submit host function + auth entries — relayer builds the envelope
-                val relayerResponse = relayer.send(hostFunction, signedAuthEntries)
-
-                if (relayerResponse.hash != null) {
-                    kit.events.emit(
-                        SmartAccountEvent.TransactionSubmitted(
-                            hash = relayerResponse.hash,
-                            success = relayerResponse.success
-                        )
-                    )
-                }
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            }
-        } else {
-            // No relayer — submit via RPC
-            val sendResult = kit.sorobanServer.sendTransaction(finalTransaction)
-
-            val hash = sendResult.hash
-                ?: throw TransactionException.submissionFailed(
-                    "Failed to get transaction hash from send result: ${sendResult.errorResultXdr ?: "unknown error"}"
-                )
-
-            kit.events.emit(
-                SmartAccountEvent.TransactionSubmitted(
-                    hash = hash,
-                    success = true
-                )
-            )
-
-            pollForConfirmation(hash)
-        }
+        return submitOrRelay(
+            transaction = finalTransaction,
+            hostFunction = hostFunction,
+            signedAuthEntries = signedAuthEntries,
+            signer = deployer,
+            useRelayer = useRelayer
+        )
     }
 
     // MARK: - Testnet Wallet Funding
@@ -938,59 +808,18 @@ class OZTransactionOperations internal constructor(
             .setSorobanData(transactionData)
             .build()
 
-        // STEP 11: Determine submission method
+        // STEP 11: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
-        val useFeeSponsoring = submissionMethod == SubmissionMethod.RELAYER
-        val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
+        val useRelayer = submissionMethod == SubmissionMethod.RELAYER
 
-        // Sign with temp keypair only if NOT using fee sponsoring OR has source auth (Mode 2)
-        if (!useFeeSponsoring || hasSourceAuth) {
-            finalTransaction.sign(tempKeypair)
-        }
-
-        // STEP 12: Submit transaction
-        val result = if (useFeeSponsoring) {
-            val relayer = kit.relayerClient
-                ?: throw TransactionException.submissionFailed("Relayer is not configured")
-
-            // Use relayer submission
-            if (hasSourceAuth) {
-                // Mode 2: Submit signed transaction XDR
-                val txXdr = finalTransaction.toEnvelopeXdr()
-                val relayerResponse = relayer.sendXdr(txXdr)
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            } else {
-                // Mode 1: Submit host function and signed auth entries
-                val relayerResponse = relayer.send(hostFunction, signedAuthEntries)
-
-                if (relayerResponse.success && relayerResponse.hash != null) {
-                    pollForConfirmation(relayerResponse.hash)
-                } else {
-                    TransactionResult(
-                        success = false,
-                        error = relayerResponse.error ?: "Relayer submission failed"
-                    )
-                }
-            }
-        } else {
-            // Submit via RPC
-            val sendResult = kit.sorobanServer.sendTransaction(finalTransaction)
-
-            val hash = sendResult.hash
-                ?: throw TransactionException.submissionFailed(
-                    "Failed to send funding transaction: ${sendResult.errorResultXdr ?: "unknown error"}"
-                )
-
-            pollForConfirmation(hash)
-        }
+        val result = submitOrRelay(
+            transaction = finalTransaction,
+            hostFunction = hostFunction,
+            signedAuthEntries = signedAuthEntries,
+            signer = tempKeypair,
+            useRelayer = useRelayer,
+            emitEvents = false
+        )
 
         if (!result.success) {
             throw TransactionException.submissionFailed(
@@ -1234,6 +1063,88 @@ class OZTransactionOperations internal constructor(
             "No signer found on-chain for credential ID: " +
                 Util.base64urlEncode(credentialIdBytes)
         )
+    }
+
+    /**
+     * Signs (when required), submits, and polls a built transaction via relayer or RPC.
+     *
+     * Handles Mode 1 (host function + auth entries) and Mode 2 (signed XDR) relayer paths,
+     * and direct RPC submission. Signing is performed only when not using the relayer, or
+     * when source_account auth entries are present (Mode 2).
+     *
+     * @param transaction The fully built transaction (not yet signed). Mutated by signing when required.
+     * @param hostFunction The host function, passed to the relayer for Mode 1 submission.
+     * @param signedAuthEntries Signed auth entries, used for Mode 1 and mode detection.
+     * @param signer The keypair to sign with when signing is required.
+     * @param useRelayer Whether to submit via relayer or RPC.
+     * @param emitEvents Whether to emit [SmartAccountEvent.TransactionSubmitted] events (default true).
+     * @return TransactionResult with the outcome after polling for confirmation.
+     */
+    private suspend fun submitOrRelay(
+        transaction: Transaction,
+        hostFunction: HostFunctionXdr,
+        signedAuthEntries: List<SorobanAuthorizationEntryXdr>,
+        signer: KeyPair,
+        useRelayer: Boolean,
+        emitEvents: Boolean = true
+    ): TransactionResult {
+        val hasSourceAuth = shouldUseRelayerMode2(signedAuthEntries)
+
+        // Sign when not using the relayer (RPC always requires a signature), or when
+        // using Mode 2 (source_account auth present — relayer needs a signed envelope).
+        if (!useRelayer || hasSourceAuth) {
+            transaction.sign(signer)
+        }
+
+        return if (useRelayer) {
+            val relayer = kit.relayerClient
+                ?: throw TransactionException.submissionFailed("Relayer is not configured")
+
+            // Mode 2: source_account auth — submit signed transaction XDR
+            // Mode 1: no source_account auth — relayer builds the envelope
+            val relayerResponse = if (hasSourceAuth) {
+                relayer.sendXdr(transaction.toEnvelopeXdr())
+            } else {
+                relayer.send(hostFunction, signedAuthEntries)
+            }
+
+            if (emitEvents && relayerResponse.hash != null) {
+                kit.events.emit(
+                    SmartAccountEvent.TransactionSubmitted(
+                        hash = relayerResponse.hash,
+                        success = relayerResponse.success
+                    )
+                )
+            }
+
+            if (relayerResponse.success && relayerResponse.hash != null) {
+                pollForConfirmation(relayerResponse.hash)
+            } else {
+                TransactionResult(
+                    success = false,
+                    error = relayerResponse.error ?: "Relayer submission failed"
+                )
+            }
+        } else {
+            // Submit via RPC
+            val sendResult = kit.sorobanServer.sendTransaction(transaction)
+
+            val hash = sendResult.hash
+                ?: throw TransactionException.submissionFailed(
+                    "Failed to get transaction hash from send result: ${sendResult.errorResultXdr ?: "unknown error"}"
+                )
+
+            if (emitEvents) {
+                kit.events.emit(
+                    SmartAccountEvent.TransactionSubmitted(
+                        hash = hash,
+                        success = true
+                    )
+                )
+            }
+
+            pollForConfirmation(hash)
+        }
     }
 
     /**
