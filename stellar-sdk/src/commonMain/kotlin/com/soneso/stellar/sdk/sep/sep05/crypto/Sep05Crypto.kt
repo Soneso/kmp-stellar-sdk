@@ -35,19 +35,6 @@ package com.soneso.stellar.sdk.sep.sep05.crypto
  */
 
 /**
- * Generates cryptographically secure random bytes.
- *
- * Uses platform-specific CSPRNG:
- * - JVM: java.security.SecureRandom
- * - Native: libsodium randombytes_buf() (backed by arc4random_buf)
- * - JS: crypto.getRandomValues()
- *
- * @param size Number of random bytes to generate
- * @return ByteArray of cryptographically secure random bytes
- */
-internal expect fun secureRandomBytes(size: Int): ByteArray
-
-/**
  * Computes SHA-256 hash of the input data.
  *
  * Used for BIP-39 checksum calculation.

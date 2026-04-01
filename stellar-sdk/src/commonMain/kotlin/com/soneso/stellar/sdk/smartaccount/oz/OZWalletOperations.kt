@@ -17,7 +17,7 @@ import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
-import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.secureRandomBytes
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.assembleTransaction
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
@@ -261,9 +261,8 @@ class OZWalletOperations internal constructor(
         }
 
         // STEP 2: Generate random challenge (32 bytes) and user ID (32 bytes)
-        val crypto = getEd25519Crypto()
-        val challengeData = crypto.generatePrivateKey() // Reuse for 32 secure random bytes
-        val userIdData = crypto.generatePrivateKey() // Reuse for 32 secure random bytes
+        val challengeData = secureRandomBytes(32)
+        val userIdData = secureRandomBytes(32)
 
         // STEP 3: Call WebAuthn registration
         val registrationResult = try {
@@ -620,8 +619,7 @@ class OZWalletOperations internal constructor(
             )
 
         // Generate random challenge (32 bytes)
-        val crypto = getEd25519Crypto()
-        val challengeData = crypto.generatePrivateKey() // Reuse for 32 secure random bytes
+        val challengeData = secureRandomBytes(32)
 
         // STEP 4: Call WebAuthn authentication (no credential filter - allow all)
         val authenticationResult = try {
@@ -783,10 +781,7 @@ class OZWalletOperations internal constructor(
             )
 
         // STEP 2: Generate or use provided challenge
-        val challengeData = challenge ?: run {
-            val crypto = getEd25519Crypto()
-            crypto.generatePrivateKey() // Reuse for 32 secure random bytes
-        }
+        val challengeData = challenge ?: secureRandomBytes(32)
 
         // STEP 3: Call WebAuthn authentication
         // Decode base64url credential IDs to byte arrays for the WebAuthn provider.

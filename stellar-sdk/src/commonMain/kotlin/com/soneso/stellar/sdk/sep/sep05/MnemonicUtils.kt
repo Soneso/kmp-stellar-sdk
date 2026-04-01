@@ -17,9 +17,9 @@
 package com.soneso.stellar.sdk.sep.sep05
 
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.secureRandomBytes
 import com.soneso.stellar.sdk.sep.sep05.crypto.normalizeNfkd
 import com.soneso.stellar.sdk.sep.sep05.crypto.pbkdf2HmacSha512
-import com.soneso.stellar.sdk.sep.sep05.crypto.secureRandomBytes
 import com.soneso.stellar.sdk.sep.sep05.crypto.sha256
 import com.soneso.stellar.sdk.sep.sep05.crypto.zeroOut
 import com.soneso.stellar.sdk.sep.sep05.exceptions.InvalidChecksumException

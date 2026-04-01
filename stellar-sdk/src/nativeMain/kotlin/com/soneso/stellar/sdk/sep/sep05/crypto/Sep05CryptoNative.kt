@@ -12,7 +12,6 @@ import platform.Foundation.decomposedStringWithCompatibilityMapping
  *
  * Uses libsodium for cryptographic operations and Foundation for Unicode normalization:
  *
- * - **Random**: libsodium randombytes_buf() using system CSPRNG (arc4random_buf)
  * - **SHA-256**: libsodium crypto_hash_sha256
  * - **HMAC-SHA512**: libsodium crypto_auth_hmacsha512
  * - **PBKDF2**: Custom implementation using HMAC-SHA512
@@ -28,21 +27,6 @@ private val sodiumInitialized: Boolean = run {
         throw IllegalStateException("Failed to initialize libsodium")
     }
     true
-}
-
-/**
- * Generates cryptographically secure random bytes using libsodium.
- *
- * Uses randombytes_buf() which is backed by the system CSPRNG (arc4random_buf on Apple platforms).
- */
-internal actual fun secureRandomBytes(size: Int): ByteArray {
-    require(size > 0) { "Size must be positive" }
-
-    return UByteArray(size).apply {
-        usePinned { pinned ->
-            randombytes_buf(pinned.addressOf(0), size.toULong())
-        }
-    }.asByteArray()
 }
 
 /**

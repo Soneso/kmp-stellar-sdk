@@ -9,7 +9,6 @@ import org.khronos.webgl.Uint8Array
  * Uses libsodium-wrappers-sumo for cryptographic operations and
  * native JavaScript APIs where appropriate:
  *
- * - **Random**: crypto.getRandomValues() (Web Crypto API)
  * - **SHA-256**: libsodium crypto_hash_sha256
  * - **HMAC-SHA512**: libsodium crypto_auth_hmacsha512
  * - **PBKDF2**: Custom implementation using HMAC-SHA512
@@ -26,25 +25,6 @@ import org.khronos.webgl.Uint8Array
  * browser environments). To prevent this, every `js()` call that references Kotlin
  * locals is extracted into a non-suspend helper function where variable names are stable.
  */
-
-/**
- * Generates cryptographically secure random bytes using Web Crypto API.
- *
- * Uses crypto.getRandomValues() which is available in all modern browsers
- * and Node.js. This is the recommended way to generate cryptographic randomness
- * in JavaScript environments.
- */
-internal actual fun secureRandomBytes(size: Int): ByteArray {
-    require(size > 0) { "Size must be positive" }
-
-    return try {
-        val array = Uint8Array(size)
-        js("crypto.getRandomValues(array)")
-        array.toByteArray()
-    } catch (e: Throwable) {
-        throw IllegalStateException("Failed to generate secure random bytes: ${e.message}", e)
-    }
-}
 
 /**
  * Computes SHA-256 hash using libsodium's crypto_hash_sha256.
