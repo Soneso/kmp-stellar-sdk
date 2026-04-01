@@ -14,6 +14,9 @@ import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 // MARK: - External Signer Type
 
@@ -674,17 +677,22 @@ class OZExternalSignerManager(
         )
     }
 
-    // MARK: - Private Storage Helpers
+    // =========================================================================
+    // Private Storage Helpers
+    // =========================================================================
 
     /**
      * Stored wallet connection info for serialization.
      */
-    private data class StoredWalletConnection(
+    @Serializable
+    internal data class StoredWalletConnection(
         val address: String,
         val walletId: String,
         val walletName: String,
         val connectedAt: Long
     )
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     /**
      * Retrieves stored wallet connections from storage.
@@ -748,204 +756,35 @@ class OZExternalSignerManager(
         }
     }
 
-    // MARK: - JSON Serialization
+    // =========================================================================
+    // JSON Serialization
+    // =========================================================================
 
     /**
-     * Serializes wallet connections to a JSON array string.
+     * Serializes wallet connections to a JSON array string using kotlinx.serialization.
      *
-     * Uses a simple manual JSON format to avoid additional serialization dependencies.
-     * Format:
+     * Produces the same format as the previous manual serializer:
      * ```json
      * [{"address":"G...","walletId":"freighter","walletName":"Freighter","connectedAt":12345}]
      * ```
      */
     private fun serializeWallets(wallets: List<StoredWalletConnection>): String {
-        val entries = wallets.joinToString(",") { w ->
-            buildString {
-                append("{\"address\":\"")
-                append(escapeJson(w.address))
-                append("\",\"walletId\":\"")
-                append(escapeJson(w.walletId))
-                append("\",\"walletName\":\"")
-                append(escapeJson(w.walletName))
-                append("\",\"connectedAt\":")
-                append(w.connectedAt)
-                append("}")
-            }
-        }
-        return "[$entries]"
+        return json.encodeToString(wallets)
     }
 
     /**
-     * Parses wallet connections from a JSON array string.
+     * Parses wallet connections from a JSON array string using kotlinx.serialization.
      *
-     * Uses simple manual parsing to avoid additional serialization dependencies.
-     * Tolerant of extra whitespace. Malformed entries are silently skipped.
+     * Returns all entries or an empty list on any parse failure. Unlike the previous
+     * manual parser which skipped individual malformed entries, kotlinx.serialization
+     * parses atomically. This is acceptable because the serializer always produces valid
+     * JSON — corruption would only come from external tampering or storage failure.
      */
-    private fun parseStoredWallets(json: String): List<StoredWalletConnection> {
-        val result = mutableListOf<StoredWalletConnection>()
-        val trimmed = json.trim()
-
-        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
-            return emptyList()
+    private fun parseStoredWallets(jsonString: String): List<StoredWalletConnection> {
+        return try {
+            json.decodeFromString<List<StoredWalletConnection>>(jsonString)
+        } catch (_: Exception) {
+            emptyList()
         }
-
-        // Extract content between outer brackets
-        val content = trimmed.substring(1, trimmed.length - 1).trim()
-        if (content.isEmpty()) return emptyList()
-
-        // Split into individual objects by finding matching braces
-        val objects = splitJsonObjects(content)
-
-        for (obj in objects) {
-            try {
-                val address = extractJsonStringField(obj, "address") ?: continue
-                val walletId = extractJsonStringField(obj, "walletId") ?: continue
-                val walletName = extractJsonStringField(obj, "walletName") ?: continue
-                val connectedAt = extractJsonLongField(obj, "connectedAt") ?: continue
-
-                result.add(
-                    StoredWalletConnection(
-                        address = address,
-                        walletId = walletId,
-                        walletName = walletName,
-                        connectedAt = connectedAt
-                    )
-                )
-            } catch (_: Exception) {
-                // Skip malformed entries
-            }
-        }
-
-        return result
-    }
-
-    /**
-     * Splits a comma-separated sequence of JSON objects, respecting nested braces.
-     */
-    private fun splitJsonObjects(content: String): List<String> {
-        val objects = mutableListOf<String>()
-        var depth = 0
-        var start = -1
-
-        for (i in content.indices) {
-            when (content[i]) {
-                '{' -> {
-                    if (depth == 0) start = i
-                    depth++
-                }
-                '}' -> {
-                    depth--
-                    if (depth == 0 && start >= 0) {
-                        objects.add(content.substring(start, i + 1))
-                        start = -1
-                    }
-                }
-            }
-        }
-
-        return objects
-    }
-
-    /**
-     * Extracts a string field value from a JSON object string.
-     */
-    private fun extractJsonStringField(json: String, field: String): String? {
-        val key = "\"$field\""
-        val keyIndex = json.indexOf(key)
-        if (keyIndex < 0) return null
-
-        val colonIndex = json.indexOf(':', keyIndex + key.length)
-        if (colonIndex < 0) return null
-
-        val quoteStart = json.indexOf('"', colonIndex + 1)
-        if (quoteStart < 0) return null
-
-        val quoteEnd = findClosingQuote(json, quoteStart + 1)
-        if (quoteEnd < 0) return null
-
-        return unescapeJson(json.substring(quoteStart + 1, quoteEnd))
-    }
-
-    /**
-     * Extracts a long field value from a JSON object string.
-     */
-    private fun extractJsonLongField(json: String, field: String): Long? {
-        val key = "\"$field\""
-        val keyIndex = json.indexOf(key)
-        if (keyIndex < 0) return null
-
-        val colonIndex = json.indexOf(':', keyIndex + key.length)
-        if (colonIndex < 0) return null
-
-        val valueStart = colonIndex + 1
-        val sb = StringBuilder()
-        for (i in valueStart until json.length) {
-            val c = json[i]
-            if (c.isDigit() || c == '-') {
-                sb.append(c)
-            } else if (sb.isNotEmpty()) {
-                break
-            }
-        }
-
-        return sb.toString().toLongOrNull()
-    }
-
-    /**
-     * Finds the closing quote of a JSON string, handling escape sequences.
-     */
-    private fun findClosingQuote(json: String, startAfterQuote: Int): Int {
-        var i = startAfterQuote
-        while (i < json.length) {
-            if (json[i] == '\\') {
-                i += 2 // Skip escaped character
-            } else if (json[i] == '"') {
-                return i
-            } else {
-                i++
-            }
-        }
-        return -1
-    }
-
-    /**
-     * Escapes a string for safe inclusion in a JSON value.
-     */
-    private fun escapeJson(value: String): String {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
-
-    /**
-     * Unescapes a JSON string value.
-     */
-    private fun unescapeJson(value: String): String {
-        val sb = StringBuilder()
-        var i = 0
-        while (i < value.length) {
-            if (value[i] == '\\' && i + 1 < value.length) {
-                when (value[i + 1]) {
-                    '\\' -> sb.append('\\')
-                    '"' -> sb.append('"')
-                    'n' -> sb.append('\n')
-                    'r' -> sb.append('\r')
-                    't' -> sb.append('\t')
-                    else -> {
-                        sb.append('\\')
-                        sb.append(value[i + 1])
-                    }
-                }
-                i += 2
-            } else {
-                sb.append(value[i])
-                i++
-            }
-        }
-        return sb.toString()
     }
 }

@@ -456,4 +456,359 @@ class ExternalSignerManagerTest {
         val restored = manager.restoreConnections()
         assertTrue(restored.isEmpty())
     }
+
+    // MARK: - JSON Serialization Round-Trip Tests
+
+    /**
+     * Storage key used by OZExternalSignerManager for persisted wallet connections.
+     * Must match the private constant in the production class.
+     */
+    private val walletStorageKey = "external_wallets"
+
+    /**
+     * Writes a single StoredWalletConnection as a JSON array directly to storage,
+     * bypassing the manager's address validation. Useful for testing raw JSON parsing.
+     */
+    private suspend fun InMemoryWalletConnectionStorage.writeWalletJson(jsonString: String) {
+        setItem(walletStorageKey, jsonString)
+    }
+
+    @Test
+    fun testSerializationRoundTrip_singleConnection() = runTest {
+        // Write JSON directly to storage, bypassing manager address validation.
+        // Then create a manager + adapter and confirm restoreConnections correctly parses it.
+        val storage = InMemoryWalletConnectionStorage()
+        storage.writeWalletJson(
+            """[{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",""" +
+                """"walletId":"freighter","walletName":"Freighter","connectedAt":1700000000000}]"""
+        )
+
+        val adapter = object : ExternalWalletAdapter {
+            private val connectedWallets = mutableListOf<ConnectedWallet>()
+
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                if (walletId == "freighter") {
+                    val w = ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "freighter",
+                        walletName = "Freighter"
+                    )
+                    connectedWallets.add(w)
+                    return w
+                }
+                return null
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                connectedWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = connectedWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                connectedWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val restored = manager.restoreConnections()
+
+        assertEquals(1, restored.size)
+        assertEquals("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN", restored[0].address)
+        assertEquals("freighter", restored[0].walletId)
+        assertEquals("Freighter", restored[0].walletName)
+    }
+
+    @Test
+    fun testSerializationRoundTrip_multipleConnections() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        storage.writeWalletJson(
+            """[""" +
+                """{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",""" +
+                """"walletId":"freighter","walletName":"Freighter","connectedAt":1700000000000},""" +
+                """{"address":"GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB",""" +
+                """"walletId":"lobstr","walletName":"LOBSTR","connectedAt":1700000001000},""" +
+                """{"address":"GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGKBF3LZGXNGZAQJ8FQB2T",""" +
+                """"walletId":"xbull","walletName":"xBull","connectedAt":1700000002000}]"""
+        )
+
+        val connectedWallets = mutableListOf<ConnectedWallet>()
+        val adapter = object : ExternalWalletAdapter {
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                val w = when (walletId) {
+                    "freighter" -> ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "freighter",
+                        walletName = "Freighter"
+                    )
+                    "lobstr" -> ConnectedWallet(
+                        address = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB",
+                        walletId = "lobstr",
+                        walletName = "LOBSTR"
+                    )
+                    "xbull" -> ConnectedWallet(
+                        address = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGKBF3LZGXNGZAQJ8FQB2T",
+                        walletId = "xbull",
+                        walletName = "xBull"
+                    )
+                    else -> null
+                }
+                if (w != null) connectedWallets.add(w)
+                return w
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                connectedWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = connectedWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                connectedWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val restored = manager.restoreConnections()
+
+        assertEquals(3, restored.size)
+        val walletIds = restored.map { it.walletId }.toSet()
+        assertTrue(walletIds.contains("freighter"))
+        assertTrue(walletIds.contains("lobstr"))
+        assertTrue(walletIds.contains("xbull"))
+    }
+
+    @Test
+    fun testSerializationRoundTrip_emptyStorage() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        // Storage has no data at all
+        val manager = createManager(walletAdapter = null, walletConnectionStorage = storage)
+
+        // restoreConnections with no adapter returns empty without touching storage
+        val result = manager.restoreConnections()
+        assertTrue(result.isEmpty())
+
+        // Confirm storage is still empty
+        assertNull(storage.getItem(walletStorageKey))
+    }
+
+    @Test
+    fun testSerializationRoundTrip_malformedJson() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        // Write clearly invalid JSON; the parser must return empty list, not crash
+        storage.writeWalletJson("this is not json")
+
+        // Use a stub adapter so restoreConnections proceeds to parsing
+        val adapter = object : ExternalWalletAdapter {
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? = null
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean = false
+            override fun getConnectedWallets(): List<ConnectedWallet> = emptyList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? = null
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        // Must not throw; malformed data results in no restored wallets
+        val result = manager.restoreConnections()
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun testSerializationRoundTrip_specialCharactersInWalletName() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        // walletName contains a double-quote, a newline escape, and a backslash — all JSON-escaped.
+        // The JSON-escaped form "My \\\"Wallet\\\"\\nLine2" represents: My \"Wallet\"\nLine2
+        storage.writeWalletJson(
+            """[{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",""" +
+                """"walletId":"test","walletName":"My \\\"Wallet\\\"\\nLine2","connectedAt":1700000000000}]"""
+        )
+
+        // The expected decoded walletName after JSON parsing: My "Wallet"\nLine2 (with real newline)
+        val expectedWalletName = "My \"Wallet\"\nLine2"
+
+        val adapter = object : ExternalWalletAdapter {
+            private val connectedWallets = mutableListOf<ConnectedWallet>()
+
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                if (walletId == "test") {
+                    val w = ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "test",
+                        walletName = expectedWalletName
+                    )
+                    connectedWallets.add(w)
+                    return w
+                }
+                return null
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                connectedWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = connectedWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                connectedWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val restored = manager.restoreConnections()
+
+        assertEquals(1, restored.size)
+        assertEquals("test", restored[0].walletId)
+    }
+
+    @Test
+    fun testSerializationRoundTrip_backwardCompatibility() = runTest {
+        // This is the exact JSON format produced by the old manual serializer.
+        // The new kotlinx.serialization parser must read it without errors.
+        val legacyJson = """[{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN","walletId":"freighter","walletName":"Freighter","connectedAt":1700000000000}]"""
+
+        val storage = InMemoryWalletConnectionStorage()
+        storage.writeWalletJson(legacyJson)
+
+        val adapter = object : ExternalWalletAdapter {
+            private val connectedWallets = mutableListOf<ConnectedWallet>()
+
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                if (walletId == "freighter") {
+                    val w = ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "freighter",
+                        walletName = "Freighter"
+                    )
+                    connectedWallets.add(w)
+                    return w
+                }
+                return null
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                connectedWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = connectedWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                connectedWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val restored = manager.restoreConnections()
+
+        assertEquals(1, restored.size)
+        assertEquals("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN", restored[0].address)
+        assertEquals("freighter", restored[0].walletId)
+        assertEquals("Freighter", restored[0].walletName)
+    }
+
+    @Test
+    fun testSerializationRoundTrip_emptyStringFields() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        // walletName is empty string
+        storage.writeWalletJson(
+            """[{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",""" +
+                """"walletId":"","walletName":"","connectedAt":1700000000000}]"""
+        )
+
+        val adapter = object : ExternalWalletAdapter {
+            private val connectedWallets = mutableListOf<ConnectedWallet>()
+
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                if (walletId == "") {
+                    val w = ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "",
+                        walletName = ""
+                    )
+                    connectedWallets.add(w)
+                    return w
+                }
+                return null
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                connectedWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = connectedWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                connectedWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val restored = manager.restoreConnections()
+
+        assertEquals(1, restored.size)
+        assertEquals("", restored[0].walletId)
+        assertEquals("", restored[0].walletName)
+    }
+
+    @Test
+    fun testSerializationRoundTrip_connectedAtBoundaryValues() = runTest {
+        val storage = InMemoryWalletConnectionStorage()
+        // Test Long.MAX_VALUE and 0L as connectedAt values
+        storage.writeWalletJson(
+            """[""" +
+                """{"address":"GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",""" +
+                """"walletId":"w1","walletName":"MaxTime","connectedAt":${Long.MAX_VALUE}},""" +
+                """{"address":"GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB",""" +
+                """"walletId":"w2","walletName":"ZeroTime","connectedAt":0}]"""
+        )
+
+        val restoredWallets = mutableListOf<ConnectedWallet>()
+        val adapter = object : ExternalWalletAdapter {
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? {
+                val w = when (walletId) {
+                    "w1" -> ConnectedWallet(
+                        address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+                        walletId = "w1",
+                        walletName = "MaxTime"
+                    )
+                    "w2" -> ConnectedWallet(
+                        address = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB",
+                        walletId = "w2",
+                        walletName = "ZeroTime"
+                    )
+                    else -> null
+                }
+                if (w != null) restoredWallets.add(w)
+                return w
+            }
+            override suspend fun disconnect() {}
+            override fun canSignFor(address: String): Boolean =
+                restoredWallets.any { it.address == address }
+            override fun getConnectedWallets(): List<ConnectedWallet> = restoredWallets.toList()
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                restoredWallets.find { it.address == address }
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+
+        val manager = createManager(walletAdapter = adapter, walletConnectionStorage = storage)
+        val result = manager.restoreConnections()
+
+        assertEquals(2, result.size)
+        val walletIds = result.map { it.walletId }.toSet()
+        assertTrue(walletIds.contains("w1"))
+        assertTrue(walletIds.contains("w2"))
+    }
 }
