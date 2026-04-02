@@ -1,0 +1,131 @@
+//
+//  BridgeTypes.kt
+//  Smart Account Demo
+//
+//  Copyright (c) 2026 Soneso. All rights reserved.
+//
+
+package com.soneso.smartdemo
+
+/**
+ * Swift-friendly activity log entry.
+ *
+ * Replaces [com.soneso.smartdemo.state.LogEntry] for Swift interop by avoiding Kotlin-specific
+ * types that generate awkward Swift wrappers: [kotlinx.datetime.Instant] is replaced with epoch
+ * millis ([Long]), and the [com.soneso.smartdemo.state.LogLevel] enum is replaced with a plain
+ * [String] constant so Swift can compare values without importing the enum.
+ *
+ * @property message Human-readable log message.
+ * @property level Severity level: one of "INFO", "SUCCESS", or "ERROR".
+ * @property timestampMs UNIX epoch timestamp in milliseconds.
+ */
+data class ActivityLogEntryBridge(
+    val message: String,
+    val level: String,
+    val timestampMs: Long
+)
+
+/**
+ * Swift-friendly policy descriptor for passing known policy configurations from Swift.
+ *
+ * Mirrors [com.soneso.smartdemo.config.PolicyInfo] but is used as a bridge type so Swift
+ * code does not need to import the config package directly.
+ *
+ * @property type Short policy type identifier (e.g., "threshold", "spending_limit", "weighted_threshold").
+ * @property name Display name shown in the UI.
+ * @property description Human-readable description of what the policy enforces.
+ * @property address On-chain contract address (C-address) for this policy.
+ */
+data class PolicyInfoBridge(
+    val type: String,
+    val name: String,
+    val description: String,
+    val address: String
+)
+
+/**
+ * Describes a signer to be constructed or looked up from Swift.
+ *
+ * Used in [MacOSBridge.addContextRule] and [MacOSBridge.multiSignerTransfer] to pass signer
+ * configuration without exposing [com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner]
+ * sealed class variants to Swift.
+ *
+ * @property type Signer type: "delegated", "ed25519", or "passkey".
+ * @property value Type-specific value:
+ *   - "delegated": the G-address of the Stellar account.
+ *   - "ed25519": lowercase hex-encoded 32-byte public key.
+ *   - "passkey": Base64URL-encoded credential ID (used to look up the full signer from context rules).
+ */
+data class SignerDescriptor(
+    val type: String,
+    val value: String
+)
+
+/**
+ * Describes a policy entry to be built from Swift.
+ *
+ * Used in [MacOSBridge.addContextRule] so Swift can pass typed policy configurations
+ * without needing to construct [com.soneso.stellar.sdk.xdr.SCValXdr] instances.
+ *
+ * @property policyAddress On-chain policy contract address (C-address).
+ * @property policyType Short type identifier: "threshold", "spending_limit", or "weighted_threshold".
+ * @property params Type-specific parameters encoded as String pairs, for example:
+ *   - threshold: `{"threshold": "2"}`
+ *   - spending_limit: `{"amount": "100.0", "period_days": "7"}`
+ *   - weighted_threshold: `{"threshold": "5", "weights": "addr1:3,addr2:2"}`
+ */
+data class PolicyDescriptor(
+    val policyAddress: String,
+    val policyType: String,
+    val params: Map<String, String>
+)
+
+/**
+ * A fully parsed context rule suitable for pre-populating an edit form in Swift.
+ *
+ * Replaces [com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule] for Swift interop by
+ * converting all Kotlin-specific types to primitives:
+ * - [com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType] sealed class → [contextType] + [contextTypeParam] strings.
+ * - [UInt] rule ID and validUntil → [Long] to avoid Objective-C unsigned integer boxing.
+ * - [com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner] sealed class list → [List<SignerDescriptor>].
+ * - Policy addresses → [List<PolicyDescriptor>] (no SCVal params; they are already on-chain).
+ *
+ * @property name The rule's human-readable name.
+ * @property contextType Context type tag: "default", "call_contract", or "create_contract".
+ * @property contextTypeParam For "call_contract": the contract C-address. For "create_contract":
+ *   lowercase hex-encoded WASM hash. Null for "default".
+ * @property validUntil Absolute ledger expiry, or null if the rule has no expiry.
+ * @property signers Signers registered on the rule, as [SignerDescriptor] instances.
+ * @property policies Policy addresses registered on the rule (no SCVal params needed in edit mode).
+ */
+data class ParsedRuleBridge(
+    val name: String,
+    val contextType: String,
+    val contextTypeParam: String?,
+    val validUntil: Long?,
+    val signers: List<SignerDescriptor>,
+    val policies: List<PolicyDescriptor>
+)
+
+/**
+ * Signer information for display in the transfer screen signer picker.
+ *
+ * Aggregates the data needed to render a signer row and determine whether it can
+ * participate in a multi-signer transfer without exposing SDK signer types to Swift.
+ *
+ * @property type Signer type: "passkey", "delegated", or "ed25519".
+ * @property displayName Human-readable label shown in the picker.
+ * @property identifier Stable identifier: credential ID for passkey, G-address for delegated,
+ *   hex public key prefix for Ed25519.
+ * @property canSign Whether the app currently has the credentials to sign with this signer.
+ * @property keyData Hex-encoded full key data for passkey signers (needed to reconstruct the
+ *   [com.soneso.stellar.sdk.smartaccount.core.ExternalSigner] for the transfer call). Null for
+ *   non-passkey signers.
+ */
+data class SignerInfoBridge(
+    val type: String,
+    val displayName: String,
+    val identifier: String,
+    val canSign: Boolean,
+    val keyData: String?
+)

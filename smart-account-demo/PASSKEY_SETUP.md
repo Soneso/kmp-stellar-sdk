@@ -230,7 +230,7 @@ macOS uses the same AuthenticationServices framework as iOS. The configuration i
 
 ### Differences from iOS
 
-- macOS passkeys are available on macOS 12.0 (Monterey) and later.
+- macOS passkeys are available on macOS 13.0 (Ventura) and later.
 - The same Associated Domains entitlement and `apple-app-site-association` file are required.
 - macOS Compose apps and native SwiftUI apps follow the same steps.
 - Touch ID or Apple Watch can serve as the biometric authenticator.

@@ -20,8 +20,10 @@ import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import platform.AuthenticationServices.ASAuthorizationControllerDelegateProtocol
+import platform.AuthenticationServices.ASAuthorizationControllerPresentationContextProvidingProtocol
 import platform.AuthenticationServices.ASAuthorization
 import platform.AuthenticationServices.ASAuthorizationController
+import platform.AuthenticationServices.ASPresentationAnchor
 import platform.AuthenticationServices.ASAuthorizationPlatformPublicKeyCredentialAssertion
 import platform.AuthenticationServices.ASAuthorizationPlatformPublicKeyCredentialProvider
 import platform.AuthenticationServices.ASAuthorizationPlatformPublicKeyCredentialRegistration
@@ -88,6 +90,31 @@ class AppleWebAuthnProvider(
      * in the delegate callbacks to avoid leaks.
      */
     private var activeDelegate: AuthorizationDelegate? = null
+
+    /**
+     * Optional presentation context provider for the authorization controller.
+     *
+     * On macOS, ASAuthorizationController requires a presentation context provider
+     * that returns the window (ASPresentationAnchor / NSWindow) in which to display
+     * the passkey sheet. Without this, macOS will fail with error code 1004
+     * ("No host window provided").
+     *
+     * On iOS, this is not required — the system automatically presents the sheet.
+     *
+     * Set this property before calling any registration or authentication methods
+     * on macOS. The provider holds a strong reference to the context provider.
+     *
+     * Example from Swift (macOS):
+     * ```swift
+     * class WindowProvider: NSObject, ASAuthorizationControllerPresentationContextProviding {
+     *     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+     *         return NSApplication.shared.keyWindow ?? NSWindow()
+     *     }
+     * }
+     * provider.presentationContextProvider = WindowProvider()
+     * ```
+     */
+    var presentationContextProvider: ASAuthorizationControllerPresentationContextProvidingProtocol? = null
 
     init {
         require(rpId.isNotBlank()) { "rpId must not be blank" }
@@ -212,6 +239,24 @@ class AppleWebAuthnProvider(
         val provider = ASAuthorizationPlatformPublicKeyCredentialProvider(rpId)
         val request = provider.createCredentialAssertionRequestWithChallenge(challengeData)
 
+        // Require user verification so the authenticator sets the UV bit in the
+        // authenticator data flags. The OZ WebAuthn verifier contract checks UV=true
+        // (error #3117 VerifiedBitNotSet). On macOS with the default "preferred" setting,
+        // the system may return UV=false even after Touch ID — setting "required" forces it.
+        request.userVerificationPreference =
+            platform.AuthenticationServices.ASAuthorizationPublicKeyCredentialUserVerificationPreferenceRequired
+
+        // Set allowed credentials to restrict which passkeys the system presents.
+        // Without this, macOS shows a picker for all passkeys matching the RP ID.
+        if (!allowCredentialIds.isNullOrEmpty()) {
+            val descriptors = allowCredentialIds.map { credId ->
+                platform.AuthenticationServices.ASAuthorizationPlatformPublicKeyCredentialDescriptor(
+                    credentialID = credId.toNSData()
+                )
+            }
+            request.allowedCredentials = descriptors
+        }
+
         val authorization = performAuthorizationRequest(request, isRegistration = false)
         val credential = authorization.credential
 
@@ -294,11 +339,20 @@ class AppleWebAuthnProvider(
                 // so a local variable is not sufficient -- the compiler may optimize it away.
                 activeDelegate = delegate
 
-                val controller = ASAuthorizationController(
-                    authorizationRequests = listOf(request)
-                )
-                controller.delegate = delegate
-                controller.performRequests()
+                // ASAuthorizationController must be created and perform requests on
+                // the main thread. On macOS, performing requests from a background
+                // thread causes the system to reject the authorization sheet with
+                // error code 1004 ("Told not to present authorization sheet").
+                platform.darwin.dispatch_async(platform.darwin.dispatch_get_main_queue()) {
+                    val controller = ASAuthorizationController(
+                        authorizationRequests = listOf(request)
+                    )
+                    controller.delegate = delegate
+                    presentationContextProvider?.let {
+                        controller.presentationContextProvider = it
+                    }
+                    controller.performRequests()
+                }
 
                 continuation.invokeOnCancellation {
                     activeDelegate = null

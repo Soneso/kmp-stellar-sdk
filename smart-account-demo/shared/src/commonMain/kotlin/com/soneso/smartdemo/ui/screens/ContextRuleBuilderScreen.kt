@@ -17,6 +17,7 @@ package com.soneso.smartdemo.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,8 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -85,6 +88,7 @@ import com.soneso.smartdemo.flows.registerPasskeySigner
 import com.soneso.smartdemo.flows.resolveAbsoluteLedger
 import com.soneso.smartdemo.flows.updateContextRuleName
 import com.soneso.smartdemo.flows.updateContextRuleValidUntil
+import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.buildSimpleThresholdScVal
@@ -126,6 +130,8 @@ class ContextRuleBuilderScreen(
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
+        val clipboard = remember { getClipboard() }
 
         val isEditing = editRuleId != null
 
@@ -248,7 +254,8 @@ class ContextRuleBuilderScreen(
                         navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 )
-            }
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -357,7 +364,21 @@ class ContextRuleBuilderScreen(
                                     color = if (result.success)
                                         Color(0xFF2E7D32)
                                     else
-                                        MaterialTheme.colorScheme.onErrorContainer
+                                        MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.clickable {
+                                        scope.launch {
+                                            clipboard.copyToClipboard(result.hash)
+                                            snackbarHostState.showSnackbar("Hash copied to clipboard")
+                                        }
+                                    }
+                                )
+                                Text(
+                                    text = "Tap to copy",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (result.success)
+                                        Color(0xFF2E7D32).copy(alpha = 0.6f)
+                                    else
+                                        MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
                                 )
                             }
                             if (result.error != null) {
@@ -1502,7 +1523,7 @@ class ContextRuleBuilderScreen(
 
                     if (isSubmitting) {
                         Text(
-                            text = "Transaction in progress. This may take up to 30 seconds...",
+                            text = "Transaction in progress...",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
