@@ -134,10 +134,10 @@ class OZMultiSignerManager internal constructor(
      * @param amount The amount to transfer in XLM units
      * @param selectedSigners All signers that must sign, in collection order.
      *   An empty list means no signatures are collected (only valid for read-only simulation).
-     * @param contextRuleId Explicit context rule ID to use instead of automatic resolution.
-     *   When null (default), the SDK resolves the rule ID automatically from the selected signers.
-     *   Provide an explicit ID when automatic resolution fails due to ambiguity (selected signers
-     *   match multiple rules).
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null (default), the SDK resolves the rule IDs automatically from the selected signers
+     *   and available context rules. Provide a callback when automatic resolution fails due to
+     *   ambiguity (selected signers match multiple rules) or to bypass auto-resolution.
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails, signing fails, or submission fails
      *
@@ -163,7 +163,7 @@ class OZMultiSignerManager internal constructor(
         recipient: String,
         amount: String,
         selectedSigners: List<SelectedSigner>,
-        contextRuleId: UInt? = null
+        resolveContextRuleIds: ResolveContextRuleIds? = null
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
         val (_, contractId) = kit.requireConnected()
@@ -273,7 +273,7 @@ class OZMultiSignerManager internal constructor(
         // signAuthEntry is called once per passkey and the entry accumulates signatures across calls.
         val signedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
-        for (entry in authEntries) {
+        for ((entryIndex, entry) in authEntries.withIndex()) {
             // Check if this entry's credentials match our contract
             val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
             if (credentials == null) {
@@ -310,9 +310,9 @@ class OZMultiSignerManager internal constructor(
                 }
             }
 
-            // Use caller-provided context rule ID or resolve automatically.
-            val resolvedContextRuleIds = if (contextRuleId != null) {
-                listOf(contextRuleId)
+            // Use caller-provided callback or resolve automatically.
+            val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
+                resolveContextRuleIds(signedEntry, entryIndex)
             } else {
                 kit.contextRuleManager.resolveContextRuleIdsForEntry(
                     signedEntry, smartAccountSigners, contextRules

@@ -74,6 +74,33 @@ data class TransactionResult(
 )
 
 /**
+ * Callback for resolving context rule IDs per auth entry.
+ *
+ * Called during the signing flow for each authorization entry that matches the connected
+ * smart account. The callback receives the entry and its index in the auth entries list,
+ * and returns the context rule IDs to use for that entry's invocation tree.
+ *
+ * When not provided, the SDK resolves rule IDs automatically from the connected signer
+ * and available context rules. Provide a callback when automatic resolution fails due
+ * to ambiguity (selected signers match multiple rules) or to bypass auto-resolution.
+ *
+ * Example:
+ * ```kotlin
+ * // Simple case: same rule for all entries
+ * val resolver: ResolveContextRuleIds = { _, _ -> listOf(ruleId) }
+ *
+ * // Advanced: inspect entry to decide
+ * val resolver: ResolveContextRuleIds = { entry, index ->
+ *     if (index == 0) listOf(rule1Id) else listOf(rule2Id)
+ * }
+ * ```
+ */
+typealias ResolveContextRuleIds = suspend (
+    entry: SorobanAuthorizationEntryXdr,
+    index: Int
+) -> List<UInt>
+
+/**
  * Transaction operations for OpenZeppelin Smart Accounts.
  *
  * Provides high-level transaction building, signing, and submission capabilities
@@ -221,6 +248,64 @@ class OZTransactionOperations internal constructor(
         return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
+    // MARK: - Execute Arbitrary Contract Function
+
+    /**
+     * Executes an arbitrary contract function call through the smart account's execute entry point.
+     *
+     * Builds an invocation of the smart account contract's `execute(target, target_fn, target_args)`
+     * function, which calls the target contract on behalf of the smart account. The smart account's
+     * authorization rules (context rules, signers, policies) apply to this call.
+     *
+     * This is the single-signer equivalent of arbitrary contract execution. For multi-signer
+     * operations, use [OZMultiSignerManager].
+     *
+     * @param target The target contract address (C-address) to call
+     * @param targetFn The function name to invoke on the target contract
+     * @param targetArgs The arguments to pass to the target function as SCVal list
+     * @param forceMethod Optional override to force relayer or RPC submission
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null, rule IDs are resolved automatically from the connected signer and available
+     *   context rules. Provide a callback when automatic resolution fails due to ambiguity or to
+     *   bypass auto-resolution.
+     * @return TransactionResult indicating success or failure
+     * @throws SmartAccountException if submission fails
+     */
+    suspend fun executeAndSubmit(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        val (_, contractId) = kit.requireConnected()
+
+        // Validate target address (must be C-address)
+        requireContractAddress(target, "target")
+
+        // Build the execute invocation on the smart account contract
+        val functionArgs = listOf(
+            Scv.toAddress(Address(target).toSCAddress()),
+            Scv.toSymbol(targetFn),
+            Scv.toVec(targetArgs)
+        )
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(contractId).toSCAddress(),
+            functionName = SCSymbolXdr("execute"),
+            args = functionArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submit(
+            hostFunction = hostFunction,
+            auth = emptyList(),
+            forceMethod = forceMethod,
+            resolveContextRuleIds = resolveContextRuleIds
+        )
+    }
+
     // MARK: - Transaction Submission
 
     /**
@@ -281,6 +366,10 @@ class OZTransactionOperations internal constructor(
      * @param hostFunction The host function to execute
      * @param auth Authorization entries for the transaction (typically empty; simulation provides them)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null (default), rule IDs are resolved automatically from the connected signer and
+     *   available context rules. Provide a callback when automatic resolution is ambiguous or to
+     *   bypass auto-resolution entirely.
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if submission, simulation, signing, or polling fails
      *
@@ -289,7 +378,8 @@ class OZTransactionOperations internal constructor(
     suspend fun submit(
         hostFunction: HostFunctionXdr,
         auth: List<SorobanAuthorizationEntryXdr>,
-        forceMethod: SubmissionMethod? = null
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
     ): TransactionResult {
         // STEP 1: Require connected wallet
         val (credentialId, contractId) = kit.requireConnected()
@@ -331,7 +421,7 @@ class OZTransactionOperations internal constructor(
 
             val signed = mutableListOf<SorobanAuthorizationEntryXdr>()
 
-            for (entry in simulatedAuthEntries) {
+            for ((entryIndex, entry) in simulatedAuthEntries.withIndex()) {
                 // Check if this entry has address credentials
                 val addressCreds = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
                 if (addressCreds == null) {
@@ -390,12 +480,16 @@ class OZTransactionOperations internal constructor(
                 )
 
                 // (f) Resolve context rule IDs for this auth entry (using pre-fetched rules)
-                val contextRuleIds = kit.contextRuleManager.resolveContextRuleIdsForEntry(
-                    entry, listOf(signer), contextRules
-                )
+                val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
+                    resolveContextRuleIds(entry, entryIndex)
+                } else {
+                    kit.contextRuleManager.resolveContextRuleIdsForEntry(
+                        entry, listOf(signer), contextRules
+                    )
+                }
 
                 // (g) Compute auth digest binding rule IDs to the payload hash
-                val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, contextRuleIds)
+                val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
 
                 // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt)
                 val authResult = webauthnProvider.authenticate(
@@ -419,7 +513,7 @@ class OZTransactionOperations internal constructor(
                     signer = signer,
                     signature = webAuthnSig,
                     expirationLedger = expiration,
-                    contextRuleIds = contextRuleIds
+                    contextRuleIds = resolvedContextRuleIds
                 )
 
                 signed.add(signedEntry)

@@ -780,4 +780,126 @@ class SmartAccountAuthTest {
 
         assertTrue(!digestEmpty.contentEquals(digestNonEmpty), "Empty and non-empty rule IDs must differ")
     }
+
+    // MARK: - contextRuleIds Codec Tests
+
+    @Test
+    fun testSignAuthEntry_contextRuleIdsArePreservedInPayload() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(3u, 7u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(2, ruleIdsVec.size)
+        assertEquals(3u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+        assertEquals(7u, (ruleIdsVec[1] as SCValXdr.U32).value.value)
+    }
+
+    @Test
+    fun testSignAuthEntry_emptyContextRuleIdsProducesEmptyVec() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        // No contextRuleIds passed — defaults to empty
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(0, ruleIdsVec.size, "Empty contextRuleIds should produce empty Vec")
+    }
+
+    @Test
+    fun testSignAuthEntry_secondSignerPreservesContextRuleIds() = runTest {
+        val keypair1 = KeyPair.random()
+        val keypair2 = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(5u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig1 = Ed25519Signature(publicKey = keypair1.getPublicKey(), signature = keypair1.sign(payloadHash))
+        val signer1 = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair1.getPublicKey())
+
+        val entryAfterFirst = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer1,
+            signature = sig1,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        // Second signer does NOT pass contextRuleIds — they should be preserved from the first call
+        val sig2 = Ed25519Signature(publicKey = keypair2.getPublicKey(), signature = keypair2.sign(payloadHash))
+        val signer2 = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair2.getPublicKey())
+
+        val entryAfterSecond = SmartAccountAuth.signAuthEntry(
+            entry = entryAfterFirst,
+            signer = signer2,
+            signature = sig2,
+            expirationLedger = expirationLedger
+        )
+
+        val credentials = (entryAfterSecond.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(1, ruleIdsVec.size)
+        assertEquals(5u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+
+        val signersEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "signers"
+        }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size, "Both signers must be present")
+    }
 }

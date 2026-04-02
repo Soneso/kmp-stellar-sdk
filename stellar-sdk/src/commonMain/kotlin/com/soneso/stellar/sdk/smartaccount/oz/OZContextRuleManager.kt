@@ -778,8 +778,17 @@ class OZContextRuleManager internal constructor(
                 )
             }
 
-            if (selectedSubsetMatches.size > 1) {
-                val ids = selectedSubsetMatches.joinToString(", ") { it.id.toString() }
+            // Collect all rules that contain ALL selected signers (from tiers 1-3)
+            val allMatchingRules = candidates.filter { rule ->
+                selectedSigners.all { selected ->
+                    rule.signers.any { ruleSigner ->
+                        SmartAccountBuilders.signersEqual(ruleSigner, selected)
+                    }
+                }
+            }
+
+            if (allMatchingRules.size > 1) {
+                val ids = allMatchingRules.joinToString(", ") { it.id.toString() }
                 throw ValidationException.invalidInput(
                     "contextRuleIds",
                     "Selected signers match multiple context rules: $ids."
