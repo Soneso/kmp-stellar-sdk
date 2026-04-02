@@ -35,19 +35,6 @@ package com.soneso.stellar.sdk.sep.sep05.crypto
  */
 
 /**
- * Generates cryptographically secure random bytes.
- *
- * Uses platform-specific CSPRNG:
- * - JVM: java.security.SecureRandom
- * - Native: libsodium randombytes_buf() (backed by arc4random_buf)
- * - JS: crypto.getRandomValues()
- *
- * @param size Number of random bytes to generate
- * @return ByteArray of cryptographically secure random bytes
- */
-internal expect fun secureRandomBytes(size: Int): ByteArray
-
-/**
  * Computes SHA-256 hash of the input data.
  *
  * Used for BIP-39 checksum calculation.
@@ -105,25 +92,6 @@ internal expect suspend fun hmacSha512(key: ByteArray, data: ByteArray): ByteArr
  * @return NFKD-normalized string
  */
 internal expect fun normalizeNfkd(input: String): String
-
-/**
- * Constant-time byte array comparison.
- *
- * Compares two byte arrays in constant time to prevent timing attacks.
- * Returns true only if both arrays have the same length and contents.
- *
- * @param a First byte array
- * @param b Second byte array
- * @return true if arrays are equal, false otherwise
- */
-internal fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
-    if (a.size != b.size) return false
-    var result = 0
-    for (i in a.indices) {
-        result = result or (a[i].toInt() xor b[i].toInt())
-    }
-    return result == 0
-}
 
 /**
  * Securely zeros out a byte array.

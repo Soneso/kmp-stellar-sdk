@@ -1,6 +1,13 @@
 package com.soneso.stellar.sdk
 
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.decimal.RoundingMode
+import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.pow
 
 /**
@@ -132,113 +139,120 @@ object Util {
     }
 
     /**
-     * One Stroop is the smallest unit of Stellar's native asset (Lumen).
-     * One Lumen = 10^7 stroops.
+     * Encodes a byte array to Base64URL format (RFC 4648 Section 5, no padding).
+     *
+     * Uses URL-safe alphabet: `-` instead of `+`, `_` instead of `/`.
+     * Padding `=` characters are stripped.
+     *
+     * @param data The data to encode
+     * @return Base64URL-encoded string without padding
      */
-    private const val ONE = 10_000_000L // 10^7
-
-    /**
-     * Converts a stroop amount (Long) to a decimal amount string.
-     *
-     * Stroops are the smallest unit of Stellar's native asset. One Lumen = 10^7 stroops.
-     * The resulting string will have up to 7 decimal places.
-     *
-     * Note: This is an internal utility function and should not be used directly by
-     * SDK consumers. The API may change without notice.
-     *
-     * @param value The amount in stroops
-     * @return The amount as a decimal string (e.g., "10.0000000" for 100000000 stroops)
-     *
-     * ## Example
-     * ```kotlin
-     * toAmountString(10_000_000L)  // "1.0000000"
-     * toAmountString(15_000_000L)  // "1.5000000"
-     * ```
-     */
-    internal fun toAmountString(value: Long): String {
-        val wholePart = value / ONE
-        val fractionalPart = value % ONE
-        return "$wholePart.${fractionalPart.toString().padStart(7, '0')}"
+    @OptIn(ExperimentalEncodingApi::class)
+    fun base64urlEncode(data: ByteArray): String {
+        return Base64.UrlSafe.encode(data).trimEnd('=')
     }
 
     /**
-     * Converts a decimal amount string to stroops (Long).
+     * Decodes a Base64URL-encoded string to a byte array.
      *
-     * The amount must have at most 7 decimal places (stroop precision).
-     * One Lumen = 10^7 stroops.
+     * Accepts input with or without padding. Uses URL-safe alphabet:
+     * `-` instead of `+`, `_` instead of `/`.
      *
-     * Note: This is an internal utility function and should not be used directly by
-     * SDK consumers. The API may change without notice.
-     *
-     * @param value The amount as a decimal string (e.g., "1.5", "10.0000000")
-     * @return The amount in stroops
-     * @throws IllegalArgumentException if the amount format is invalid or exceeds 7 decimal places
-     *
-     * ## Example
-     * ```kotlin
-     * toStroops("1.0000000")  // 10_000_000L
-     * toStroops("1.5")        // 15_000_000L
-     * ```
+     * @param encoded The Base64URL-encoded string (with or without padding)
+     * @return Decoded byte array
+     * @throws IllegalArgumentException if the input is not valid Base64URL
      */
-    internal fun toStroops(value: String): Long {
-        require(value.isNotBlank()) { "Amount cannot be blank" }
-
-        // Parse the decimal value
-        val parts = value.split(".")
-        require(parts.size <= 2) { "Invalid amount format: '$value'" }
-
-        val wholePart = try {
-            if (parts[0].isEmpty()) 0L else parts[0].toLong()
-        } catch (e: NumberFormatException) {
-            throw IllegalArgumentException("Invalid amount format: '$value'", e)
+    @OptIn(ExperimentalEncodingApi::class)
+    fun base64urlDecode(encoded: String): ByteArray {
+        val padded = when (encoded.length % 4) {
+            2 -> encoded + "=="
+            3 -> encoded + "="
+            else -> encoded
         }
-
-        val fractionalPart = if (parts.size == 2) {
-            val fraction = parts[1]
-            require(fraction.length <= 7) {
-                "Amount cannot have more than 7 decimal places, got ${fraction.length}"
-            }
-            // Pad to 7 digits and parse
-            val paddedFraction = fraction.padEnd(7, '0')
-            try {
-                paddedFraction.toLong()
-            } catch (e: NumberFormatException) {
-                throw IllegalArgumentException("Invalid amount format: '$value'", e)
-            }
-        } else {
-            0L
-        }
-
-        return wholePart * ONE + fractionalPart
+        return Base64.UrlSafe.decode(padded)
     }
 
     /**
-     * Formats an amount string to have exactly 7 decimal places.
+     * Constant-time byte array comparison to prevent timing side-channel attacks.
      *
-     * Note: This is an internal utility function and should not be used directly by
-     * SDK consumers. The API may change without notice.
+     * Unlike [ByteArray.contentEquals], this always compares every byte regardless
+     * of where the first mismatch occurs, preventing an attacker from inferring
+     * how many leading bytes match by measuring comparison time.
      *
-     * @param value The amount string
-     * @return The amount string with exactly 7 decimal places
-     * @throws IllegalArgumentException if the scale exceeds 7 decimal places
+     * @param a First byte array
+     * @param b Second byte array
+     * @return true if both arrays have identical length and contents, false otherwise
      */
-    internal fun formatAmountScale(value: String): String {
-        require(value.isNotBlank()) { "Amount cannot be blank" }
+    fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+        if (a.size != b.size) return false
+        var result = 0
+        for (i in a.indices) {
+            result = result or (a[i].toInt() xor b[i].toInt())
+        }
+        return result == 0
+    }
 
-        val parts = value.split(".")
-        require(parts.size <= 2) { "Invalid amount format: '$value'" }
+    /** Number of stroops in one XLM (1 XLM = 10,000,000 stroops). */
+    const val STROOPS_PER_XLM = 10_000_000L
 
-        val wholePart = parts[0]
-        val fractionalPart = if (parts.size == 2) {
-            require(parts[1].length <= 7) {
-                "The scale of the amount must be less than or equal to 7, got ${parts[1].length}"
-            }
-            parts[1].padEnd(7, '0')
-        } else {
-            "0000000"
+    /** Average number of ledgers closed per hour on the Stellar network (~5s per ledger). */
+    const val LEDGERS_PER_HOUR = 720
+
+    /** Average number of ledgers closed per day on the Stellar network (~5s per ledger). */
+    const val LEDGERS_PER_DAY = 17_280
+
+    /**
+     * Converts a decimal XLM amount string to stroops using BigDecimal arithmetic.
+     *
+     * Parses the string as a decimal number, multiplies by 10,000,000 (stroops per XLM),
+     * and rounds to the nearest integer. Supports up to 7 decimal places.
+     *
+     * @param amount The amount in XLM as a decimal string (must be non-empty and positive)
+     * @return The amount in stroops as a BigInteger (1 XLM = 10,000,000 stroops)
+     * @throws IllegalArgumentException if the string is empty, not a valid number,
+     *         or the resulting value is not positive
+     */
+    fun amountToStroops(amount: String): BigInteger {
+        require(amount.isNotBlank()) { "Amount must not be empty" }
+        require(!amount.contains('e', ignoreCase = true)) {
+            "Scientific notation is not supported, got: $amount"
         }
 
-        return "$wholePart.$fractionalPart"
+        val decimal = try {
+            BigDecimal.parseString(amount)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Amount is not a valid number, got: $amount", e)
+        }
+
+        require(decimal > BigDecimal.ZERO) {
+            "Amount must be greater than zero, got: $amount"
+        }
+
+        val stroopsDecimal = decimal.multiply(BigDecimal.fromLong(STROOPS_PER_XLM))
+        val stroops = stroopsDecimal.roundToDigitPositionAfterDecimalPoint(
+            0,
+            RoundingMode.ROUND_HALF_AWAY_FROM_ZERO
+        ).toBigInteger()
+
+        require(stroops > BigInteger.ZERO) {
+            "Amount too small; minimum is 0.0000001 (1 stroop), got: $amount"
+        }
+
+        return stroops
+    }
+
+    /**
+     * Converts stroops (BigInteger) to I128 ScVal.
+     *
+     * Delegates to [Scv.toInt128] which handles the full 128-bit range correctly,
+     * including values larger than Long.MAX_VALUE.
+     *
+     * @param stroops The amount in stroops (must be within I128 range)
+     * @return SCValXdr I128 representation
+     * @throws IllegalArgumentException if the value is outside the I128 range
+     */
+    fun stroopsToI128ScVal(stroops: BigInteger): SCValXdr {
+        return Scv.toInt128(stroops)
     }
 }
 
@@ -266,3 +280,17 @@ internal expect fun currentTimeMillis(): Long
  * @param timeMillis The delay duration in milliseconds
  */
 internal expect suspend fun platformDelay(timeMillis: Long)
+
+/**
+ * Provides mutual exclusion for concurrent access to shared mutable state.
+ *
+ * On JVM, this delegates to [kotlin.synchronized] for proper thread synchronization.
+ * On JS, this simply executes the block directly since JavaScript is single-threaded.
+ * On Native, this uses [kotlin.native.concurrent.AtomicReference]-based spinlock or
+ * platform-specific synchronization to protect shared state under the new memory model.
+ *
+ * @param lock The object to use as the monitor lock
+ * @param block The block to execute under mutual exclusion
+ * @return The result of executing [block]
+ */
+internal expect fun <T> platformSynchronized(lock: Any, block: () -> T): T

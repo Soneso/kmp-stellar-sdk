@@ -6,7 +6,6 @@ import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import java.security.SecureRandom
 import java.security.Security
 import java.text.Normalizer
 
@@ -18,8 +17,7 @@ import java.text.Normalizer
  * - HMAC-SHA512
  * - PBKDF2 with HMAC-SHA512
  *
- * java.security.SecureRandom is used for cryptographically secure randomness,
- * and java.text.Normalizer handles Unicode normalization.
+ * java.text.Normalizer handles Unicode normalization.
  */
 
 // Register BouncyCastle provider on class load
@@ -28,16 +26,6 @@ private val providerRegistered: Boolean = run {
         Security.addProvider(BouncyCastleProvider())
     }
     true
-}
-
-/**
- * Generates cryptographically secure random bytes using java.security.SecureRandom.
- */
-internal actual fun secureRandomBytes(size: Int): ByteArray {
-    require(size > 0) { "Size must be positive" }
-    val bytes = ByteArray(size)
-    SecureRandom().nextBytes(bytes)
-    return bytes
 }
 
 /**

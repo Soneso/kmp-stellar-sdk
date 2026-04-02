@@ -4,12 +4,11 @@
 
 package com.soneso.stellar.sdk.sep.sep10
 
+import com.soneso.stellar.sdk.Util
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -194,7 +193,7 @@ data class AuthToken(
 
                 // Decode JWT payload (Base64 URL-safe encoding)
                 val payload = parts[1]
-                val decodedBytes = decodeBase64UrlSafe(payload)
+                val decodedBytes = Util.base64urlDecode(payload)
                 val payloadJson = decodedBytes.decodeToString()
 
                 val json = Json { ignoreUnknownKeys = true }
@@ -214,23 +213,5 @@ data class AuthToken(
             }
         }
 
-        /**
-         * Decodes a Base64 URL-safe encoded string with automatic padding.
-         *
-         * JWT base64 encoding omits padding, but Kotlin's Base64.UrlSafe.decode() requires it.
-         * This private helper adds the necessary padding before decoding.
-         *
-         * @param encoded Base64 URL-safe encoded string (without padding)
-         * @return Decoded bytes
-         */
-        @OptIn(ExperimentalEncodingApi::class)
-        private fun decodeBase64UrlSafe(encoded: String): ByteArray {
-            val paddedPayload = when (encoded.length % 4) {
-                2 -> encoded + "=="
-                3 -> encoded + "="
-                else -> encoded
-            }
-            return Base64.UrlSafe.decode(paddedPayload)
-        }
     }
 }
