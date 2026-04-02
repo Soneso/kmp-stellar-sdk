@@ -134,6 +134,10 @@ class OZMultiSignerManager internal constructor(
      * @param amount The amount to transfer in XLM units
      * @param selectedSigners All signers that must sign, in collection order.
      *   An empty list means no signatures are collected (only valid for read-only simulation).
+     * @param contextRuleId Explicit context rule ID to use instead of automatic resolution.
+     *   When null (default), the SDK resolves the rule ID automatically from the selected signers.
+     *   Provide an explicit ID when automatic resolution fails due to ambiguity (selected signers
+     *   match multiple rules).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails, signing fails, or submission fails
      *
@@ -158,7 +162,8 @@ class OZMultiSignerManager internal constructor(
         tokenContract: String,
         recipient: String,
         amount: String,
-        selectedSigners: List<SelectedSigner>
+        selectedSigners: List<SelectedSigner>,
+        contextRuleId: UInt? = null
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
         val (_, contractId) = kit.requireConnected()
@@ -260,6 +265,9 @@ class OZMultiSignerManager internal constructor(
         val expirationLedger = latestLedger.sequence.toUInt() +
                 OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
+        // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
+        val contextRules = kit.contextRuleManager.listContextRules()
+
         // STEP 6: Sign auth entries.
         // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow.
         // signAuthEntry is called once per passkey and the entry accumulates signatures across calls.
@@ -282,6 +290,46 @@ class OZMultiSignerManager internal constructor(
             // Clone the entry and set the expiration ledger before signing
             var signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
 
+            // Build the list of SmartAccountSigner objects from selectedSigners for rule resolution.
+            val smartAccountSigners = selectedSigners.map { selectedSigner ->
+                when (selectedSigner) {
+                    is SelectedSigner.Passkey -> {
+                        val keyData = selectedSigner.keyData
+                            ?: throw ValidationException.invalidInput(
+                                "selectedSigners",
+                                "keyData is required for passkey signers for rule resolution"
+                            )
+                        ExternalSigner(
+                            verifierAddress = kit.config.webauthnVerifierAddress,
+                            keyData = keyData
+                        ) as SmartAccountSigner
+                    }
+                    is SelectedSigner.Wallet -> {
+                        DelegatedSigner(address = selectedSigner.address) as SmartAccountSigner
+                    }
+                }
+            }
+
+            // Use caller-provided context rule ID or resolve automatically.
+            val resolvedContextRuleIds = if (contextRuleId != null) {
+                listOf(contextRuleId)
+            } else {
+                kit.contextRuleManager.resolveContextRuleIdsForEntry(
+                    signedEntry, smartAccountSigners, contextRules
+                )
+            }
+
+            // Compute the payload hash once for this entry (used by both passkey and delegated paths).
+            val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+                entry = signedEntry,
+                expirationLedger = expirationLedger,
+                networkPassphrase = kit.config.networkPassphrase
+            )
+
+            // Compute the auth digest binding the rule IDs. This is what all signers actually sign,
+            // preventing rule-selection downgrade attacks.
+            val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
+
             // STEP 6a: Sign with each passkey signer using SmartAccountAuth.signAuthEntry().
             // Each call triggers one WebAuthn prompt and appends to the signature map.
             for ((signerIndex, selectedSigner) in selectedSigners.withIndex()) {
@@ -293,20 +341,13 @@ class OZMultiSignerManager internal constructor(
                                 "WebAuthn provider is required for passkey signers but is not configured"
                             )
 
-                        // Compute payload hash from the entry (which now has expiration set)
-                        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
-                            entry = signedEntry,
-                            expirationLedger = expirationLedger,
-                            networkPassphrase = kit.config.networkPassphrase
-                        )
-
                         // Trigger WebAuthn authentication (one OS prompt per passkey signer).
                         // Pass credentialIdBytes as allowCredentials so the browser uses
                         // the correct passkey when multiple exist for this RP.
                         val allowCredentialIds = selectedSigner.credentialIdBytes?.let { listOf(it) }
 
                         val authResult = try {
-                            webauthnProvider.authenticate(payloadHash, allowCredentialIds)
+                            webauthnProvider.authenticate(authDigest, allowCredentialIds)
                         } catch (e: Exception) {
                             throw WebAuthnException.authenticationFailed(
                                 "WebAuthn authentication failed for passkey signer " +
@@ -345,7 +386,8 @@ class OZMultiSignerManager internal constructor(
                             entry = signedEntry,
                             signer = passkeySigner,
                             signature = webAuthnSig,
-                            expirationLedger = expirationLedger
+                            expirationLedger = expirationLedger,
+                            contextRuleIds = resolvedContextRuleIds
                         )
                     }
 
@@ -369,19 +411,14 @@ class OZMultiSignerManager internal constructor(
                     )
 
                 // Build the invocation targeting the smart account's __check_auth.
-                // The payload hash from the smart account's entry is passed as argument.
-                val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
-                    entry = signedEntry,
-                    expirationLedger = expirationLedger,
-                    networkPassphrase = kit.config.networkPassphrase
-                )
-
+                // The auth digest (payloadHash bound to contextRuleIds) is passed as argument,
+                // matching what the verifier contract expects in v0.7.0+.
                 val checkAuthInvocation = SorobanAuthorizedInvocationXdr(
                     function = SorobanAuthorizedFunctionXdr.ContractFn(
                         InvokeContractArgsXdr(
                             contractAddress = Address(contractId).toSCAddress(),
                             functionName = SCSymbolXdr("__check_auth"),
-                            args = listOf(Scv.toBytes(payloadHash))
+                            args = listOf(Scv.toBytes(authDigest))
                         )
                     ),
                     subInvocations = emptyList()
@@ -434,7 +471,8 @@ class OZMultiSignerManager internal constructor(
                 signedEntry = SmartAccountAuth.addRawSignatureMapEntry(
                     entry = signedEntry,
                     signerKey = delegatedSigner.toScVal(),
-                    signatureValue = Scv.toBytes(byteArrayOf())
+                    signatureValue = Scv.toBytes(byteArrayOf()),
+                    contextRuleIds = resolvedContextRuleIds
                 )
             }
 

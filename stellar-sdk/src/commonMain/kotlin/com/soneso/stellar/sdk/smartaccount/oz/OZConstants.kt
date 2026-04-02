@@ -61,4 +61,5 @@ object OZConstants {
      * Maximum context rules per smart account (OZ contract limit).
      */
     const val MAX_CONTEXT_RULES = 15
+
 }

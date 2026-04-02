@@ -19,19 +19,19 @@ object DemoConfig {
 
     // -- Smart Account Contract --
 
-    /** WASM hash of the multisig smart account contract (OZ stellar-contracts v0.6.0).
+    /** WASM hash of the multisig smart account contract (OZ stellar-contracts v0.7.0).
      *  Passed to OZSmartAccountConfig.accountWasmHash for wallet deployment.
      *  This hash can change when the contract is upgraded or testnet is reset.
      *  See docs/smart-accounts/README.md#testnet-contract-addresses for upload instructions. */
-    const val ACCOUNT_WASM_HASH = "64086253db59176c3bbbcf57fbb68c0a2fbe6fe9e0b05883ff1da44c5978ae4c"
+    const val ACCOUNT_WASM_HASH = "3e51f5b222dec74650f0b33367acb42a41ce497f72639230463070e666abba2c"
 
     // -- Verifier Contracts --
 
     /** WebAuthn (secp256r1) signature verifier contract. Validates passkey signatures on-chain. */
-    const val WEBAUTHN_VERIFIER_ADDRESS = "CBSHV66WG7UV6FQVUTB67P3DZUEJ2KJ5X6JKQH5MFRAAFNFJUAJVXJYV"
+    const val WEBAUTHN_VERIFIER_ADDRESS = "CATPTBRWVMH5ZCIKO5HN2F4FMPXVZEXC56RKGHRXCM7EEZGGXK7PICEH"
 
     /** Ed25519 signature verifier contract. Validates Ed25519 signer signatures on-chain. */
-    const val ED25519_VERIFIER_ADDRESS = "CDGMOL3BP6Y6LYOXXTRNXBNJ2SLNTQ47BGG3LOS2OBBE657E3NYCN54B"
+    const val ED25519_VERIFIER_ADDRESS = "CAIKK32K3BZJYTWVTXHZFPIEEDBR6YCVTGPABH4UQUQ4XFA3OLYXG27G"
 
     // -- Token Contracts --
 
@@ -110,13 +110,13 @@ val KNOWN_POLICIES = listOf(
         type = "threshold",
         name = "Threshold (M-of-N)",
         description = "Requires M signatures out of N total signers",
-        address = "CCT4MMN5MJ6O2OU6LXPYTCVORQ2QVTBMDJ7MYBZQ2ULSYQVUIYP4IFYD"
+        address = "CDDQLFG7CV74QHWPSP6NZIPNBR2PPCMTUVYCJF4P3ONDYHODRFGR7LWC"
     ),
     PolicyInfo(
         type = "spending_limit",
         name = "Spending Limit",
         description = "Limits spending to a maximum amount per time period",
-        address = "CBMMWY54XOV6JJHSWCMKWWPXVRXASR5U26UJMLZDN4SP6CFFTVZARPTY"
+        address = "CBYLPYZGLQ6JVY2IQ5P23QLQPR3KAMMKMZLNWG6RUUKJDNYGPLVHK7U4"
     ),
     PolicyInfo(
         type = "weighted_threshold",

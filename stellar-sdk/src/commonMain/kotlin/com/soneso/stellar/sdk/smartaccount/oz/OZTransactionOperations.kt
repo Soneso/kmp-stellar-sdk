@@ -221,76 +221,6 @@ class OZTransactionOperations internal constructor(
         return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
-    // MARK: - Auth Entry Signing
-
-    /**
-     * Signs authorization entries matching the connected contract.
-     *
-     * Iterates through all auth entries and signs those with address credentials
-     * matching the connected smart account contract. The signature is added to the
-     * entry's signature map using the specified signer.
-     *
-     * @param authEntries The authorization entries to sign
-     * @param signer The smart account signer to use for signing
-     * @param signature The signature object (WebAuthn, Ed25519, or Policy)
-     * @param expirationLedger Optional ledger number at which signatures expire (defaults to current + buffer)
-     * @return Array of signed authorization entries
-     * @throws SmartAccountException if signing fails
-     *
-     * Example:
-     * ```kotlin
-     * val webAuthnSig = WebAuthnSignature(
-     *     authenticatorData = authData,
-     *     clientData = clientData,
-     *     signature = signature
-     * )
-     *
-     * val signedEntries = txOps.signAuthEntries(
-     *     authEntries = unsignedEntries,
-     *     signer = externalSigner,
-     *     signature = webAuthnSig,
-     *     expirationLedger = currentLedger + 100u
-     * )
-     * ```
-     */
-    suspend fun signAuthEntries(
-        authEntries: List<SorobanAuthorizationEntryXdr>,
-        signer: SmartAccountSigner,
-        signature: SmartAccountSignature,
-        expirationLedger: UInt? = null
-    ): List<SorobanAuthorizationEntryXdr> {
-        val (_, contractId) = kit.requireConnected()
-
-        // Determine expiration ledger
-        val expiration = expirationLedger ?: run {
-            // Fetch latest ledger and add buffer
-            val latestLedger = kit.sorobanServer.getLatestLedger()
-            latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
-        }
-
-        // Sign all matching auth entries
-        return authEntries.map { entry ->
-            // Check if this entry's credentials match our contract
-            val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
-                ?: return@map entry // Not an address credential, skip
-
-            // Check if the address matches our contract
-            val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
-            if (entryAddress == contractId) {
-                // This entry is for our smart account - sign it
-                SmartAccountAuth.signAuthEntry(
-                    entry = entry,
-                    signer = signer,
-                    signature = signature,
-                    expirationLedger = expiration
-                )
-            } else {
-                // Not our entry, pass through unchanged
-                entry
-            }
-        }
-    }
-
     // MARK: - Transaction Submission
 
     /**
@@ -308,14 +238,17 @@ class OZTransactionOperations internal constructor(
      * 4. Simulate transaction to discover required auth entries
      * 5. Extract auth entries from simulation result
      * 6. For each auth entry matching our contract:
-     *    a. Set signature expiration ledger
-     *    b. Build auth payload hash
-     *    c. Sign with WebAuthn passkey (triggers biometric prompt)
-     *    d. Normalize signature to low-S compact format
-     *    e. Build WebAuthn signature ScVal
-     *    f. Construct signer key from stored credential
-     *    g. Build signature map entry with double XDR-encoded signature
-     *    h. Set credential signature on entry
+     *    a. Build auth payload hash
+     *    b. Require WebAuthn provider
+     *    c. Decode credential ID bytes
+     *    d. Resolve key data from storage or on-chain context rules
+     *    e. Build ExternalSigner for context rule resolution
+     *    f. Resolve context rule IDs via contextRuleManager
+     *    g. Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
+     *    h. Authenticate with WebAuthn using auth digest as challenge
+     *    i. Normalize signature to low-S compact format
+     *    j. Build WebAuthn signature ScVal
+     *    k. Attach signature and context rule IDs to the auth entry
      * 7. Update transaction with signed auth entries
      * 8. Re-simulate to get correct resource fees
      * 9. Assemble transaction from re-simulation
@@ -393,6 +326,9 @@ class OZTransactionOperations internal constructor(
             val latestLedger = kit.sorobanServer.getLatestLedger()
             val expiration = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
+            // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
+            val contextRules = kit.contextRuleManager.listContextRules()
+
             val signed = mutableListOf<SorobanAuthorizationEntryXdr>()
 
             for (entry in simulatedAuthEntries) {
@@ -437,22 +373,7 @@ class OZTransactionOperations internal constructor(
                     )
                 }
 
-                // (d) Authenticate with passkey (triggers biometric prompt)
-                val authResult = webauthnProvider.authenticate(
-                    payloadHash,
-                    allowCredentialIds = listOf(credIdBytes)
-                )
-
-                // (e) Normalize DER signature to compact format with low-S
-                val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
-
-                // (f) Build WebAuthn signature
-                val webAuthnSig = WebAuthnSignature(
-                    authenticatorData = authResult.authenticatorData,
-                    clientData = authResult.clientDataJSON,
-                    signature = compactSig
-                )
-
+                // (d) Resolve key data from storage or on-chain context rules
                 val keyData: ByteArray
                 val storage = kit.getStorage()
                 val stored = storage.get(credentialId)
@@ -462,17 +383,43 @@ class OZTransactionOperations internal constructor(
                     keyData = findKeyDataFromContextRules(credIdBytes)
                 }
 
+                // (e) Build the connected signer — required for context rule resolution
                 val signer = ExternalSigner(
                     verifierAddress = kit.config.webauthnVerifierAddress,
                     keyData = keyData
                 )
 
-                // (h) Attach the signature to the auth entry
+                // (f) Resolve context rule IDs for this auth entry (using pre-fetched rules)
+                val contextRuleIds = kit.contextRuleManager.resolveContextRuleIdsForEntry(
+                    entry, listOf(signer), contextRules
+                )
+
+                // (g) Compute auth digest binding rule IDs to the payload hash
+                val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, contextRuleIds)
+
+                // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt)
+                val authResult = webauthnProvider.authenticate(
+                    authDigest,
+                    allowCredentialIds = listOf(credIdBytes)
+                )
+
+                // (i) Normalize DER signature to compact format with low-S
+                val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
+
+                // (j) Build WebAuthn signature
+                val webAuthnSig = WebAuthnSignature(
+                    authenticatorData = authResult.authenticatorData,
+                    clientData = authResult.clientDataJSON,
+                    signature = compactSig
+                )
+
+                // (k) Attach the signature and context rule IDs to the auth entry
                 val signedEntry = SmartAccountAuth.signAuthEntry(
                     entry = entry,
                     signer = signer,
                     signature = webAuthnSig,
-                    expirationLedger = expiration
+                    expirationLedger = expiration,
+                    contextRuleIds = contextRuleIds
                 )
 
                 signed.add(signedEntry)

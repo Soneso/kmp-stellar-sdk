@@ -219,7 +219,8 @@ class OZSignerManager internal constructor(
      * context rule. The user will be prompted for biometric authentication if the current
      * passkey is the authorizing signer.
      *
-     * Contract call: `smart_account.add_signer(context_rule_id, signer)`
+     * Contract call: `smart_account.add_signer(context_rule_id, signer)` — returns a u32 signer ID.
+     * The assigned ID is available via [ParsedContextRule.signerIds] after fetching the context rule.
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param publicKey The uncompressed secp256r1 public key (65 bytes, starting with 0x04)
@@ -293,7 +294,8 @@ class OZSignerManager internal constructor(
      * The transaction requires authorization from an existing signer on the specified
      * context rule.
      *
-     * Contract call: `smart_account.add_signer(context_rule_id, signer)`
+     * Contract call: `smart_account.add_signer(context_rule_id, signer)` — returns a u32 signer ID.
+     * The assigned ID is available via [ParsedContextRule.signerIds] after fetching the context rule.
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param address The Stellar address (G-address for accounts, C-address for contracts)
@@ -342,7 +344,8 @@ class OZSignerManager internal constructor(
      * The transaction requires authorization from an existing signer on the specified
      * context rule.
      *
-     * Contract call: `smart_account.add_signer(context_rule_id, signer)`
+     * Contract call: `smart_account.add_signer(context_rule_id, signer)` — returns a u32 signer ID.
+     * The assigned ID is available via [ParsedContextRule.signerIds] after fetching the context rule.
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param verifierAddress The Ed25519 verifier contract address (C-address)
@@ -384,11 +387,11 @@ class OZSignerManager internal constructor(
     // MARK: - Remove Signer
 
     /**
-     * Removes a signer from a context rule.
+     * Removes a signer from a context rule by its ID.
      *
-     * Removes the specified signer from the given context rule on the smart account contract.
-     * The signer is identified by its on-chain representation (address for delegated signers,
-     * verifier+key for external signers).
+     * Removes the signer with the given ID from the specified context rule on the smart
+     * account contract. The signer ID is assigned by the contract when the signer is added
+     * and is available via [ParsedContextRule.signerIds] after fetching the context rule.
      *
      * The transaction requires authorization from an existing signer on the specified
      * context rule.
@@ -397,31 +400,22 @@ class OZSignerManager internal constructor(
      * has policies that provide authorization. The contract will throw error 3004
      * if you attempt to remove the last signer with no policies configured.
      *
-     * Contract call: `smart_account.remove_signer(context_rule_id, signer)`
+     * Contract call: `smart_account.remove_signer(context_rule_id, signer_id)`
      *
      * @param contextRuleId The context rule ID to remove the signer from
-     * @param signer The signer to remove (must match an existing signer exactly)
+     * @param signerId The on-chain signer ID assigned by the contract (available from [ParsedContextRule.signerIds])
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails or transaction fails
      *
      * Example:
      * ```kotlin
-     * // Remove a delegated signer
-     * val delegatedSigner = DelegatedSigner(address = "GA7QYNF7...")
+     * // Fetch the context rule to get signer IDs
+     * val contextRule = kit.contextRuleManager.getContextRule(contextRuleId = 0u)
+     * val signerIdToRemove = contextRule.signerIds.first()
+     *
      * val result = signerManager.removeSigner(
      *     contextRuleId = 0u,
-     *     signer = delegatedSigner
-     * )
-     *
-     * // Remove a passkey signer
-     * val passkeySignerToRemove = ExternalSigner.webAuthn(
-     *     verifierAddress = "CBCD1234...",
-     *     publicKey = publicKey,
-     *     credentialId = credentialId
-     * )
-     * val removeResult = signerManager.removeSigner(
-     *     contextRuleId = 0u,
-     *     signer = passkeySignerToRemove
+     *     signerId = signerIdToRemove
      * )
      *
      * if (!result.success) {
@@ -431,17 +425,15 @@ class OZSignerManager internal constructor(
      */
     suspend fun removeSigner(
         contextRuleId: UInt,
-        signer: SmartAccountSigner
+        signerId: UInt
     ): TransactionResult {
         // Validate inputs
         val (_, contractId) = kit.requireConnected()
 
         // Build contract invocation for remove_signer
-        val signerScVal = signer.toScVal()
-
         val functionArgs = listOf(
             Scv.toUint32(contextRuleId),
-            signerScVal
+            Scv.toUint32(signerId)
         )
 
         val invokeArgs = InvokeContractArgsXdr(
@@ -463,6 +455,10 @@ class OZSignerManager internal constructor(
      *
      * Builds the contract invocation for add_signer and submits it via transaction operations.
      * The submit method handles simulation, authorization entry signing, and transaction submission.
+     *
+     * Note: The contract returns a u32 signer ID for the newly added signer. The ID is emitted
+     * in a contract event and is accessible via [ParsedContextRule.signerIds] after fetching
+     * the context rule. It can be used with [OZSignerManager.removeSigner] to remove the signer.
      *
      * @param contextRuleId The context rule ID
      * @param signer The signer to add

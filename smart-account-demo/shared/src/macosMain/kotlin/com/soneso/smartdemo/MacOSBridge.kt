@@ -26,8 +26,8 @@ import com.soneso.smartdemo.flows.initializeKit
 import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.flows.loadAvailablePasskeySigners
 import com.soneso.smartdemo.flows.loadAvailableSigners
-import com.soneso.smartdemo.flows.loadContextRule
 import com.soneso.smartdemo.flows.loadContextRules
+import com.soneso.smartdemo.flows.loadParsedContextRule
 import com.soneso.smartdemo.flows.manualConnect
 import com.soneso.smartdemo.flows.multiSignerTransfer
 import com.soneso.smartdemo.flows.quickConnect
@@ -47,7 +47,6 @@ import com.soneso.smartdemo.util.buildWeightedThresholdScVal
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.hexToByteArray
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.parseSingleContextRuleFromScVal
 import com.soneso.smartdemo.util.toHexString
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.KeyPair
@@ -507,20 +506,16 @@ class MacOSBridge {
     /**
      * Loads a single context rule for pre-populating an edit form in Swift.
      *
-     * Fetches the raw [SCValXdr] from the chain and parses it using [parseSingleContextRuleFromScVal],
-     * then converts all Kotlin-specific types to their [ParsedRuleBridge] equivalents.
+     * Fetches the fully parsed [ParsedContextRule] via [loadParsedContextRule] (which uses
+     * [OZContextRuleManager.listContextRules]) and converts it to a [ParsedRuleBridge].
      *
      * @param ruleId Rule ID as an Int (converted to UInt internally).
-     * @return [ParsedRuleBridge] with all rule fields in Swift-friendly format.
+     * @return [ParsedRuleBridge] with rule fields in Swift-friendly format.
      * @throws Exception if the rule does not exist or the RPC call fails.
      */
     @Throws(Exception::class)
     suspend fun loadContextRuleForEdit(ruleId: Int): ParsedRuleBridge {
-        val ruleIdUInt = ruleId.toUInt()
-        val scVal = loadContextRule(ruleIdUInt)
-        val parsed = parseSingleContextRuleFromScVal(scVal, ruleIdUInt)
-            ?: throw IllegalStateException("Failed to parse context rule #$ruleId")
-
+        val parsed = loadParsedContextRule(ruleId.toUInt())
         return convertRuleToBridge(parsed)
     }
 

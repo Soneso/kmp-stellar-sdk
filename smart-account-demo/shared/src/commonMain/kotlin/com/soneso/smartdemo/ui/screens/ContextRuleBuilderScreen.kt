@@ -83,7 +83,7 @@ import com.soneso.smartdemo.flows.addContextRule
 import com.soneso.smartdemo.flows.buildDelegatedSigner
 import com.soneso.smartdemo.flows.buildEd25519Signer
 import com.soneso.smartdemo.flows.loadAvailablePasskeySigners
-import com.soneso.smartdemo.flows.loadContextRule
+import com.soneso.smartdemo.flows.loadParsedContextRule
 import com.soneso.smartdemo.flows.registerPasskeySigner
 import com.soneso.smartdemo.flows.resolveAbsoluteLedger
 import com.soneso.smartdemo.flows.updateContextRuleName
@@ -99,7 +99,6 @@ import com.soneso.smartdemo.util.formatSignerForDisplay
 import com.soneso.smartdemo.util.hexToByteArray
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.isValidSpendingAmount
-import com.soneso.smartdemo.util.parseSingleContextRuleFromScVal
 import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.toHexString
 import com.soneso.smartdemo.util.truncateAddress
@@ -188,48 +187,43 @@ class ContextRuleBuilderScreen(
                 isLoadingRule = true
                 errorMessage = null
                 try {
-                    val ruleScVal = loadContextRule(editRuleId)
-                    val parsed = parseSingleContextRuleFromScVal(ruleScVal, editRuleId)
-                    if (parsed != null) {
-                        ruleName = parsed.name
-                        when (val ct = parsed.contextType) {
-                            is ContextRuleType.Default -> {
-                                contextTypeOption = ContextTypeOption.DEFAULT
-                            }
-                            is ContextRuleType.CallContract -> {
-                                contextTypeOption = ContextTypeOption.CALL_CONTRACT
-                                contractAddress = ct.contractAddress
-                            }
-                            is ContextRuleType.CreateContract -> {
-                                contextTypeOption = ContextTypeOption.CREATE_CONTRACT
-                                wasmHashHex = ct.wasmHash.toHexString()
-                            }
+                    val parsed = loadParsedContextRule(editRuleId)
+                    ruleName = parsed.name
+                    when (val ct = parsed.contextType) {
+                        is ContextRuleType.Default -> {
+                            contextTypeOption = ContextTypeOption.DEFAULT
                         }
-                        if (parsed.validUntil != null) {
-                            hasExpiry = true
-                            // Do not pre-populate expiryLedger: the value from on-chain
-                            // is an absolute ledger number and must not be treated as an
-                            // offset at submission time. Show it as informational text only.
-                            existingExpiryLedger = parsed.validUntil
+                        is ContextRuleType.CallContract -> {
+                            contextTypeOption = ContextTypeOption.CALL_CONTRACT
+                            contractAddress = ct.contractAddress
                         }
-                        signers = parsed.signers
-                        // Pre-populate policies from existing rule (addresses only, params not available)
-                        policies = parsed.policies.mapNotNull { addr ->
-                            val known = KNOWN_POLICIES.find { it.address == addr }
-                            if (known != null) {
-                                PolicyEntry(info = known, label = known.name, address = addr)
-                            } else {
-                                PolicyEntry(
-                                    info = null,
-                                    label = "Unknown Policy",
-                                    address = addr
-                                )
-                            }
+                        is ContextRuleType.CreateContract -> {
+                            contextTypeOption = ContextTypeOption.CREATE_CONTRACT
+                            wasmHashHex = ct.wasmHash.toHexString()
                         }
-                        ActivityLogState.info("Loaded rule #$editRuleId for editing")
-                    } else {
-                        errorMessage = "Failed to parse rule #$editRuleId"
                     }
+                    if (parsed.validUntil != null) {
+                        hasExpiry = true
+                        // Do not pre-populate expiryLedger: the value from on-chain
+                        // is an absolute ledger number and must not be treated as an
+                        // offset at submission time. Show it as informational text only.
+                        existingExpiryLedger = parsed.validUntil
+                    }
+                    signers = parsed.signers
+                    // Pre-populate policies from existing rule (addresses only, params not available)
+                    policies = parsed.policies.mapNotNull { addr ->
+                        val known = KNOWN_POLICIES.find { it.address == addr }
+                        if (known != null) {
+                            PolicyEntry(info = known, label = known.name, address = addr)
+                        } else {
+                            PolicyEntry(
+                                info = null,
+                                label = "Unknown Policy",
+                                address = addr
+                            )
+                        }
+                    }
+                    ActivityLogState.info("Loaded rule #$editRuleId for editing")
                 } catch (e: Exception) {
                     errorMessage = "Failed to load rule #$editRuleId: ${e.message}"
                     ActivityLogState.error("Failed to load rule: ${e.message}")
