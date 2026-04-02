@@ -500,25 +500,15 @@ class OZMultiSignerManager internal constructor(
             throw TransactionException.simulationFailed("Re-simulation error: ${resignedSimulation.error}")
         }
 
-        val transactionData = resignedSimulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from re-simulation"
-            )
-
-        val minResourceFee = resignedSimulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from re-simulation"
-            )
-
-        // STEP 8: Submit via the same Mode 1 / Mode 2 routing as single-signer transfer.
+        // STEP 8: Assemble and submit via the same Mode 1 / Mode 2 routing as single-signer.
         // Mode 1 (default): relayer receives hostFunction + authEntries and builds the envelope.
         // Mode 2 (fallback): used only when source_account auth entries are present.
+        // prepareTransaction applies resource fees, footprint, and soroban data from simulation.
         return kit.transactionOperations.submitMultiSignerTransaction(
             hostFunction = hostFunction,
             signedAuthEntries = signedAuthEntries,
-            transactionData = transactionData,
-            minResourceFee = minResourceFee,
-            deployerAccount = refetchedDeployerAccount
+            signedTransaction = signedTransaction,
+            simulation = resignedSimulation
         )
     }
 

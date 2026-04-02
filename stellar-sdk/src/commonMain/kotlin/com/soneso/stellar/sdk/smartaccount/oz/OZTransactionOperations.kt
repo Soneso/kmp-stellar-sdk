@@ -18,8 +18,9 @@ import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
-import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
@@ -28,7 +29,6 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
-import com.soneso.stellar.sdk.xdr.SorobanTransactionDataXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -463,10 +463,14 @@ class OZTransactionOperations internal constructor(
                     )
                 }
 
-                // (d) Resolve key data from storage or on-chain context rules
+                // (d) Resolve key data from storage or on-chain context rules.
+                // Storage lookup is an optimization; fall through to on-chain lookup on any failure.
                 val keyData: ByteArray
-                val storage = kit.getStorage()
-                val stored = storage.get(credentialId)
+                val stored = try {
+                    kit.getStorage().get(credentialId)
+                } catch (_: Exception) {
+                    null
+                }
                 if (stored != null) {
                     keyData = stored.publicKey + credIdBytes
                 } else {
@@ -532,9 +536,12 @@ class OZTransactionOperations internal constructor(
             )
         )
 
-        // STEP 9: Rebuild transaction with signed auth entries
+        // STEP 9: Rebuild transaction with signed auth entries.
+        // Re-fetch deployer account to get the correct on-chain sequence number.
+        // The initial fetch (step 2) was consumed by TransactionBuilder.build() in step 3.
+        val refreshedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val signedTransaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
+        val signedTransaction = TransactionBuilder(refreshedDeployerAccount, Network(kit.config.networkPassphrase))
             .setBaseFee(100)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
@@ -548,25 +555,9 @@ class OZTransactionOperations internal constructor(
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
         }
 
-        // STEP 11: Assemble transaction from re-simulation
-        val transactionData = reSimulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from re-simulation"
-            )
-
-        val minResourceFee = reSimulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from re-simulation"
-            )
-
-        // Rebuild transaction with Soroban data and resource fee
-        val finalTransaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(signedOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // STEP 11: Assemble transaction from re-simulation.
+        // prepareTransaction applies resource fees, footprint, and soroban data from simulation.
+        val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, reSimulation)
 
         // STEP 12: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
@@ -596,33 +587,22 @@ class OZTransactionOperations internal constructor(
      *
      * @param hostFunction The host function for the token transfer
      * @param signedAuthEntries Auth entries with all collected signatures
-     * @param transactionData Soroban transaction data from re-simulation
-     * @param minResourceFee Minimum resource fee from re-simulation
-     * @param deployerAccount The deployer account (already fetched by the caller to avoid
-     *   a redundant network round-trip and potential sequence number drift)
+     * @param signedTransaction The transaction with signed auth entries (pre-assembly)
+     * @param simulation The re-simulation response for transaction assembly
      * @return TransactionResult with submission outcome
      * @throws SmartAccountException if submission fails
      */
     internal suspend fun submitMultiSignerTransaction(
         hostFunction: HostFunctionXdr,
         signedAuthEntries: List<SorobanAuthorizationEntryXdr>,
-        transactionData: SorobanTransactionDataXdr,
-        minResourceFee: Long,
-        deployerAccount: TransactionBuilderAccount
+        signedTransaction: Transaction,
+        simulation: SimulateTransactionResponse
     ): TransactionResult {
         val deployer = kit.getDeployer()
 
-        val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val finalTransaction = TransactionBuilder(
-            deployerAccount,
-            Network(kit.config.networkPassphrase)
-        )
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(signedOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // Assemble the transaction using the SDK's prepareTransaction.
+        // This correctly applies resource fees, footprint, and soroban data from simulation.
+        val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, simulation)
 
         // submitMultiSignerTransaction intentionally uses relayerClient presence directly
         // rather than getSubmissionMethod(), because multi-signer transfers do not support
@@ -798,8 +778,8 @@ class OZTransactionOperations internal constructor(
         // Extract auth entries from simulation
         val simulatedAuthEntries = simulation.results?.firstOrNull()?.parseAuth() ?: emptyList()
 
-        // STEP 8: Convert source_account auth entries to Address credentials
-        // This allows the Relayer to use its own channel accounts for fee sponsoring
+        // STEP 8: Convert source_account auth entries to Address credentials.
+        // This allows the Relayer to use its own channel accounts for fee sponsoring.
         val latestLedger = kit.sorobanServer.getLatestLedger()
         val expirationLedger = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
@@ -809,10 +789,10 @@ class OZTransactionOperations internal constructor(
             expirationLedger = expirationLedger
         )
 
-        // STEP 9: Refresh temp account for re-simulation
+        // STEP 9: Rebuild transaction with signed auth entries and re-simulate.
+        // Use a fresh account fetch to avoid sequence number issues.
         val tempAccountRefresh = kit.sorobanServer.getAccount(tempKeypair.getAccountId())
 
-        // Build transaction with signed auth entries
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
             .setBaseFee(100)
@@ -821,40 +801,22 @@ class OZTransactionOperations internal constructor(
             .setTimeout(300)
             .build()
 
-        // STEP 10: Re-simulate with signed auth entries to get correct resource estimates
         val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
 
         if (reSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
         }
 
-        // Assemble transaction from re-simulation
-        val transactionData = reSimulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from re-simulation"
-            )
-
-        val minResourceFee = reSimulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from re-simulation"
-            )
-
-        // Rebuild transaction with signed auth entries and Soroban data
-        val finalOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val finalTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(finalOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // STEP 10: Assemble the transaction using the SDK's prepareTransaction.
+        // This correctly applies resource fees, footprint, and soroban data from simulation.
+        val preparedTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, reSimulation)
 
         // STEP 11: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
         val useRelayer = submissionMethod == SubmissionMethod.RELAYER
 
         val result = submitOrRelay(
-            transaction = finalTransaction,
+            transaction = preparedTransaction,
             hostFunction = hostFunction,
             signedAuthEntries = signedAuthEntries,
             signer = tempKeypair,
@@ -868,7 +830,7 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 13: Return funded amount as XLM string
+        // STEP 12: Return funded amount as XLM string
         val xlmWhole = transferStroops / BigInteger.fromLong(Util.STROOPS_PER_XLM)
         val xlmFraction = transferStroops % BigInteger.fromLong(Util.STROOPS_PER_XLM)
         return if (xlmFraction == BigInteger.ZERO) {
@@ -1170,9 +1132,29 @@ class OZTransactionOperations internal constructor(
             // Submit via RPC
             val sendResult = kit.sorobanServer.sendTransaction(transaction)
 
+            when (sendResult.status) {
+                SendTransactionStatus.ERROR -> {
+                    return TransactionResult(
+                        success = false,
+                        hash = sendResult.hash ?: "",
+                        error = sendResult.errorResultXdr ?: "Transaction rejected by network"
+                    )
+                }
+                SendTransactionStatus.TRY_AGAIN_LATER -> {
+                    return TransactionResult(
+                        success = false,
+                        hash = sendResult.hash ?: "",
+                        error = "Network is congested. Try again later."
+                    )
+                }
+                else -> {
+                    // PENDING or DUPLICATE — poll for confirmation
+                }
+            }
+
             val hash = sendResult.hash
                 ?: throw TransactionException.submissionFailed(
-                    "Failed to get transaction hash from send result: ${sendResult.errorResultXdr ?: "unknown error"}"
+                    "No transaction hash returned from send result"
                 )
 
             if (emitEvents) {
@@ -1189,55 +1171,38 @@ class OZTransactionOperations internal constructor(
     }
 
     /**
-     * Polls for transaction confirmation.
+     * Polls for transaction confirmation using the SDK's [SorobanServer.pollTransaction].
      *
-     * Repeatedly checks the transaction status on Soroban RPC until it is confirmed,
-     * fails, or times out. Uses exponential backoff between attempts.
+     * Uses 30 attempts with 3-second intervals (~90 seconds total) to account for
+     * testnet ledger close times and potential congestion.
      *
      * @param hash The transaction hash to poll
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if polling times out
      */
     private suspend fun pollForConfirmation(hash: String): TransactionResult {
-        val maxAttempts = 10
-        val sleepDurationMs = 2000L
+        val txResponse = kit.sorobanServer.pollTransaction(
+            hash = hash,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
 
-        repeat(maxAttempts) { attempt ->
-            val txStatus = kit.sorobanServer.getTransaction(hash)
-
-            when (txStatus.status) {
-                GetTransactionStatus.SUCCESS -> return TransactionResult(
-                    success = true,
-                    hash = hash,
-                    ledger = txStatus.latestLedger?.toUInt()
-                )
-
-                GetTransactionStatus.FAILED -> {
-                    val errorMessage = txStatus.resultXdr ?: "Transaction failed on-chain"
-                    return TransactionResult(
-                        success = false,
-                        hash = hash,
-                        ledger = txStatus.latestLedger?.toUInt(),
-                        error = errorMessage
-                    )
-                }
-
-                GetTransactionStatus.NOT_FOUND -> {
-                    // Transaction not yet confirmed, retry
-                    if (attempt < maxAttempts - 1) {
-                        delay(sleepDurationMs)
-                    } else {
-                        return TransactionResult(
-                            success = false,
-                            hash = hash,
-                            error = "Transaction timed out after $maxAttempts attempts"
-                        )
-                    }
-                }
-            }
+        return when (txResponse.status) {
+            GetTransactionStatus.SUCCESS -> TransactionResult(
+                success = true,
+                hash = hash,
+                ledger = txResponse.latestLedger?.toUInt()
+            )
+            GetTransactionStatus.FAILED -> TransactionResult(
+                success = false,
+                hash = hash,
+                ledger = txResponse.latestLedger?.toUInt(),
+                error = txResponse.resultXdr ?: "Transaction failed on-chain"
+            )
+            GetTransactionStatus.NOT_FOUND -> TransactionResult(
+                success = false,
+                hash = hash,
+                error = "Transaction not confirmed after 30 polling attempts"
+            )
         }
-
-        // Should not reach here, but for safety
-        throw TransactionException.timeout("Transaction polling timed out after $maxAttempts attempts")
     }
 }
