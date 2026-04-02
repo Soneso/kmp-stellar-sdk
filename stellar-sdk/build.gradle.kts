@@ -305,7 +305,15 @@ android {
 }
 
 // Kover Code Coverage Configuration
+// Use a custom "jvm" variant so Kover only instruments and runs JVM tests.
+// Without this, Kover also compiles Android test targets which require
+// platform-specific expect/actual declarations and Android SDK dependencies.
 kover {
+    currentProject {
+        createVariant("jvmOnly") {
+            add("jvm", optional = true)
+        }
+    }
     reports {
         // Filter out integration test classes from coverage reports
         filters {

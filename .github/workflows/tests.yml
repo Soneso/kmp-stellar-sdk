@@ -42,12 +42,12 @@ jobs:
 
       - name: Run JVM unit tests with coverage
         if: matrix.java == '25'
-        run: ./gradlew :stellar-sdk:koverHtmlReport :stellar-sdk:koverXmlReport -PexcludeIntegrationTests --no-daemon
+        run: ./gradlew :stellar-sdk:koverHtmlReportJvmOnly :stellar-sdk:koverXmlReportJvmOnly -PexcludeIntegrationTests --no-daemon
 
       - name: Print coverage summary
         if: always() && matrix.java == '25'
         run: |
-          XML_REPORT="stellar-sdk/build/reports/kover/report.xml"
+          XML_REPORT="stellar-sdk/build/reports/kover/reportJvmOnly.xml"
           if [ -f "$XML_REPORT" ]; then
             echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -85,7 +85,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: stellar-sdk/build/reports/kover/report.xml
+          files: stellar-sdk/build/reports/kover/reportJvmOnly.xml
           fail_ci_if_error: false
           verbose: true
 
