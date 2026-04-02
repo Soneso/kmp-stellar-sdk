@@ -265,13 +265,13 @@ struct KnownSignersScreen: View {
         } else if let external = signer as? ExternalSigner {
             let keyData = external.keyData
             // Determine passkey vs Ed25519 by key length:
-            // WebAuthn compressed P-256 keys are 65 bytes; Ed25519 keys are 32 bytes.
-            if keyData.size == 32 {
+            // WebAuthn P-256 keys are 65 bytes (+ credential ID suffix); Ed25519 keys are 32 bytes.
+            if keyData.size <= 32 {
                 signerType = "ed25519"
                 identifier = KotlinInterop.hexString(from: keyData)
             } else {
                 signerType = "passkey"
-                identifier = KotlinInterop.hexString(from: keyData)
+                identifier = bridgeWrapper.bridge.getCredentialIdFromSigner(signer: external) ?? KotlinInterop.hexString(from: keyData)
             }
         } else {
             signerType = "ed25519"
