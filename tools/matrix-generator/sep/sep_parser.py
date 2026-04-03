@@ -11,43 +11,21 @@ Date: 2026-02-13
 License: Apache-2.0
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import json
 import re
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-
-class Colors:
-    """ANSI color codes for terminal output"""
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
-
-    @classmethod
-    def disable(cls) -> None:
-        """Disable colors (for non-TTY output)"""
-        cls.HEADER = ''
-        cls.BLUE = ''
-        cls.CYAN = ''
-        cls.GREEN = ''
-        cls.YELLOW = ''
-        cls.RED = ''
-        cls.BOLD = ''
-        cls.UNDERLINE = ''
-        cls.END = ''
+from common import Colors, DATA_DIR, SDK_ROOT
 
 
 @dataclass
@@ -746,11 +724,65 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def _parse_endpoint_sections(
+        self,
+        endpoint_sections: List[tuple],
+        content: str
+    ) -> List[Section]:
+        """
+        Parse endpoint sections that share a common ## heading / ### Request+Response structure.
+
+        Each element of *endpoint_sections* is a ``(section_name, section_key)`` tuple.
+        For every entry the method searches *content* for:
+
+        * A ``##  <section_name>`` block
+        * ``### Request`` and ``### Response`` sub-blocks within that block
+
+        Fields are extracted from Markdown tables in those sub-blocks.
+
+        Args:
+            endpoint_sections: Ordered list of ``(display_name, dict_key)`` pairs.
+            content: Raw Markdown content to search inside (usually ``self.raw_content``).
+
+        Returns:
+            List of :class:`Section` objects that contained at least one field.
+        """
+        sections: List[Section] = []
+
+        for section_name, section_key in endpoint_sections:
+            section_pattern = rf'##\s+{re.escape(section_name)}\s*\n(.*?)(?=\n##\s+[A-Z]|\Z)'
+            match = re.search(section_pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+
+            if not match:
+                continue
+
+            section_content = match.group(1)
+            all_fields: List[Field] = []
+
+            # Extract request parameters
+            request_pattern = r'###\s+Request.*?\n(.*?)(?=\n###|\n##|\Z)'
+            request_match = re.search(request_pattern, section_content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+            if request_match:
+                request_fields = self._extract_fields_from_markdown_table(request_match.group(1), 'parameter')
+                all_fields.extend(request_fields)
+
+            # Extract response fields
+            response_pattern = r'###\s+Response.*?\n(.*?)(?=\n###|\n##|\Z)'
+            response_match = re.search(response_pattern, section_content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+            if response_match:
+                response_fields = self._extract_fields_from_markdown_table(response_match.group(1), 'response_field')
+                all_fields.extend(response_fields)
+
+            if all_fields:
+                section = Section(title=section_name, key=section_key, fields=all_fields)
+                sections.append(section)
+                print(f"{Colors.GREEN}  Found '{section_name}': {len(all_fields)} fields{Colors.END}")
+
+        return sections
+
     def parse_sep_06(self) -> Dict[str, Any]:
         """Parse SEP-06 (Deposit/Withdrawal API) structure"""
         print(f"{Colors.BLUE}Using SEP-06 specific parser{Colors.END}")
-
-        sections: List[Section] = []
 
         # SEP-06 uses ## level sections (Deposit, Withdraw, etc.) with ### Request/Response subsections
         endpoint_sections = [
@@ -764,35 +796,7 @@ class SEPParser:
             ('Fee', 'fee')
         ]
 
-        for section_name, section_key in endpoint_sections:
-            section_pattern = rf'##\s+{re.escape(section_name)}\s*\n(.*?)(?=\n##\s+[A-Z]|\Z)'
-            match = re.search(section_pattern, self.raw_content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-
-            if not match:
-                continue
-
-            content = match.group(1)
-            all_fields: List[Field] = []
-
-            # Extract request parameters
-            request_pattern = r'###\s+Request.*?\n(.*?)(?=\n###|\n##|\Z)'
-            request_match = re.search(request_pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-            if request_match:
-                request_fields = self._extract_fields_from_markdown_table(request_match.group(1), 'parameter')
-                all_fields.extend(request_fields)
-
-            # Extract response fields
-            response_pattern = r'###\s+Response.*?\n(.*?)(?=\n###|\n##|\Z)'
-            response_match = re.search(response_pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-            if response_match:
-                response_fields = self._extract_fields_from_markdown_table(response_match.group(1), 'response_field')
-                all_fields.extend(response_fields)
-
-            if all_fields:
-                section = Section(title=section_name, key=section_key, fields=all_fields)
-                sections.append(section)
-                print(f"{Colors.GREEN}  Found '{section_name}': {len(all_fields)} fields{Colors.END}")
-
+        sections = self._parse_endpoint_sections(endpoint_sections, self.raw_content)
         return self._build_result(sections)
 
     def parse_sep_08(self) -> Dict[str, Any]:
@@ -963,51 +967,186 @@ class SEPParser:
         return self._build_result(sections)
 
     def parse_sep_10(self) -> Dict[str, Any]:
-        """Parse SEP-10 (Web Authentication) structure"""
+        """
+        Parse SEP-10 (Web Authentication) structure.
+
+        Uses a hard-coded feature manifest instead of regex extraction because
+        SEP-10 is a protocol specification rather than a data schema.  The
+        manifest mirrors the Flutter SDK's SEP-10 definition so that both SDKs
+        produce directly comparable compatibility matrices.
+        """
         print(f"{Colors.BLUE}Using SEP-10 specific parser{Colors.END}")
 
-        sections: List[Section] = []
-
-        section_definitions = [
-            {
-                'title': 'Authentication Endpoints',
-                'key': 'authentication_endpoints',
-                'pattern': r'##\s+(?:Authentication|Endpoints).*?\n(.*?)(?=\n##|\Z)'
-            },
-            {
-                'title': 'Challenge Features',
-                'key': 'challenge_features',
-                'pattern': r'##\s+Challenge.*?\n(.*?)(?=\n##|\Z)'
-            },
-            {
-                'title': 'JWT Features',
-                'key': 'jwt_features',
-                'pattern': r'##\s+(?:JWT|Token).*?\n(.*?)(?=\n##|\Z)'
-            },
-            {
-                'title': 'Client Domain',
-                'key': 'client_domain',
-                'pattern': r'##\s+Client Domain.*?\n(.*?)(?=\n##|\Z)'
-            },
-            {
-                'title': 'Verification',
-                'key': 'verification',
-                'pattern': r'##\s+Verification.*?\n(.*?)(?=\n##|\Z)'
-            }
+        # --- Authentication Endpoints ----------------------------------------
+        auth_endpoint_fields = [
+            Field(
+                name='get_auth_challenge',
+                description='GET /auth endpoint - Returns challenge transaction',
+                required=True,
+            ),
+            Field(
+                name='post_auth_token',
+                description='POST /auth endpoint - Validates signed challenge and returns JWT token',
+                required=True,
+            ),
         ]
 
-        for section_def in section_definitions:
-            match = re.search(section_def['pattern'], self.raw_content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-            if match:
-                content = match.group(1)
-                fields = self.extract_all_fields(content)
-                section = Section(
-                    title=section_def['title'],
-                    key=section_def['key'],
-                    fields=fields
-                )
-                sections.append(section)
-                print(f"{Colors.GREEN}  Found '{section_def['title']}': {len(fields)} fields{Colors.END}")
+        # --- Challenge Transaction Features ----------------------------------
+        challenge_fields = [
+            Field(
+                name='challenge_transaction_generation',
+                description='Generate challenge transaction with proper structure',
+                required=True,
+            ),
+            Field(
+                name='transaction_envelope_format',
+                description='Challenge uses proper Stellar transaction envelope format',
+                required=True,
+            ),
+            Field(
+                name='sequence_number_zero',
+                description='Challenge transaction has sequence number 0',
+                required=True,
+            ),
+            Field(
+                name='manage_data_operations',
+                description='Challenge uses ManageData operations for auth data',
+                required=True,
+            ),
+            Field(
+                name='home_domain_operation',
+                description='First operation contains home_domain + " auth" as data name',
+                required=True,
+            ),
+            Field(
+                name='web_auth_domain_operation',
+                description='Optional operation with web_auth_domain for domain verification',
+                required=False,
+            ),
+            Field(
+                name='timebounds_enforcement',
+                description='Challenge transaction has timebounds for expiration',
+                required=True,
+            ),
+            Field(
+                name='server_signature',
+                description='Challenge is signed by server before sending to client',
+                required=True,
+            ),
+            Field(
+                name='nonce_generation',
+                description='Random nonce in ManageData operation value',
+                required=True,
+            ),
+        ]
+
+        # --- Client Domain Features ------------------------------------------
+        client_domain_fields = [
+            Field(
+                name='client_domain_parameter',
+                description='Support optional client_domain parameter in GET /auth',
+                required=False,
+            ),
+            Field(
+                name='client_domain_operation',
+                description='Add client_domain ManageData operation to challenge',
+                required=False,
+            ),
+            Field(
+                name='client_domain_signature',
+                description='Require signature from client domain account',
+                required=False,
+            ),
+        ]
+
+        # --- JWT Token Features ----------------------------------------------
+        jwt_fields = [
+            Field(
+                name='jwt_token_generation',
+                description='Generate JWT token after successful challenge validation',
+                required=True,
+            ),
+            Field(
+                name='jwt_token_response',
+                description='Return JWT token in JSON response with "token" field',
+                required=True,
+            ),
+            Field(
+                name='jwt_expiration',
+                description='JWT token includes expiration time',
+                required=True,
+            ),
+            Field(
+                name='jwt_claims',
+                description='JWT token includes required claims (sub, iat, exp)',
+                required=True,
+            ),
+        ]
+
+        # --- Verification Features -------------------------------------------
+        verification_fields = [
+            Field(
+                name='challenge_validation',
+                description='Validate challenge transaction structure and content',
+                required=True,
+            ),
+            Field(
+                name='signature_verification',
+                description='Verify all signatures on challenge transaction',
+                required=True,
+            ),
+            Field(
+                name='multi_signature_support',
+                description='Support multiple signatures on challenge (client account + signers)',
+                required=True,
+            ),
+            Field(
+                name='timebounds_validation',
+                description='Validate challenge is within valid time window',
+                required=True,
+            ),
+            Field(
+                name='home_domain_validation',
+                description='Validate home domain in challenge matches server',
+                required=True,
+            ),
+            Field(
+                name='memo_support',
+                description='Support optional memo in challenge for muxed accounts',
+                required=False,
+            ),
+        ]
+
+        sections: List[Section] = [
+            Section(
+                title='Authentication Endpoints',
+                key='authentication_endpoints',
+                fields=auth_endpoint_fields,
+            ),
+            Section(
+                title='Challenge Transaction Features',
+                key='challenge_transaction_features',
+                fields=challenge_fields,
+            ),
+            Section(
+                title='Client Domain Features',
+                key='client_domain_features',
+                fields=client_domain_fields,
+            ),
+            Section(
+                title='JWT Token Features',
+                key='jwt_token_features',
+                fields=jwt_fields,
+            ),
+            Section(
+                title='Verification Features',
+                key='verification_features',
+                fields=verification_fields,
+            ),
+        ]
+
+        for section in sections:
+            print(f"{Colors.GREEN}  Defined '{section.title}': {section.field_count} fields{Colors.END}")
 
         return self._build_result(sections)
 
@@ -1062,8 +1201,6 @@ class SEPParser:
         """Parse SEP-24 (Hosted Deposit/Withdrawal) structure"""
         print(f"{Colors.BLUE}Using SEP-24 specific parser{Colors.END}")
 
-        sections: List[Section] = []
-
         # SEP-24 uses ## level sections (Deposit, Withdraw, Info, etc.) with ### Request/Response subsections
         endpoint_sections = [
             ('Deposit', 'deposit'),
@@ -1074,35 +1211,7 @@ class SEPParser:
             ('Transaction', 'transaction')
         ]
 
-        for section_name, section_key in endpoint_sections:
-            section_pattern = rf'##\s+{re.escape(section_name)}\s*\n(.*?)(?=\n##\s+[A-Z]|\Z)'
-            match = re.search(section_pattern, self.raw_content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-
-            if not match:
-                continue
-
-            content = match.group(1)
-            all_fields: List[Field] = []
-
-            # Extract request parameters
-            request_pattern = r'###\s+Request.*?\n(.*?)(?=\n###|\n##|\Z)'
-            request_match = re.search(request_pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-            if request_match:
-                request_fields = self._extract_fields_from_markdown_table(request_match.group(1), 'parameter')
-                all_fields.extend(request_fields)
-
-            # Extract response fields
-            response_pattern = r'###\s+Response.*?\n(.*?)(?=\n###|\n##|\Z)'
-            response_match = re.search(response_pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-            if response_match:
-                response_fields = self._extract_fields_from_markdown_table(response_match.group(1), 'response_field')
-                all_fields.extend(response_fields)
-
-            if all_fields:
-                section = Section(title=section_name, key=section_key, fields=all_fields)
-                sections.append(section)
-                print(f"{Colors.GREEN}  Found '{section_name}': {len(all_fields)} fields{Colors.END}")
-
+        sections = self._parse_endpoint_sections(endpoint_sections, self.raw_content)
         return self._build_result(sections)
 
     def parse_sep_38(self) -> Dict[str, Any]:
@@ -1506,14 +1615,12 @@ def main() -> int:
 
     sep_number = sys.argv[1]
 
-    # Determine project root and output path
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent.parent.parent
-    output_dir = project_root / 'compatibility' / 'sep' / 'data'
+    # Output path: tools/matrix-generator/data/sep/
+    output_dir = DATA_DIR / 'sep'
     output_file = output_dir / f"sep_{sep_number.zfill(4)}_definition.json"
 
     print(f"{Colors.BOLD}{Colors.HEADER}KMP Stellar SDK - SEP Parser{Colors.END}")
-    print(f"Project root: {project_root}")
+    print(f"Output directory: {output_dir}")
     print()
 
     # Create parser and fetch content

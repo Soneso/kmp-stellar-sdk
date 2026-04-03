@@ -1,10 +1,10 @@
 # SEP-0030 (Account Recovery: multi-party recovery of Stellar accounts) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:17
 
-**SEP Version:** 0.8.1<br>
-**SEP Status:** Draft<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 0.8.1  
+**SEP Status:** Draft  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0030.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ Account Recovery: multi-party recovery of Stellar accounts using alternative aut
 
 - ✅ **Implemented:** 35/35
 - ❌ **Not Implemented:** 0/35
-- **Required Fields:** 100.0% (30/30)
+
+**Required Fields:** 100.0% (30/30)
+
+**Optional Fields:** 100.0% (5/5)
 
 ## Implementation Status
 
@@ -172,11 +175,20 @@ Account Recovery: multi-party recovery of Stellar accounts using alternative aut
 | `identities[].auth_methods[].type` | ✓ | ✅ | `Sep30AuthMethod.type` | Auth method type |
 | `identities[].auth_methods[].value` | ✓ | ✅ | `Sep30AuthMethod.value` | Auth method value |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0030!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

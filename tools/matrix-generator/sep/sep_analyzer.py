@@ -16,60 +16,37 @@ Date: 2026-02-13
 License: Apache-2.0
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import json
 import re
-import sys
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional, Set
 
-
-class Colors:
-    """ANSI color codes for terminal output"""
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
-
-    @classmethod
-    def disable(cls):
-        """Disable colors (for non-TTY output)"""
-        cls.HEADER = ''
-        cls.BLUE = ''
-        cls.CYAN = ''
-        cls.GREEN = ''
-        cls.YELLOW = ''
-        cls.RED = ''
-        cls.BOLD = ''
-        cls.UNDERLINE = ''
-        cls.END = ''
+from common import Colors, DATA_DIR, SDK_ROOT, get_sdk_version, snake_to_camel
 
 
 class SEPAnalyzer:
     """Analyzer for KMP SDK SEP implementations"""
 
-    def __init__(self, sdk_path: str, sep_number: str):
+    def __init__(self, sep_number: str):
         """
         Initialize SEP analyzer.
 
         Args:
-            sdk_path: Path to KMP SDK root directory
             sep_number: SEP number to analyze (e.g., '0001')
         """
-        self.sdk_path = Path(sdk_path)
+        self.sdk_path = SDK_ROOT
         self.sep_number = sep_number.zfill(4)
         # Directory naming uses short form: sep01, sep02, sep45 (not zero-padded)
         sep_dir_name = f'sep{str(int(self.sep_number)).zfill(2)}'
-        self.sep_dir = self.sdk_path / 'stellar-sdk' / 'src' / 'commonMain' / 'kotlin' / 'com' / 'soneso' / 'stellar' / 'sdk' / 'sep' / sep_dir_name
-        self.test_dir_unit = self.sdk_path / 'stellar-sdk' / 'src' / 'commonTest' / 'kotlin' / 'com' / 'soneso' / 'stellar' / 'sdk' / 'unitTests' / 'sep' / sep_dir_name
-        self.test_dir_integration = self.sdk_path / 'stellar-sdk' / 'src' / 'commonTest' / 'kotlin' / 'com' / 'soneso' / 'stellar' / 'sdk' / 'integrationTests' / 'sep' / sep_dir_name
+        self.sep_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep' / sep_dir_name
+        self.test_dir_unit = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep' / sep_dir_name
+        self.test_dir_integration = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep' / sep_dir_name
         # Special case: SEP-53 lives in KeyPair.kt, not in sep53/ directory
-        self.keypair_file = self.sdk_path / 'stellar-sdk' / 'src' / 'commonMain' / 'kotlin' / 'com' / 'soneso' / 'stellar' / 'sdk' / 'KeyPair.kt'
+        self.keypair_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/KeyPair.kt'
         self.analysis_data: Dict[str, Any] = {}
 
     def find_sep_files(self) -> List[Path]:
@@ -109,7 +86,7 @@ class SEPAnalyzer:
 
         # Special case: SEP-53 test is Sep53Test.kt in unitTests/sep/sep53/
         if self.sep_number == '0053':
-            sep53_test_file = self.sdk_path / 'stellar-sdk' / 'src' / 'commonTest' / 'kotlin' / 'com' / 'soneso' / 'stellar' / 'sdk' / 'unitTests' / 'sep' / 'sep53' / 'Sep53Test.kt'
+            sep53_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep53/Sep53Test.kt'
             if sep53_test_file.exists():
                 files.append(sep53_test_file)
             return sorted(files)
@@ -326,21 +303,6 @@ class SEPAnalyzer:
 
         return properties
 
-    def get_sdk_version(self) -> str:
-        """
-        Read SDK version from gradle.properties.
-
-        Returns:
-            SDK version string
-        """
-        gradle_props = self.sdk_path / 'gradle.properties'
-        if gradle_props.exists():
-            content = gradle_props.read_text(encoding='utf-8')
-            version_match = re.search(r'^version\s*=\s*(.+)$', content, re.MULTILINE)
-            if version_match:
-                return version_match.group(1).strip()
-        return 'unknown'
-
     def analyze(self) -> Dict[str, Any]:
         """
         Analyze SEP implementation and generate output.
@@ -358,7 +320,7 @@ class SEPAnalyzer:
             }
 
         # Load SEP definition
-        sep_def_path = self.sdk_path / 'compatibility' / 'sep' / 'data' / f'sep_{self.sep_number}_definition.json'
+        sep_def_path = DATA_DIR / 'sep' / f'sep_{self.sep_number}_definition.json'
 
         sep_definition = {}
         if sep_def_path.exists():
@@ -395,8 +357,8 @@ class SEPAnalyzer:
             'classes': all_classes,
             'field_mappings': field_mappings,
             'metadata': {
-                'generated_at': datetime.now(tz=__import__('datetime').timezone.utc).isoformat(),
-                'sdk_version': self.get_sdk_version(),
+                'generated_at': datetime.now(tz=timezone.utc).isoformat(),
+                'sdk_version': get_sdk_version(),
                 'total_fields_implemented': implemented_fields,
                 'coverage': coverage
             }
@@ -407,6 +369,9 @@ class SEPAnalyzer:
         """
         Generate field mappings based on SEP number.
 
+        Dispatches to the appropriate SEP-specific mapper via a dict lookup.
+        Falls back to ``map_generic_fields`` for unknown SEP numbers.
+
         Args:
             classes: List of SDK classes
             sep_definition: SEP specification definition
@@ -414,36 +379,23 @@ class SEPAnalyzer:
         Returns:
             Dictionary mapping SEP fields to SDK properties/methods
         """
-        # Route to SEP-specific mapping logic
-        if self.sep_number == '0001':
-            return self.map_sep_01_fields(classes, sep_definition)
-        elif self.sep_number == '0002':
-            return self.map_sep_02_fields(classes, sep_definition)
-        elif self.sep_number == '0005':
-            return self.map_sep_05_fields(classes, sep_definition)
-        elif self.sep_number == '0006':
-            return self.map_sep_06_fields(classes, sep_definition)
-        elif self.sep_number == '0008':
-            return self.map_sep_08_fields(classes, sep_definition)
-        elif self.sep_number == '0009':
-            return self.map_sep_09_fields(classes, sep_definition)
-        elif self.sep_number == '0010':
-            return self.map_sep_10_fields(classes, sep_definition)
-        elif self.sep_number == '0012':
-            return self.map_sep_12_fields(classes, sep_definition)
-        elif self.sep_number == '0024':
-            return self.map_sep_24_fields(classes, sep_definition)
-        elif self.sep_number == '0030':
-            return self.map_sep_30_fields(classes, sep_definition)
-        elif self.sep_number == '0038':
-            return self.map_sep_38_fields(classes, sep_definition)
-        elif self.sep_number == '0045':
-            return self.map_sep_45_fields(classes, sep_definition)
-        elif self.sep_number == '0053':
-            return self.map_sep_53_fields(classes, sep_definition)
-        else:
-            # Generic mapping for unknown SEPs
-            return self.map_generic_fields(classes, sep_definition)
+        mappers = {
+            '0001': self.map_sep_01_fields,
+            '0002': self.map_sep_02_fields,
+            '0005': self.map_sep_05_fields,
+            '0006': self.map_sep_06_fields,
+            '0008': self.map_sep_08_fields,
+            '0009': self.map_sep_09_fields,
+            '0010': self.map_sep_10_fields,
+            '0012': self.map_sep_12_fields,
+            '0024': self.map_sep_24_fields,
+            '0030': self.map_sep_30_fields,
+            '0038': self.map_sep_38_fields,
+            '0045': self.map_sep_45_fields,
+            '0053': self.map_sep_53_fields,
+        }
+        mapper = mappers.get(self.sep_number, self.map_generic_fields)
+        return mapper(classes, sep_definition)
 
     def map_sep_01_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -794,7 +746,7 @@ class SEPAnalyzer:
                 # Use generic mapping for other sections
                 for field in sep_fields:
                     field_name = field.get('name', '')
-                    sdk_name = self.snake_to_camel(field_name)
+                    sdk_name = snake_to_camel(field_name)
                     if sdk_name in all_methods or sdk_name in all_enum_values:
                         section_mappings[field_name] = sdk_name
                     else:
@@ -803,6 +755,35 @@ class SEPAnalyzer:
             field_mappings[section_key] = section_mappings
 
         return field_mappings
+
+    def _map_service_methods(
+        self,
+        classes: List[Dict[str, Any]],
+        method_map: Dict[str, str]
+    ) -> Dict[str, Optional[str]]:
+        """
+        Build a ``{field_name: sdk_method_or_None}`` mapping for service-level methods.
+
+        Collects every method name from *classes*, then for each entry in *method_map*
+        resolves whether the target SDK method name actually exists in the collected set.
+
+        Args:
+            classes: List of class analysis dicts (each has a ``'methods'`` list).
+            method_map: Ordered mapping of ``{spec_field_name: sdk_method_name}``.
+
+        Returns:
+            Dict where each key is a spec field name and the value is the SDK method
+            name when that method was found in *classes*, or ``None`` otherwise.
+        """
+        all_methods: Dict[str, str] = {}
+        for cls in classes:
+            for method in cls.get('methods', []):
+                all_methods[method['name']] = cls['name']
+
+        return {
+            field_name: (method_name if method_name in all_methods else None)
+            for field_name, method_name in method_map.items()
+        }
 
     def map_sep_06_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -814,14 +795,6 @@ class SEPAnalyzer:
         - Sep06DepositRequest, Sep06WithdrawRequest
         - Sep06Transaction for transaction status
         """
-        field_mappings = {}
-
-        # Build lookups
-        all_methods = {}
-        for cls in classes:
-            for method in cls.get('methods', []):
-                all_methods[method['name']] = cls['name']
-
         # Since SEP-06 definition has 0 fields, create basic method mappings
         service_methods = {
             'info': 'info',
@@ -833,13 +806,7 @@ class SEPAnalyzer:
             'transactions': 'transactions'
         }
 
-        service_mappings = {}
-        for field_name, method_name in service_methods.items():
-            service_mappings[field_name] = method_name if method_name in all_methods else method_name
-
-        field_mappings['service_methods'] = service_mappings
-
-        return field_mappings
+        return {'service_methods': self._map_service_methods(classes, service_methods)}
 
     def map_sep_08_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -1021,7 +988,7 @@ class SEPAnalyzer:
                 # Generic mapping
                 for field in sep_fields:
                     field_name = field.get('name', '')
-                    sdk_name = self.snake_to_camel(field_name)
+                    sdk_name = snake_to_camel(field_name)
                     if sdk_name in all_methods:
                         section_mappings[field_name] = sdk_name
                     else:
@@ -1157,19 +1124,19 @@ class SEPAnalyzer:
         # Build field mappings
         natural_person_mappings = {}
         for field_name, prop_name in natural_person_fields.items():
-            natural_person_mappings[field_name] = prop_name if prop_name in natural_person_props else prop_name
+            natural_person_mappings[field_name] = prop_name if prop_name in natural_person_props else None
 
         organization_mappings = {}
         for field_name, prop_name in organization_fields.items():
-            organization_mappings[field_name] = prop_name if prop_name in organization_props else prop_name
+            organization_mappings[field_name] = prop_name if prop_name in organization_props else None
 
         financial_mappings = {}
         for field_name, prop_name in financial_account_fields.items():
-            financial_mappings[field_name] = prop_name if prop_name in financial_props else prop_name
+            financial_mappings[field_name] = prop_name if prop_name in financial_props else None
 
         card_mappings = {}
         for field_name, prop_name in card_fields.items():
-            card_mappings[field_name] = prop_name if prop_name in card_props else prop_name
+            card_mappings[field_name] = prop_name if prop_name in card_props else None
 
         field_mappings['natural_person_fields'] = natural_person_mappings
         field_mappings['organization_fields'] = organization_mappings
@@ -1181,116 +1148,102 @@ class SEPAnalyzer:
     def map_sep_10_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
         """
-        Map SEP-10 (Web Authentication) fields.
+        Map SEP-10 (Web Authentication) fields to KMP SDK methods.
 
-        SEP-10 implementation uses:
-        - WebAuth class with authentication methods
-        - ChallengeResponse data class
-        - AuthToken data class
-        - TokenSubmissionRequest and TokenSubmissionResponse
+        The definition produced by parse_sep_10 contains five sections with
+        hard-coded feature names.  Each feature is mapped to the WebAuth or
+        AuthToken method that implements it.
+
+        KMP SDK classes:
+        - WebAuth          - fromDomain, jwtToken, getChallenge, validateChallenge,
+                             signTransaction, sendSignedChallenge
+        - AuthToken        - parse, isExpired, token, iss, sub, iat, exp, jti,
+                             clientDomain, account, memo
+        - ChallengeResponse - transaction, networkPassphrase
         """
-        field_mappings = {}
-
-        # Build lookups
-        all_methods = {}
-        all_properties = {}
+        # Collect all method names across all SDK classes for existence checks.
+        all_methods: set[str] = set()
         for cls in classes:
             for method in cls.get('methods', []):
-                all_methods[method['name']] = cls['name']
-            if cls['name'] not in all_properties:
-                all_properties[cls['name']] = set()
-            for prop in cls.get('properties', []):
-                all_properties[cls['name']].add(prop['name'])
+                all_methods.add(method['name'])
 
-        # Map sections
-        sections = sep_definition.get('sections', [])
+        # ------------------------------------------------------------------
+        # Explicit feature -> SDK method/property mappings
+        # ------------------------------------------------------------------
 
-        for section in sections:
+        authentication_endpoints_map: Dict[str, str] = {
+            'get_auth_challenge': 'getChallenge',
+            'post_auth_token': 'sendSignedChallenge',
+        }
+
+        challenge_transaction_features_map: Dict[str, str] = {
+            # getChallenge fetches the challenge and carries the nonce
+            'challenge_transaction_generation': 'getChallenge',
+            'nonce_generation': 'getChallenge',
+            # validateChallenge enforces all structural requirements
+            'transaction_envelope_format': 'validateChallenge',
+            'sequence_number_zero': 'validateChallenge',
+            'manage_data_operations': 'validateChallenge',
+            'home_domain_operation': 'validateChallenge',
+            'web_auth_domain_operation': 'validateChallenge',
+            'timebounds_enforcement': 'validateChallenge',
+            'server_signature': 'validateChallenge',
+        }
+
+        client_domain_features_map: Dict[str, str] = {
+            # getChallenge passes client_domain as a query parameter
+            'client_domain_parameter': 'getChallenge',
+            # validateChallenge checks the client_domain ManageData operation
+            'client_domain_operation': 'validateChallenge',
+            # signTransaction adds the client domain signature
+            'client_domain_signature': 'signTransaction',
+        }
+
+        jwt_token_features_map: Dict[str, str] = {
+            # sendSignedChallenge posts the signed transaction and returns an
+            # AuthToken parsed from the JWT response
+            'jwt_token_generation': 'sendSignedChallenge',
+            'jwt_token_response': 'sendSignedChallenge',
+            # AuthToken exposes exp and the full claims set
+            'jwt_expiration': 'isExpired',
+            'jwt_claims': 'parse',
+        }
+
+        verification_features_map: Dict[str, str] = {
+            'challenge_validation': 'validateChallenge',
+            'signature_verification': 'validateChallenge',
+            'home_domain_validation': 'validateChallenge',
+            'timebounds_validation': 'validateChallenge',
+            # signTransaction accepts a list of signers for multi-sig accounts
+            'multi_signature_support': 'signTransaction',
+            # getChallenge accepts a memo parameter
+            'memo_support': 'getChallenge',
+        }
+
+        section_maps: Dict[str, Dict[str, str]] = {
+            'authentication_endpoints': authentication_endpoints_map,
+            'challenge_transaction_features': challenge_transaction_features_map,
+            'client_domain_features': client_domain_features_map,
+            'jwt_token_features': jwt_token_features_map,
+            'verification_features': verification_features_map,
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
             section_key = section.get('key', '')
-            sep_fields = section.get('fields', [])
-            section_mappings = {}
+            feature_map = section_maps.get(section_key, {})
+            section_mappings: Dict[str, Optional[str]] = {}
 
-            if section_key == 'authentication_endpoints':
-                # Map to WebAuth methods
-                endpoint_map = {
-                    'get_challenge': 'getChallenge',
-                    'post_token': 'sendSignedChallenge',
-                    'web_auth_endpoint': 'fromDomain'
-                }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = endpoint_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = sdk_method if sdk_method else None
-
-            elif section_key == 'challenge_features':
-                # Map challenge validation features
-                feature_map = {
-                    'validate_transaction_source': 'validateChallenge',
-                    'validate_sequence_number': 'validateChallenge',
-                    'validate_time_bounds': 'validateChallenge',
-                    'validate_operation_type': 'validateChallenge',
-                    'validate_operation_source': 'validateChallenge',
-                    'validate_home_domain': 'validateChallenge',
-                    'validate_web_auth_domain': 'validateChallenge',
-                    'validate_nonce': 'validateChallenge',
-                    'validate_server_signature': 'validateChallenge',
-                    'validate_client_domain': 'validateChallenge',
-                    'muxed_account_support': 'validateChallenge',
-                    'memo_support': 'validateChallenge'
-                }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = feature_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = sdk_method if sdk_method else None
-
-            elif section_key == 'jwt_features':
-                # Map JWT token features to AuthToken properties
-                jwt_map = {
-                    'iss': 'token',
-                    'sub': 'token',
-                    'iat': 'token',
-                    'exp': 'token',
-                    'client_domain': 'token',
-                    'Content': '(handled by sendSignedChallenge)',
-                    'decode': 'validateChallenge',
-                    'verify': 'validateChallenge',
-                    'if': 'validateChallenge'
-                }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_item = jwt_map.get(field_name)
-                    section_mappings[field_name] = sdk_item if sdk_item else None
-
-            elif section_key == 'verification':
-                # Map verification methods
-                verify_map = {
-                    'verify_challenge': 'validateChallenge',
-                    'verify_signatures': 'validateChallenge',
-                    'verify_client_domain': 'validateChallenge'
-                }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = verify_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = sdk_method if sdk_method else None
-
-            else:
-                # Generic mapping
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_name = self.snake_to_camel(field_name)
-                    if sdk_name in all_methods:
-                        section_mappings[field_name] = sdk_name
-                    else:
-                        section_mappings[field_name] = None
+            for field in section.get('fields', []):
+                field_name = field.get('name', '')
+                sdk_method = feature_map.get(field_name)
+                # Verify the mapped method actually exists in the SDK classes.
+                if sdk_method and sdk_method in all_methods:
+                    section_mappings[field_name] = sdk_method
+                else:
+                    # Method not found or no mapping defined.
+                    section_mappings[field_name] = None
 
             field_mappings[section_key] = section_mappings
 
@@ -1307,14 +1260,6 @@ class SEPAnalyzer:
         - GetCustomerInfoResponse, PutCustomerInfoResponse
         - CustomerStatus enum
         """
-        field_mappings = {}
-
-        # Build lookups
-        all_methods = {}
-        for cls in classes:
-            for method in cls.get('methods', []):
-                all_methods[method['name']] = cls['name']
-
         # Since SEP-12 definition has minimal fields, create basic method mappings
         service_methods = {
             'get_customer': 'getCustomerInfo',
@@ -1325,13 +1270,7 @@ class SEPAnalyzer:
             'get_customer_files': 'getCustomerFiles'
         }
 
-        service_mappings = {}
-        for field_name, method_name in service_methods.items():
-            service_mappings[field_name] = method_name if method_name in all_methods else method_name
-
-        field_mappings['service_methods'] = service_mappings
-
-        return field_mappings
+        return {'service_methods': self._map_service_methods(classes, service_methods)}
 
     def map_sep_24_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -1343,14 +1282,6 @@ class SEPAnalyzer:
         - Sep24InteractiveFlowRequest
         - Sep24Transaction for transaction status
         """
-        field_mappings = {}
-
-        # Build lookups
-        all_methods = {}
-        for cls in classes:
-            for method in cls.get('methods', []):
-                all_methods[method['name']] = cls['name']
-
         # Since SEP-24 definition has 0 fields, create basic method mappings
         service_methods = {
             'info': 'info',
@@ -1361,13 +1292,7 @@ class SEPAnalyzer:
             'transactions': 'transactions'
         }
 
-        service_mappings = {}
-        for field_name, method_name in service_methods.items():
-            service_mappings[field_name] = method_name if method_name in all_methods else method_name
-
-        field_mappings['service_methods'] = service_mappings
-
-        return field_mappings
+        return {'service_methods': self._map_service_methods(classes, service_methods)}
 
     def map_sep_38_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -1379,14 +1304,6 @@ class SEPAnalyzer:
         - Sep38QuoteRequest, Sep38QuoteResponse
         - Sep38InfoResponse, Sep38PriceResponse
         """
-        field_mappings = {}
-
-        # Build lookups
-        all_methods = {}
-        for cls in classes:
-            for method in cls.get('methods', []):
-                all_methods[method['name']] = cls['name']
-
         # Since SEP-38 definition has 0 fields, create basic method mappings
         service_methods = {
             'get_info': 'getInfo',
@@ -1396,13 +1313,33 @@ class SEPAnalyzer:
             'get_quote': 'getQuote'
         }
 
-        service_mappings = {}
-        for field_name, method_name in service_methods.items():
-            service_mappings[field_name] = method_name if method_name in all_methods else method_name
+        return {'service_methods': self._map_service_methods(classes, service_methods)}
 
-        field_mappings['service_methods'] = service_mappings
+    @staticmethod
+    def _map_sep30_identity_fields(sep_fields: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+        """
+        Map the five SEP-30 identity request fields to their SDK equivalents.
 
-        return field_mappings
+        Both ``register_account`` and ``update_identities`` sections share the same
+        five-field identity structure, so this helper centralises that mapping.
+
+        Args:
+            sep_fields: List of field dicts from the SEP definition section.
+
+        Returns:
+            Mapping of ``{spec_field_name: sdk_property_or_None}``.
+        """
+        identity_map: Dict[str, Optional[str]] = {
+            'identities': 'Sep30Request.identities',
+            'identities[].role': 'Sep30RequestIdentity.role',
+            'identities[].auth_methods': 'Sep30RequestIdentity.authMethods',
+            'identities[].auth_methods[].type': 'Sep30AuthMethod.type',
+            'identities[].auth_methods[].value': 'Sep30AuthMethod.value',
+        }
+        return {
+            field.get('name', ''): identity_map.get(field.get('name', ''))
+            for field in sep_fields
+        }
 
     def map_sep_30_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -1428,37 +1365,11 @@ class SEPAnalyzer:
 
             if section_key == 'register_account':
                 # Register account request fields
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    if field_name == 'identities':
-                        section_mappings[field_name] = 'Sep30Request.identities'
-                    elif field_name == 'identities[].role':
-                        section_mappings[field_name] = 'Sep30RequestIdentity.role'
-                    elif field_name == 'identities[].auth_methods':
-                        section_mappings[field_name] = 'Sep30RequestIdentity.authMethods'
-                    elif field_name == 'identities[].auth_methods[].type':
-                        section_mappings[field_name] = 'Sep30AuthMethod.type'
-                    elif field_name == 'identities[].auth_methods[].value':
-                        section_mappings[field_name] = 'Sep30AuthMethod.value'
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_sep30_identity_fields(sep_fields)
 
             elif section_key == 'update_identities':
-                # Update identities request fields (same as register)
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    if field_name == 'identities':
-                        section_mappings[field_name] = 'Sep30Request.identities'
-                    elif field_name == 'identities[].role':
-                        section_mappings[field_name] = 'Sep30RequestIdentity.role'
-                    elif field_name == 'identities[].auth_methods':
-                        section_mappings[field_name] = 'Sep30RequestIdentity.authMethods'
-                    elif field_name == 'identities[].auth_methods[].type':
-                        section_mappings[field_name] = 'Sep30AuthMethod.type'
-                    elif field_name == 'identities[].auth_methods[].value':
-                        section_mappings[field_name] = 'Sep30AuthMethod.value'
-                    else:
-                        section_mappings[field_name] = None
+                # Update identities request fields (same structure as register_account)
+                section_mappings = self._map_sep30_identity_fields(sep_fields)
 
             elif section_key == 'sign_transaction':
                 # Sign transaction request
@@ -1599,7 +1510,7 @@ class SEPAnalyzer:
 
         service_mappings = {}
         for field_name, method_name in service_methods.items():
-            service_mappings[field_name] = method_name if method_name in all_methods else method_name
+            service_mappings[field_name] = method_name if method_name in all_methods else None
 
         field_mappings['service_methods'] = service_mappings
 
@@ -1698,7 +1609,7 @@ class SEPAnalyzer:
 
                 # Try to find matching property or method
                 # Convert snake_case to camelCase
-                sdk_name = self.snake_to_camel(field_name)
+                sdk_name = snake_to_camel(field_name)
 
                 if sdk_name in all_properties:
                     section_mappings[field_name] = sdk_name
@@ -1710,20 +1621,6 @@ class SEPAnalyzer:
             field_mappings[section_key] = section_mappings
 
         return field_mappings
-
-    def snake_to_camel(self, snake_str: str) -> str:
-        """
-        Convert snake_case to camelCase.
-
-        Args:
-            snake_str: String in snake_case
-
-        Returns:
-            String in camelCase
-        """
-        parts = snake_str.lower().split('_')
-        return parts[0] + ''.join(p.capitalize() for p in parts[1:])
-
 
 def main():
     """Main entry point for the analyzer."""
@@ -1739,15 +1636,11 @@ def main():
 
     sep_number = sys.argv[1].zfill(4)
 
-    # Get SDK path (4 levels up from script location: tools/sdk-analysis/sep/ -> root)
-    script_path = Path(__file__).resolve()
-    sdk_path = script_path.parent.parent.parent.parent
-
     print(f"{Colors.HEADER}KMP Stellar SDK SEP Implementation Analyzer{Colors.END}")
     print(f"{Colors.CYAN}Analyzing SEP-{sep_number}{Colors.END}\n")
 
     # Create analyzer
-    analyzer = SEPAnalyzer(str(sdk_path), sep_number)
+    analyzer = SEPAnalyzer(sep_number)
 
     # Run analysis
     print(f"{Colors.BLUE}Scanning source files...{Colors.END}")
@@ -1766,8 +1659,9 @@ def main():
     print(f"{Colors.GREEN}Coverage: {result['metadata']['coverage']}{Colors.END}\n")
 
     # Write output
-    output_path = sdk_path / 'compatibility' / 'sep' / 'data' / f'kmp_sep_{sep_number}_implementation.json'
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir = DATA_DIR / 'sep'
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f'kmp_sep_{sep_number}_implementation.json'
 
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, indent=2, ensure_ascii=False)

@@ -1,10 +1,10 @@
 # SEP-0002 (Federation protocol) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:13
 
-**SEP Version:** 1.1.0<br>
-**SEP Status:** Final<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 1.1.0  
+**SEP Status:** Final  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0002.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ The federation protocol resolves human-readable addresses like `name*yourdomain.
 
 - ✅ **Implemented:** 10/10
 - ❌ **Not Implemented:** 0/10
-- **Required Fields:** 100.0% (6/6)
+
+**Required Fields:** 100.0% (6/6)
+
+**Optional Fields:** 100.0% (4/4)
 
 ## Implementation Status
 
@@ -84,11 +87,20 @@ The federation protocol resolves human-readable addresses like `name*yourdomain.
 | `memo_type` |  | ✅ | `memoType` | type of memo to attach to transaction, one of text, id or hash |
 | `memo` |  | ✅ | `memo` | value of memo to attach to transaction, for hash this should be base64-encoded |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0002!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

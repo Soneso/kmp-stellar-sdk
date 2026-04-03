@@ -1,10 +1,10 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:14
 
-**SEP Version:** 4.3.0<br>
-**SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 4.3.0  
+**SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 
 - ✅ **Implemented:** 73/73
 - ❌ **Not Implemented:** 0/73
-- **Required Fields:** 100.0% (4/4)
+
+**Required Fields:** 100.0% (4/4)
+
+**Optional Fields:** 100.0% (69/69)
 
 ## Implementation Status
 
@@ -204,11 +207,20 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 | `wallet_name` |  | ✅ | `walletName` | (**Deprecated**, optional) In communications / pages about the withdrawal, anchor should display ... |
 | `wallet_url` |  | ✅ | `walletUrl` | (**Deprecated**, optional) Anchor can show this to the user when referencing the wallet involved ... |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0006!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

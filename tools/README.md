@@ -28,29 +28,25 @@ cd tools/xdrgen-kt
 
 For detailed documentation, see the README.md in each tool's subdirectory.
 
-### sdk-analysis - Compatibility Matrix Generator
+### matrix-generator - Compatibility Matrix Generator
 
-**Location:** `tools/sdk-analysis/`
+**Location:** `tools/matrix-generator/`
 
 **Description:** Python-based tools for generating compatibility matrices that compare the KMP Stellar SDK against official Stellar API specifications. Covers Horizon REST API, Soroban RPC, and SEP (Stellar Ecosystem Proposals).
 
 **Prerequisites:**
 - Python 3.8+ (standard library only, no external dependencies)
-- `stellar-go` repo (for Horizon analysis)
-- `stellar-rpc` repo (for RPC analysis, or fetched from GitHub automatically)
+- Optional: `GITHUB_TOKEN` for higher API rate limits
 
 **Usage:**
 ```bash
-# Generate Horizon + RPC matrices
-python3 tools/sdk-analysis/run_analysis.py
-
-# Generate all SEP matrices
-python3 tools/sdk-analysis/sep/run_sep_analysis.py
+# Generate all matrices (Horizon + RPC + SEPs)
+python3 tools/matrix-generator/run_analysis.py
 ```
 
 **Output:** Generates compatibility matrices in `compatibility/horizon/`, `compatibility/rpc/`, and `compatibility/sep/`.
 
-For detailed documentation, see `tools/sdk-analysis/README.md` and `tools/sdk-analysis/sep/README.md`.
+For detailed documentation, see `tools/matrix-generator/README.md`.
 
 ## Directory Structure
 
@@ -61,18 +57,14 @@ tools/
 │   ├── generate.rb        # Main generator script
 │   ├── Gemfile            # Ruby dependencies
 │   └── lib/               # Custom Kotlin generator
-└── sdk-analysis/          # Compatibility matrix generator
-    ├── run_analysis.py    # Horizon + RPC orchestrator
-    ├── horizon_parser.py  # Parse Horizon endpoints from stellar-go
-    ├── kmp_sdk_analyzer.py # Analyze SDK Kotlin source
-    ├── generate_horizon_comparison.py  # Generate Horizon matrix
-    ├── generate_rpc_comparison.py      # Generate RPC matrix
-    ├── go_protocol_parser.py           # Parse Go protocol files
-    └── sep/               # SEP compatibility pipeline
-        ├── run_sep_analysis.py         # SEP orchestrator
-        ├── sep_parser.py              # Parse SEP specs from GitHub
-        ├── sep_analyzer.py            # Analyze SDK SEP implementations
-        └── generate_sep_comparison.py # Generate SEP matrices
+└── matrix-generator/      # Compatibility matrix generator
+    ├── run_analysis.py    # Master orchestrator (all pipelines)
+    ├── common.py          # Shared utilities
+    ├── github_fetcher.py  # GitHub API client
+    ├── sdk_analyzer.py    # Kotlin source analyzer
+    ├── horizon/           # Horizon API pipeline
+    ├── rpc/               # Soroban RPC pipeline
+    └── sep/               # SEP pipeline
 ```
 
 ## Contributing

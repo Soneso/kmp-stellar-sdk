@@ -112,7 +112,10 @@ class SorobanServerTest {
   "result": {
     "id": "e73d7654b72daa637f396669182c6072549736a26d1f31bc53ba6a08f9e3ca1f",
     "protocolVersion": 20,
-    "sequence": 24170
+    "sequence": 24170,
+    "closeTime": 1700000000,
+    "headerXdr": "AAAAIKN0fRh...",
+    "metadataXdr": "AAAAAwAAAA..."
   }
 }"""
 
@@ -361,6 +364,9 @@ class SorobanServerTest {
             assertEquals("e73d7654b72daa637f396669182c6072549736a26d1f31bc53ba6a08f9e3ca1f", ledger.id)
             assertEquals(20, ledger.protocolVersion)
             assertEquals(24170L, ledger.sequence)
+            assertEquals(1700000000L, ledger.closeTime)
+            assertEquals("AAAAIKN0fRh...", ledger.headerXdr)
+            assertEquals("AAAAAwAAAA...", ledger.metadataXdr)
         }
     }
 

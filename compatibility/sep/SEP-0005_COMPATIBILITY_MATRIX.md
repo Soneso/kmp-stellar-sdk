@@ -1,10 +1,10 @@
 # SEP-0005 (Key Derivation Methods for Stellar Keys) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:14
 
-**SEP Version:** N/A<br>
-**SEP Status:** Final<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** N/A  
+**SEP Status:** Final  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0005.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ Defines methods for deriving Stellar keypairs from mnemonic phrases, making it e
 
 - ✅ **Implemented:** 31/31
 - ❌ **Not Implemented:** 0/31
-- **Required Fields:** 100.0% (22/22)
+
+**Required Fields:** 100.0% (22/22)
+
+**Optional Fields:** 100.0% (9/9)
 
 ## Implementation Status
 
@@ -134,11 +137,20 @@ Defines methods for deriving Stellar keypairs from mnemonic phrases, making it e
 | `test_vector_4_24words_passphrase` | ✓ | ✅ | `(verified in tests)` | 24-word mnemonic with passphrase test vector: 'cable spray genius state float twenty...' with pas... |
 | `test_vector_5_abandon_about` | ✓ | ✅ | `(verified in tests)` | Known test vector: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon aband... |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0005!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

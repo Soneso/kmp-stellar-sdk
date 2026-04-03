@@ -37,7 +37,10 @@ class ExtendedResponseDeserializationTest {
         val jsonString = """{
             "id": "b789e0caef47ac1f1ef6fd9f21a6bbf625e5cb575c9b08c5d4a11e2e0a688dac",
             "protocolVersion": 20,
-            "sequence": 50000
+            "sequence": 50000,
+            "closeTime": 1700000000,
+            "headerXdr": "AAAAIKN0fRh...",
+            "metadataXdr": "AAAAAwAAAA..."
         }"""
 
         val response: GetLatestLedgerResponse = json.decodeFromString(jsonString)
@@ -45,6 +48,9 @@ class ExtendedResponseDeserializationTest {
         assertEquals("b789e0caef47ac1f1ef6fd9f21a6bbf625e5cb575c9b08c5d4a11e2e0a688dac", response.id)
         assertEquals(20, response.protocolVersion)
         assertEquals(50000L, response.sequence)
+        assertEquals(1700000000L, response.closeTime)
+        assertEquals("AAAAIKN0fRh...", response.headerXdr)
+        assertEquals("AAAAAwAAAA...", response.metadataXdr)
     }
 
     // ========== GetVersionInfoResponse Tests ==========

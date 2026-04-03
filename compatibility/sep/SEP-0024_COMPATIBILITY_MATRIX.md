@@ -1,10 +1,10 @@
 # SEP-0024 (Hosted Deposit and Withdrawal) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:16
 
-**SEP Version:** 3.8.0<br>
-**SEP Status:** Active<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 3.8.0  
+**SEP Status:** Active  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0024.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 
 - ✅ **Implemented:** 28/28
 - ❌ **Not Implemented:** 0/28
-- **Required Fields:** 100% (0/0)
+
+**Required Fields:** 100% (0/0)
+
+**Optional Fields:** 100.0% (28/28)
 
 ## Implementation Status
 
@@ -125,11 +128,20 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 | `refund_memo_type` |  | ✅ | `refundMemoType` | (optional) The type of the `refund_memo`. Can be `id`, `text`, or `hash`. See the [memos](https://developers.stellar.org/docs/encyclopedia/memos) documentation for more information. If specified, `refund_memo` must also be specified. |
 | `customer_id` |  | ✅ | `customerId` | (optional) id of an off-chain account (managed by the anchor) associated with this user's Stellar... |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0024!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

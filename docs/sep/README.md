@@ -42,7 +42,7 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0045 Compatibility Matrix](../../compatibility/sep/SEP-0045_COMPATIBILITY_MATRIX.md)
 - [SEP-0053 Compatibility Matrix](../../compatibility/sep/SEP-0053_COMPATIBILITY_MATRIX.md)
 
-To regenerate all matrices: `python3 tools/sdk-analysis/sep/run_sep_analysis.py`
+To regenerate all matrices: `python3 tools/matrix-generator/run_analysis.py`
 
 ---
 

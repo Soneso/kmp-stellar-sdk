@@ -918,6 +918,27 @@ class RpcResponseExtendedTest {
         {
             "id": "abc123hash",
             "protocolVersion": 21,
+            "sequence": 50000,
+            "closeTime": 1700000000,
+            "headerXdr": "AAAAIKN0fRh...",
+            "metadataXdr": "AAAAAwAAAA..."
+        }
+        """.trimIndent()
+        val response = json.decodeFromString<GetLatestLedgerResponse>(llJson)
+        assertEquals("abc123hash", response.id)
+        assertEquals(21, response.protocolVersion)
+        assertEquals(50000L, response.sequence)
+        assertEquals(1700000000L, response.closeTime)
+        assertEquals("AAAAIKN0fRh...", response.headerXdr)
+        assertEquals("AAAAAwAAAA...", response.metadataXdr)
+    }
+
+    @Test
+    fun testGetLatestLedgerResponse_withoutOptionalFields() {
+        val llJson = """
+        {
+            "id": "abc123hash",
+            "protocolVersion": 21,
             "sequence": 50000
         }
         """.trimIndent()
@@ -925,6 +946,9 @@ class RpcResponseExtendedTest {
         assertEquals("abc123hash", response.id)
         assertEquals(21, response.protocolVersion)
         assertEquals(50000L, response.sequence)
+        assertNull(response.closeTime)
+        assertNull(response.headerXdr)
+        assertNull(response.metadataXdr)
     }
 
     // ========== GetNetworkResponse Extended Tests ==========
