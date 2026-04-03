@@ -41,6 +41,14 @@ package com.soneso.stellar.sdk.xdr
  *     ConfigSettingContractLedgerCostExtV0 contractLedgerCostExt;
  * case CONFIG_SETTING_SCP_TIMING:
  *     ConfigSettingSCPTiming contractSCPTiming;
+ * case CONFIG_SETTING_FROZEN_LEDGER_KEYS:
+ *     FrozenLedgerKeys frozenLedgerKeys;
+ * case CONFIG_SETTING_FROZEN_LEDGER_KEYS_DELTA:
+ *     FrozenLedgerKeysDelta frozenLedgerKeysDelta;
+ * case CONFIG_SETTING_FREEZE_BYPASS_TXS:
+ *     FreezeBypassTxs freezeBypassTxs;
+ * case CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA:
+ *     FreezeBypassTxsDelta freezeBypassTxsDelta;
  * };
  */
 sealed class ConfigSettingEntryXdr {
@@ -148,6 +156,30 @@ sealed class ConfigSettingEntryXdr {
     override val discriminant: ConfigSettingIDXdr = ConfigSettingIDXdr.CONFIG_SETTING_SCP_TIMING
   }
 
+  data class FrozenLedgerKeys(
+    val value: FrozenLedgerKeysXdr
+  ) : ConfigSettingEntryXdr() {
+    override val discriminant: ConfigSettingIDXdr = ConfigSettingIDXdr.CONFIG_SETTING_FROZEN_LEDGER_KEYS
+  }
+
+  data class FrozenLedgerKeysDelta(
+    val value: FrozenLedgerKeysDeltaXdr
+  ) : ConfigSettingEntryXdr() {
+    override val discriminant: ConfigSettingIDXdr = ConfigSettingIDXdr.CONFIG_SETTING_FROZEN_LEDGER_KEYS_DELTA
+  }
+
+  data class FreezeBypassTxs(
+    val value: FreezeBypassTxsXdr
+  ) : ConfigSettingEntryXdr() {
+    override val discriminant: ConfigSettingIDXdr = ConfigSettingIDXdr.CONFIG_SETTING_FREEZE_BYPASS_TXS
+  }
+
+  data class FreezeBypassTxsDelta(
+    val value: FreezeBypassTxsDeltaXdr
+  ) : ConfigSettingEntryXdr() {
+    override val discriminant: ConfigSettingIDXdr = ConfigSettingIDXdr.CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA
+  }
+
   companion object {
 
     fun decode(reader: XdrReader): ConfigSettingEntryXdr {
@@ -221,6 +253,22 @@ sealed class ConfigSettingEntryXdr {
           val value = ConfigSettingSCPTimingXdr.decode(reader)
           ContractSCPTiming(value)
         }
+        ConfigSettingIDXdr.CONFIG_SETTING_FROZEN_LEDGER_KEYS -> {
+          val value = FrozenLedgerKeysXdr.decode(reader)
+          FrozenLedgerKeys(value)
+        }
+        ConfigSettingIDXdr.CONFIG_SETTING_FROZEN_LEDGER_KEYS_DELTA -> {
+          val value = FrozenLedgerKeysDeltaXdr.decode(reader)
+          FrozenLedgerKeysDelta(value)
+        }
+        ConfigSettingIDXdr.CONFIG_SETTING_FREEZE_BYPASS_TXS -> {
+          val value = FreezeBypassTxsXdr.decode(reader)
+          FreezeBypassTxs(value)
+        }
+        ConfigSettingIDXdr.CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA -> {
+          val value = FreezeBypassTxsDeltaXdr.decode(reader)
+          FreezeBypassTxsDelta(value)
+        }
         else -> throw IllegalArgumentException("Unknown ConfigSettingEntryXdr discriminant: $discriminant")
       }
     }
@@ -281,6 +329,18 @@ sealed class ConfigSettingEntryXdr {
         value.encode(writer)
       }
       is ContractSCPTiming -> {
+        value.encode(writer)
+      }
+      is FrozenLedgerKeys -> {
+        value.encode(writer)
+      }
+      is FrozenLedgerKeysDelta -> {
+        value.encode(writer)
+      }
+      is FreezeBypassTxs -> {
+        value.encode(writer)
+      }
+      is FreezeBypassTxsDelta -> {
         value.encode(writer)
       }
     }

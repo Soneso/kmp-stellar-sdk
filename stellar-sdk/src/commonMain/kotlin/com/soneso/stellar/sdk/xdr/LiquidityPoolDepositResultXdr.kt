@@ -16,6 +16,7 @@ package com.soneso.stellar.sdk.xdr
  * case LIQUIDITY_POOL_DEPOSIT_LINE_FULL:
  * case LIQUIDITY_POOL_DEPOSIT_BAD_PRICE:
  * case LIQUIDITY_POOL_DEPOSIT_POOL_FULL:
+ * case LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN:
  *     void;
  * };
  */
@@ -39,6 +40,7 @@ sealed class LiquidityPoolDepositResultXdr {
         LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_LINE_FULL -> Void(discriminant)
         LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_BAD_PRICE -> Void(discriminant)
         LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_POOL_FULL -> Void(discriminant)
+        LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown LiquidityPoolDepositResultXdr discriminant: $discriminant")
       }
     }

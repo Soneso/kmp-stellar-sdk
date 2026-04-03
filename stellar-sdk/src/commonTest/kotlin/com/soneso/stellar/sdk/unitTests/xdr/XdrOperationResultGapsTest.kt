@@ -169,6 +169,7 @@ class XdrOperationResultGapsTest {
     @Test fun testLiquidityPoolDepositLineFull() { rtLPD(LiquidityPoolDepositResultXdr.Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_LINE_FULL)) }
     @Test fun testLiquidityPoolDepositBadPrice() { rtLPD(LiquidityPoolDepositResultXdr.Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_BAD_PRICE)) }
     @Test fun testLiquidityPoolDepositPoolFull() { rtLPD(LiquidityPoolDepositResultXdr.Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_POOL_FULL)) }
+    @Test fun testLiquidityPoolDepositTrustlineFrozen() { rtLPD(LiquidityPoolDepositResultXdr.Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN)) }
     @Test fun testLiquidityPoolDepositSuccess() { rtLPD(LiquidityPoolDepositResultXdr.Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_SUCCESS)) }
 
     private fun rtLPD(v: LiquidityPoolDepositResultXdr) = assertXdrRoundTrip(v, { v2, w -> v2.encode(w) }, { r -> LiquidityPoolDepositResultXdr.decode(r) })
@@ -178,6 +179,7 @@ class XdrOperationResultGapsTest {
     @Test fun testLiquidityPoolWithdrawUnderfunded() { rtLPW(LiquidityPoolWithdrawResultXdr.Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDERFUNDED)) }
     @Test fun testLiquidityPoolWithdrawLineFull() { rtLPW(LiquidityPoolWithdrawResultXdr.Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_LINE_FULL)) }
     @Test fun testLiquidityPoolWithdrawUnderMinimum() { rtLPW(LiquidityPoolWithdrawResultXdr.Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM)) }
+    @Test fun testLiquidityPoolWithdrawTrustlineFrozen() { rtLPW(LiquidityPoolWithdrawResultXdr.Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN)) }
     @Test fun testLiquidityPoolWithdrawSuccess() { rtLPW(LiquidityPoolWithdrawResultXdr.Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_SUCCESS)) }
 
     private fun rtLPW(v: LiquidityPoolWithdrawResultXdr) = assertXdrRoundTrip(v, { v2, w -> v2.encode(w) }, { r -> LiquidityPoolWithdrawResultXdr.decode(r) })
@@ -207,6 +209,7 @@ class XdrOperationResultGapsTest {
     @Test fun testClaimClaimableBalanceLineFull() { rtCCB(ClaimClaimableBalanceResultXdr.Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_LINE_FULL)) }
     @Test fun testClaimClaimableBalanceNoTrust() { rtCCB(ClaimClaimableBalanceResultXdr.Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NO_TRUST)) }
     @Test fun testClaimClaimableBalanceNotAuthorized() { rtCCB(ClaimClaimableBalanceResultXdr.Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED)) }
+    @Test fun testClaimClaimableBalanceTrustlineFrozen() { rtCCB(ClaimClaimableBalanceResultXdr.Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN)) }
 
     private fun rtCCB(v: ClaimClaimableBalanceResultXdr) = assertXdrRoundTrip(v, { v2, w -> v2.encode(w) }, { r -> ClaimClaimableBalanceResultXdr.decode(r) })
 
@@ -266,6 +269,7 @@ class XdrOperationResultGapsTest {
     @Test fun testInnerTxBadMinSeq() { rtITR(InnerTransactionResultResultXdr.Void(TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP)) }
     @Test fun testInnerTxMalformed() { rtITR(InnerTransactionResultResultXdr.Void(TransactionResultCodeXdr.txMALFORMED)) }
     @Test fun testInnerTxSorobanInvalid() { rtITR(InnerTransactionResultResultXdr.Void(TransactionResultCodeXdr.txSOROBAN_INVALID)) }
+    @Test fun testInnerTxFrozenKeyAccessed() { rtITR(InnerTransactionResultResultXdr.Void(TransactionResultCodeXdr.txFROZEN_KEY_ACCESSED)) }
     @Test fun testInnerTxInsufficientFee() { rtITR(InnerTransactionResultResultXdr.Void(TransactionResultCodeXdr.txINSUFFICIENT_FEE)) }
 
     private fun rtITR(v: InnerTransactionResultResultXdr) = assertXdrRoundTrip(v, { v2, w -> v2.encode(w) }, { r -> InnerTransactionResultResultXdr.decode(r) })

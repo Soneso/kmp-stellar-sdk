@@ -14,6 +14,7 @@ package com.soneso.stellar.sdk.xdr
  * case LIQUIDITY_POOL_WITHDRAW_UNDERFUNDED:
  * case LIQUIDITY_POOL_WITHDRAW_LINE_FULL:
  * case LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM:
+ * case LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN:
  *     void;
  * };
  */
@@ -35,6 +36,7 @@ sealed class LiquidityPoolWithdrawResultXdr {
         LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDERFUNDED -> Void(discriminant)
         LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_LINE_FULL -> Void(discriminant)
         LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM -> Void(discriminant)
+        LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown LiquidityPoolWithdrawResultXdr discriminant: $discriminant")
       }
     }

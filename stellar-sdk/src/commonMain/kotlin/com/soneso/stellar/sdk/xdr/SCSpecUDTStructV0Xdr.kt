@@ -10,7 +10,7 @@ package com.soneso.stellar.sdk.xdr
  *     string doc<SC_SPEC_DOC_LIMIT>;
  *     string lib<80>;
  *     string name<60>;
- *     SCSpecUDTStructFieldV0 fields<40>;
+ *     SCSpecUDTStructFieldV0 fields<>;
  * };
  */
 data class SCSpecUDTStructV0Xdr(

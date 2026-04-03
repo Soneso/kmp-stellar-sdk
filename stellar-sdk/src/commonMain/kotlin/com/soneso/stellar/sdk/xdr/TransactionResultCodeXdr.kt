@@ -29,7 +29,8 @@ package com.soneso.stellar.sdk.xdr
  *     txBAD_SPONSORSHIP = -14,        // sponsorship not confirmed
  *     txBAD_MIN_SEQ_AGE_OR_GAP = -15, // minSeqAge or minSeqLedgerGap conditions not met
  *     txMALFORMED = -16,              // precondition is invalid
- *     txSOROBAN_INVALID = -17         // soroban-specific preconditions were not met
+ *     txSOROBAN_INVALID = -17,        // soroban-specific preconditions were not met
+ *     txFROZEN_KEY_ACCESSED = -18     // a 'frozen' ledger key is accessed by any operation
  * };
  */
 enum class TransactionResultCodeXdr(val value: Int) {
@@ -70,7 +71,9 @@ enum class TransactionResultCodeXdr(val value: Int) {
   /** precondition is invalid */
   txMALFORMED(-16),
   /** soroban-specific preconditions were not met */
-  txSOROBAN_INVALID(-17);
+  txSOROBAN_INVALID(-17),
+  /** a 'frozen' ledger key is accessed by any operation */
+  txFROZEN_KEY_ACCESSED(-18);
 
   companion object {
 

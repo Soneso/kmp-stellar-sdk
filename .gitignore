@@ -151,3 +151,6 @@ plan.md
 
 # Internal planning and review documents
 plans/
+
+# Downloaded XDR definition files (fetched by download-xdr.sh)
+tools/xdrgen-kt/xdr/

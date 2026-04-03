@@ -27,6 +27,7 @@ class XdrTransactionResultTest {
     @Test fun testResultBadMinSeqAgeOrGap() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP))
     @Test fun testResultMalformed() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txMALFORMED))
     @Test fun testResultSorobanInvalid() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txSOROBAN_INVALID))
+    @Test fun testResultFrozenKeyAccessed() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txFROZEN_KEY_ACCESSED))
 
     @Test fun testResultSuccessEmptyOps() = rtResult(TransactionResultResultXdr.Results(emptyList()))
 

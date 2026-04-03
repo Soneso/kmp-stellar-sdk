@@ -11,7 +11,7 @@ package com.soneso.stellar.sdk.xdr
  *     string lib<80>;
  *     SCSymbol name;
  *     SCSymbol prefixTopics<2>;
- *     SCSpecEventParamV0 params<50>;
+ *     SCSpecEventParamV0 params<>;
  *     SCSpecEventDataFormat dataFormat;
  * };
  */

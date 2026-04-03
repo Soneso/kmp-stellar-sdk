@@ -288,4 +288,102 @@ class XdrConfigSettingTest {
         )
         XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
     }
+
+    @Test fun testConfigSettingEntryFrozenLedgerKeys() {
+        val key1 = EncodedLedgerKeyXdr(byteArrayOf(1, 2, 3, 4, 5))
+        val key2 = EncodedLedgerKeyXdr(byteArrayOf(10, 20, 30))
+        val v = ConfigSettingEntryXdr.FrozenLedgerKeys(FrozenLedgerKeysXdr(listOf(key1, key2)))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFrozenLedgerKeysEmpty() {
+        val v = ConfigSettingEntryXdr.FrozenLedgerKeys(FrozenLedgerKeysXdr(emptyList()))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFrozenLedgerKeysDelta() {
+        val freeze = EncodedLedgerKeyXdr(byteArrayOf(1, 2, 3))
+        val unfreeze = EncodedLedgerKeyXdr(byteArrayOf(4, 5, 6))
+        val v = ConfigSettingEntryXdr.FrozenLedgerKeysDelta(
+            FrozenLedgerKeysDeltaXdr(listOf(freeze), listOf(unfreeze))
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFrozenLedgerKeysDeltaEmpty() {
+        val v = ConfigSettingEntryXdr.FrozenLedgerKeysDelta(
+            FrozenLedgerKeysDeltaXdr(emptyList(), emptyList())
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFreezeBypassTxs() {
+        val v = ConfigSettingEntryXdr.FreezeBypassTxs(
+            FreezeBypassTxsXdr(listOf(XdrTestHelpers.hashXdr(), XdrTestHelpers.hashXdrAlt()))
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFreezeBypassTxsEmpty() {
+        val v = ConfigSettingEntryXdr.FreezeBypassTxs(FreezeBypassTxsXdr(emptyList()))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFreezeBypassTxsDelta() {
+        val v = ConfigSettingEntryXdr.FreezeBypassTxsDelta(
+            FreezeBypassTxsDeltaXdr(
+                addTxs = listOf(XdrTestHelpers.hashXdr()),
+                removeTxs = listOf(XdrTestHelpers.hashXdrAlt())
+            )
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    @Test fun testConfigSettingEntryFreezeBypassTxsDeltaEmpty() {
+        val v = ConfigSettingEntryXdr.FreezeBypassTxsDelta(
+            FreezeBypassTxsDeltaXdr(emptyList(), emptyList())
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> ConfigSettingEntryXdr.decode(r) })
+    }
+
+    // ---- Standalone freeze-related types ----
+
+    @Test fun testFrozenLedgerKeysXdr() {
+        val v = FrozenLedgerKeysXdr(listOf(
+            EncodedLedgerKeyXdr(byteArrayOf(1, 2, 3)),
+            EncodedLedgerKeyXdr(byteArrayOf(4, 5, 6, 7, 8))
+        ))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> FrozenLedgerKeysXdr.decode(r) })
+    }
+
+    @Test fun testFrozenLedgerKeysDeltaXdr() {
+        val v = FrozenLedgerKeysDeltaXdr(
+            keysToFreeze = listOf(EncodedLedgerKeyXdr(byteArrayOf(1, 2))),
+            keysToUnfreeze = listOf(EncodedLedgerKeyXdr(byteArrayOf(3, 4)))
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> FrozenLedgerKeysDeltaXdr.decode(r) })
+    }
+
+    @Test fun testFreezeBypassTxsXdr() {
+        val v = FreezeBypassTxsXdr(listOf(XdrTestHelpers.hashXdr()))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> FreezeBypassTxsXdr.decode(r) })
+    }
+
+    @Test fun testFreezeBypassTxsDeltaXdr() {
+        val v = FreezeBypassTxsDeltaXdr(
+            addTxs = listOf(XdrTestHelpers.hashXdr()),
+            removeTxs = listOf(XdrTestHelpers.hashXdrAlt())
+        )
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> FreezeBypassTxsDeltaXdr.decode(r) })
+    }
+
+    @Test fun testEncodedLedgerKeyXdr() {
+        val v = EncodedLedgerKeyXdr(byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> EncodedLedgerKeyXdr.decode(r) })
+    }
+
+    @Test fun testEncodedLedgerKeyXdrEmpty() {
+        val v = EncodedLedgerKeyXdr(byteArrayOf())
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> EncodedLedgerKeyXdr.decode(r) })
+    }
 }

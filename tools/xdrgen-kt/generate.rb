@@ -5,12 +5,21 @@ require 'bundler/setup'
 require 'xdrgen'
 require_relative 'lib/xdrgen/generators/kotlin'
 
-# Parse command line arguments
+# Parse command line arguments.
+# If no arguments are given, default to xdr/*.x (downloaded by download-xdr.sh).
 input_files = ARGV
 if input_files.empty?
-  puts "Usage: #{$PROGRAM_NAME} <input.x> [<input2.x> ...]"
-  puts "Example: #{$PROGRAM_NAME} /path/to/stellar-xdr/Stellar-*.x"
-  exit 1
+  default_dir = File.expand_path('xdr', __dir__)
+  input_files = Dir.glob(File.join(default_dir, '*.x')).sort
+  if input_files.empty?
+    puts "No .x files found in #{default_dir}."
+    puts "Run ./download-xdr.sh first, or pass file paths explicitly."
+    puts ""
+    puts "Usage: #{$PROGRAM_NAME} [<input.x> ...]"
+    puts "Example: #{$PROGRAM_NAME} /path/to/stellar-xdr/Stellar-*.x"
+    exit 1
+  end
+  puts "Using .x files from #{default_dir}"
 end
 
 # Files to exclude from generation
