@@ -118,11 +118,9 @@ class SignAuthEntryCryptoTest {
 
         // Unpack the signature from the signed entry
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
-        val vec = (credentials.signature as SCValXdr.Vec).value
-        assertNotNull(vec)
-        assertTrue(vec.value.isNotEmpty())
-
-        val mapEntry = (vec.value[0] as SCValXdr.Map).value
+        val outerMap = (credentials.signature as SCValXdr.Map).value!!
+        val signersEntry = outerMap.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val mapEntry = (signersEntry.`val` as SCValXdr.Map).value
         assertNotNull(mapEntry)
         assertEquals(1, mapEntry.value.size)
 
@@ -184,8 +182,9 @@ class SignAuthEntryCryptoTest {
 
         // Unpack signature bytes
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
-        val vec = (credentials.signature as SCValXdr.Vec).value!!
-        val mapEntry = (vec.value[0] as SCValXdr.Map).value!!
+        val outerMap = (credentials.signature as SCValXdr.Map).value!!
+        val signersEntry = outerMap.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val mapEntry = (signersEntry.`val` as SCValXdr.Map).value!!
         val xdrBytes = ((mapEntry.value[0].`val`) as SCValXdr.Bytes).value.value
         val innerMap = (SCValXdr.decode(com.soneso.stellar.sdk.xdr.XdrReader(xdrBytes)) as SCValXdr.Map).value!!
         val sigEntry = innerMap.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signature" }

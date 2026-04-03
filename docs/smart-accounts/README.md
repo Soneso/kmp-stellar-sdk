@@ -230,13 +230,10 @@ val lowLevelResult = kit.signerManager.addPasskey(
     credentialId = otherCredentialId  // raw credential ID bytes
 )
 
-// Remove a signer
-val delegatedSigner = DelegatedSigner(
-    address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
-)
+// Remove a signer by its on-chain signer ID
 val removeResult = kit.signerManager.removeSigner(
     contextRuleId = 0u,
-    signer = delegatedSigner
+    signerId = 1u
 )
 ```
 

@@ -17,6 +17,8 @@ import com.soneso.stellar.sdk.smartaccount.core.Ed25519Signature
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.PolicySignature
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuth
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayload
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
@@ -295,7 +297,8 @@ class SmartAccountAuthTest {
     @Test
     fun testAddRawSignatureMapEntry_addsEntryToVoidSignatureEntry() {
         val entry = createAddressAuthEntry()
-        val signerKey = Scv.toBytes(ByteArray(32) { 0xAB.toByte() })
+        val delegatedSigner = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signerKey = delegatedSigner.toScVal()
         val signatureValue = Scv.toBytes(ByteArray(0))
 
         val result = SmartAccountAuth.addRawSignatureMapEntry(
@@ -305,23 +308,22 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (result.credentials as SorobanCredentialsXdr.Address).value
-        val vecXdr = credentials.signature as? SCValXdr.Vec
-        assertNotNull(vecXdr, "Signature must be a Vec")
-        assertNotNull(vecXdr.value, "Vec value must not be null")
-        assertEquals(1, vecXdr.value!!.value.size, "Vec must contain exactly one element")
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val outerEntries = outerMap.value!!.value
+        assertEquals(2, outerEntries.size, "AuthPayload must have exactly 2 entries")
 
-        val mapXdr = vecXdr.value!!.value[0] as? SCValXdr.Map
-        assertNotNull(mapXdr, "Vec element must be a Map")
-        assertNotNull(mapXdr.value, "Map value must not be null")
-        assertEquals(1, mapXdr.value!!.value.size, "Map must contain exactly one entry")
+        val signersEntry = outerEntries.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(1, signersMap.size, "Signers map must contain exactly one entry")
     }
 
     @Test
     fun testAddRawSignatureMapEntry_mapEntryHasCorrectKeyAndValue() {
         val entry = createAddressAuthEntry()
-        val keyBytes = ByteArray(32) { it.toByte() }
         val valueBytes = ByteArray(16) { (it + 1).toByte() }
-        val signerKey = Scv.toBytes(keyBytes)
+        val delegatedSigner = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signerKey = delegatedSigner.toScVal()
         val signatureValue = Scv.toBytes(valueBytes)
 
         val result = SmartAccountAuth.addRawSignatureMapEntry(
@@ -331,14 +333,13 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (result.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = ((credentials.signature as SCValXdr.Vec).value!!.value[0] as SCValXdr.Map).value!!.value
-        assertEquals(1, mapEntries.size)
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(1, signersMap.size)
 
-        val entryKey = mapEntries[0].key as? SCValXdr.Bytes
-        assertNotNull(entryKey, "Map entry key must be SCValXdr.Bytes")
-        assertTrue(entryKey.value.value.contentEquals(keyBytes), "Key bytes must match")
-
-        val entryValue = mapEntries[0].`val` as? SCValXdr.Bytes
+        val entryValue = signersMap[0].`val` as? SCValXdr.Bytes
         assertNotNull(entryValue, "Map entry value must be SCValXdr.Bytes")
         assertTrue(entryValue.value.value.contentEquals(valueBytes), "Value bytes must match")
     }
@@ -346,8 +347,10 @@ class SmartAccountAuthTest {
     @Test
     fun testAddRawSignatureMapEntry_secondCallProducesTwoEntries() {
         val entry = createAddressAuthEntry()
-        val key1 = Scv.toBytes(ByteArray(32) { 0x01.toByte() })
-        val key2 = Scv.toBytes(ByteArray(32) { 0x02.toByte() })
+        val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+        val key1 = signer1.toScVal()
+        val key2 = signer2.toScVal()
         val voidValue = Scv.toBytes(ByteArray(0))
 
         val entryWith1 = SmartAccountAuth.addRawSignatureMapEntry(
@@ -362,8 +365,11 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (entryWith2.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = ((credentials.signature as SCValXdr.Vec).value!!.value[0] as SCValXdr.Map).value!!.value
-        assertEquals(2, mapEntries.size, "Map must contain two entries after two addRawSignatureMapEntry calls")
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size, "Signers map must contain two entries after two addRawSignatureMapEntry calls")
     }
 
     @Test
@@ -371,24 +377,27 @@ class SmartAccountAuthTest {
         val entry = createAddressAuthEntry()
         val voidValue = Scv.toBytes(ByteArray(0))
 
-        // Key with higher byte value added first: should end up second after sort
-        val higherKey = Scv.toBytes(ByteArray(32) { 0xFF.toByte() })
-        val lowerKey  = Scv.toBytes(ByteArray(32) { 0x00.toByte() })
+        // Add two different delegated signers — order inserted should not determine final order
+        val signer1 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+        val signer2 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
 
-        val entryWithHigher = SmartAccountAuth.addRawSignatureMapEntry(
+        val entryWithFirst = SmartAccountAuth.addRawSignatureMapEntry(
             entry = entry,
-            signerKey = higherKey,
+            signerKey = signer1.toScVal(),
             signatureValue = voidValue
         )
         val entryWithBoth = SmartAccountAuth.addRawSignatureMapEntry(
-            entry = entryWithHigher,
-            signerKey = lowerKey,
+            entry = entryWithFirst,
+            signerKey = signer2.toScVal(),
             signatureValue = voidValue
         )
 
         val credentials = (entryWithBoth.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = ((credentials.signature as SCValXdr.Vec).value!!.value[0] as SCValXdr.Map).value!!.value
-        assertEquals(2, mapEntries.size)
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size)
 
         // Compute XDR hex keys for both entries and verify ascending order
         fun xdrHex(scVal: SCValXdr): String {
@@ -396,9 +405,9 @@ class SmartAccountAuthTest {
             scVal.encode(w)
             return w.toByteArray().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
         }
-        val firstKeyHex = xdrHex(mapEntries[0].key)
-        val secondKeyHex = xdrHex(mapEntries[1].key)
-        assertTrue(firstKeyHex < secondKeyHex, "Map entries must be sorted by XDR-encoded key hex in strictly ascending order (distinct entries)")
+        val firstKeyHex = xdrHex(signersMap[0].key)
+        val secondKeyHex = xdrHex(signersMap[1].key)
+        assertTrue(firstKeyHex < secondKeyHex, "Signers map entries must be sorted by XDR-encoded key hex in strictly ascending order (distinct entries)")
     }
 
     @Test
@@ -438,7 +447,8 @@ class SmartAccountAuthTest {
     @Test
     fun testAddRawSignatureMapEntry_doesNotMutateOriginalEntry() {
         val entry = createAddressAuthEntry()
-        val signerKey = Scv.toBytes(ByteArray(32) { 0xAA.toByte() })
+        val delegatedSigner = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signerKey = delegatedSigner.toScVal()
         val signatureValue = Scv.toBytes(ByteArray(0))
 
         SmartAccountAuth.addRawSignatureMapEntry(
@@ -459,7 +469,8 @@ class SmartAccountAuthTest {
     fun testAddRawSignatureMapEntry_rawBytesAreStoredAsScvBytes() {
         val entry = createAddressAuthEntry()
         val rawBytes = ByteArray(64) { (it * 3).toByte() }
-        val signerKey = Scv.toBytes(ByteArray(32) { 0xCC.toByte() })
+        val delegatedSigner = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signerKey = delegatedSigner.toScVal()
         val signatureValue = Scv.toBytes(rawBytes)
 
         val result = SmartAccountAuth.addRawSignatureMapEntry(
@@ -469,8 +480,11 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (result.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = ((credentials.signature as SCValXdr.Vec).value!!.value[0] as SCValXdr.Map).value!!.value
-        val storedValue = mapEntries[0].`val` as? SCValXdr.Bytes
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        val storedValue = signersMap[0].`val` as? SCValXdr.Bytes
         assertNotNull(storedValue, "Stored value must be SCValXdr.Bytes")
         assertTrue(storedValue.value.value.contentEquals(rawBytes), "Raw bytes must be preserved exactly")
     }
@@ -512,10 +526,13 @@ class SmartAccountAuthTest {
 
         val credentials = (entryAfterSecond.credentials as SorobanCredentialsXdr.Address).value
         assertEquals(expirationLedger, credentials.signatureExpirationLedger.value, "Expiration ledger must be set on credentials")
-        val vec = credentials.signature as? SCValXdr.Vec
-        assertNotNull(vec)
-        val mapEntries = (vec.value!!.value[0] as SCValXdr.Map).value!!.value
-        assertEquals(2, mapEntries.size, "Both signatures must be present in the map")
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val outerEntries = outerMap.value!!.value
+        assertEquals(2, outerEntries.size, "AuthPayload must have exactly 2 entries")
+        val signersEntry = outerEntries.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size, "Both signatures must be present in the signers map")
     }
 
     @Test
@@ -551,16 +568,19 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (entryAfterSecond.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = (((credentials.signature as SCValXdr.Vec).value!!.value[0]) as SCValXdr.Map).value!!.value
-        assertEquals(2, mapEntries.size)
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size)
 
         fun xdrHex(scVal: SCValXdr): String {
             val w = XdrWriter()
             scVal.encode(w)
             return w.toByteArray().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
         }
-        val firstKeyHex = xdrHex(mapEntries[0].key)
-        val secondKeyHex = xdrHex(mapEntries[1].key)
+        val firstKeyHex = xdrHex(signersMap[0].key)
+        val secondKeyHex = xdrHex(signersMap[1].key)
         assertTrue(firstKeyHex < secondKeyHex, "Two-signer map must be sorted by XDR-encoded key hex in strictly ascending order (distinct entries)")
     }
 
@@ -586,8 +606,9 @@ class SmartAccountAuthTest {
             expirationLedger = expirationLedger
         )
 
-        // Add a raw placeholder entry (e.g., for a delegated signer awaiting require_auth)
-        val rawKey = Scv.toBytes(ByteArray(32) { 0xDD.toByte() })
+        // Add a raw placeholder entry for a delegated signer (different from the keypair-based signer)
+        val rawDelegatedSigner = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+        val rawKey = rawDelegatedSigner.toScVal()
         val rawValue = Scv.toBytes(ByteArray(0))
         val entryWithBoth = SmartAccountAuth.addRawSignatureMapEntry(
             entry = signedEntry,
@@ -596,8 +617,11 @@ class SmartAccountAuthTest {
         )
 
         val credentials = (entryWithBoth.credentials as SorobanCredentialsXdr.Address).value
-        val mapEntries = (((credentials.signature as SCValXdr.Vec).value!!.value[0]) as SCValXdr.Map).value!!.value
-        assertEquals(2, mapEntries.size, "Entry from signAuthEntry and raw entry must both be present")
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size, "Entry from signAuthEntry and raw entry must both be present")
     }
 
     // MARK: - PolicySignature + DelegatedSigner Tests
@@ -622,19 +646,22 @@ class SmartAccountAuthTest {
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
         assertEquals(expirationLedger, credentials.signatureExpirationLedger.value, "Expiration ledger must be set")
 
-        // Verify outer Vec -> Map structure
-        val vec = credentials.signature as? SCValXdr.Vec
-        assertNotNull(vec, "Signature must be a Vec")
-        assertNotNull(vec.value, "Vec value must not be null")
-        assertEquals(1, vec.value!!.value.size, "Vec must contain exactly one element")
+        // Verify outer Map (AuthPayload) structure
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val outerEntries = outerMap.value!!.value
+        assertEquals(2, outerEntries.size, "AuthPayload must have exactly 2 entries")
 
-        val mapXdr = vec.value!!.value[0] as? SCValXdr.Map
-        assertNotNull(mapXdr, "Vec element must be a Map")
-        assertNotNull(mapXdr.value, "Map value must not be null")
-        assertEquals(1, mapXdr.value!!.value.size, "Map must contain exactly one entry")
+        val contextRuleIdsEntry = outerEntries.first { (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids" }
+        val contextRuleIdsVec = contextRuleIdsEntry.`val` as? SCValXdr.Vec
+        assertNotNull(contextRuleIdsVec, "context_rule_ids must be a Vec")
+
+        val signersEntry = outerEntries.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(1, signersMap.size, "Signers map must contain exactly one entry")
 
         // Verify the value is double-XDR-encoded empty map (PolicySignature.toScVal() = empty map)
-        val outerBytes = mapXdr.value!!.value[0].`val` as? SCValXdr.Bytes
+        val outerBytes = signersMap[0].`val` as? SCValXdr.Bytes
         assertNotNull(outerBytes, "Signature value must be SCValXdr.Bytes (outer double-encoding)")
 
         val innerScVal = SCValXdr.decode(XdrReader(outerBytes.value.value))
@@ -691,13 +718,14 @@ class SmartAccountAuthTest {
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
         assertEquals(expirationLedger, credentials.signatureExpirationLedger.value)
 
-        val vec = credentials.signature as? SCValXdr.Vec
-        assertNotNull(vec, "Signature must be a Vec")
-        val mapEntries = (vec.value!!.value[0] as SCValXdr.Map).value!!.value
-        assertEquals(1, mapEntries.size, "Map must have exactly one entry")
+        val outerMap = credentials.signature as? SCValXdr.Map
+        assertNotNull(outerMap, "Signature must be a Map (AuthPayload)")
+        val signersEntry = outerMap.value!!.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(1, signersMap.size, "Signers map must have exactly one entry")
 
         // The value must be a double-XDR-encoded SCVal::Bytes
-        val outerBytes = mapEntries[0].`val` as? SCValXdr.Bytes
+        val outerBytes = signersMap[0].`val` as? SCValXdr.Bytes
         assertNotNull(outerBytes, "Signature value must be SCValXdr.Bytes (outer)")
         val innerScVal = SCValXdr.decode(XdrReader(outerBytes.value.value))
         assertTrue(innerScVal is SCValXdr.Map, "Inner ScVal must be a Map (WebAuthn signature map)")
@@ -717,5 +745,384 @@ class SmartAccountAuthTest {
         assertTrue(storedAuthData.contentEquals(authenticatorData), "authenticator_data bytes must be preserved")
         assertTrue(storedClientData.contentEquals(clientData), "client_data bytes must be preserved")
         assertTrue(storedSig.contentEquals(compactSig), "signature bytes must be preserved")
+    }
+
+    // MARK: - buildAuthDigest Tests
+
+    @Test
+    fun testBuildAuthDigest_changesWithDifferentRuleIds() = runTest {
+        val signaturePayload = ByteArray(32) { it.toByte() }
+
+        val digest1 = SmartAccountAuth.buildAuthDigest(signaturePayload, listOf(1u))
+        val digest2 = SmartAccountAuth.buildAuthDigest(signaturePayload, listOf(2u))
+        val digest3 = SmartAccountAuth.buildAuthDigest(signaturePayload, listOf(1u, 2u))
+
+        assertEquals(32, digest1.size, "Auth digest must be 32 bytes")
+        assertTrue(!digest1.contentEquals(digest2), "Different rule IDs must produce different digests")
+        assertTrue(!digest1.contentEquals(digest3), "Different number of rule IDs must produce different digests")
+    }
+
+    @Test
+    fun testBuildAuthDigest_isConsistent() = runTest {
+        val signaturePayload = ByteArray(32) { it.toByte() }
+        val ruleIds = listOf(1u, 2u, 3u)
+
+        val digest1 = SmartAccountAuth.buildAuthDigest(signaturePayload, ruleIds)
+        val digest2 = SmartAccountAuth.buildAuthDigest(signaturePayload, ruleIds)
+
+        assertTrue(digest1.contentEquals(digest2), "Same inputs must produce identical digests")
+    }
+
+    @Test
+    fun testBuildAuthDigest_emptyRuleIdsProducesDifferentDigestThanNonEmpty() = runTest {
+        val signaturePayload = ByteArray(32) { it.toByte() }
+
+        val digestEmpty = SmartAccountAuth.buildAuthDigest(signaturePayload, emptyList())
+        val digestNonEmpty = SmartAccountAuth.buildAuthDigest(signaturePayload, listOf(0u))
+
+        assertTrue(!digestEmpty.contentEquals(digestNonEmpty), "Empty and non-empty rule IDs must differ")
+    }
+
+    // MARK: - contextRuleIds Codec Tests
+
+    @Test
+    fun testSignAuthEntry_contextRuleIdsArePreservedInPayload() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(3u, 7u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(2, ruleIdsVec.size)
+        assertEquals(3u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+        assertEquals(7u, (ruleIdsVec[1] as SCValXdr.U32).value.value)
+    }
+
+    @Test
+    fun testSignAuthEntry_emptyContextRuleIdsProducesEmptyVec() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        // No contextRuleIds passed — defaults to empty
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(0, ruleIdsVec.size, "Empty contextRuleIds should produce empty Vec")
+    }
+
+    @Test
+    fun testSignAuthEntry_secondSignerPreservesContextRuleIds() = runTest {
+        val keypair1 = KeyPair.random()
+        val keypair2 = KeyPair.random()
+        val expirationLedger = 5000000u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(5u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+
+        val sig1 = Ed25519Signature(publicKey = keypair1.getPublicKey(), signature = keypair1.sign(payloadHash))
+        val signer1 = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair1.getPublicKey())
+
+        val entryAfterFirst = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer1,
+            signature = sig1,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        // Second signer does NOT pass contextRuleIds — they should be preserved from the first call
+        val sig2 = Ed25519Signature(publicKey = keypair2.getPublicKey(), signature = keypair2.sign(payloadHash))
+        val signer2 = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair2.getPublicKey())
+
+        val entryAfterSecond = SmartAccountAuth.signAuthEntry(
+            entry = entryAfterFirst,
+            signer = signer2,
+            signature = sig2,
+            expirationLedger = expirationLedger
+        )
+
+        val credentials = (entryAfterSecond.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+
+        val contextRuleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (contextRuleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(1, ruleIdsVec.size)
+        assertEquals(5u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+
+        val signersEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "signers"
+        }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size, "Both signers must be present")
+    }
+
+    // MARK: - SmartAccountAuthPayloadCodec Tests
+
+    @Test
+    fun testCodecRead_voidReturnsEmptyPayload() {
+        val payload = SmartAccountAuthPayloadCodec.read(SCValXdr.Void(SCValTypeXdr.SCV_VOID))
+        assertTrue(payload.signers.isEmpty())
+        assertTrue(payload.contextRuleIds.isEmpty())
+    }
+
+    @Test
+    fun testCodecRead_nonMapThrows() {
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.read(Scv.toUint32(42u))
+        }
+    }
+
+    @Test
+    fun testCodecWriteRead_roundTrip() {
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val sigBytes = ByteArray(64) { it.toByte() }
+        val ruleIds = listOf(1u, 5u, 10u)
+
+        val original = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer to sigBytes),
+            contextRuleIds = ruleIds
+        )
+
+        val scVal = SmartAccountAuthPayloadCodec.write(original)
+        val restored = SmartAccountAuthPayloadCodec.read(scVal)
+
+        assertEquals(1, restored.signers.size)
+        assertEquals(3, restored.contextRuleIds.size)
+        assertEquals(listOf(1u, 5u, 10u), restored.contextRuleIds)
+        assertTrue(restored.signers.values.first().contentEquals(sigBytes))
+    }
+
+    @Test
+    fun testCodecWriteRead_emptyPayloadRoundTrip() {
+        val original = SmartAccountAuthPayload(
+            signers = mutableMapOf(),
+            contextRuleIds = emptyList()
+        )
+        val scVal = SmartAccountAuthPayloadCodec.write(original)
+        val restored = SmartAccountAuthPayloadCodec.read(scVal)
+        assertTrue(restored.signers.isEmpty())
+        assertTrue(restored.contextRuleIds.isEmpty())
+    }
+
+    @Test
+    fun testCodecWrite_producesMapWithTwoEntries() {
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(),
+            contextRuleIds = listOf(7u)
+        )
+        val scVal = SmartAccountAuthPayloadCodec.write(payload)
+        assertTrue(scVal is SCValXdr.Map)
+        val entries = (scVal as SCValXdr.Map).value!!.value
+        assertEquals(2, entries.size)
+        assertEquals("context_rule_ids", (entries[0].key as SCValXdr.Sym).value.value)
+        assertEquals("signers", (entries[1].key as SCValXdr.Sym).value.value)
+    }
+
+    @Test
+    fun testCodecUpsertSigner_replacesExisting() {
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer to ByteArray(32) { 0x01 }),
+            contextRuleIds = emptyList()
+        )
+        val newBytes = ByteArray(32) { 0x02 }
+        SmartAccountAuthPayloadCodec.upsertSigner(payload, signer, newBytes)
+        assertEquals(1, payload.signers.size)
+        assertTrue(payload.signers.values.first().contentEquals(newBytes))
+    }
+
+    @Test
+    fun testCodecUpsertSigner_addsNewSigner() {
+        val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer1 to ByteArray(32) { 0x01 }),
+            contextRuleIds = emptyList()
+        )
+        SmartAccountAuthPayloadCodec.upsertSigner(payload, signer2, ByteArray(32) { 0x02 })
+        assertEquals(2, payload.signers.size)
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_parsesDelegated() {
+        val address = "GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW"
+        val signer = DelegatedSigner(address)
+        val scVal = signer.toScVal()
+        val parsed = SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
+        assertTrue(parsed is DelegatedSigner)
+        assertEquals(address, (parsed as DelegatedSigner).address)
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_parsesExternal() {
+        val verifier = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+        val keyData = ByteArray(65) { it.toByte() }
+        val signer = ExternalSigner(verifier, keyData)
+        val scVal = signer.toScVal()
+        val parsed = SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
+        assertTrue(parsed is ExternalSigner)
+        assertEquals(verifier, (parsed as ExternalSigner).verifierAddress)
+        assertTrue(parsed.keyData.contentEquals(keyData))
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnNonVec() {
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(Scv.toUint32(42u))
+        }
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnUnknownTag() {
+        val badVec = Scv.toVec(listOf(Scv.toSymbol("Unknown"), Scv.toUint32(1u)))
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(badVec)
+        }
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnEmptyVec() {
+        val emptyVec = Scv.toVec(emptyList())
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(emptyVec)
+        }
+    }
+
+    @Test
+    fun testCodecWrite_signersSortedByXdrKey() {
+        val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(
+                signer2 to ByteArray(32) { 0x02 },
+                signer1 to ByteArray(32) { 0x01 }
+            ),
+            contextRuleIds = emptyList()
+        )
+
+        val scVal = SmartAccountAuthPayloadCodec.write(payload)
+        val outerMap = (scVal as SCValXdr.Map).value!!.value
+        val signersEntry = outerMap.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size)
+
+        fun xdrHex(scv: SCValXdr): String {
+            val w = XdrWriter()
+            scv.encode(w)
+            return w.toByteArray().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        }
+        val firstHex = xdrHex(signersMap[0].key)
+        val secondHex = xdrHex(signersMap[1].key)
+        assertTrue(firstHex < secondHex, "Signers must be sorted by XDR key hex")
+    }
+
+    // MARK: - SmartAccountAuth Additional Edge Case Tests
+
+    @Test
+    fun testBuildAuthDigest_withEmptyPayloadIs32Bytes() = runTest {
+        val payload = ByteArray(32) { 0xFF.toByte() }
+        val digest = SmartAccountAuth.buildAuthDigest(payload, emptyList())
+        assertEquals(32, digest.size)
+    }
+
+    @Test
+    fun testSignAuthEntry_setsExpirationWithContextRuleIds() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 9999999u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(1u, 2u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        assertEquals(expirationLedger, credentials.signatureExpirationLedger.value)
+    }
+
+    @Test
+    fun testAddRawSignatureMapEntry_contextRuleIdsAreSet() {
+        val entry = createAddressAuthEntry()
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val contextRuleIds = listOf(3u, 8u)
+
+        val result = SmartAccountAuth.addRawSignatureMapEntry(
+            entry = entry,
+            signerKey = signer.toScVal(),
+            signatureValue = Scv.toBytes(byteArrayOf()),
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (result.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val ruleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (ruleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(2, ruleIdsVec.size)
+        assertEquals(3u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+        assertEquals(8u, (ruleIdsVec[1] as SCValXdr.U32).value.value)
     }
 }

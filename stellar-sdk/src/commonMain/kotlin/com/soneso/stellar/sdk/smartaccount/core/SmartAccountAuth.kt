@@ -13,14 +13,12 @@ import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
-import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 
@@ -60,6 +58,47 @@ object SmartAccountAuth {
     // ========================================================================
     // Payload Hash Building
     // ========================================================================
+
+    /**
+     * Computes the auth digest that binds context rule IDs to the signature payload.
+     *
+     * The digest is computed as:
+     * ```
+     * auth_digest = SHA-256(signaturePayload || contextRuleIds.toXDR())
+     * ```
+     *
+     * Where `contextRuleIds.toXDR()` is the XDR encoding of `ScVal::Vec([ScVal::U32(id), ...])`.
+     * This matches the TypeScript SDK computation exactly:
+     * ```typescript
+     * const ruleIdsXdr = xdr.ScVal.scvVec(contextRuleIds.map(id => xdr.ScVal.scvU32(id))).toXDR();
+     * return hash(Buffer.concat([signaturePayload, ruleIdsXdr]));
+     * ```
+     *
+     * @param signaturePayload The 32-byte signature payload hash from [buildAuthPayloadHash]
+     * @param contextRuleIds The context rule IDs to bind into the digest
+     * @return The 32-byte SHA-256 auth digest
+     * @throws TransactionException.SigningFailed if XDR encoding fails
+     */
+    suspend fun buildAuthDigest(
+        signaturePayload: ByteArray,
+        contextRuleIds: List<UInt>
+    ): ByteArray {
+        val ruleIdsScVal = Scv.toVec(contextRuleIds.map { id -> Scv.toUint32(id) })
+
+        val ruleIdsXdr: ByteArray = try {
+            val writer = XdrWriter()
+            ruleIdsScVal.encode(writer)
+            writer.toByteArray()
+        } catch (e: Exception) {
+            throw TransactionException.signingFailed(
+                "Failed to XDR encode context rule IDs ScVal",
+                e
+            )
+        }
+
+        val concatenated = signaturePayload + ruleIdsXdr
+        return getSha256Crypto().hash(concatenated)
+    }
 
     /**
      * Builds the authorization payload hash for signing.
@@ -230,7 +269,8 @@ object SmartAccountAuth {
         entry: SorobanAuthorizationEntryXdr,
         signer: SmartAccountSigner,
         signature: SmartAccountSignature,
-        expirationLedger: UInt
+        expirationLedger: UInt,
+        contextRuleIds: List<UInt> = emptyList()
     ): SorobanAuthorizationEntryXdr {
         // STEP 1: Clone entry via XDR round-trip to avoid mutating input
         val entryBytes: ByteArray = try {
@@ -294,17 +334,34 @@ object SmartAccountAuth {
             )
         }
 
-        // Step C: Wrap those raw bytes in a new ScVal::Bytes
-        val signatureValue = Scv.toBytes(sigXdrBytes)
+        // STEP 4-6: Update AuthPayload and return updated entry
 
-        // Create map entry
-        val mapEntry = SCMapEntryXdr(key = signerKey, `val` = signatureValue)
+        // Read existing payload from credentials (Void -> empty payload)
+        val existingPayload = SmartAccountAuthPayloadCodec.read(credentials.signature)
 
-        // STEP 4-6: Add to signatures map and return updated entry
-        return appendSignatureMapEntry(
-            entry = entryCopy,
-            credentials = credentials,
-            mapEntry = mapEntry
+        // Preserve or override context rule IDs
+        val updatedPayload = SmartAccountAuthPayload(
+            signers = existingPayload.signers,
+            contextRuleIds = if (contextRuleIds.isNotEmpty()) contextRuleIds else existingPayload.contextRuleIds
+        )
+
+        // Upsert signer with double-XDR-encoded signature bytes
+        SmartAccountAuthPayloadCodec.upsertSigner(updatedPayload, signer, sigXdrBytes)
+
+        // Write updated payload back as SCVal
+        val payloadScVal = SmartAccountAuthPayloadCodec.write(updatedPayload)
+
+        // Build updated credentials with new signature
+        val updatedCredentials = SorobanAddressCredentialsXdr(
+            address = credentials.address,
+            nonce = credentials.nonce,
+            signatureExpirationLedger = credentials.signatureExpirationLedger,
+            signature = payloadScVal
+        )
+
+        return SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            rootInvocation = entryCopy.rootInvocation
         )
     }
 
@@ -316,28 +373,69 @@ object SmartAccountAuth {
      * Adds a raw key/value entry to the auth entry's signature map.
      *
      * Used for delegated signer placeholders where the value is `Bytes(empty)`
-     * rather than a double-XDR-encoded signature. The entry is cloned, the map
-     * entry is appended, and the map is re-sorted.
+     * rather than a double-XDR-encoded signature. Uses the v0.7.0 AuthPayload format.
      *
      * @param entry The auth entry to modify
      * @param signerKey The signer identity ScVal (map key)
-     * @param signatureValue The raw ScVal to use as the map value
+     * @param signatureValue The raw ScVal to use as the map value. If `SCValXdr.Bytes`, the bytes
+     *        are stored directly. Otherwise the value is XDR-encoded and the resulting bytes stored.
+     * @param contextRuleIds The context rule IDs to bind into the payload (optional).
      * @return A new auth entry with the map entry added
      */
     fun addRawSignatureMapEntry(
         entry: SorobanAuthorizationEntryXdr,
         signerKey: SCValXdr,
-        signatureValue: SCValXdr
+        signatureValue: SCValXdr,
+        contextRuleIds: List<UInt> = emptyList()
     ): SorobanAuthorizationEntryXdr {
         val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
             ?: throw TransactionException.signingFailed(
                 "Credentials must be of type address to add signature map entry"
             )
 
-        return appendSignatureMapEntry(
-            entry = entry,
-            credentials = credentials,
-            mapEntry = SCMapEntryXdr(key = signerKey, `val` = signatureValue)
+        // Read existing payload
+        val existingPayload = SmartAccountAuthPayloadCodec.read(credentials.signature)
+
+        // Preserve or override context rule IDs
+        val updatedPayload = SmartAccountAuthPayload(
+            signers = existingPayload.signers,
+            contextRuleIds = if (contextRuleIds.isNotEmpty()) contextRuleIds else existingPayload.contextRuleIds
+        )
+
+        // Extract bytes from signatureValue: use raw bytes if Bytes, otherwise XDR-encode
+        val sigBytes = when (signatureValue) {
+            is SCValXdr.Bytes -> signatureValue.value.value
+            else -> {
+                try {
+                    val writer = XdrWriter()
+                    signatureValue.encode(writer)
+                    writer.toByteArray()
+                } catch (e: Exception) {
+                    throw TransactionException.signingFailed(
+                        "Failed to XDR-encode raw signature value",
+                        e
+                    )
+                }
+            }
+        }
+
+        // Parse signer from key ScVal and upsert
+        val signer = SmartAccountAuthPayloadCodec.signerFromScVal(signerKey)
+        updatedPayload.signers[signer] = sigBytes
+
+        // Write updated payload back as SCVal
+        val payloadScVal = SmartAccountAuthPayloadCodec.write(updatedPayload)
+
+        val updatedCredentials = SorobanAddressCredentialsXdr(
+            address = credentials.address,
+            nonce = credentials.nonce,
+            signatureExpirationLedger = credentials.signatureExpirationLedger,
+            signature = payloadScVal
+        )
+
+        return SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            rootInvocation = entry.rootInvocation
         )
     }
 
@@ -388,85 +486,5 @@ object SmartAccountAuth {
         }
 
         return getSha256Crypto().hash(encodedPreimage)
-    }
-
-    /**
-     * Appends a signature map entry to an authorization entry's credential signature map.
-     *
-     * Collects existing map entries from the credentials signature field (if any),
-     * appends the new entry, sorts all entries by XDR-encoded key bytes (lowercase hex,
-     * lexicographic), rebuilds the signature Vec/Map structure, and returns a new
-     * [SorobanAuthorizationEntryXdr] with updated credentials. The input [entry] is not mutated.
-     *
-     * @param entry The authorization entry whose root invocation is preserved
-     * @param credentials The address credentials containing the existing signature map
-     * @param mapEntry The new map entry to append
-     * @return A new authorization entry with the map entry added and the map re-sorted
-     */
-    private fun appendSignatureMapEntry(
-        entry: SorobanAuthorizationEntryXdr,
-        credentials: SorobanAddressCredentialsXdr,
-        mapEntry: SCMapEntryXdr
-    ): SorobanAuthorizationEntryXdr {
-        val mapEntries = mutableListOf<SCMapEntryXdr>()
-
-        if (credentials.signature is SCValXdr.Vec) {
-            val existingVecXdr = (credentials.signature as SCValXdr.Vec).value
-            if (existingVecXdr != null && existingVecXdr.value.isNotEmpty()) {
-                val firstElement = existingVecXdr.value[0]
-                if (firstElement is SCValXdr.Map) {
-                    firstElement.value?.let { mapXdr ->
-                        mapEntries.addAll(mapXdr.value)
-                    }
-                }
-            }
-        }
-
-        mapEntries.add(mapEntry)
-
-        val sortedEntries = sortMapEntries(mapEntries)
-        val signatureMap = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {
-            sortedEntries.forEach { e -> put(e.key, e.`val`) }
-        })
-        val updatedCredentials = SorobanAddressCredentialsXdr(
-            address = credentials.address,
-            nonce = credentials.nonce,
-            signatureExpirationLedger = credentials.signatureExpirationLedger,
-            signature = Scv.toVec(listOf(signatureMap))
-        )
-
-        return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
-            rootInvocation = entry.rootInvocation
-        )
-    }
-
-    /**
-     * Sorts map entries by XDR-encoded key bytes (lowercase hex, lexicographic).
-     *
-     * This is CRITICAL for contract compatibility. The smart account contract expects
-     * signature map entries to be sorted in a specific order based on the XDR-encoded
-     * key bytes converted to lowercase hex strings.
-     *
-     * @param entries The list of map entries to sort
-     * @return Sorted list of map entries
-     */
-    private fun sortMapEntries(entries: List<SCMapEntryXdr>): List<SCMapEntryXdr> {
-        return entries.sortedBy { entry ->
-            try {
-                // Encode the key to XDR bytes
-                val writer = XdrWriter()
-                entry.key.encode(writer)
-                val keyBytes = writer.toByteArray()
-
-                // Convert to lowercase hex string
-                Util.bytesToHex(keyBytes)
-            } catch (e: Exception) {
-                throw TransactionException.signingFailed(
-                    "Failed to XDR-encode signature map key for sorting: ${e.message}",
-                    e
-                )
-            }
-        }
     }
 }

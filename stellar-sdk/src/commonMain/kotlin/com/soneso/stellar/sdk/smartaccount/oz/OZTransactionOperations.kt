@@ -18,8 +18,9 @@ import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
-import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
@@ -28,7 +29,6 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
-import com.soneso.stellar.sdk.xdr.SorobanTransactionDataXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -72,6 +72,33 @@ data class TransactionResult(
     val ledger: UInt? = null,
     val error: String? = null
 )
+
+/**
+ * Callback for resolving context rule IDs per auth entry.
+ *
+ * Called during the signing flow for each authorization entry that matches the connected
+ * smart account. The callback receives the entry and its index in the auth entries list,
+ * and returns the context rule IDs to use for that entry's invocation tree.
+ *
+ * When not provided, the SDK resolves rule IDs automatically from the connected signer
+ * and available context rules. Provide a callback when automatic resolution fails due
+ * to ambiguity (selected signers match multiple rules) or to bypass auto-resolution.
+ *
+ * Example:
+ * ```kotlin
+ * // Simple case: same rule for all entries
+ * val resolver: ResolveContextRuleIds = { _, _ -> listOf(ruleId) }
+ *
+ * // Advanced: inspect entry to decide
+ * val resolver: ResolveContextRuleIds = { entry, index ->
+ *     if (index == 0) listOf(rule1Id) else listOf(rule2Id)
+ * }
+ * ```
+ */
+typealias ResolveContextRuleIds = suspend (
+    entry: SorobanAuthorizationEntryXdr,
+    index: Int
+) -> List<UInt>
 
 /**
  * Transaction operations for OpenZeppelin Smart Accounts.
@@ -221,74 +248,62 @@ class OZTransactionOperations internal constructor(
         return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
-    // MARK: - Auth Entry Signing
+    // MARK: - Execute Arbitrary Contract Function
 
     /**
-     * Signs authorization entries matching the connected contract.
+     * Executes an arbitrary contract function call through the smart account's execute entry point.
      *
-     * Iterates through all auth entries and signs those with address credentials
-     * matching the connected smart account contract. The signature is added to the
-     * entry's signature map using the specified signer.
+     * Builds an invocation of the smart account contract's `execute(target, target_fn, target_args)`
+     * function, which calls the target contract on behalf of the smart account. The smart account's
+     * authorization rules (context rules, signers, policies) apply to this call.
      *
-     * @param authEntries The authorization entries to sign
-     * @param signer The smart account signer to use for signing
-     * @param signature The signature object (WebAuthn, Ed25519, or Policy)
-     * @param expirationLedger Optional ledger number at which signatures expire (defaults to current + buffer)
-     * @return Array of signed authorization entries
-     * @throws SmartAccountException if signing fails
+     * This is the single-signer equivalent of arbitrary contract execution. For multi-signer
+     * operations, use [OZMultiSignerManager].
      *
-     * Example:
-     * ```kotlin
-     * val webAuthnSig = WebAuthnSignature(
-     *     authenticatorData = authData,
-     *     clientData = clientData,
-     *     signature = signature
-     * )
-     *
-     * val signedEntries = txOps.signAuthEntries(
-     *     authEntries = unsignedEntries,
-     *     signer = externalSigner,
-     *     signature = webAuthnSig,
-     *     expirationLedger = currentLedger + 100u
-     * )
-     * ```
+     * @param target The target contract address (C-address) to call
+     * @param targetFn The function name to invoke on the target contract
+     * @param targetArgs The arguments to pass to the target function as SCVal list
+     * @param forceMethod Optional override to force relayer or RPC submission
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null, rule IDs are resolved automatically from the connected signer and available
+     *   context rules. Provide a callback when automatic resolution fails due to ambiguity or to
+     *   bypass auto-resolution.
+     * @return TransactionResult indicating success or failure
+     * @throws SmartAccountException if submission fails
      */
-    suspend fun signAuthEntries(
-        authEntries: List<SorobanAuthorizationEntryXdr>,
-        signer: SmartAccountSigner,
-        signature: SmartAccountSignature,
-        expirationLedger: UInt? = null
-    ): List<SorobanAuthorizationEntryXdr> {
+    suspend fun executeAndSubmit(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
-        // Determine expiration ledger
-        val expiration = expirationLedger ?: run {
-            // Fetch latest ledger and add buffer
-            val latestLedger = kit.sorobanServer.getLatestLedger()
-            latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
-        }
+        // Validate target address (must be C-address)
+        requireContractAddress(target, "target")
 
-        // Sign all matching auth entries
-        return authEntries.map { entry ->
-            // Check if this entry's credentials match our contract
-            val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
-                ?: return@map entry // Not an address credential, skip
+        // Build the execute invocation on the smart account contract
+        val functionArgs = listOf(
+            Scv.toAddress(Address(target).toSCAddress()),
+            Scv.toSymbol(targetFn),
+            Scv.toVec(targetArgs)
+        )
 
-            // Check if the address matches our contract
-            val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
-            if (entryAddress == contractId) {
-                // This entry is for our smart account - sign it
-                SmartAccountAuth.signAuthEntry(
-                    entry = entry,
-                    signer = signer,
-                    signature = signature,
-                    expirationLedger = expiration
-                )
-            } else {
-                // Not our entry, pass through unchanged
-                entry
-            }
-        }
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(contractId).toSCAddress(),
+            functionName = SCSymbolXdr("execute"),
+            args = functionArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submit(
+            hostFunction = hostFunction,
+            auth = emptyList(),
+            forceMethod = forceMethod,
+            resolveContextRuleIds = resolveContextRuleIds
+        )
     }
 
     // MARK: - Transaction Submission
@@ -308,14 +323,17 @@ class OZTransactionOperations internal constructor(
      * 4. Simulate transaction to discover required auth entries
      * 5. Extract auth entries from simulation result
      * 6. For each auth entry matching our contract:
-     *    a. Set signature expiration ledger
-     *    b. Build auth payload hash
-     *    c. Sign with WebAuthn passkey (triggers biometric prompt)
-     *    d. Normalize signature to low-S compact format
-     *    e. Build WebAuthn signature ScVal
-     *    f. Construct signer key from stored credential
-     *    g. Build signature map entry with double XDR-encoded signature
-     *    h. Set credential signature on entry
+     *    a. Build auth payload hash
+     *    b. Require WebAuthn provider
+     *    c. Decode credential ID bytes
+     *    d. Resolve key data from storage or on-chain context rules
+     *    e. Build ExternalSigner for context rule resolution
+     *    f. Resolve context rule IDs via contextRuleManager
+     *    g. Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
+     *    h. Authenticate with WebAuthn using auth digest as challenge
+     *    i. Normalize signature to low-S compact format
+     *    j. Build WebAuthn signature ScVal
+     *    k. Attach signature and context rule IDs to the auth entry
      * 7. Update transaction with signed auth entries
      * 8. Re-simulate to get correct resource fees
      * 9. Assemble transaction from re-simulation
@@ -348,6 +366,10 @@ class OZTransactionOperations internal constructor(
      * @param hostFunction The host function to execute
      * @param auth Authorization entries for the transaction (typically empty; simulation provides them)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null (default), rule IDs are resolved automatically from the connected signer and
+     *   available context rules. Provide a callback when automatic resolution is ambiguous or to
+     *   bypass auto-resolution entirely.
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if submission, simulation, signing, or polling fails
      *
@@ -356,7 +378,8 @@ class OZTransactionOperations internal constructor(
     suspend fun submit(
         hostFunction: HostFunctionXdr,
         auth: List<SorobanAuthorizationEntryXdr>,
-        forceMethod: SubmissionMethod? = null
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
     ): TransactionResult {
         // STEP 1: Require connected wallet
         val (credentialId, contractId) = kit.requireConnected()
@@ -393,9 +416,12 @@ class OZTransactionOperations internal constructor(
             val latestLedger = kit.sorobanServer.getLatestLedger()
             val expiration = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
+            // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
+            val contextRules = kit.contextRuleManager.listContextRules()
+
             val signed = mutableListOf<SorobanAuthorizationEntryXdr>()
 
-            for (entry in simulatedAuthEntries) {
+            for ((entryIndex, entry) in simulatedAuthEntries.withIndex()) {
                 // Check if this entry has address credentials
                 val addressCreds = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
                 if (addressCreds == null) {
@@ -437,42 +463,61 @@ class OZTransactionOperations internal constructor(
                     )
                 }
 
-                // (d) Authenticate with passkey (triggers biometric prompt)
-                val authResult = webauthnProvider.authenticate(
-                    payloadHash,
-                    allowCredentialIds = listOf(credIdBytes)
-                )
-
-                // (e) Normalize DER signature to compact format with low-S
-                val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
-
-                // (f) Build WebAuthn signature
-                val webAuthnSig = WebAuthnSignature(
-                    authenticatorData = authResult.authenticatorData,
-                    clientData = authResult.clientDataJSON,
-                    signature = compactSig
-                )
-
+                // (d) Resolve key data from storage or on-chain context rules.
+                // Storage lookup is an optimization; fall through to on-chain lookup on any failure.
                 val keyData: ByteArray
-                val storage = kit.getStorage()
-                val stored = storage.get(credentialId)
+                val stored = try {
+                    kit.getStorage().get(credentialId)
+                } catch (_: Exception) {
+                    null
+                }
                 if (stored != null) {
                     keyData = stored.publicKey + credIdBytes
                 } else {
                     keyData = findKeyDataFromContextRules(credIdBytes)
                 }
 
+                // (e) Build the connected signer — required for context rule resolution
                 val signer = ExternalSigner(
                     verifierAddress = kit.config.webauthnVerifierAddress,
                     keyData = keyData
                 )
 
-                // (h) Attach the signature to the auth entry
+                // (f) Resolve context rule IDs for this auth entry (using pre-fetched rules)
+                val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
+                    resolveContextRuleIds(entry, entryIndex)
+                } else {
+                    kit.contextRuleManager.resolveContextRuleIdsForEntry(
+                        entry, listOf(signer), contextRules
+                    )
+                }
+
+                // (g) Compute auth digest binding rule IDs to the payload hash
+                val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
+
+                // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt)
+                val authResult = webauthnProvider.authenticate(
+                    authDigest,
+                    allowCredentialIds = listOf(credIdBytes)
+                )
+
+                // (i) Normalize DER signature to compact format with low-S
+                val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
+
+                // (j) Build WebAuthn signature
+                val webAuthnSig = WebAuthnSignature(
+                    authenticatorData = authResult.authenticatorData,
+                    clientData = authResult.clientDataJSON,
+                    signature = compactSig
+                )
+
+                // (k) Attach the signature and context rule IDs to the auth entry
                 val signedEntry = SmartAccountAuth.signAuthEntry(
                     entry = entry,
                     signer = signer,
                     signature = webAuthnSig,
-                    expirationLedger = expiration
+                    expirationLedger = expiration,
+                    contextRuleIds = resolvedContextRuleIds
                 )
 
                 signed.add(signedEntry)
@@ -491,9 +536,12 @@ class OZTransactionOperations internal constructor(
             )
         )
 
-        // STEP 9: Rebuild transaction with signed auth entries
+        // STEP 9: Rebuild transaction with signed auth entries.
+        // Re-fetch deployer account to get the correct on-chain sequence number.
+        // The initial fetch (step 2) was consumed by TransactionBuilder.build() in step 3.
+        val refreshedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val signedTransaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
+        val signedTransaction = TransactionBuilder(refreshedDeployerAccount, Network(kit.config.networkPassphrase))
             .setBaseFee(100)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
@@ -507,25 +555,9 @@ class OZTransactionOperations internal constructor(
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
         }
 
-        // STEP 11: Assemble transaction from re-simulation
-        val transactionData = reSimulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from re-simulation"
-            )
-
-        val minResourceFee = reSimulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from re-simulation"
-            )
-
-        // Rebuild transaction with Soroban data and resource fee
-        val finalTransaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(signedOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // STEP 11: Assemble transaction from re-simulation.
+        // prepareTransaction applies resource fees, footprint, and soroban data from simulation.
+        val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, reSimulation)
 
         // STEP 12: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
@@ -555,33 +587,22 @@ class OZTransactionOperations internal constructor(
      *
      * @param hostFunction The host function for the token transfer
      * @param signedAuthEntries Auth entries with all collected signatures
-     * @param transactionData Soroban transaction data from re-simulation
-     * @param minResourceFee Minimum resource fee from re-simulation
-     * @param deployerAccount The deployer account (already fetched by the caller to avoid
-     *   a redundant network round-trip and potential sequence number drift)
+     * @param signedTransaction The transaction with signed auth entries (pre-assembly)
+     * @param simulation The re-simulation response for transaction assembly
      * @return TransactionResult with submission outcome
      * @throws SmartAccountException if submission fails
      */
     internal suspend fun submitMultiSignerTransaction(
         hostFunction: HostFunctionXdr,
         signedAuthEntries: List<SorobanAuthorizationEntryXdr>,
-        transactionData: SorobanTransactionDataXdr,
-        minResourceFee: Long,
-        deployerAccount: TransactionBuilderAccount
+        signedTransaction: Transaction,
+        simulation: SimulateTransactionResponse
     ): TransactionResult {
         val deployer = kit.getDeployer()
 
-        val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val finalTransaction = TransactionBuilder(
-            deployerAccount,
-            Network(kit.config.networkPassphrase)
-        )
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(signedOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // Assemble the transaction using the SDK's prepareTransaction.
+        // This correctly applies resource fees, footprint, and soroban data from simulation.
+        val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, simulation)
 
         // submitMultiSignerTransaction intentionally uses relayerClient presence directly
         // rather than getSubmissionMethod(), because multi-signer transfers do not support
@@ -757,8 +778,8 @@ class OZTransactionOperations internal constructor(
         // Extract auth entries from simulation
         val simulatedAuthEntries = simulation.results?.firstOrNull()?.parseAuth() ?: emptyList()
 
-        // STEP 8: Convert source_account auth entries to Address credentials
-        // This allows the Relayer to use its own channel accounts for fee sponsoring
+        // STEP 8: Convert source_account auth entries to Address credentials.
+        // This allows the Relayer to use its own channel accounts for fee sponsoring.
         val latestLedger = kit.sorobanServer.getLatestLedger()
         val expirationLedger = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
 
@@ -768,10 +789,10 @@ class OZTransactionOperations internal constructor(
             expirationLedger = expirationLedger
         )
 
-        // STEP 9: Refresh temp account for re-simulation
+        // STEP 9: Rebuild transaction with signed auth entries and re-simulate.
+        // Use a fresh account fetch to avoid sequence number issues.
         val tempAccountRefresh = kit.sorobanServer.getAccount(tempKeypair.getAccountId())
 
-        // Build transaction with signed auth entries
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
             .setBaseFee(100)
@@ -780,40 +801,22 @@ class OZTransactionOperations internal constructor(
             .setTimeout(300)
             .build()
 
-        // STEP 10: Re-simulate with signed auth entries to get correct resource estimates
         val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
 
         if (reSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
         }
 
-        // Assemble transaction from re-simulation
-        val transactionData = reSimulation.parseTransactionData()
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get transaction data from re-simulation"
-            )
-
-        val minResourceFee = reSimulation.minResourceFee
-            ?: throw TransactionException.submissionFailed(
-                "Failed to get min resource fee from re-simulation"
-            )
-
-        // Rebuild transaction with signed auth entries and Soroban data
-        val finalOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
-        val finalTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
-            .setBaseFee(100 + minResourceFee)
-            .addOperation(finalOperation)
-            .addMemo(MemoNone)
-            .setTimeout(300)
-            .setSorobanData(transactionData)
-            .build()
+        // STEP 10: Assemble the transaction using the SDK's prepareTransaction.
+        // This correctly applies resource fees, footprint, and soroban data from simulation.
+        val preparedTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, reSimulation)
 
         // STEP 11: Determine submission method and submit
         val submissionMethod = getSubmissionMethod(forceMethod)
         val useRelayer = submissionMethod == SubmissionMethod.RELAYER
 
         val result = submitOrRelay(
-            transaction = finalTransaction,
+            transaction = preparedTransaction,
             hostFunction = hostFunction,
             signedAuthEntries = signedAuthEntries,
             signer = tempKeypair,
@@ -827,7 +830,7 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 13: Return funded amount as XLM string
+        // STEP 12: Return funded amount as XLM string
         val xlmWhole = transferStroops / BigInteger.fromLong(Util.STROOPS_PER_XLM)
         val xlmFraction = transferStroops % BigInteger.fromLong(Util.STROOPS_PER_XLM)
         return if (xlmFraction == BigInteger.ZERO) {
@@ -1129,9 +1132,29 @@ class OZTransactionOperations internal constructor(
             // Submit via RPC
             val sendResult = kit.sorobanServer.sendTransaction(transaction)
 
+            when (sendResult.status) {
+                SendTransactionStatus.ERROR -> {
+                    return TransactionResult(
+                        success = false,
+                        hash = sendResult.hash ?: "",
+                        error = sendResult.errorResultXdr ?: "Transaction rejected by network"
+                    )
+                }
+                SendTransactionStatus.TRY_AGAIN_LATER -> {
+                    return TransactionResult(
+                        success = false,
+                        hash = sendResult.hash ?: "",
+                        error = "Network is congested. Try again later."
+                    )
+                }
+                else -> {
+                    // PENDING or DUPLICATE — poll for confirmation
+                }
+            }
+
             val hash = sendResult.hash
                 ?: throw TransactionException.submissionFailed(
-                    "Failed to get transaction hash from send result: ${sendResult.errorResultXdr ?: "unknown error"}"
+                    "No transaction hash returned from send result"
                 )
 
             if (emitEvents) {
@@ -1148,55 +1171,38 @@ class OZTransactionOperations internal constructor(
     }
 
     /**
-     * Polls for transaction confirmation.
+     * Polls for transaction confirmation using the SDK's [SorobanServer.pollTransaction].
      *
-     * Repeatedly checks the transaction status on Soroban RPC until it is confirmed,
-     * fails, or times out. Uses exponential backoff between attempts.
+     * Uses 30 attempts with 3-second intervals (~90 seconds total) to account for
+     * testnet ledger close times and potential congestion.
      *
      * @param hash The transaction hash to poll
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if polling times out
      */
     private suspend fun pollForConfirmation(hash: String): TransactionResult {
-        val maxAttempts = 10
-        val sleepDurationMs = 2000L
+        val txResponse = kit.sorobanServer.pollTransaction(
+            hash = hash,
+            maxAttempts = 30,
+            sleepStrategy = { 3000L }
+        )
 
-        repeat(maxAttempts) { attempt ->
-            val txStatus = kit.sorobanServer.getTransaction(hash)
-
-            when (txStatus.status) {
-                GetTransactionStatus.SUCCESS -> return TransactionResult(
-                    success = true,
-                    hash = hash,
-                    ledger = txStatus.latestLedger?.toUInt()
-                )
-
-                GetTransactionStatus.FAILED -> {
-                    val errorMessage = txStatus.resultXdr ?: "Transaction failed on-chain"
-                    return TransactionResult(
-                        success = false,
-                        hash = hash,
-                        ledger = txStatus.latestLedger?.toUInt(),
-                        error = errorMessage
-                    )
-                }
-
-                GetTransactionStatus.NOT_FOUND -> {
-                    // Transaction not yet confirmed, retry
-                    if (attempt < maxAttempts - 1) {
-                        delay(sleepDurationMs)
-                    } else {
-                        return TransactionResult(
-                            success = false,
-                            hash = hash,
-                            error = "Transaction timed out after $maxAttempts attempts"
-                        )
-                    }
-                }
-            }
+        return when (txResponse.status) {
+            GetTransactionStatus.SUCCESS -> TransactionResult(
+                success = true,
+                hash = hash,
+                ledger = txResponse.latestLedger?.toUInt()
+            )
+            GetTransactionStatus.FAILED -> TransactionResult(
+                success = false,
+                hash = hash,
+                ledger = txResponse.latestLedger?.toUInt(),
+                error = txResponse.resultXdr ?: "Transaction failed on-chain"
+            )
+            GetTransactionStatus.NOT_FOUND -> TransactionResult(
+                success = false,
+                hash = hash,
+                error = "Transaction not confirmed after 30 polling attempts"
+            )
         }
-
-        // Should not reach here, but for safety
-        throw TransactionException.timeout("Transaction polling timed out after $maxAttempts attempts")
     }
 }

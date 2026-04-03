@@ -4,7 +4,7 @@ package com.soneso.smartdemo.flows
  * Business logic for managing context rules on a smart account.
  *
  * Functions provided by this file:
- * - Loading rules: [loadContextRules], [loadContextRule]
+ * - Loading rules: [loadContextRules], [loadParsedContextRule]
  * - Modifying rules: [addContextRule], [removeContextRule], [updateContextRuleName], [updateContextRuleValidUntil]
  * - Signer construction: [registerPasskeySigner], [buildDelegatedSigner], [buildEd25519Signer]
  * - Helpers: [resolveAbsoluteLedger], [loadAvailablePasskeySigners]
@@ -13,9 +13,9 @@ package com.soneso.smartdemo.flows
  * authorize which operations (Default, CallContract, or CreateContract) and which
  * policy contracts are enforced. All modifying operations require passkey authentication.
  *
- * Rule data is stored on-chain as Soroban SCVal maps and parsed by [fetchAllContextRules]
- * from ContextRuleParser.kt. Individual rule parsing is done via parseSingleContextRuleFromScVal
- * (defined in ContextRuleParser.kt) by the calling screen.
+ * Rule data is fetched via [OZContextRuleManager.listContextRules] which returns fully
+ * parsed [ParsedContextRule] objects including the [ParsedContextRule.signerIds] and
+ * [ParsedContextRule.policyIds] fields introduced in v0.7.0.
  */
 
 import com.soneso.smartdemo.config.DemoConfig
@@ -62,43 +62,37 @@ data class FlowPolicyEntry(
 /**
  * Loads all context rules from the connected smart account.
  *
- * SDK workflow:
- * 1. Call [contextRuleManager.getContextRulesCount] to get the total rule count.
- * 2. Iterate IDs from 0 upward, calling [contextRuleManager.getContextRule] for each.
- *    Gaps from removed rules are skipped.
- * 3. Parse each SCVal result using [parseSingleContextRuleFromScVal] from ContextRuleParser.
+ * Delegates to [fetchAllContextRules] which calls [OZContextRuleManager.listContextRules].
+ * The returned rules include [ParsedContextRule.signerIds] and [ParsedContextRule.policyIds]
+ * populated by the SDK.
  *
- * @return List of [ParsedContextRule], sorted by ID with duplicates removed.
+ * @return List of [ParsedContextRule], sorted by ID.
  * @throws IllegalStateException if the kit is not initialized.
  */
 suspend fun loadContextRules(): List<ParsedContextRule> {
-    // fetchAllContextRules reads from DemoState.kit internally and handles the
-    // count-then-fetch pattern with a fallback for contracts without count support.
     val rules = fetchAllContextRules()
     ActivityLogState.info("Fetched ${rules.size} context rule(s)")
     return rules
 }
 
 /**
- * Loads a single context rule by ID for edit mode pre-population.
+ * Loads a single context rule by ID as a fully parsed [ParsedContextRule].
  *
- * SDK workflow:
- * - Calls [OZSmartAccountKit.contextRuleManager.getContextRule] which returns the
- *   rule's on-chain data as a raw SCVal map.
- * - The screen parses the result using [parseSingleContextRuleFromScVal] to populate
- *   its form fields (name, context type, signers, policies, expiry).
+ * Fetches all context rules via [OZContextRuleManager.listContextRules] and returns the
+ * rule matching [ruleId]. This ensures the result includes [ParsedContextRule.signerIds]
+ * and [ParsedContextRule.policyIds] as populated by the SDK parser.
  *
- * @param ruleId The rule ID (0-indexed) to load.
- * @return The raw [SCValXdr] for parsing by the caller.
- * @throws Exception if the rule does not exist or the RPC call fails.
+ * @param ruleId The rule ID to load.
+ * @return The parsed [ParsedContextRule].
+ * @throws IllegalStateException if the kit is not initialized.
+ * @throws NoSuchElementException if no rule with the given ID exists.
  */
-suspend fun loadContextRule(ruleId: UInt): SCValXdr {
+suspend fun loadParsedContextRule(ruleId: UInt): ParsedContextRule {
     val kit = DemoState.kit
         ?: throw IllegalStateException("Kit not initialized")
-
-    // getContextRule returns the raw on-chain SCVal so the screen can parse
-    // it into typed form fields using parseSingleContextRuleFromScVal.
-    return kit.contextRuleManager.getContextRule(ruleId)
+    return kit.contextRuleManager.listContextRules()
+        .firstOrNull { it.id == ruleId }
+        ?: throw NoSuchElementException("Context rule #$ruleId not found")
 }
 
 /**

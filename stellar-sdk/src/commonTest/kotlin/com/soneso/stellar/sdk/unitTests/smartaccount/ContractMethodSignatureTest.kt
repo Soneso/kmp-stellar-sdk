@@ -547,30 +547,30 @@ class ContractMethodSignatureTest {
     // ========================================================================
 
     @Test
+    fun testExecuteFunction_isInvokedByExecuteAndSubmit() {
+        // "execute" (SmartAccountContractAbi.Functions.EXECUTE) is used by
+        // OZTransactionOperations.executeAndSubmit(), which builds an invocation of the
+        // smart account's execute(target, target_fn, target_args) entry point.
+        assertEquals("execute", SmartAccountContractAbi.Functions.EXECUTE)
+    }
+
+    @Test
     fun testUnusedAbiFunctions_areDocumented() {
-        // The following ABI functions are NOT currently invoked in the KMP SDK:
+        // The following ABI function is NOT currently invoked in the KMP SDK:
         //
-        // 1. "execute" (SmartAccountContractAbi.Functions.EXECUTE)
-        //    - ExecutionEntryPoint trait method for invoking target contracts
-        //    - The KMP SDK uses direct InvokeHostFunction operations instead
-        //    - Rationale: The SDK builds and submits transactions directly rather than
-        //      routing through the smart account's execute() function
-        //
-        // 2. "upgrade" (SmartAccountContractAbi.Functions.UPGRADE)
+        // 1. "upgrade" (SmartAccountContractAbi.Functions.UPGRADE)
         //    - Upgradeable trait method for WASM upgrade
         //    - Not yet implemented in the KMP SDK
         //    - Rationale: Contract upgrade functionality is not yet part of the SDK's scope
         //
-        // This test serves as documentation of the unused functions.
-        // If these functions are implemented in the future, this test should be updated.
+        // This test serves as documentation of the unused function.
+        // If this function is implemented in the future, this test should be updated.
 
         val unusedFunctions = listOf(
-            SmartAccountContractAbi.Functions.EXECUTE,
             SmartAccountContractAbi.Functions.UPGRADE
         )
-        assertEquals(2, unusedFunctions.size, "There should be exactly 2 unused ABI functions")
-        assertEquals("execute", unusedFunctions[0])
-        assertEquals("upgrade", unusedFunctions[1])
+        assertEquals(1, unusedFunctions.size, "There should be exactly 1 unused ABI function")
+        assertEquals("upgrade", unusedFunctions[0])
     }
 
     // ========================================================================

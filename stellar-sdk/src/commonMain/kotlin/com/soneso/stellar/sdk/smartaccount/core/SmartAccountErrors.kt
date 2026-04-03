@@ -765,3 +765,42 @@ object SmartAccountConstants {
      */
     const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04
 }
+
+// ============================================================================
+// Contract Error Codes
+// ============================================================================
+
+/**
+ * Contract-level error codes from the OZ smart account contract.
+ *
+ * These codes are returned in contract error responses and can be mapped to
+ * exceptions by the SDK when interpreting failed transaction results.
+ *
+ * Error code range: 3xxx (credential errors, aligned with the contract's Error enum).
+ */
+object ContractErrorCodes {
+    /**
+     * Integer arithmetic overflow occurred in the contract.
+     */
+    const val MATH_OVERFLOW = 3012
+
+    /**
+     * The key_data field on a signer exceeds the maximum allowed size.
+     */
+    const val KEY_DATA_TOO_LARGE = 3013
+
+    /**
+     * The number of context rule IDs in the auth payload does not match the expected count.
+     */
+    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014
+
+    /**
+     * A name field (e.g. context rule name) exceeds the maximum allowed length.
+     */
+    const val NAME_TOO_LONG = 3015
+
+    /**
+     * The signer is not authorized to sign the given context rule.
+     */
+    const val UNAUTHORIZED_SIGNER = 3016
+}

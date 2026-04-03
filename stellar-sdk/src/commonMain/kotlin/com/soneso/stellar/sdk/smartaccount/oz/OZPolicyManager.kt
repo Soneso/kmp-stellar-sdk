@@ -240,10 +240,10 @@ sealed class PolicyInstallParams {
  *     println("Policy added successfully")
  * }
  *
- * // Remove a policy
+ * // Remove a policy by its ID (ID available from ParsedContextRule.policyIds)
  * val removeResult = policyManager.removePolicy(
  *     contextRuleId = 0u,
- *     policyAddress = "CBCD1234..."
+ *     policyId = 1u
  * )
  * ```
  *
@@ -439,14 +439,15 @@ class OZPolicyManager internal constructor(
     // MARK: - Remove Policy
 
     /**
-     * Removes a policy from a context rule.
+     * Removes a policy from a context rule by its ID.
      *
-     * Uninstalls an existing policy from the specified context rule. The policy
-     * contract remains deployed on the network but is no longer evaluated for
-     * this context rule.
+     * Uninstalls the policy with the given ID from the specified context rule. The policy
+     * contract remains deployed on the network but is no longer evaluated for this context rule.
+     * The policy ID is assigned by the contract when the policy is added and is available via
+     * [ParsedContextRule.policyIds] after fetching the context rule.
      *
      * Flow:
-     * 1. Validates inputs (connected wallet, policy address format)
+     * 1. Validates that a wallet is connected
      * 2. Builds contract invocation for remove_policy
      * 3. Submits transaction via transactionOps (handles simulation, signing, polling)
      *
@@ -455,17 +456,20 @@ class OZPolicyManager internal constructor(
      * to sign the transaction.
      *
      * @param contextRuleId The context rule ID to remove the policy from (0 for Default rule)
-     * @param policyAddress The policy contract address to remove (C-address)
+     * @param policyId The on-chain policy ID assigned by the contract (available from [ParsedContextRule.policyIds])
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
      *
      * Example:
      * ```kotlin
-     * // Remove a policy from the default context rule
+     * // Fetch the context rule to get policy IDs
+     * val contextRule = kit.contextRuleManager.getContextRule(contextRuleId = 0u)
+     * val policyIdToRemove = contextRule.policyIds.first()
+     *
      * val result = policyManager.removePolicy(
      *     contextRuleId = 0u,
-     *     policyAddress = "CBCD1234..."
+     *     policyId = policyIdToRemove
      * )
      *
      * if (result.success) {
@@ -477,19 +481,16 @@ class OZPolicyManager internal constructor(
      */
     suspend fun removePolicy(
         contextRuleId: UInt,
-        policyAddress: String
+        policyId: UInt
     ): TransactionResult {
         // Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
-
-        // Validate policy address (must be C-address)
-        requireContractAddress(policyAddress, "policyAddress")
 
         // Build host function
         val hostFunction = buildRemovePolicyFunction(
             contractId = contractId,
             contextRuleId = contextRuleId,
-            policyAddress = policyAddress
+            policyId = policyId
         )
 
         // Submit transaction
@@ -517,6 +518,10 @@ class OZPolicyManager internal constructor(
      * Contract limits:
      * - Maximum [OZConstants.MAX_POLICIES] policies per context rule
      * - Policy address must be a valid C-address
+     *
+     * Note: The contract returns a u32 policy ID for the newly added policy. The ID is available
+     * via [ParsedContextRule.policyIds] after fetching the context rule and can be used with
+     * [OZPolicyManager.removePolicy] to remove the policy.
      *
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
@@ -609,24 +614,24 @@ class OZPolicyManager internal constructor(
     /**
      * Builds the host function for removing a policy.
      *
-     * Contract method: remove_policy(context_rule_id: u32, policy: Address)
+     * Contract method: remove_policy(context_rule_id: u32, policy_id: u32)
      *
      * @param contractId The smart account contract ID
      * @param contextRuleId The context rule ID
-     * @param policyAddress The policy contract address
+     * @param policyId The on-chain policy ID to remove
      * @return HostFunctionXDR for the remove_policy invocation
      */
     private fun buildRemovePolicyFunction(
         contractId: String,
         contextRuleId: UInt,
-        policyAddress: String
+        policyId: UInt
     ): HostFunctionXdr {
         val invokeArgs = InvokeContractArgsXdr(
             contractAddress = Address(contractId).toSCAddress(),
             functionName = SCSymbolXdr("remove_policy"),
             args = listOf(
                 Scv.toUint32(contextRuleId),
-                Scv.toAddress(Address(policyAddress).toSCAddress())
+                Scv.toUint32(policyId)
             )
         )
         return HostFunctionXdr.InvokeContract(invokeArgs)

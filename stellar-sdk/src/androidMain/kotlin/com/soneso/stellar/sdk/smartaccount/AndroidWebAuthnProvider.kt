@@ -177,7 +177,7 @@ class AndroidWebAuthnProvider(
         challenge: ByteArray,
         allowCredentialIds: List<ByteArray>?
     ): WebAuthnAuthenticationResult {
-        val requestJson = buildAuthenticationRequestJson(challenge)
+        val requestJson = buildAuthenticationRequestJson(challenge, allowCredentialIds)
 
         val getRequest = GetCredentialRequest(
             credentialOptions = listOf(
@@ -288,15 +288,31 @@ class AndroidWebAuthnProvider(
      * Builds the PublicKeyCredentialRequestOptions JSON for an authentication ceremony.
      *
      * Constructs a JSON string conforming to the WebAuthn specification's
-     * `PublicKeyCredentialRequestOptions` dictionary. Uses an empty `allowCredentials`
-     * list to enable discoverable credential selection (the user picks which passkey
-     * to use).
+     * `PublicKeyCredentialRequestOptions` dictionary. When [allowCredentialIds] is
+     * provided, the `allowCredentials` array constrains the authenticator to only
+     * the specified credentials. When null or empty, discoverable credential selection
+     * is used (the user picks which passkey to use).
      *
      * @param challenge The challenge bytes (base64url encoded in the JSON)
+     * @param allowCredentialIds Optional list of credential ID bytes to constrain selection
      * @return JSON string for the authentication request
      */
-    private fun buildAuthenticationRequestJson(challenge: ByteArray): String {
+    private fun buildAuthenticationRequestJson(
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>? = null
+    ): String {
         val challengeB64 = base64UrlEncode(challenge)
+
+        val allowCredentials = if (!allowCredentialIds.isNullOrEmpty()) {
+            JsonArray(allowCredentialIds.map { credId ->
+                JsonObject(mapOf(
+                    "type" to JsonPrimitive("public-key"),
+                    "id" to JsonPrimitive(base64UrlEncode(credId))
+                ))
+            })
+        } else {
+            JsonArray(emptyList())
+        }
 
         val jsonObject = JsonObject(
             mapOf(
@@ -304,8 +320,7 @@ class AndroidWebAuthnProvider(
                 "rpId" to JsonPrimitive(rpId),
                 "timeout" to JsonPrimitive(timeout),
                 "userVerification" to JsonPrimitive("required"),
-                // Empty allowCredentials = discoverable credential (passkey) selection
-                "allowCredentials" to JsonArray(emptyList())
+                "allowCredentials" to allowCredentials
             )
         )
 

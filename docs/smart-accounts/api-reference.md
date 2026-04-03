@@ -554,7 +554,8 @@ if (result.success) {
 suspend fun submit(
     hostFunction: HostFunctionXdr,
     auth: List<SorobanAuthorizationEntryXdr>,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
 ): TransactionResult
 ```
 
@@ -566,10 +567,60 @@ Handles simulation, auth entry extraction, WebAuthn signing, re-simulation, and 
 - `hostFunction`: The Soroban host function to execute
 - `auth`: Initial authorization entries (typically empty; simulation provides them)
 - `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. Called once per entry with the entry and its index. When provided, the contract evaluates only the returned rules instead of scanning all matching rules. See [ResolveContextRuleIds](#resolvecontextruleids).
 
 **Returns**: `TransactionResult` with submission outcome
 
 **Throws**: Multiple exception types (see transaction operations exceptions)
+
+---
+
+#### executeAndSubmit
+
+```kotlin
+suspend fun executeAndSubmit(
+    target: String,
+    targetFn: String,
+    targetArgs: List<SCValXdr> = emptyList(),
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Executes a generic contract call through the smart account's `execute` entry point. Builds the invocation, handles simulation, WebAuthn signing, and submission in one step. Designed for single-signer workflows where the connected passkey authorizes the call.
+
+**Parameters**:
+- `target`: Contract address to call (C-address)
+- `targetFn`: Function name to invoke on the target contract
+- `targetArgs`: Arguments for the target function as XDR values
+- `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
+
+**Returns**: `TransactionResult` with submission outcome
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid addresses or arguments
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+// Call a custom contract function through the smart account
+val result = kit.transactionOperations.executeAndSubmit(
+    target = "CBCD1234...",
+    targetFn = "approve",
+    targetArgs = listOf(
+        Scv.toAddress("GA7QYNF7..."),
+        Scv.toInt128(1_000_000_000L)
+    )
+)
+
+if (result.success) {
+    println("Executed: ${result.hash}")
+}
+```
 
 ---
 
@@ -908,17 +959,17 @@ Adds an Ed25519 signer to a context rule.
 ```kotlin
 suspend fun removeSigner(
     contextRuleId: UInt,
-    signer: SmartAccountSigner
+    signerId: UInt
 ): TransactionResult
 ```
 
-Removes a signer from a context rule.
+Removes a signer from a context rule by its on-chain signer ID.
 
 **Note**: Cannot remove the last signer unless policies exist.
 
 **Parameters**:
 - `contextRuleId`: Context rule ID
-- `signer`: The signer to remove
+- `signerId`: The on-chain ID of the signer to remove
 
 **Returns**: `TransactionResult`
 
@@ -1070,15 +1121,15 @@ val result = kit.policyManager.addSpendingLimit(
 ```kotlin
 suspend fun removePolicy(
     contextRuleId: UInt,
-    policyAddress: String
+    policyId: UInt
 ): TransactionResult
 ```
 
-Removes a policy from a context rule.
+Removes a policy from a context rule by its on-chain policy ID.
 
 **Parameters**:
 - `contextRuleId`: Context rule ID
-- `policyAddress`: Policy contract address to remove
+- `policyId`: The on-chain ID of the policy to remove
 
 **Returns**: `TransactionResult`
 
@@ -1265,7 +1316,8 @@ suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
     amount: String,
-    selectedSigners: List<SelectedSigner>
+    selectedSigners: List<SelectedSigner>,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
 ): TransactionResult
 ```
 
@@ -1278,6 +1330,7 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 - `recipient`: Recipient address (G-address or C-address)
 - `amount`: Amount in XLM
 - `selectedSigners`: All signers that must sign, in collection order
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
 
 **Returns**: `TransactionResult`
 
@@ -1818,6 +1871,31 @@ Represents a WebAuthn signature with authenticator and client data.
 
 ---
 
+### ResolveContextRuleIds
+
+```kotlin
+typealias ResolveContextRuleIds = suspend (
+    entry: SorobanAuthorizationEntryXdr,
+    index: Int
+) -> List<UInt>
+```
+
+Callback that resolves context rule IDs for a given authorization entry during transaction signing. Called once per entry. The `entry` is the authorization entry being signed, and `index` is its position in the authorization list. Return the list of context rule IDs the contract should evaluate for that entry.
+
+**Usage**:
+
+```kotlin
+// Same rule for all entries
+resolveContextRuleIds = { _, _ -> listOf(ruleId) }
+
+// Different rules per entry
+resolveContextRuleIds = { entry, index ->
+    if (index == 0) listOf(1u) else listOf(2u)
+}
+```
+
+---
+
 ### SubmissionMethod
 
 ```kotlin
@@ -1931,4 +2009,4 @@ Stellar SDK Kotlin Multiplatform - Apache License 2.0
 
 ---
 
-**Last Updated**: February 2026
+**Last Updated**: April 2026

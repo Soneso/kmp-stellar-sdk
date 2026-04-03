@@ -29,6 +29,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -896,16 +897,18 @@ class SmartAccountTest {
         )
 
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
-        assertTrue(credentials.signature is com.soneso.stellar.sdk.xdr.SCValXdr.Vec)
+        assertTrue(credentials.signature is com.soneso.stellar.sdk.xdr.SCValXdr.Map)
 
-        val vec = (credentials.signature as com.soneso.stellar.sdk.xdr.SCValXdr.Vec).value
-        assertFalse(vec?.value.isNullOrEmpty())
+        val outerMap = (credentials.signature as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
+        assertFalse(outerMap?.value.isNullOrEmpty())
+        assertEquals(2, outerMap?.value?.size)
 
-        val firstElement = vec?.value?.get(0)
-        assertTrue(firstElement is com.soneso.stellar.sdk.xdr.SCValXdr.Map)
-
-        val map = (firstElement as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
-        assertEquals(1, map?.value?.size)
+        val signersEntry = outerMap?.value?.first {
+            (it.key as? com.soneso.stellar.sdk.xdr.SCValXdr.Sym)?.value?.value == "signers"
+        }
+        assertNotNull(signersEntry)
+        val signersMap = (signersEntry!!.`val` as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
+        assertEquals(1, signersMap?.value?.size)
     }
 
     @Test
@@ -935,9 +938,12 @@ class SmartAccountTest {
         )
 
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
-        val vec = (credentials.signature as com.soneso.stellar.sdk.xdr.SCValXdr.Vec).value
-        val map = (vec?.value?.get(0) as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
-        val sigValue = map?.value?.get(0)?.`val`
+        val outerMap = (credentials.signature as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
+        val signersEntry = outerMap?.value?.first {
+            (it.key as? com.soneso.stellar.sdk.xdr.SCValXdr.Sym)?.value?.value == "signers"
+        }
+        val signersMap = (signersEntry!!.`val` as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
+        val sigValue = signersMap?.value?.get(0)?.`val`
 
         // Signature value should be Bytes containing XDR
         assertTrue(sigValue is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes)
