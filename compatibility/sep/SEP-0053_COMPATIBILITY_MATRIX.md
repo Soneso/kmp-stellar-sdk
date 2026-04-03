@@ -1,10 +1,10 @@
 # SEP-0053 (Sign and Verify Messages) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:18
 
-**SEP Version:** 0.0.1<br>
-**SEP Status:** Draft<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 0.0.1  
+**SEP Status:** Draft  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ Standardizes signing and verification of arbitrary messages using Stellar Ed2551
 
 - ✅ **Implemented:** 8/8
 - ❌ **Not Implemented:** 0/8
-- **Required Fields:** 100.0% (8/8)
+
+**Required Fields:** 100.0% (8/8)
+
+**Optional Fields:** 100% (0/0)
 
 ## Implementation Status
 
@@ -60,11 +63,20 @@ Standardizes signing and verification of arbitrary messages using Stellar Ed2551
 | `ed25519_signature` | ✓ | ✅ | `sign` | 64-byte Ed25519 signature output |
 | `signature_output` | ✓ | ✅ | `ByteArray` | ByteArray signature return type |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0053!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

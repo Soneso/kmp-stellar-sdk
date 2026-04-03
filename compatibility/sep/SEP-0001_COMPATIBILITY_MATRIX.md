@@ -1,10 +1,10 @@
 # SEP-0001 (Stellar Info File) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:13
 
-**SEP Version:** 2.7.0<br>
-**SEP Status:** Active<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 2.7.0  
+**SEP Status:** Active  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0001.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ The `stellar.toml` file publishes information about an organization's Stellar in
 
 - ✅ **Implemented:** 71/71
 - ❌ **Not Implemented:** 0/71
-- **Required Fields:** 100.0% (3/3)
+
+**Required Fields:** 100.0% (3/3)
+
+**Optional Fields:** 100.0% (68/68)
 
 ## Implementation Status
 
@@ -160,11 +163,20 @@ The `stellar.toml` file publishes information about an organization's Stellar in
 | `HOST` |  | ✅ | `host` | The IP:port or domain:port peers can use to connect to the node |
 | `HISTORY` |  | ✅ | `history` | The location of the history archive published by this validator |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0001!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

@@ -6,8 +6,8 @@ This script compares SEP specifications with KMP Stellar SDK implementations
 and generates detailed compatibility reports, statistics, and markdown documentation.
 
 This is part of a 3-stage SEP compatibility analysis pipeline:
-1. sep_parser.py - Parses SEP specs from GitHub -> compatibility/sep/data/sep_{number}_definition.json
-2. sep_analyzer.py - Analyzes SDK Kotlin code -> compatibility/sep/data/kmp_sep_{number}_implementation.json
+1. sep_parser.py - Parses SEP specs from GitHub -> data/sep/sep_{number}_definition.json
+2. sep_analyzer.py - Analyzes SDK Kotlin code -> data/sep/kmp_sep_{number}_implementation.json
 3. generate_sep_comparison.py - THIS FILE - Compares both and generates reports
 
 Author: KMP Stellar SDK Team
@@ -23,12 +23,17 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from common import Colors, DATA_DIR, COMPATIBILITY_DIR, SDK_ROOT, get_sdk_version, snake_to_camel
+
 
 class CompatibilityStatus(Enum):
     """Compatibility status indicators"""
     IMPLEMENTED = "✅"
     NOT_IMPLEMENTED = "❌"
     PARTIAL = "⚠️"
+    SERVER = "Server"
 
 
 class FieldPriority(Enum):
@@ -37,32 +42,6 @@ class FieldPriority(Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
-
-
-class Colors:
-    """ANSI color codes for terminal output"""
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
-
-    @classmethod
-    def disable(cls):
-        """Disable colors (for non-TTY output)"""
-        cls.HEADER = ''
-        cls.BLUE = ''
-        cls.CYAN = ''
-        cls.GREEN = ''
-        cls.YELLOW = ''
-        cls.RED = ''
-        cls.BOLD = ''
-        cls.UNDERLINE = ''
-        cls.END = ''
 
 
 @dataclass
@@ -74,6 +53,7 @@ class FieldComparison:
     status: str
     notes: str
     priority: Optional[str] = None
+    server_side_only: bool = False
 
 
 class SEPCompatibilityGenerator:
@@ -110,6 +90,7 @@ class SEPCompatibilityGenerator:
         self.sdk_data: Dict[str, Any] = {}
         self.comparisons: List[FieldComparison] = []
         self.sdk_version = sdk_version
+        self._cached_stats: Optional[Dict[str, Any]] = None
 
     def load_data(self) -> None:
         """Load JSON data from both files"""
@@ -208,33 +189,50 @@ class SEPCompatibilityGenerator:
 
         return field_mappings
 
-    def snake_to_camel(self, snake_str: str) -> str:
-        """Convert snake_case to camelCase"""
-        components = snake_str.split('_')
-        return components[0] + ''.join(x.title() for x in components[1:])
+    def _map_definition_fields_by_property(
+        self,
+        field_mappings: Dict[str, Dict[str, Optional[str]]],
+        *,
+        check_methods: bool = False,
+    ) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Shared helper: map SEP definition fields to SDK properties (and optionally methods).
 
-    def map_sep_06_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
-        """Map SEP-06 definition fields to SDK properties"""
+        For each section in ``self.sep_data``, converts every ``field_name`` from
+        snake_case to camelCase and checks whether a matching property exists in any
+        SDK class.  When ``check_methods`` is ``True`` the SDK method names are also
+        consulted as a fallback (used by SEP-12).
+
+        Args:
+            field_mappings: Original field mappings from the implementation JSON.
+            check_methods: When ``True``, also match against SDK class method names.
+
+        Returns:
+            A copy of ``field_mappings`` with a ``section_key -> {field_name -> sdk_name}``
+            entry added for every section found in the SEP definition.
+        """
         enhanced = field_mappings.copy()
 
-        # Extract all property names from SDK classes
-        sdk_properties = set()
+        sdk_properties: set[str] = set()
+        sdk_methods: set[str] = set()
         for cls in self.sdk_data.get('classes', []):
             for prop in cls.get('properties', []):
                 sdk_properties.add(prop['name'])
+            if check_methods:
+                for method in cls.get('methods', []):
+                    sdk_methods.add(method['name'])
 
-        # Map each section in the definition
         for section in self.sep_data.get('sections', []):
             section_key = section['key']
-            section_fields = {}
+            section_fields: Dict[str, Optional[str]] = {}
 
             for field in section.get('fields', []):
                 field_name = field['name']
-                # Convert snake_case to camelCase
-                sdk_property_name = self.snake_to_camel(field_name)
+                sdk_property_name = snake_to_camel(field_name)
 
-                # Check if this property exists in SDK
                 if sdk_property_name in sdk_properties:
+                    section_fields[field_name] = sdk_property_name
+                elif check_methods and sdk_property_name in sdk_methods:
                     section_fields[field_name] = sdk_property_name
                 else:
                     section_fields[field_name] = None
@@ -242,6 +240,10 @@ class SEPCompatibilityGenerator:
             enhanced[section_key] = section_fields
 
         return enhanced
+
+    def map_sep_06_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
+        """Map SEP-06 definition fields to SDK properties."""
+        return self._map_definition_fields_by_property(field_mappings)
 
     def map_sep_09_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
         """Map SEP-09 definition fields to SDK properties"""
@@ -273,9 +275,11 @@ class SEPCompatibilityGenerator:
                     sdk_property_name = 'lastName'
                 elif base_field_name == 'given_name':
                     sdk_property_name = 'firstName'
+                elif base_field_name == 'VAT_number':
+                    sdk_property_name = 'VATNumber'
                 else:
                     # Convert snake_case to camelCase
-                    sdk_property_name = self.snake_to_camel(base_field_name)
+                    sdk_property_name = snake_to_camel(base_field_name)
 
                 if sdk_property_name in sdk_properties:
                     section_fields[field_name] = sdk_property_name
@@ -287,94 +291,16 @@ class SEPCompatibilityGenerator:
         return enhanced
 
     def map_sep_12_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
-        """Map SEP-12 definition fields to SDK properties"""
-        enhanced = field_mappings.copy()
-
-        # Build property and method maps
-        sdk_properties = set()
-        sdk_methods = set()
-        for cls in self.sdk_data.get('classes', []):
-            for prop in cls.get('properties', []):
-                sdk_properties.add(prop['name'])
-            for method in cls.get('methods', []):
-                sdk_methods.add(method['name'])
-
-        # Map each section
-        for section in self.sep_data.get('sections', []):
-            section_key = section['key']
-            section_fields = {}
-
-            for field in section.get('fields', []):
-                field_name = field['name']
-                sdk_property_name = self.snake_to_camel(field_name)
-
-                # Check both properties and methods
-                if sdk_property_name in sdk_properties:
-                    section_fields[field_name] = sdk_property_name
-                elif sdk_property_name in sdk_methods:
-                    section_fields[field_name] = sdk_property_name
-                else:
-                    section_fields[field_name] = None
-
-            enhanced[section_key] = section_fields
-
-        return enhanced
+        """Map SEP-12 definition fields to SDK properties and methods."""
+        return self._map_definition_fields_by_property(field_mappings, check_methods=True)
 
     def map_sep_24_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
-        """Map SEP-24 definition fields to SDK properties"""
-        enhanced = field_mappings.copy()
-
-        # Build property map
-        sdk_properties = set()
-        for cls in self.sdk_data.get('classes', []):
-            for prop in cls.get('properties', []):
-                sdk_properties.add(prop['name'])
-
-        # Map each section
-        for section in self.sep_data.get('sections', []):
-            section_key = section['key']
-            section_fields = {}
-
-            for field in section.get('fields', []):
-                field_name = field['name']
-                sdk_property_name = self.snake_to_camel(field_name)
-
-                if sdk_property_name in sdk_properties:
-                    section_fields[field_name] = sdk_property_name
-                else:
-                    section_fields[field_name] = None
-
-            enhanced[section_key] = section_fields
-
-        return enhanced
+        """Map SEP-24 definition fields to SDK properties."""
+        return self._map_definition_fields_by_property(field_mappings)
 
     def map_sep_38_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
-        """Map SEP-38 definition fields to SDK properties"""
-        enhanced = field_mappings.copy()
-
-        # Build property map
-        sdk_properties = set()
-        for cls in self.sdk_data.get('classes', []):
-            for prop in cls.get('properties', []):
-                sdk_properties.add(prop['name'])
-
-        # Map each section
-        for section in self.sep_data.get('sections', []):
-            section_key = section['key']
-            section_fields = {}
-
-            for field in section.get('fields', []):
-                field_name = field['name']
-                sdk_property_name = self.snake_to_camel(field_name)
-
-                if sdk_property_name in sdk_properties:
-                    section_fields[field_name] = sdk_property_name
-                else:
-                    section_fields[field_name] = None
-
-            enhanced[section_key] = section_fields
-
-        return enhanced
+        """Map SEP-38 definition fields to SDK properties."""
+        return self._map_definition_fields_by_property(field_mappings)
 
     def map_sep_45_definition_fields(self, field_mappings: Dict[str, Dict[str, Optional[str]]]) -> Dict[str, Dict[str, Optional[str]]]:
         """Map SEP-45 definition fields to SDK properties"""
@@ -402,14 +328,14 @@ class SEPCompatibilityGenerator:
                 # Challenge response fields map to Sep45ChallengeResponse properties
                 for field in section.get('fields', []):
                     field_name = field['name']
-                    sdk_property_name = self.snake_to_camel(field_name)
+                    sdk_property_name = snake_to_camel(field_name)
                     section_fields[field_name] = sdk_property_name
 
             elif section_key == 'token_request_parameters':
                 # Token request parameters map to sendSignedChallenge() method parameters
                 for field in section.get('fields', []):
                     field_name = field['name']
-                    sdk_property_name = self.snake_to_camel(field_name)
+                    sdk_property_name = snake_to_camel(field_name)
                     section_fields[field_name] = sdk_property_name
 
             elif section_key == 'token_response_fields':
@@ -459,7 +385,7 @@ class SEPCompatibilityGenerator:
                 # Unknown section, use generic snake_case to camelCase conversion
                 for field in section.get('fields', []):
                     field_name = field['name']
-                    sdk_property_name = self.snake_to_camel(field_name)
+                    sdk_property_name = snake_to_camel(field_name)
                     section_fields[field_name] = sdk_property_name
 
             enhanced[section_key] = section_fields
@@ -468,6 +394,7 @@ class SEPCompatibilityGenerator:
 
     def compare_fields(self) -> None:
         """Compare all SEP fields with SDK implementation"""
+        self._cached_stats = None
         print(f"\n{Colors.CYAN}Comparing fields...{Colors.END}")
 
         sections = self.sep_data.get('sections', [])
@@ -512,23 +439,35 @@ class SEPCompatibilityGenerator:
         print(f"{Colors.GREEN}✓ Compared {len(self.comparisons)} fields{Colors.END}")
 
     def calculate_statistics(self) -> Dict[str, Any]:
-        """Calculate coverage statistics from comparisons"""
+        """Calculate coverage statistics from comparisons (excluding server-side-only features)"""
+        if self._cached_stats is not None:
+            return self._cached_stats
+
         print(f"\n{Colors.CYAN}Calculating statistics...{Colors.END}")
 
-        total = len(self.comparisons)
-        implemented = sum(1 for c in self.comparisons
+        # Separate client-facing and server-side-only comparisons
+        client_comparisons = [c for c in self.comparisons if not c.server_side_only]
+        server_side_count = len([c for c in self.comparisons if c.server_side_only])
+
+        total = len(client_comparisons)
+        implemented = sum(1 for c in client_comparisons
                          if c.status == CompatibilityStatus.IMPLEMENTED.value)
         not_implemented = total - implemented
 
-        # Separate required and total field tracking
-        required_total = sum(1 for c in self.comparisons if c.sep_field.get('required', False))
-        required_implemented = sum(1 for c in self.comparisons
+        # Separate required and optional field tracking (client-facing only)
+        required_total = sum(1 for c in client_comparisons if c.sep_field.get('required', False))
+        required_implemented = sum(1 for c in client_comparisons
                                   if c.sep_field.get('required', False) and
                                   c.status == CompatibilityStatus.IMPLEMENTED.value)
 
-        # Section statistics with required tracking
+        optional_total = sum(1 for c in client_comparisons if not c.sep_field.get('required', False))
+        optional_implemented = sum(1 for c in client_comparisons
+                                  if not c.sep_field.get('required', False) and
+                                  c.status == CompatibilityStatus.IMPLEMENTED.value)
+
+        # Section statistics with required tracking (client-facing only)
         section_stats = {}
-        for comp in self.comparisons:
+        for comp in client_comparisons:
             if comp.section not in section_stats:
                 section_stats[comp.section] = {
                     'total': 0,
@@ -549,6 +488,7 @@ class SEPCompatibilityGenerator:
         # Calculate percentages
         coverage_percentage = round((implemented / total * 100) if total > 0 else 0, 2)
         required_percentage = round((required_implemented / required_total * 100) if required_total > 0 else 100, 2)
+        optional_percentage = round((optional_implemented / optional_total * 100) if optional_total > 0 else 100, 2)
 
         for section, stats in section_stats.items():
             stats['percentage'] = round(
@@ -559,7 +499,7 @@ class SEPCompatibilityGenerator:
                 if stats['required_total'] > 0 else 100, 2
             )
 
-        # Gap analysis by priority
+        # Gap analysis by priority (all comparisons including server-side tracked separately)
         gaps_by_priority = {
             FieldPriority.CRITICAL.value: [],
             FieldPriority.HIGH.value: [],
@@ -576,7 +516,7 @@ class SEPCompatibilityGenerator:
                     'description': comp.sep_field.get('description', '')
                 })
 
-        return {
+        self._cached_stats = {
             'overall': {
                 'total_fields': total,
                 'implemented': implemented,
@@ -584,11 +524,20 @@ class SEPCompatibilityGenerator:
                 'coverage_percentage': coverage_percentage,
                 'required_total': required_total,
                 'required_implemented': required_implemented,
-                'required_percentage': required_percentage
+                'required_percentage': required_percentage,
+                'optional_total': optional_total,
+                'optional_implemented': optional_implemented,
+                'optional_percentage': optional_percentage,
+                'server_side_only_count': server_side_count,
+                'server_side_note': (
+                    f'Excludes {server_side_count} server-side-only feature(s) not applicable to client SDKs'
+                    if server_side_count > 0 else None
+                )
             },
             'by_section': section_stats,
             'gaps_by_priority': gaps_by_priority
         }
+        return self._cached_stats
 
     def generate_markdown_matrix(self, output_path: Path) -> None:
         """Generate detailed markdown compatibility matrix"""
@@ -603,9 +552,9 @@ class SEPCompatibilityGenerator:
             # Header
             f.write(f"# SEP-{self.sep_number} ({preamble['title']}) Compatibility Matrix\n\n")
             f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.write(f"**SEP Version:** {preamble.get('version', 'N/A')}<br>\n")
-            f.write(f"**SEP Status:** {preamble['status']}<br>\n")
-            f.write(f"**SDK Version:** {self.sdk_version}<br>\n")
+            f.write(f"**SEP Version:** {preamble.get('version', 'N/A')}  \n")
+            f.write(f"**SEP Status:** {preamble['status']}  \n")
+            f.write(f"**SDK Version:** {self.sdk_version}  \n")
             f.write(f"**SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-{self.sep_number}.md\n\n")
 
             # SEP Summary
@@ -618,8 +567,14 @@ class SEPCompatibilityGenerator:
             f.write("## Overall Coverage\n\n")
             f.write(f"**Total Coverage:** {overall['coverage_percentage']}% ({overall['implemented']}/{overall['total_fields']} fields)\n\n")
             f.write(f"- ✅ **Implemented:** {overall['implemented']}/{overall['total_fields']}\n")
-            f.write(f"- ❌ **Not Implemented:** {overall['not_implemented']}/{overall['total_fields']}\n")
-            f.write(f"- **Required Fields:** {overall['required_percentage']}% ({overall['required_implemented']}/{overall['required_total']})\n\n")
+            f.write(f"- ❌ **Not Implemented:** {overall['not_implemented']}/{overall['total_fields']}\n\n")
+
+            # Note about server-side exclusions if applicable
+            if overall.get('server_side_only_count', 0) > 0:
+                f.write(f"_Note: {overall['server_side_note']}_\n\n")
+
+            f.write(f"**Required Fields:** {overall['required_percentage']}% ({overall['required_implemented']}/{overall['required_total']})\n\n")
+            f.write(f"**Optional Fields:** {overall['optional_percentage']}% ({overall['optional_implemented']}/{overall['optional_total']})\n\n")
 
             # Implementation Status
             f.write("## Implementation Status\n\n")
@@ -684,26 +639,36 @@ class SEPCompatibilityGenerator:
 
                 for comp in by_section[section]:
                     field = comp.sep_field
-                    required_mark = "✓" if field.get('required') else ""
-                    sdk_prop = comp.sdk_property if comp.sdk_property else "-"
-                    desc = field.get('description', '')
+                    if comp.server_side_only:
+                        required_mark = ""
+                        status = CompatibilityStatus.SERVER.value
+                        sdk_prop = "N/A"
+                        desc = field.get('description', '')
+                    else:
+                        required_mark = "✓" if field.get('required') else ""
+                        status = comp.status
+                        sdk_prop = f"`{comp.sdk_property}`" if comp.sdk_property else "-"
+                        desc = field.get('description', '')
 
                     # Truncate description if too long (but not URLs)
+                    desc = desc.replace('\n', ' ').strip()
                     if len(desc) > 100 and 'http' not in desc:
                         desc = desc[:97] + "..."
 
-                    f.write(f"| `{field['name']}` | {required_mark} | {comp.status} | "
-                           f"`{sdk_prop}` | {desc} |\n")
+                    f.write(f"| `{field['name']}` | {required_mark} | {status} | "
+                           f"{sdk_prop} | {desc} |\n")
 
                 f.write("\n")
 
-            # Implementation Gaps (conditional - only show if there are gaps)
+            # Implementation Gaps (always shown)
+            f.write("## Implementation Gaps\n\n")
+
             gaps = stats['gaps_by_priority']
             total_gaps = sum(len(gaps[p]) for p in gaps)
 
-            if total_gaps > 0:
-                f.write("## Implementation Gaps\n\n")
-
+            if total_gaps == 0:
+                f.write("No gaps found! All fields are implemented.\n\n")
+            else:
                 for priority in [FieldPriority.CRITICAL.value, FieldPriority.HIGH.value,
                                FieldPriority.MEDIUM.value, FieldPriority.LOW.value]:
                     priority_gaps = gaps[priority]
@@ -723,12 +688,38 @@ class SEPCompatibilityGenerator:
 
                         f.write("\n")
 
+            # Recommendations
+            f.write("## Recommendations\n\n")
+
+            if total_gaps > 0:
+                critical_gaps = len(gaps[FieldPriority.CRITICAL.value])
+                high_gaps = len(gaps[FieldPriority.HIGH.value])
+
+                if critical_gaps > 0:
+                    f.write(f"1. **Immediate Action Required**: Implement {critical_gaps} critical field(s)\n")
+                if high_gaps > 0:
+                    f.write(f"2. **High Priority**: Implement {high_gaps} high-priority field(s)\n")
+
+                if overall['required_percentage'] < 100:
+                    missing_required = overall['required_total'] - overall['required_implemented']
+                    f.write(f"3. **Required Fields**: Complete implementation of {missing_required} required field(s)\n")
+            else:
+                f.write(f"The SDK has full compatibility with SEP-{self.sep_number}!\n")
+
+            f.write("\n")
+
             # Legend
             f.write("## Legend\n\n")
             f.write("- ✅ **Implemented**: Field is fully supported in the SDK\n")
             f.write("- ❌ **Not Implemented**: Field is not currently supported\n")
             f.write("- ⚠️ **Partial**: Field is partially supported with limitations\n")
+            f.write("- **Server**: Server-side only feature (not applicable to client SDKs)\n")
             f.write("- ✓ **Required**: Field is required by SEP specification\n\n")
+
+            # Note about server-side features in legend if any exist
+            server_side_count = stats['overall'].get('server_side_only_count', 0)
+            if server_side_count > 0:
+                f.write(f"**Note:** {stats['overall']['server_side_note']}\n\n")
 
             # Additional Information
             f.write("## Additional Information\n\n")
@@ -821,36 +812,6 @@ class SEPCompatibilityGenerator:
         print(f"\n{Colors.BOLD}{Colors.HEADER}{'=' * 70}{Colors.END}\n")
 
 
-def read_sdk_version(project_root: Path) -> str:
-    """
-    Read SDK version from gradle.properties.
-
-    Args:
-        project_root: Path to project root directory
-
-    Returns:
-        SDK version string (e.g., "1.2.1")
-    """
-    gradle_props = project_root / 'gradle.properties'
-
-    if not gradle_props.exists():
-        print(f"{Colors.YELLOW}WARNING: gradle.properties not found at {gradle_props}{Colors.END}")
-        return "development"
-
-    try:
-        with open(gradle_props, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('version='):
-                    version = line.split('=', 1)[1].strip()
-                    print(f"{Colors.GREEN}Detected SDK version: {version}{Colors.END}")
-                    return version
-    except Exception as e:
-        print(f"{Colors.YELLOW}WARNING: Failed to read gradle.properties: {e}{Colors.END}")
-
-    return "development"
-
-
 def main():
     """Main entry point for the script"""
     # Disable colors if not running in a TTY
@@ -867,18 +828,15 @@ def main():
     else:
         sep_number = sys.argv[1]
 
-    # Define paths - script is in tools/sdk-analysis/sep/
-    script_path = Path(__file__).resolve()
-    project_root = script_path.parent.parent.parent.parent
-    data_dir = project_root / 'compatibility' / 'sep' / 'data'
-    output_dir = project_root / 'compatibility' / 'sep'
+    # Read SDK version via shared utility
+    sdk_version = get_sdk_version()
 
-    # Read SDK version from gradle.properties
-    sdk_version = read_sdk_version(project_root)
+    # Data directory: tools/matrix-generator/data/sep/
+    data_dir = DATA_DIR / 'sep'
 
     # Output paths
-    markdown_output = output_dir / f"SEP-{sep_number.upper()}_COMPATIBILITY_MATRIX.md"
-    stats_output = output_dir / 'data' / f"sep_{sep_number}_coverage_stats.json"
+    markdown_output = COMPATIBILITY_DIR / 'sep' / f"SEP-{sep_number.upper()}_COMPATIBILITY_MATRIX.md"
+    stats_output = DATA_DIR / 'sep' / f"sep_{sep_number}_coverage_stats.json"
 
     # Create generator
     generator = SEPCompatibilityGenerator(sep_number, data_dir, sdk_version)

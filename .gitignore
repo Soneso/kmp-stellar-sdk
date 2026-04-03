@@ -122,13 +122,8 @@ stellar-sdk/native-libs/libsodium-macos/
 # Backup files
 *.bak
 
-# Compatibility analysis (keep local for now)
-tools/sdk-analysis/
-
-# Compatibility analysis generated data (keep source code)
-compatibility/horizon/data/
-compatibility/rpc/data/
-compatibility/sep/data/
+# Matrix generator intermediate data
+tools/matrix-generator/data/
 
 # Node modules (web app dependencies)
 node_modules/

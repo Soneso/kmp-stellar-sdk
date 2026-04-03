@@ -15,6 +15,9 @@ import kotlinx.serialization.Serializable
  * @property sequence The ledger sequence number. Ledgers are numbered sequentially starting from 1
  *                    at network genesis. This number increases by 1 with each new ledger (approximately
  *                    every 5 seconds on the Stellar network).
+ * @property closeTime The unix timestamp of when the latest ledger was closed.
+ * @property headerXdr Base64-encoded LedgerHeader XDR.
+ * @property metadataXdr Base64-encoded LedgerCloseMeta XDR containing ledger close metadata.
  *
  * @see [Stellar Soroban RPC getLatestLedger documentation](https://developers.stellar.org/docs/data/rpc/api-reference/methods/getLatestLedger)
  */
@@ -22,5 +25,8 @@ import kotlinx.serialization.Serializable
 data class GetLatestLedgerResponse(
     val id: String,
     val protocolVersion: Int,
-    val sequence: Long
+    val sequence: Long,
+    val closeTime: Long? = null,
+    val headerXdr: String? = null,
+    val metadataXdr: String? = null
 )

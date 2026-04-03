@@ -1,10 +1,10 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:17
 
-**SEP Version:** 2.5.0<br>
-**SEP Status:** Draft<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 2.5.0  
+**SEP Status:** Draft  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ Lets anchors provide quotes for exchanging on-chain assets for off-chain assets 
 
 - ✅ **Implemented:** 69/69
 - ❌ **Not Implemented:** 0/69
-- **Required Fields:** 100.0% (2/2)
+
+**Required Fields:** 100.0% (2/2)
+
+**Optional Fields:** 100.0% (67/67)
 
 ## Implementation Status
 
@@ -185,11 +188,20 @@ Lets anchors provide quotes for exchanging on-chain assets for off-chain assets 
 | `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) The method by which the user plans to receive an off-chain asset from the anchor. This... |
 | `fee` |  | ✅ | `fee` | An object describing the fee used to calculate the conversion price. This can be used to datail t... |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0038!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information

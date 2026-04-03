@@ -1,10 +1,10 @@
 # SEP-0045 (Stellar Web Authentication for Contract Accounts) Compatibility Matrix
 
-**Generated:** 2026-04-03 17:48:35
+**Generated:** 2026-04-04 00:01:18
 
-**SEP Version:** 0.1.1<br>
-**SEP Status:** Draft<br>
-**SDK Version:** 1.3.1<br>
+**SEP Version:** 0.1.1  
+**SEP Status:** Draft  
+**SDK Version:** 1.3.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0045.md
 
 ## SEP Summary
@@ -17,7 +17,10 @@ Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to s
 
 - ✅ **Implemented:** 19/19
 - ❌ **Not Implemented:** 0/19
-- **Required Fields:** 100.0% (13/13)
+
+**Required Fields:** 100.0% (13/13)
+
+**Optional Fields:** 100.0% (6/6)
 
 ## Implementation Status
 
@@ -55,7 +58,7 @@ Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to s
 
 ### Key Classes
 
-- **`Sep45AuthToken`** - Methods: isExpired, toString, parse, decodeBase64UrlSafe
+- **`Sep45AuthToken`** - Methods: isExpired, toString, parse
 - **`Sep45ChallengeResponse`** - Methods: fromJson
 - **`Sep45TokenResponse`**
 - **`WebAuthForContracts`** - Methods: fromDomain, getChallenge, validateChallenge, signAuthorizationEntries, sendSignedChallenge, decodeAuthorizationEntries, encodeAuthorizationEntries, extractArgsFromEntry, verifyServerSignature, scAddressToString, entryToBase64, base64ToEntry
@@ -156,11 +159,20 @@ Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to s
 |-------|----------|--------|--------------|-------------|
 | `token` | ✓ | ✅ | `token` | The JWT that can be used to authenticate future endpoint calls with the anchor |
 
+## Implementation Gaps
+
+No gaps found! All fields are implemented.
+
+## Recommendations
+
+The SDK has full compatibility with SEP-0045!
+
 ## Legend
 
 - ✅ **Implemented**: Field is fully supported in the SDK
 - ❌ **Not Implemented**: Field is not currently supported
 - ⚠️ **Partial**: Field is partially supported with limitations
+- **Server**: Server-side only feature (not applicable to client SDKs)
 - ✓ **Required**: Field is required by SEP specification
 
 ## Additional Information
