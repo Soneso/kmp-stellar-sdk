@@ -17,6 +17,8 @@ import com.soneso.stellar.sdk.smartaccount.core.Ed25519Signature
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.PolicySignature
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuth
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayload
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
@@ -901,5 +903,226 @@ class SmartAccountAuthTest {
         }
         val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
         assertEquals(2, signersMap.size, "Both signers must be present")
+    }
+
+    // MARK: - SmartAccountAuthPayloadCodec Tests
+
+    @Test
+    fun testCodecRead_voidReturnsEmptyPayload() {
+        val payload = SmartAccountAuthPayloadCodec.read(SCValXdr.Void(SCValTypeXdr.SCV_VOID))
+        assertTrue(payload.signers.isEmpty())
+        assertTrue(payload.contextRuleIds.isEmpty())
+    }
+
+    @Test
+    fun testCodecRead_nonMapThrows() {
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.read(Scv.toUint32(42u))
+        }
+    }
+
+    @Test
+    fun testCodecWriteRead_roundTrip() {
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val sigBytes = ByteArray(64) { it.toByte() }
+        val ruleIds = listOf(1u, 5u, 10u)
+
+        val original = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer to sigBytes),
+            contextRuleIds = ruleIds
+        )
+
+        val scVal = SmartAccountAuthPayloadCodec.write(original)
+        val restored = SmartAccountAuthPayloadCodec.read(scVal)
+
+        assertEquals(1, restored.signers.size)
+        assertEquals(3, restored.contextRuleIds.size)
+        assertEquals(listOf(1u, 5u, 10u), restored.contextRuleIds)
+        assertTrue(restored.signers.values.first().contentEquals(sigBytes))
+    }
+
+    @Test
+    fun testCodecWriteRead_emptyPayloadRoundTrip() {
+        val original = SmartAccountAuthPayload(
+            signers = mutableMapOf(),
+            contextRuleIds = emptyList()
+        )
+        val scVal = SmartAccountAuthPayloadCodec.write(original)
+        val restored = SmartAccountAuthPayloadCodec.read(scVal)
+        assertTrue(restored.signers.isEmpty())
+        assertTrue(restored.contextRuleIds.isEmpty())
+    }
+
+    @Test
+    fun testCodecWrite_producesMapWithTwoEntries() {
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(),
+            contextRuleIds = listOf(7u)
+        )
+        val scVal = SmartAccountAuthPayloadCodec.write(payload)
+        assertTrue(scVal is SCValXdr.Map)
+        val entries = (scVal as SCValXdr.Map).value!!.value
+        assertEquals(2, entries.size)
+        assertEquals("context_rule_ids", (entries[0].key as SCValXdr.Sym).value.value)
+        assertEquals("signers", (entries[1].key as SCValXdr.Sym).value.value)
+    }
+
+    @Test
+    fun testCodecUpsertSigner_replacesExisting() {
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer to ByteArray(32) { 0x01 }),
+            contextRuleIds = emptyList()
+        )
+        val newBytes = ByteArray(32) { 0x02 }
+        SmartAccountAuthPayloadCodec.upsertSigner(payload, signer, newBytes)
+        assertEquals(1, payload.signers.size)
+        assertTrue(payload.signers.values.first().contentEquals(newBytes))
+    }
+
+    @Test
+    fun testCodecUpsertSigner_addsNewSigner() {
+        val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(signer1 to ByteArray(32) { 0x01 }),
+            contextRuleIds = emptyList()
+        )
+        SmartAccountAuthPayloadCodec.upsertSigner(payload, signer2, ByteArray(32) { 0x02 })
+        assertEquals(2, payload.signers.size)
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_parsesDelegated() {
+        val address = "GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW"
+        val signer = DelegatedSigner(address)
+        val scVal = signer.toScVal()
+        val parsed = SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
+        assertTrue(parsed is DelegatedSigner)
+        assertEquals(address, (parsed as DelegatedSigner).address)
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_parsesExternal() {
+        val verifier = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+        val keyData = ByteArray(65) { it.toByte() }
+        val signer = ExternalSigner(verifier, keyData)
+        val scVal = signer.toScVal()
+        val parsed = SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
+        assertTrue(parsed is ExternalSigner)
+        assertEquals(verifier, (parsed as ExternalSigner).verifierAddress)
+        assertTrue(parsed.keyData.contentEquals(keyData))
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnNonVec() {
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(Scv.toUint32(42u))
+        }
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnUnknownTag() {
+        val badVec = Scv.toVec(listOf(Scv.toSymbol("Unknown"), Scv.toUint32(1u)))
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(badVec)
+        }
+    }
+
+    @Test
+    fun testCodecSignerFromScVal_throwsOnEmptyVec() {
+        val emptyVec = Scv.toVec(emptyList())
+        assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(emptyVec)
+        }
+    }
+
+    @Test
+    fun testCodecWrite_signersSortedByXdrKey() {
+        val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(
+                signer2 to ByteArray(32) { 0x02 },
+                signer1 to ByteArray(32) { 0x01 }
+            ),
+            contextRuleIds = emptyList()
+        )
+
+        val scVal = SmartAccountAuthPayloadCodec.write(payload)
+        val outerMap = (scVal as SCValXdr.Map).value!!.value
+        val signersEntry = outerMap.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
+        assertEquals(2, signersMap.size)
+
+        fun xdrHex(scv: SCValXdr): String {
+            val w = XdrWriter()
+            scv.encode(w)
+            return w.toByteArray().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        }
+        val firstHex = xdrHex(signersMap[0].key)
+        val secondHex = xdrHex(signersMap[1].key)
+        assertTrue(firstHex < secondHex, "Signers must be sorted by XDR key hex")
+    }
+
+    // MARK: - SmartAccountAuth Additional Edge Case Tests
+
+    @Test
+    fun testBuildAuthDigest_withEmptyPayloadIs32Bytes() = runTest {
+        val payload = ByteArray(32) { 0xFF.toByte() }
+        val digest = SmartAccountAuth.buildAuthDigest(payload, emptyList())
+        assertEquals(32, digest.size)
+    }
+
+    @Test
+    fun testSignAuthEntry_setsExpirationWithContextRuleIds() = runTest {
+        val keypair = KeyPair.random()
+        val expirationLedger = 9999999u
+        val authEntry = createAddressAuthEntry()
+        val contextRuleIds = listOf(1u, 2u)
+
+        val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            entry = authEntry,
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+        val sig = Ed25519Signature(publicKey = keypair.getPublicKey(), signature = keypair.sign(payloadHash))
+        val signer = ExternalSigner.ed25519(verifierAddress = contractAddress, publicKey = keypair.getPublicKey())
+
+        val signedEntry = SmartAccountAuth.signAuthEntry(
+            entry = authEntry,
+            signer = signer,
+            signature = sig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        assertEquals(expirationLedger, credentials.signatureExpirationLedger.value)
+    }
+
+    @Test
+    fun testAddRawSignatureMapEntry_contextRuleIdsAreSet() {
+        val entry = createAddressAuthEntry()
+        val signer = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
+        val contextRuleIds = listOf(3u, 8u)
+
+        val result = SmartAccountAuth.addRawSignatureMapEntry(
+            entry = entry,
+            signerKey = signer.toScVal(),
+            signatureValue = Scv.toBytes(byteArrayOf()),
+            contextRuleIds = contextRuleIds
+        )
+
+        val credentials = (result.credentials as SorobanCredentialsXdr.Address).value
+        val outerMap = credentials.signature as SCValXdr.Map
+        val ruleIdsEntry = outerMap.value!!.value.first {
+            (it.key as? SCValXdr.Sym)?.value?.value == "context_rule_ids"
+        }
+        val ruleIdsVec = (ruleIdsEntry.`val` as SCValXdr.Vec).value!!.value
+        assertEquals(2, ruleIdsVec.size)
+        assertEquals(3u, (ruleIdsVec[0] as SCValXdr.U32).value.value)
+        assertEquals(8u, (ruleIdsVec[1] as SCValXdr.U32).value.value)
     }
 }
