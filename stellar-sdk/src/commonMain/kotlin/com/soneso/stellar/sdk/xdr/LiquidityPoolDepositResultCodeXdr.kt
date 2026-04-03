@@ -21,7 +21,9 @@ package com.soneso.stellar.sdk.xdr
  *     LIQUIDITY_POOL_DEPOSIT_LINE_FULL = -5,      // pool share trust line doesn't
  *                                                 // have sufficient limit
  *     LIQUIDITY_POOL_DEPOSIT_BAD_PRICE = -6,      // deposit price outside bounds
- *     LIQUIDITY_POOL_DEPOSIT_POOL_FULL = -7       // pool reserves are full
+ *     LIQUIDITY_POOL_DEPOSIT_POOL_FULL = -7,      // pool reserves are full
+ *     LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN = -8  // trustline for one of the
+ *                                                   // assets is frozen
  * };
  */
 enum class LiquidityPoolDepositResultCodeXdr(val value: Int) {
@@ -55,7 +57,9 @@ enum class LiquidityPoolDepositResultCodeXdr(val value: Int) {
    */
   LIQUIDITY_POOL_DEPOSIT_BAD_PRICE(-6),
   /** pool reserves are full */
-  LIQUIDITY_POOL_DEPOSIT_POOL_FULL(-7);
+  LIQUIDITY_POOL_DEPOSIT_POOL_FULL(-7),
+  /** trustline for one of the */
+  LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN(-8);
 
   companion object {
 

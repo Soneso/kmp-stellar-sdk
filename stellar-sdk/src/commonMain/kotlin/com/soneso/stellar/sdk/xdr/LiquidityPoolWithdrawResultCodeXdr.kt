@@ -18,7 +18,9 @@ package com.soneso.stellar.sdk.xdr
  *                                                // pool share
  *     LIQUIDITY_POOL_WITHDRAW_LINE_FULL = -4,    // would go above limit for one
  *                                                // of the assets
- *     LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM = -5 // didn't withdraw enough
+ *     LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM = -5, // didn't withdraw enough
+ *     LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN = -6  // trustline for one of the
+ *                                                    // assets is frozen
  * };
  */
 enum class LiquidityPoolWithdrawResultCodeXdr(val value: Int) {
@@ -45,7 +47,9 @@ enum class LiquidityPoolWithdrawResultCodeXdr(val value: Int) {
    * of the assets
    * didn't withdraw enough
    */
-  LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM(-5);
+  LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM(-5),
+  /** trustline for one of the */
+  LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN(-6);
 
   companion object {
 

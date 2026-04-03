@@ -1,0 +1,279 @@
+name: Check for upstream XDR updates
+
+on:
+  schedule:
+    # Runs daily at 13:30 UTC
+    - cron: '30 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without creating an issue (for testing)'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-xdr-updates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Read pinned XDR commit from config
+        id: pinned
+        run: |
+          CONFIG_FILE="tools/xdrgen-kt/xdr-source.cfg"
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::Config file not found: $CONFIG_FILE"
+            exit 1
+          fi
+
+          source "$CONFIG_FILE"
+
+          if [ -z "${XDR_COMMIT:-}" ]; then
+            echo "::error::XDR_COMMIT is not set in $CONFIG_FILE"
+            exit 1
+          fi
+
+          if ! [[ "$XDR_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::XDR_COMMIT is not a valid commit hash: $XDR_COMMIT"
+            exit 1
+          fi
+
+          echo "commit=$XDR_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${XDR_COMMIT:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Pinned commit: $XDR_COMMIT"
+
+      - name: Fetch latest upstream commit on curr branch
+        id: upstream
+        continue-on-error: true
+        run: |
+          UPSTREAM_SHA=$(git ls-remote https://github.com/stellar/stellar-xdr.git refs/heads/curr | awk '{print $1}')
+
+          if [ -z "$UPSTREAM_SHA" ]; then
+            echo "::warning::Failed to fetch latest commit from stellar/stellar-xdr curr branch"
+            exit 1
+          fi
+
+          echo "commit=$UPSTREAM_SHA" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${UPSTREAM_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Upstream curr commit: $UPSTREAM_SHA"
+
+      - name: Warn if upstream fetch failed
+        if: steps.upstream.outcome == 'failure'
+        run: echo "::warning::Upstream fetch failed. Skipping remaining steps."
+
+      - name: Compare commits
+        if: steps.upstream.outcome == 'success'
+        id: compare
+        run: |
+          PINNED="${{ steps.pinned.outputs.commit }}"
+          UPSTREAM="${{ steps.upstream.outputs.commit }}"
+
+          if [ "$PINNED" = "$UPSTREAM" ]; then
+            echo "XDR is up to date (commit: $PINNED)"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "XDR update available: $PINNED -> $UPSTREAM"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clone upstream for diff analysis
+        if: steps.compare.outputs.changed == 'true'
+        id: clone
+        continue-on-error: true
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/stellar/stellar-xdr.git /tmp/stellar-xdr.git
+          if [ $? -ne 0 ]; then
+            echo "::warning::Failed to clone stellar/stellar-xdr repository"
+            exit 1
+          fi
+
+      - name: Warn if clone failed
+        if: steps.compare.outputs.changed == 'true' && steps.clone.outcome == 'failure'
+        run: echo "::warning::Upstream clone failed. Issue will be created without inline diffs."
+
+      - name: Analyse .x file changes
+        if: steps.compare.outputs.changed == 'true'
+        id: diff
+        run: |
+          PINNED="${{ steps.pinned.outputs.commit }}"
+          UPSTREAM="${{ steps.upstream.outputs.commit }}"
+          CONFIG_FILE="tools/xdrgen-kt/xdr-source.cfg"
+
+          source "$CONFIG_FILE"
+
+          # Build array of tracked .x filenames
+          TRACKED_FILES=()
+          while IFS= read -r line; do
+            line="$(echo "$line" | xargs)"
+            if [ -n "$line" ]; then
+              TRACKED_FILES+=("$line")
+            fi
+          done <<< "$XDR_FILES"
+
+          : > /tmp/changes_summary.txt
+          : > /tmp/full_diff.txt
+          any_x_changed=false
+
+          if [ "${{ steps.clone.outcome }}" = "success" ]; then
+            # Get changed .x files between pinned and upstream
+            CHANGED_FILES=$(git -C /tmp/stellar-xdr.git diff --name-only "$PINNED..$UPSTREAM" -- '*.x' 2>/dev/null || echo "")
+
+            while IFS= read -r changed_file; do
+              [ -z "$changed_file" ] && continue
+              filename=$(basename "$changed_file")
+
+              # Check if this file is in our tracked list
+              is_tracked=false
+              for tracked in "${TRACKED_FILES[@]}"; do
+                if [ "$tracked" = "$filename" ]; then
+                  is_tracked=true
+                  break
+                fi
+              done
+
+              stat_line=$(git -C /tmp/stellar-xdr.git diff --numstat "$PINNED..$UPSTREAM" -- "$changed_file" 2>/dev/null | head -1)
+              added=$(echo "$stat_line" | awk '{print $1}')
+              removed=$(echo "$stat_line" | awk '{print $2}')
+
+              if [ "$is_tracked" = true ]; then
+                any_x_changed=true
+                printf -- '- `%s`: +%s / -%s lines\n' "$filename" "$added" "$removed" >> /tmp/changes_summary.txt
+
+                # Generate inline diff for collapsible section
+                printf '\n<details>\n<summary>%s</summary>\n\n```diff\n' "$filename" >> /tmp/full_diff.txt
+                git -C /tmp/stellar-xdr.git diff "$PINNED..$UPSTREAM" -- "$changed_file" >> /tmp/full_diff.txt 2>/dev/null || true
+                printf '\n```\n\n</details>\n' >> /tmp/full_diff.txt
+              else
+                printf -- '- `%s`: +%s / -%s lines (not currently tracked)\n' "$filename" "$added" "$removed" >> /tmp/changes_summary.txt
+              fi
+            done <<< "$CHANGED_FILES"
+
+            # Check for new .x files upstream that we do not track
+            ALL_UPSTREAM_X=$(git -C /tmp/stellar-xdr.git ls-tree --name-only "$UPSTREAM" -- '*.x' 2>/dev/null || echo "")
+            while IFS= read -r upstream_file; do
+              [ -z "$upstream_file" ] && continue
+              filename=$(basename "$upstream_file")
+              is_tracked=false
+              for tracked in "${TRACKED_FILES[@]}"; do
+                if [ "$tracked" = "$filename" ]; then
+                  is_tracked=true
+                  break
+                fi
+              done
+              if [ "$is_tracked" = false ]; then
+                # Avoid duplicating entries already captured from the diff
+                if ! grep -q "$filename" /tmp/changes_summary.txt 2>/dev/null; then
+                  printf -- '- `%s`: new upstream file (not currently tracked)\n' "$filename" >> /tmp/changes_summary.txt
+                fi
+              fi
+            done <<< "$ALL_UPSTREAM_X"
+
+            # Count commits between pinned and upstream
+            COMMIT_COUNT=$(git -C /tmp/stellar-xdr.git rev-list --count "$PINNED..$UPSTREAM" 2>/dev/null || echo "unknown")
+          else
+            # Clone failed: we still know the commits differ, but cannot produce diffs.
+            # Mark as changed so an issue is created with limited info.
+            any_x_changed=true
+            COMMIT_COUNT="unknown"
+            echo "Unable to determine per-file changes (clone failed)." > /tmp/changes_summary.txt
+          fi
+
+          echo "commit_count=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
+          echo "any_x_changed=$any_x_changed" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing open issue
+        if: steps.diff.outputs.any_x_changed == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          count=$(gh issue list \
+            --label "xdr-update" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "open_issues=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure xdr-update label exists
+        if: steps.diff.outputs.any_x_changed == 'true' && steps.existing.outputs.open_issues == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "xdr-update" \
+            --description "Upstream XDR definition changes detected" \
+            --color "1d76db" \
+            2>/dev/null || true
+
+      - name: Build issue body
+        if: steps.diff.outputs.any_x_changed == 'true' && steps.existing.outputs.open_issues == '0'
+        run: |
+          PINNED="${{ steps.pinned.outputs.commit }}"
+          PINNED_SHORT="${{ steps.pinned.outputs.commit_short }}"
+          UPSTREAM="${{ steps.upstream.outputs.commit }}"
+          UPSTREAM_SHORT="${{ steps.upstream.outputs.commit_short }}"
+          COMMIT_COUNT="${{ steps.diff.outputs.commit_count }}"
+
+          {
+            printf 'The upstream [`stellar/stellar-xdr`](https://github.com/stellar/stellar-xdr) `curr` branch has changes that are not yet reflected in this SDK.\n'
+            printf '\n'
+            printf '**Pinned commit:** [`%s`](https://github.com/stellar/stellar-xdr/commit/%s)\n' "$PINNED_SHORT" "$PINNED"
+            printf '**Latest upstream:** [`%s`](https://github.com/stellar/stellar-xdr/commit/%s)\n' "$UPSTREAM_SHORT" "$UPSTREAM"
+            printf '**Commits behind:** %s\n' "$COMMIT_COUNT"
+            printf '**Compare:** [%s...%s](https://github.com/stellar/stellar-xdr/compare/%s...%s)\n' "$PINNED_SHORT" "$UPSTREAM_SHORT" "$PINNED" "$UPSTREAM"
+          } > /tmp/issue_body.md
+
+          if [ -s /tmp/changes_summary.txt ]; then
+            printf '\n## Changed .x files\n\n' >> /tmp/issue_body.md
+            cat /tmp/changes_summary.txt >> /tmp/issue_body.md
+          else
+            printf '\n## Changed .x files\n\nNo tracked .x files were modified.\n' >> /tmp/issue_body.md
+          fi
+
+          if [ -s /tmp/full_diff.txt ]; then
+            printf '\n## Diffs\n' >> /tmp/issue_body.md
+            cat /tmp/full_diff.txt >> /tmp/issue_body.md
+          fi
+
+          {
+            printf '\n## Required actions\n\n'
+            printf '1. Update `XDR_COMMIT` in `tools/xdrgen-kt/xdr-source.cfg` to `%s`\n' "$UPSTREAM"
+            printf '2. If new `.x` files were added upstream, add them to `XDR_FILES` in `xdr-source.cfg`\n'
+            printf '3. Run `make -C tools/xdrgen-kt clean-all generate` to re-download and regenerate Kotlin XDR types\n'
+            printf '4. Run `make -C tools/xdrgen-kt test` to verify snapshot tests pass (update snapshots if needed)\n'
+            printf '5. Build and run unit tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
+            printf '6. If the XDR changes introduce new types or modify existing ones, evaluate whether the SDK needs updated high-level APIs (operation builders, SEP implementations, etc.)\n'
+            printf '7. Update the changelog with any breaking changes or new features\n'
+          } >> /tmp/issue_body.md
+
+          printf '\n---\n*This issue was created automatically by the [XDR update check workflow](.github/workflows/xdr-update-check.yml).*\n' >> /tmp/issue_body.md
+
+      - name: Create issue
+        if: >-
+          steps.diff.outputs.any_x_changed == 'true'
+          && steps.existing.outputs.open_issues == '0'
+          && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          UPSTREAM_SHORT="${{ steps.upstream.outputs.commit_short }}"
+          gh issue create \
+            --title "Update XDR definitions from upstream stellar-xdr ($UPSTREAM_SHORT)" \
+            --label "xdr-update" \
+            --body-file /tmp/issue_body.md
+
+      - name: Dry run summary
+        if: >-
+          steps.diff.outputs.any_x_changed == 'true'
+          && steps.existing.outputs.open_issues == '0'
+          && inputs.dry_run == 'true'
+        run: |
+          echo "::notice::Dry run: issue would have been created. Body:"
+          cat /tmp/issue_body.md

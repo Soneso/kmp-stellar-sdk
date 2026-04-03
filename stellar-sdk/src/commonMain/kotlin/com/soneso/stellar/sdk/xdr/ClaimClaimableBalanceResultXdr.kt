@@ -14,6 +14,7 @@ package com.soneso.stellar.sdk.xdr
  * case CLAIM_CLAIMABLE_BALANCE_LINE_FULL:
  * case CLAIM_CLAIMABLE_BALANCE_NO_TRUST:
  * case CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED:
+ * case CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN:
  *     void;
  * };
  */
@@ -35,6 +36,7 @@ sealed class ClaimClaimableBalanceResultXdr {
         ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_LINE_FULL -> Void(discriminant)
         ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NO_TRUST -> Void(discriminant)
         ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED -> Void(discriminant)
+        ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown ClaimClaimableBalanceResultXdr discriminant: $discriminant")
       }
     }

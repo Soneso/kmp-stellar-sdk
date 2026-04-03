@@ -9,7 +9,7 @@ package com.soneso.stellar.sdk.xdr
  * {
  *     string doc<SC_SPEC_DOC_LIMIT>;
  *     SCSymbol name;
- *     SCSpecFunctionInputV0 inputs<10>;
+ *     SCSpecFunctionInputV0 inputs<>;
  *     SCSpecTypeDef outputs<1>;
  * };
  */

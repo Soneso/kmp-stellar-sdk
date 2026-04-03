@@ -27,6 +27,7 @@ package com.soneso.stellar.sdk.xdr
  *     case txBAD_MIN_SEQ_AGE_OR_GAP:
  *     case txMALFORMED:
  *     case txSOROBAN_INVALID:
+ *     case txFROZEN_KEY_ACCESSED:
  *         void;
  *     }
  */
@@ -73,6 +74,7 @@ sealed class InnerTransactionResultResultXdr {
         TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP -> Void(discriminant)
         TransactionResultCodeXdr.txMALFORMED -> Void(discriminant)
         TransactionResultCodeXdr.txSOROBAN_INVALID -> Void(discriminant)
+        TransactionResultCodeXdr.txFROZEN_KEY_ACCESSED -> Void(discriminant)
         else -> throw IllegalArgumentException("Unknown InnerTransactionResultResultXdr discriminant: $discriminant")
       }
     }

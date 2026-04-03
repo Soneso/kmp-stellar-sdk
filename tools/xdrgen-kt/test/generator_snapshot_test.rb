@@ -1,0 +1,283 @@
+# frozen_string_literal: true
+
+require 'minitest/autorun'
+require 'fileutils'
+require 'tmpdir'
+require 'xdrgen'
+require_relative '../lib/xdrgen/generators/kotlin'
+
+class GeneratorSnapshotTest < Minitest::Test
+  SNAPSHOT_DIR = File.expand_path('snapshots', __dir__)
+  FIXTURE_DIR  = File.expand_path('fixtures', __dir__)
+
+  # Generate once for all tests to avoid redundant compilation.
+  @@output_dir = nil
+  @@generated  = false
+
+  def setup
+    unless @@generated
+      @@output_dir = Dir.mktmpdir('xdr_gen_test_')
+      fixtures = Dir.glob(File.join(FIXTURE_DIR, '*.x')).sort
+      raise "No .x fixtures found in #{FIXTURE_DIR}" if fixtures.empty?
+
+      Xdrgen::Compilation.new(
+        fixtures,
+        output_dir: @@output_dir + '/',
+        generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr',
+        options: {}
+      ).compile
+
+      @@generated = true
+    end
+    @output_dir = @@output_dir
+  end
+
+  Minitest.after_run { FileUtils.rm_rf(@@output_dir) if @@output_dir }
+
+  # -- Generator configuration tests ------------------------------------------
+
+  def test_generator_class_is_defined
+    assert defined?(Xdrgen::Generators::Kotlin), 'Kotlin generator class should be defined'
+  end
+
+  # -- Snapshot tests: Enum ---------------------------------------------------
+
+  def test_snapshot_color_enum
+    assert_snapshot 'ColorXdr.kt'
+  end
+
+  def test_snapshot_status_code_enum
+    assert_snapshot 'StatusCodeXdr.kt'
+  end
+
+  # -- Snapshot tests: Struct -------------------------------------------------
+
+  def test_snapshot_simple_struct
+    assert_snapshot 'SimpleStructXdr.kt'
+  end
+
+  def test_snapshot_keyword_struct
+    assert_snapshot 'KeywordStructXdr.kt'
+  end
+
+  def test_snapshot_nested_struct
+    assert_snapshot 'NestedStructXdr.kt'
+  end
+
+  # -- Snapshot tests: Union --------------------------------------------------
+
+  def test_snapshot_result_union
+    assert_snapshot 'ResultXdr.kt'
+  end
+
+  def test_snapshot_result_type_enum
+    assert_snapshot 'ResultTypeXdr.kt'
+  end
+
+  def test_snapshot_simple_status_enum
+    assert_snapshot 'SimpleStatusXdr.kt'
+  end
+
+  def test_snapshot_simple_result_union
+    assert_snapshot 'SimpleResultXdr.kt'
+  end
+
+  def test_snapshot_multi_case_union
+    assert_snapshot 'MultiCaseUnionXdr.kt'
+  end
+
+  def test_snapshot_error_detail_struct
+    assert_snapshot 'ErrorDetailXdr.kt'
+  end
+
+  # -- Snapshot tests: Typedef ------------------------------------------------
+
+  def test_snapshot_int32_typedef
+    assert_snapshot 'Int32Xdr.kt'
+  end
+
+  def test_snapshot_uint32_typedef
+    assert_snapshot 'Uint32Xdr.kt'
+  end
+
+  def test_snapshot_int64_typedef
+    assert_snapshot 'Int64Xdr.kt'
+  end
+
+  def test_snapshot_uint64_typedef
+    assert_snapshot 'Uint64Xdr.kt'
+  end
+
+  def test_snapshot_data_blob_typedef
+    assert_snapshot 'DataBlobXdr.kt'
+  end
+
+  def test_snapshot_signed_count_typedef
+    assert_snapshot 'SignedCountXdr.kt'
+  end
+
+  def test_snapshot_my_counter_typedef
+    assert_snapshot 'MyCounterXdr.kt'
+  end
+
+  def test_snapshot_int_list_typedef
+    assert_snapshot 'IntListXdr.kt'
+  end
+
+  def test_snapshot_short_string_typedef
+    assert_snapshot 'ShortStringXdr.kt'
+  end
+
+  def test_snapshot_hash_typedef
+    assert_snapshot 'HashXdr.kt'
+  end
+
+  # -- Snapshot tests: Constants ----------------------------------------------
+
+  def test_snapshot_constants
+    assert_snapshot 'Constants.kt'
+  end
+
+  # -- Snapshot tests: Primitive extensions ------------------------------------
+
+  def test_snapshot_primitive_extensions
+    assert_snapshot 'XdrPrimitiveExtensions.kt'
+  end
+
+  # -- Output sanity checks ---------------------------------------------------
+
+  def test_generated_file_count
+    generated = Dir.glob(File.join(@output_dir, '*.kt'))
+    assert generated.length >= 20,
+      "Expected at least 20 generated files, got #{generated.length}"
+  end
+
+  def test_no_extra_generated_files
+    generated_names = Dir.glob(File.join(@output_dir, '*.kt')).map { |f| File.basename(f) }.sort
+    snapshot_names  = Dir.glob(File.join(SNAPSHOT_DIR, '*.kt')).map { |f| File.basename(f) }.sort
+    extra = generated_names - snapshot_names
+    assert extra.empty?,
+      "Generated files not covered by snapshots: #{extra.join(', ')} -- run 'make update-snapshots'"
+  end
+
+  def test_no_missing_generated_files
+    generated_names = Dir.glob(File.join(@output_dir, '*.kt')).map { |f| File.basename(f) }.sort
+    snapshot_names  = Dir.glob(File.join(SNAPSHOT_DIR, '*.kt')).map { |f| File.basename(f) }.sort
+    missing = snapshot_names - generated_names
+    assert missing.empty?,
+      "Snapshot files not produced by generator: #{missing.join(', ')} -- stale snapshots?"
+  end
+
+  # -- Semantic checks --------------------------------------------------------
+
+  def test_all_generated_files_have_marker
+    Dir.glob(File.join(@output_dir, '*.kt')).each do |file|
+      content = File.read(file)
+      assert_includes content, 'Automatically generated by xdrgen',
+        "#{File.basename(file)} is missing the 'Automatically generated by xdrgen' marker"
+    end
+  end
+
+  def test_all_generated_files_have_package_declaration
+    Dir.glob(File.join(@output_dir, '*.kt')).each do |file|
+      content = File.read(file)
+      assert_includes content, 'package com.soneso.stellar.sdk.xdr',
+        "#{File.basename(file)} is missing the package declaration"
+    end
+  end
+
+  def test_enum_has_decode_and_encode
+    content = File.read(File.join(@output_dir, 'ColorXdr.kt'))
+    assert_includes content, 'fun decode(reader: XdrReader): ColorXdr'
+    assert_includes content, 'fun encode(writer: XdrWriter)'
+  end
+
+  def test_struct_has_decode_and_encode
+    content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
+    assert_includes content, 'fun decode(reader: XdrReader): SimpleStructXdr'
+    assert_includes content, 'fun encode(writer: XdrWriter)'
+  end
+
+  def test_union_has_sealed_class
+    content = File.read(File.join(@output_dir, 'ResultXdr.kt'))
+    assert_includes content, 'sealed class ResultXdr'
+    assert_includes content, 'abstract val discriminant'
+  end
+
+  def test_typedef_has_value_class
+    content = File.read(File.join(@output_dir, 'Int32Xdr.kt'))
+    assert_includes content, 'value class Int32Xdr'
+    assert_includes content, '@kotlin.jvm.JvmInline'
+  end
+
+  def test_optional_field_generates_nullable_type
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'val optionalInner: SimpleStructXdr?'
+  end
+
+  def test_variable_array_generates_list_type
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'val items: List<SimpleStructXdr>'
+  end
+
+  def test_fixed_array_generates_array_type
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'val fixedItems: Array<SimpleStructXdr>'
+  end
+
+  def test_opaque_generates_byte_array
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'val rawData: ByteArray'
+    assert_includes content, 'val fixedData: ByteArray'
+  end
+
+  def test_typedef_chain_resolves_correctly
+    content = File.read(File.join(@output_dir, 'MyCounterXdr.kt'))
+    assert_includes content, 'value class MyCounterXdr'
+    assert_includes content, 'fun decode(reader: XdrReader): MyCounterXdr'
+  end
+
+  def test_array_typedef_generates_list_type
+    content = File.read(File.join(@output_dir, 'IntListXdr.kt'))
+    assert_includes content, 'value class IntListXdr'
+    assert_includes content, 'List<Int>'
+  end
+
+  def test_union_without_default_has_else_throw
+    content = File.read(File.join(@output_dir, 'SimpleResultXdr.kt'))
+    assert_includes content, 'sealed class SimpleResultXdr'
+    assert_includes content, 'throw IllegalArgumentException'
+    refute_includes content, 'else -> {'
+  end
+
+  def test_kotlin_keywords_are_escaped_with_backticks
+    content = File.read(File.join(@output_dir, 'KeywordStructXdr.kt'))
+    assert_includes content, '`val`'
+    assert_includes content, '`when`'
+  end
+
+  def test_enum_comments_are_preserved
+    content = File.read(File.join(@output_dir, 'ColorXdr.kt'))
+    assert_includes content, '/** Red color */'
+    assert_includes content, '/** Green color */'
+  end
+
+  private
+
+  def assert_snapshot(filename)
+    generated = File.join(@output_dir, filename)
+    snapshot  = File.join(SNAPSHOT_DIR, filename)
+
+    assert File.exist?(generated),
+      "Generated file #{filename} should exist"
+    assert File.exist?(snapshot),
+      "Snapshot file #{filename} should exist -- run 'make update-snapshots'"
+
+    generated_content = File.read(generated)
+    snapshot_content  = File.read(snapshot)
+
+    assert_equal snapshot_content, generated_content,
+      "Generated #{filename} does not match snapshot -- run 'make update-snapshots' if the change is intentional"
+  end
+end

@@ -9,7 +9,7 @@ package com.soneso.stellar.sdk.xdr
  * {
  *     string doc<SC_SPEC_DOC_LIMIT>;
  *     string name<60>;
- *     SCSpecTypeDef type<12>;
+ *     SCSpecTypeDef type<>;
  * };
  */
 data class SCSpecUDTUnionCaseTupleV0Xdr(
