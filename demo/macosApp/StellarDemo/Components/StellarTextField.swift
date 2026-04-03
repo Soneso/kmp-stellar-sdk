@@ -62,7 +62,7 @@ import SwiftUI
 ///     placeholder: "USD, EUR, etc.",
 ///     text: $assetCode,
 ///     error: validationErrors["assetCode"],
-///     helpText: "1-12 uppercase alphanumeric characters"
+///     helpText: "1-12 alphanumeric characters"
 /// )
 /// ```
 struct StellarTextField: View {
@@ -258,7 +258,7 @@ struct StellarTextField_Previews: PreviewProvider {
                 label: "Asset Code",
                 placeholder: "USD, EUR, etc.",
                 text: .constant("USDC"),
-                helpText: "1-12 uppercase alphanumeric characters"
+                helpText: "1-12 alphanumeric characters"
             )
 
             // Secure text field with visibility toggle

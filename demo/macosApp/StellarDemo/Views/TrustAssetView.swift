@@ -106,7 +106,7 @@ struct TrustAssetScreen: View {
                 label: "Asset Code",
                 placeholder: "USD, EUR, etc.",
                 text: $assetCode,
-                helpText: "1-12 uppercase alphanumeric characters"
+                helpText: "1-12 alphanumeric characters"
             )
             .onChange(of: assetCode) { _ in
                 validationError = nil
@@ -211,7 +211,7 @@ struct TrustAssetScreen: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Material3Colors.onSecondaryContainer)
 
-                Text("• Asset code must be 1-12 uppercase alphanumeric characters")
+                Text("• Asset code must be 1-12 alphanumeric characters (a-z, A-Z, 0-9)")
                     .font(.system(size: 13))
                     .foregroundStyle(Material3Colors.onSecondaryContainer)
 

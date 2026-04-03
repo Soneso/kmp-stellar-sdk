@@ -152,7 +152,7 @@ struct SendPaymentScreen: View {
                     placeholder: "USD, EUR, USDC, etc.",
                     text: Binding(
                         get: { assetCode },
-                        set: { assetCode = $0.uppercased().trimmingCharacters(in: .whitespaces) }
+                        set: { assetCode = $0.trimmingCharacters(in: .whitespaces) }
                     ),
                     error: validationErrors["assetCode"]
                 )

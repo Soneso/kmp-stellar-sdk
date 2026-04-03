@@ -1691,7 +1691,7 @@ val asset = Asset.create("USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE3
 
 // Get canonical representation
 println(usdc.toString())  // "USDC:GA5Z..."
-// Asset codes: 1-12 uppercase A-Z characters or digits 0-9
+// Asset codes: 1-12 alphanumeric characters (a-z, A-Z, 0-9)
 
 // Check asset type
 when (asset) {

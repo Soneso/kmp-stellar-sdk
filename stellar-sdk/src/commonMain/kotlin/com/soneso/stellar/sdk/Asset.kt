@@ -245,12 +245,8 @@ data object AssetTypeNative : Asset() {
  *
  * This sealed class represents assets that are issued by an account on the Stellar network.
  * All issued assets have:
- * - A code (1-12 alphanumeric characters)
+ * - A code (1-12 alphanumeric characters: a-z, A-Z, 0-9)
  * - An issuer (the account that created the asset)
- *
- * Asset codes must contain only:
- * - Uppercase letters (A-Z)
- * - Digits (0-9)
  *
  * The issuer must be a valid ed25519 public key (G... address).
  *
@@ -286,23 +282,15 @@ sealed class AssetTypeCreditAlphaNum : Asset() {
     }
 
     /**
-     * Validates that an asset code contains only valid characters.
-     *
-     * Valid characters are:
-     * - Uppercase letters (A-Z)
-     * - Digits (0-9)
+     * Validates that an asset code contains only alphanumeric characters (a-z, A-Z, 0-9).
+     * Matches the validation used by the JS and Python Stellar SDKs.
      *
      * @throws IllegalArgumentException if the code contains invalid characters
      */
     protected fun validateAssetCode(code: String) {
-        val invalidChars = code.filter { char ->
-            char !in 'A'..'Z' && char !in '0'..'9'
-        }
-
-        if (invalidChars.isNotEmpty()) {
+        if (!Regex("^[a-zA-Z0-9]+$").matches(code)) {
             throw IllegalArgumentException(
-                "Asset code '$code' contains invalid characters: '${invalidChars}'. " +
-                "Asset codes must contain only uppercase letters (A-Z) and digits (0-9)"
+                "Asset code is invalid (maximum alphanumeric, 12 characters at max)"
             )
         }
     }
@@ -342,8 +330,7 @@ sealed class AssetTypeCreditAlphaNum : Asset() {
  * This class is used for assets with short codes like "USD", "EUR", "BTC", etc.
  *
  * ## Validation
- * - Code length must be 1-4 characters
- * - Code must contain only uppercase letters (A-Z) and digits (0-9)
+ * - Code must be 1-4 alphanumeric characters (a-z, A-Z, 0-9)
  * - Issuer must be a valid ed25519 public key (G... address)
  *
  * ## Usage
@@ -411,8 +398,7 @@ class AssetTypeCreditAlphaNum4(
  * This class is used for assets with longer codes that don't fit in AlphaNum4.
  *
  * ## Validation
- * - Code length must be 5-12 characters
- * - Code must contain only uppercase letters (A-Z) and digits (0-9)
+ * - Code must be 5-12 alphanumeric characters (a-z, A-Z, 0-9)
  * - Issuer must be a valid ed25519 public key (G... address)
  *
  * ## Usage
