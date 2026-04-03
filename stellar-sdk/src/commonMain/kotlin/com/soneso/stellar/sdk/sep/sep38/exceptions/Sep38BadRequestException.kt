@@ -55,7 +55,7 @@ package com.soneso.stellar.sdk.sep.sep38.exceptions
  * ```kotlin
  * fun validateQuoteRequest(request: Sep38PostQuoteRequest): String? {
  *     // Check asset format
- *     val assetPattern = Regex("^(stellar:[A-Z0-9]{1,12}:[A-Z0-9]{56}|iso4217:[A-Z]{3})$")
+ *     val assetPattern = Regex("^(stellar:[a-zA-Z0-9]{1,12}:[A-Z0-9]{56}|iso4217:[A-Z]{3})$")
  *     if (!request.sellAsset.matches(assetPattern)) {
  *         return "Invalid sellAsset format: ${request.sellAsset}"
  *     }

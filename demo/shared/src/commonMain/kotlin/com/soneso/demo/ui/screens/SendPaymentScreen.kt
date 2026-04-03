@@ -355,7 +355,7 @@ class SendPaymentScreen : Screen {
                             OutlinedTextField(
                                 value = assetCode,
                                 onValueChange = {
-                                    assetCode = it.uppercase().trim()
+                                    assetCode = it.trim()
                                     validationErrors = validationErrors - "assetCode"
                                     paymentResult = null
                                 },

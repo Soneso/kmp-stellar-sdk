@@ -33,8 +33,8 @@ package com.soneso.demo.util
  *
  * ## Asset Codes
  *
- * Asset codes can be 1-12 characters long and must contain only uppercase letters (A-Z)
- * and digits (0-9). Common examples: `USD`, `USDC`, `BTC`, `EURT`, `MYTOKEN`.
+ * Asset codes can be 1-12 alphanumeric characters (a-z, A-Z, 0-9).
+ * Common examples: `USD`, `USDC`, `BTC`, `yUSDC`, `yETH`.
  *
  * @see <a href="https://developers.stellar.org/docs/learn/encyclopedia/data-format/strkey">StrKey Encoding</a>
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/stellar-data-structures/accounts">Stellar Accounts</a>
@@ -189,7 +189,7 @@ object StellarValidation {
      *
      * Asset codes identify issued assets (tokens) on the Stellar network. They must:
      * - Be between 1 and 12 characters long
-     * - Contain only uppercase letters (A-Z) and digits (0-9)
+     * - Contain only alphanumeric characters (a-z, A-Z, 0-9)
      * - Not be empty or blank
      *
      * Common examples:
@@ -219,17 +219,8 @@ object StellarValidation {
         return when {
             assetCode.isBlank() -> "Asset code cannot be empty"
             assetCode.length > 12 -> "Asset code cannot exceed 12 characters (got: ${assetCode.length})"
-            else -> {
-                // Validate asset code contains only alphanumeric characters
-                val invalidChars = assetCode.filter { char ->
-                    char !in 'A'..'Z' && char !in '0'..'9'
-                }
-                if (invalidChars.isNotEmpty()) {
-                    "Asset code must contain only uppercase letters and digits. Invalid characters: '$invalidChars'"
-                } else {
-                    null
-                }
-            }
+            !Regex("^[a-zA-Z0-9]+$").matches(assetCode) -> "Asset code must contain only alphanumeric characters (a-z, A-Z, 0-9)"
+            else -> null
         }
     }
 }

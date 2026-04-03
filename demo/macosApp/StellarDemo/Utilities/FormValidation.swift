@@ -32,8 +32,8 @@ import Foundation
 ///
 /// ## Asset Codes
 ///
-/// Asset codes can be 1-12 characters long and must contain only uppercase letters (A-Z)
-/// and digits (0-9). Common examples: `USD`, `USDC`, `BTC`, `EURT`, `MYTOKEN`.
+/// Asset codes can be 1-12 alphanumeric characters (a-z, A-Z, 0-9).
+/// Common examples: `USD`, `USDC`, `BTC`, `yUSDC`, `yETH`.
 struct FormValidation {
 
     /// Validates an account ID field for UI display.
@@ -172,7 +172,7 @@ struct FormValidation {
     ///
     /// Asset codes identify issued assets (tokens) on the Stellar network. They must:
     /// - Be between 1 and 12 characters long
-    /// - Contain only uppercase letters (A-Z) and digits (0-9)
+    /// - Contain only alphanumeric characters (a-z, A-Z, 0-9)
     /// - Not be empty or blank
     ///
     /// Common examples:
@@ -288,13 +288,13 @@ struct FormValidation {
         if assetCode.count > 12 {
             return "Asset code cannot exceed 12 characters (got: \(assetCode.count))"
         }
-        // Validate asset code contains only alphanumeric characters (A-Z, 0-9)
-        let validCharacterSet = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        // Validate asset code contains only alphanumeric characters (a-z, A-Z, 0-9)
+        let validCharacterSet = CharacterSet.alphanumerics
         if assetCode.rangeOfCharacter(from: validCharacterSet.inverted) != nil {
             let invalidChars = assetCode.filter { char in
                 !validCharacterSet.contains(char.unicodeScalars.first!)
             }
-            return "Asset code must contain only uppercase letters and digits. Invalid characters: '\(invalidChars)'"
+            return "Asset code must contain only alphanumeric characters (a-z, A-Z, 0-9). Invalid characters: '\(invalidChars)'"
         }
         return nil
     }

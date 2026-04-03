@@ -92,10 +92,16 @@ class AssetTest {
         assertDoesNotThrow { AssetTypeCreditAlphaNum4("A1B2", testIssuer) }
         assertDoesNotThrow { AssetTypeCreditAlphaNum12("ASSET123", testIssuer) }
 
-        // Invalid codes with lowercase letters
-        assertFailsWith<IllegalArgumentException> {
-            AssetTypeCreditAlphaNum4("usd", testIssuer)
-        }
+        // Valid codes with lowercase letters (issue #14)
+        assertDoesNotThrow { AssetTypeCreditAlphaNum4("usd", testIssuer) }
+        assertDoesNotThrow { AssetTypeCreditAlphaNum4("yBTC", testIssuer) }
+        assertDoesNotThrow { AssetTypeCreditAlphaNum4("yETH", testIssuer) }
+        assertDoesNotThrow { AssetTypeCreditAlphaNum12("yUSDC", testIssuer) }
+        assertDoesNotThrow { AssetTypeCreditAlphaNum12("yUSDC12345", testIssuer) }
+
+        // Valid codes with digits only
+        assertDoesNotThrow { AssetTypeCreditAlphaNum4("1234", testIssuer) }
+        assertDoesNotThrow { AssetTypeCreditAlphaNum12("12345", testIssuer) }
 
         // Invalid codes with special characters
         assertFailsWith<IllegalArgumentException> {
@@ -106,6 +112,17 @@ class AssetTest {
         }
         assertFailsWith<IllegalArgumentException> {
             AssetTypeCreditAlphaNum4("US D", testIssuer)
+        }
+
+        // Invalid: empty or wrong length
+        assertFailsWith<IllegalArgumentException> {
+            AssetTypeCreditAlphaNum4("", testIssuer)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AssetTypeCreditAlphaNum4("TOOLONG", testIssuer)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AssetTypeCreditAlphaNum12("ABCD", testIssuer)
         }
     }
 
@@ -407,6 +424,23 @@ class AssetTest {
         val xdr2 = asset2.toXdr()
         val restored2 = Asset.fromXdr(xdr2)
         assertEquals(asset2, restored2)
+    }
+
+    @Test
+    fun testXdrRoundTripLowercaseAssetCodes() {
+        // AlphaNum4 with lowercase (issue #14)
+        val yETH = AssetTypeCreditAlphaNum4("yETH", testIssuer)
+        val xdr1 = yETH.toXdr()
+        val restored1 = Asset.fromXdr(xdr1)
+        assertEquals(yETH, restored1)
+        assertEquals("yETH", (restored1 as AssetTypeCreditAlphaNum4).code)
+
+        // AlphaNum12 with lowercase
+        val yUSDC = AssetTypeCreditAlphaNum12("yUSDC", testIssuer)
+        val xdr2 = yUSDC.toXdr()
+        val restored2 = Asset.fromXdr(xdr2)
+        assertEquals(yUSDC, restored2)
+        assertEquals("yUSDC", (restored2 as AssetTypeCreditAlphaNum12).code)
     }
 
     @Test

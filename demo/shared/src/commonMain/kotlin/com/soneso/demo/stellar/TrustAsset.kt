@@ -77,7 +77,7 @@ sealed class TrustAssetResult {
  * - The account must have enough XLM to meet the base reserve requirement (0.5 XLM per trustline)
  * - Setting the limit to "0" removes the trustline (account must have zero balance of that asset)
  * - The maximum limit is approximately 922 trillion (922337203685.4775807)
- * - Asset codes must be 1-12 alphanumeric characters (uppercase letters and digits only)
+ * - Asset codes must be 1-12 alphanumeric characters (a-z, A-Z, 0-9)
  * - Both the account and issuer must be valid Stellar account IDs (G... addresses)
  *
  * @param accountId The account ID that will trust the asset (must start with 'G')

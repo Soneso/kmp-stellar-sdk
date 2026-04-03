@@ -230,8 +230,7 @@ class TrustAssetScreen : Screen {
                     OutlinedTextField(
                         value = assetCode,
                         onValueChange = {
-                            // Auto-uppercase for asset codes
-                            assetCode = it.uppercase().trim()
+                            assetCode = it.trim()
                             validationErrors = validationErrors - "assetCode"
                             trustResult = null
                         },
@@ -646,7 +645,7 @@ private fun TrustAssetErrorCard(error: TrustAssetResult.Error) {
                 TroubleshootingItem("Ensure the account has been funded (at least 0.5 XLM for reserve)")
                 TroubleshootingItem("Check that the secret seed matches the account ID")
                 TroubleshootingItem("Verify the asset issuer account exists on the network")
-                TroubleshootingItem("Asset codes must be uppercase letters and digits only")
+                TroubleshootingItem("Asset codes must be alphanumeric characters only (a-z, A-Z, 0-9)")
             }
                 }
         }

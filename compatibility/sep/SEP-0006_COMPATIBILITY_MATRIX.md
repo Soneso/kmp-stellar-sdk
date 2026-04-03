@@ -1,10 +1,10 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-02-14 20:32:36
+**Generated:** 2026-04-03 17:48:35
 
 **SEP Version:** 4.3.0<br>
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)<br>
-**SDK Version:** 1.3.0<br>
+**SDK Version:** 1.3.1<br>
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md
 
 ## SEP Summary
@@ -13,10 +13,10 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (72/72 fields)
+**Total Coverage:** 100.0% (73/73 fields)
 
-- ✅ **Implemented:** 72/72
-- ❌ **Not Implemented:** 0/72
+- ✅ **Implemented:** 73/73
+- ❌ **Not Implemented:** 0/73
 - **Required Fields:** 100.0% (4/4)
 
 ## Implementation Status
@@ -101,7 +101,7 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 | Deposit | 100.0% | 1/1 | 16 | 16 |
 | Deposit Exchange | 100.0% | 1/1 | 18 | 18 |
 | Info | 100.0% | N/A | 1 | 1 |
-| Withdraw | 100.0% | 1/1 | 17 | 17 |
+| Withdraw | 100.0% | 1/1 | 18 | 18 |
 | Withdraw Exchange | 100.0% | 1/1 | 20 | 20 |
 
 ## Detailed Field Comparison
@@ -163,6 +163,7 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 | `asset_code` |  | ✅ | `assetCode` | Code of the on-chain asset the user wants to withdraw. The value passed must match one of the cod... |
 | `funding_method` | ✓ | ✅ | `fundingMethod` | A method supported by the Anchor for transferring or settling assets. Must match one of the value... |
 | `account` |  | ✅ | `account` | (optional) The classic account, muxed account, or contract account that the client will use as th... |
+| `memo` |  | ✅ | `memo` | (optional) This field should only be used if SEP-10 or SEP-45 authentication is not. It was origi... |
 | `lang` |  | ✅ | `lang` | (optional) Defaults to `en` if not specified or if the specified language is not supported. Langu... |
 | `on_change_callback` |  | ✅ | `onChangeCallback` | (optional) A URL that the anchor should `POST` a JSON message to when the `status` property of th... |
 | `amount` |  | ✅ | `amount` | (optional) The amount of the asset the user would like to withdraw. This field may be necessary f... |
