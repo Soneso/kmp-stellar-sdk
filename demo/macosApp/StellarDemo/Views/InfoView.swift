@@ -4,7 +4,7 @@ struct InfoView: View {
     @ObservedObject var toastManager: ToastManager
 
     // Version from demo.version property in gradle.properties
-    private let appVersion = "1.3.0"
+    private let appVersion = "1.3.1"
     private let githubUrl = "https://github.com/Soneso/kmp-stellar-sdk"
     private let emailAddress = "info@soneso.com"
 
