@@ -22,12 +22,15 @@ object DemoState {
      * Set during kit initialization so TransferScreen can register secret keys.
      */
     var externalSignerManager: ExternalSignerManagerAdapter? = null
+        private set
 
     /** Platform-specific WebAuthn provider, set by platform entry points (MainActivity, AppDelegate, etc.). */
     var webauthnProvider: WebAuthnProvider? = null
+        private set
 
     /** Platform-specific storage adapter, set by platform entry points. */
     var storage: StorageAdapter? = null
+        private set
 
     /** Whether a wallet is currently connected. */
     var isConnected: Boolean by mutableStateOf(false)
@@ -57,6 +60,18 @@ object DemoState {
         kit = newKit
     }
 
+    fun setExternalSignerManager(manager: ExternalSignerManagerAdapter?) {
+        externalSignerManager = manager
+    }
+
+    fun setWebAuthnProvider(provider: WebAuthnProvider?) {
+        webauthnProvider = provider
+    }
+
+    fun setStorage(storageAdapter: StorageAdapter?) {
+        storage = storageAdapter
+    }
+
     fun setConnected(connected: Boolean, contract: String? = null, credential: String? = null) {
         isConnected = connected
         contractId = contract
@@ -79,6 +94,8 @@ object DemoState {
     fun reset() {
         kit = null
         externalSignerManager = null
+        webauthnProvider = null
+        storage = null
         isConnected = false
         contractId = null
         credentialId = null

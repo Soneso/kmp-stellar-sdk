@@ -135,8 +135,8 @@ class MacOSBridge {
                 suiteName = "com.soneso.stellar.smartdemo.macos"
             )
 
-            DemoState.webauthnProvider = webauthnProvider
-            DemoState.storage = storage
+            DemoState.setWebAuthnProvider(webauthnProvider)
+            DemoState.setStorage(storage)
 
             initializeKit(webauthnProvider, storage)
         } catch (e: Exception) {

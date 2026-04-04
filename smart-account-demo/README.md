@@ -191,7 +191,7 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 |---------|-------------|
 | `RPC_URL` | Soroban RPC endpoint (`soroban-testnet.stellar.org`) |
 | `NETWORK_PASSPHRASE` | Stellar testnet passphrase |
-| `ACCOUNT_WASM_HASH` | Smart account contract WASM hash (OZ stellar-contracts v0.6.0) |
+| `ACCOUNT_WASM_HASH` | Smart account contract WASM hash (OZ stellar-contracts v0.7.0) |
 | `WEBAUTHN_VERIFIER_ADDRESS` | On-chain WebAuthn (secp256r1) signature verifier contract |
 | `ED25519_VERIFIER_ADDRESS` | On-chain Ed25519 signature verifier contract |
 | `NATIVE_TOKEN_CONTRACT` | XLM Stellar Asset Contract (SAC) address on testnet |
