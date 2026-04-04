@@ -282,6 +282,52 @@ val config = OZSmartAccountConfig.builder(
     .build()
 ```
 
+**Instance Methods**:
+
+#### getDeployer
+
+```kotlin
+suspend fun getDeployer(): KeyPair
+```
+
+Returns the deployer keypair, creating the default deterministic deployer if none was explicitly configured.
+
+**Returns**: The configured deployer or the default deterministic deployer
+
+**Throws**: `ConfigurationException` if default deployer creation fails
+
+#### effectiveIndexerUrl
+
+```kotlin
+fun effectiveIndexerUrl(): String?
+```
+
+Returns the effective indexer URL for this configuration. If an indexer URL is explicitly configured, it is returned. Otherwise, returns the default indexer URL for the network passphrase.
+
+**Returns**: The indexer URL to use, or null if no URL is configured and no default exists
+
+#### createIndexerClient
+
+```kotlin
+fun createIndexerClient(
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
+): OZIndexerClient?
+```
+
+Creates an `OZIndexerClient` using the effective indexer URL. Falls back to the default URL for the network passphrase if no explicit URL is configured.
+
+**Parameters**:
+- `timeoutMs`: Optional request timeout in milliseconds (defaults to `OZConstants.DEFAULT_INDEXER_TIMEOUT_MS`)
+
+**Returns**: An `OZIndexerClient` instance, or null if no indexer URL is available
+
+```kotlin
+val client = config.createIndexerClient()
+if (client != null) {
+    val contracts = client.lookupByCredentialId(credentialId)
+}
+```
+
 ---
 
 ## Wallet Operations
@@ -1624,6 +1670,29 @@ kit.events.on<SmartAccountEvent.TransactionSubmitted> { event ->
 }
 ```
 
+**Cross-Language Listener (Java/Swift)**:
+
+The `on<T>` method uses Kotlin reified generics and is not callable from Java or Swift. Use `addListener` for cross-language event subscription:
+
+```kotlin
+fun addListener(listener: SmartAccountEventListener): () -> Unit
+```
+
+Subscribes a listener that receives all event types. The listener must dispatch internally using `when` (Kotlin) or `instanceof` (Java) / pattern matching (Swift). Returns an unsubscribe function.
+
+```kotlin
+val unsubscribe = kit.events.addListener { event ->
+    when (event) {
+        is SmartAccountEvent.WalletConnected ->
+            println("Connected to ${event.contractId}")
+        is SmartAccountEvent.TransactionSubmitted ->
+            println("Transaction ${event.hash}: success=${event.success}")
+        else -> {}
+    }
+}
+// Later: unsubscribe()
+```
+
 ---
 
 ## Exceptions
@@ -1985,8 +2054,23 @@ Defined in `smartaccount/core/SmartAccountErrors.kt`. Contains crypto constants 
 
 ```kotlin
 object SmartAccountConstants {
+    const val ED25519_PUBLIC_KEY_SIZE = 32         // Size in bytes of an Ed25519 public key (RFC 8032)
     const val SECP256R1_PUBLIC_KEY_SIZE = 65       // Size in bytes of an uncompressed secp256r1 public key
     const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04  // Uncompressed point prefix byte as defined in SEC 1
+}
+```
+
+### ContractErrorCodes
+
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Contract-level error codes from the OZ smart account contract. These codes are returned in contract error responses and can be mapped to exceptions when interpreting failed transaction results. Error code range: 3xxx.
+
+```kotlin
+object ContractErrorCodes {
+    const val MATH_OVERFLOW = 3012                   // Integer arithmetic overflow occurred in the contract
+    const val KEY_DATA_TOO_LARGE = 3013              // The key_data field on a signer exceeds the maximum allowed size
+    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014  // The number of context rule IDs does not match the expected count
+    const val NAME_TOO_LONG = 3015                   // A name field (e.g. context rule name) exceeds the maximum allowed length
+    const val UNAUTHORIZED_SIGNER = 3016             // The signer is not authorized to sign the given context rule
 }
 ```
 
