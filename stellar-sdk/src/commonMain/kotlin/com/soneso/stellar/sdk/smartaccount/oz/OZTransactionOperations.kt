@@ -8,7 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
-import com.soneso.stellar.sdk.currentTimeMillis
+import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
@@ -909,7 +909,7 @@ class OZTransactionOperations internal constructor(
             // For source_account credentials, convert to Address credentials
             if (credType is SorobanCredentialsXdr.Void) {
                 // Generate a nonce for the new Address credential
-                val nonce = Int64Xdr(currentTimeMillis())
+                val nonce = Int64Xdr(generateNonce())
 
                 // Build auth payload hash
                 val payloadHash = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
@@ -1204,5 +1204,14 @@ class OZTransactionOperations internal constructor(
                 error = "Transaction not confirmed after 30 polling attempts"
             )
         }
+    }
+
+    private suspend fun generateNonce(): Long {
+        val randomBytes = getEd25519Crypto().generatePrivateKey()
+        var nonce = 0L
+        for (i in 0..7) {
+            nonce = (nonce shl 8) or (randomBytes[i].toLong() and 0xFF)
+        }
+        return nonce
     }
 }

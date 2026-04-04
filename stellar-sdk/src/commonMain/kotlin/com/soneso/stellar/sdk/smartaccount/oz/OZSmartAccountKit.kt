@@ -103,7 +103,12 @@ class OZSmartAccountKit private constructor(
     /**
      * Optional external wallet adapter for multi-signer support.
      */
-    internal val externalWallet: ExternalWalletAdapter?
+    internal val externalWallet: ExternalWalletAdapter?,
+
+    /**
+     * Soroban RPC server for contract operations.
+     */
+    internal val sorobanServer: SorobanServer
 ) {
     // MARK: - Connection State
 
@@ -209,26 +214,6 @@ class OZSmartAccountKit private constructor(
     val contractId: String?
         get() = _contractId
 
-    // MARK: - Soroban Server Access
-
-    /**
-     * Backing field for the lazily initialized Soroban RPC server.
-     * Null until first access. Set to null again after [close] is called.
-     */
-    private var _sorobanServer: SorobanServer? = null
-
-    /**
-     * Provides access to the Soroban RPC server for contract operations.
-     *
-     * Initialized on first access and reused for subsequent calls.
-     * Used by operation modules to simulate transactions, submit transactions,
-     * query ledger state, and fetch account information.
-     */
-    internal val sorobanServer: SorobanServer
-        get() {
-            return _sorobanServer ?: SorobanServer(config.rpcUrl).also { _sorobanServer = it }
-        }
-
     // MARK: - Connection Management
 
     /**
@@ -302,8 +287,7 @@ class OZSmartAccountKit private constructor(
      * ```
      */
     fun close() {
-        _sorobanServer?.close()
-        _sorobanServer = null
+        sorobanServer.close()
         indexerClient?.close()
     }
 
@@ -413,7 +397,8 @@ class OZSmartAccountKit private constructor(
                 storage = config.storage,
                 relayerClient = relayerClient,
                 indexerClient = indexerClient,
-                externalWallet = config.externalWallet
+                externalWallet = config.externalWallet,
+                sorobanServer = SorobanServer(config.rpcUrl)
             )
         }
     }
