@@ -535,7 +535,7 @@ Transfers tokens from the smart account to a recipient. The amount is a decimal 
 val result = kit.transactionOperations.transfer(
     tokenContract = "CBCD1234...",
     recipient = "GA7QYNF7SOWQ...",
-    amount = 100.5
+    amount = "100.5"
 )
 
 if (result.success) {
@@ -630,7 +630,7 @@ if (result.success) {
 suspend fun fundWallet(
     nativeTokenContract: String,
     forceMethod: SubmissionMethod? = null
-): Double
+): String
 ```
 
 Funds the smart account wallet using Friendbot (testnet only).
@@ -641,7 +641,7 @@ Creates a temporary keypair, funds it via Friendbot, then transfers to the smart
 - `nativeTokenContract`: Native token contract address (C-address)
 - `forceMethod`: Optional submission method override
 
-**Returns**: Amount funded in XLM
+**Returns**: Amount funded in XLM as a decimal string
 
 **Throws**:
 - `ValidationException`: Invalid contract address
@@ -1087,7 +1087,7 @@ Adds a weighted threshold policy with configurable signer weights.
 suspend fun addSpendingLimit(
     contextRuleId: UInt,
     policyAddress: String,
-    spendingLimit: Double,
+    spendingLimit: String,
     periodLedgers: UInt
 ): TransactionResult
 ```
@@ -1097,7 +1097,7 @@ Adds a spending limit policy.
 **Parameters**:
 - `contextRuleId`: Context rule ID
 - `policyAddress`: Policy contract address
-- `spendingLimit`: Maximum amount per period in XLM
+- `spendingLimit`: Maximum amount per period as a decimal string (e.g., "1000")
 - `periodLedgers`: Period duration in ledgers (17,280 ≈ 1 day)
 
 **Returns**: `TransactionResult`
@@ -1767,6 +1767,19 @@ sealed class SignerException : SmartAccountException {
 
 ---
 
+### SessionException
+
+```kotlin
+sealed class SessionException : SmartAccountException {
+    class Expired(message: String, cause: Throwable? = null)
+    class Invalid(message: String, cause: Throwable? = null)
+}
+```
+
+**Error Codes**: 9001-9002
+
+---
+
 ## Types
 
 ### SelectedSigner
@@ -1861,7 +1874,10 @@ interface WebAuthnProvider {
         userName: String
     ): WebAuthnRegistrationResult
 
-    suspend fun authenticate(challenge: ByteArray): WebAuthnAuthenticationResult
+    suspend fun authenticate(
+        challenge: ByteArray,
+        allowCredentialIds: List<ByteArray>? = null
+    ): WebAuthnAuthenticationResult
 }
 
 data class WebAuthnRegistrationResult(

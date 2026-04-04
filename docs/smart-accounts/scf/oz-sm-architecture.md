@@ -101,7 +101,7 @@ The KMP SDK provides WebAuthn and storage implementations for each target platfo
 
 The KMP SDK also provides non-encrypted storage adapters (UserDefaults on Apple, localStorage on web) for development and testing.
 
-iOS and macOS share the WebAuthn provider through Kotlin's `nativeMain` source set, with platform-specific code in `iosMain` and `macosMain`. Android implementations go in `jvmMain`, web implementations in `jsMain`.
+iOS and macOS share the WebAuthn provider through Kotlin's `nativeMain` source set, with platform-specific code in `iosMain` and `macosMain`. Android implementations go in `androidMain`, web implementations in `jsMain`.
 
 Both WebAuthnProvider and StorageAdapter are defined as interfaces, so developers can supply custom implementations if needed.
 

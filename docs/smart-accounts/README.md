@@ -135,7 +135,7 @@ val wallet = kit.walletOperations.createWallet(
 val result = kit.transactionOperations.transfer(
     tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     recipient = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
-    amount = 10.0  // 10 XLM (automatically converted to stroops)
+    amount = "10"  // 10 XLM (automatically converted to stroops)
 )
 
 if (result.success) {
