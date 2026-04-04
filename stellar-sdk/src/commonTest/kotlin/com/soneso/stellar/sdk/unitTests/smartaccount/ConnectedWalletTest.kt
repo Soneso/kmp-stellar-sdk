@@ -7,6 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
+import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.ConnectedWallet
@@ -298,7 +299,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_zeroThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 0,
@@ -309,7 +310,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_negativeThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = -1,
@@ -320,7 +321,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_zeroSignerWeight_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 1,
@@ -331,7 +332,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_negativeSignerWeight_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 1,
@@ -342,7 +343,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightLessThanThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         // Total weight = 30, threshold = 50 — should throw
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
@@ -354,7 +355,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightEqualsThreshold_doesNotThrow() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         val params = SmartAccountBuilders.createWeightedThresholdParams(
             threshold = 50,
             signerWeights = mapOf(signer to 50)
@@ -365,7 +366,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightExceedsThreshold_doesNotThrow() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         val params = SmartAccountBuilders.createWeightedThresholdParams(
             threshold = 50,
             signerWeights = mapOf(signer to 100)

@@ -261,35 +261,6 @@ object SmartAccountBuilders {
     }
 
     // ========================================================================
-    // Signer Parsing
-    // ========================================================================
-
-    /**
-     * Parses a signer from a Stellar address string.
-     *
-     * Accepts a Stellar account address (G-address) and returns a [DelegatedSigner].
-     * For more complex signer types, construct the appropriate [SmartAccountSigner]
-     * subclass directly.
-     *
-     * @param address Stellar account address (G-address)
-     * @return A [DelegatedSigner] for the given address
-     * @throws ValidationException.InvalidAddress if the address format is invalid
-     *
-     * Example:
-     * ```kotlin
-     * val signer = SmartAccountBuilders.parseSigner("GA7Q...")
-     * ```
-     */
-    fun parseSigner(address: String): DelegatedSigner {
-        if (!address.startsWith("G") || address.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Invalid Stellar account address. Must start with 'G' and be 56 characters, got: $address"
-            )
-        }
-        return DelegatedSigner(address)
-    }
-
-    // ========================================================================
     // Signer Inspection Utilities
     // ========================================================================
 
