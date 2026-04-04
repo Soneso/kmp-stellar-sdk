@@ -13,11 +13,6 @@ package com.soneso.stellar.sdk.smartaccount.oz
 object OZConstants {
 
     /**
-     * Buffer in ledgers added to the latest ledger sequence when calculating auth entry expiration.
-     */
-    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100
-
-    /**
      * Default session expiry in milliseconds (7 days).
      */
     const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L

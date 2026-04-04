@@ -414,7 +414,7 @@ class OZTransactionOperations internal constructor(
         val signedAuthEntries = if (simulatedAuthEntries.isNotEmpty()) {
             // Get latest ledger ONCE before the signing loop
             val latestLedger = kit.sorobanServer.getLatestLedger()
-            val expiration = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+            val expiration = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
 
             // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
             val contextRules = kit.contextRuleManager.listContextRules()
@@ -781,7 +781,7 @@ class OZTransactionOperations internal constructor(
         // STEP 8: Convert source_account auth entries to Address credentials.
         // This allows the Relayer to use its own channel accounts for fee sponsoring.
         val latestLedger = kit.sorobanServer.getLatestLedger()
-        val expirationLedger = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+        val expirationLedger = latestLedger.sequence.toUInt() + Util.LEDGERS_PER_HOUR.toUInt()
 
         val signedAuthEntries = convertAndSignAuthEntries(
             authEntries = simulatedAuthEntries,

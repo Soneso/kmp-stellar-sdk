@@ -262,8 +262,7 @@ class OZMultiSignerManager internal constructor(
         val latestLedger = kit.sorobanServer.getLatestLedger()
 
         // STEP 5: Calculate expiration
-        val expirationLedger = latestLedger.sequence.toUInt() +
-                OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+        val expirationLedger = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
 
         // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
         val contextRules = kit.contextRuleManager.listContextRules()

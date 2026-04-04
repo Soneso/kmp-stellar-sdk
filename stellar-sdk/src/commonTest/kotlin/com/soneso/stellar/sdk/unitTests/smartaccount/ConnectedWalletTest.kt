@@ -402,8 +402,4 @@ class ConnectedWalletTest {
         assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
     }
 
-    @Test
-    fun testOZConstants_authEntryExpirationBufferIs100() {
-        assertEquals(100, OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER)
-    }
 }
