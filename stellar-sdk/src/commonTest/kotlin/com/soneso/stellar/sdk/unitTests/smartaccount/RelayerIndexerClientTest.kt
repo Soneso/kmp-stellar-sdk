@@ -208,32 +208,6 @@ class RelayerIndexerClientTest {
         assertNull(client, "forNetwork must return null for unknown networks")
     }
 
-    // MARK: - SmartAccountVersion constants
-
-    @Test
-    fun testSmartAccountVersion_nameIsNotBlank() {
-        assertTrue(SmartAccountVersion.NAME.isNotBlank(), "Client name must not be blank")
-    }
-
-    @Test
-    fun testSmartAccountVersion_versionIsNotBlank() {
-        assertTrue(SmartAccountVersion.VERSION.isNotBlank(), "Client version must not be blank")
-    }
-
-    @Test
-    fun testSmartAccountVersion_nameMatchesExpected() {
-        assertEquals("kmp-smart-account-kit", SmartAccountVersion.NAME)
-    }
-
-    @Test
-    fun testSmartAccountVersion_versionHasSemverFormat() {
-        val parts = SmartAccountVersion.VERSION.split(".")
-        assertEquals(3, parts.size, "Version must follow semver (MAJOR.MINOR.PATCH)")
-        parts.forEach { part ->
-            assertTrue(part.toIntOrNull() != null, "Each semver part must be numeric, got: '$part'")
-        }
-    }
-
     // MARK: - RelayerErrorCodes constants
 
     @Test

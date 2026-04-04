@@ -257,8 +257,8 @@ class OZRelayerClient(
             val response = try {
                 client.post(normalizedUrl) {
                     contentType(ContentType.Application.Json)
-                    header("X-Client-Name", SmartAccountVersion.NAME)
-                    header("X-Client-Version", SmartAccountVersion.VERSION)
+                    header("X-Client-Name", "kmp-stellar-sdk")
+                    header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
                     setBody(payload)
                     timeout {
                         requestTimeoutMillis = effectiveTimeout
