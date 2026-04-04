@@ -1849,6 +1849,19 @@ sealed class SessionException : SmartAccountException {
 
 ---
 
+### IndexerException
+
+```kotlin
+sealed class IndexerException : SmartAccountException {
+    class RequestFailed(message: String, cause: Throwable? = null)
+    class Timeout(message: String, cause: Throwable? = null)
+}
+```
+
+**Error Codes**: 10001-10002
+
+---
+
 ## Types
 
 ### SelectedSigner

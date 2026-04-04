@@ -440,26 +440,20 @@ class OZIndexerClient(
                     "(unable to decode response body)"
                 }
                 val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
-                throw ValidationException.InvalidInput(
-                    "Indexer returned HTTP ${response.status.value}: $truncatedBody"
+                throw IndexerException.requestFailed(
+                    "HTTP ${response.status.value}: $truncatedBody"
                 )
             }
 
             return response.body()
         } catch (e: HttpRequestTimeoutException) {
-            throw ValidationException.InvalidInput(
-                "Indexer request timed out: $url",
-                e
-            )
-        } catch (e: ValidationException) {
-            // Re-throw validation exceptions as-is
+            throw IndexerException.timeout(url, e)
+        } catch (e: SmartAccountException) {
+            // Re-throw SDK exceptions as-is (includes IndexerException, ValidationException)
             throw e
         } catch (e: Exception) {
             val errorMessage = e.message ?: e.toString()
-            throw ValidationException.InvalidInput(
-                "Indexer request failed: $errorMessage",
-                e
-            )
+            throw IndexerException.requestFailed(errorMessage, e)
         }
     }
 
