@@ -209,6 +209,9 @@ data class OZSmartAccountConfig(
         if (networkPassphrase.isBlank()) throw ConfigurationException.missingConfig("networkPassphrase")
 
         if (accountWasmHash.isBlank()) throw ConfigurationException.missingConfig("accountWasmHash")
+        if (!accountWasmHash.matches(Regex("[0-9a-fA-F]{64}"))) throw ConfigurationException.invalidConfig(
+            "accountWasmHash must be a 64-character hex string (SHA-256 of WASM), got: $accountWasmHash"
+        )
 
         if (!StrKey.isValidContract(webauthnVerifierAddress)) throw ConfigurationException.invalidConfig(
             "webauthnVerifierAddress must be a valid contract address (C...), got: $webauthnVerifierAddress"

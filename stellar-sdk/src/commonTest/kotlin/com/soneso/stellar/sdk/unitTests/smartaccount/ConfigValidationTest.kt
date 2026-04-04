@@ -179,6 +179,30 @@ class ConfigValidationTest {
         }
     }
 
+    @Test
+    fun testAccountWasmHash_invalidHexThrows() {
+        assertFailsWith<ConfigurationException.InvalidConfig> {
+            OZSmartAccountConfig(
+                rpcUrl = validRpcUrl,
+                networkPassphrase = validPassphrase,
+                accountWasmHash = "not_a_valid_hex_hash",
+                webauthnVerifierAddress = validVerifier
+            )
+        }
+    }
+
+    @Test
+    fun testAccountWasmHash_tooShortHexThrows() {
+        assertFailsWith<ConfigurationException.InvalidConfig> {
+            OZSmartAccountConfig(
+                rpcUrl = validRpcUrl,
+                networkPassphrase = validPassphrase,
+                accountWasmHash = "abcdef",
+                webauthnVerifierAddress = validVerifier
+            )
+        }
+    }
+
     // MARK: - Builder Pattern Tests
 
     @Test
