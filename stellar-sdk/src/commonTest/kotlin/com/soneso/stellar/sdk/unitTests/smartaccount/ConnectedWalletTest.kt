@@ -249,7 +249,7 @@ class ConnectedWalletTest {
     }
 
     @Test
-    fun testMaxContextRuleScanId_builderPersistsValue() {
+    fun testMaxContextRuleScanId_builderDefaultValue() {
         val config = OZSmartAccountConfig.builder(
             rpcUrl = validRpcUrl,
             networkPassphrase = validPassphrase,
@@ -257,6 +257,17 @@ class ConnectedWalletTest {
             webauthnVerifierAddress = validVerifier
         ).build()
         assertEquals(50u, config.maxContextRuleScanId, "Builder default maxContextRuleScanId must be 50")
+    }
+
+    @Test
+    fun testMaxContextRuleScanId_builderCustomValue() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        ).maxContextRuleScanId(200u).build()
+        assertEquals(200u, config.maxContextRuleScanId)
     }
 
     // ========================================================================

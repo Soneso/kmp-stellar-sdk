@@ -493,7 +493,7 @@ class InMemoryStorageAdapter : StorageAdapter {
         if (currentSession != null && currentSession.isExpired) {
             // Clear expired session
             session = null
-            return null
+            return@withLock null
         }
         currentSession
     }

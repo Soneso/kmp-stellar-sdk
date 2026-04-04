@@ -142,9 +142,9 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
      * @throws StorageException.ReadFailed if the read operation fails due to a storage error
      */
     override suspend fun get(credentialId: String): StoredCredential? = mutex.withLock {
-        return try {
+        return@withLock try {
             val key = credentialKey(credentialId)
-            val jsonStr = prefs.getString(key, null) ?: return null
+            val jsonStr = prefs.getString(key, null) ?: return@withLock null
             deserializeCredential(jsonStr, credentialId)
         } catch (e: StorageException) {
             throw e
@@ -345,16 +345,16 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
      * @throws StorageException.ReadFailed if the read operation fails due to a storage error
      */
     override suspend fun getSession(): StoredSession? = mutex.withLock {
-        return try {
-            val jsonStr = prefs.getString(SESSION_KEY, null) ?: return null
+        return@withLock try {
+            val jsonStr = prefs.getString(SESSION_KEY, null) ?: return@withLock null
             val session = deserializeSession(jsonStr)
             if (session == null) {
-                return null
+                return@withLock null
             }
             if (session.isExpired) {
                 // Clear expired session from storage
                 prefs.edit().remove(SESSION_KEY).commit()
-                return null
+                return@withLock null
             }
             session
         } catch (e: StorageException) {

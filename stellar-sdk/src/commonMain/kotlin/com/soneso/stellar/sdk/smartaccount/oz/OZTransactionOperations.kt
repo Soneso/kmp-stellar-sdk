@@ -1189,12 +1189,12 @@ class OZTransactionOperations internal constructor(
             GetTransactionStatus.SUCCESS -> TransactionResult(
                 success = true,
                 hash = hash,
-                ledger = txResponse.latestLedger?.toUInt()
+                ledger = txResponse.ledger?.toUInt()
             )
             GetTransactionStatus.FAILED -> TransactionResult(
                 success = false,
                 hash = hash,
-                ledger = txResponse.latestLedger?.toUInt(),
+                ledger = txResponse.ledger?.toUInt(),
                 error = txResponse.resultXdr ?: "Transaction failed on-chain"
             )
             GetTransactionStatus.NOT_FOUND -> TransactionResult(

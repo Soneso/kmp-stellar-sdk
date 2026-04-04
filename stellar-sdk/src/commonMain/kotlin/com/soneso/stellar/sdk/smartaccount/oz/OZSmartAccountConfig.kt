@@ -354,6 +354,7 @@ data class OZSmartAccountConfig(
         private var webauthnProvider: WebAuthnProvider? = null
         private var storage: StorageAdapter = InMemoryStorageAdapter()
         private var externalWallet: ExternalWalletAdapter? = null
+        private var maxContextRuleScanId: UInt = 50u
 
         /**
          * Sets the deployer keypair.
@@ -468,6 +469,17 @@ data class OZSmartAccountConfig(
         fun externalWallet(externalWallet: ExternalWalletAdapter?) = apply { this.externalWallet = externalWallet }
 
         /**
+         * Sets the maximum context rule ID to scan when iterating rules.
+         *
+         * @param value The maximum scan ID (default 50)
+         * @return This builder for chaining
+         */
+        fun maxContextRuleScanId(value: UInt): Builder {
+            maxContextRuleScanId = value
+            return this
+        }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -489,7 +501,8 @@ data class OZSmartAccountConfig(
                 indexerUrl = indexerUrl,
                 webauthnProvider = webauthnProvider,
                 storage = storage,
-                externalWallet = externalWallet
+                externalWallet = externalWallet,
+                maxContextRuleScanId = maxContextRuleScanId
             )
         }
     }

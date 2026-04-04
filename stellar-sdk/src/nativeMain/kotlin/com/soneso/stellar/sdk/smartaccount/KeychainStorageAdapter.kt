@@ -278,14 +278,14 @@ class KeychainStorageAdapter(
 
     override suspend fun getSession(): StoredSession? = mutex.withLock {
         try {
-            val jsonString = keychainRead(account = KEY_SESSION) ?: return null
+            val jsonString = keychainRead(account = KEY_SESSION) ?: return@withLock null
             val serializable = json.decodeFromString<SerializableSession>(jsonString)
             val session = serializable.toStoredSession()
 
             if (session.isExpired) {
                 // Clear expired session
                 keychainDelete(account = KEY_SESSION)
-                return null
+                return@withLock null
             }
 
             session
