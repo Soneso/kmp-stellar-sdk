@@ -278,8 +278,13 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // STEP 4: Extract public key from attestation (already extracted by provider)
-        val publicKey = registrationResult.publicKey
+        // STEP 4: Normalize and validate the public key from registration.
+        // Built-in providers return correct 65-byte uncompressed keys, but custom
+        // providers (e.g., YubiKey) might return SPKI-wrapped or COSE-encoded keys.
+        val publicKey = SmartAccountUtils.extractPublicKeyFromRegistration(
+            publicKey = registrationResult.publicKey,
+            attestationObject = registrationResult.attestationObject
+        )
 
         // STEP 5: Derive contract address
         val deployer = kit.getDeployer()

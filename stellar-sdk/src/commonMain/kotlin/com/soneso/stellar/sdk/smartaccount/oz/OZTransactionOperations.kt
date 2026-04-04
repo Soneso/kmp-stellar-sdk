@@ -921,7 +921,9 @@ class OZTransactionOperations internal constructor(
                 // Sign with temp keypair
                 val signature = tempKeypair.sign(payloadHash)
 
-                // Create signature map and vec
+                // Standard Ed25519 format: Vec([Map({public_key, signature})]).
+                // This is for a classical Stellar account (temp keypair), NOT the smart
+                // account's AuthPayload format. Do not merge with the AuthPayload path.
                 val signatureMapScVal = Scv.toMap(linkedMapOf(
                     Scv.toSymbol("public_key") to Scv.toBytes(tempKeypair.getPublicKey()),
                     Scv.toSymbol("signature") to Scv.toBytes(signature)

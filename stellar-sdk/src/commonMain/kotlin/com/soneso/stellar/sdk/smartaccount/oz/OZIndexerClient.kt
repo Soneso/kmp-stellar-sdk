@@ -319,12 +319,11 @@ class OZIndexerClient(
      * @param address The signer address to look up (G... or C... format).
      * @return A response containing the signer address, matching contracts, and count.
      * @throws ValidationException.InvalidAddress if the address format is invalid.
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun lookupByAddress(address: String): AddressLookupResponse {
-        if (!address.startsWith("G") && !address.startsWith("C")) {
-            throw ValidationException.invalidAddress("Signer address must start with 'G' or 'C', got: $address")
-        }
+        requireStellarAddress(address, "address")
 
         val url = "${indexerUrl.trimEnd('/')}/api/lookup/address/$address"
         return performRequest(url)
@@ -339,12 +338,11 @@ class OZIndexerClient(
      * @param contractId The contract ID to query (C... format).
      * @return A response containing the contract ID, summary, and all context rules.
      * @throws ValidationException.InvalidAddress if the contract ID format is invalid.
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun getContract(contractId: String): ContractDetailsResponse {
-        if (!contractId.startsWith("C")) {
-            throw ValidationException.invalidAddress("Contract ID must start with 'C', got: $contractId")
-        }
+        requireContractAddress(contractId, "contractId")
 
         val url = "${indexerUrl.trimEnd('/')}/api/contract/$contractId"
         return performRequest(url)

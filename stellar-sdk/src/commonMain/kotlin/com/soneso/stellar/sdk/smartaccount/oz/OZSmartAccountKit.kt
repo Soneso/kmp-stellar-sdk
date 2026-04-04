@@ -384,8 +384,8 @@ class OZSmartAccountKit private constructor(
                 )
             }
 
-            // Initialize indexer client if configured
-            val indexerClient = config.indexerUrl?.let { url ->
+            // Initialize indexer client if configured or if a default URL exists for the network
+            val indexerClient = config.effectiveIndexerUrl()?.let { url ->
                 OZIndexerClient(
                     indexerUrl = url,
                     timeoutMs = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
