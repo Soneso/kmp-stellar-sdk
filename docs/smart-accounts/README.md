@@ -270,6 +270,10 @@ val result = kit.policyManager.addPolicy(
 )
 ```
 
+### Multi-Signer Operations
+
+When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers with multiple signers. `multiSignerExecuteAndSubmit()` handles arbitrary contract calls (e.g., governance votes, multisig swaps) with multiple signers -- it routes the call through the smart account's `execute` entry point.
+
 ### Error Handling
 
 All operations throw typed exceptions from the `SmartAccountException` hierarchy:

@@ -589,6 +589,7 @@ class OZTransactionOperations internal constructor(
      * @param signedAuthEntries Auth entries with all collected signatures
      * @param signedTransaction The transaction with signed auth entries (pre-assembly)
      * @param simulation The re-simulation response for transaction assembly
+     * @param forceMethod Override the submission method. Null uses the default (relayer if configured, otherwise RPC).
      * @return TransactionResult with submission outcome
      * @throws SmartAccountException if submission fails
      */
@@ -596,7 +597,8 @@ class OZTransactionOperations internal constructor(
         hostFunction: HostFunctionXdr,
         signedAuthEntries: List<SorobanAuthorizationEntryXdr>,
         signedTransaction: Transaction,
-        simulation: SimulateTransactionResponse
+        simulation: SimulateTransactionResponse,
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val deployer = kit.getDeployer()
 
@@ -604,10 +606,7 @@ class OZTransactionOperations internal constructor(
         // This correctly applies resource fees, footprint, and soroban data from simulation.
         val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, simulation)
 
-        // submitMultiSignerTransaction intentionally uses relayerClient presence directly
-        // rather than getSubmissionMethod(), because multi-signer transfers do not support
-        // forceMethod override.
-        val useRelayer = kit.relayerClient != null
+        val useRelayer = getSubmissionMethod(forceMethod) == SubmissionMethod.RELAYER
 
         return submitOrRelay(
             transaction = finalTransaction,

@@ -9,16 +9,22 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Auth
+import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
+import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.TransactionBuilder
+import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
+import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
@@ -71,8 +77,9 @@ sealed class SelectedSigner {
 /**
  * Manager for multi-signature smart account operations.
  *
- * OZMultiSignerManager provides functionality for executing multi-signature token transfers
- * and collecting signatures from both passkey and external wallet signers.
+ * OZMultiSignerManager provides functionality for executing multi-signature operations —
+ * including token transfers and arbitrary contract calls — collecting signatures from both
+ * passkey and external wallet signers.
  *
  * Multi-signature transactions require collecting signatures from multiple signers
  * sequentially to enable fail-fast behavior on user cancellation.
@@ -134,6 +141,8 @@ class OZMultiSignerManager internal constructor(
      * @param amount The amount to transfer in XLM units
      * @param selectedSigners All signers that must sign, in collection order.
      *   An empty list means no signatures are collected (only valid for read-only simulation).
+     * @param forceMethod Optional override for the submission method. When null (default),
+     *   the SDK auto-detects whether to use the relayer or direct submission.
      * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
      *   When null (default), the SDK resolves the rule IDs automatically from the selected signers
      *   and available context rules. Provide a callback when automatic resolution fails due to
@@ -163,6 +172,7 @@ class OZMultiSignerManager internal constructor(
         recipient: String,
         amount: String,
         selectedSigners: List<SelectedSigner>,
+        forceMethod: SubmissionMethod? = null,
         resolveContextRuleIds: ResolveContextRuleIds? = null
     ): TransactionResult {
         // STEP 1: Validate inputs (same as single-signer transfer)
@@ -190,6 +200,148 @@ class OZMultiSignerManager internal constructor(
             )
         }
 
+        // STEP 2: Build host function for token transfer
+        val stroops = Util.amountToStroops(amount)
+
+        val fromAddress = Address(contractId).toSCAddress()
+        val toAddress = Address(recipient).toSCAddress()
+
+        val amountScVal = Util.stroopsToI128ScVal(stroops)
+
+        val functionArgs = listOf(
+            Scv.toAddress(fromAddress),
+            Scv.toAddress(toAddress),
+            amountScVal
+        )
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(tokenContract).toSCAddress(),
+            functionName = SCSymbolXdr("transfer"),
+            args = functionArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
+    }
+
+    // MARK: - Multi-Signer Execute
+
+    /**
+     * Executes an arbitrary contract function through the smart account's `execute` entry
+     * point with multi-signer authorization.
+     *
+     * This method is the multi-signer counterpart to `OZTransactionOperations.executeAndSubmit()`.
+     * Use it when a contract call must be authorized by more than one signer — for example, a
+     * governance vote, a multisig swap, or any operation gated by a multi-signer context rule.
+     *
+     * The method routes the call through the smart account contract's `execute(target, target_fn,
+     * target_args)` entry point and collects signatures from all [selectedSigners] before submission.
+     *
+     * This method takes `target`, `targetFn`, and `targetArgs` directly rather than accepting an
+     * `AssembledTransaction`. The KMP SDK constructs transactions from raw XDR without an
+     * AssembledTransaction wrapper; `targetArgs` must therefore be pre-encoded using [Scv] helpers.
+     *
+     * @param target The target contract address (C-address) to invoke via `execute`.
+     * @param targetFn The function name to call on the target contract.
+     * @param targetArgs Pre-encoded arguments for the target function. Use [Scv] helpers
+     *   (e.g., `Scv.toUint32`, `Scv.toBoolean`, `Scv.toAddress`) to encode each argument.
+     *   Defaults to an empty list for functions that take no arguments.
+     * @param selectedSigners All signers that must sign, in collection order.
+     *   - [SelectedSigner.Passkey] triggers one OS WebAuthn authentication prompt per entry.
+     *   - [SelectedSigner.Wallet] requests a delegated auth entry from the external wallet adapter.
+     *   The list must not be empty.
+     * @param forceMethod Optional override for the submission method. When null (default),
+     *   the SDK auto-detects whether to use the relayer or direct submission.
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     *   When null (default), the SDK resolves the rule IDs automatically from the selected signers
+     *   and available context rules.
+     * @return [TransactionResult] indicating success or failure with the transaction hash.
+     * @throws SmartAccountException if validation fails, signing fails, or submission fails.
+     *
+     * Example — multi-signer governance vote:
+     * ```kotlin
+     * val result = multiSigner.multiSignerExecuteAndSubmit(
+     *     target = "CDAO_CONTRACT_ADDRESS_HERE...",
+     *     targetFn = "vote",
+     *     targetArgs = listOf(
+     *         Scv.toUint32(proposalId),
+     *         Scv.toBoolean(true)
+     *     ),
+     *     selectedSigners = listOf(
+     *         SelectedSigner.Passkey(
+     *             credentialId = credIdStr,
+     *             credentialIdBytes = credIdBytes,
+     *             keyData = signer.keyData
+     *         ),
+     *         SelectedSigner.Wallet("GA7Q...")
+     *     )
+     * )
+     * if (result.success) {
+     *     println("Vote submitted: ${result.hash ?: ""}")
+     * }
+     * ```
+     */
+    suspend fun multiSignerExecuteAndSubmit(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        selectedSigners: List<SelectedSigner>,
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        val (_, contractId) = kit.requireConnected()
+
+        // Validate target address (must be C-address)
+        requireContractAddress(target, "target")
+
+        // Validate function name
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
+
+        // At least one signer is required
+        if (selectedSigners.isEmpty()) {
+            throw ValidationException.invalidInput(
+                "selectedSigners",
+                "At least one signer must be provided"
+            )
+        }
+
+        // Build host function for execute(target, target_fn, target_args) on the smart account
+        val functionArgs = listOf(
+            Scv.toAddress(Address(target).toSCAddress()),
+            Scv.toSymbol(targetFn),
+            Scv.toVec(targetArgs)
+        )
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(contractId).toSCAddress(),
+            functionName = SCSymbolXdr("execute"),
+            args = functionArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
+    }
+
+    // MARK: - Private Shared Signing Pipeline
+
+    /**
+     * Shared signing pipeline used by both [multiSignerTransfer] and [multiSignerExecuteAndSubmit].
+     *
+     * Handles wallet signer validation, simulation, auth entry signing, re-simulation, and
+     * submission. The caller is responsible for building the [hostFunction] before calling this.
+     */
+    private suspend fun submitWithMultipleSigners(
+        hostFunction: HostFunctionXdr,
+        selectedSigners: List<SelectedSigner>,
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        val (_, contractId) = kit.requireConnected()
+
         // Validate: wallet signers require an external wallet adapter
         val walletSigners = selectedSigners.filterIsInstance<SelectedSigner.Wallet>()
         if (walletSigners.isNotEmpty() && kit.externalWallet == null) {
@@ -214,28 +366,6 @@ class OZMultiSignerManager internal constructor(
                 )
             }
         }
-
-        // STEP 2: Build host function for token transfer
-        val stroops = Util.amountToStroops(amount)
-
-        val fromAddress = Address(contractId).toSCAddress()
-        val toAddress = Address(recipient).toSCAddress()
-
-        val amountScVal = Util.stroopsToI128ScVal(stroops)
-
-        val functionArgs = listOf(
-            Scv.toAddress(fromAddress),
-            Scv.toAddress(toAddress),
-            amountScVal
-        )
-
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = Address(tokenContract).toSCAddress(),
-            functionName = SCSymbolXdr("transfer"),
-            args = functionArgs
-        )
-
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
         // STEP 3: Simulate to get auth entries
         val deployer = kit.getDeployer()
@@ -267,6 +397,27 @@ class OZMultiSignerManager internal constructor(
         // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
         val contextRules = kit.contextRuleManager.listContextRules()
 
+        // Build the list of SmartAccountSigner objects from selectedSigners for rule resolution.
+        // Hoisted outside the auth entry loop since selectedSigners is invariant across entries.
+        val smartAccountSigners = selectedSigners.map { selectedSigner ->
+            when (selectedSigner) {
+                is SelectedSigner.Passkey -> {
+                    val keyData = selectedSigner.keyData
+                        ?: throw ValidationException.invalidInput(
+                            "selectedSigners",
+                            "keyData is required for passkey signers for rule resolution"
+                        )
+                    ExternalSigner(
+                        verifierAddress = kit.config.webauthnVerifierAddress,
+                        keyData = keyData
+                    ) as SmartAccountSigner
+                }
+                is SelectedSigner.Wallet -> {
+                    DelegatedSigner(address = selectedSigner.address) as SmartAccountSigner
+                }
+            }
+        }
+
         // STEP 6: Sign auth entries.
         // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow.
         // signAuthEntry is called once per passkey and the entry accumulates signatures across calls.
@@ -282,32 +433,28 @@ class OZMultiSignerManager internal constructor(
 
             val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
             if (entryAddress != contractId) {
-                signedAuthEntries.add(entry)
+                // The entry address doesn't match the smart account contract.
+                // Check whether it matches any SelectedSigner.Wallet address — if so, sign it
+                // directly using the external wallet adapter (mirrors TS SDK signWalletAddressAuthEntry).
+                val matchingWalletSigner = walletSigners.firstOrNull { it.address == entryAddress }
+                if (matchingWalletSigner != null) {
+                    val signedWalletEntry = signWalletAddressAuthEntry(
+                        entry = entry,
+                        walletSigner = matchingWalletSigner,
+                        expirationLedger = expirationLedger
+                    )
+                    signedAuthEntries.add(signedWalletEntry)
+                } else {
+                    throw TransactionException.signingFailed(
+                        "Unsupported auth entry for $entryAddress. " +
+                            "Add an external signer for that address or remove it from the transaction."
+                    )
+                }
                 continue
             }
 
             // Clone the entry and set the expiration ledger before signing
             var signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
-
-            // Build the list of SmartAccountSigner objects from selectedSigners for rule resolution.
-            val smartAccountSigners = selectedSigners.map { selectedSigner ->
-                when (selectedSigner) {
-                    is SelectedSigner.Passkey -> {
-                        val keyData = selectedSigner.keyData
-                            ?: throw ValidationException.invalidInput(
-                                "selectedSigners",
-                                "keyData is required for passkey signers for rule resolution"
-                            )
-                        ExternalSigner(
-                            verifierAddress = kit.config.webauthnVerifierAddress,
-                            keyData = keyData
-                        ) as SmartAccountSigner
-                    }
-                    is SelectedSigner.Wallet -> {
-                        DelegatedSigner(address = selectedSigner.address) as SmartAccountSigner
-                    }
-                }
-            }
 
             // Use caller-provided callback or resolve automatically.
             val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
@@ -507,11 +654,110 @@ class OZMultiSignerManager internal constructor(
             hostFunction = hostFunction,
             signedAuthEntries = signedAuthEntries,
             signedTransaction = signedTransaction,
-            simulation = resignedSimulation
+            simulation = resignedSimulation,
+            forceMethod = forceMethod
         )
     }
 
     // MARK: - Private Helpers
+
+    /**
+     * Signs an auth entry whose address matches a [SelectedSigner.Wallet] address directly,
+     * without going through the smart account's __check_auth indirection.
+     *
+     * This handles auth entries produced by arbitrary contract calls (via `execute`) that
+     * require direct authorization from the wallet signer's own address rather than from the
+     * smart account contract. Mirrors the TS SDK's `signWalletAddressAuthEntry()`.
+     *
+     * The signature is formatted as `Vec([Map({public_key: Bytes, signature: Bytes})])`,
+     * matching the standard Ed25519 authorization format expected by Soroban contracts.
+     *
+     * @param entry The auth entry to sign.
+     * @param walletSigner The wallet signer whose address matches the entry.
+     * @param expirationLedger The ledger at which the signature expires.
+     * @return The signed auth entry with expiration and signature set.
+     */
+    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    private suspend fun signWalletAddressAuthEntry(
+        entry: SorobanAuthorizationEntryXdr,
+        walletSigner: SelectedSigner.Wallet,
+        expirationLedger: UInt
+    ): SorobanAuthorizationEntryXdr {
+        val externalWallet = kit.externalWallet
+            ?: throw ValidationException.invalidInput(
+                "externalWallet",
+                "External wallet adapter is required for wallet signers"
+            )
+
+        // Clone and set the expiration ledger
+        val signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
+
+        val credentials = (signedEntry.credentials as? SorobanCredentialsXdr.Address)?.value
+            ?: throw TransactionException.signingFailed(
+                "Expected Address credentials on wallet auth entry for ${walletSigner.address}"
+            )
+
+        // Build HashIDPreimage::SorobanAuthorization from the cloned entry's credentials
+        val networkId = getSha256ForNetworkPassphrase(kit.config.networkPassphrase)
+        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
+            networkId = HashXdr(networkId),
+            nonce = credentials.nonce,
+            signatureExpirationLedger = credentials.signatureExpirationLedger,
+            invocation = signedEntry.rootInvocation
+        )
+        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
+
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val preimageXdr = kotlin.io.encoding.Base64.encode(writer.toByteArray())
+
+        // Request signature from the external wallet
+        val signResult = try {
+            externalWallet.signAuthEntry(
+                preimageXdr,
+                SignAuthEntryOptions(
+                    networkPassphrase = kit.config.networkPassphrase,
+                    address = walletSigner.address
+                )
+            )
+        } catch (e: Exception) {
+            throw TransactionException.signingFailed(
+                "External wallet signing failed for ${walletSigner.address}: ${e.message}", e
+            )
+        }
+
+        val signatureBytes = kotlin.io.encoding.Base64.decode(signResult.signedAuthEntry)
+
+        // Derive the raw 32-byte Ed25519 public key from the G-address
+        val publicKeyBytes = KeyPair.fromAccountId(walletSigner.address).getPublicKey()
+
+        // Build Vec([Map({public_key: Bytes, signature: Bytes})]) — standard Ed25519 auth format
+        val sigMap = linkedMapOf(
+            Scv.toSymbol("public_key") to Scv.toBytes(publicKeyBytes),
+            Scv.toSymbol("signature") to Scv.toBytes(signatureBytes)
+        )
+        val signatureScVal = Scv.toVec(listOf(Scv.toMap(sigMap)))
+
+        // Set the signature on the cloned entry's credentials
+        val updatedCredentials = SorobanAddressCredentialsXdr(
+            address = credentials.address,
+            nonce = credentials.nonce,
+            signatureExpirationLedger = credentials.signatureExpirationLedger,
+            signature = signatureScVal
+        )
+
+        return SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            rootInvocation = signedEntry.rootInvocation
+        )
+    }
+
+    /**
+     * Computes the SHA-256 hash of the network passphrase for use in preimage construction.
+     */
+    private suspend fun getSha256ForNetworkPassphrase(networkPassphrase: String): ByteArray {
+        return getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
+    }
 
     /**
      * Clones an auth entry via XDR round-trip and sets the signatureExpirationLedger.
@@ -543,4 +789,3 @@ class OZMultiSignerManager internal constructor(
         )
     }
 }
-

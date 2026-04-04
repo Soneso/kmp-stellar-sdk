@@ -1301,7 +1301,7 @@ ContextRuleType.CreateContract(wasmHashBytes)
 
 ### OZMultiSignerManager
 
-Manages multi-signature token transfers. The caller is responsible for discovering signers from context rules and passing complete signer data via `SelectedSigner`.
+Manages multi-signature operations including token transfers and arbitrary contract calls. The caller is responsible for discovering signers from context rules and passing complete signer data via `SelectedSigner`.
 
 ```kotlin
 val multiMgr = kit.multiSignerManager
@@ -1317,6 +1317,7 @@ suspend fun multiSignerTransfer(
     recipient: String,
     amount: String,
     selectedSigners: List<SelectedSigner>,
+    forceMethod: SubmissionMethod? = null,
     resolveContextRuleIds: ResolveContextRuleIds? = null
 ): TransactionResult
 ```
@@ -1330,6 +1331,7 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 - `recipient`: Recipient address (G-address or C-address)
 - `amount`: Amount in XLM
 - `selectedSigners`: All signers that must sign, in collection order
+- `forceMethod`: Optional override for the submission method. When null (default), the SDK auto-detects whether to use the relayer or direct submission.
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
 
 **Returns**: `TransactionResult`
@@ -1341,7 +1343,57 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 val result = kit.multiSignerManager.multiSignerTransfer(
     tokenContract = "CBCD...",
     recipient = "GBXYZ...",
-    amount = 50.0,
+    amount = "50",
+    selectedSigners = listOf(
+        SelectedSigner.Passkey(
+            credentialId = credIdStr,
+            credentialIdBytes = credIdBytes,
+            keyData = signer.keyData
+        ),
+        SelectedSigner.Wallet("GA7Q...")
+    )
+)
+```
+
+---
+
+#### multiSignerExecuteAndSubmit
+
+```kotlin
+suspend fun multiSignerExecuteAndSubmit(
+    target: String,
+    targetFn: String,
+    targetArgs: List<SCValXdr> = emptyList(),
+    selectedSigners: List<SelectedSigner>,
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Executes an arbitrary contract function through the smart account's `execute` entry point with multi-signer authorization. This is the multi-signer counterpart to `executeAndSubmit()`. Use it when a contract call must be authorized by more than one signer -- for example, a governance vote, a multisig swap, or any operation gated by a multi-signer context rule.
+
+The method routes the call through the smart account contract's `execute(target, target_fn, target_args)` entry point and collects signatures from all `selectedSigners` before submission.
+
+**Parameters**:
+- `target`: Target contract address (C-address)
+- `targetFn`: Function name to invoke on the target contract
+- `targetArgs`: Pre-encoded arguments as `SCValXdr` list. Use `Scv` helpers (e.g., `Scv.toUint32`, `Scv.toBoolean`, `Scv.toAddress`) to encode each argument. Defaults to empty.
+- `selectedSigners`: All signers that must sign, in collection order
+- `forceMethod`: Optional override for the submission method. When null (default), the SDK auto-detects whether to use the relayer or direct submission.
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
+
+**Returns**: `TransactionResult`
+
+**Example**:
+
+```kotlin
+val result = kit.multiSignerManager.multiSignerExecuteAndSubmit(
+    target = "CDAO_CONTRACT...",
+    targetFn = "vote",
+    targetArgs = listOf(
+        Scv.toUint32(proposalId),
+        Scv.toBoolean(true)
+    ),
     selectedSigners = listOf(
         SelectedSigner.Passkey(
             credentialId = credIdStr,

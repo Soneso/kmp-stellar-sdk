@@ -117,7 +117,7 @@ Both WebAuthnProvider and StorageAdapter are defined as interfaces, so developer
 
 **Policy enforcement**: Attach and remove policy contracts on context rules. Built-in policy types: simple threshold (M-of-N), weighted threshold (per-signer weights), spending limit (rolling window). Custom policy contracts supported via generic install parameters. The on-chain contract enforces limits: 15 context rules, 15 signers per rule, 5 policies per rule. The KMP SDK validates these before submission.
 
-**Multi-signer workflows**: Discover available signers across passkey and external wallet sources. Coordinate multi-party token transfers that require multiple signatures.
+**Multi-signer workflows**: Discover available signers across passkey and external wallet sources. Coordinate multi-party token transfers and arbitrary contract calls that require multiple signatures.
 
 **Credential management**: Store credential metadata locally. Sync with on-chain state to track deployment status.
 
