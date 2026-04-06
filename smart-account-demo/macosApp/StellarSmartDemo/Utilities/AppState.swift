@@ -39,6 +39,9 @@ final class AppState: ObservableObject {
     /// Whether a smart account wallet is currently connected.
     @Published var isConnected: Bool = false
 
+    /// Whether the connected wallet's contract has been deployed on-chain.
+    @Published var isDeployed: Bool = false
+
     /// The connected wallet's contract address (C-address), or `nil` when disconnected.
     @Published var contractId: String? = nil
 
@@ -84,6 +87,7 @@ final class AppState: ObservableObject {
     /// - Parameter bridge: The shared `MacOSBridge` instance.
     func sync(from bridge: MacOSBridge) {
         isConnected = bridge.isConnected()
+        isDeployed = bridge.isWalletDeployed()
         contractId = bridge.getContractId()
         credentialId = bridge.getCredentialId()
         xlmBalance = bridge.getBalance()

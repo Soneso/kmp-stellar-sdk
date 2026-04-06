@@ -35,6 +35,8 @@ import com.soneso.smartdemo.flows.refreshBalances
 import com.soneso.smartdemo.flows.registerPasskeySigner
 import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.flows.resolveAbsoluteLedger
+import com.soneso.smartdemo.flows.DeployAndProvisionResult
+import com.soneso.smartdemo.flows.deployPendingAndProvision
 import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.flows.updateContextRuleName
@@ -227,6 +229,23 @@ class MacOSBridge {
         credentialId: String,
     ): WalletConnectionResult =
         com.soneso.smartdemo.flows.retryPendingDeploy(credentialId)
+
+    /**
+     * Deploys a pending wallet and provisions it with XLM and DEMO tokens.
+     *
+     * Combines deployment with DEMO token minting and balance refresh. Both Compose
+     * and macOS Swift call this to get identical post-deploy provisioning.
+     *
+     * @param credentialId Base64URL-encoded credential ID of the pending deployment.
+     * @param onProgress Callback for progress messages shown in the UI.
+     * @return [DeployAndProvisionResult] with deployment status and balances.
+     */
+    @Throws(Exception::class)
+    suspend fun deployPendingAndProvision(
+        credentialId: String,
+        onProgress: (String) -> Unit = {}
+    ): DeployAndProvisionResult =
+        com.soneso.smartdemo.flows.deployPendingAndProvision(credentialId, onProgress)
 
     /**
      * Returns the list of pending (not yet deployed) credentials from local storage.
@@ -694,6 +713,9 @@ class MacOSBridge {
 
     /** Returns whether a wallet is currently connected. */
     fun isConnected(): Boolean = DemoState.isConnected
+
+    /** Returns whether the connected wallet's contract has been deployed on-chain. */
+    fun isWalletDeployed(): Boolean = DemoState.isDeployed
 
     /** Returns the connected wallet's contract address, or null if disconnected. */
     fun getContractId(): String? = DemoState.contractId

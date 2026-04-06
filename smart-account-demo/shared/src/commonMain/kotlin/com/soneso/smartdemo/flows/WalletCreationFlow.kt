@@ -11,7 +11,7 @@ package com.soneso.smartdemo.flows
  * 5. Deploy the DEMO token (if not already deployed) and mint 10,000 DEMO.
  *
  * Uses [OZSmartAccountKit.walletOperations.createWallet] as the main SDK entry point.
- * The DEMO token step is non-fatal — wallet creation succeeds even if token minting fails.
+ * The DEMO token step is non-fatal -- wallet creation succeeds even if token minting fails.
  */
 
 import com.soneso.smartdemo.config.DemoConfig
@@ -49,13 +49,17 @@ data class WalletCreationResult(
  * SDK workflow:
  * 1. Ensure the deployer account is funded (needed after testnet reset). The deployer
  *    signs the deployment transaction on behalf of the user via the relayer.
- * 2. Call [OZSmartAccountKit.walletOperations.createWallet] with autoSubmit=true and
- *    autoFund=true. This triggers the WebAuthn passkey registration on the device, then
- *    deploys the smart account contract to the Stellar network.
+ * 2. Call [OZSmartAccountKit.walletOperations.createWallet] with the specified autoSubmit
+ *    and autoFund settings. This triggers the WebAuthn passkey registration on the device,
+ *    then optionally deploys the smart account contract to the Stellar network.
  * 3. Update [DemoState] so all screens can see the new connection.
  * 4. Fetch the initial XLM balance via the Stellar Asset Contract (SAC).
  * 5. Deploy the DEMO token contract (idempotent) and mint 10,000 DEMO to the wallet.
- *    Failure here is non-fatal — the wallet was already created successfully.
+ *    Failure here is non-fatal -- the wallet was already created successfully.
+ *
+ * When autoSubmit=false, steps 4 and 5 are skipped because the contract is not yet on-chain.
+ * The credential is stored locally as "pending" and can be deployed later via
+ * [retryPendingDeploy].
  *
  * The passkey is created using the platform's WebAuthn provider:
  * - Android: Credential Manager
@@ -63,6 +67,7 @@ data class WalletCreationResult(
  * - Web: navigator.credentials
  *
  * @param username Display name shown in the biometric/passkey prompt.
+ * @param autoSubmit If true, deploy the contract immediately after passkey registration.
  * @param onProgress Callback for progress messages shown in the UI.
  * @return [WalletCreationResult] with the credential, contract address, and balances.
  * @throws Exception if wallet creation fails (passkey cancelled, network error, etc.).
@@ -87,7 +92,7 @@ suspend fun createWallet(
             server.getAccount(deployer.getAccountId())
         }
     } catch (e: Exception) {
-        // Deployer account does not exist — fund it via Friendbot and wait for network confirmation.
+        // Deployer account does not exist -- fund it via Friendbot and wait for network confirmation.
         ActivityLogState.info("Funding deployer account...")
         FriendBot.fundTestnetAccount(deployer.getAccountId())
         kotlinx.coroutines.delay(5000)
@@ -97,8 +102,8 @@ suspend fun createWallet(
 
     // Step 2: createWallet triggers the WebAuthn ceremony on the device (passkey registration),
     // then deploys the smart account contract using the deployer and native token contract.
-    // - autoSubmit=true: the SDK submits the transaction automatically.
-    // - autoFund=true: the relayer funds the new wallet with XLM after deployment.
+    // - autoSubmit: controls whether the SDK submits the transaction automatically.
+    // - autoFund: if true, the relayer funds the new wallet with XLM after deployment.
     // - nativeTokenContract: the XLM SAC address, used to top up the wallet via the relayer.
     val result = kit.walletOperations.createWallet(
         userName = username,
@@ -107,7 +112,11 @@ suspend fun createWallet(
         nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
     )
 
-    ActivityLogState.success("Wallet created successfully")
+    if (autoSubmit) {
+        ActivityLogState.success("Wallet created successfully")
+    } else {
+        ActivityLogState.success("Passkey registered (deployment pending)")
+    }
     ActivityLogState.info("Credential ID: ${result.credentialId}")
     ActivityLogState.info("Contract ID: ${result.contractId}")
 
@@ -118,43 +127,54 @@ suspend fun createWallet(
     // Step 3: Update DemoState so all screens know the wallet is connected.
     DemoState.setConnected(true, result.contractId, result.credentialId)
 
-    // Step 4: Fetch the initial XLM balance via the Stellar Asset Contract (SAC).
-    // The relayer funded the wallet with XLM; fetching it confirms the funding succeeded.
-    var xlmBalance = "0.0"
-    try {
-        xlmBalance = fetchXlmBalance(result.contractId)
-        DemoState.updateBalance(xlmBalance)
-        ActivityLogState.info("Balance: $xlmBalance XLM")
-    } catch (e: Exception) {
-        ActivityLogState.error("Failed to fetch balance: ${e.message}")
+    // Track whether the contract was actually deployed on-chain.
+    if (autoSubmit && result.transactionHash != null) {
+        DemoState.setDeployed(true)
+    } else {
+        DemoState.setDeployed(false)
     }
 
-    // Step 5: Deploy the DEMO token (idempotent) and mint 10,000 DEMO to the new wallet.
-    // The DEMO token is a demo-only Soroban token used to showcase token transfers.
-    // This step is non-fatal: if it fails, the wallet was already created and the user
-    // can still use XLM transfers. The error is logged but not re-thrown.
+    // Steps 4-5 only apply when the contract is deployed on-chain.
+    var xlmBalance = "0.0"
     var demoTokenBalance: String? = null
-    try {
-        onProgress("Deploying demo token...")
-        ActivityLogState.info("Deploying demo token...")
 
-        val tokenService = DemoTokenService(
-            DemoConfig.RPC_URL,
-            DemoConfig.NETWORK_PASSPHRASE
-        )
-        // ensureTokenAndMint deploys the contract if not already deployed, then mints to the wallet.
-        val tokenResult = tokenService.ensureTokenAndMint(result.contractId)
+    if (autoSubmit) {
+        // Step 4: Fetch the initial XLM balance via the Stellar Asset Contract (SAC).
+        // The relayer funded the wallet with XLM; fetching it confirms the funding succeeded.
+        try {
+            xlmBalance = fetchXlmBalance(result.contractId)
+            DemoState.updateBalance(xlmBalance)
+            ActivityLogState.info("Balance: $xlmBalance XLM")
+        } catch (e: Exception) {
+            ActivityLogState.error("Failed to fetch balance: ${e.message}")
+        }
 
-        // Store the DEMO token contract address for use by TransferScreen.
-        DemoState.updateDemoToken(tokenResult.tokenContractId)
+        // Step 5: Deploy the DEMO token (idempotent) and mint 10,000 DEMO to the new wallet.
+        // The DEMO token is a demo-only Soroban token used to showcase token transfers.
+        // This step is non-fatal: if it fails, the wallet was already created and the user
+        // can still use XLM transfers. The error is logged but not re-thrown.
+        try {
+            onProgress("Deploying demo token...")
+            ActivityLogState.info("Deploying demo token...")
 
-        val mintedFormatted = formatStroopsAsXlm(tokenResult.amountMinted)
-        demoTokenBalance = mintedFormatted
-        DemoState.updateDemoTokenBalance(mintedFormatted)
-        ActivityLogState.success("Minted 10,000 DEMO to wallet")
-    } catch (e: Exception) {
-        // DEMO token failure is logged but does not fail wallet creation.
-        ActivityLogState.error("Demo token minting failed: ${e.message}")
+            val tokenService = DemoTokenService(
+                DemoConfig.RPC_URL,
+                DemoConfig.NETWORK_PASSPHRASE
+            )
+            // ensureTokenAndMint deploys the contract if not already deployed, then mints to the wallet.
+            val tokenResult = tokenService.ensureTokenAndMint(result.contractId)
+
+            // Store the DEMO token contract address for use by TransferScreen.
+            DemoState.updateDemoToken(tokenResult.tokenContractId)
+
+            val mintedFormatted = formatStroopsAsXlm(tokenResult.amountMinted)
+            demoTokenBalance = mintedFormatted
+            DemoState.updateDemoTokenBalance(mintedFormatted)
+            ActivityLogState.success("Minted 10,000 DEMO to wallet")
+        } catch (e: Exception) {
+            // DEMO token failure is logged but does not fail wallet creation.
+            ActivityLogState.error("Demo token minting failed: ${e.message}")
+        }
     }
 
     return WalletCreationResult(

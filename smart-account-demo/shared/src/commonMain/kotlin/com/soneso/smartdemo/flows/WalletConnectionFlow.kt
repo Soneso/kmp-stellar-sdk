@@ -5,15 +5,15 @@ package com.soneso.smartdemo.flows
  *
  * Demonstrates three connection strategies provided by the Smart Account SDK:
  *
- * 1. Auto Connect — [OZWalletOperations.connectWallet] with prompt=true.
+ * 1. Auto Connect -- [OZWalletOperations.connectWallet] with prompt=true.
  *    Restores the last connected session if available. If no session exists,
  *    triggers passkey authentication and resolves the contract address via indexer.
  *
- * 2. Connect via Indexer — Two-step: [authenticatePasskey] then [connectWallet] with credentialId.
+ * 2. Connect via Indexer -- Two-step: [authenticatePasskey] then [connectWallet] with credentialId.
  *    Authenticates with a passkey, then uses the indexer service to look up the
  *    smart account contract associated with that credential.
  *
- * 3. Retry Pending Deploy — [connectWallet] with both credentialId and contractId.
+ * 3. Retry Pending Deploy -- [connectWallet] with both credentialId and contractId.
  *    Used when a previous wallet creation registered the passkey but the on-chain
  *    deployment did not complete. The credential is stored as "pending" until the
  *    contract is successfully deployed.
@@ -22,6 +22,9 @@ package com.soneso.smartdemo.flows
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.token.DemoTokenService
+import com.soneso.smartdemo.util.fetchXlmBalance
+import com.soneso.smartdemo.util.formatStroopsAsXlm
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.refreshAllBalances
 import com.soneso.stellar.sdk.smartaccount.oz.DeployPendingResult
@@ -41,6 +44,39 @@ data class WalletConnectionResult(
     val credentialId: String,
     val restoredFromSession: Boolean
 )
+
+/**
+ * Result of deploying a pending credential and provisioning it with tokens.
+ *
+ * @property success True if the deployment succeeded. When true, [xlmBalance] is populated.
+ * @property xlmBalance The XLM balance after deployment, formatted for display (e.g. "100.0").
+ * @property demoTokenBalance The DEMO balance after minting, or null if minting failed.
+ *   DEMO minting failure is non-fatal -- the wallet is still usable with XLM.
+ * @property error Error message if the deployment itself failed. Null on success.
+ */
+data class DeployAndProvisionResult(
+    val success: Boolean,
+    val xlmBalance: String,
+    val demoTokenBalance: String?,
+    val error: String?
+)
+
+/**
+ * Checks whether a smart account contract is actually deployed on-chain.
+ *
+ * Attempts to read the contract's context rules count. If the contract
+ * does not exist on-chain, this returns false (the RPC call fails).
+ * Used after session restore to detect undeployed wallets.
+ */
+private suspend fun isContractDeployed(): Boolean {
+    val kit = DemoState.kit ?: return false
+    return try {
+        kit.contextRuleManager.getContextRulesCount()
+        true
+    } catch (_: Exception) {
+        false
+    }
+}
 
 /**
  * Connects to an existing wallet using Auto Connect.
@@ -81,9 +117,18 @@ suspend fun quickConnect(): WalletConnectionResult? {
     // Update DemoState with the connected wallet's contract and credential.
     DemoState.setConnected(true, result.contractId, result.credentialId)
 
-    // Fetch both XLM and DEMO balances after connection so the main screen shows
-    // up-to-date values without requiring a manual refresh.
-    refreshAllBalances(result.contractId)
+    // Verify the contract is actually deployed on-chain. Session restore does not
+    // guarantee on-chain existence (e.g., createWallet with autoSubmit=false).
+    val deployed = isContractDeployed()
+    DemoState.setDeployed(deployed)
+
+    if (deployed) {
+        // Fetch both XLM and DEMO balances after connection so the main screen shows
+        // up-to-date values without requiring a manual refresh.
+        refreshAllBalances(result.contractId)
+    } else {
+        ActivityLogState.info("Wallet contract not yet deployed on-chain")
+    }
 
     return WalletConnectionResult(
         contractId = result.contractId,
@@ -134,6 +179,8 @@ suspend fun manualConnect(): WalletConnectionResult? {
 
     ActivityLogState.success("Connected to contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, result.credentialId)
+    // A successful indexer-based connection means the contract exists on-chain.
+    DemoState.setDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
@@ -150,7 +197,7 @@ suspend fun manualConnect(): WalletConnectionResult? {
  * creation) and authenticates with a passkey that is registered as a signer on the
  * contract (e.g., a recovery passkey added via a Default context rule).
  *
- * The indexer is not needed — the contract address is provided directly.
+ * The indexer is not needed -- the contract address is provided directly.
  *
  * @param contractAddress The C-address of the smart account contract.
  * @return [WalletConnectionResult] on success, or null if connection failed.
@@ -179,6 +226,8 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
 
     ActivityLogState.success("Connected to contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, result.credentialId)
+    // A successful address-based connection means the contract exists on-chain.
+    DemoState.setDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
@@ -229,12 +278,97 @@ suspend fun retryPendingDeploy(
 
     ActivityLogState.success("Successfully deployed contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, credentialId)
+    // Deployment succeeded -- the contract now exists on-chain.
+    DemoState.setDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
         contractId = result.contractId,
         credentialId = credentialId,
         restoredFromSession = false
+    )
+}
+
+/**
+ * Deploys a pending wallet and provisions it with XLM and DEMO tokens.
+ *
+ * Combines [retryPendingDeploy] with DEMO token minting and balance refresh into a
+ * single flow function. Both Compose and macOS Swift call sites use this to ensure
+ * identical post-deploy provisioning behavior.
+ *
+ * Steps:
+ * 1. Deploy the pending credential via [retryPendingDeploy].
+ * 2. Fetch the XLM balance and update [DemoState].
+ * 3. Deploy the DEMO token (idempotent) and mint 10,000 DEMO to the wallet.
+ * 4. Update [DemoState] with DEMO token contract and balance.
+ *
+ * DEMO minting is non-fatal: if it fails, the result still indicates success with the
+ * XLM balance. This matches the [createWallet] provisioning pattern.
+ *
+ * @param credentialId The Base64URL-encoded credential ID of the pending deployment.
+ * @param onProgress Callback for progress messages shown in the UI.
+ * @return [DeployAndProvisionResult] with deployment status and balances.
+ */
+suspend fun deployPendingAndProvision(
+    credentialId: String,
+    onProgress: (String) -> Unit = {}
+): DeployAndProvisionResult {
+    // Step 1: Deploy the pending credential. This handles the on-chain deployment,
+    // sets DemoState.isDeployed=true, and refreshes XLM + DEMO balances via
+    // refreshAllBalances. On failure, the exception propagates to the caller.
+    val connectionResult: WalletConnectionResult
+    try {
+        onProgress("Deploying contract...")
+        connectionResult = retryPendingDeploy(credentialId)
+    } catch (e: Exception) {
+        return DeployAndProvisionResult(
+            success = false,
+            xlmBalance = "0.0",
+            demoTokenBalance = null,
+            error = e.message ?: "Deployment failed"
+        )
+    }
+
+    // Step 2: Fetch the XLM balance. retryPendingDeploy already called
+    // refreshAllBalances which updates DemoState, but we need the value
+    // for the result. Fetch it explicitly so we return an accurate value.
+    var xlmBalance = "0.0"
+    try {
+        xlmBalance = fetchXlmBalance(connectionResult.contractId)
+        DemoState.updateBalance(xlmBalance)
+    } catch (_: Exception) {
+        // Balance fetch failure is non-fatal; DemoState was already updated
+        // by refreshAllBalances in retryPendingDeploy.
+        xlmBalance = DemoState.balance ?: "0.0"
+    }
+
+    // Step 3: Deploy the DEMO token (idempotent) and mint 10,000 DEMO.
+    // This is non-fatal -- wallet creation succeeds even if token minting fails.
+    var demoTokenBalance: String? = null
+    try {
+        onProgress("Deploying demo token...")
+        ActivityLogState.info("Deploying demo token...")
+
+        val tokenService = DemoTokenService(
+            DemoConfig.RPC_URL,
+            DemoConfig.NETWORK_PASSPHRASE
+        )
+        val tokenResult = tokenService.ensureTokenAndMint(connectionResult.contractId)
+
+        DemoState.updateDemoToken(tokenResult.tokenContractId)
+        val mintedFormatted = formatStroopsAsXlm(tokenResult.amountMinted)
+        demoTokenBalance = mintedFormatted
+        DemoState.updateDemoTokenBalance(mintedFormatted)
+        ActivityLogState.success("Minted 10,000 DEMO to wallet")
+    } catch (e: Exception) {
+        ActivityLogState.error("Demo token minting failed: ${e.message}")
+    }
+
+    return DeployAndProvisionResult(
+        success = true,
+        xlmBalance = xlmBalance,
+        demoTokenBalance = demoTokenBalance,
+        error = null
     )
 }
 

@@ -36,6 +36,10 @@ object DemoState {
     var isConnected: Boolean by mutableStateOf(false)
         private set
 
+    /** Whether the connected wallet's contract has been deployed on-chain. */
+    var isDeployed: Boolean by mutableStateOf(false)
+        private set
+
     /** The connected wallet's contract address (C-address), null if disconnected. */
     var contractId: String? by mutableStateOf(null)
         private set
@@ -76,7 +80,14 @@ object DemoState {
         isConnected = connected
         contractId = contract
         credentialId = credential
-        if (!connected) balance = null
+        if (!connected) {
+            balance = null
+            isDeployed = false
+        }
+    }
+
+    fun setDeployed(deployed: Boolean) {
+        isDeployed = deployed
     }
 
     fun updateBalance(newBalance: String?) {
@@ -97,6 +108,7 @@ object DemoState {
         webauthnProvider = null
         storage = null
         isConnected = false
+        isDeployed = false
         contractId = null
         credentialId = null
         balance = null

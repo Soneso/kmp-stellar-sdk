@@ -3,6 +3,10 @@ package com.soneso.smartdemo.ui.screens
 /**
  * Main screen: wallet status dashboard, navigation, and activity log.
  * SDK initialization and balance refresh are handled by MainScreenFlow.
+ *
+ * When a wallet is connected but not yet deployed on-chain, a warning card is shown
+ * with a "Deploy Now" button. Navigation buttons for features that require an on-chain
+ * contract (Transfer, Context Rules, Account Signers) are disabled until deployment.
  */
 
 import androidx.compose.foundation.clickable
@@ -14,12 +18,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.deployPendingAndProvision
 import com.soneso.smartdemo.flows.disconnect
 import com.soneso.smartdemo.flows.initializeKit
 import com.soneso.smartdemo.flows.refreshBalances
@@ -73,6 +81,10 @@ class MainScreen : Screen {
 
         // Controls the Refresh button loading state
         var isRefreshingBalance by remember { mutableStateOf(false) }
+
+        // Controls the Deploy Now button in the undeployed warning card
+        var isDeploying by remember { mutableStateOf(false) }
+        var deployErrorMessage by remember { mutableStateOf<String?>(null) }
 
         // Auto-initialize the SDK when platform providers become available
         LaunchedEffect(DemoState.webauthnProvider, DemoState.storage) {
@@ -206,46 +218,77 @@ class MainScreen : Screen {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Balances
-                            Text(
-                                text = "Balance:",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "${DemoState.balance ?: "Loading..."} XLM",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Text(
-                                        text = "${DemoState.demoTokenBalance ?: "0.0"} DEMO",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                OutlinedButton(
-                                    onClick = {
+                            // Undeployed warning card
+                            if (!DemoState.isDeployed) {
+                                UndeployedWarningCard(
+                                    isDeploying = isDeploying,
+                                    deployErrorMessage = deployErrorMessage,
+                                    onDeploy = {
+                                        val credId = DemoState.credentialId ?: return@UndeployedWarningCard
                                         scope.launch {
-                                            isRefreshingBalance = true
+                                            isDeploying = true
+                                            deployErrorMessage = null
                                             try {
-                                                refreshBalances()
+                                                val result = deployPendingAndProvision(credId)
+                                                if (!result.success) {
+                                                    deployErrorMessage = "Deployment failed: ${result.error}"
+                                                    ActivityLogState.error("Deployment failed: ${result.error}")
+                                                }
                                             } catch (e: Throwable) {
-                                                ActivityLogState.error("Failed to refresh balance: ${e.message}")
+                                                deployErrorMessage = "Deployment failed: ${e.message}"
+                                                ActivityLogState.error("Deployment failed: ${e.message}")
                                             } finally {
-                                                isRefreshingBalance = false
+                                                isDeploying = false
                                             }
                                         }
-                                    },
-                                    enabled = !isRefreshingBalance
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            // Balances (only show when deployed)
+                            if (DemoState.isDeployed) {
+                                Text(
+                                    text = "Balance:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(if (isRefreshingBalance) "Refreshing..." else "Refresh")
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${DemoState.balance ?: "Loading..."} XLM",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text(
+                                            text = "${DemoState.demoTokenBalance ?: "0.0"} DEMO",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                isRefreshingBalance = true
+                                                try {
+                                                    refreshBalances()
+                                                } catch (e: Throwable) {
+                                                    ActivityLogState.error("Failed to refresh balance: ${e.message}")
+                                                } finally {
+                                                    isRefreshingBalance = false
+                                                }
+                                            }
+                                        },
+                                        enabled = !isRefreshingBalance
+                                    ) {
+                                        Text(if (isRefreshingBalance) "Refreshing..." else "Refresh")
+                                    }
                                 }
                             }
 
@@ -259,20 +302,47 @@ class MainScreen : Screen {
                                 ) {
                                     Button(
                                         onClick = { navigator.push(ContextRulesScreen()) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        enabled = DemoState.isDeployed,
+                                        colors = if (DemoState.isDeployed) {
+                                            ButtonDefaults.buttonColors()
+                                        } else {
+                                            ButtonDefaults.buttonColors(
+                                                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
+                                        }
                                     ) {
                                         Text("Context Rules")
                                     }
                                     Button(
                                         onClick = { navigator.push(TransferScreen()) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        enabled = DemoState.isDeployed,
+                                        colors = if (DemoState.isDeployed) {
+                                            ButtonDefaults.buttonColors()
+                                        } else {
+                                            ButtonDefaults.buttonColors(
+                                                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
+                                        }
                                     ) {
                                         Text("Transfer")
                                     }
                                 }
                                 Button(
                                     onClick = { navigator.push(KnownSignersScreen()) },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = DemoState.isDeployed,
+                                    colors = if (DemoState.isDeployed) {
+                                        ButtonDefaults.buttonColors()
+                                    } else {
+                                        ButtonDefaults.buttonColors(
+                                            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                        )
+                                    }
                                 ) {
                                     Text("Account Signers")
                                 }
@@ -286,7 +356,8 @@ class MainScreen : Screen {
                                             }
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isDeploying
                                 ) {
                                     Text("Disconnect")
                                 }
@@ -342,6 +413,80 @@ class MainScreen : Screen {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun UndeployedWarningCard(
+        isDeploying: Boolean,
+        deployErrorMessage: String?,
+        onDeploy: () -> Unit
+    ) {
+        val warningContainerColor = Color(0xFFFFF3E0) // Orange 50
+        val warningContentColor = Color(0xFFE65100) // Orange 900
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = warningContainerColor
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Wallet Not Deployed",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = warningContentColor
+                )
+                Text(
+                    text = "Your passkey is registered but the smart account contract has not been deployed to the network. Deploy it to start using your wallet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = warningContentColor
+                )
+
+                if (deployErrorMessage != null) {
+                    Text(
+                        text = deployErrorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (isDeploying) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = warningContentColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Deploying contract...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = warningContentColor
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = onDeploy,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isDeploying,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = warningContentColor,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(if (isDeploying) "Deploying..." else "Deploy Now")
                 }
             }
         }
