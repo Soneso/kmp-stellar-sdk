@@ -32,6 +32,7 @@ struct WalletCreationScreen: View {
     // MARK: - State
 
     @State private var username: String = ""
+    @State private var autoSubmit: Bool = true
     @State private var isLoading: Bool = false
     @State private var progressMessage: String = ""
     @State private var errorMessage: String? = nil
@@ -57,6 +58,7 @@ struct WalletCreationScreen: View {
                 if let error = errorMessage { errorCard(message: error) }
                 if let info = infoMessage { infoCard(message: info) }
                 if isLoading { progressCard }
+                if createResult == nil && !isLoading { autoSubmitToggle }
                 if createResult == nil && !isLoading { createButton }
                 if let result = createResult { resultSection(result: result) }
                 Spacer().frame(height: 16)
@@ -139,6 +141,15 @@ struct WalletCreationScreen: View {
         .padding(16)
         .background(Material3Colors.surfaceVariant)
         .cornerRadius(8)
+    }
+
+    // MARK: - Auto-submit Toggle
+
+    private var autoSubmitToggle: some View {
+        Toggle("Auto-deploy after passkey registration", isOn: $autoSubmit)
+            .toggleStyle(.checkbox)
+            .font(.system(size: 13))
+            .foregroundStyle(Material3Colors.onSurface)
     }
 
     // MARK: - Create Button
@@ -247,6 +258,7 @@ struct WalletCreationScreen: View {
             do {
                 let result = try await bridgeWrapper.bridge.createWallet(
                     username: username,
+                    autoSubmit: autoSubmit,
                     onProgress: { progress in
                         // Kotlin (String) -> Unit callback runs on the coroutine dispatcher thread.
                         // DispatchQueue.main.async is used here because this is a synchronous callback,

@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
@@ -373,10 +374,10 @@ class OZMultiSignerManager internal constructor(
 
         val operation = InvokeHostFunctionOperation(hostFunction, emptyList())
         val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
@@ -634,10 +635,10 @@ class OZMultiSignerManager internal constructor(
             refetchedDeployerAccount,
             Network(kit.config.networkPassphrase)
         )
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val resignedSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)

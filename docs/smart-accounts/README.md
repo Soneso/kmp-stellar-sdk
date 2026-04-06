@@ -122,9 +122,10 @@ val wallet = kit.walletOperations.createWallet(
     nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 )
 
-// wallet.credentialId  -- Base64URL-encoded credential ID
-// wallet.contractId    -- Stellar C-address of the deployed contract
-// wallet.transactionHash -- deployment transaction hash
+// wallet.credentialId      -- Base64URL-encoded credential ID
+// wallet.contractId        -- Stellar C-address of the deployed contract
+// wallet.signedTransactionXdr -- signed deploy transaction envelope (always present)
+// wallet.transactionHash   -- deployment transaction hash (present when autoSubmit = true)
 
 // Step 4: Transfer tokens
 //
@@ -200,6 +201,18 @@ val connection = kit.walletOperations.connectWallet(
         contractId = "CABC..."
     )
 )
+```
+
+### Retrying Failed Deployments
+
+When `createWallet(autoSubmit = false)` is used, or if a deployment fails after the credential is created, use `deployPendingCredential()` to submit the deploy transaction later. The credential must exist in local storage. The `signedTransactionXdr` field on `CreateWalletResult` is always populated regardless of `autoSubmit`, so it can also be submitted externally.
+
+```kotlin
+val result = kit.walletOperations.deployPendingCredential(
+    credentialId = wallet.credentialId,
+    autoSubmit = true
+)
+println("Deployed: ${result.contractId}, tx: ${result.transactionHash}")
 ```
 
 ### Managing Signers

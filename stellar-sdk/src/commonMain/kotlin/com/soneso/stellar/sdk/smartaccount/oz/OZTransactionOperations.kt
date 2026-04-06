@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
@@ -393,10 +394,10 @@ class OZTransactionOperations internal constructor(
         val operation = InvokeHostFunctionOperation(hostFunction, auth)
 
         val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         // STEP 4: Simulate transaction
@@ -542,10 +543,10 @@ class OZTransactionOperations internal constructor(
         val refreshedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(refreshedDeployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         // STEP 10: Re-simulate with signed auth entries to get correct resource fees
@@ -762,10 +763,10 @@ class OZTransactionOperations internal constructor(
 
         // STEP 7: Simulate to get auth entries
         val transaction = TransactionBuilder(tempAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
@@ -794,10 +795,10 @@ class OZTransactionOperations internal constructor(
 
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
@@ -862,10 +863,10 @@ class OZTransactionOperations internal constructor(
         val operation = InvokeHostFunctionOperation(hostFunction, emptyList())
 
         val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)

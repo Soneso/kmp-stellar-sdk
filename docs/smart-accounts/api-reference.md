@@ -350,7 +350,8 @@ suspend fun createWallet(
     userName: String = "Smart Account User",
     autoSubmit: Boolean = false,
     autoFund: Boolean = false,
-    nativeTokenContract: String? = null
+    nativeTokenContract: String? = null,
+    forceMethod: SubmissionMethod? = null
 ): CreateWalletResult
 ```
 
@@ -361,8 +362,9 @@ Creates a new smart account wallet with WebAuthn passkey authentication.
 - `autoSubmit`: Whether to automatically submit the deploy transaction. When a relayer is configured, the transaction is submitted via the relayer which sponsors fees on behalf of the deployer. Without a relayer, the deployer account must be funded to pay fees directly.
 - `autoFund`: Whether to automatically fund the wallet after deployment (testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
+- `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
 
-**Returns**: `CreateWalletResult` containing credential ID, contract address, optional transaction hash, and nickname
+**Returns**: `CreateWalletResult` containing credential ID, contract address, signed transaction XDR, optional transaction hash, and nickname
 
 **Throws**:
 - `WebAuthnException.NotSupported`: No WebAuthn provider configured
@@ -487,6 +489,56 @@ Use this for credential discovery via indexer or pre-authentication before contr
 
 ---
 
+#### deployPendingCredential
+
+```kotlin
+suspend fun deployPendingCredential(
+    credentialId: String,
+    autoSubmit: Boolean = true,
+    autoFund: Boolean = false,
+    nativeTokenContract: String? = null,
+    forceMethod: SubmissionMethod? = null
+): DeployPendingResult
+```
+
+Deploys a wallet from a previously created pending credential. Use this to retry a failed deployment or to submit a wallet that was created with `createWallet(autoSubmit = false)`. The credential must exist in local storage with a valid public key and contract ID.
+
+After successful deployment, the kit is set to the connected state and ready for use.
+
+**Parameters**:
+- `credentialId`: Base64URL-encoded credential ID of the pending credential
+- `autoSubmit`: Whether to submit the deploy transaction (default: true)
+- `autoFund`: Whether to fund the wallet after deployment via Friendbot (default: false, testnet only)
+- `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
+- `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
+
+**Returns**: `DeployPendingResult` containing contract address, signed transaction XDR, and optional transaction hash
+
+**Throws**:
+- `CredentialException`: Credential not found in storage or missing required fields
+- `ValidationException`: `autoFund` is true but `nativeTokenContract` is null
+- `TransactionException`: Building, simulating, or submitting the deploy transaction failed
+
+**Example**:
+
+```kotlin
+// Retry a failed deployment
+val result = walletOps.deployPendingCredential(
+    credentialId = "abc123...",
+    autoSubmit = true
+)
+println("Deployed: ${result.contractId}, tx: ${result.transactionHash}")
+
+// Build signed XDR without submitting (for external submission)
+val deferred = walletOps.deployPendingCredential(
+    credentialId = "abc123...",
+    autoSubmit = false
+)
+println("Signed XDR: ${deferred.signedTransactionXdr}")
+```
+
+---
+
 ### Result Types
 
 #### CreateWalletResult
@@ -495,6 +547,7 @@ data class CreateWalletResult(
     val credentialId: String,
     val contractId: String,
     val publicKey: ByteArray,
+    val signedTransactionXdr: String,
     val transactionHash: String? = null,
     val nickname: String? = null
 )
@@ -504,6 +557,7 @@ data class CreateWalletResult(
 - `credentialId`: Base64URL-encoded credential ID
 - `contractId`: Smart account contract address (C-address)
 - `publicKey`: Uncompressed secp256r1 public key (65 bytes)
+- `signedTransactionXdr`: Base64-encoded signed deploy transaction envelope (always present, regardless of `autoSubmit`)
 - `transactionHash`: Transaction hash if auto-submitted, null otherwise
 - `nickname`: Display name from the `userName` parameter, stored with the credential
 
@@ -520,6 +574,20 @@ data class ConnectWalletResult(
 - `credentialId`: Base64URL-encoded credential ID
 - `contractId`: Smart account contract address
 - `restoredFromSession`: True if reconnected from saved session, false if new authentication
+
+#### DeployPendingResult
+```kotlin
+data class DeployPendingResult(
+    val contractId: String,
+    val signedTransactionXdr: String,
+    val transactionHash: String? = null
+)
+```
+
+**Fields**:
+- `contractId`: Smart account contract address (C-address)
+- `signedTransactionXdr`: Base64-encoded signed deploy transaction envelope
+- `transactionHash`: Transaction hash if auto-submitted, null when `autoSubmit` is false
 
 #### AddPasskeySignerResult
 ```kotlin

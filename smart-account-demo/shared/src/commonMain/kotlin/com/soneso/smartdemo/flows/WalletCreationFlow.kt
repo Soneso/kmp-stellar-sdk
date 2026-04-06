@@ -70,6 +70,7 @@ data class WalletCreationResult(
  */
 suspend fun createWallet(
     username: String,
+    autoSubmit: Boolean = true,
     onProgress: (String) -> Unit
 ): WalletCreationResult {
     val kit = DemoState.kit
@@ -101,8 +102,8 @@ suspend fun createWallet(
     // - nativeTokenContract: the XLM SAC address, used to top up the wallet via the relayer.
     val result = kit.walletOperations.createWallet(
         userName = username,
-        autoSubmit = true,
-        autoFund = true,
+        autoSubmit = autoSubmit,
+        autoFund = autoSubmit,
         nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
     )
 

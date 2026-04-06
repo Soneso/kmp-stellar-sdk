@@ -165,8 +165,9 @@ class MacOSBridge {
     @Throws(Exception::class)
     suspend fun createWallet(
         username: String,
+        autoSubmit: Boolean = true,
         onProgress: (String) -> Unit
-    ): WalletCreationResult = com.soneso.smartdemo.flows.createWallet(username, onProgress)
+    ): WalletCreationResult = com.soneso.smartdemo.flows.createWallet(username, autoSubmit, onProgress)
 
     // =========================================================================
     // MARK: - Wallet Connection
@@ -206,17 +207,18 @@ class MacOSBridge {
     /**
      * Retries a pending wallet deployment for a previously registered passkey.
      *
+     * The SDK looks up the contract ID and public key from stored credential data.
+     *
      * @param credentialId Base64URL-encoded credential ID of the pending deployment.
-     * @param contractId C-address of the contract to deploy or connect to, if known.
-     * @return [WalletConnectionResult] on success, null if deployment cannot be completed.
-     * @throws Exception if the network call fails.
+     * @return [WalletConnectionResult] on success.
+     * @throws Exception if the credential is not found, missing required fields, or the
+     *   deploy transaction fails.
      */
     @Throws(Exception::class)
     suspend fun retryPendingDeploy(
         credentialId: String,
-        contractId: String?
-    ): WalletConnectionResult? =
-        com.soneso.smartdemo.flows.retryPendingDeploy(credentialId, contractId)
+    ): WalletConnectionResult =
+        com.soneso.smartdemo.flows.retryPendingDeploy(credentialId)
 
     /**
      * Returns the list of pending (not yet deployed) credentials from local storage.

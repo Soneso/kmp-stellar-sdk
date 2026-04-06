@@ -19,10 +19,12 @@ package com.soneso.smartdemo.flows
  *    contract is successfully deployed.
  */
 
+import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.stellar.sdk.smartaccount.oz.DeployPendingResult
 import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 
@@ -195,50 +197,44 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
  * so the user can retry the deployment later.
  *
  * SDK workflow:
- * 1. Call [OZSmartAccountKit.walletOperations.connectWallet] with both credentialId and
- *    contractId. The SDK attempts to deploy or reconnect to the contract at the given address.
+ * 1. Call [OZWalletOperations.deployPendingCredential] with the credential ID.
+ *    The SDK looks up the stored credential (including its contract ID and public key)
+ *    and submits the deploy transaction.
  * 2. On success, update [DemoState] and refresh balances.
  *
  * After this call succeeds, the caller should call [loadPendingCredentials] again to
- * refresh the pending list — the flow does not auto-refresh it.
+ * refresh the pending list -- the flow does not auto-refresh it.
  *
  * @param credentialId The Base64URL-encoded credential ID of the pending deployment.
- * @param contractId The C-address of the contract that was not yet fully deployed, if known.
- * @return [WalletConnectionResult] on success, or null if the deployment cannot be completed.
- * @throws Exception if the network call fails.
+ * @return [WalletConnectionResult] on success.
+ * @throws Exception if the credential is not found, missing required fields, or the
+ *   deploy transaction fails.
  */
 suspend fun retryPendingDeploy(
     credentialId: String,
-    contractId: String?
-): WalletConnectionResult? {
+): WalletConnectionResult {
     val kit = DemoState.kit
         ?: throw IllegalStateException("SDK not initialized")
 
     ActivityLogState.info("Retrying deployment for ${credentialId.take(16)}...")
 
-    // Passing both credentialId and contractId lets the SDK skip the indexer lookup
-    // and go directly to deploying or connecting to the known contract address.
-    // Throws WalletException.NotFound if the credential cannot be resolved.
-    val result = kit.walletOperations.connectWallet(
-        OZWalletOperations.ConnectWalletOptions(
-            credentialId = credentialId,
-            contractId = contractId
-        )
+    // deployPendingCredential looks up the credential (with its contractId and publicKey)
+    // from storage and submits the deploy transaction. autoFund ensures the wallet gets
+    // funded with XLM after deployment, matching the createWallet flow.
+    val result: DeployPendingResult = kit.walletOperations.deployPendingCredential(
+        credentialId = credentialId,
+        autoFund = true,
+        nativeTokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
     )
 
-    if (result == null) {
-        ActivityLogState.error("Failed to connect with pending credential")
-        return null
-    }
-
-    ActivityLogState.success("Successfully deployed contract")
-    DemoState.setConnected(true, result.contractId, result.credentialId)
+    ActivityLogState.success("Successfully deployed contract: ${result.contractId}")
+    DemoState.setConnected(true, result.contractId, credentialId)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
         contractId = result.contractId,
-        credentialId = result.credentialId,
-        restoredFromSession = result.restoredFromSession
+        credentialId = credentialId,
+        restoredFromSession = false
     )
 }
 

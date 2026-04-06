@@ -507,18 +507,13 @@ struct WalletConnectionScreen: View {
         Task {
             do {
                 let result = try await bridgeWrapper.bridge.retryPendingDeploy(
-                    credentialId: credential.credentialId,
-                    contractId: credential.contractId
+                    credentialId: credential.credentialId
                 )
                 await MainActor.run {
                     activeSection = nil
-                    if result != nil {
-                        appState.sync(from: bridgeWrapper.bridge)
-                        toastManager.show("Connected successfully")
-                        dismiss()
-                    } else {
-                        toastManager.show("Retry failed: could not deploy contract")
-                    }
+                    appState.sync(from: bridgeWrapper.bridge)
+                    toastManager.show("Connected successfully")
+                    dismiss()
                 }
             } catch {
                 await MainActor.run {

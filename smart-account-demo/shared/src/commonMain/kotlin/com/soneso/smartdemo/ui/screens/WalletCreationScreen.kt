@@ -7,6 +7,8 @@ package com.soneso.smartdemo.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +71,7 @@ class WalletCreationScreen : Screen {
 
         // Form input state
         var username by remember { mutableStateOf("") }
+        var autoSubmit by remember { mutableStateOf(true) }
 
         // Loading / result state
         var isLoading by remember { mutableStateOf(false) }
@@ -199,6 +202,24 @@ class WalletCreationScreen : Screen {
                     }
                 }
 
+                // Auto-submit checkbox
+                if (createResult == null && !isLoading) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = autoSubmit,
+                            onCheckedChange = { autoSubmit = it }
+                        )
+                        Text(
+                            text = "Auto-deploy after passkey registration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.clickable { autoSubmit = !autoSubmit }
+                        )
+                    }
+                }
+
                 // Create Wallet Button
                 if (createResult == null && !isLoading) {
                     Button(
@@ -209,7 +230,7 @@ class WalletCreationScreen : Screen {
                                 infoMessage = null
 
                                 try {
-                                    val result = createWallet(username) { progressMessage = it }
+                                    val result = createWallet(username, autoSubmit) { progressMessage = it }
                                     createResult = result
                                 } catch (e: Throwable) {
                                     val message = e.message ?: "Unknown error"

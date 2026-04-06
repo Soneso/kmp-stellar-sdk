@@ -477,14 +477,9 @@ class WalletConnectionScreen : Screen {
                                                             try {
                                                                 val result = retryPendingDeploy(
                                                                     credential.credentialId,
-                                                                    credential.contractId
                                                                 )
-                                                                if (result != null) {
-                                                                    refreshPendingList()
-                                                                    navigator.pop()
-                                                                } else {
-                                                                    ActivityLogState.error("Retry failed: could not deploy contract")
-                                                                }
+                                                                refreshPendingList()
+                                                                navigator.pop()
                                                             } catch (e: Throwable) {
                                                                 ActivityLogState.error("Retry failed: ${e.message}")
                                                             } finally {
@@ -495,7 +490,17 @@ class WalletConnectionScreen : Screen {
                                                     modifier = Modifier.weight(1f),
                                                     enabled = !pendingActionInProgress
                                                 ) {
-                                                    Text("Retry Deploy")
+                                                    if (pendingActionInProgress) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Deploying...")
+                                                    } else {
+                                                        Text("Retry Deploy")
+                                                    }
                                                 }
 
                                                 OutlinedButton(
