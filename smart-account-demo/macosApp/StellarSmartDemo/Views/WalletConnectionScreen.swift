@@ -26,13 +26,15 @@ private enum ConnectionSection {
 /// Screen that provides four paths for connecting a smart account wallet.
 ///
 /// Mirrors the Compose `WalletConnectionScreen` exactly:
-/// - **Auto Connect** — always visible; restores the last session or authenticates with a passkey
+/// - **Auto Connect** — restores the last session or authenticates with a passkey
 ///   and resolves the contract address via the indexer.
-/// - **Connect via Indexer** — collapsible; authenticates with a passkey and resolves the
+/// - **Connect via Indexer** — authenticates with a passkey and resolves the
 ///   associated contract via the indexer.
-/// - **Connect with Address** — collapsible; connects directly to a known contract address.
-/// - **Pending Deployments** — collapsible; visible only when there are locally stored credentials
+/// - **Connect with Address** — connects directly to a known contract address.
+/// - **Pending Deployments** — visible only when there are locally stored credentials
 ///   whose contract deployment may not have completed.
+///
+/// All sections are always expanded with descriptions visible.
 ///
 /// All async operations call the corresponding `MacOSBridge` suspend functions via `Task`.
 /// A `activeSection` state variable guards against concurrent connection attempts.
@@ -65,14 +67,7 @@ struct WalletConnectionScreen: View {
     /// Locally stored credentials with a pending deployment status.
     @State private var pendingCredentials: [StoredCredential] = []
 
-    /// Expand/collapse state for the Connect via Indexer section.
-    @State private var indexerExpanded: Bool = false
-
-    /// Expand/collapse state for the Connect with Address section.
-    @State private var addressExpanded: Bool = false
-
-    /// Expand/collapse state for the Pending Deployments section.
-    @State private var pendingExpanded: Bool = false
+    // All sections are always expanded (no collapse/expand toggle).
 
     // MARK: - Derived state
 
@@ -155,51 +150,34 @@ struct WalletConnectionScreen: View {
     // MARK: - Connect via Indexer section
 
     private var indexerSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row — always visible
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { indexerExpanded.toggle() } }) {
-                HStack {
-                    Text("Connect via Indexer")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Material3Colors.onSurface)
-                    Spacer()
-                    Image(systemName: indexerExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Material3Colors.onSurfaceVariant)
-                }
-            }
-            .buttonStyle(.plain)
-            .padding(16)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Connect via Indexer")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Material3Colors.onSurface)
 
-            // Expandable content
-            if indexerExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(
-                        "Authenticates with a passkey, then uses the indexer service " +
-                        "to look up the smart account contract associated with that credential."
-                    )
-                    .font(.system(size: 13))
-                    .foregroundColor(Material3Colors.onSurfaceVariant)
+            Text(
+                "Authenticates with a passkey, then uses the indexer service " +
+                "to look up the smart account contract associated with that credential."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(Material3Colors.onSurfaceVariant)
 
-                    Spacer().frame(height: 4)
+            Spacer().frame(height: 4)
 
-                    LoadingButton(
-                        action: performIndexerConnect,
-                        isLoading: isIndexerLoading,
-                        isEnabled: isIdle,
-                        text: "Connect via Indexer",
-                        loadingText: "Connecting...",
-                        style: .filled
-                    )
+            LoadingButton(
+                action: performIndexerConnect,
+                isLoading: isIndexerLoading,
+                isEnabled: isIdle,
+                text: "Connect via Indexer",
+                loadingText: "Connecting...",
+                style: .filled
+            )
 
-                    if let error = indexerError {
-                        inlineError(error)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+            if let error = indexerError {
+                inlineError(error)
             }
         }
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Material3Colors.surfaceVariant)
         .cornerRadius(8)
@@ -213,68 +191,51 @@ struct WalletConnectionScreen: View {
     // MARK: - Connect with Address section
 
     private var addressSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row — always visible
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { addressExpanded.toggle() } }) {
-                HStack {
-                    Text("Connect with Address (Recovery)")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Material3Colors.onSurface)
-                    Spacer()
-                    Image(systemName: addressExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Material3Colors.onSurfaceVariant)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Connect with Address")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Material3Colors.onSurface)
+
+            Text(
+                "Connect to a smart account using a known contract address. " +
+                "Authenticates with a passkey that is registered as a signer on the contract. " +
+                "Use this to reconnect with a recovery signer."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(Material3Colors.onSurfaceVariant)
+
+            Spacer().frame(height: 4)
+
+            ValidationTextField(
+                label: "Contract Address",
+                text: $contractAddressInput,
+                error: contractAddressInput.trimmingCharacters(in: .whitespaces).isEmpty
+                    ? nil
+                    : (isAddressValid ? nil : "Must be a C-address (56 characters starting with C)"),
+                placeholder: "C...",
+                isMonospace: true,
+                isEnabled: activeSection == nil
+            )
+            .onChange(of: contractAddressInput) { _ in
+                addressError = nil
             }
-            .buttonStyle(.plain)
-            .padding(16)
 
-            // Expandable content
-            if addressExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(
-                        "Connect to a smart account using a known contract address. " +
-                        "Authenticates with a passkey that is registered as a signer on the contract. " +
-                        "Use this to reconnect with a recovery signer."
-                    )
-                    .font(.system(size: 13))
-                    .foregroundColor(Material3Colors.onSurfaceVariant)
+            Spacer().frame(height: 4)
 
-                    Spacer().frame(height: 4)
+            LoadingButton(
+                action: performAddressConnect,
+                isLoading: isAddressLoading,
+                isEnabled: isIdle && isAddressValid,
+                text: "Connect",
+                loadingText: "Connecting...",
+                style: .filled
+            )
 
-                    ValidationTextField(
-                        label: "Contract Address",
-                        text: $contractAddressInput,
-                        error: contractAddressInput.trimmingCharacters(in: .whitespaces).isEmpty
-                            ? nil
-                            : (isAddressValid ? nil : "Must be a C-address (56 characters starting with C)"),
-                        placeholder: "C...",
-                        isMonospace: true,
-                        isEnabled: activeSection == nil
-                    )
-                    .onChange(of: contractAddressInput) { _ in
-                        addressError = nil
-                    }
-
-                    Spacer().frame(height: 4)
-
-                    LoadingButton(
-                        action: performAddressConnect,
-                        isLoading: isAddressLoading,
-                        isEnabled: isIdle && isAddressValid,
-                        text: "Connect",
-                        loadingText: "Connecting...",
-                        style: .filled
-                    )
-
-                    if let error = addressError {
-                        inlineError(error)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+            if let error = addressError {
+                inlineError(error)
             }
         }
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Material3Colors.surfaceVariant)
         .cornerRadius(8)
@@ -288,39 +249,25 @@ struct WalletConnectionScreen: View {
     // MARK: - Pending Deployments section
 
     private var pendingDeploymentsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row — always visible
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { pendingExpanded.toggle() } }) {
-                HStack {
-                    Text("Pending Deployments (\(pendingCredentials.count))")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Material3Colors.onErrorContainer)
-                    Spacer()
-                    Image(systemName: pendingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Material3Colors.onErrorContainer)
-                }
-            }
-            .buttonStyle(.plain)
-            .padding(16)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Pending Deployments (\(pendingCredentials.count))")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Material3Colors.onErrorContainer)
 
-            // Expandable content
-            if pendingExpanded {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(
-                        "These credentials were registered but contract deployment may not have completed."
-                    )
-                    .font(.system(size: 13))
-                    .foregroundColor(Material3Colors.onErrorContainer)
+            Text(
+                "These credentials were registered but contract deployment " +
+                "may not have completed. Retry the deployment or delete the credential."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(Material3Colors.onErrorContainer)
 
-                    ForEach(pendingCredentials, id: \.credentialId) { credential in
-                        pendingCredentialCard(credential)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+            Spacer().frame(height: 4)
+
+            ForEach(pendingCredentials, id: \.credentialId) { credential in
+                pendingCredentialCard(credential)
             }
         }
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Material3Colors.errorContainer)
         .cornerRadius(8)
