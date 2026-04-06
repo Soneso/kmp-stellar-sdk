@@ -953,11 +953,12 @@ enum class CredentialDeploymentStatus {
 
 ---
 
+
 ## Signers and Policies
 
 ### OZSignerManager
 
-Manages signers for context rules.
+Manages signers for context rules. All methods accept an optional `selectedSigners` parameter for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey. When non-empty, routes through the multi-signer pipeline.
 
 ```kotlin
 val signerMgr = kit.signerManager
@@ -970,7 +971,9 @@ val signerMgr = kit.signerManager
 ```kotlin
 suspend fun addNewPasskeySigner(
     contextRuleId: UInt,
-    userName: String
+    userName: String,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): AddPasskeySignerResult
 ```
 
@@ -981,6 +984,8 @@ Internally calls the WebAuthn provider's `register()` method, stores the credent
 **Parameters**:
 - `contextRuleId`: Context rule ID (e.g., 0 for Default)
 - `userName`: Display name shown during the WebAuthn registration ceremony
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `AddPasskeySignerResult` with the new credential ID, public key, and transaction result
 
@@ -1011,7 +1016,9 @@ println("Transaction hash: ${result.transactionResult.hash}")
 suspend fun addPasskey(
     contextRuleId: UInt,
     publicKey: ByteArray,
-    credentialId: ByteArray
+    credentialId: ByteArray,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1021,6 +1028,8 @@ Low-level method that adds a pre-registered WebAuthn passkey signer to a context
 - `contextRuleId`: Context rule ID (e.g., 0 for Default)
 - `publicKey`: Uncompressed secp256r1 public key (65 bytes starting with 0x04)
 - `credentialId`: WebAuthn credential ID
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult` indicating success or failure
 
@@ -1033,7 +1042,9 @@ Low-level method that adds a pre-registered WebAuthn passkey signer to a context
 ```kotlin
 suspend fun addDelegated(
     contextRuleId: UInt,
-    address: String
+    address: String,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1042,8 +1053,30 @@ Adds a delegated signer (account or contract) to a context rule.
 **Parameters**:
 - `contextRuleId`: Context rule ID
 - `address`: Stellar address (G for accounts, C for contracts)
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
+
+**Example**:
+
+```kotlin
+// Single-signer (default)
+val result = kit.signerManager.addDelegated(
+    contextRuleId = 0u,
+    address = "GA7Q..."
+)
+
+// Multi-signer
+val result = kit.signerManager.addDelegated(
+    contextRuleId = 0u,
+    address = "GA7Q...",
+    selectedSigners = listOf(
+        SelectedSigner.Passkey(credentialId = credIdStr, credentialIdBytes = credIdBytes, keyData = keyData),
+        SelectedSigner.Wallet("GA7Q...")
+    )
+)
+```
 
 ---
 
@@ -1053,7 +1086,9 @@ Adds a delegated signer (account or contract) to a context rule.
 suspend fun addEd25519(
     contextRuleId: UInt,
     verifierAddress: String,
-    publicKey: ByteArray
+    publicKey: ByteArray,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1063,6 +1098,8 @@ Adds an Ed25519 signer to a context rule.
 - `contextRuleId`: Context rule ID
 - `verifierAddress`: Ed25519 verifier contract address (C-address)
 - `publicKey`: Ed25519 public key (32 bytes)
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1073,7 +1110,9 @@ Adds an Ed25519 signer to a context rule.
 ```kotlin
 suspend fun removeSigner(
     contextRuleId: UInt,
-    signerId: UInt
+    signerId: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1084,6 +1123,8 @@ Removes a signer from a context rule by its on-chain signer ID.
 **Parameters**:
 - `contextRuleId`: Context rule ID
 - `signerId`: The on-chain ID of the signer to remove
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1093,7 +1134,7 @@ Removes a signer from a context rule by its on-chain signer ID.
 
 ### OZPolicyManager
 
-Manages policies for context rules. Provides both a generic `addPolicy` method for arbitrary policy contracts and convenience methods (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) for common policy types.
+Manages policies for context rules. Provides both a generic `addPolicy` method for arbitrary policy contracts and convenience methods (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) for common policy types. All methods accept an optional `selectedSigners` parameter for multi-signer authorization.
 
 ```kotlin
 val policyMgr = kit.policyManager
@@ -1107,7 +1148,9 @@ val policyMgr = kit.policyManager
 suspend fun addPolicy(
     contextRuleId: UInt,
     policyAddress: String,
-    installParams: SCValXdr
+    installParams: SCValXdr,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1120,6 +1163,8 @@ Generic method for adding any policy contract to a context rule. The convenience
 | `contextRuleId` | `UInt` | Context rule ID (e.g., 0 for Default) |
 | `policyAddress` | `String` | C-address of the policy contract |
 | `installParams` | `SCValXdr` | Policy-specific installation parameters |
+| `selectedSigners` | `List<SelectedSigner>` | Optional signers for multi-signer auth (default: empty) |
+| `forceMethod` | `SubmissionMethod?` | Optional submission method override (default: null, auto-detect) |
 
 **Returns**: `TransactionResult`
 
@@ -1157,7 +1202,9 @@ if (result.success) {
 suspend fun addSimpleThreshold(
     contextRuleId: UInt,
     policyAddress: String,
-    threshold: UInt
+    threshold: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1167,6 +1214,8 @@ Adds a simple threshold policy (M-of-N signers).
 - `contextRuleId`: Context rule ID
 - `policyAddress`: Policy contract address (C-address)
 - `threshold`: Number of signers required
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1179,7 +1228,9 @@ suspend fun addWeightedThreshold(
     contextRuleId: UInt,
     policyAddress: String,
     signerWeights: Map<SmartAccountSigner, UInt>,
-    threshold: UInt
+    threshold: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1190,6 +1241,8 @@ Adds a weighted threshold policy with configurable signer weights.
 - `policyAddress`: Policy contract address
 - `signerWeights`: Map of signers to their weights (vote power)
 - `threshold`: Minimum total weight required
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1202,7 +1255,9 @@ suspend fun addSpendingLimit(
     contextRuleId: UInt,
     policyAddress: String,
     spendingLimit: String,
-    periodLedgers: UInt
+    periodLedgers: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1213,6 +1268,8 @@ Adds a spending limit policy.
 - `policyAddress`: Policy contract address
 - `spendingLimit`: Maximum amount per period as a decimal string (e.g., "1000")
 - `periodLedgers`: Period duration in ledgers (17,280 ≈ 1 day)
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1235,7 +1292,9 @@ val result = kit.policyManager.addSpendingLimit(
 ```kotlin
 suspend fun removePolicy(
     contextRuleId: UInt,
-    policyId: UInt
+    policyId: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
@@ -1244,6 +1303,8 @@ Removes a policy from a context rule by its on-chain policy ID.
 **Parameters**:
 - `contextRuleId`: Context rule ID
 - `policyId`: The on-chain ID of the policy to remove
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
 
@@ -1275,7 +1336,7 @@ sealed class PolicyInstallParams {
 
 ### OZContextRuleManager
 
-Manages authorization rules that determine which signers and policies apply.
+Manages authorization rules that determine which signers and policies apply. Methods that modify rules accept an optional `selectedSigners` parameter for multi-signer authorization.
 
 ```kotlin
 val ruleMgr = kit.contextRuleManager
@@ -1291,18 +1352,34 @@ suspend fun addContextRule(
     name: String,
     validUntil: UInt? = null,
     signers: List<SmartAccountSigner>,
-    policies: Map<String, SCValXdr> = emptyMap()
+    policies: Map<String, SCValXdr> = emptyMap(),
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
-Adds a new context rule to the smart account.
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `contextType` | `ContextRuleType` | Rule scope: `Default`, `CallContract(address)`, or `CreateContract(wasmHash)` |
+| `name` | `String` | Human-readable name stored on-chain |
+| `validUntil` | `UInt?` | Optional expiry ledger number (null = no expiry) |
+| `signers` | `List<SmartAccountSigner>` | Signers who can authorize operations matching this context |
+| `policies` | `Map<String, SCValXdr>` | Policy contract addresses mapped to their installation parameters |
+| `selectedSigners` | `List<SelectedSigner>` | Optional signers for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey. |
+| `forceMethod` | `SubmissionMethod?` | Optional submission method override (default: null, auto-detect) |
 
-**Parameters**:
-- `contextType`: Type of operations this rule applies to
-- `name`: Human-readable rule name
-- `validUntil`: Optional expiration ledger (null = no expiration)
-- `signers`: List of signers (1-15, required)
-- `policies`: Map of policy address to installation parameters
+
+
+
+
+
+
+
+
+
+
+
+
 
 **Contract limits**:
 - Max 15 signers per rule
@@ -1359,30 +1436,67 @@ Retrieves all active context rules as raw ScVal objects. Iterates rule IDs from 
 #### updateName
 
 ```kotlin
-suspend fun updateName(id: UInt, name: String): TransactionResult
+suspend fun updateName(
+    id: UInt,
+    name: String,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
 ```
 
 Updates the name of a context rule.
+
+**Parameters**:
+- `id`: Context rule ID
+- `name`: New rule name (must not be empty)
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
+
+**Returns**: `TransactionResult`
 
 ---
 
 #### updateValidUntil
 
 ```kotlin
-suspend fun updateValidUntil(id: UInt, validUntil: UInt?): TransactionResult
+suspend fun updateValidUntil(
+    id: UInt,
+    validUntil: UInt?,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
 ```
 
 Updates the expiration ledger of a context rule.
+
+**Parameters**:
+- `id`: Context rule ID
+- `validUntil`: New expiration ledger, or null to remove expiration
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
+
+**Returns**: `TransactionResult`
 
 ---
 
 #### removeContextRule
 
 ```kotlin
-suspend fun removeContextRule(id: UInt): TransactionResult
+suspend fun removeContextRule(
+    id: UInt,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
 ```
 
 Removes a context rule.
+
+**Parameters**:
+- `id`: Context rule ID
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
+- `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
+
+**Returns**: `TransactionResult`
 
 ---
 
@@ -1417,6 +1531,8 @@ ContextRuleType.CreateContract(wasmHashBytes)
 
 Manages multi-signature operations including token transfers and arbitrary contract calls. The caller is responsible for discovering signers from context rules and passing complete signer data via `SelectedSigner`.
 
+Note: The `selectedSigners` parameter is also available on individual manager methods (`signerManager`, `policyManager`, `contextRuleManager`). Use those methods directly instead of `multiSignerExecuteAndSubmit` when performing standard signer, policy, or rule operations with multi-signer authorization. The SDK handles argument encoding and routing internally.
+
 ```kotlin
 val multiMgr = kit.multiSignerManager
 ```
@@ -1438,7 +1554,7 @@ suspend fun multiSignerTransfer(
 
 Executes a multi-signature token transfer. The amount is a decimal string (e.g., "100" or "10.5").
 
-The caller explicitly lists every signer. There is no implicit connected passkey — include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` entry requests a delegated auth entry from the external wallet.
+The caller explicitly lists every signer. There is no implicit connected passkey -- include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` entry requests a delegated auth entry from the external wallet.
 
 **Parameters**:
 - `tokenContract`: Token contract address (C-address)
@@ -1486,6 +1602,8 @@ suspend fun multiSignerExecuteAndSubmit(
 
 Executes an arbitrary contract function through the smart account's `execute` entry point with multi-signer authorization. This is the multi-signer counterpart to `executeAndSubmit()`. Use it when a contract call must be authorized by more than one signer -- for example, a governance vote, a multisig swap, or any operation gated by a multi-signer context rule.
 
+For standard signer, policy, and context rule operations, prefer passing `selectedSigners` directly to the respective manager methods (`signerManager.addDelegated()`, `policyManager.addPolicy()`, `contextRuleManager.updateName()`, etc.) instead of manually encoding arguments for `multiSignerExecuteAndSubmit`.
+
 The method routes the call through the smart account contract's `execute(target, target_fn, target_args)` entry point and collects signatures from all `selectedSigners` before submission.
 
 **Parameters**:
@@ -1520,7 +1638,6 @@ val result = kit.multiSignerManager.multiSignerExecuteAndSubmit(
 ```
 
 ---
-
 ## External Signers
 
 ### OZExternalSignerManager

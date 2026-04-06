@@ -327,15 +327,26 @@ class OZMultiSignerManager internal constructor(
         return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
     }
 
-    // MARK: - Private Shared Signing Pipeline
+    // MARK: - Internal Shared Signing Pipeline
 
     /**
-     * Shared signing pipeline used by both [multiSignerTransfer] and [multiSignerExecuteAndSubmit].
+     * Shared signing pipeline for multi-signer operations.
      *
      * Handles wallet signer validation, simulation, auth entry signing, re-simulation, and
      * submission. The caller is responsible for building the [hostFunction] before calling this.
+     *
+     * Used by [multiSignerTransfer], [multiSignerExecuteAndSubmit], and by other managers
+     * (signer, policy, context rule) when they receive a non-empty `selectedSigners` list
+     * for multi-signer authorization.
+     *
+     * @param hostFunction The host function to invoke.
+     * @param selectedSigners All signers that must sign, in collection order.
+     * @param forceMethod Optional override for the submission method.
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     * @return [TransactionResult] indicating success or failure.
+     * @throws SmartAccountException if validation fails, signing fails, or submission fails.
      */
-    private suspend fun submitWithMultipleSigners(
+    internal suspend fun submitWithMultipleSigners(
         hostFunction: HostFunctionXdr,
         selectedSigners: List<SelectedSigner>,
         forceMethod: SubmissionMethod? = null,

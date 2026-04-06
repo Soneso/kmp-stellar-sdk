@@ -69,6 +69,14 @@ struct PolicyEntry: Identifiable {
     let label: String
     /// Encoded policy parameters for `PolicyDescriptor.params`.
     let params: [String: String]
+    /// On-chain policy ID if loaded from an existing rule, nil for newly added.
+    var onChainId: Int32? = nil
+    /// True if this policy was loaded from the existing on-chain rule.
+    var isOriginal: Bool = false
+    /// True if the user changed parameters on an existing policy.
+    var modified: Bool = false
+    /// On-chain parameters loaded at edit start, for display and comparison.
+    var originalParams: PolicyParamsBridge? = nil
 }
 
 /// A signer item in the pending signers list.
@@ -80,6 +88,10 @@ struct SignerItem: Identifiable {
     let displayName: String
     /// Stable bridge value: G-address, hex key (64 chars), or Base64URL credential ID.
     let identifier: String
+    /// On-chain signer ID if loaded from an existing rule, nil for newly added.
+    var onChainId: Int32? = nil
+    /// True if this signer was loaded from the existing on-chain rule.
+    var isOriginal: Bool = false
 
     var descriptor: SignerDescriptor {
         SignerDescriptor(type: type, value: identifier)
@@ -91,6 +103,15 @@ struct ContractOption: Identifiable {
     let id = UUID()
     let label: String
     let address: String
+}
+
+/// Tracks progress of a multi-operation edit submission.
+struct SubmissionProgress {
+    var isActive: Bool
+    var currentStep: String
+    var completedSteps: Int
+    var totalSteps: Int
+    var infoMessages: [String]
 }
 
 // MARK: - ContextRuleBuilderViewModel
@@ -111,7 +132,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     @Published var hasExpiry: Bool = false
     /// Selected ledger offset from the duration dropdown (stored as string).
     @Published var expiryLedger: String = ""
-    /// Absolute ledger loaded from chain in edit mode — read-only display only.
+    /// Absolute ledger loaded from chain in edit mode -- read-only display only.
     @Published var existingExpiryLedger: Int64? = nil
     /// True once the user has touched the expiry section after form load in edit mode.
     @Published var expiryModified: Bool = false
@@ -147,6 +168,16 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     @Published var submissionError: String? = nil
     @Published var hasSubmitted: Bool = false
 
+    // MARK: - Edit mode submission state
+
+    @Published var submissionProgress: SubmissionProgress? = nil
+    @Published var editResult: EditResult? = nil
+    @Published var showSignerPicker: Bool = false
+
+    // MARK: - Create mode multi-signer state
+
+    @Published var showCreateSignerPicker: Bool = false
+
     // MARK: - Loading / error state
 
     @Published var isLoadingRule: Bool = false
@@ -167,6 +198,17 @@ final class ContextRuleBuilderViewModel: ObservableObject {
 
     let isEditing: Bool
     let editRuleId: Int32?
+
+    // MARK: - Edit mode original state (snapshot at load time)
+
+    @Published var originalSigners: [SignerItem] = []
+    @Published var originalPolicies: [PolicyEntry] = []
+    @Published var originalName: String = ""
+    /// All signers from all on-chain rules for the "Reuse Signer" picker.
+    @Published var allOnChainSigners: [SignerInfoBridge] = []
+    /// Available signers for the multi-signer picker.
+    @Published var availableSignersForPicker: [SignerInfoBridge] = []
+    @Published var signersForPickerLoaded: Bool = false
 
     // MARK: - Init
 
@@ -251,6 +293,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         do {
             let parsed = try await bridge.loadContextRuleForEdit(ruleId: ruleId)
             ruleName = parsed.name
+            originalName = parsed.name
 
             switch parsed.contextType {
             case "call_contract":
@@ -268,31 +311,225 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                 existingExpiryLedger = validUntil.int64Value
             }
 
+            // Populate signer entries with on-chain IDs.
             let loadedSigners = KotlinInterop.toArray(parsed.signers, as: SignerDescriptor.self)
-            signers = loadedSigners.map { desc in
+            let loadedSignerIds = KotlinInterop.toIntArray(parsed.signerIds)
+            signers = loadedSigners.enumerated().map { (index, desc) in
                 SignerItem(
                     type: desc.type,
                     displayName: displayNameForDescriptor(desc),
-                    identifier: desc.value
+                    identifier: desc.value,
+                    onChainId: index < loadedSignerIds.count ? loadedSignerIds[index] : nil,
+                    isOriginal: true
                 )
             }
+            originalSigners = signers
 
+            // Populate policy entries with on-chain IDs and read params.
             let loadedPolicies = KotlinInterop.toArray(parsed.policies, as: PolicyDescriptor.self)
-            policies = loadedPolicies.map { desc in
+            let loadedPolicyIds = KotlinInterop.toIntArray(parsed.policyIds)
+            var policyEntries: [PolicyEntry] = []
+            for (index, desc) in loadedPolicies.enumerated() {
                 let known = knownPolicies.first(where: { $0.address == desc.policyAddress })
-                return PolicyEntry(
-                    policyType: known?.type ?? desc.policyType,
+                let policyId: Int32? = index < loadedPolicyIds.count ? loadedPolicyIds[index] : nil
+                let policyType = known?.type ?? desc.policyType
+
+                // Read on-chain params for known policies.
+                var params: PolicyParamsBridge? = nil
+                if let knownType = known?.type, policyId != nil {
+                    params = try? await bridge.readPolicyParams(
+                        policyAddress: desc.policyAddress,
+                        policyType: knownType,
+                        contextRuleId: ruleId
+                    )
+                }
+
+                policyEntries.append(PolicyEntry(
+                    policyType: policyType,
                     policyName: known?.name ?? "Unknown Policy",
                     policyAddress: desc.policyAddress,
                     label: known?.name ?? "Unknown Policy",
-                    params: [:]
-                )
+                    params: [:],
+                    onChainId: policyId,
+                    isOriginal: true,
+                    modified: false,
+                    originalParams: params
+                ))
             }
+            policies = policyEntries
+            originalPolicies = policyEntries
+
+            // Load all signers from all on-chain rules for the "Reuse Signer" picker.
+            do {
+                let onChainSigners = try await bridge.loadAllOnChainSigners()
+                allOnChainSigners = KotlinInterop.toArray(onChainSigners, as: SignerInfoBridge.self)
+            } catch {
+                // Non-fatal: reuse picker will be empty.
+            }
+
+            // Load available signers for multi-signer picker.
+            do {
+                let signerInfos = try await bridge.loadAvailableSigners()
+                availableSignersForPicker = KotlinInterop.toArray(signerInfos, as: SignerInfoBridge.self)
+                signersForPickerLoaded = true
+            } catch {
+                signersForPickerLoaded = true
+            }
+
         } catch {
             errorMessage = "Failed to load rule #\(ruleId): \(error.localizedDescription)"
         }
 
         isLoadingRule = false
+    }
+
+    /// Reloads the rule from chain after a partial edit failure.
+    func reloadRuleFromChain(bridge: MacOSBridge) async {
+        guard let ruleId = editRuleId else { return }
+        do {
+            let parsed = try await bridge.loadContextRuleForEdit(ruleId: ruleId)
+            ruleName = parsed.name
+            originalName = parsed.name
+
+            let loadedSigners = KotlinInterop.toArray(parsed.signers, as: SignerDescriptor.self)
+            let loadedSignerIds = KotlinInterop.toIntArray(parsed.signerIds)
+            signers = loadedSigners.enumerated().map { (index, desc) in
+                SignerItem(
+                    type: desc.type,
+                    displayName: displayNameForDescriptor(desc),
+                    identifier: desc.value,
+                    onChainId: index < loadedSignerIds.count ? loadedSignerIds[index] : nil,
+                    isOriginal: true
+                )
+            }
+            originalSigners = signers
+
+            let loadedPolicies = KotlinInterop.toArray(parsed.policies, as: PolicyDescriptor.self)
+            let loadedPolicyIds = KotlinInterop.toIntArray(parsed.policyIds)
+            var policyEntries: [PolicyEntry] = []
+            for (index, desc) in loadedPolicies.enumerated() {
+                let known = knownPolicies.first(where: { $0.address == desc.policyAddress })
+                let policyId: Int32? = index < loadedPolicyIds.count ? loadedPolicyIds[index] : nil
+                let policyType = known?.type ?? desc.policyType
+
+                var params: PolicyParamsBridge? = nil
+                if let knownType = known?.type, policyId != nil {
+                    params = try? await bridge.readPolicyParams(
+                        policyAddress: desc.policyAddress,
+                        policyType: knownType,
+                        contextRuleId: ruleId
+                    )
+                }
+
+                policyEntries.append(PolicyEntry(
+                    policyType: policyType,
+                    policyName: known?.name ?? "Unknown Policy",
+                    policyAddress: desc.policyAddress,
+                    label: known?.name ?? "Unknown Policy",
+                    params: [:],
+                    onChainId: policyId,
+                    isOriginal: true,
+                    modified: false,
+                    originalParams: params
+                ))
+            }
+            policies = policyEntries
+            originalPolicies = policyEntries
+
+            if let validUntil = parsed.validUntil {
+                hasExpiry = true
+                existingExpiryLedger = validUntil.int64Value
+            } else {
+                hasExpiry = false
+                existingExpiryLedger = nil
+            }
+            expiryLedger = ""
+            expiryModified = false
+
+        } catch {
+            errorMessage = "Failed to reload rule: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Edit Mode Diff Computation
+
+    /// Computes the diff between original and current form state.
+    func computeEditDiff() -> EditDiff? {
+        guard isEditing, let ruleId = editRuleId else { return nil }
+
+        let nameChanged = ruleName.trimmingCharacters(in: .whitespaces) != originalName
+
+        // Removed signers: in original but not in current.
+        let removedSignerIds = originalSigners.filter { orig in
+            !signers.contains(where: { $0.identifier == orig.identifier })
+        }.compactMap { $0.onChainId }
+
+        // New signers: in current but not original.
+        let newSignerDescs = signers.filter { !$0.isOriginal }.map { $0.descriptor }
+
+        // Removed policies: in original but not in current.
+        let removedPolicyIds = originalPolicies.filter { orig in
+            !policies.contains(where: { $0.policyAddress == orig.policyAddress })
+        }.compactMap { $0.onChainId }
+
+        // New policies: in current but not original.
+        let newPolicyDescs = policies.filter { !$0.isOriginal }.map { policy in
+            PolicyDescriptor(
+                policyAddress: policy.policyAddress,
+                policyType: policy.policyType,
+                params: policy.params
+            )
+        }
+
+        // Modified policies: original, flagged as modified.
+        let modifiedPolicies = policies.filter { $0.isOriginal && $0.modified }
+        let modifiedPolicyDescs = modifiedPolicies.map { policy in
+            PolicyDescriptor(
+                policyAddress: policy.policyAddress,
+                policyType: policy.policyType,
+                params: policy.params
+            )
+        }
+        let modifiedPolicyIds = modifiedPolicies.compactMap { $0.onChainId }
+
+        return EditDiff(
+            ruleId: ruleId,
+            nameChanged: nameChanged,
+            newName: nameChanged ? ruleName.trimmingCharacters(in: .whitespaces) : nil,
+            newSignerDescriptors: newSignerDescs,
+            removedSignerIds: removedSignerIds,
+            newPolicyDescriptors: newPolicyDescs,
+            removedPolicyIds: removedPolicyIds,
+            modifiedPolicyDescriptors: modifiedPolicyDescs,
+            modifiedPolicyIds: modifiedPolicyIds,
+            expiryChanged: expiryModified,
+            newExpiry: nil // Resolved at submission time.
+        )
+    }
+
+    /// Builds an operation summary string from a diff.
+    func buildOperationSummary(_ diff: EditDiff) -> String {
+        if diff.isEmpty { return "No changes to apply" }
+        var parts: [String] = []
+        if diff.nameChanged { parts.append("name update") }
+        if !diff.newSignerDescriptors.isEmpty {
+            parts.append("\(diff.newSignerDescriptors.count) signer(s) to add")
+        }
+        if !diff.removedSignerIds.isEmpty {
+            parts.append("\(diff.removedSignerIds.count) signer(s) to remove")
+        }
+        if !diff.newPolicyDescriptors.isEmpty {
+            parts.append("\(diff.newPolicyDescriptors.count) policy(ies) to add")
+        }
+        if !diff.removedPolicyIds.isEmpty {
+            parts.append("\(diff.removedPolicyIds.count) policy(ies) to remove")
+        }
+        if !diff.modifiedPolicyDescriptors.isEmpty {
+            parts.append("\(diff.modifiedPolicyDescriptors.count) policy(ies) to update")
+        }
+        if diff.expiryChanged { parts.append("expiry update") }
+        return "Pending changes: \(parts.joined(separator: ", ")) " +
+            "(\(diff.totalOperations) passkey prompt(s) required)"
     }
 
     // MARK: - Signer Management
@@ -314,7 +551,6 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             identifier: addr
         ))
         delegatedAddress = ""
-        // Reset signer weights when signer list changes.
         signerWeights.removeAll()
     }
 
@@ -350,7 +586,6 @@ final class ContextRuleBuilderViewModel: ObservableObject {
 
         do {
             let signer: ExternalSigner = try await bridge.registerPasskeySigner(name: name)
-            // Extract credential ID from keyData via the bridge helper.
             let info = convertExternalSignerToInfo(signer, bridge: bridge)
             let credId = info.identifier
 
@@ -364,7 +599,6 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                         : info.displayName,
                     identifier: credId
                 ))
-                // Add to available list so "already added" state is shown immediately.
                 let newBridge = SignerInfoBridge(
                     type: "passkey",
                     displayName: info.displayName,
@@ -421,6 +655,12 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         guard index < signers.count else { return }
         let removed = signers.remove(at: index)
         signerWeights.removeValue(forKey: removed.identifier)
+    }
+
+    /// Returns true if the signer at this index is the connected wallet's passkey (cannot be removed).
+    func isConnectedWalletSigner(_ signer: SignerItem, credentialId: String?) -> Bool {
+        guard signer.isOriginal, signer.type == "passkey" else { return false }
+        return credentialId != nil && signer.identifier == credentialId
     }
 
     func isPasskeyAlreadyAdded(_ signer: SignerInfoBridge) -> Bool {
@@ -556,6 +796,23 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         policies.remove(at: index)
     }
 
+    /// Updates an existing policy's parameters and marks it as modified.
+    func updatePolicyParams(at index: Int, params: [String: String], label: String) {
+        guard index < policies.count, policies[index].isOriginal else { return }
+        var updated = policies[index]
+        policies[index] = PolicyEntry(
+            policyType: updated.policyType,
+            policyName: updated.policyName,
+            policyAddress: updated.policyAddress,
+            label: label,
+            params: params,
+            onChainId: updated.onChainId,
+            isOriginal: true,
+            modified: true,
+            originalParams: updated.originalParams
+        )
+    }
+
     // MARK: - Validation
 
     @discardableResult
@@ -631,47 +888,235 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         isSubmitting = false
     }
 
+    // MARK: - Edit Submission (multi-signer aware)
+
+    /// Called from the submit button or after signer picker confirms.
+    func submitEditWithSigners(
+        bridge: MacOSBridge,
+        selectedSigners: [SignerInfoBridge],
+        delegatedSecretKeys: [String: String]
+    ) async {
+        guard let diff = computeEditDiff() else { return }
+        guard !diff.isEmpty else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+        editResult = nil
+
+        do {
+            // Resolve expiry if changed.
+            var resolvedDiff = diff
+            if diff.expiryChanged {
+                if hasExpiry, let offset = Int32(expiryLedger) {
+                    let absoluteLedgerKt = try await bridge.resolveAbsoluteLedger(offset: offset)
+                    resolvedDiff = diff.withResolvedExpiry(absoluteLedgerKt.int32Value)
+                } else if !hasExpiry {
+                    resolvedDiff = diff.withResolvedExpiry(nil)
+                }
+            }
+
+            let totalOps = resolvedDiff.totalOperations
+            submissionProgress = SubmissionProgress(
+                isActive: true,
+                currentStep: "Starting...",
+                completedSteps: 0,
+                totalSteps: totalOps,
+                infoMessages: []
+            )
+
+            // Build bridge diff.
+            let bridgeDiff = ContextRuleEditDiffBridge(
+                ruleId: resolvedDiff.ruleId,
+                nameChanged: resolvedDiff.nameChanged,
+                newName: resolvedDiff.newName,
+                newSignerDescriptors: resolvedDiff.newSignerDescriptors,
+                removedSignerIds: resolvedDiff.removedSignerIds.map { KotlinInt(value: $0) },
+                newPolicyDescriptors: resolvedDiff.newPolicyDescriptors,
+                removedPolicyIds: resolvedDiff.removedPolicyIds.map { KotlinInt(value: $0) },
+                modifiedPolicyDescriptors: resolvedDiff.modifiedPolicyDescriptors,
+                modifiedPolicyIds: resolvedDiff.modifiedPolicyIds.map { KotlinInt(value: $0) },
+                expiryChanged: resolvedDiff.expiryChanged,
+                newExpiry: resolvedDiff.newExpiry.map { KotlinInt(value: $0) }
+            )
+
+            // Build signer descriptors for multi-signer auth.
+            let signerDescs = selectedSigners.map { info in
+                SignerDescriptor(type: info.type, value: info.identifier)
+            }
+
+            var stepCount = 0
+            let result = try await bridge.submitContextRuleEdits(
+                editDiff: bridgeDiff,
+                signerDescriptors: signerDescs,
+                delegatedSecretKeys: delegatedSecretKeys,
+                onProgress: { [weak self] msg in
+                    Task { @MainActor in
+                        stepCount += 1
+                        self?.submissionProgress = SubmissionProgress(
+                            isActive: true,
+                            currentStep: msg,
+                            completedSteps: stepCount - 1,
+                            totalSteps: totalOps,
+                            infoMessages: self?.submissionProgress?.infoMessages ?? []
+                        )
+                    }
+                }
+            )
+
+            submissionProgress?.isActive = false
+
+            editResult = EditResult(
+                success: result.success,
+                completedOperations: Int(result.completedOperations),
+                totalOperations: Int(result.totalOperations),
+                partialDueToAuthGuard: result.partialDueToAuthGuard,
+                authGuardMessage: result.authGuardMessage,
+                error: result.error,
+                failedStep: result.failedStep
+            )
+
+            if result.success && !result.partialDueToAuthGuard {
+                // Full success -- view will dismiss.
+            } else {
+                // Partial or failure -- reload from chain.
+                await reloadRuleFromChain(bridge: bridge)
+            }
+
+        } catch {
+            submissionProgress?.isActive = false
+            let msg = error.localizedDescription
+            if bridge.isUserCancellation(message: msg) {
+                editResult = EditResult(
+                    success: false,
+                    completedOperations: 0,
+                    totalOperations: diff.totalOperations,
+                    partialDueToAuthGuard: false,
+                    authGuardMessage: nil,
+                    error: "Passkey authentication cancelled",
+                    failedStep: nil
+                )
+            } else {
+                editResult = EditResult(
+                    success: false,
+                    completedOperations: 0,
+                    totalOperations: diff.totalOperations,
+                    partialDueToAuthGuard: false,
+                    authGuardMessage: nil,
+                    error: msg,
+                    failedStep: nil
+                )
+                await reloadRuleFromChain(bridge: bridge)
+            }
+        }
+
+        isSubmitting = false
+    }
+
     // MARK: - Private Submission Helpers
 
     private func submitEdit(bridge: MacOSBridge) async throws {
-        guard let ruleId = editRuleId else { return }
-        let trimmedName = ruleName.trimmingCharacters(in: .whitespaces)
-
-        let nameResult = try await bridge.updateContextRuleName(ruleId: ruleId, name: trimmedName)
-        guard nameResult.success else {
-            throw SubmissionError.operationFailed(
-                "Failed to update name: \(nameResult.error ?? "Unknown error")"
-            )
+        guard let diff = computeEditDiff() else { return }
+        if diff.isEmpty {
+            throw SubmissionError.operationFailed("No changes to apply")
         }
 
-        if expiryModified {
-            let offsetInt32: KotlinInt?
-            if hasExpiry, let offset = Int32(expiryLedger) {
-                offsetInt32 = KotlinInt(value: offset)
-            } else {
-                offsetInt32 = nil
-            }
-            let validUntilResult = try await bridge.updateContextRuleValidUntil(
-                ruleId: ruleId,
-                validUntilOffset: offsetInt32
-            )
-            guard validUntilResult.success else {
-                throw SubmissionError.operationFailed(
-                    "Name updated but failed to update expiry: \(validUntilResult.error ?? "Unknown error")"
-                )
-            }
-            submissionSuccess = true
-            submissionTxHash = validUntilResult.hash
-            submissionError = nil
-        } else {
-            submissionSuccess = true
-            submissionTxHash = nameResult.hash
-            submissionError = nil
+        // Check if multi-signer auth is needed.
+        // Use original (on-chain) signers — matches Compose's isSinglePasskeyTransfer():
+        // single-signer only when exactly one on-chain signer AND it is the connected passkey.
+        let connectedCredId = bridge.getCredentialId()
+        let isSinglePasskey = originalSigners.count == 1
+            && originalSigners[0].type == "passkey"
+            && connectedCredId != nil
+            && originalSigners[0].identifier == connectedCredId
+
+        if !isSinglePasskey {
+            // Multi-signer: show signer picker. Submission happens via submitEditWithSigners().
+            showSignerPicker = true
+            isSubmitting = false
+            return
         }
-        hasSubmitted = true
+
+        // Single-signer path: submit directly with empty signers list.
+        await submitEditWithSigners(
+            bridge: bridge,
+            selectedSigners: [],
+            delegatedSecretKeys: [:]
+        )
     }
 
     private func submitCreate(bridge: MacOSBridge) async throws {
+        // Check if multi-signer authorization is needed.
+        let connectedCredId = bridge.getCredentialId()
+        let isSinglePasskey: Bool = {
+            guard signersForPickerLoaded, availableSignersForPicker.count > 1 else { return true }
+            // If there's only one passkey signer and it's the connected one, single-signer is fine
+            if availableSignersForPicker.count == 1,
+               availableSignersForPicker[0].type == "passkey",
+               let credId = connectedCredId,
+               availableSignersForPicker[0].identifier == credId {
+                return true
+            }
+            return availableSignersForPicker.count <= 1
+        }()
+
+        if !isSinglePasskey {
+            // Multi-signer: show signer picker. Submission happens via submitCreateWithSigners().
+            showCreateSignerPicker = true
+            isSubmitting = false
+            return
+        }
+
+        // Single-signer path: submit directly
+        try await performCreateSubmission(bridge: bridge, signerDescs: [], secretKeys: [:])
+    }
+
+    /// Called from the create-mode signer picker after user confirms signer selection.
+    func submitCreateWithSigners(
+        bridge: MacOSBridge,
+        selectedSigners: [SignerInfoBridge],
+        delegatedSecretKeys: [String: String]
+    ) async {
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            let signerDescs = selectedSigners.map { info in
+                SignerDescriptor(type: info.type, value: info.identifier)
+            }
+            try await performCreateSubmission(
+                bridge: bridge,
+                signerDescs: signerDescs,
+                secretKeys: delegatedSecretKeys
+            )
+        } catch let submissionErr as SubmissionError {
+            submissionSuccess = false
+            submissionTxHash = nil
+            submissionError = submissionErr.errorDescription
+            hasSubmitted = true
+        } catch {
+            let msg = error.localizedDescription
+            if bridge.isUserCancellation(message: msg) {
+                submissionSuccess = false
+                submissionTxHash = nil
+                submissionError = "Passkey authentication cancelled"
+                hasSubmitted = true
+            } else {
+                submissionSuccess = false
+                submissionTxHash = nil
+                submissionError = msg
+                hasSubmitted = true
+            }
+        }
+
+        isSubmitting = false
+    }
+
+    /// Shared create-mode submission logic used by both single-signer and multi-signer paths.
+    private func performCreateSubmission(
+        bridge: MacOSBridge,
+        signerDescs: [SignerDescriptor],
+        secretKeys: [String: String]
+    ) async throws {
         let contextTypeName: String
         let contextTypeParam: String?
         switch contextTypeOption {
@@ -708,7 +1153,9 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             name: ruleName.trimmingCharacters(in: .whitespaces),
             validUntilOffset: offsetInt32,
             signerDescriptors: signerDescriptors,
-            policyDescriptors: policyDescriptors
+            policyDescriptors: policyDescriptors,
+            signerDescriptorsForAuth: signerDescs,
+            delegatedSecretKeysForAuth: secretKeys
         )
 
         submissionSuccess = result.success
@@ -747,9 +1194,6 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     }
 
     /// Converts an `ExternalSigner` returned by `registerPasskeySigner` to a `SignerInfoBridge`.
-    ///
-    /// The bridge's `loadAvailablePasskeySigners` does this conversion server-side; for a freshly
-    /// registered signer that is not yet on any context rule, we do it locally by reading keyData.
     private func convertExternalSignerToInfo(
         _ signer: ExternalSigner,
         bridge: MacOSBridge
@@ -775,6 +1219,70 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         case "weighted_threshold": return Material3Colors.policyWeightedThreshold
         default:                   return Material3Colors.signerDefault
         }
+    }
+}
+
+// MARK: - Edit Result Type
+
+/// Mirrors `ContextRuleEditResult` for Swift display.
+struct EditResult {
+    let success: Bool
+    let completedOperations: Int
+    let totalOperations: Int
+    let partialDueToAuthGuard: Bool
+    let authGuardMessage: String?
+    let error: String?
+    let failedStep: String?
+}
+
+// MARK: - Edit Diff Type
+
+/// Swift-side representation of the edit diff, used for UI display and bridge conversion.
+struct EditDiff {
+    let ruleId: Int32
+    let nameChanged: Bool
+    let newName: String?
+    let newSignerDescriptors: [SignerDescriptor]
+    let removedSignerIds: [Int32]
+    let newPolicyDescriptors: [PolicyDescriptor]
+    let removedPolicyIds: [Int32]
+    let modifiedPolicyDescriptors: [PolicyDescriptor]
+    let modifiedPolicyIds: [Int32]
+    let expiryChanged: Bool
+    let newExpiry: Int32?
+
+    var isEmpty: Bool {
+        !nameChanged && newSignerDescriptors.isEmpty &&
+        removedSignerIds.isEmpty && newPolicyDescriptors.isEmpty &&
+        removedPolicyIds.isEmpty && modifiedPolicyDescriptors.isEmpty && !expiryChanged
+    }
+
+    var totalOperations: Int {
+        var count = 0
+        if nameChanged { count += 1 }
+        count += newSignerDescriptors.count
+        count += removedSignerIds.count
+        count += removedPolicyIds.count
+        count += modifiedPolicyDescriptors.count * 2 // remove + re-add each
+        count += newPolicyDescriptors.count
+        if expiryChanged { count += 1 }
+        return count
+    }
+
+    func withResolvedExpiry(_ absoluteLedger: Int32?) -> EditDiff {
+        EditDiff(
+            ruleId: ruleId,
+            nameChanged: nameChanged,
+            newName: newName,
+            newSignerDescriptors: newSignerDescriptors,
+            removedSignerIds: removedSignerIds,
+            newPolicyDescriptors: newPolicyDescriptors,
+            removedPolicyIds: removedPolicyIds,
+            modifiedPolicyDescriptors: modifiedPolicyDescriptors,
+            modifiedPolicyIds: modifiedPolicyIds,
+            expiryChanged: expiryChanged,
+            newExpiry: absoluteLedger
+        )
     }
 }
 

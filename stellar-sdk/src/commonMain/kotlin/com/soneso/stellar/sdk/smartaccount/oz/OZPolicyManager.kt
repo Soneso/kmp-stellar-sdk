@@ -202,6 +202,11 @@ sealed class PolicyInstallParams {
  * A context rule can have multiple policies (up to [OZConstants.MAX_POLICIES]),
  * and all policies must be satisfied for a transaction to succeed.
  *
+ * All state-changing methods accept an optional [selectedSigners] parameter for multi-signer
+ * authorization. When empty (default), the operation uses single-signer auth with the
+ * connected passkey. When non-empty, signatures are collected from all listed signers
+ * via [OZMultiSignerManager.submitWithMultipleSigners].
+ *
  * Policy lifecycle:
  * 1. Deploy policy contract to network
  * 2. Add policy to context rule with installation parameters
@@ -222,18 +227,22 @@ sealed class PolicyInstallParams {
  * val kit = OZSmartAccountKit.create(config)
  * val policyManager = kit.policyManager
  *
- * // Add a simple threshold policy (2-of-3)
+ * // Add a simple threshold policy (2-of-3, single-signer)
  * val result = policyManager.addSimpleThreshold(
  *     contextRuleId = 0u,
  *     policyAddress = "CBCD1234...",
  *     threshold = 2u
  * )
  *
- * // Add a custom policy with raw install parameters
+ * // Add a custom policy with multi-signer authorization
  * val customResult = policyManager.addPolicy(
  *     contextRuleId = 0u,
  *     policyAddress = "CBCD5678...",
- *     installParams = myCustomPolicyParams
+ *     installParams = myCustomPolicyParams,
+ *     selectedSigners = listOf(
+ *         SelectedSigner.Passkey(credentialId = cred1, credentialIdBytes = cred1Bytes, keyData = key1),
+ *         SelectedSigner.Wallet("GA7Q...")
+ *     )
  * )
  *
  * if (result.success) {
@@ -281,6 +290,11 @@ class OZPolicyManager internal constructor(
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
      * @param threshold Number of signers required to authorize (1 to signer count)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -304,10 +318,12 @@ class OZPolicyManager internal constructor(
     suspend fun addSimpleThreshold(
         contextRuleId: UInt,
         policyAddress: String,
-        threshold: UInt
+        threshold: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val params = PolicyInstallParams.SimpleThreshold(threshold)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Add Weighted Threshold Policy
@@ -338,6 +354,11 @@ class OZPolicyManager internal constructor(
      * @param policyAddress The policy contract address (C-address)
      * @param signerWeights Map of signers to their weights defining vote power
      * @param threshold Minimum total weight required for authorization
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -367,10 +388,12 @@ class OZPolicyManager internal constructor(
         contextRuleId: UInt,
         policyAddress: String,
         signerWeights: Map<SmartAccountSigner, UInt>,
-        threshold: UInt
+        threshold: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val params = PolicyInstallParams.WeightedThreshold(signerWeights, threshold)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Add Spending Limit Policy
@@ -404,6 +427,11 @@ class OZPolicyManager internal constructor(
      * @param spendingLimit Maximum amount per period in XLM as a decimal string
      *   (e.g. "100" or "10.5"). Converted to stroops internally.
      * @param periodLedgers Period duration in ledgers (17,280 = approximately 1 day)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -429,11 +457,13 @@ class OZPolicyManager internal constructor(
         contextRuleId: UInt,
         policyAddress: String,
         spendingLimit: String,
-        periodLedgers: UInt
+        periodLedgers: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val stroops = Util.amountToStroops(spendingLimit)
         val params = PolicyInstallParams.SpendingLimit(stroops, periodLedgers)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Remove Policy
@@ -457,6 +487,11 @@ class OZPolicyManager internal constructor(
      *
      * @param contextRuleId The context rule ID to remove the policy from (0 for Default rule)
      * @param policyId The on-chain policy ID assigned by the contract (available from [ParsedContextRule.policyIds])
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -481,7 +516,9 @@ class OZPolicyManager internal constructor(
      */
     suspend fun removePolicy(
         contextRuleId: UInt,
-        policyId: UInt
+        policyId: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
@@ -493,8 +530,12 @@ class OZPolicyManager internal constructor(
             policyId = policyId
         )
 
-        // Submit transaction
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Add Generic Policy
@@ -530,6 +571,11 @@ class OZPolicyManager internal constructor(
      *   [PolicyInstallParams.SimpleThreshold.toScVal],
      *   [PolicyInstallParams.WeightedThreshold.toScVal], or
      *   [PolicyInstallParams.SpendingLimit.toScVal].
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -560,7 +606,9 @@ class OZPolicyManager internal constructor(
     suspend fun addPolicy(
         contextRuleId: UInt,
         policyAddress: String,
-        installParams: SCValXdr
+        installParams: SCValXdr,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
@@ -576,8 +624,12 @@ class OZPolicyManager internal constructor(
             installParams = installParams
         )
 
-        // Submit transaction
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Private Helpers

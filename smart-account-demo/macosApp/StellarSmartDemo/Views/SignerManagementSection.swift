@@ -8,16 +8,19 @@
 import SwiftUI
 import shared
 
-/// Form section for managing signers on a context rule being created.
+/// Form section for managing signers on a context rule.
 ///
-/// Only visible in create mode — signers cannot be modified via this form in edit mode
-/// (signer changes require separate SDK calls: `addSigner` / `removeSigner`).
+/// Supports both create mode and edit mode:
+/// - **Create mode**: Signers can be added and removed freely.
+/// - **Edit mode**: Existing on-chain signers show "(on-chain)" badges. The connected wallet's
+///   passkey cannot be removed. New signers can be added and removed normally.
 ///
 /// Supports three add modes: Delegated (G-address), Ed25519 (hex key), and Passkey
 /// (WebAuthn credential). Signers are displayed as removable chips.
 struct SignerManagementSection: View {
 
     @ObservedObject var viewModel: ContextRuleBuilderViewModel
+    @EnvironmentObject var appState: AppState
     let bridge: MacOSBridge
 
     var body: some View {
@@ -79,16 +82,29 @@ struct SignerManagementSection: View {
     }
 
     private func signerRow(signer: SignerItem, index: Int) -> some View {
-        HStack(spacing: 8) {
+        let isProtected = viewModel.isConnectedWalletSigner(signer, credentialId: appState.credentialId)
+
+        return HStack(spacing: 8) {
             SignerBadge(signerType: signer.type)
             VStack(alignment: .leading, spacing: 2) {
-                // Show credential ID / address / hex key as primary identifier
-                Text(signer.identifier)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(Material3Colors.onSurface)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                // Show display name as secondary label if different from identifier
+                HStack(spacing: 6) {
+                    Text(signer.identifier)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(Material3Colors.onSurface)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    if signer.isOriginal {
+                        Text("on-chain")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Material3Colors.primary.opacity(0.7))
+                            .cornerRadius(3)
+                    }
+                }
+
                 if signer.displayName != signer.identifier &&
                    !signer.displayName.isEmpty {
                     Text(signer.displayName)
@@ -96,15 +112,24 @@ struct SignerManagementSection: View {
                         .foregroundColor(Material3Colors.onSurfaceVariant)
                         .lineLimit(1)
                 }
+
+                if isProtected {
+                    Text("Connected wallet signer (cannot be removed)")
+                        .font(.system(size: 10))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: { viewModel.removeSigner(at: index) }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(Material3Colors.error)
+
+            if !isProtected {
+                Button(action: { viewModel.removeSigner(at: index) }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Material3Colors.error)
+                }
+                .buttonStyle(.plain)
+                .help("Remove signer")
             }
-            .buttonStyle(.plain)
-            .help("Remove signer")
         }
         .padding(12)
         .background(signerBackground(type: signer.type))

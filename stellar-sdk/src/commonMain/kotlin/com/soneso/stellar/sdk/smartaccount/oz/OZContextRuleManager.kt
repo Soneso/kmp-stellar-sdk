@@ -157,6 +157,11 @@ data class ParsedContextRule(
  * 1. Which signers are required to authorize the transaction
  * 2. Which policies must be satisfied for the transaction to execute
  *
+ * All state-changing methods accept an optional [selectedSigners] parameter for multi-signer
+ * authorization. When empty (default), the operation uses single-signer auth with the
+ * connected passkey. When non-empty, signatures are collected from all listed signers
+ * via [OZMultiSignerManager.submitWithMultipleSigners].
+ *
  * Contract limits:
  * - Maximum 15 signers per context rule
  * - Maximum 5 policies per context rule
@@ -215,6 +220,11 @@ class OZContextRuleManager internal constructor(
      * @param validUntil Optional ledger number when this rule expires (null = no expiration)
      * @param signers List of signers who can authorize operations matching this context
      * @param policies Map of policy contract addresses to their installation parameters
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -241,7 +251,9 @@ class OZContextRuleManager internal constructor(
         name: String,
         validUntil: UInt? = null,
         signers: List<SmartAccountSigner>,
-        policies: Map<String, SCValXdr> = emptyMap()
+        policies: Map<String, SCValXdr> = emptyMap(),
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
@@ -321,8 +333,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Get Context Rule
@@ -906,6 +922,11 @@ class OZContextRuleManager internal constructor(
      *
      * @param id The ID of the context rule to update
      * @param name The new name for the context rule
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -921,7 +942,12 @@ class OZContextRuleManager internal constructor(
      * }
      * ```
      */
-    suspend fun updateName(id: UInt, name: String): TransactionResult {
+    suspend fun updateName(
+        id: UInt,
+        name: String,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Validate input
@@ -943,8 +969,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Update Context Rule Valid Until
@@ -967,6 +997,11 @@ class OZContextRuleManager internal constructor(
      *
      * @param id The ID of the context rule to update
      * @param validUntil The new expiration ledger number, or null for no expiration
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws TransactionException if transaction submission fails
      *
@@ -985,7 +1020,12 @@ class OZContextRuleManager internal constructor(
      * )
      * ```
      */
-    suspend fun updateValidUntil(id: UInt, validUntil: UInt?): TransactionResult {
+    suspend fun updateValidUntil(
+        id: UInt,
+        validUntil: UInt?,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Build valid_until ScVal (Option<u32>)
@@ -1009,8 +1049,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Remove Context Rule
@@ -1033,6 +1077,11 @@ class OZContextRuleManager internal constructor(
      * The user will be prompted for biometric authentication.
      *
      * @param id The ID of the context rule to remove
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws TransactionException if the rule doesn't exist or transaction submission fails
      *
@@ -1044,7 +1093,11 @@ class OZContextRuleManager internal constructor(
      * }
      * ```
      */
-    suspend fun removeContextRule(id: UInt): TransactionResult {
+    suspend fun removeContextRule(
+        id: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Build invocation
@@ -1058,7 +1111,11 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 }

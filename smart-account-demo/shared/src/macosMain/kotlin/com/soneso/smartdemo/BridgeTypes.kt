@@ -85,10 +85,10 @@ data class PolicyDescriptor(
  *
  * Replaces [com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule] for Swift interop by
  * converting all Kotlin-specific types to primitives:
- * - [com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType] sealed class → [contextType] + [contextTypeParam] strings.
- * - [UInt] rule ID and validUntil → [Long] to avoid Objective-C unsigned integer boxing.
- * - [com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner] sealed class list → [List<SignerDescriptor>].
- * - Policy addresses → [List<PolicyDescriptor>] (no SCVal params; they are already on-chain).
+ * - [com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType] sealed class -> [contextType] + [contextTypeParam] strings.
+ * - [UInt] rule ID and validUntil -> [Long] to avoid Objective-C unsigned integer boxing.
+ * - [com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner] sealed class list -> [List<SignerDescriptor>].
+ * - Policy addresses -> [List<PolicyDescriptor>] (no SCVal params; they are already on-chain).
  *
  * @property name The rule's human-readable name.
  * @property contextType Context type tag: "default", "call_contract", or "create_contract".
@@ -96,7 +96,11 @@ data class PolicyDescriptor(
  *   lowercase hex-encoded WASM hash. Null for "default".
  * @property validUntil Absolute ledger expiry, or null if the rule has no expiry.
  * @property signers Signers registered on the rule, as [SignerDescriptor] instances.
+ * @property signerIds On-chain signer IDs, positionally aligned with [signers]. Each value is
+ *   the on-chain signer ID as Int (converted from UInt).
  * @property policies Policy addresses registered on the rule (no SCVal params needed in edit mode).
+ * @property policyIds On-chain policy IDs, positionally aligned with [policies]. Each value is
+ *   the on-chain policy ID as Int (converted from UInt).
  */
 data class ParsedRuleBridge(
     val name: String,
@@ -104,7 +108,9 @@ data class ParsedRuleBridge(
     val contextTypeParam: String?,
     val validUntil: Long?,
     val signers: List<SignerDescriptor>,
-    val policies: List<PolicyDescriptor>
+    val signerIds: List<Int>,
+    val policies: List<PolicyDescriptor>,
+    val policyIds: List<Int>
 )
 
 /**
@@ -128,4 +134,83 @@ data class SignerInfoBridge(
     val identifier: String,
     val canSign: Boolean,
     val keyData: String?
+)
+
+/**
+ * Describes the diff of changes between the original and current form state for a context rule edit.
+ *
+ * Swift cannot use UInt or sealed classes, so all IDs use Int and signer/policy objects are
+ * represented as descriptors. The bridge converts these to the internal [ContextRuleEditDiff]
+ * before calling the flow orchestrator.
+ *
+ * @property ruleId The on-chain context rule ID being edited.
+ * @property nameChanged True if the name was modified.
+ * @property newName The new name value, or null if unchanged.
+ * @property newSignerDescriptors Signer descriptors that are newly added (not yet on-chain).
+ * @property removedSignerIds On-chain IDs of signers that were removed by the user.
+ * @property newPolicyDescriptors Policy descriptors that are newly added (not yet on-chain).
+ * @property removedPolicyIds On-chain IDs of policies that were removed by the user.
+ * @property modifiedPolicyDescriptors Policy descriptors with changed parameters.
+ * @property modifiedPolicyIds On-chain IDs of modified policies (positionally aligned with
+ *   [modifiedPolicyDescriptors]).
+ * @property expiryChanged True if the expiration was modified.
+ * @property newExpiry The new absolute expiry ledger number, or null to remove expiry.
+ */
+data class ContextRuleEditDiffBridge(
+    val ruleId: Int,
+    val nameChanged: Boolean,
+    val newName: String?,
+    val newSignerDescriptors: List<SignerDescriptor>,
+    val removedSignerIds: List<Int>,
+    val newPolicyDescriptors: List<PolicyDescriptor>,
+    val removedPolicyIds: List<Int>,
+    val modifiedPolicyDescriptors: List<PolicyDescriptor>,
+    val modifiedPolicyIds: List<Int>,
+    val expiryChanged: Boolean,
+    val newExpiry: Int?
+)
+
+/**
+ * Result of a context rule edit submission, suitable for Swift consumption.
+ *
+ * Mirrors [com.soneso.smartdemo.flows.ContextRuleEditResult] with all types safe for
+ * Objective-C/Swift interop.
+ *
+ * @property success True if all operations completed successfully.
+ * @property completedOperations Number of operations that succeeded.
+ * @property totalOperations Total number of operations that were planned.
+ * @property partialDueToAuthGuard True if policy/expiry updates were skipped due to auth context guard.
+ * @property authGuardMessage Message explaining the auth context guard, or null if not triggered.
+ * @property error Error message if [success] is false.
+ * @property failedStep Description of the step that failed, or null on success.
+ */
+data class ContextRuleEditResultBridge(
+    val success: Boolean,
+    val completedOperations: Int,
+    val totalOperations: Int,
+    val partialDueToAuthGuard: Boolean,
+    val authGuardMessage: String?,
+    val error: String?,
+    val failedStep: String?
+)
+
+/**
+ * On-chain policy parameters read from contract storage, suitable for Swift consumption.
+ *
+ * Mirrors [com.soneso.smartdemo.flows.PolicyParams] with UInt converted to Int for
+ * Objective-C/Swift interop.
+ *
+ * @property type The policy type identifier ("threshold", "spending_limit", "weighted_threshold").
+ * @property threshold Threshold value for "threshold" and "weighted_threshold" policies.
+ * @property spendingLimit Formatted XLM amount string for "spending_limit" policies (e.g. "1000").
+ * @property periodDays Period in days for "spending_limit" policies.
+ * @property signerWeights Map of signer key string to weight for "weighted_threshold" policies.
+ *   Weights use Int instead of UInt for Swift compatibility.
+ */
+data class PolicyParamsBridge(
+    val type: String,
+    val threshold: Int?,
+    val spendingLimit: String?,
+    val periodDays: Int?,
+    val signerWeights: Map<String, Int>?
 )

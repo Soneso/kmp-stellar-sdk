@@ -42,6 +42,12 @@ struct ContextRulesScreen: View {
     @State private var ruleToRemove: ParsedContextRule? = nil
     @State private var isRemoving = false
 
+    // Multi-signer state for rule removal
+    @State private var availableSigners: [SignerInfoBridge] = []
+    @State private var signersLoaded = false
+    @State private var showRemoveSignerPicker = false
+    @State private var ruleToRemoveWithSigners: ParsedContextRule? = nil
+
     // MARK: - Init
 
     init(toastManager: ToastManager) {
@@ -88,6 +94,7 @@ struct ContextRulesScreen: View {
         .navigationToolbar(title: "Context Rules")
         .task {
             await loadRules()
+            await loadSigners()
         }
         .confirmationDialog(
             removeDialogTitle,
@@ -111,6 +118,31 @@ struct ContextRulesScreen: View {
                 Text(
                     "Remove rule #\(rule.id) \"\(rule.name)\"? " +
                     "This action requires smart account authorization and cannot be undone."
+                )
+            }
+        }
+        .sheet(isPresented: $showRemoveSignerPicker) {
+            if let rule = ruleToRemoveWithSigners {
+                SignerPickerSheet(
+                    signers: availableSigners,
+                    activeCredentialId: appState.credentialId,
+                    onConfirm: { selected, secretKeys in
+                        showRemoveSignerPicker = false
+                        let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
+                        let capturedRule = rule
+                        ruleToRemoveWithSigners = nil
+                        Task {
+                            await performRemoveWithSigners(
+                                rule: capturedRule,
+                                signerDescs: signerDescs,
+                                secretKeys: secretKeys
+                            )
+                        }
+                    },
+                    onDismiss: {
+                        showRemoveSignerPicker = false
+                        ruleToRemoveWithSigners = nil
+                    }
                 )
             }
         }
@@ -602,12 +634,49 @@ struct ContextRulesScreen: View {
 
     private func performRemove(rule: ParsedContextRule) async {
         let bridge = bridgeWrapper.bridge
+
+        // Check if multi-signer authorization is needed
+        let isSinglePasskey: Bool = {
+            guard signersLoaded, availableSigners.count > 1 else { return true }
+            let credId = bridge.getCredentialId()
+            if availableSigners.count == 1,
+               availableSigners[0].type == "passkey",
+               let cId = credId,
+               availableSigners[0].identifier == cId {
+                return true
+            }
+            return availableSigners.count <= 1
+        }()
+
+        if !isSinglePasskey {
+            await MainActor.run {
+                ruleToRemoveWithSigners = rule
+                showRemoveSignerPicker = true
+            }
+            return
+        }
+
+        // Single-signer path
+        await performRemoveWithSigners(rule: rule, signerDescs: [], secretKeys: [:])
+    }
+
+    /// Performs rule removal with optional multi-signer authorization.
+    private func performRemoveWithSigners(
+        rule: ParsedContextRule,
+        signerDescs: [SignerDescriptor],
+        secretKeys: [String: String]
+    ) async {
+        let bridge = bridgeWrapper.bridge
         let ruleIdForBridge = Int32(bitPattern: rule.id)
         await MainActor.run {
             isRemoving = true
         }
         do {
-            let result = try await bridge.removeContextRule(ruleId: ruleIdForBridge)
+            let result = try await bridge.removeContextRule(
+                ruleId: ruleIdForBridge,
+                signerDescriptors: signerDescs,
+                delegatedSecretKeys: secretKeys
+            )
             if result.success {
                 await MainActor.run {
                     isLoading = true
@@ -636,9 +705,31 @@ struct ContextRulesScreen: View {
                 }
             }
         } catch {
+            let msg = error.localizedDescription
             await MainActor.run {
-                errorMessage = "Failed to remove rule: \(error.localizedDescription)"
+                if bridge.isUserCancellation(message: msg) {
+                    errorMessage = "Passkey authentication cancelled"
+                } else {
+                    errorMessage = "Failed to remove rule: \(msg)"
+                }
                 isRemoving = false
+            }
+        }
+    }
+
+    private func loadSigners() async {
+        guard appState.isConnected else { return }
+        let bridge = bridgeWrapper.bridge
+        do {
+            let result = try await bridge.loadAvailableSigners()
+            let loaded = KotlinInterop.toArray(result, as: SignerInfoBridge.self)
+            await MainActor.run {
+                availableSigners = loaded
+                signersLoaded = true
+            }
+        } catch {
+            await MainActor.run {
+                signersLoaded = true
             }
         }
     }

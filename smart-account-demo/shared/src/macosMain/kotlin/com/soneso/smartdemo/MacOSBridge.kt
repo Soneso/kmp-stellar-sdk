@@ -39,6 +39,14 @@ import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.flows.updateContextRuleName
 import com.soneso.smartdemo.flows.updateContextRuleValidUntil
+import com.soneso.smartdemo.flows.ContextRuleEditDiff
+import com.soneso.smartdemo.flows.EditSignerEntry
+import com.soneso.smartdemo.flows.EditPolicyEntry
+import com.soneso.smartdemo.flows.PolicyParams
+import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
+import com.soneso.smartdemo.flows.readPolicyParams
+import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.buildSimpleThresholdScVal
@@ -392,14 +400,54 @@ class MacOSBridge {
     /**
      * Removes a context rule from the smart account.
      *
-     * Requires passkey authentication. The UI should prevent removing the last rule.
+     * Requires passkey authentication or multi-signer authorization when signerDescriptors
+     * is non-empty. The UI should prevent removing the last rule.
      *
      * @param ruleId Rule ID as an Int (UInt internally). Use [loadContextRules] to get valid IDs.
+     * @param signerDescriptors Selected signers for multi-signer auth. Empty = single-signer mode.
+     * @param delegatedSecretKeys Map of G-address to secret key for delegated signers. Empty if none.
      * @return [ContextRuleResult] with success flag and transaction hash.
      */
     @Throws(Exception::class)
-    suspend fun removeContextRule(ruleId: Int): ContextRuleResult =
-        com.soneso.smartdemo.flows.removeContextRule(ruleId.toUInt())
+    suspend fun removeContextRule(
+        ruleId: Int,
+        signerDescriptors: List<SignerDescriptor> = emptyList(),
+        delegatedSecretKeys: Map<String, String> = emptyMap()
+    ): ContextRuleResult {
+        // Register delegated keypairs for multi-signer operations.
+        if (delegatedSecretKeys.isNotEmpty()) {
+            val externalManager = DemoState.externalSignerManager
+                ?: throw IllegalStateException("External signer manager not initialized")
+            externalManager.removeAll()
+            for ((_, secret) in delegatedSecretKeys) {
+                if (secret.isNotBlank()) {
+                    externalManager.addFromSecret(secret)
+                }
+            }
+        }
+
+        // Resolve selected signers for multi-signer mode.
+        val selectedSigners: List<SelectedSigner> = if (signerDescriptors.isNotEmpty()) {
+            val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
+            val allPasskeySigners = rules.flatMap { it.signers }
+                .filterIsInstance<ExternalSigner>()
+                .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+
+            val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
+                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
+            }
+            if (isSinglePasskeyTransfer(smartAccountSigners)) {
+                emptyList()
+            } else {
+                buildSelectedSigners(smartAccountSigners)
+            }
+        } else {
+            emptyList()
+        }
+
+        return com.soneso.smartdemo.flows.removeContextRule(ruleId.toUInt(), selectedSigners)
+    }
 
     /**
      * Updates the name of an existing context rule.
@@ -466,7 +514,9 @@ class MacOSBridge {
         name: String,
         validUntilOffset: Int?,
         signerDescriptors: List<SignerDescriptor>,
-        policyDescriptors: List<PolicyDescriptor>
+        policyDescriptors: List<PolicyDescriptor>,
+        signerDescriptorsForAuth: List<SignerDescriptor> = emptyList(),
+        delegatedSecretKeysForAuth: Map<String, String> = emptyMap()
     ): ContextRuleResult {
         // Build ContextRuleType.
         val contextType = buildContextRuleType(contextTypeName, contextTypeParam)
@@ -476,6 +526,18 @@ class MacOSBridge {
             resolveAbsoluteLedger(validUntilOffset.toUInt())
         } else {
             null
+        }
+
+        // Register delegated keypairs for multi-signer auth operations.
+        if (delegatedSecretKeysForAuth.isNotEmpty()) {
+            val externalManager = DemoState.externalSignerManager
+                ?: throw IllegalStateException("External signer manager not initialized")
+            externalManager.removeAll()
+            for ((_, secret) in delegatedSecretKeysForAuth) {
+                if (secret.isNotBlank()) {
+                    externalManager.addFromSecret(secret)
+                }
+            }
         }
 
         // Resolve signers. Passkey signers are looked up from on-chain context rules by credential
@@ -496,12 +558,27 @@ class MacOSBridge {
         // but the flow layer wraps that in FlowPolicyEntry for convenience.
         val policies = buildPolicyEntries(policyDescriptors, signers)
 
+        // Resolve selected signers for multi-signer mode.
+        val selectedSigners: List<SelectedSigner> = if (signerDescriptorsForAuth.isNotEmpty()) {
+            val smartAccountSigners = signerDescriptorsForAuth.mapNotNull { desc ->
+                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
+            }
+            if (isSinglePasskeyTransfer(smartAccountSigners)) {
+                emptyList()
+            } else {
+                buildSelectedSigners(smartAccountSigners)
+            }
+        } else {
+            emptyList()
+        }
+
         return com.soneso.smartdemo.flows.addContextRule(
             contextType = contextType,
             name = name,
             validUntil = validUntil,
             signers = signers,
-            policies = policies
+            policies = policies,
+            selectedSigners = selectedSigners
         )
     }
 
@@ -591,6 +668,24 @@ class MacOSBridge {
     suspend fun loadAvailablePasskeySigners(excludeCredentialId: String?): List<SignerInfoBridge> {
         val passkeys = com.soneso.smartdemo.flows.loadAvailablePasskeySigners(excludeCredentialId)
         return passkeys.map { signer -> convertSignerInfoToBridge(signer, canSign = false) }
+    }
+
+    /**
+     * Loads all unique signers from all on-chain context rules, excluding the connected
+     * wallet's own passkey. Used by the "Reuse Signer" picker in edit mode.
+     *
+     * @return List of [SignerInfoBridge] for each unique signer across all rules.
+     */
+    @Throws(Exception::class)
+    suspend fun loadAllOnChainSigners(): List<SignerInfoBridge> {
+        val allRules = com.soneso.smartdemo.flows.loadContextRules()
+        val uniqueSigners = allRules.flatMap { it.signers }
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+            .filter { signer ->
+                val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+                credId == null || credId != DemoState.credentialId
+            }
+        return uniqueSigners.map { signer -> convertSignerInfoToBridge(signer, canSign = false) }
     }
 
     // =========================================================================
@@ -761,6 +856,217 @@ class MacOSBridge {
         } catch (_: Exception) {
             false
         }
+    }
+
+
+    // =========================================================================
+    // MARK: - Context Rule Edit
+    // =========================================================================
+
+    /**
+     * Submits context rule edit operations using the edit flow orchestrator.
+     *
+     * Converts Swift-friendly bridge types to internal Kotlin types and delegates to
+     * [com.soneso.smartdemo.flows.submitContextRuleEdits]. For multi-signer rules,
+     * delegated signer keypairs must be pre-registered via [delegatedSecretKeys].
+     *
+     * @param editDiff The computed diff from Swift form state.
+     * @param signerDescriptors Selected signers for multi-signer auth. Empty = single-signer mode.
+     * @param delegatedSecretKeys Map of G-address to secret key for delegated signers in the picker.
+     * @param onProgress Callback for per-operation progress messages.
+     * @return [ContextRuleEditResultBridge] with completion details or error.
+     */
+    @Throws(Exception::class)
+    suspend fun submitContextRuleEdits(
+        editDiff: ContextRuleEditDiffBridge,
+        signerDescriptors: List<SignerDescriptor>,
+        delegatedSecretKeys: Map<String, String>,
+        onProgress: (String) -> Unit
+    ): ContextRuleEditResultBridge {
+        // Register delegated keypairs for multi-signer operations.
+        if (delegatedSecretKeys.isNotEmpty()) {
+            val externalManager = DemoState.externalSignerManager
+                ?: throw IllegalStateException("External signer manager not initialized")
+            externalManager.removeAll()
+            for ((_, secret) in delegatedSecretKeys) {
+                if (secret.isNotBlank()) {
+                    externalManager.addFromSecret(secret)
+                }
+            }
+        }
+
+        // Resolve signers from descriptors to full SmartAccountSigner instances.
+        val rules = try {
+            loadContextRules()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val allPasskeySigners = rules.flatMap { it.signers }
+            .filterIsInstance<ExternalSigner>()
+            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+
+        // Build new signer entries from descriptors.
+        val newSignerEntries = editDiff.newSignerDescriptors.map { desc ->
+            val signer = resolveSignerFromDescriptor(desc, allPasskeySigners)
+                ?: throw IllegalStateException("Could not resolve signer: ${desc.type}/${desc.value.take(16)}")
+            EditSignerEntry(
+                signer = signer,
+                onChainId = null,
+                isOriginal = false,
+                isPending = desc.type.lowercase() == "passkey"
+            )
+        }
+
+        // Build removed signer entries (need on-chain IDs and signer objects for the flow).
+        val removedSignerEntries = editDiff.removedSignerIds.mapNotNull { signerId ->
+            val rule = rules.flatMap { r ->
+                r.signers.mapIndexedNotNull { i, s ->
+                    if (r.signerIds.getOrNull(i)?.toInt() == signerId) Pair(s, r.signerIds[i])
+                    else null
+                }
+            }.firstOrNull()
+            if (rule != null) {
+                EditSignerEntry(
+                    signer = rule.first,
+                    onChainId = rule.second,
+                    isOriginal = true
+                )
+            } else {
+                ActivityLogState.error("Could not find signer with on-chain ID $signerId for removal")
+                null
+            }
+        }
+
+        // Build policy entries (new, removed, modified).
+        val newPolicyEntries = editDiff.newPolicyDescriptors.map { desc ->
+            val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
+            val signers = newSignerEntries.map { it.signer } +
+                removedSignerEntries.map { it.signer }
+            // Also resolve signers from existing rule for weighted threshold weight resolution.
+            val existingSigners = rules.flatMap { it.signers }
+            val allSigners = (signers + existingSigners).distinctBy { SmartAccountBuilders.getSignerKey(it) }
+            val scVal = buildPolicyScVal(desc, allSigners)
+            EditPolicyEntry(
+                info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
+                label = known?.name ?: "Unknown Policy",
+                address = desc.policyAddress,
+                scVal = scVal,
+                onChainId = null,
+                isOriginal = false
+            )
+        }
+
+        val removedPolicyEntries = editDiff.removedPolicyIds.map { policyId ->
+            EditPolicyEntry(
+                info = null,
+                label = "",
+                address = "",
+                scVal = null,
+                onChainId = policyId.toUInt(),
+                isOriginal = true
+            )
+        }
+
+        val modifiedPolicyEntries = editDiff.modifiedPolicyDescriptors.mapIndexed { index, desc ->
+            val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
+            val existingSigners = rules.flatMap { it.signers }
+                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+            val scVal = buildPolicyScVal(desc, existingSigners)
+            val onChainId = editDiff.modifiedPolicyIds.getOrNull(index)?.toUInt()
+            EditPolicyEntry(
+                info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
+                label = known?.name ?: "Unknown Policy",
+                address = desc.policyAddress,
+                scVal = scVal,
+                onChainId = onChainId,
+                isOriginal = true,
+                modified = true
+            )
+        }
+
+        // Build the internal ContextRuleEditDiff.
+        val diff = ContextRuleEditDiff(
+            ruleId = editDiff.ruleId.toUInt(),
+            nameChanged = editDiff.nameChanged,
+            newName = editDiff.newName,
+            newSigners = newSignerEntries,
+            removedSigners = removedSignerEntries,
+            newPolicies = newPolicyEntries,
+            removedPolicies = removedPolicyEntries,
+            modifiedPolicies = modifiedPolicyEntries,
+            expiryChanged = editDiff.expiryChanged,
+            newExpiry = editDiff.newExpiry?.toUInt()
+        )
+
+        // Resolve selected signers for multi-signer mode.
+        // If the user only selected the connected passkey, use empty list to route through
+        // the simpler single-signer pipeline (matches Compose's isSinglePasskeyTransfer check).
+        val selectedSigners: List<SelectedSigner> = if (signerDescriptors.isNotEmpty()) {
+            val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
+                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
+            }
+            if (isSinglePasskeyTransfer(smartAccountSigners)) {
+                emptyList()
+            } else {
+                buildSelectedSigners(smartAccountSigners)
+            }
+        } else {
+            emptyList()
+        }
+
+        // Call the flow orchestrator.
+        val result = com.soneso.smartdemo.flows.submitContextRuleEdits(
+            diff = diff,
+            selectedSigners = selectedSigners,
+            onProgress = onProgress
+        )
+
+        return ContextRuleEditResultBridge(
+            success = result.success,
+            completedOperations = result.completedOperations,
+            totalOperations = result.totalOperations,
+            partialDueToAuthGuard = result.partialDueToAuthGuard,
+            authGuardMessage = result.authGuardMessage,
+            error = result.error,
+            failedStep = result.failedStep
+        )
+    }
+
+    /**
+     * Reads on-chain policy parameters for a specific policy on a context rule.
+     *
+     * Delegates to [com.soneso.smartdemo.flows.readPolicyParams] and converts the result
+     * to [PolicyParamsBridge] for Swift consumption.
+     *
+     * @param policyAddress The policy contract C-address to read from.
+     * @param policyType The policy type identifier ("threshold", "spending_limit", "weighted_threshold").
+     * @param contextRuleId The context rule ID the policy is installed on.
+     * @return [PolicyParamsBridge] with parsed parameters, or null if the entry cannot be read.
+     */
+    @Throws(Exception::class)
+    suspend fun readPolicyParams(
+        policyAddress: String,
+        policyType: String,
+        contextRuleId: Int
+    ): PolicyParamsBridge? {
+        val contractId = DemoState.contractId
+            ?: throw IllegalStateException("No contract ID available")
+
+        val params = com.soneso.smartdemo.flows.readPolicyParams(
+            smartAccountContractId = contractId,
+            policyAddress = policyAddress,
+            policyType = policyType,
+            contextRuleId = contextRuleId.toUInt()
+        ) ?: return null
+
+        return PolicyParamsBridge(
+            type = params.type,
+            threshold = params.threshold?.toInt(),
+            spendingLimit = params.spendingLimit,
+            periodDays = params.periodDays,
+            signerWeights = params.signerWeights?.mapValues { it.value.toInt() }
+        )
     }
 
     // =========================================================================
@@ -954,11 +1260,12 @@ class MacOSBridge {
             }
         }
 
-        // Policies are stored on-chain; we expose their addresses without SCVal params.
+        // Policies are stored on-chain; we expose their addresses and resolve known policy types.
         val policyDescs = rule.policies.map { address ->
+            val known = KNOWN_POLICIES.find { it.address == address }
             PolicyDescriptor(
                 policyAddress = address,
-                policyType = "unknown",
+                policyType = known?.type ?: "unknown",
                 params = emptyMap()
             )
         }
@@ -969,7 +1276,9 @@ class MacOSBridge {
             contextTypeParam = contextTypeParam,
             validUntil = rule.validUntil?.toLong(),
             signers = signerDescs,
-            policies = policyDescs
+            signerIds = rule.signerIds.map { it.toInt() },
+            policies = policyDescs,
+            policyIds = rule.policyIds.map { it.toInt() }
         )
     }
 
@@ -1015,6 +1324,89 @@ class MacOSBridge {
             }
         }
     }
+
+    /**
+     * Resolves a single [SignerDescriptor] to a [SmartAccountSigner] instance.
+     *
+     * Passkey descriptors are resolved from [allPasskeySigners] and [registeredPasskeySigners]
+     * by credential ID. Delegated and Ed25519 descriptors are constructed directly.
+     *
+     * @return The resolved signer, or null if a passkey signer cannot be found.
+     */
+    private fun resolveSignerFromDescriptor(
+        desc: SignerDescriptor,
+        allPasskeySigners: List<ExternalSigner>
+    ): SmartAccountSigner? {
+        val allKnown = allPasskeySigners + registeredPasskeySigners
+        return when (desc.type.lowercase()) {
+            "passkey" -> {
+                allKnown.firstOrNull { signer ->
+                    SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
+                } ?: allKnown.firstOrNull { signer ->
+                    signer.keyData.toHexString() == desc.value
+                }
+            }
+            "delegated" -> buildDelegatedSigner(desc.value)
+            "ed25519" -> buildEd25519Signer(hexToByteArray(desc.value))
+            else -> null
+        }
+    }
+
+    /**
+     * Builds an SCVal from a [PolicyDescriptor] for use in add/modify policy operations.
+     *
+     * Delegates to the same SCVal builder functions used by [buildPolicyEntries].
+     *
+     * @param desc The policy descriptor with type and params.
+     * @param signers Available signers for resolving weighted threshold weights.
+     * @return The encoded SCVal for the policy install parameters.
+     */
+    private fun buildPolicyScVal(
+        desc: PolicyDescriptor,
+        signers: List<SmartAccountSigner>
+    ): com.soneso.stellar.sdk.xdr.SCValXdr {
+        return when (desc.policyType.lowercase()) {
+            "threshold" -> {
+                val threshold = desc.params["threshold"]?.toUIntOrNull()
+                    ?: throw IllegalArgumentException(
+                        "threshold policy requires 'threshold' param"
+                    )
+                buildSimpleThresholdScVal(threshold)
+            }
+            "spending_limit" -> {
+                val amount = desc.params["amount"]
+                    ?: throw IllegalArgumentException("spending_limit policy requires 'amount' param")
+                val periodDays = desc.params["period_days"]?.toUIntOrNull() ?: 1u
+                val periodLedgers = periodDays * getLedgersPerDay().toUInt()
+                buildSpendingLimitScVal(amount, periodLedgers)
+            }
+            "weighted_threshold" -> {
+                val threshold = desc.params["threshold"]?.toUIntOrNull()
+                    ?: throw IllegalArgumentException("weighted_threshold policy requires 'threshold' param")
+                val weightsRaw = desc.params["weights"] ?: ""
+                val weightMap = mutableMapOf<SmartAccountSigner, UInt>()
+                if (weightsRaw.isNotBlank()) {
+                    for (pair in weightsRaw.split(",")) {
+                        val parts = pair.trim().split(":")
+                        if (parts.size == 2) {
+                            val addr = parts[0].trim()
+                            val w = parts[1].trim().toUIntOrNull() ?: continue
+                            val signer = signers.firstOrNull { s ->
+                                when (s) {
+                                    is DelegatedSigner -> s.address == addr
+                                    else -> false
+                                }
+                            } ?: DelegatedSigner(addr)
+                            weightMap[signer] = w
+                        }
+                    }
+                }
+                buildWeightedThresholdScVal(weightMap, threshold)
+            }
+            else -> throw IllegalArgumentException("Unknown policy type: ${desc.policyType}")
+        }
+    }
+
 }
 
 /**
