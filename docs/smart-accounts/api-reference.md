@@ -1793,8 +1793,7 @@ suspend fun addContextRule(
 | `selectedSigners` | `List<SelectedSigner>` | Optional signers for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey. |
 | `forceMethod` | `SubmissionMethod?` | Optional submission method override (default: null, auto-detect) |
 
-
-
+**Validation**: At least one signer or one policy is required.
 
 
 
@@ -1811,6 +1810,8 @@ suspend fun addContextRule(
 - Max 5 policies per rule
 
 **Returns**: `TransactionResult`
+
+**Throws**: `ValidationException` if name is empty, signer/policy count exceeds limits, or policy address is invalid. `TransactionException` if submission fails.
 
 **Example**:
 
@@ -1831,15 +1832,34 @@ val result = kit.contextRuleManager.addContextRule(
 
 ---
 
+#### getContextRule
+
+```kotlin
+suspend fun getContextRule(id: UInt): SCValXdr
+```
+
+Retrieves a single context rule by ID as a raw ScVal. Query operation (read-only, no authorization required).
+
+**Parameters**:
+- `id`: Context rule ID
+
+**Returns**: Raw SCValXdr containing the rule data.
+
+**Throws**: `TransactionException` if simulation fails or the rule does not exist.
+
+---
+
 #### getContextRulesCount
 
 ```kotlin
 suspend fun getContextRulesCount(): UInt
 ```
 
-Retrieves the total number of active context rules.
+Retrieves the total number of active context rules. Query operation (read-only, no authorization required).
 
-**Returns**: Count of active rules
+**Returns**: Count of active rules.
+
+**Throws**: `TransactionException` if simulation fails.
 
 ---
 
@@ -1855,6 +1875,32 @@ Retrieves all active context rules as raw ScVal objects. Iterates rule IDs from 
 - `maxScanId`: Upper bound on rule IDs to scan. Defaults to `OZSmartAccountConfig.maxContextRuleScanId`.
 
 **Returns**: List of raw ScVal objects, one per active context rule.
+
+---
+
+#### listContextRules
+
+```kotlin
+suspend fun listContextRules(maxScanId: UInt = config.maxContextRuleScanId): List<ParsedContextRule>
+```
+
+Lists all active context rules as parsed objects. This is the primary method for rule discovery.
+
+**Parameters**:
+- `maxScanId`: Upper bound on rule IDs to scan. Defaults to `OZSmartAccountConfig.maxContextRuleScanId`.
+
+**Returns**: List of `ParsedContextRule` objects.
+
+**Throws**: `ValidationException` if a rule cannot be parsed. `TransactionException` if simulation fails.
+
+**Example**:
+
+```kotlin
+val rules = kit.contextRuleManager.listContextRules()
+for (rule in rules) {
+    println("Rule ${rule.id}: ${rule.name} (${rule.signers.size} signers, ${rule.policies.size} policies)")
+}
+```
 
 ---
 
@@ -1922,6 +1968,36 @@ Removes a context rule.
 - `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
+
+---
+
+### ParsedContextRule
+
+Parsed representation of a context rule from on-chain data. Returned by `listContextRules()`.
+
+```kotlin
+data class ParsedContextRule(
+    val id: UInt,
+    val contextType: ContextRuleType,
+    val name: String,
+    val signers: List<SmartAccountSigner>,
+    val signerIds: List<UInt>,
+    val policies: List<String>,
+    val policyIds: List<UInt>,
+    val validUntil: UInt?
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `UInt` | Unique identifier of this context rule |
+| `contextType` | `ContextRuleType` | Operations this rule applies to |
+| `name` | `String` | Human-readable name |
+| `signers` | `List<SmartAccountSigner>` | Signers who can authorize matching operations |
+| `signerIds` | `List<UInt>` | On-chain signer IDs, positionally aligned with `signers` |
+| `policies` | `List<String>` | Policy contract addresses (C-addresses) |
+| `policyIds` | `List<UInt>` | On-chain policy IDs, positionally aligned with `policies` |
+| `validUntil` | `UInt?` | Expiry ledger number, or null if no expiration |
 
 ---
 

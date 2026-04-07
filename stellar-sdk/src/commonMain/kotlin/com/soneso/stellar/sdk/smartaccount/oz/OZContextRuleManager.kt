@@ -201,7 +201,7 @@ class OZContextRuleManager internal constructor(
      * and policies that constrain how operations can be executed.
      *
      * Flow:
-     * 1. Validates inputs (name, signers count, policies count)
+     * 1. Validates inputs (name, signers count, policies count, policy addresses)
      * 2. Builds contract invocation for add_context_rule
      * 3. Simulates to get auth entries
      * 4. Signs auth entries (requires user interaction)
@@ -352,17 +352,7 @@ class OZContextRuleManager internal constructor(
      * This is a query operation (read-only, no authorization required). It uses simulation
      * to extract the return value without submitting a transaction.
      *
-     * The returned ScVal structure contains:
-     * - id: u32
-     * - context_type: Vec[Symbol, ...] (Default | CallContract | CreateContract)
-     * - name: Symbol or String
-     * - signers: Vec[signer ScVals]
-     * - policies: Map[Address -> ScVal]
-     * - valid_until: Option<u32> (void for None, u32 for Some)
-     *
-     * NOTE: Parsing the full context rule from ScVal is complex due to nested structures.
-     * For initial implementation, this method returns the raw ScVal. Applications can
-     * extract specific fields as needed.
+     * For parsed context rules, use [listContextRules] which returns [ParsedContextRule] objects.
      *
      * @param id The context rule ID to retrieve
      * @return The raw SCVal response containing the context rule details
@@ -405,7 +395,7 @@ class OZContextRuleManager internal constructor(
      *
      * @return The number of context rules currently configured
      * @throws TransactionException if simulation fails
-     * @throws ValidationException if parsing fails
+     * @throws ValidationException if the result is not a U32 value
      *
      * Example:
      * ```kotlin
@@ -452,6 +442,8 @@ class OZContextRuleManager internal constructor(
      * @param maxScanId Upper bound on rule IDs to scan. Defaults to
      *   [OZSmartAccountConfig.maxContextRuleScanId].
      * @return List of raw ScVal objects, one per active context rule.
+     * @throws TransactionException if simulation fails
+     * @throws ValidationException if the count result cannot be parsed
      */
     suspend fun getAllContextRules(maxScanId: UInt = kit.config.maxContextRuleScanId): List<SCValXdr> {
         val activeCount = getContextRulesCount()
@@ -479,7 +471,7 @@ class OZContextRuleManager internal constructor(
      * Lists all active context rules as parsed objects.
      *
      * Fetches all raw ScVal rules via [getAllContextRules] and parses each one.
-     * This is the primary method for rule discovery in v0.7.0.
+     * This is the primary method for rule discovery.
      *
      * @param maxScanId Upper bound on rule IDs to scan
      * @return List of parsed context rules
@@ -645,6 +637,8 @@ class OZContextRuleManager internal constructor(
      * Format:
      * - Delegated: Vec([Symbol("Delegated"), Address])
      * - External: Vec([Symbol("External"), Address, Bytes])
+     *
+     * @throws ValidationException for unknown signer types or malformed data
      */
     private fun parseSigner(scVal: SCValXdr): SmartAccountSigner {
         val vec = try { Scv.fromVec(scVal) } catch (e: Exception) {
@@ -691,11 +685,14 @@ class OZContextRuleManager internal constructor(
      * then matches those against the account's active rules. The resolution algorithm:
      * 1. Filter rules by context type match
      * 2. If 1 candidate: use it
-     * 3. If multiple: filter by exact signer match (same signers, same count)
+     * 3. Tier 1 — Exact signer match: same signers and same count in both directions
      * 4. If 1 match: use it
-     * 5. If multiple: filter by signer subset (rule signers subset of selected, no policies)
+     * 5. Tier 2 — Rule subset: all rule signers appear in selected signers, no policies
      * 6. If 1 match: use it
-     * 7. Otherwise: throw error
+     * 7. Tier 3 — Selected subset: all selected signers appear in the rule (handles
+     *    threshold scenarios where the user picks fewer signers than the rule has)
+     * 8. If 1 match: use it
+     * 9. Otherwise: throw error (no match, or ambiguous multi-match)
      *
      * @param entry The auth entry to resolve rules for
      * @param selectedSigners The signers that will sign this entry
@@ -703,7 +700,7 @@ class OZContextRuleManager internal constructor(
      * @throws ValidationException if no unique context rule can be resolved for any context
      * @throws TransactionException if simulation fails while fetching rules
      */
-    suspend fun resolveContextRuleIdsForEntry(
+    internal suspend fun resolveContextRuleIdsForEntry(
         entry: SorobanAuthorizationEntryXdr,
         selectedSigners: List<SmartAccountSigner>
     ): List<UInt> {
@@ -723,7 +720,7 @@ class OZContextRuleManager internal constructor(
      * @return Ordered list of context rule IDs, one per invocation context
      * @throws ValidationException if no unique context rule can be resolved for any context
      */
-    fun resolveContextRuleIdsForEntry(
+    internal fun resolveContextRuleIdsForEntry(
         entry: SorobanAuthorizationEntryXdr,
         selectedSigners: List<SmartAccountSigner>,
         rules: List<ParsedContextRule>
@@ -830,7 +827,7 @@ class OZContextRuleManager internal constructor(
      * @param entry The auth entry whose invocation tree to traverse
      * @return Ordered list of context types, one per invocation node (depth-first)
      */
-    fun buildInvocationContextTypes(entry: SorobanAuthorizationEntryXdr): List<ContextRuleType> {
+    private fun buildInvocationContextTypes(entry: SorobanAuthorizationEntryXdr): List<ContextRuleType> {
         val result = mutableListOf<ContextRuleType>()
         collectInvocationContextTypes(entry.rootInvocation.function, result)
         collectSubInvocationContextTypes(entry.rootInvocation.subInvocations, result)
@@ -896,7 +893,7 @@ class OZContextRuleManager internal constructor(
      * @param requiredType The context type required by the invocation
      * @return true if the rule's context type matches the required type
      */
-    fun contextRuleTypeMatches(ruleType: ContextRuleType, requiredType: ContextRuleType): Boolean {
+    private fun contextRuleTypeMatches(ruleType: ContextRuleType, requiredType: ContextRuleType): Boolean {
         if (ruleType is ContextRuleType.Default) return true
         return ruleType == requiredType
     }
@@ -1003,6 +1000,7 @@ class OZContextRuleManager internal constructor(
      * @param forceMethod Optional submission method override. When null (default), uses the
      *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
+     * @throws ValidationException if the wallet is not connected
      * @throws TransactionException if transaction submission fails
      *
      * Example:

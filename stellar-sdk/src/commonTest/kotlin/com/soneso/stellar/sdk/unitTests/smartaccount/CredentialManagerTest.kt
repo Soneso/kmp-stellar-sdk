@@ -16,6 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -265,7 +266,7 @@ class CredentialManagerTest {
     }
 
     @Test
-    fun testCreatePendingCredential_setsIsPrimaryTrue() = runTest {
+    fun testCreatePendingCredential_setsIsPrimaryFalse() = runTest {
         val kit = createKit()
 
         val credential = kit.credentialManager.createPendingCredential(
@@ -274,7 +275,7 @@ class CredentialManagerTest {
             contractId = testContractId
         )
 
-        assertTrue(credential.isPrimary)
+        assertFalse(credential.isPrimary)
     }
 
     @Test

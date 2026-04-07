@@ -493,7 +493,7 @@ class SmartAccountKitTest {
         assertNotNull(credential)
         assertEquals("test-credential-1", credential.credentialId)
         assertEquals(CredentialDeploymentStatus.PENDING, credential.deploymentStatus)
-        assertTrue(credential.isPrimary)
+        assertFalse(credential.isPrimary)
     }
 
     @Test
@@ -1045,12 +1045,11 @@ class SmartAccountKitTest {
 
     @Test
     fun testPolicyInstallParams_simpleThreshold_zeroThreshold() {
-        val params = PolicyInstallParams.SimpleThreshold(threshold = 0u)
-        val scVal = params.toScVal()
-
-        // Zero threshold is allowed (validation is contract-side)
-        assertNotNull(scVal)
-        assertTrue(scVal is SCValXdr.Map)
+        // Zero threshold is rejected — must be > 0
+        assertFailsWith<ValidationException.InvalidInput> {
+            val params = PolicyInstallParams.SimpleThreshold(threshold = 0u)
+            params.toScVal()
+        }
     }
 
     @Test
