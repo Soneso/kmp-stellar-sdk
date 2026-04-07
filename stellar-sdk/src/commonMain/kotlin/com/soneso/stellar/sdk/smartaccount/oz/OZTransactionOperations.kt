@@ -204,16 +204,10 @@ class OZTransactionOperations internal constructor(
         amount: String,
         forceMethod: SubmissionMethod? = null
     ): TransactionResult {
-        // STEP 1: Validate inputs
         val (_, contractId) = kit.requireConnected()
 
-        // Validate token contract address (must be C-address)
-        requireContractAddress(tokenContract, "tokenContract")
-
-        // Validate recipient address (G or C)
         requireStellarAddress(recipient, "recipient")
 
-        // Prevent self-transfer
         if (recipient == contractId) {
             throw ValidationException.invalidInput(
                 "recipient",
@@ -221,32 +215,20 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 2: Convert amount to stroops — validates non-empty and positive
         val stroops = Util.amountToStroops(amount)
 
-        // STEP 3: Build host function for token transfer
-        // Contract call: token.transfer(from: smartAccount, to: recipient, amount: stroops)
-        val fromAddress = Address(contractId).toSCAddress()
-        val toAddress = Address(recipient).toSCAddress()
-
-        val amountScVal = Util.stroopsToI128ScVal(stroops)
-
-        val functionArgs = listOf(
-            Scv.toAddress(fromAddress),
-            Scv.toAddress(toAddress),
-            amountScVal
+        val targetArgs = listOf(
+            Scv.toAddress(Address(contractId).toSCAddress()),
+            Scv.toAddress(Address(recipient).toSCAddress()),
+            Util.stroopsToI128ScVal(stroops)
         )
 
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = Address(tokenContract).toSCAddress(),
-            functionName = SCSymbolXdr("transfer"),
-            args = functionArgs
+        return contractCall(
+            target = tokenContract,
+            targetFn = "transfer",
+            targetArgs = targetArgs,
+            forceMethod = forceMethod
         )
-
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-
-        // STEP 4-8: Submit the transaction (will handle simulation, signing, and polling)
-        return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
     // MARK: - Direct Contract Call

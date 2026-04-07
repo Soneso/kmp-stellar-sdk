@@ -176,16 +176,10 @@ class OZMultiSignerManager internal constructor(
         forceMethod: SubmissionMethod? = null,
         resolveContextRuleIds: ResolveContextRuleIds? = null
     ): TransactionResult {
-        // STEP 1: Validate inputs (same as single-signer transfer)
         val (_, contractId) = kit.requireConnected()
 
-        // Validate token contract address (must be C-address)
-        requireContractAddress(tokenContract, "tokenContract")
-
-        // Validate recipient address (G or C)
         requireStellarAddress(recipient, "recipient")
 
-        // Prevent self-transfer
         if (recipient == contractId) {
             throw ValidationException.invalidInput(
                 "recipient",
@@ -193,37 +187,22 @@ class OZMultiSignerManager internal constructor(
             )
         }
 
-        // At least one signer is required
-        if (selectedSigners.isEmpty()) {
-            throw ValidationException.invalidInput(
-                "selectedSigners",
-                "At least one signer must be provided"
-            )
-        }
-
-        // STEP 2: Build host function for token transfer
         val stroops = Util.amountToStroops(amount)
 
-        val fromAddress = Address(contractId).toSCAddress()
-        val toAddress = Address(recipient).toSCAddress()
-
-        val amountScVal = Util.stroopsToI128ScVal(stroops)
-
-        val functionArgs = listOf(
-            Scv.toAddress(fromAddress),
-            Scv.toAddress(toAddress),
-            amountScVal
+        val targetArgs = listOf(
+            Scv.toAddress(Address(contractId).toSCAddress()),
+            Scv.toAddress(Address(recipient).toSCAddress()),
+            Util.stroopsToI128ScVal(stroops)
         )
 
-        val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = Address(tokenContract).toSCAddress(),
-            functionName = SCSymbolXdr("transfer"),
-            args = functionArgs
+        return multiSignerContractCall(
+            target = tokenContract,
+            targetFn = "transfer",
+            targetArgs = targetArgs,
+            selectedSigners = selectedSigners,
+            forceMethod = forceMethod,
+            resolveContextRuleIds = resolveContextRuleIds
         )
-
-        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
-
-        return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
     }
 
     // MARK: - Multi-Signer Direct Contract Call
