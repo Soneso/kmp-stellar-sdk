@@ -232,6 +232,18 @@ class ManagerSelectedSignersTest {
         }
     }
 
+    @Test
+    fun testRemovePolicyByAddress_notConnected_throwsNotConnected() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
+        assertFailsWith<WalletException.NotConnected> {
+            kit.policyManager.removePolicy(
+                contextRuleId = 0u,
+                policyAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                selectedSigners = multiSigners
+            )
+        }
+    }
+
     // ========================================================================
     // OZContextRuleManager.updateName — selectedSigners
     // ========================================================================

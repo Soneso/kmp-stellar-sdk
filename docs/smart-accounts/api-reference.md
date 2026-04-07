@@ -1492,8 +1492,10 @@ Generic method for adding any policy contract to a context rule. The convenience
 **Returns**: `TransactionResult`
 
 **Throws**:
-- `ValidationException`: Invalid address or wallet not connected
-- `TransactionException`: Transaction simulation or submission failed
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid policy address
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
 
 **Example**:
 
@@ -1542,6 +1544,22 @@ Adds a simple threshold policy (M-of-N signers).
 
 **Returns**: `TransactionResult`
 
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid policy address
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val result = kit.policyManager.addSimpleThreshold(
+    contextRuleId = 1u,
+    policyAddress = "CTHRESHOLD...",
+    threshold = 2u
+)
+```
+
 ---
 
 #### addWeightedThreshold
@@ -1569,6 +1587,26 @@ Adds a weighted threshold policy with configurable signer weights.
 
 **Returns**: `TransactionResult`
 
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid policy address or empty signer weights map
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val signer1 = DelegatedSigner(address = "GA7Q...")
+val signer2 = DelegatedSigner(address = "GBXYZ...")
+
+val result = kit.policyManager.addWeightedThreshold(
+    contextRuleId = 1u,
+    policyAddress = "CWEIGHTED...",
+    signerWeights = mapOf(signer1 to 3u, signer2 to 2u),
+    threshold = 4u
+)
+```
+
 ---
 
 #### addSpendingLimit
@@ -1595,6 +1633,13 @@ Adds a spending limit policy.
 - `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid policy address
+- `IllegalArgumentException`: Invalid spending limit amount
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
 
 **Example**:
 
@@ -1630,6 +1675,63 @@ Removes a policy from a context rule by its on-chain policy ID.
 - `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `TransactionException`: Simulation, signing, or submission failed (including invalid policy ID rejected by contract)
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+// Get policy IDs from the parsed context rule
+val rules = kit.contextRuleManager.listContextRules()
+val rule = rules.first { it.id == 1u }
+val policyId = rule.policyIds.first()
+
+val result = kit.policyManager.removePolicy(
+    contextRuleId = 1u,
+    policyId = policyId
+)
+```
+
+---
+
+#### removePolicy (by policy address)
+
+```kotlin
+suspend fun removePolicy(
+    contextRuleId: UInt,
+    policyAddress: String,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
+```
+
+Convenience overload that resolves the on-chain policy ID internally. Fetches the specified context rule (single RPC call), finds the policy matching the given address, and delegates to the ID-based `removePolicy`.
+
+**Parameters**:
+- `contextRuleId`: Context rule ID
+- `policyAddress`: The policy contract address (C-address) to remove
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization
+- `forceMethod`: Optional submission method override
+
+**Returns**: `TransactionResult`
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Policy address not found on the context rule
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val result = kit.policyManager.removePolicy(
+    contextRuleId = 1u,
+    policyAddress = "CPOLICY..."
+)
+```
 
 ---
 
