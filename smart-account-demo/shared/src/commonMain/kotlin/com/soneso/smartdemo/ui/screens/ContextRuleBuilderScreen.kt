@@ -105,6 +105,7 @@ import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 import kotlinx.coroutines.launch
@@ -1518,13 +1519,11 @@ class ContextRuleBuilderScreen(
         wasmHashHex: String
     ): ContextRuleType {
         return when (option) {
-            ContextTypeOption.DEFAULT -> ContextRuleType.Default
+            ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContext()
             ContextTypeOption.CALL_CONTRACT ->
-                ContextRuleType.CallContract(contractAddress.trim())
+                OZBuilders.createCallContractContext(contractAddress.trim())
             ContextTypeOption.CREATE_CONTRACT ->
-                ContextRuleType.CreateContract(
-                    hexToByteArray(wasmHashHex.trim().lowercase())
-                )
+                OZBuilders.createCreateContractContext(wasmHashHex.trim().lowercase())
         }
     }
 

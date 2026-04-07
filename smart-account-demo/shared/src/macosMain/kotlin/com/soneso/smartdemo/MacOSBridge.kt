@@ -69,6 +69,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
+import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
@@ -1227,19 +1228,19 @@ class MacOSBridge {
             "call_contract" -> {
                 val addr = contextTypeParam
                     ?: throw IllegalArgumentException("call_contract requires a contract address")
-                ContextRuleType.CallContract(addr)
+                OZBuilders.createCallContractContext(addr)
             }
             "create_contract" -> {
                 val hex = contextTypeParam
                     ?: throw IllegalArgumentException("create_contract requires a WASM hash hex string")
-                ContextRuleType.CreateContract(hexToByteArray(hex))
+                OZBuilders.createCreateContractContext(hex)
             }
-            else -> ContextRuleType.Default
+            else -> OZBuilders.createDefaultContext()
         }
     }
 
     /**
-     * Non-throwing variant of [buildContextRuleType], returning [ContextRuleType.Default] on error.
+     * Non-throwing variant of [buildContextRuleType], returning Default on error.
      */
     private fun buildContextRuleTypeNoThrow(
         contextTypeName: String,
@@ -1248,7 +1249,7 @@ class MacOSBridge {
         return try {
             buildContextRuleType(contextTypeName, contextTypeParam)
         } catch (_: Exception) {
-            ContextRuleType.Default
+            OZBuilders.createDefaultContext()
         }
     }
 

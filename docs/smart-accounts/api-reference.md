@@ -17,13 +17,14 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 5. [Credential Management](#credential-management)
 6. [Signers and Policies](#signers-and-policies)
 7. [Context Rules](#context-rules)
-8. [Multi-Signer Operations](#multi-signer-operations)
-9. [External Signers](#external-signers)
-10. [Indexer Client](#indexer-client)
-11. [Relayer Client](#relayer-client)
-12. [Events](#events)
-13. [Exceptions](#exceptions)
-14. [Types](#types)
+8. [Builders](#builders)
+9. [Multi-Signer Operations](#multi-signer-operations)
+10. [External Signers](#external-signers)
+11. [Indexer Client](#indexer-client)
+12. [Relayer Client](#relayer-client)
+13. [Events](#events)
+14. [Exceptions](#exceptions)
+15. [Types](#types)
 
 ---
 
@@ -1640,6 +1641,74 @@ ContextRuleType.CallContract("CBCD1234...")
 // Deployment: applies to contract deployments with this WASM hash
 ContextRuleType.CreateContract(wasmHashBytes)
 ```
+
+---
+
+## Builders
+
+### OZBuilders
+
+Type-safe constructors for context rule types and signer utilities. Use these instead of constructing `ContextRuleType` directly to get input validation.
+
+```kotlin
+val builders = OZBuilders
+```
+
+#### createDefaultContext
+
+```kotlin
+fun createDefaultContext(): ContextRuleType
+```
+
+Creates a Default context rule type that matches any operation.
+
+#### createCallContractContext
+
+```kotlin
+fun createCallContractContext(contractAddress: String): ContextRuleType
+```
+
+Creates a CallContract context rule type for a specific contract.
+
+**Parameters**:
+- `contractAddress`: The contract address (C-address, validated)
+
+**Throws**: `ValidationException` if the address is not a valid C-address
+
+**Example**:
+
+```kotlin
+val contextType = OZBuilders.createCallContractContext("CTOKEN...")
+val result = kit.contextRuleManager.addContextRule(
+    contextType = contextType,
+    name = "Token operations",
+    signers = signerList,
+    policies = policyMap
+)
+```
+
+#### createCreateContractContext
+
+```kotlin
+fun createCreateContractContext(wasmHashHex: String): ContextRuleType
+fun createCreateContractContext(wasmHash: ByteArray): ContextRuleType
+```
+
+Creates a CreateContract context rule type for a specific WASM hash.
+
+**Parameters**:
+- `wasmHashHex`: 64-character hex string (with optional "0x" prefix), or
+- `wasmHash`: 32-byte array
+
+**Throws**: `ValidationException` if the hash length is incorrect
+
+#### collectUniqueSignersFromRules
+
+```kotlin
+fun collectUniqueSignersFromRules(rules: List<ParsedContextRule>): List<SmartAccountSigner>
+```
+
+Collects unique signers from all context rules, removing duplicates across rules.
 
 ---
 

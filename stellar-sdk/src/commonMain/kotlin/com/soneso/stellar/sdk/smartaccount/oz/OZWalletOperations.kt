@@ -386,7 +386,6 @@ class OZWalletOperations internal constructor(
             buildDeployTransaction(
                 publicKey = publicKey,
                 credentialId = registrationResult.credentialId,
-                contractId = contractId,
                 forceMethod = forceMethod
             )
         } catch (e: Exception) {
@@ -396,8 +395,7 @@ class OZWalletOperations internal constructor(
                     error = e.message ?: "Build failed"
                 )
             } catch (_: Exception) {}
-            throw if (e is SmartAccountException) e
-            else TransactionException.submissionFailed(
+            throw (e as? SmartAccountException) ?: TransactionException.submissionFailed(
                 "Failed to build deploy transaction: ${e.message}",
                 e
             )
@@ -612,7 +610,7 @@ class OZWalletOperations internal constructor(
         if (!options.fresh) {
             val session = try {
                 kit.getStorage().getSession()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
 
@@ -624,11 +622,11 @@ class OZWalletOperations internal constructor(
                         contractId = session.contractId
                     )
                     return result.copy(restoredFromSession = true)
-                } catch (e: WalletException.NotFound) {
+                } catch (_: WalletException.NotFound) {
                     // Contract no longer exists on-chain (expired TTL) - clear stale session
                     try {
                         kit.getStorage().clearSession()
-                    } catch (clearError: Exception) {
+                    } catch (_: Exception) {
                         // Non-critical
                     }
                     // Fall through to prompt or return null
@@ -647,7 +645,7 @@ class OZWalletOperations internal constructor(
 
                 try {
                     kit.getStorage().clearSession()
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Non-critical - continue
                 }
             }
@@ -691,7 +689,7 @@ class OZWalletOperations internal constructor(
             if (storedCredential != null) {
                 contractId = storedCredential.contractId
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Storage lookup failed - continue to indexer
         }
 
@@ -704,7 +702,7 @@ class OZWalletOperations internal constructor(
                     if (lookupResponse.contracts.isNotEmpty()) {
                         contractId = lookupResponse.contracts.first().contractId
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Indexer lookup failed - continue to derivation
                 }
             }
@@ -888,7 +886,7 @@ class OZWalletOperations internal constructor(
             if (storedCredential != null) {
                 publicKey = storedCredential.publicKey
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Storage lookup failed - continue with empty public key
             // Caller can retrieve it from other sources if needed
         }
@@ -936,7 +934,7 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        var finalCredentialId = credentialId
+        val finalCredentialId = credentialId
         var finalContractId = contractId
 
         // If credentialId provided, look up contract ID if not provided
@@ -948,7 +946,7 @@ class OZWalletOperations internal constructor(
                     if (storedCredential != null) {
                         finalContractId = storedCredential.contractId
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Storage lookup failed - continue to indexer
                 }
             }
@@ -962,7 +960,7 @@ class OZWalletOperations internal constructor(
                         if (lookupResponse.contracts.isNotEmpty()) {
                             finalContractId = lookupResponse.contracts.first().contractId
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Indexer lookup failed - continue to derivation
                     }
                 }
@@ -975,7 +973,7 @@ class OZWalletOperations internal constructor(
                 // Decode Base64URL credential ID to raw bytes
                 val credentialIdBytes = try {
                     Util.base64urlDecode(finalCredentialId)
-                } catch (e: IllegalArgumentException) {
+                } catch (_: IllegalArgumentException) {
                     throw ValidationException.invalidInput(
                         "credentialId",
                         "Invalid Base64URL-encoded credential ID"
@@ -1009,7 +1007,7 @@ class OZWalletOperations internal constructor(
         // Delete transitional credential from storage after on-chain verification
         try {
             credentialManager.deleteCredential(credentialId = finalCredentialId)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Non-critical - credential is transitional
         }
 
@@ -1170,7 +1168,7 @@ class OZWalletOperations internal constructor(
         // Decode credentialId bytes from base64url
         val credentialIdBytes = try {
             Util.base64urlDecode(credentialId)
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             throw CredentialException.invalid(
                 "Invalid Base64URL-encoded credential ID: $credentialId"
             )
@@ -1196,7 +1194,6 @@ class OZWalletOperations internal constructor(
             buildDeployTransaction(
                 publicKey = publicKey,
                 credentialId = credentialIdBytes,
-                contractId = contractId,
                 forceMethod = forceMethod
             )
         } catch (e: Exception) {
@@ -1206,8 +1203,7 @@ class OZWalletOperations internal constructor(
                     error = e.message ?: "Build failed"
                 )
             } catch (_: Exception) {}
-            throw if (e is SmartAccountException) e
-            else TransactionException.submissionFailed(
+            throw (e as? SmartAccountException) ?: TransactionException.submissionFailed(
                 "Failed to build deploy transaction: ${e.message}",
                 e
             )
@@ -1265,7 +1261,6 @@ class OZWalletOperations internal constructor(
      *
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
      * @param credentialId The WebAuthn credential ID (raw bytes)
-     * @param contractId The derived contract address
      * @param forceMethod Optional override to force relayer or RPC submission. When null, auto-detects based on relayer configuration.
      * @return The signed [Transaction] ready for submission
      * @throws TransactionException if building or simulation fails
@@ -1273,7 +1268,6 @@ class OZWalletOperations internal constructor(
     private suspend fun buildDeployTransaction(
         publicKey: ByteArray,
         credentialId: ByteArray,
-        contractId: String,
         forceMethod: SubmissionMethod? = null
     ): Transaction {
         // Build key_data = publicKey (65 bytes) + credentialId
@@ -1544,7 +1538,7 @@ class OZWalletOperations internal constructor(
 
             val txStatus = try {
                 kit.sorobanServer.getTransaction(hash = transactionHash)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Network error, retry
                 if (attempt < 10) {
                     continue

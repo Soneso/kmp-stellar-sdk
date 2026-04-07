@@ -16,7 +16,7 @@ import com.soneso.stellar.sdk.smartaccount.core.ValidationException
  * Builder utilities for OpenZeppelin smart account context rules.
  *
  * Provides type-safe constructors and display utilities for [ContextRuleType] and
- * related OZ-specific operations. These functions are separated from [com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders]
+ * related OZ-specific operations. These functions are separated from [SmartAccountBuilders]
  * to avoid a circular package dependency between `core` and `oz`.
  */
 object OZBuilders {
@@ -69,7 +69,7 @@ object OZBuilders {
      *
      * @param wasmHashHex The WASM hash as a hex string (64 characters, optionally prefixed with "0x")
      * @return A [ContextRuleType.CreateContract] for contract creation authorization
-     * @throws ValidationException.InvalidInput if the hex string is not 64 characters
+     * @throws ValidationException.InvalidInput if the hex string (after removing optional "0x" prefix) is not 64 characters
      *
      * Example:
      * ```kotlin
