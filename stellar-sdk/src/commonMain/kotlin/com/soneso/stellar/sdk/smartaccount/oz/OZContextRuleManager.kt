@@ -502,7 +502,7 @@ class OZContextRuleManager internal constructor(
      * @return The parsed context rule
      * @throws ValidationException if the ScVal structure is invalid or required fields are missing
      */
-    private fun parseContextRule(scVal: SCValXdr): ParsedContextRule {
+    internal fun parseContextRule(scVal: SCValXdr): ParsedContextRule {
         val mapEntries = (scVal as? SCValXdr.Map)?.value?.value
             ?: throw ValidationException.invalidInput("contextRule", "Expected Map ScVal for context rule")
 

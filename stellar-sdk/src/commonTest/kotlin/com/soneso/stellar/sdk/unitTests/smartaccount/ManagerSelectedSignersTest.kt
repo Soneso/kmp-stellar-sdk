@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.SubmissionMethod
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.core.WalletException
@@ -168,6 +169,18 @@ class ManagerSelectedSignersTest {
             kit.signerManager.removeSigner(
                 contextRuleId = 0u,
                 signerId = 1u,
+                selectedSigners = multiSigners
+            )
+        }
+    }
+
+    @Test
+    fun testRemoveSignerBySigner_notConnected_throwsNotConnected() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
+        assertFailsWith<WalletException.NotConnected> {
+            kit.signerManager.removeSigner(
+                contextRuleId = 0u,
+                signer = DelegatedSigner(address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"),
                 selectedSigners = multiSigners
             )
         }

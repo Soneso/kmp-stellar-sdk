@@ -66,7 +66,7 @@ class OZCredentialManager internal constructor(
      *
      * The credential is created with:
      * - deploymentStatus: PENDING
-     * - isPrimary: true
+     * - isPrimary: false (set to true by wallet creation flow)
      * - createdAt: current timestamp
      *
      * Validation:
@@ -137,7 +137,7 @@ class OZCredentialManager internal constructor(
             publicKey = publicKey,
             contractId = contractId,
             deploymentStatus = CredentialDeploymentStatus.PENDING,
-            isPrimary = true,
+            isPrimary = false,
             createdAt = currentTimeMillis(),
             nickname = nickname,
             transports = transports,

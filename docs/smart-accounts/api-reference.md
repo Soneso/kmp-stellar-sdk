@@ -1222,9 +1222,11 @@ Internally calls the WebAuthn provider's `register()` method, stores the credent
 **Returns**: `AddPasskeySignerResult` with the new credential ID, public key, and transaction result
 
 **Throws**:
-- `WebAuthnException.NotSupported`: No WebAuthn provider configured
 - `WalletException.NotConnected`: Wallet is not connected
+- `WebAuthnException.NotSupported`: No WebAuthn provider configured
 - `WebAuthnException.RegistrationFailed`: Passkey registration failed
+- `ValidationException`: Invalid public key or credential ID
+- `StorageException`: Credential storage failed
 - `TransactionException`: On-chain signer addition failed
 
 **Example**:
@@ -1237,8 +1239,6 @@ val result = kit.signerManager.addNewPasskeySigner(
 println("New passkey credential: ${result.credentialId}")
 println("Transaction hash: ${result.transactionResult.hash}")
 ```
-
-**TS SDK divergence**: The TypeScript SDK's `addPasskey()` returns an unsigned transaction for the caller to submit. The KMP SDK's `addNewPasskeySigner()` returns a `TransactionResult` because the transaction is assembled and submitted internally (via relayer when configured).
 
 ---
 
@@ -1265,7 +1265,21 @@ Low-level method that adds a pre-registered WebAuthn passkey signer to a context
 
 **Returns**: `TransactionResult` indicating success or failure
 
-**Throws**: `SmartAccountException` if validation or submission fails
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid public key size or credential ID
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val result = kit.signerManager.addPasskey(
+    contextRuleId = 0u,
+    publicKey = secp256r1PublicKey,   // 65 bytes, uncompressed
+    credentialId = credentialIdBytes  // raw WebAuthn credential ID
+)
+```
 
 ---
 
@@ -1289,6 +1303,12 @@ Adds a delegated signer (account or contract) to a context rule.
 - `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
 **Returns**: `TransactionResult`
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid address format
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
 
 **Example**:
 
@@ -1335,6 +1355,22 @@ Adds an Ed25519 signer to a context rule.
 
 **Returns**: `TransactionResult`
 
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid verifier address or public key size
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val result = kit.signerManager.addEd25519(
+    contextRuleId = 0u,
+    verifierAddress = "CED25519VERIFIER...",
+    publicKey = ed25519PublicKey  // 32 bytes
+)
+```
+
 ---
 
 #### removeSigner
@@ -1360,7 +1396,62 @@ Removes a signer from a context rule by its on-chain signer ID.
 
 **Returns**: `TransactionResult`
 
-**Throws**: Various SmartAccount exceptions
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `TransactionException`: Simulation, signing, or submission failed (including invalid signer ID rejected by contract)
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+// Get signer IDs from the parsed context rule
+val rules = kit.contextRuleManager.listContextRules()
+val rule = rules.first { it.id == 1u }
+val signerId = rule.signerIds.first()
+
+val result = kit.signerManager.removeSigner(
+    contextRuleId = 1u,
+    signerId = signerId
+)
+```
+
+---
+
+#### removeSigner (by signer value)
+
+```kotlin
+suspend fun removeSigner(
+    contextRuleId: UInt,
+    signer: SmartAccountSigner,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
+```
+
+Convenience overload that resolves the on-chain signer ID internally. Fetches the context rule, finds the matching signer, and delegates to the ID-based `removeSigner`.
+
+**Parameters**:
+- `contextRuleId`: Context rule ID
+- `signer`: The signer to remove (matched by equality against the rule's signers)
+- `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization
+- `forceMethod`: Optional submission method override
+
+**Returns**: `TransactionResult`
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Signer not found on the context rule
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+val result = kit.signerManager.removeSigner(
+    contextRuleId = 1u,
+    signer = DelegatedSigner(address = "GA7Q...")
+)
+```
 
 ---
 

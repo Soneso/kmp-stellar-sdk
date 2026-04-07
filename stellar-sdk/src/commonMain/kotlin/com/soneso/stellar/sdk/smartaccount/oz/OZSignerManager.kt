@@ -87,8 +87,8 @@ data class AddPasskeySignerResult(
  * // Add a passkey signer to the Default context rule (single-signer)
  * val result = signerManager.addPasskey(
  *     contextRuleId = 0u,
- *     publicKey = secp256r1PublicKey,
- *     credentialId = webAuthnCredentialId
+ *     publicKey = secp256r1PublicKey,       // ByteArray, 65 bytes
+ *     credentialId = credentialIdBytes      // ByteArray, raw WebAuthn credential ID
  * )
  * println("Signer added: ${result.success}")
  *
@@ -104,7 +104,8 @@ data class AddPasskeySignerResult(
  * ```
  *
  * Thread Safety:
- * This class is thread-safe. All operations are async and can be safely called from any coroutine context.
+ * This class holds no mutable state. Thread safety of operations depends on the
+ * parent [OZSmartAccountKit] instance which synchronizes connection state via Mutex.
  *
  * @property kit Reference to the parent OZSmartAccountKit instance
  */
@@ -188,7 +189,7 @@ class OZSignerManager internal constructor(
             )
         } catch (e: Exception) {
             throw WebAuthnException.registrationFailed(
-                "WebAuthn registration failed: ${e.message}",
+                e.message ?: "Unknown error",
                 e
             )
         }
@@ -196,7 +197,7 @@ class OZSignerManager internal constructor(
         // Step 5: Base64URL-encode credential ID for storage
         val credentialIdBase64url = Util.base64urlEncode(registrationResult.credentialId)
 
-        // Step 6: Save credential locally as pending (not primary — this is an additional signer)
+        // Step 6: Save credential locally as pending (isPrimary defaults to false)
         val credential = kit.credentialManager.createPendingCredential(
             credentialId = credentialIdBase64url,
             publicKey = registrationResult.publicKey,
@@ -205,15 +206,6 @@ class OZSignerManager internal constructor(
             deviceType = registrationResult.deviceType,
             backedUp = registrationResult.backedUp
         )
-        // Additional signers are not primary — only the wallet creation passkey is primary
-        try {
-            kit.credentialManager.updateCredential(
-                credentialIdBase64url,
-                StoredCredentialUpdate(isPrimary = false)
-            )
-        } catch (_: Exception) {
-            // Non-critical — isPrimary is metadata only
-        }
 
         // Step 7: Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
@@ -462,22 +454,21 @@ class OZSignerManager internal constructor(
      * @param forceMethod Optional submission method override. When null (default), uses the
      *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if validation fails or transaction fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
      *
      * Example:
      * ```kotlin
-     * // Fetch the context rule to get signer IDs
-     * val contextRule = kit.contextRuleManager.getContextRule(contextRuleId = 0u)
-     * val signerIdToRemove = contextRule.signerIds.first()
+     * // Fetch the parsed context rule to get signer IDs
+     * val rules = kit.contextRuleManager.listContextRules()
+     * val rule = rules.first { it.id == 0u }
+     * val signerIdToRemove = rule.signerIds.first()
      *
      * val result = signerManager.removeSigner(
      *     contextRuleId = 0u,
      *     signerId = signerIdToRemove
      * )
-     *
-     * if (!result.success) {
-     *     println("Failed to remove signer: ${result.error ?: ""}")
-     * }
      * ```
      */
     suspend fun removeSigner(
@@ -511,6 +502,63 @@ class OZSignerManager internal constructor(
         }
     }
 
+    /**
+     * Removes a signer from a context rule by matching the signer value.
+     *
+     * Convenience overload that resolves the on-chain signer ID internally. Fetches the
+     * specified context rule (single RPC call), finds the matching signer by equality,
+     * and delegates to the ID-based [removeSigner]. Use this when you have the
+     * [SmartAccountSigner] object but not the numeric signer ID.
+     *
+     * @param contextRuleId The context rule ID to remove the signer from
+     * @param signer The signer to remove (matched by equality against the rule's signers)
+     * @param selectedSigners Optional list of [SelectedSigner] for multi-signer authorization.
+     * @param forceMethod Optional submission method override.
+     * @return TransactionResult indicating success or failure
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if the signer is not found on the context rule
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = kit.signerManager.removeSigner(
+     *     contextRuleId = 1u,
+     *     signer = DelegatedSigner(address = "GA7Q...")
+     * )
+     * ```
+     */
+    suspend fun removeSigner(
+        contextRuleId: UInt,
+        signer: SmartAccountSigner,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
+        // Fetch only the target context rule (single RPC call) and parse it
+        val ruleScVal = kit.contextRuleManager.getContextRule(contextRuleId)
+        val rule = kit.contextRuleManager.parseContextRule(ruleScVal)
+
+        // Find the matching signer index
+        val signerIndex = rule.signers.indexOfFirst { SmartAccountBuilders.signersEqual(it, signer) }
+        if (signerIndex == -1) {
+            throw ValidationException.invalidInput(
+                "signer",
+                "Signer not found on context rule $contextRuleId"
+            )
+        }
+
+        // Bounds check: signerIds must be aligned with signers
+        if (signerIndex >= rule.signerIds.size) {
+            throw ValidationException.invalidInput(
+                "signer",
+                "Signer found at index $signerIndex but signerIds has only ${rule.signerIds.size} entries"
+            )
+        }
+
+        val signerId = rule.signerIds[signerIndex]
+        return removeSigner(contextRuleId, signerId, selectedSigners, forceMethod)
+    }
+
     // MARK: - Private Helpers
 
     /**
@@ -520,9 +568,9 @@ class OZSignerManager internal constructor(
      * submission path. When [selectedSigners] is empty, uses single-signer submission.
      * When non-empty, delegates to [OZMultiSignerManager.submitWithMultipleSigners].
      *
-     * Note: The contract returns a u32 signer ID for the newly added signer. The ID is emitted
-     * in a contract event and is accessible via [ParsedContextRule.signerIds] after fetching
-     * the context rule. It can be used with [OZSignerManager.removeSigner] to remove the signer.
+     * Note: The contract assigns a u32 signer ID to the newly added signer. This ID is not
+     * included in the [TransactionResult]. To discover it, fetch the context rule via
+     * [OZContextRuleManager.listContextRules] and read [ParsedContextRule.signerIds].
      *
      * @param contextRuleId The context rule ID
      * @param signer The signer to add

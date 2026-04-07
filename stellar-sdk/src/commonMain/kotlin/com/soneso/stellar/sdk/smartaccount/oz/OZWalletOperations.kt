@@ -363,6 +363,13 @@ class OZWalletOperations internal constructor(
             )
         }
 
+        // Mark as primary — this is the wallet creation passkey
+        try {
+            credentialManager.setPrimary(credentialIdBase64url)
+        } catch (_: Exception) {
+            // Non-critical — isPrimary is metadata only
+        }
+
         // Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
 
