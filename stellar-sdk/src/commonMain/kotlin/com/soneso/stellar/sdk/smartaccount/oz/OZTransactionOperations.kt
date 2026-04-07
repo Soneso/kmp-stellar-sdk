@@ -35,8 +35,6 @@ import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import io.ktor.client.request.get
-import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 
 /**
@@ -51,7 +49,7 @@ import kotlinx.coroutines.delay
  * val result = txOps.transfer(
  *     tokenContract = "CBCD...",
  *     recipient = "GA7Q...",
- *     amount = 10.0
+ *     amount = "10"
  * )
  *
  * if (result.success) {
@@ -160,28 +158,29 @@ class OZTransactionOperations internal constructor(
     /**
      * Transfers tokens from the smart account to a recipient.
      *
-     * Builds and submits a token transfer transaction from the connected smart account
-     * to the specified recipient. The amount is automatically converted from XLM to stroops.
+     * Works with any SEP-41 compatible token (XLM via SAC, custom Soroban tokens).
+     * The amount is a decimal string converted to stroops (7 decimal places) internally.
      *
      * Flow:
-     * 1. Validates inputs (addresses, amount, not sending to self)
-     * 2. Converts amount to stroops (1 XLM = 10,000,000 stroops)
-     * 3. Builds contract invocation for token transfer
-     * 4. Simulates transaction to get auth entries
-     * 5. Signs auth entries with passkey (requires user interaction)
-     * 6. Re-simulates with signed auth entries
-     * 7. Submits via relayer (if configured) or RPC
-     * 8. Polls for confirmation
+     * 1. Validates recipient address and prevents self-transfer
+     * 2. Converts amount to stroops using BigInteger arithmetic
+     * 3. Delegates to [contractCall] which builds the host function, simulates,
+     *    signs auth entries via WebAuthn, re-simulates, and submits
      *
      * IMPORTANT: This method requires WebAuthn interaction to sign auth entries.
      * The user will be prompted for biometric authentication.
      *
-     * @param tokenContract The token contract address (C-address)
+     * @param tokenContract The token contract address (C-address). Use the SAC address
+     *   for XLM or the token's contract address for custom tokens.
      * @param recipient The recipient address (G-address for accounts, C-address for contracts)
-     * @param amount The amount to transfer in XLM (will be converted to stroops)
+     * @param amount Decimal amount string (e.g., "10", "100.5"). Converted to stroops automatically.
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if validation fails, simulation fails, or submission fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if recipient address is invalid or same as smart account
+     * @throws IllegalArgumentException if amount is not a valid positive decimal
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
      *
      * Example:
      * ```kotlin
@@ -192,7 +191,7 @@ class OZTransactionOperations internal constructor(
      * )
      *
      * if (result.success) {
-     *     println("Transferred 10.5 XLM. Hash: ${result.hash ?: ""}")
+     *     println("Transferred. Hash: ${result.hash ?: ""}")
      * } else {
      *     println("Transfer failed: ${result.error ?: ""}")
      * }
@@ -355,28 +354,16 @@ class OZTransactionOperations internal constructor(
      *
      * Flow:
      * 1. Require connected wallet (credential ID + contract ID)
-     * 2. Get deployer account from kit
-     * 3. Build transaction with host function and provided auth (may be empty)
-     * 4. Simulate transaction to discover required auth entries
-     * 5. Extract auth entries from simulation result
-     * 6. For each auth entry matching our contract:
-     *    a. Build auth payload hash
-     *    b. Require WebAuthn provider
-     *    c. Decode credential ID bytes
-     *    d. Resolve key data from storage or on-chain context rules
-     *    e. Build ExternalSigner for context rule resolution
-     *    f. Resolve context rule IDs via contextRuleManager
-     *    g. Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
-     *    h. Authenticate with WebAuthn using auth digest as challenge
-     *    i. Normalize signature to low-S compact format
-     *    j. Build WebAuthn signature ScVal
-     *    k. Attach signature and context rule IDs to the auth entry
-     * 7. Update transaction with signed auth entries
-     * 8. Re-simulate to get correct resource fees
-     * 9. Assemble transaction from re-simulation
-     * 10. Conditionally sign envelope with deployer keypair
-     * 11. Determine submission mode (relayer vs RPC)
-     * 12. Submit and poll for confirmation
+     * 2. Build and simulate the transaction to discover required auth entries
+     * 3. For each auth entry matching the smart account contract:
+     *    - Build the auth payload hash from the entry's nonce and invocation
+     *    - Resolve context rule IDs (automatic or via callback)
+     *    - Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
+     *    - Authenticate with WebAuthn using the auth digest as challenge
+     *    - Normalize signature and attach to the auth entry
+     * 4. Rebuild transaction with signed auth entries and re-simulate
+     * 5. Assemble, optionally sign with deployer, and submit via relayer or RPC
+     * 6. Poll for on-chain confirmation
      *
      * ## Fee Sponsoring and Deployer Signing
      *
@@ -408,7 +395,11 @@ class OZTransactionOperations internal constructor(
      *   available context rules. Provide a callback when automatic resolution is ambiguous or to
      *   bypass auto-resolution entirely.
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if submission, simulation, signing, or polling fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if configuration is invalid
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
+     * @throws CredentialException if credential lookup fails during signing
      *
      * @see shouldUseRelayerMode2 for mode selection logic
      */
@@ -624,7 +615,7 @@ class OZTransactionOperations internal constructor(
      *
      * @param hostFunction The host function for the token transfer
      * @param signedAuthEntries Auth entries with all collected signatures
-     * @param signedTransaction The transaction with signed auth entries (pre-assembly)
+     * @param signedTransaction The transaction containing signed authorization entries, prior to assembly and envelope signing
      * @param simulation The re-simulation response for transaction assembly
      * @param forceMethod Override the submission method. Null uses the default (relayer if configured, otherwise RPC).
      * @return TransactionResult with submission outcome
@@ -699,7 +690,9 @@ class OZTransactionOperations internal constructor(
      * @param nativeTokenContract The native token (XLM) contract address (C-address)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return The amount funded in XLM
-     * @throws SmartAccountException if funding fails at any step
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if the contract address is invalid
+     * @throws TransactionException if any step of the funding flow fails
      *
      * Example:
      * ```kotlin
@@ -1211,8 +1204,8 @@ class OZTransactionOperations internal constructor(
     /**
      * Polls for transaction confirmation using the SDK's [SorobanServer.pollTransaction].
      *
-     * Uses 30 attempts with 3-second intervals (~90 seconds total) to account for
-     * testnet ledger close times and potential congestion.
+     * Uses 30 attempts with 3-second intervals to account for ledger close
+     * times and potential congestion.
      *
      * @param hash The transaction hash to poll
      * @return TransactionResult indicating success or failure
@@ -1244,6 +1237,10 @@ class OZTransactionOperations internal constructor(
         }
     }
 
+    /**
+     * Generates a cryptographically random nonce for authorization credentials.
+     * Uses 8 bytes from the platform CSPRNG, interpreted as a signed 64-bit integer.
+     */
     private suspend fun generateNonce(): Long {
         val randomBytes = getEd25519Crypto().generatePrivateKey()
         var nonce = 0L

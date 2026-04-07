@@ -694,20 +694,22 @@ suspend fun transfer(
 ): TransactionResult
 ```
 
-Transfers tokens from the smart account to a recipient. The amount is a decimal string (e.g., "100" or "10.5") converted to stroops internally using BigInteger arithmetic.
+Transfers tokens from the smart account to a recipient. The amount is a decimal string (e.g., "100" or "10.5") converted to stroops internally using BigInteger arithmetic. Works with any SEP-41 compatible token (XLM SAC, custom Soroban tokens).
 
 **Parameters**:
-- `tokenContract`: Token contract address (C-address)
+- `tokenContract`: Token contract address (C-address). Use the SAC address for XLM or the token's contract address for custom tokens.
 - `recipient`: Recipient address (G-address for accounts, C-address for contracts)
-- `amount`: Amount in XLM (converted to stroops automatically)
+- `amount`: Decimal amount string (e.g., "10", "100.5"). Converted to stroops automatically.
 - `forceMethod`: Optional override to force RELAYER or RPC submission
 
 **Returns**: `TransactionResult` with success status, hash, ledger, and optional error
 
 **Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
 - `ValidationException`: Invalid addresses or amount
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
+- `CredentialException`: Credential lookup failed during signing
 
 **Example**:
 
@@ -725,33 +727,6 @@ if (result.success) {
     println("Error: ${result.error}")
 }
 ```
-
----
-
-#### submit
-
-```kotlin
-suspend fun submit(
-    hostFunction: HostFunctionXdr,
-    auth: List<SorobanAuthorizationEntryXdr>,
-    forceMethod: SubmissionMethod? = null,
-    resolveContextRuleIds: ResolveContextRuleIds? = null
-): TransactionResult
-```
-
-Submits a custom host function with full authorization flow.
-
-Handles simulation, auth entry extraction, WebAuthn signing, re-simulation, and submission.
-
-**Parameters**:
-- `hostFunction`: The Soroban host function to execute
-- `auth`: Initial authorization entries (typically empty; simulation provides them)
-- `forceMethod`: Optional submission method override
-- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. Called once per entry with the entry and its index. When provided, the contract evaluates only the returned rules instead of scanning all matching rules. See [ResolveContextRuleIds](#resolvecontextruleids).
-
-**Returns**: `TransactionResult` with submission outcome
-
-**Throws**: Multiple exception types (see transaction operations exceptions)
 
 ---
 
@@ -774,7 +749,7 @@ Use this for external contract interactions (e.g., token approve, DeFi protocol 
 **Parameters**:
 - `target`: Contract address to call (C-address)
 - `targetFn`: Function name to invoke on the target contract
-- `targetArgs`: Arguments for the target function as XDR values (use `Scv` helpers)
+- `targetArgs`: Arguments for the target function as XDR values. Use `Scv` helpers for encoding (e.g., `Scv.toUint32()`, `Scv.toAddress(Address(...).toSCAddress())`)
 - `forceMethod`: Optional submission method override
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
 
@@ -785,11 +760,17 @@ Use this for external contract interactions (e.g., token approve, DeFi protocol 
 - `ValidationException`: Invalid addresses or arguments
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
+- `CredentialException`: Credential lookup failed during signing
 
 **Example**:
 
 ```kotlin
 // Approve a token allowance directly on the token contract
+val smartAccountAddress = kit.contractId!!
+val spenderAddress = "GSPENDER..."
+val tokenContractId = "CTOKEN..."
+val expirationLedger = 2_000_000u  // absolute ledger number
+
 val result = kit.transactionOperations.contractCall(
     target = tokenContractId,
     targetFn = "approve",
@@ -820,12 +801,16 @@ suspend fun executeAndSubmit(
 ): TransactionResult
 ```
 
-Executes a generic contract call through the smart account's `execute` entry point. Builds the invocation, handles simulation, WebAuthn signing, and submission in one step. Designed for single-signer workflows where the connected passkey authorizes the call.
+Executes a contract call through the smart account's `execute()` entry point. The smart account invokes the target contract on behalf of itself, making it the direct caller. This is required for contracts that check their invoker (e.g., policy contracts that verify the smart account is the caller).
+
+The auth context for `execute()` is `CallContract(smartAccountAddress)`, which means only Default rules (or rules targeting the smart account address) match. For external contract calls with contract-specific rules (e.g., `CallContract(tokenContract)`), use [contractCall](#contractcall) instead.
+
+For the multi-signer equivalent, see [multiSignerExecuteAndSubmit](#multisignerexecuteandsubmit).
 
 **Parameters**:
 - `target`: Contract address to call (C-address)
 - `targetFn`: Function name to invoke on the target contract
-- `targetArgs`: Arguments for the target function as XDR values
+- `targetArgs`: Arguments for the target function as XDR values (use `Scv` helpers)
 - `forceMethod`: Optional submission method override
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
 
@@ -836,24 +821,63 @@ Executes a generic contract call through the smart account's `execute` entry poi
 - `ValidationException`: Invalid addresses or arguments
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
+- `CredentialException`: Credential lookup failed during signing
 
 **Example**:
 
 ```kotlin
-// Call a custom contract function through the smart account
+// Update a threshold policy via the smart account's execute() entry point
+val ruleId = 1u
+val thresholdPolicyAddress = "CPOLICY..."
+val newThreshold = 3u
+
+val contextRuleScVal = kit.contextRuleManager.getContextRule(ruleId)
 val result = kit.transactionOperations.executeAndSubmit(
-    target = "CBCD1234...",
-    targetFn = "approve",
+    target = thresholdPolicyAddress,
+    targetFn = "set_threshold",
     targetArgs = listOf(
-        Scv.toAddress("GA7QYNF7..."),
-        Scv.toInt128(1_000_000_000L)
+        Scv.toUint32(newThreshold),
+        contextRuleScVal,
+        Address(kit.contractId!!).toSCVal()
     )
 )
 
 if (result.success) {
-    println("Executed: ${result.hash}")
+    println("Threshold updated: ${result.hash}")
 }
 ```
+
+---
+
+#### submit
+
+```kotlin
+suspend fun submit(
+    hostFunction: HostFunctionXdr,
+    auth: List<SorobanAuthorizationEntryXdr>,
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Low-level submission method. Accepts a pre-built host function and handles the full authorization lifecycle: simulation, auth entry extraction, WebAuthn signing, re-simulation, and submission.
+
+This is the building block used internally by `transfer`, `contractCall`, and `executeAndSubmit`. Use it directly when you need full control over the host function construction.
+
+**Parameters**:
+- `hostFunction`: The Soroban host function to execute
+- `auth`: Initial authorization entries (typically empty; simulation provides them)
+- `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
+
+**Returns**: `TransactionResult` with submission outcome
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid configuration
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+- `CredentialException`: Credential lookup failed during signing
 
 ---
 
