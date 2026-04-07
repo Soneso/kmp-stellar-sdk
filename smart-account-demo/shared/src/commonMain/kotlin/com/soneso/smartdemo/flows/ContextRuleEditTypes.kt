@@ -128,7 +128,11 @@ data class ContextRuleEditDiff(
             count += newSigners.size
             count += removedSigners.size
             count += removedPolicies.size
-            count += modifiedPolicies.size * 2 // remove + re-add each
+            // Simple threshold uses execute() for set_threshold (1 op),
+            // other policy types use remove + re-add (2 ops)
+            count += modifiedPolicies.sumOf { policy ->
+                if (policy.info?.type == "threshold") 1 else 2 as Int
+            }
             count += newPolicies.size
             if (expiryChanged) count++
             return count
@@ -153,7 +157,8 @@ data class ContextRuleEditResult(
     val partialDueToAuthGuard: Boolean,
     val authGuardMessage: String?,
     val error: String?,
-    val failedStep: String?
+    val failedStep: String?,
+    val transactionHashes: List<String> = emptyList()
 )
 
 /**

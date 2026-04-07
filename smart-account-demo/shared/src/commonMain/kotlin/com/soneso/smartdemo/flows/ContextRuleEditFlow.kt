@@ -29,11 +29,14 @@ package com.soneso.smartdemo.flows
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
+import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
  * Executes the full edit-mode submission flow for a context rule.
@@ -78,6 +81,7 @@ suspend fun submitContextRuleEdits(
 
     val ruleId = diff.ruleId
     var completedOps = 0
+    val txHashes = mutableListOf<String>()
 
     // Step 1: Update name (if changed)
     if (diff.nameChanged) {
@@ -87,12 +91,13 @@ suspend fun submitContextRuleEdits(
             val newName = diff.newName ?: ""
             val result = updateContextRuleName(ruleId, newName, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
             ActivityLogState.info("Rule name updated successfully")
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -103,11 +108,12 @@ suspend fun submitContextRuleEdits(
         try {
             val result = addSignerByType(ruleId, signerEntry, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -121,11 +127,12 @@ suspend fun submitContextRuleEdits(
 
             val result = removeSignerFromRule(ruleId, signerId, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -150,7 +157,8 @@ suspend fun submitContextRuleEdits(
             partialDueToAuthGuard = true,
             authGuardMessage = authGuardMsg,
             error = null,
-            failedStep = null
+            failedStep = null,
+            transactionHashes = txHashes
         )
     }
 
@@ -164,40 +172,96 @@ suspend fun submitContextRuleEdits(
 
             val result = removePolicyFromRule(ruleId, policyId, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
-    // Step 6: Update modified policies (remove + re-add, 2 transactions each)
+    // Step 6: Update modified policies.
+    // Simple threshold policies use executeAndSubmit to call set_threshold() directly
+    // on the policy contract via the smart account's execute() entry point (1 transaction).
+    // All other policy types use the remove + re-add path (2 transactions).
     for ((index, policyEntry) in diff.modifiedPolicies.withIndex()) {
         val stepName = "Updating policy ${index + 1} of ${diff.modifiedPolicies.size}"
-        onProgress("$stepName (removing old)...")
         try {
-            val policyId = policyEntry.onChainId
-                ?: throw IllegalStateException("Cannot update policy without on-chain ID")
-            val installParams = policyEntry.scVal
-                ?: throw IllegalStateException("Cannot re-add policy without install parameters")
+            val isSimpleThreshold = policyEntry.info?.type == "threshold"
 
-            // Remove the existing policy
-            val removeResult = removePolicyFromRule(ruleId, policyId, selectedSigners)
-            if (!removeResult.success) {
-                return failureResult(completedOps, diff.totalOperations, "$stepName (remove)", removeResult.error)
-            }
-            completedOps++
+            if (isSimpleThreshold) {
+                // Use execute() to call set_threshold() on the policy contract directly.
+                // This is a single transaction instead of remove + re-add.
+                onProgress("$stepName (set_threshold)...")
 
-            // Re-add with new parameters
-            onProgress("$stepName (adding new)...")
-            val addResult = addPolicyToRule(ruleId, policyEntry.address, installParams, selectedSigners)
-            if (!addResult.success) {
-                return failureResult(completedOps, diff.totalOperations, "$stepName (re-add)", addResult.error)
+                // Extract the new threshold value from the encoded install params map.
+                // The scVal is a Map { Symbol("threshold") -> U32(value) }.
+                val scVal = policyEntry.scVal
+                    ?: throw IllegalStateException("Cannot update threshold without parameter value")
+                val paramsMap = Scv.fromMap(scVal)
+                val thresholdScVal = paramsMap.entries.firstOrNull { (k, _) ->
+                    try { Scv.fromSymbol(k) == "threshold" } catch (_: Exception) { false }
+                }?.value ?: throw IllegalStateException("Threshold value not found in policy params")
+                val newThreshold = Scv.fromUint32(thresholdScVal)
+
+                // Get the full ContextRule SCVal from the contract (required by set_threshold)
+                val contextRuleScVal = kit.contextRuleManager.getContextRule(ruleId)
+                val smartAccountAddress = DemoState.contractId
+                    ?: throw IllegalStateException("Smart account contract ID not set")
+
+                val targetArgs = listOf(
+                    Scv.toUint32(newThreshold),
+                    contextRuleScVal,
+                    Address(smartAccountAddress).toSCVal()
+                )
+
+                val result = if (selectedSigners.isEmpty()) {
+                    kit.transactionOperations.executeAndSubmit(
+                        target = policyEntry.address,
+                        targetFn = "set_threshold",
+                        targetArgs = targetArgs
+                    )
+                } else {
+                    kit.multiSignerManager.multiSignerExecuteAndSubmit(
+                        target = policyEntry.address,
+                        targetFn = "set_threshold",
+                        targetArgs = targetArgs,
+                        selectedSigners = selectedSigners
+                    )
+                }
+
+                if (!result.success) {
+                    return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
+                }
+                completedOps++
+                result.hash?.let { txHashes.add(it) }
+            } else {
+                // All other policy types: remove + re-add (2 transactions)
+                onProgress("$stepName (removing old)...")
+
+                val policyId = policyEntry.onChainId
+                    ?: throw IllegalStateException("Cannot update policy without on-chain ID")
+                val installParams = policyEntry.scVal
+                    ?: throw IllegalStateException("Cannot re-add policy without install parameters")
+
+                val removeResult = removePolicyFromRule(ruleId, policyId, selectedSigners)
+                if (!removeResult.success) {
+                    return failureResult(completedOps, diff.totalOperations, "$stepName (remove)", removeResult.error, txHashes)
+                }
+                completedOps++
+                removeResult.hash?.let { txHashes.add(it) }
+
+                onProgress("$stepName (adding new)...")
+                val addResult = addPolicyToRule(ruleId, policyEntry.address, installParams, selectedSigners)
+                if (!addResult.success) {
+                    return failureResult(completedOps, diff.totalOperations, "$stepName (re-add)", addResult.error, txHashes)
+                }
+                completedOps++
+                addResult.hash?.let { txHashes.add(it) }
             }
-            completedOps++
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -211,11 +275,12 @@ suspend fun submitContextRuleEdits(
 
             val result = addPolicyToRule(ruleId, policyEntry.address, installParams, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -226,11 +291,12 @@ suspend fun submitContextRuleEdits(
         try {
             val result = updateContextRuleValidUntil(ruleId, diff.newExpiry, selectedSigners)
             if (!result.success) {
-                return failureResult(completedOps, diff.totalOperations, stepName, result.error)
+                return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
             completedOps++
+            result.hash?.let { txHashes.add(it) }
         } catch (e: Exception) {
-            return failureResult(completedOps, diff.totalOperations, stepName, e.message)
+            return failureResult(completedOps, diff.totalOperations, stepName, e.message, txHashes)
         }
     }
 
@@ -260,7 +326,8 @@ suspend fun submitContextRuleEdits(
         partialDueToAuthGuard = false,
         authGuardMessage = null,
         error = null,
-        failedStep = null
+        failedStep = null,
+        transactionHashes = txHashes
     )
 }
 
@@ -323,7 +390,8 @@ private fun failureResult(
     completedOps: Int,
     totalOps: Int,
     failedStep: String,
-    error: String?
+    error: String?,
+    txHashes: List<String> = emptyList()
 ): ContextRuleEditResult {
     val msg = error ?: "Unknown error"
     ActivityLogState.error("Edit failed at step '$failedStep': $msg")
@@ -334,6 +402,7 @@ private fun failureResult(
         partialDueToAuthGuard = false,
         authGuardMessage = null,
         error = msg,
-        failedStep = failedStep
+        failedStep = failedStep,
+        transactionHashes = txHashes
     )
 }

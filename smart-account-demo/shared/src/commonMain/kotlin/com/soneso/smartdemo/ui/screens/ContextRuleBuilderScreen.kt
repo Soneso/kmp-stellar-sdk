@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -66,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -559,6 +561,41 @@ class ContextRuleBuilderScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = bodyColor
                             )
+                            if (result.transactionHashes.isNotEmpty()) {
+                                Text(
+                                    text = "Transaction Hashes",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = bodyColor
+                                )
+                                for (hash in result.transactionHashes) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = hash,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = bodyColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    clipboard.copyToClipboard(hash)
+                                                    snackbarHostState.showSnackbar("Hash copied")
+                                                }
+                                            },
+                                            modifier = Modifier.padding(start = 4.dp)
+                                        ) {
+                                            Text("Copy", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
                             if (result.authGuardMessage != null) {
                                 Text(
                                     text = result.authGuardMessage,

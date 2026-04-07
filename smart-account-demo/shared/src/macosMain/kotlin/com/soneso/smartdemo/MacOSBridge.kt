@@ -1168,7 +1168,8 @@ class MacOSBridge {
             partialDueToAuthGuard = result.partialDueToAuthGuard,
             authGuardMessage = result.authGuardMessage,
             error = result.error,
-            failedStep = result.failedStep
+            failedStep = result.failedStep,
+            transactionHashes = result.transactionHashes
         )
     }
 

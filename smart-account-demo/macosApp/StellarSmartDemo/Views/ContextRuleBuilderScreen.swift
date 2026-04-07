@@ -121,12 +121,7 @@ struct ContextRuleBuilderScreen: View {
                             selectedSigners: selected,
                             delegatedSecretKeys: secretKeys
                         )
-                        if let result = viewModel.editResult,
-                           result.success && !result.partialDueToAuthGuard {
-                            appState.sync(from: bridgeWrapper.bridge)
-                            onRuleChanged?()
-                            dismiss()
-                        }
+                        appState.sync(from: bridgeWrapper.bridge)
                     }
                 },
                 onDismiss: {
@@ -146,11 +141,7 @@ struct ContextRuleBuilderScreen: View {
                             selectedSigners: selected,
                             delegatedSecretKeys: secretKeys
                         )
-                        if viewModel.submissionSuccess {
-                            appState.sync(from: bridgeWrapper.bridge)
-                            onRuleChanged?()
-                            dismiss()
-                        }
+                        appState.sync(from: bridgeWrapper.bridge)
                     }
                 },
                 onDismiss: {
@@ -254,6 +245,33 @@ struct ContextRuleBuilderScreen: View {
             Text("\(result.completedOperations) of \(result.totalOperations) operation(s) completed")
                 .font(.callout)
                 .foregroundColor(Material3Colors.onSurfaceVariant)
+
+            let hashes = result.transactionHashes
+            if !hashes.isEmpty {
+                Text("Transaction Hashes")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Material3Colors.onSurfaceVariant)
+
+                ForEach(hashes, id: \.self) { hash in
+                    HStack {
+                        Text(hash)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(Material3Colors.onSurfaceVariant)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Button {
+                            ClipboardHelper.copy(hash)
+                            toastManager.show("Hash copied")
+                        } label: {
+                            Text("Copy")
+                                .font(.caption)
+                                .foregroundColor(Material3Colors.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
 
             if let authMsg = result.authGuardMessage {
                 Text(authMsg)

@@ -191,7 +191,8 @@ data class ContextRuleEditResultBridge(
     val partialDueToAuthGuard: Boolean,
     val authGuardMessage: String?,
     val error: String?,
-    val failedStep: String?
+    val failedStep: String?,
+    val transactionHashes: List<String>
 )
 
 /**

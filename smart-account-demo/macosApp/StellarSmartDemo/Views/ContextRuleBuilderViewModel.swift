@@ -972,7 +972,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                 partialDueToAuthGuard: result.partialDueToAuthGuard,
                 authGuardMessage: result.authGuardMessage,
                 error: result.error,
-                failedStep: result.failedStep
+                failedStep: result.failedStep,
+                transactionHashes: (result.transactionHashes as? [String]) ?? []
             )
 
             if result.success && !result.partialDueToAuthGuard {
@@ -993,7 +994,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                     partialDueToAuthGuard: false,
                     authGuardMessage: nil,
                     error: "Passkey authentication cancelled",
-                    failedStep: nil
+                    failedStep: nil,
+                    transactionHashes: []
                 )
             } else {
                 editResult = EditResult(
@@ -1003,7 +1005,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                     partialDueToAuthGuard: false,
                     authGuardMessage: nil,
                     error: msg,
-                    failedStep: nil
+                    failedStep: nil,
+                    transactionHashes: []
                 )
                 await reloadRuleFromChain(bridge: bridge)
             }
@@ -1233,6 +1236,7 @@ struct EditResult {
     let authGuardMessage: String?
     let error: String?
     let failedStep: String?
+    let transactionHashes: [String]
 }
 
 // MARK: - Edit Diff Type
