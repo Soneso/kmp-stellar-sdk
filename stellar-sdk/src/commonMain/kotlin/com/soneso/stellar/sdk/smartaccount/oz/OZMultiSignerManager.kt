@@ -670,6 +670,18 @@ class OZMultiSignerManager internal constructor(
             signedAuthEntries.add(signedEntry)
         }
 
+        // Update lastUsedAt for each passkey signer that participated (once per transaction)
+        for (signer in selectedSigners) {
+            if (signer is SelectedSigner.Passkey) {
+                val credId = signer.credentialId ?: continue
+                try {
+                    kit.credentialManager.updateLastUsed(credId)
+                } catch (_: Exception) {
+                    // Non-critical — credential tracking is best-effort
+                }
+            }
+        }
+
         // STEP 7: Re-simulate with signed auth entries.
         // Use a fresh deployer account to avoid sequence number double-increment.
         val refetchedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())

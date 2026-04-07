@@ -196,7 +196,7 @@ class OZSignerManager internal constructor(
         // Step 5: Base64URL-encode credential ID for storage
         val credentialIdBase64url = Util.base64urlEncode(registrationResult.credentialId)
 
-        // Step 6: Save credential locally as pending
+        // Step 6: Save credential locally as pending (not primary — this is an additional signer)
         val credential = kit.credentialManager.createPendingCredential(
             credentialId = credentialIdBase64url,
             publicKey = registrationResult.publicKey,
@@ -205,6 +205,15 @@ class OZSignerManager internal constructor(
             deviceType = registrationResult.deviceType,
             backedUp = registrationResult.backedUp
         )
+        // Additional signers are not primary — only the wallet creation passkey is primary
+        try {
+            kit.credentialManager.updateCredential(
+                credentialIdBase64url,
+                StoredCredentialUpdate(isPrimary = false)
+            )
+        } catch (_: Exception) {
+            // Non-critical — isPrimary is metadata only
+        }
 
         // Step 7: Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))

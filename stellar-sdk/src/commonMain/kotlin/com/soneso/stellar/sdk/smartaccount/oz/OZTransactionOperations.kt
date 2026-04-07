@@ -556,6 +556,15 @@ class OZTransactionOperations internal constructor(
             emptyList()
         }
 
+        // Update lastUsedAt timestamp after successful signing (once per transaction)
+        if (signedAuthEntries.isNotEmpty()) {
+            try {
+                kit.credentialManager.updateLastUsed(credentialId)
+            } catch (_: Exception) {
+                // Non-critical — credential tracking is best-effort
+            }
+        }
+
         // Emit transaction signed event
         kit.events.emit(
             SmartAccountEvent.TransactionSigned(

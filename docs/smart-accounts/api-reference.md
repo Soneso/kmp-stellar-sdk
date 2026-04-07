@@ -1005,6 +1005,8 @@ Retrieves credentials with PENDING or FAILED deployment status.
 
 **Returns**: List of credentials awaiting or failed deployment
 
+**Throws**: `StorageException.ReadFailed` if reading fails
+
 ---
 
 #### sync
@@ -1040,6 +1042,93 @@ data class SyncResult(
 Syncs all credentials with on-chain state.
 
 **Returns**: Summary of credential states
+
+**Throws**: `StorageException.ReadFailed` if reading fails
+
+---
+
+#### getCredential
+
+```kotlin
+suspend fun getCredential(credentialId: String): StoredCredential?
+```
+
+Retrieves a single credential by its ID.
+
+**Parameters**: `credentialId` — Base64URL-encoded credential ID
+
+**Returns**: The stored credential, or null if not found
+
+**Throws**: `StorageException.ReadFailed` if reading fails
+
+---
+
+#### getCredentialsByContract
+
+```kotlin
+suspend fun getCredentialsByContract(contractId: String): List<StoredCredential>
+```
+
+Retrieves all credentials associated with a specific contract address.
+
+**Parameters**: `contractId` — Smart account contract address (C-address)
+
+**Returns**: List of credentials for the contract (empty if none)
+
+**Throws**: `StorageException.ReadFailed` if reading fails
+
+---
+
+#### getForConnectedWallet
+
+```kotlin
+suspend fun getForConnectedWallet(): List<StoredCredential>
+```
+
+Retrieves credentials associated with the currently connected wallet's contract address. Returns an empty list if no wallet is connected or no credentials are found.
+
+**Returns**: List of credentials for the connected wallet (empty if none or not connected)
+
+**Throws**: `StorageException.ReadFailed` if reading fails
+
+---
+
+#### saveCredential
+
+```kotlin
+suspend fun saveCredential(
+    credentialId: String,
+    publicKey: ByteArray,
+    nickname: String? = null,
+    contractId: String? = null
+): StoredCredential
+```
+
+Saves a credential directly to storage. Unlike [createPendingCredential], this does not set deployment metadata (transports, deviceType, backedUp). Use this for restoring credentials or manual credential management.
+
+**Parameters**:
+- `credentialId`: Base64URL-encoded credential ID
+- `publicKey`: Uncompressed secp256r1 public key (65 bytes)
+- `nickname`: Optional display name
+- `contractId`: Optional contract address to associate with
+
+**Returns**: The saved `StoredCredential`
+
+**Throws**:
+- `ValidationException.InvalidInput`: Empty credential ID or wrong public key size
+- `StorageException.WriteFailed`: Storage write failed
+
+---
+
+#### clearAll
+
+```kotlin
+suspend fun clearAll()
+```
+
+Clears all credentials from storage. This operation is irreversible.
+
+**Throws**: `StorageException.WriteFailed` if clearing fails
 
 ---
 
@@ -1077,15 +1166,15 @@ data class StoredCredential(
     val credentialId: String,
     val publicKey: ByteArray,
     val contractId: String? = null,
-    val deploymentStatus: CredentialDeploymentStatus,
-    val isPrimary: Boolean = false,
-    val createdAt: Long,
+    val deploymentStatus: CredentialDeploymentStatus = CredentialDeploymentStatus.PENDING,
+    val deploymentError: String? = null,
+    val createdAt: Long = currentTimeMillis(),
     val lastUsedAt: Long? = null,
     val nickname: String? = null,
+    val isPrimary: Boolean = false,
     val transports: List<String>? = null,
     val deviceType: String? = null,
-    val backedUp: Boolean? = null,
-    val deploymentError: String? = null
+    val backedUp: Boolean? = null
 )
 
 enum class CredentialDeploymentStatus {

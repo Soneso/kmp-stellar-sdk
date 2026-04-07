@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
  * - getAllCredentials / getPendingCredentials
  * - saveCredential (direct save without duplicate check)
  * - updateNickname / updateCredential
- * - markDeployed (sync workflow that deletes from storage)
+ * - deleteCredential
  * - createPendingCredential with duplicate ID
  * - clearAll
  * - setPrimary
@@ -173,37 +173,6 @@ class CredentialManagerTest {
                 publicKey = ByteArray(32) // Wrong size
             )
         }
-    }
-
-    // MARK: - markDeployed Tests (Sync Workflow)
-
-    @Test
-    fun testMarkDeployed_deletesCredentialFromStorage() = runTest {
-        val kit = createKit()
-
-        kit.credentialManager.createPendingCredential(
-            credentialId = "deploy-cred",
-            publicKey = testPublicKey(),
-            contractId = testContractId
-        )
-
-        // Verify credential exists
-        assertNotNull(kit.credentialManager.getCredential("deploy-cred"))
-
-        // Mark as deployed (deletes from storage)
-        kit.credentialManager.markDeployed("deploy-cred")
-
-        // Verify credential is gone
-        assertNull(kit.credentialManager.getCredential("deploy-cred"))
-    }
-
-    @Test
-    fun testMarkDeployed_nonExistentCredentialDoesNotThrow() = runTest {
-        val kit = createKit()
-
-        // markDeployed calls storage.delete which is a silent no-op for non-existent IDs
-        kit.credentialManager.markDeployed("nonexistent")
-        // Should not throw
     }
 
     // MARK: - updateNickname Tests

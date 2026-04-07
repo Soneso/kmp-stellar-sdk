@@ -22,11 +22,13 @@ import com.soneso.stellar.sdk.scval.Scv
  * ```
  * pending --[deploy success]--> credential DELETED from storage
  * pending --[deploy failure]--> failed (deploymentError set)
+ * pending --[sync discovers contract on-chain]--> credential DELETED from storage
+ * failed  --[deleteCredential]--> credential DELETED from storage
  * ```
  *
- * After successful deployment, credentials are deleted from storage. Reconnection works
- * via sessions or the indexer. Failed deployments can be retried by deleting the
- * credential and creating a new one.
+ * After successful deployment (or sync discovery), credentials are deleted from storage.
+ * Reconnection works via sessions or the indexer. Failed deployments can be retried by
+ * deleting the credential and creating a new one.
  *
  * Thread Safety:
  * All operations delegate to the StorageAdapter, which is responsible for thread-safety.
@@ -35,21 +37,17 @@ import com.soneso.stellar.sdk.scval.Scv
  * ```kotlin
  * val manager = kit.credentialManager
  *
- * // Create a pending credential
- * val credential = manager.createPendingCredential(
- *     credentialId = "base64url-id",
- *     publicKey = secp256r1PublicKey,
- *     contractId = "CBCD1234..."
- * )
+ * // Get all credentials
+ * val all = manager.getAllCredentials()
  *
- * // If deployment fails, mark it
- * manager.markDeploymentFailed(
- *     credentialId = credential.credentialId,
- *     error = "Transaction failed: insufficient balance"
- * )
+ * // Get pending and failed credentials
+ * val pending = manager.getPendingCredentials()
  *
- * // On successful deployment, delete the credential
- * manager.deleteCredential(credentialId = credential.credentialId)
+ * // Sync a credential with on-chain state (deletes if deployed)
+ * val isDeployed = manager.sync(credentialId = "base64url-id")
+ *
+ * // Delete a pending credential
+ * manager.deleteCredential(credentialId = "base64url-id")
  * ```
  */
 class OZCredentialManager internal constructor(
@@ -68,7 +66,7 @@ class OZCredentialManager internal constructor(
      *
      * The credential is created with:
      * - deploymentStatus: PENDING
-     * - isPrimary: true (first credential is the primary credential)
+     * - isPrimary: true
      * - createdAt: current timestamp
      *
      * Validation:
@@ -79,6 +77,7 @@ class OZCredentialManager internal constructor(
      * @param credentialId The Base64URL-encoded credential ID (must be unique and non-empty)
      * @param publicKey The uncompressed secp256r1 public key (must be 65 bytes)
      * @param contractId The smart account contract address (C-address)
+     * @param nickname Optional user-friendly display name for the credential
      * @param transports Authenticator transport hints (e.g., "usb", "nfc", "ble", "internal")
      * @param deviceType Authenticator device type ("singleDevice" or "multiDevice")
      * @param backedUp Whether the passkey is backed up or synced
@@ -93,6 +92,7 @@ class OZCredentialManager internal constructor(
      *     credentialId = "abc123",
      *     publicKey = publicKeyData,
      *     contractId = "CBCD1234...",
+     *     nickname = "Alice",
      *     transports = listOf("internal"),
      *     deviceType = "multiDevice",
      *     backedUp = true
@@ -165,14 +165,18 @@ class OZCredentialManager internal constructor(
     /**
      * Saves a credential to storage.
      *
-     * Saves a pre-built credential directly to storage. The credential is stored with
-     * PENDING deployment status by default. Unlike [createPendingCredential], this
-     * method does not validate or modify the credential -- it performs a direct save.
+     * Saves a credential directly to storage with PENDING deployment status and
+     * isPrimary = false. Unlike [createPendingCredential], this does not set deployment
+     * metadata (transports, deviceType, backedUp) and does not check for duplicates —
+     * if a credential with the same ID already exists, it is silently overwritten.
+     *
+     * Validates that credentialId is non-empty and publicKey is exactly 65 bytes.
+     * A null [contractId] is stored as an empty string.
      *
      * @param credentialId The Base64URL-encoded credential ID (must not be empty)
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
      * @param nickname Optional user-friendly name for the credential
-     * @param contractId Optional smart account contract address (C-address)
+     * @param contractId Optional smart account contract address (C-address). Null is stored as empty string.
      * @return The saved credential
      * @throws ValidationException.InvalidInput if credentialId is empty or publicKey is wrong size
      * @throws StorageException.WriteFailed if saving fails
@@ -233,34 +237,6 @@ class OZCredentialManager internal constructor(
     }
 
     /**
-     * Marks a credential as deployed by removing it from storage.
-     *
-     * After successful deployment, credentials are deleted from storage because
-     * reconnection works via sessions or the indexer.
-     *
-     * @param credentialId The ID of the credential that was successfully deployed
-     * @throws StorageException.WriteFailed if deletion fails
-     *
-     * Example:
-     * ```kotlin
-     * // After successful deployment transaction confirmation
-     * manager.markDeployed(credentialId = "abc123")
-     * ```
-     */
-    suspend fun markDeployed(credentialId: String) {
-        try {
-            storage.delete(credentialId)
-        } catch (e: StorageException) {
-            throw e
-        } catch (e: Exception) {
-            throw StorageException.writeFailed(
-                key = credentialId,
-                cause = e
-            )
-        }
-    }
-
-    /**
      * Marks a credential as failed deployment.
      *
      * Updates the credential's deployment status to FAILED and sets the deployment
@@ -279,13 +255,12 @@ class OZCredentialManager internal constructor(
      * )
      * ```
      */
-    suspend fun markDeploymentFailed(
+    internal suspend fun markDeploymentFailed(
         credentialId: String,
         error: String
     ) {
         // Verify credential exists
-        val existing = storage.get(credentialId)
-            ?: throw CredentialException.notFound(credentialId)
+        storage.get(credentialId) ?: throw CredentialException.notFound(credentialId)
 
         // Update deployment status
         val update = StoredCredentialUpdate(
@@ -313,8 +288,8 @@ class OZCredentialManager internal constructor(
      * Checks whether the smart account contract for this credential exists on-chain
      * by querying the contract instance via Soroban RPC. If the contract exists, the
      * credential is deleted from storage (deployment is confirmed) and the method
-     * returns true. If the contract does not exist, the credential is not modified
-     * and the method returns false.
+     * returns true. If the contract does not exist, or if the on-chain check fails
+     * (e.g., network error, storage deletion failure), the method returns false.
      *
      * This is essential for the pending credentials workflow: when a deployment
      * transaction is submitted but the app closes before confirmation, sync() allows
@@ -640,10 +615,9 @@ class OZCredentialManager internal constructor(
      * manager.updateCredential(credentialId = "abc123", updates = update)
      * ```
      */
-    suspend fun updateCredential(credentialId: String, updates: StoredCredentialUpdate) {
+    internal suspend fun updateCredential(credentialId: String, updates: StoredCredentialUpdate) {
         // Verify credential exists
-        val existing = storage.get(credentialId)
-            ?: throw CredentialException.notFound(credentialId)
+        storage.get(credentialId) ?: throw CredentialException.notFound(credentialId)
 
         // Apply update
         try {
@@ -672,7 +646,7 @@ class OZCredentialManager internal constructor(
      * manager.updateLastUsed(credentialId = "abc123")
      * ```
      */
-    suspend fun updateLastUsed(credentialId: String) {
+    internal suspend fun updateLastUsed(credentialId: String) {
         val update = StoredCredentialUpdate(
             lastUsedAt = currentTimeMillis()
         )
@@ -712,7 +686,7 @@ class OZCredentialManager internal constructor(
      * manager.setPrimary(credentialId = "abc123")
      * ```
      */
-    suspend fun setPrimary(credentialId: String) {
+    internal suspend fun setPrimary(credentialId: String) {
         // Verify credential exists
         val credential = storage.get(credentialId)
             ?: throw CredentialException.notFound(credentialId)
