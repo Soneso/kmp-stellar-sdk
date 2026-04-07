@@ -320,6 +320,7 @@ Interface for delegated (G-address) signers in multi-signer operations. Implemen
 - `signAuthEntry(preimageXdr: String, options: SignAuthEntryOptions?): SignAuthEntryResult` — sign an auth entry preimage
 - `connect(): ConnectedWallet?` — connect to the external wallet
 - `disconnect()` — disconnect all wallets
+- `disconnectByAddress(address: String)` — disconnect a specific wallet by address (default no-op)
 - `getConnectedWallets(): List<ConnectedWallet>` — list connected wallets
 
 The SDK includes `OZExternalSignerManager` which implements this interface and manages keypair-based signers. See [External Signers](#external-signers) for details.
@@ -2303,6 +2304,11 @@ val externalMgr = OZExternalSignerManager(
 )
 ```
 
+**Constructor Parameters**:
+- `networkPassphrase`: Stellar network passphrase (e.g., `"Test SDF Network ; September 2015"`)
+- `walletAdapter`: Optional `ExternalWalletAdapter` for external wallet connections (e.g., Freighter, LOBSTR). Required for `addFromWallet` and `restoreConnections`.
+- `walletConnectionStorage`: Optional `WalletConnectionStorage` for persisting wallet connections across app launches. When null, wallet connections are not persisted.
+
 ---
 
 #### addFromSecret
@@ -2333,7 +2339,7 @@ Connection metadata is persisted if storage is configured.
 
 **Returns**: Connected wallet info, or null if user cancelled
 
-**Throws**: `ConfigurationException.MissingConfig` if no adapter configured
+**Throws**: `ConfigurationException.MissingConfig` if no adapter configured. `SmartAccountException` if the wallet connection fails.
 
 ---
 
@@ -2449,6 +2455,28 @@ data class ConnectedWallet(
 ```
 
 Information about a connected external wallet.
+
+---
+
+#### WalletConnectionStorage
+
+```kotlin
+interface WalletConnectionStorage {
+    suspend fun getItem(key: String): String?
+    suspend fun setItem(key: String, value: String)
+    suspend fun removeItem(key: String)
+}
+```
+
+Key-value storage interface for persisting external wallet connections across app launches. Implementations must be thread-safe.
+
+Platform-specific implementations should use SharedPreferences (Android), UserDefaults (iOS/macOS), localStorage (Web), or any other persistent key-value store.
+
+| Method | Description |
+|--------|-------------|
+| `getItem(key)` | Retrieves a value by key, or null if not found |
+| `setItem(key, value)` | Stores a value for a key (overwrites existing) |
+| `removeItem(key)` | Removes a value by key (no-op if absent) |
 
 ---
 
@@ -2987,6 +3015,7 @@ Interface for integrating external wallets (Freighter, LOBSTR, etc). Configured 
 interface ExternalWalletAdapter {
     suspend fun connect(): ConnectedWallet?
     suspend fun disconnect()
+    suspend fun disconnectByAddress(address: String) { }  // default no-op
     fun canSignFor(address: String): Boolean
     fun getWalletForAddress(address: String): ConnectedWallet?
     fun getConnectedWallets(): List<ConnectedWallet>

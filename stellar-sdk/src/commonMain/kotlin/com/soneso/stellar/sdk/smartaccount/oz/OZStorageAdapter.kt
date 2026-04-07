@@ -649,6 +649,18 @@ interface ExternalWalletAdapter {
     suspend fun disconnect()
 
     /**
+     * Disconnects a specific wallet by address.
+     *
+     * Override this to clean up adapter runtime state when a single signer is removed
+     * via [OZExternalSignerManager.remove]. The default implementation is a no-op.
+     *
+     * @param address The Stellar G-address of the wallet to disconnect
+     */
+    suspend fun disconnectByAddress(address: String) {
+        // No-op by default
+    }
+
+    /**
      * Signs an authorization preimage with the external wallet.
      *
      * The SDK sends a base64-encoded HashIDPreimage XDR. The wallet should:
