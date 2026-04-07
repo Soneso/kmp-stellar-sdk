@@ -409,9 +409,4 @@ class ConnectedWalletTest {
         assertEquals(5, OZConstants.MAX_POLICIES)
     }
 
-    @Test
-    fun testOZConstants_maxContextRulesIs15() {
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
-    }
-
 }

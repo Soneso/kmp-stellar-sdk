@@ -33,7 +33,8 @@ object OZConstants {
     const val WEBAUTHN_TIMEOUT_MS = 60_000L
 
     /**
-     * XLM amount reserved by Friendbot when funding test accounts.
+     * XLM amount retained in the temporary account as minimum balance reserve
+     * when transferring Friendbot funds to a smart account wallet.
      */
     const val FRIENDBOT_RESERVE_XLM = 5
 
@@ -51,10 +52,5 @@ object OZConstants {
      * Maximum policies per context rule (OZ contract limit).
      */
     const val MAX_POLICIES = 5
-
-    /**
-     * Maximum context rules per smart account (OZ contract limit).
-     */
-    const val MAX_CONTEXT_RULES = 15
 
 }

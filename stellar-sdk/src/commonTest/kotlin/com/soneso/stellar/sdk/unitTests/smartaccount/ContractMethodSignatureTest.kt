@@ -534,7 +534,6 @@ class ContractMethodSignatureTest {
     fun testContractLimits_matchAbi() {
         assertEquals(5, SmartAccountContractAbi.Constants.MAX_POLICIES)
         assertEquals(15, SmartAccountContractAbi.Constants.MAX_SIGNERS)
-        assertEquals(15, SmartAccountContractAbi.Constants.MAX_CONTEXT_RULES)
     }
 
     @Test

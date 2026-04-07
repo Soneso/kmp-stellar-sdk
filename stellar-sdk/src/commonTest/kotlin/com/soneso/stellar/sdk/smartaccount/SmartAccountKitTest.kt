@@ -944,12 +944,6 @@ class SmartAccountKitTest {
     // We test validation and limits here
 
     @Test
-    fun testContextRules_maxRulesLimit() {
-        // Test that the constant is defined correctly
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
-    }
-
-    @Test
     fun testContextRuleType_default_toScVal() {
         val contextType = ContextRuleType.Default
         val scVal = contextType.toScVal()
@@ -1756,11 +1750,6 @@ class SmartAccountKitTest {
     @Test
     fun testConstants_maxPolicies() {
         assertEquals(5, OZConstants.MAX_POLICIES)
-    }
-
-    @Test
-    fun testConstants_maxContextRules() {
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
     }
 
     @Test
