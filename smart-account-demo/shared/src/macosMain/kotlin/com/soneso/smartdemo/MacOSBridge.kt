@@ -9,6 +9,7 @@ package com.soneso.smartdemo
 
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.config.KNOWN_POLICIES
+import com.soneso.smartdemo.flows.ApproveResult
 import com.soneso.smartdemo.flows.ContextRuleResult
 import com.soneso.smartdemo.flows.FlowPolicyEntry
 import com.soneso.smartdemo.flows.SignerEntry
@@ -387,6 +388,122 @@ class MacOSBridge {
         val selectedSigners = buildSelectedSigners(smartAccountSigners)
         return multiSignerTransfer(tokenContract, recipient, amount, selectedSigners)
     }
+
+    // =========================================================================
+    // MARK: - Approve (Token Allowance)
+    // =========================================================================
+
+    /**
+     * Approves a token allowance by calling the token contract's approve() directly.
+     * Single-signer path using the connected passkey.
+     *
+     * @param tokenContract C-address of the token contract.
+     * @param spenderAddress G-address or C-address being granted the allowance.
+     * @param amount Decimal amount string (e.g., "100", "10.5").
+     * @param expirationLedgerOffset Ledger offset from now as Int (converted to UInt internally).
+     * @return [ApproveResult] with success flag, transaction hash, and optional error.
+     */
+    @Throws(Exception::class)
+    suspend fun approveAllowance(
+        tokenContract: String,
+        spenderAddress: String,
+        amount: String,
+        expirationLedgerOffset: Int
+    ): ApproveResult = com.soneso.smartdemo.flows.approveAllowance(
+        tokenContract = tokenContract,
+        spenderAddress = spenderAddress,
+        amount = amount,
+        expirationLedgerOffset = expirationLedgerOffset.toUInt()
+    )
+
+    /**
+     * Approves a token allowance with multi-signer authorization.
+     *
+     * @param tokenContract C-address of the token contract.
+     * @param spenderAddress G-address or C-address being granted the allowance.
+     * @param amount Decimal amount string.
+     * @param expirationLedgerOffset Ledger offset from now as Int (converted to UInt internally).
+     * @param signerDescriptors Ordered list of signers that must participate.
+     * @param delegatedSecretKeys Map of G-address to Stellar secret key (S...) for delegated signers.
+     * @return [ApproveResult] with success flag, transaction hash, and optional error.
+     */
+    @Throws(Exception::class)
+    suspend fun multiSignerApproveAllowance(
+        tokenContract: String,
+        spenderAddress: String,
+        amount: String,
+        expirationLedgerOffset: Int,
+        signerDescriptors: List<SignerDescriptor>,
+        delegatedSecretKeys: Map<String, String>
+    ): ApproveResult {
+        // Register delegated keypairs so the ExternalSignerManagerAdapter can sign auth entries.
+        val externalManager = DemoState.externalSignerManager
+            ?: throw IllegalStateException("External signer manager not initialized")
+        externalManager.removeAll()
+        for ((_, secret) in delegatedSecretKeys) {
+            if (secret.isNotBlank()) {
+                externalManager.addFromSecret(secret)
+            }
+        }
+
+        // Resolve signers. Passkey signers require a full ExternalSigner instance including
+        // keyData, so we look them up from context rules by credential ID.
+        val rules = try {
+            loadContextRules()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val allPasskeySigners = rules.flatMap { it.signers }
+            .filterIsInstance<ExternalSigner>()
+            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+
+        val smartAccountSigners = mutableListOf<SmartAccountSigner>()
+        for (desc in signerDescriptors) {
+            when (desc.type.lowercase()) {
+                "passkey" -> {
+                    val found = allPasskeySigners.firstOrNull { signer ->
+                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
+                    }
+                    if (found != null) {
+                        smartAccountSigners.add(found)
+                    } else {
+                        ActivityLogState.error(
+                            "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
+                        )
+                    }
+                }
+                "delegated" -> {
+                    smartAccountSigners.add(buildDelegatedSigner(desc.value))
+                }
+                else -> {
+                    ActivityLogState.error("Unsupported signer type in multi-signer approve: ${desc.type}")
+                }
+            }
+        }
+
+        val selectedSigners = buildSelectedSigners(smartAccountSigners)
+        return com.soneso.smartdemo.flows.multiSignerApproveAllowance(
+            tokenContract = tokenContract,
+            spenderAddress = spenderAddress,
+            amount = amount,
+            expirationLedgerOffset = expirationLedgerOffset.toUInt(),
+            selectedSigners = selectedSigners
+        )
+    }
+
+    /**
+     * Fetches the current token allowance granted by the smart account to a spender.
+     * Read-only call, no signing needed.
+     *
+     * @param tokenContract C-address of the token contract.
+     * @param spenderAddress G-address or C-address of the spender.
+     * @return Formatted allowance amount string (e.g., "100.0"), or null on error.
+     */
+    suspend fun fetchAllowance(
+        tokenContract: String,
+        spenderAddress: String
+    ): String? = com.soneso.smartdemo.flows.fetchAllowance(tokenContract, spenderAddress)
 
     // =========================================================================
     // MARK: - Account Signers

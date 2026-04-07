@@ -1,5 +1,5 @@
 //
-//  TransferScreen.swift
+//  ApproveScreen.swift
 //  StellarSmartDemo
 //
 //  Copyright (c) 2026 Soneso. All rights reserved.
@@ -8,14 +8,15 @@
 import SwiftUI
 import shared
 
-/// Token transfer screen: select a token, enter a recipient address and amount, then submit.
+/// Token allowance approval screen: select token, enter spender address, amount, and
+/// expiration, then submit the approval.
 ///
 /// When the connected smart account has multiple registered signers a signer picker sheet
 /// is presented so the user can choose which signers co-authorize the transaction. The
-/// transfer logic mirrors the Compose `TransferScreen` exactly:
-/// - Single passkey path: `MacOSBridge.transfer(tokenContract:recipient:amount:)`.
-/// - Multi-signer path: `MacOSBridge.multiSignerTransfer(...)` after the picker confirms.
-struct TransferScreen: View {
+/// approval logic mirrors the Compose `ApproveScreen` exactly:
+/// - Single passkey path: `MacOSBridge.approveAllowance(...)`.
+/// - Multi-signer path: `MacOSBridge.multiSignerApproveAllowance(...)` after the picker confirms.
+struct ApproveScreen: View {
 
     // MARK: - Environment
 
@@ -24,27 +25,26 @@ struct TransferScreen: View {
     @ObservedObject var toastManager: ToastManager
     @Environment(\.dismiss) private var dismiss
 
-    // MARK: - Token constants
+    // MARK: - Expiration constants
 
-    private static let tokenXLM = "xlm"
-    private static let tokenDemo = "demo"
+    private static let expirationLabels = ["1 day", "10 days", "30 days"]
+    private static let expirationOffsets: [Int32] = [17_280, 172_800, 518_400]
 
     // MARK: - Form state
 
-    @State private var selectedToken = tokenXLM
-    @State private var recipient = ""
+    @State private var spender = ""
     @State private var amount = ""
+    @State private var selectedExpirationIndex = 0
 
     // MARK: - Operation state
 
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
     @State private var txHash: String? = nil
-    /// Snapshot of the token label captured at the moment the transfer was submitted,
-    /// so the success card can display it even if selectedToken changes later.
-    @State private var submittedTokenLabel = ""
-    /// Snapshot of the recipient captured at submit time for the success card.
-    @State private var submittedRecipient = ""
+    @State private var currentAllowance: String? = nil
+    @State private var allowanceFetched = false
+    /// Snapshot of the spender captured at submit time for the success card.
+    @State private var submittedSpender = ""
     /// Snapshot of the amount captured at submit time for the success card.
     @State private var submittedAmount = ""
 
@@ -56,8 +56,6 @@ struct TransferScreen: View {
     // MARK: - Signer picker
 
     @State private var showSignerPicker = false
-    @State private var selectedSignerDescriptors: [SignerDescriptor] = []
-    @State private var delegatedSecretKeys: [String: String] = [:]
 
     // MARK: - Init
 
@@ -67,19 +65,9 @@ struct TransferScreen: View {
 
     // MARK: - Derived state
 
-    private var tokenLabel: String {
-        selectedToken == TransferScreen.tokenXLM ? "XLM" : "DEMO"
-    }
-
-    private var recipientError: String? {
-        guard !recipient.isEmpty else { return nil }
-        let error = FormValidation.validateRecipient(recipient)
-        if let e = error { return e }
-        // Prevent transferring to own account
-        if let contractId = appState.contractId, recipient == contractId {
-            return "Cannot transfer to your own account"
-        }
-        return nil
+    private var spenderError: String? {
+        guard !spender.isEmpty else { return nil }
+        return FormValidation.validateRecipient(spender)
     }
 
     private var amountError: String? {
@@ -87,16 +75,12 @@ struct TransferScreen: View {
         return FormValidation.validateAmount(amount)
     }
 
-    private var isDemoAvailable: Bool {
-        appState.demoTokenContractId != nil
-    }
-
     private var isFormValid: Bool {
-        !recipient.isEmpty &&
+        !spender.isEmpty &&
         !amount.isEmpty &&
-        recipientError == nil &&
+        spenderError == nil &&
         amountError == nil &&
-        (selectedToken == TransferScreen.tokenXLM || isDemoAvailable)
+        appState.demoTokenContractId != nil
     }
 
     // MARK: - Body
@@ -109,18 +93,19 @@ struct TransferScreen: View {
                 } else {
                     infoCard
                     balanceCard
-                    tokenPicker
-                    recipientField
+                    tokenContractCard
+                    spenderField
                     amountField
+                    expirationPicker
                     if let error = errorMessage {
                         errorCard(message: error)
                     }
                     if txHash == nil {
-                        transferButton
+                        approveButton
                     }
                     if txHash != nil {
                         successCard
-                        newTransferButton
+                        newApproveButton
                         goToMainButton
                     }
                     Spacer().frame(height: 16)
@@ -129,7 +114,7 @@ struct TransferScreen: View {
             .padding(16)
         }
         .background(Material3Colors.background)
-        .navigationToolbar(title: "Transfer")
+        .navigationToolbar(title: "Approve")
         .task {
             await loadSigners()
         }
@@ -139,7 +124,7 @@ struct TransferScreen: View {
                 activeCredentialId: appState.credentialId,
                 onConfirm: { selected, secretKeys in
                     showSignerPicker = false
-                    performMultiSignerTransfer(selected: selected, secretKeys: secretKeys)
+                    performMultiSignerApprove(selected: selected, secretKeys: secretKeys)
                 },
                 onDismiss: {
                     showSignerPicker = false
@@ -176,10 +161,11 @@ struct TransferScreen: View {
     // MARK: - Info card
 
     private var infoCard: some View {
-        InfoCard(title: "Token Transfer", color: .variant) {
+        InfoCard(title: "Token Allowance", color: .variant) {
             Text(
-                "Send tokens from your smart account to another Stellar address. " +
-                "This requires passkey authentication to sign the transaction."
+                "Approve a token spending allowance for another address. " +
+                "The spender can transfer up to the approved amount from your " +
+                "smart account until the allowance expires."
             )
             .font(.system(size: 13))
             .foregroundStyle(Material3Colors.onSurfaceVariant)
@@ -190,21 +176,13 @@ struct TransferScreen: View {
 
     private var balanceCard: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Balance")
+            Text("DEMO Balance")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Material3Colors.onPrimaryContainer)
 
-            HStack(spacing: 16) {
-                Text("\(appState.xlmBalance ?? "0.0") XLM")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-                if let demoBalance = appState.demoTokenBalance {
-                    Text("\(demoBalance) DEMO")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Material3Colors.onPrimaryContainer)
-                }
-            }
+            Text("\(appState.demoTokenBalance ?? "0.0") DEMO")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Material3Colors.onPrimaryContainer)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -212,41 +190,41 @@ struct TransferScreen: View {
         .cornerRadius(8)
     }
 
-    // MARK: - Token picker
+    // MARK: - Token contract card
 
-    private var tokenPicker: some View {
+    private var tokenContractCard: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Token")
-                .font(.system(size: 12, weight: .medium))
+            Text("Token Contract")
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Material3Colors.onSurfaceVariant)
 
-            Picker("", selection: $selectedToken) {
-                Text("XLM (Native)").tag(TransferScreen.tokenXLM)
-                Text(isDemoAvailable ? "Demo Token (DEMO)" : "Demo Token (DEMO) — unavailable")
-                    .tag(TransferScreen.tokenDemo)
-            }
-            .pickerStyle(.segmented)
-            .disabled(isLoading || txHash != nil)
-            .onChange(of: selectedToken) { _ in
-                // Reset error when token selection changes
-                errorMessage = nil
-            }
-            .opacity((isLoading || txHash != nil) ? 0.5 : 1.0)
+            Text(appState.demoTokenContractId != nil
+                ? "DEMO (\(appState.demoTokenContractId!))"
+                : "DEMO token not deployed"
+            )
+            .font(.system(.callout, design: .monospaced))
+            .foregroundStyle(Material3Colors.onSurfaceVariant)
+            .lineLimit(2)
+            .truncationMode(.middle)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Material3Colors.surfaceVariant)
+        .cornerRadius(8)
     }
 
-    // MARK: - Recipient field
+    // MARK: - Spender field
 
-    private var recipientField: some View {
+    private var spenderField: some View {
         ValidationTextField(
-            label: "Recipient Address",
-            text: $recipient,
-            error: recipientError,
+            label: "Spender Address",
+            text: $spender,
+            error: spenderError,
             placeholder: "G... or C...",
             isMonospace: true,
             isEnabled: !isLoading && txHash == nil
         )
-        .onChange(of: recipient) { _ in errorMessage = nil }
+        .onChange(of: spender) { _ in errorMessage = nil }
     }
 
     // MARK: - Amount field
@@ -260,6 +238,26 @@ struct TransferScreen: View {
             isEnabled: !isLoading && txHash == nil
         )
         .onChange(of: amount) { _ in errorMessage = nil }
+    }
+
+    // MARK: - Expiration picker
+
+    private var expirationPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Expiration")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Material3Colors.onSurfaceVariant)
+
+            Picker("", selection: $selectedExpirationIndex) {
+                ForEach(0..<ApproveScreen.expirationLabels.count, id: \.self) { index in
+                    Text(ApproveScreen.expirationLabels[index]).tag(index)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(isLoading || txHash != nil)
+            .opacity((isLoading || txHash != nil) ? 0.5 : 1.0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Error card
@@ -279,16 +277,16 @@ struct TransferScreen: View {
         .cornerRadius(8)
     }
 
-    // MARK: - Transfer button
+    // MARK: - Approve button
 
-    private var transferButton: some View {
+    private var approveButton: some View {
         LoadingButton(
-            action: handleTransferTap,
+            action: handleApproveTap,
             isLoading: isLoading,
             isEnabled: isFormValid && !isLoading && bridgeWrapper.isKitInitialized,
-            icon: "paperplane",
-            text: "Transfer",
-            loadingText: "Transferring...",
+            icon: "checkmark.seal",
+            text: "Approve",
+            loadingText: "Approving...",
             style: .filled
         )
     }
@@ -297,7 +295,7 @@ struct TransferScreen: View {
 
     private var successCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Transfer Successful")
+            Text("Approve Successful")
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundStyle(Material3Colors.onPrimaryContainer)
@@ -314,46 +312,46 @@ struct TransferScreen: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Amount Sent")
+                Text("Amount Approved")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
 
-                Text("\(submittedAmount) \(submittedTokenLabel)")
+                Text("\(submittedAmount) DEMO")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Recipient")
+                Text("Spender")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
 
-                Text(submittedRecipient)
+                Text(submittedSpender)
                     .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
                     .lineLimit(2)
                     .truncationMode(.middle)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Updated Balance")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Current Allowance")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
 
-                HStack(spacing: 16) {
-                    Text("\(appState.xlmBalance ?? "0.0") XLM")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-                    if let demoBalance = appState.demoTokenBalance {
-                        Text("\(demoBalance) DEMO")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Material3Colors.onPrimaryContainer)
+                Text({
+                    if let allowance = currentAllowance {
+                        return "\(allowance) DEMO"
+                    } else if allowanceFetched {
+                        return "Unable to fetch"
+                    } else {
+                        return "Loading..."
                     }
-                }
+                }())
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Material3Colors.onPrimaryContainer)
             }
         }
         .padding(16)
@@ -364,12 +362,12 @@ struct TransferScreen: View {
 
     // MARK: - Post-success buttons
 
-    private var newTransferButton: some View {
+    private var newApproveButton: some View {
         LoadingButton(
             action: resetForm,
             isLoading: false,
             isEnabled: true,
-            text: "New Transfer",
+            text: "New Approve",
             loadingText: "",
             style: .filled
         )
@@ -404,53 +402,57 @@ struct TransferScreen: View {
         }
     }
 
-    /// Called when the Transfer button is tapped.
+    /// Called when the Approve button is tapped.
     ///
     /// Routes to the single-signer path when there is at most one signer (or signers have not
     /// yet been loaded), otherwise opens the signer picker sheet.
-    private func handleTransferTap() {
+    private func handleApproveTap() {
         guard !isLoading, isFormValid else { return }
 
         if !signersLoaded || availableSigners.count <= 1 {
-            performSingleSignerTransfer()
+            performSingleSignerApprove()
         } else {
             showSignerPicker = true
         }
     }
 
-    /// Executes a simple passkey-authenticated transfer.
-    private func performSingleSignerTransfer() {
+    /// Executes a simple passkey-authenticated approve.
+    private func performSingleSignerApprove() {
         let tokenContract = resolveTokenContract()
-        let capturedRecipient = recipient
+        let capturedSpender = spender
         let capturedAmount = amount
-        let capturedLabel = tokenLabel
+        let capturedOffset = ApproveScreen.expirationOffsets[selectedExpirationIndex]
 
         isLoading = true
         errorMessage = nil
 
         Task {
             do {
-                let result = try await bridgeWrapper.bridge.transfer(
+                let result = try await bridgeWrapper.bridge.approveAllowance(
                     tokenContract: tokenContract,
-                    recipient: capturedRecipient,
-                    amount: capturedAmount
+                    spenderAddress: capturedSpender,
+                    amount: capturedAmount,
+                    expirationLedgerOffset: capturedOffset
                 )
 
                 await MainActor.run {
                     if result.success {
-                        submittedTokenLabel = capturedLabel
-                        submittedRecipient = capturedRecipient
+                        submittedSpender = capturedSpender
                         submittedAmount = capturedAmount
                         txHash = result.hash
                         appState.sync(from: bridgeWrapper.bridge)
+                        fetchCurrentAllowance(
+                            tokenContract: tokenContract,
+                            spenderAddress: capturedSpender
+                        )
                     } else {
-                        handleTransferError(result.error ?? "Transfer failed")
+                        handleApproveError(result.error ?? "Approve failed")
                     }
                     isLoading = false
                 }
             } catch {
                 await MainActor.run {
-                    handleTransferError(error.localizedDescription)
+                    handleApproveError(error.localizedDescription)
                     isLoading = false
                 }
             }
@@ -461,19 +463,18 @@ struct TransferScreen: View {
     ///
     /// Determines whether to use the single-passkey path (only the connected passkey was
     /// chosen) or the multi-signer path.
-    private func performMultiSignerTransfer(
+    private func performMultiSignerApprove(
         selected: [SignerInfoBridge],
         secretKeys: [String: String]
     ) {
         let tokenContract = resolveTokenContract()
-        let capturedRecipient = recipient
+        let capturedSpender = spender
         let capturedAmount = amount
-        let capturedLabel = tokenLabel
+        let capturedOffset = ApproveScreen.expirationOffsets[selectedExpirationIndex]
 
         isLoading = true
         errorMessage = nil
 
-        // Build SignerDescriptor list for the bridge.
         let descriptors = selected.map { signer in
             SignerDescriptor(type: signer.type, value: signer.identifier)
         }
@@ -491,19 +492,21 @@ struct TransferScreen: View {
 
         Task {
             do {
-                let result: TransferResult
+                let result: ApproveResult
 
                 if isSingleOwnPasskey {
-                    result = try await bridgeWrapper.bridge.transfer(
+                    result = try await bridgeWrapper.bridge.approveAllowance(
                         tokenContract: tokenContract,
-                        recipient: capturedRecipient,
-                        amount: capturedAmount
+                        spenderAddress: capturedSpender,
+                        amount: capturedAmount,
+                        expirationLedgerOffset: capturedOffset
                     )
                 } else {
-                    result = try await bridgeWrapper.bridge.multiSignerTransfer(
+                    result = try await bridgeWrapper.bridge.multiSignerApproveAllowance(
                         tokenContract: tokenContract,
-                        recipient: capturedRecipient,
+                        spenderAddress: capturedSpender,
                         amount: capturedAmount,
+                        expirationLedgerOffset: capturedOffset,
                         signerDescriptors: descriptors,
                         delegatedSecretKeys: secretKeys
                     )
@@ -511,21 +514,38 @@ struct TransferScreen: View {
 
                 await MainActor.run {
                     if result.success {
-                        submittedTokenLabel = capturedLabel
-                        submittedRecipient = capturedRecipient
+                        submittedSpender = capturedSpender
                         submittedAmount = capturedAmount
                         txHash = result.hash
                         appState.sync(from: bridgeWrapper.bridge)
+                        fetchCurrentAllowance(
+                            tokenContract: tokenContract,
+                            spenderAddress: capturedSpender
+                        )
                     } else {
-                        handleTransferError(result.error ?? "Transfer failed")
+                        handleApproveError(result.error ?? "Approve failed")
                     }
                     isLoading = false
                 }
             } catch {
                 await MainActor.run {
-                    handleTransferError(error.localizedDescription)
+                    handleApproveError(error.localizedDescription)
                     isLoading = false
                 }
+            }
+        }
+    }
+
+    /// Fetches the current allowance after a successful approve and updates the UI.
+    private func fetchCurrentAllowance(tokenContract: String, spenderAddress: String) {
+        Task {
+            let allowance = try? await bridgeWrapper.bridge.fetchAllowance(
+                tokenContract: tokenContract,
+                spenderAddress: spenderAddress
+            )
+            await MainActor.run {
+                currentAllowance = allowance
+                allowanceFetched = true
             }
         }
     }
@@ -534,31 +554,29 @@ struct TransferScreen: View {
     ///
     /// User cancellation (Touch ID dismissed) is shown as a distinct informational message
     /// rather than a generic failure string.
-    private func handleTransferError(_ message: String) {
+    private func handleApproveError(_ message: String) {
         if bridgeWrapper.bridge.isUserCancellation(message: message) {
             errorMessage = "Passkey authentication cancelled"
         } else {
-            errorMessage = "Transfer failed: \(message)"
+            errorMessage = "Approve failed: \(message)"
         }
     }
 
-    /// Resets all form and result state for a new transfer.
+    /// Resets all form and result state for a new approval.
     private func resetForm() {
-        recipient = ""
+        spender = ""
         amount = ""
         txHash = nil
         errorMessage = nil
-        selectedToken = TransferScreen.tokenXLM
-        submittedTokenLabel = ""
-        submittedRecipient = ""
+        currentAllowance = nil
+        allowanceFetched = false
+        selectedExpirationIndex = 0
+        submittedSpender = ""
         submittedAmount = ""
     }
 
-    /// Returns the token contract address for the currently selected token.
+    /// Returns the DEMO token contract address.
     private func resolveTokenContract() -> String {
-        if selectedToken == TransferScreen.tokenXLM {
-            return bridgeWrapper.bridge.getNativeTokenContract()
-        }
         return appState.demoTokenContractId ?? ""
     }
 }

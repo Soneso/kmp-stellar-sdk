@@ -273,17 +273,31 @@ struct MainScreen: View {
                     .disabled(!appState.isDeployed)
                 }
 
-                NavigationLink(destination: KnownSignersScreen(toastManager: toastManager)) {
-                    Text("Account Signers")
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .foregroundColor(appState.isDeployed ? .white : .gray)
-                        .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
-                        .cornerRadius(8)
+                HStack(spacing: 8) {
+                    NavigationLink(destination: ApproveScreen(toastManager: toastManager)) {
+                        Text("Approve")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
+
+                    NavigationLink(destination: KnownSignersScreen(toastManager: toastManager)) {
+                        Text("Account Signers")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
                 }
-                .buttonStyle(.plain)
-                .disabled(!appState.isDeployed)
 
                 // Disconnect -- outlined with error-ish styling (disabled during deployment)
                 LoadingButton(

@@ -689,6 +689,59 @@ Handles simulation, auth entry extraction, WebAuthn signing, re-simulation, and 
 
 ---
 
+#### contractCall
+
+```kotlin
+suspend fun contractCall(
+    target: String,
+    targetFn: String,
+    targetArgs: List<SCValXdr> = emptyList(),
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Calls an arbitrary function on an external contract directly from the smart account. The host function invokes `target.targetFn(targetArgs)` without going through the smart account's `execute()` entry point. Context rules of type `CallContract(target)` are matched for authorization.
+
+Use this for external contract interactions (e.g., token approve, DeFi protocol calls) where the smart account is the authorized party. For multi-signer authorization, see [multiSignerContractCall](#multisignercontractcall).
+
+**Parameters**:
+- `target`: Contract address to call (C-address)
+- `targetFn`: Function name to invoke on the target contract
+- `targetArgs`: Arguments for the target function as XDR values (use `Scv` helpers)
+- `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
+
+**Returns**: `TransactionResult` with submission outcome
+
+**Throws**:
+- `WalletException.NotConnected`: Wallet is not connected
+- `ValidationException`: Invalid addresses or arguments
+- `TransactionException`: Simulation, signing, or submission failed
+- `WebAuthnException`: Biometric authentication failed
+
+**Example**:
+
+```kotlin
+// Approve a token allowance directly on the token contract
+val result = kit.transactionOperations.contractCall(
+    target = tokenContractId,
+    targetFn = "approve",
+    targetArgs = listOf(
+        Scv.toAddress(Address(smartAccountAddress).toSCAddress()),
+        Scv.toAddress(Address(spenderAddress).toSCAddress()),
+        Util.stroopsToI128ScVal(Util.amountToStroops("100")),
+        Scv.toUint32(expirationLedger)
+    )
+)
+
+if (result.success) {
+    println("Approved: ${result.hash}")
+}
+```
+
+---
+
 #### executeAndSubmit
 
 ```kotlin
@@ -1587,6 +1640,59 @@ val result = kit.multiSignerManager.multiSignerTransfer(
 
 ---
 
+#### multiSignerContractCall
+
+```kotlin
+suspend fun multiSignerContractCall(
+    target: String,
+    targetFn: String,
+    targetArgs: List<SCValXdr> = emptyList(),
+    selectedSigners: List<SelectedSigner>,
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Calls an arbitrary function on an external contract directly with multi-signer authorization. The host function invokes `target.targetFn(targetArgs)` without going through the smart account's `execute()` entry point. Context rules of type `CallContract(target)` are matched, allowing contract-specific multi-signer rules to apply.
+
+This is the multi-signer counterpart to [contractCall](#contractcall).
+
+**Parameters**:
+- `target`: Contract address to call (C-address)
+- `targetFn`: Function name to invoke on the target contract
+- `targetArgs`: Arguments for the target function as XDR values (use `Scv` helpers)
+- `selectedSigners`: All signers that must sign, in collection order
+- `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
+
+**Returns**: `TransactionResult`
+
+**Example**:
+
+```kotlin
+// Multi-signer token approve using a CallContract rule with threshold 2-of-3
+val result = kit.multiSignerManager.multiSignerContractCall(
+    target = tokenContractId,
+    targetFn = "approve",
+    targetArgs = listOf(
+        Scv.toAddress(Address(smartAccountAddress).toSCAddress()),
+        Scv.toAddress(Address(spenderAddress).toSCAddress()),
+        Util.stroopsToI128ScVal(Util.amountToStroops("100")),
+        Scv.toUint32(expirationLedger)
+    ),
+    selectedSigners = listOf(
+        SelectedSigner.Passkey(
+            credentialId = credIdStr,
+            credentialIdBytes = credIdBytes,
+            keyData = signer.keyData
+        ),
+        SelectedSigner.Wallet("GA7Q...")
+    )
+)
+```
+
+---
+
 #### multiSignerExecuteAndSubmit
 
 ```kotlin
@@ -1636,6 +1742,31 @@ val result = kit.multiSignerManager.multiSignerExecuteAndSubmit(
     )
 )
 ```
+
+---
+
+#### submitWithMultipleSigners
+
+```kotlin
+suspend fun submitWithMultipleSigners(
+    hostFunction: HostFunctionXdr,
+    selectedSigners: List<SelectedSigner>,
+    forceMethod: SubmissionMethod? = null,
+    resolveContextRuleIds: ResolveContextRuleIds? = null
+): TransactionResult
+```
+
+Low-level multi-signer submission pipeline. Accepts a pre-built `HostFunctionXdr` and handles the full lifecycle: simulation, auth entry extraction, multi-signer signing (WebAuthn + delegated), re-simulation, and submission.
+
+This is the building block used internally by `multiSignerTransfer`, `multiSignerContractCall`, and `multiSignerExecuteAndSubmit`. Use it directly when you need full control over the host function construction.
+
+**Parameters**:
+- `hostFunction`: Pre-built host function to invoke
+- `selectedSigners`: All signers that must sign, in collection order
+- `forceMethod`: Optional submission method override
+- `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry
+
+**Returns**: `TransactionResult`
 
 ---
 ## External Signers

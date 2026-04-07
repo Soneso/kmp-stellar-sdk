@@ -249,7 +249,61 @@ class OZTransactionOperations internal constructor(
         return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
     }
 
-    // MARK: - Execute Arbitrary Contract Function
+    // MARK: - Direct Contract Call
+
+    /**
+     * Calls an arbitrary function on an external contract directly from the smart account.
+     *
+     * Builds a host function that invokes `target.targetFn(targetArgs)` directly (not through
+     * the smart account's `execute()` entry point). The smart account authorizes the call via
+     * `require_auth` triggered by the target contract. Context rules of type
+     * `CallContract(target)` are matched for authorization.
+     *
+     * Use this for any external contract interaction (e.g., token approve, token transfer,
+     * DeFi protocol calls) where the smart account is the authorized party.
+     *
+     * For the multi-signer equivalent, see [OZMultiSignerManager.multiSignerContractCall].
+     *
+     * @param target The contract address (C-address) to call.
+     * @param targetFn The function name to invoke on the target contract.
+     * @param targetArgs Pre-encoded SCVal arguments for the function.
+     * @param forceMethod Optional override to force relayer or RPC submission.
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     * @return TransactionResult indicating success or failure.
+     * @throws SmartAccountException if validation fails, simulation fails, or submission fails.
+     */
+    suspend fun contractCall(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        kit.requireConnected()
+
+        requireContractAddress(target, "target")
+
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(target).toSCAddress(),
+            functionName = SCSymbolXdr(targetFn),
+            args = targetArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submit(
+            hostFunction = hostFunction,
+            auth = emptyList(),
+            forceMethod = forceMethod,
+            resolveContextRuleIds = resolveContextRuleIds
+        )
+    }
+
+    // MARK: - Execute (Smart-Account Mediated Call)
 
     /**
      * Executes an arbitrary contract function call through the smart account's execute entry point.

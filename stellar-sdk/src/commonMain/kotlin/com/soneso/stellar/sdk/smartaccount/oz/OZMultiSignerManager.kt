@@ -226,7 +226,61 @@ class OZMultiSignerManager internal constructor(
         return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
     }
 
-    // MARK: - Multi-Signer Execute
+    // MARK: - Multi-Signer Direct Contract Call
+
+    /**
+     * Calls an arbitrary function on an external contract directly with multi-signer authorization.
+     *
+     * Builds a host function that invokes `target.targetFn(targetArgs)` directly (not through
+     * the smart account's `execute()` entry point). Context rules of type `CallContract(target)`
+     * are matched for authorization, allowing contract-specific multi-signer rules to apply.
+     *
+     * This is the multi-signer counterpart to [OZTransactionOperations.contractCall].
+     *
+     * @param target The contract address (C-address) to call.
+     * @param targetFn The function name to invoke on the target contract.
+     * @param targetArgs Pre-encoded SCVal arguments for the function.
+     * @param selectedSigners All signers that must participate, in signing order.
+     * @param forceMethod Optional override to force relayer or RPC submission.
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     * @return TransactionResult indicating success or failure.
+     * @throws SmartAccountException if validation fails, signing fails, or submission fails.
+     */
+    suspend fun multiSignerContractCall(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        selectedSigners: List<SelectedSigner>,
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        kit.requireConnected()
+
+        requireContractAddress(target, "target")
+
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
+
+        if (selectedSigners.isEmpty()) {
+            throw ValidationException.invalidInput(
+                "selectedSigners",
+                "At least one signer must be provided"
+            )
+        }
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(target).toSCAddress(),
+            functionName = SCSymbolXdr(targetFn),
+            args = targetArgs
+        )
+
+        val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
+
+        return submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod, resolveContextRuleIds)
+    }
+
+    // MARK: - Multi-Signer Execute (Smart-Account Mediated Call)
 
     /**
      * Executes an arbitrary contract function through the smart account's `execute` entry
@@ -346,7 +400,7 @@ class OZMultiSignerManager internal constructor(
      * @return [TransactionResult] indicating success or failure.
      * @throws SmartAccountException if validation fails, signing fails, or submission fails.
      */
-    internal suspend fun submitWithMultipleSigners(
+    suspend fun submitWithMultipleSigners(
         hostFunction: HostFunctionXdr,
         selectedSigners: List<SelectedSigner>,
         forceMethod: SubmissionMethod? = null,

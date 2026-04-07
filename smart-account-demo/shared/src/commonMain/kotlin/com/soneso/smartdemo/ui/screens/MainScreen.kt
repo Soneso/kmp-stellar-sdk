@@ -331,20 +331,40 @@ class MainScreen : Screen {
                                         Text("Transfer")
                                     }
                                 }
-                                Button(
-                                    onClick = { navigator.push(KnownSignersScreen()) },
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    enabled = DemoState.isDeployed,
-                                    colors = if (DemoState.isDeployed) {
-                                        ButtonDefaults.buttonColors()
-                                    } else {
-                                        ButtonDefaults.buttonColors(
-                                            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                        )
-                                    }
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Account Signers")
+                                    Button(
+                                        onClick = { navigator.push(ApproveScreen()) },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = DemoState.isDeployed,
+                                        colors = if (DemoState.isDeployed) {
+                                            ButtonDefaults.buttonColors()
+                                        } else {
+                                            ButtonDefaults.buttonColors(
+                                                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
+                                        }
+                                    ) {
+                                        Text("Approve")
+                                    }
+                                    Button(
+                                        onClick = { navigator.push(KnownSignersScreen()) },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = DemoState.isDeployed,
+                                        colors = if (DemoState.isDeployed) {
+                                            ButtonDefaults.buttonColors()
+                                        } else {
+                                            ButtonDefaults.buttonColors(
+                                                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
+                                        }
+                                    ) {
+                                        Text("Account Signers")
+                                    }
                                 }
                                 OutlinedButton(
                                     onClick = {
