@@ -2128,7 +2128,7 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 **Parameters**:
 - `tokenContract`: Token contract address (C-address)
 - `recipient`: Recipient address (G-address or C-address)
-- `amount`: Amount in XLM
+- `amount`: Decimal amount to transfer (e.g., "100" or "10.5")
 - `selectedSigners`: All signers that must sign, in collection order
 - `forceMethod`: Optional override for the submission method. When null (default), the SDK auto-detects whether to use the relayer or direct submission.
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
@@ -2175,13 +2175,15 @@ This is the multi-signer counterpart to [contractCall](#contractcall).
 
 **Parameters**:
 - `target`: Contract address to call (C-address)
-- `targetFn`: Function name to invoke on the target contract
+- `targetFn`: Function name to invoke on the target contract (must not be blank)
 - `targetArgs`: Arguments for the target function as XDR values (use `Scv` helpers)
-- `selectedSigners`: All signers that must sign, in collection order
+- `selectedSigners`: All signers that must sign, in collection order (must not be empty)
 - `forceMethod`: Optional submission method override
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
 
 **Returns**: `TransactionResult`
+
+**Throws**: `ValidationException` if `target` is not a valid C-address, `targetFn` is blank, or `selectedSigners` is empty. `SmartAccountException` if signing or submission fails.
 
 **Example**:
 
@@ -2283,6 +2285,8 @@ This is the building block used internally by `multiSignerTransfer`, `multiSigne
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry
 
 **Returns**: `TransactionResult`
+
+**Throws**: `ValidationException` if wallet signers are present but no external wallet adapter is configured, or if the adapter cannot sign for a wallet signer's address. `SmartAccountException` if signing or submission fails.
 
 ---
 ## External Signers
