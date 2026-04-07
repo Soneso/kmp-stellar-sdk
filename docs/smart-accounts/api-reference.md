@@ -2506,15 +2506,52 @@ val stats = kit.indexerClient?.getStats()
 ### Using OZIndexerClient Directly
 
 ```kotlin
-// Create client for a specific network
+// Create client for a specific network (uses default indexer URL)
 val indexer = OZIndexerClient.forNetwork("Test SDF Network ; September 2015")
 
 // Or with a custom URL
 val indexer = OZIndexerClient(
-    baseUrl = "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+    indexerUrl = "https://smart-account-indexer.sdf-ecosystem.workers.dev",
     timeoutMs = 10000
 )
 ```
+
+### Constructor
+
+```kotlin
+class OZIndexerClient(
+    indexerUrl: String,
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `indexerUrl` | `String` | Indexer service URL (must use HTTPS, or http://localhost for development) |
+| `timeoutMs` | `Long` | Request timeout in milliseconds (default: `OZConstants.DEFAULT_INDEXER_TIMEOUT_MS`) |
+
+### Factory Methods
+
+#### forNetwork
+
+```kotlin
+companion object {
+    fun forNetwork(
+        networkPassphrase: String,
+        timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
+    ): OZIndexerClient?
+}
+```
+
+Creates an `OZIndexerClient` using the default indexer URL for a known network. Returns null if no default URL is configured for the network.
+
+#### getDefaultUrl
+
+```kotlin
+fun getDefaultUrl(networkPassphrase: String): String?
+```
+
+Returns the default indexer URL for a given network passphrase, or null if unknown.
 
 ### Methods
 
@@ -2524,9 +2561,13 @@ val indexer = OZIndexerClient(
 suspend fun lookupByCredentialId(credentialId: String): CredentialLookupResponse
 ```
 
-Finds all smart account contracts where the given credential is registered as a signer. The credential ID is the Base64URL-encoded WebAuthn credential identifier.
+Finds all smart account contracts where the given credential is registered as a signer. The credential ID must be Base64URL-encoded (RFC 4648, no padding). The SDK converts it to hex internally before calling the indexer API.
 
-**Returns**: `CredentialLookupResponse` with `credentialId`, `contracts: List<IndexedContractSummary>`, `count`
+**Returns**: `CredentialLookupResponse`
+
+**Throws**: `ValidationException` if the credential ID is not valid base64url. `IndexerException` if the request fails or times out.
+
+---
 
 #### lookupByAddress
 
@@ -2536,7 +2577,11 @@ suspend fun lookupByAddress(address: String): AddressLookupResponse
 
 Finds all smart account contracts where the given address is registered as a signer. Accepts both G-addresses (Stellar accounts) and C-addresses (contracts).
 
-**Returns**: `AddressLookupResponse` with `signerAddress`, `contracts: List<IndexedContractSummary>`, `count`
+**Returns**: `AddressLookupResponse`
+
+**Throws**: `ValidationException` if the address format is invalid. `IndexerException` if the request fails or times out.
+
+---
 
 #### getContract
 
@@ -2546,7 +2591,11 @@ suspend fun getContract(contractId: String): ContractDetailsResponse
 
 Retrieves full details for a smart account contract including all context rules, signers, and policies.
 
-**Returns**: `ContractDetailsResponse` with `contractId`, `summary: IndexedContractSummary`, `contextRules: List<IndexedContextRule>`
+**Returns**: `ContractDetailsResponse`
+
+**Throws**: `ValidationException` if the contract ID format is invalid. `IndexerException` if the request fails or times out.
+
+---
 
 #### getStats
 
@@ -2554,7 +2603,11 @@ Retrieves full details for a smart account contract including all context rules,
 suspend fun getStats(): IndexerStatsResponse
 ```
 
-Returns indexer service statistics (total contracts indexed, etc.).
+Returns indexer service statistics (total contracts indexed, credentials, ledger range, event type breakdown).
+
+**Throws**: `IndexerException` if the request fails or times out.
+
+---
 
 #### isHealthy
 
@@ -2562,7 +2615,9 @@ Returns indexer service statistics (total contracts indexed, etc.).
 suspend fun isHealthy(): Boolean
 ```
 
-Returns true if the indexer service is reachable and healthy.
+Returns true if the indexer service is reachable and healthy. Does not throw — returns false for any error condition.
+
+---
 
 #### close
 
@@ -2571,6 +2626,106 @@ fun close()
 ```
 
 Closes the HTTP client. The client must not be used after calling this. When using via `kit.indexerClient`, the kit's `close()` handles this automatically.
+
+---
+
+### Response Types
+
+#### CredentialLookupResponse
+
+```kotlin
+data class CredentialLookupResponse(
+    val credentialId: String,
+    val contracts: List<IndexedContractSummary>,
+    val count: Int
+)
+```
+
+#### AddressLookupResponse
+
+```kotlin
+data class AddressLookupResponse(
+    val signerAddress: String,
+    val contracts: List<IndexedContractSummary>,
+    val count: Int
+)
+```
+
+#### ContractDetailsResponse
+
+```kotlin
+data class ContractDetailsResponse(
+    val contractId: String,
+    val summary: IndexedContractSummary,
+    val contextRules: List<IndexedContextRule>
+)
+```
+
+#### IndexedContractSummary
+
+```kotlin
+data class IndexedContractSummary(
+    val contractId: String,
+    val contextRuleCount: Int,
+    val externalSignerCount: Int,
+    val delegatedSignerCount: Int,
+    val nativeSignerCount: Int,
+    val firstSeenLedger: Int,
+    val lastSeenLedger: Int,
+    val contextRuleIds: List<Int>
+)
+```
+
+#### IndexedContextRule
+
+```kotlin
+data class IndexedContextRule(
+    val contextRuleId: Int,
+    val signers: List<IndexedSigner>,
+    val policies: List<IndexedPolicy>
+)
+```
+
+#### IndexedSigner
+
+```kotlin
+data class IndexedSigner(
+    val signerType: String,       // "External", "Delegated", or "Native"
+    val signerAddress: String?,   // G-address (Delegated/Native signers)
+    val credentialId: String?     // Hex-encoded credential ID (External signers)
+)
+```
+
+#### IndexedPolicy
+
+```kotlin
+data class IndexedPolicy(
+    val policyAddress: String,
+    val installParams: JsonElement?  // Policy-specific parameters
+)
+```
+
+#### IndexerStatsResponse
+
+```kotlin
+data class IndexerStatsResponse(
+    val stats: IndexerStats
+)
+
+data class IndexerStats(
+    val totalEvents: Long,
+    val uniqueContracts: Long,
+    val uniqueCredentials: Long,
+    val firstLedger: Long,
+    val lastLedger: Long,
+    val eventTypes: List<EventTypeCount>
+)
+
+data class EventTypeCount(
+    val eventType: String,
+    val count: Long
+)
+```
 
 ---
 
