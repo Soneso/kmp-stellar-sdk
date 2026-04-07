@@ -61,6 +61,7 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | webauthnProvider | No | null |
  * | storage | No | InMemoryStorageAdapter |
  * | externalWallet | No | null |
+ * | maxContextRuleScanId | No | 50 |
  */
 data class OZSmartAccountConfig(
     // Required Configuration
@@ -82,7 +83,7 @@ data class OZSmartAccountConfig(
     val networkPassphrase: String,
 
     /**
-     * The WASM hash of the smart account contract (hex string).
+     * The WASM hash of the smart account contract (64-character hex string).
      *
      * This is the SHA-256 hash of the smart account contract WASM code,
      * used for deploying new smart account instances.
@@ -222,9 +223,9 @@ data class OZSmartAccountConfig(
         /**
          * Creates a deterministic deployer keypair for smart account deployment.
          *
-         * Derives a keypair from SHA256("openzeppelin-smart-account-kit"). The same derivation
-         * is used by the TypeScript Smart Account Kit, so identical inputs produce identical
-         * results across implementations. This keypair only pays deployment fees and does not
+         * Derives a keypair from SHA256("openzeppelin-smart-account-kit"). The derivation is
+         * deterministic and reproducible across all Smart Account Kit implementations.
+         * This keypair only pays deployment fees and does not
          * control user wallets. Suitable for testing and simple deployments; production apps
          * typically use a custom deployer for attribution and traceability.
          *
@@ -283,42 +284,21 @@ data class OZSmartAccountConfig(
      * @return The configured deployer or the default deterministic deployer
      * @throws ConfigurationException if default deployer creation fails
      */
-    suspend fun getDeployer(): KeyPair {
+    suspend fun effectiveDeployer(): KeyPair {
         return deployerKeypair ?: createDefaultDeployer()
     }
 
     /**
-     * Returns the effective indexer URL for this configuration.
+     * Returns the indexer URL that will be used after applying fallback logic.
      *
-     * If an indexer URL is explicitly configured, it is returned.
-     * Otherwise, returns the default indexer URL for the network passphrase.
+     * If an indexer URL is explicitly configured, it is returned. Otherwise, falls back
+     * to the built-in default URL for well-known networks (testnet has a default; mainnet
+     * does not).
      *
-     * @return The indexer URL to use, or null if no URL is configured and no default exists
+     * @return The resolved indexer URL, or null if no URL is configured and no default exists for the network
      */
     fun effectiveIndexerUrl(): String? {
         return indexerUrl ?: OZIndexerClient.getDefaultUrl(networkPassphrase)
-    }
-
-    /**
-     * Creates an OZIndexerClient using the effective indexer URL.
-     *
-     * Uses the explicitly configured indexer URL if available, otherwise falls back
-     * to the default URL for the network passphrase.
-     *
-     * @param timeoutMs Optional request timeout in milliseconds
-     * @return An OZIndexerClient instance, or null if no indexer URL is available
-     *
-     * Example:
-     * ```kotlin
-     * val client = config.createIndexerClient()
-     * if (client != null) {
-     *     val contracts = client.lookupByCredentialId(credentialId)
-     * }
-     * ```
-     */
-    fun createIndexerClient(timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS): OZIndexerClient? {
-        val url = effectiveIndexerUrl() ?: return null
-        return OZIndexerClient(url, timeoutMs)
     }
 
     /**

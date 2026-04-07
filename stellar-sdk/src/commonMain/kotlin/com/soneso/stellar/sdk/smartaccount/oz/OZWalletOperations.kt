@@ -13,7 +13,6 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
-import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
@@ -41,7 +40,7 @@ import kotlinx.coroutines.delay
  * XDR (always present), and an optional transaction hash if the wallet was auto-submitted.
  *
  * The [signedTransactionXdr] field is always populated — the deploy transaction is built
- * and signed regardless of [autoSubmit]. When [autoSubmit] is false, the caller can use
+ * and signed regardless of `autoSubmit`. When `autoSubmit` is false, the caller can use
  * this XDR to submit the transaction externally or store it for later submission via
  * [OZWalletOperations.deployPendingCredential].
  *
@@ -132,7 +131,8 @@ data class ConnectWalletResult(
  *
  * @property credentialId The credential ID (Base64URL-encoded, no padding)
  * @property signature The WebAuthn signature with normalized compact format
- * @property publicKey The uncompressed secp256r1 public key (65 bytes)
+ * @property publicKey The uncompressed secp256r1 public key (65 bytes) if found in local storage,
+ *   or an empty ByteArray if the credential is not stored locally.
  */
 data class AuthenticatePasskeyResult(
     val credentialId: String,
@@ -212,14 +212,15 @@ class OZWalletOperations internal constructor(
      * address, and optionally deploying the smart account contract to the network.
      *
      * Flow:
-     * 1. Generate random 32-byte challenge for WebAuthn
+     * 1. Validate WebAuthn provider and autoFund requirements
      * 2. Call WebAuthn registration (user authenticates with biometric/security key)
-     * 3. Extract secp256r1 public key from attestation
+     * 3. Extract and normalize secp256r1 public key from attestation
      * 4. Derive deterministic contract address from credential ID
      * 5. Save credential as pending in storage
-     * 6. Build deploy transaction (if autoSubmit, submit and delete credential on success)
-     * 7. Fund wallet if autoFund is enabled
-     * 8. Return result
+     * 6. Set connected state and save session (before deployment)
+     * 7. Build and sign the deploy transaction (always, regardless of autoSubmit)
+     * 8. If autoSubmit: submit the transaction, fund wallet if autoFund, delete credential
+     * 9. Return result
      *
      * ## Auto-Fund Feature
      *
@@ -245,6 +246,8 @@ class OZWalletOperations internal constructor(
      * @throws WebAuthnException if WebAuthn registration fails or no provider configured
      * @throws ValidationException if public key extraction fails or nativeTokenContract is missing when autoFund is true
      * @throws TransactionException if deployment or funding fails
+     * @throws CredentialException if credential storage fails
+     * @throws StorageException if storage write fails
      *
      * Example:
      * ```kotlin
@@ -431,7 +434,7 @@ class OZWalletOperations internal constructor(
             // Delete credential on successful deployment
             try {
                 credentialManager.deleteCredential(credentialId = credentialIdBase64url)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Non-critical - credential is transitional
             }
         }
@@ -584,8 +587,7 @@ class OZWalletOperations internal constructor(
      * ```
      *
      * IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config
-     * when WebAuthn authentication is needed (prompt = true, fresh = true, or
-     * direct credential connection).
+     * when WebAuthn authentication is needed (prompt = true or fresh = true).
      *
      * @param options Connection options controlling the flow behavior
      * @return ConnectWalletResult on success, or null if no session and prompt is false
@@ -617,10 +619,11 @@ class OZWalletOperations internal constructor(
             if (session != null && !session.isExpired) {
                 // Valid session exists - verify contract still exists on-chain
                 try {
-                    return connectWithCredentials(
+                    val result = connectWithCredentials(
                         credentialId = session.credentialId,
                         contractId = session.contractId
                     )
+                    return result.copy(restoredFromSession = true)
                 } catch (e: WalletException.NotFound) {
                     // Contract no longer exists on-chain (expired TTL) - clear stale session
                     try {
@@ -801,14 +804,16 @@ class OZWalletOperations internal constructor(
      * println("Authenticated with credential: ${authResult.credentialId}")
      *
      * // Step 2: Discover contracts via indexer
-     * val indexer = kit.indexerClient
-     * val contracts = indexer?.lookupByCredentialId(authResult.credentialId)
+     * val response = kit.indexerClient?.lookupByCredentialId(authResult.credentialId)
      *
-     * // Step 3: Let user choose or connect to the first one
-     * if (!contracts.isNullOrEmpty()) {
-     *     kit.setConnectedState(
-     *         credentialId = authResult.credentialId,
-     *         contractId = contracts.first().contractId
+     * // Step 3: Connect to the first contract found
+     * val firstContract = response?.contracts?.firstOrNull()
+     * if (firstContract != null) {
+     *     val connected = walletOps.connectWallet(
+     *         ConnectWalletOptions(
+     *             credentialId = authResult.credentialId,
+     *             contractId = firstContract.contractId
+     *         )
      *     )
      * }
      * ```
@@ -1038,7 +1043,7 @@ class OZWalletOperations internal constructor(
      * Uses `getContractData` with the contract instance key.
      *
      * @param contractId The contract address to verify
-     * @throws WalletException.notFound if the contract does not exist
+     * @throws WalletException.NotFound if the contract does not exist
      */
     private suspend fun verifyContractExists(contractId: String) {
         val instanceEntry = try {
@@ -1249,41 +1254,6 @@ class OZWalletOperations internal constructor(
     // MARK: - Private Helpers
 
     /**
-     * Deploys a smart account wallet contract by composing build and submit.
-     *
-     * Marks the credential as failed if building the transaction throws, then
-     * delegates submission (and its own failure marking) to [submitDeployTransaction].
-     *
-     * @param publicKey The uncompressed secp256r1 public key (65 bytes)
-     * @param credentialId The WebAuthn credential ID (raw bytes)
-     * @param contractId The derived contract address
-     * @param credentialIdBase64url The Base64URL-encoded credential ID
-     * @param forceMethod Optional override to force relayer or RPC submission
-     * @return The transaction hash
-     * @throws TransactionException if building or deployment fails
-     */
-    private suspend fun deployWallet(
-        publicKey: ByteArray,
-        credentialId: ByteArray,
-        contractId: String,
-        credentialIdBase64url: String,
-        forceMethod: SubmissionMethod? = null
-    ): String {
-        val transaction = try {
-            buildDeployTransaction(publicKey, credentialId, contractId, forceMethod)
-        } catch (e: Exception) {
-            try {
-                credentialManager.markDeploymentFailed(
-                    credentialId = credentialIdBase64url,
-                    error = e.message ?: "Build failed"
-                )
-            } catch (_: Exception) {}
-            throw e
-        }
-        return submitDeployTransaction(transaction, credentialIdBase64url, forceMethod)
-    }
-
-    /**
      * Builds, simulates, assembles, and signs the deploy transaction.
      *
      * This method is side-effect-free — it does not write to storage or mark
@@ -1296,6 +1266,7 @@ class OZWalletOperations internal constructor(
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
      * @param credentialId The WebAuthn credential ID (raw bytes)
      * @param contractId The derived contract address
+     * @param forceMethod Optional override to force relayer or RPC submission. When null, auto-detects based on relayer configuration.
      * @return The signed [Transaction] ready for submission
      * @throws TransactionException if building or simulation fails
      */

@@ -34,7 +34,6 @@ import kotlin.test.assertTrue
  * - webauthnVerifierAddress additional edge cases
  * - Config data class properties and equality
  * - effectiveIndexerUrl behavior
- * - createIndexerClient behavior
  * - Builder produces identical config to constructor
  */
 class ConfigValidationTest {
@@ -395,47 +394,14 @@ class ConfigValidationTest {
         // If testnet has a default, url will be non-null; otherwise null
     }
 
-    // MARK: - createIndexerClient Tests
-
-    @Test
-    fun testCreateIndexerClient_withExplicitUrl() {
-        val config = OZSmartAccountConfig(
-            rpcUrl = validRpcUrl,
-            networkPassphrase = validPassphrase,
-            accountWasmHash = validWasmHash,
-            webauthnVerifierAddress = validVerifier,
-            indexerUrl = "https://indexer.example.com"
-        )
-
-        val client = config.createIndexerClient()
-        assertNotNull(client, "Should create indexer client when URL is configured")
-    }
-
-    @Test
-    fun testCreateIndexerClient_noUrlAndNoDefault() {
-        // Use a custom passphrase that will not have a default URL
-        val config = OZSmartAccountConfig(
-            rpcUrl = validRpcUrl,
-            networkPassphrase = "Custom Private Network ; 2026",
-            accountWasmHash = validWasmHash,
-            webauthnVerifierAddress = validVerifier,
-            indexerUrl = null
-        )
-
-        val client = config.createIndexerClient()
-        // With a custom passphrase and no explicit indexer URL, this should return null
-        // (unless OZIndexerClient has a fallback for unknown passphrases)
-        // The test verifies the method does not throw
-    }
-
-    // MARK: - getDeployer Tests
+    // MARK: - effectiveDeployer Tests
 
     @Test
     fun testGetDeployer_defaultDeployerIsDeterministic() = runTest {
         val config = validConfig()
 
-        val deployer1 = config.getDeployer()
-        val deployer2 = config.getDeployer()
+        val deployer1 = config.effectiveDeployer()
+        val deployer2 = config.effectiveDeployer()
 
         assertNotNull(deployer1)
         assertNotNull(deployer2)
@@ -453,7 +419,7 @@ class ConfigValidationTest {
             deployerKeypair = customDeployer
         )
 
-        val deployer = config.getDeployer()
+        val deployer = config.effectiveDeployer()
         assertEquals(customDeployer.getAccountId(), deployer.getAccountId())
     }
 

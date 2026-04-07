@@ -19,9 +19,11 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 7. [Context Rules](#context-rules)
 8. [Multi-Signer Operations](#multi-signer-operations)
 9. [External Signers](#external-signers)
-10. [Events](#events)
-11. [Exceptions](#exceptions)
-12. [Types](#types)
+10. [Indexer Client](#indexer-client)
+11. [Relayer Client](#relayer-client)
+12. [Events](#events)
+13. [Exceptions](#exceptions)
+14. [Types](#types)
 
 ---
 
@@ -32,30 +34,39 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "abc123...",
-    webauthnVerifierAddress = "CBCD1234...",
-    webauthnProvider = platformWebAuthnProvider()  // Platform-specific
+    accountWasmHash = "YOUR_ACCOUNT_WASM_HASH",
+    webauthnVerifierAddress = "CWEBAUTHN_VERIFIER_ADDRESS",
+    webauthnProvider = webauthnProvider,  // required for passkey auth (AndroidWebAuthnProvider / AppleWebAuthnProvider / JsWebAuthnProvider)
+    storage = storageAdapter              // defaults to InMemoryStorageAdapter (AndroidKeystoreStorageAdapter / UserDefaultsStorageAdapter / IndexedDBStorageAdapter)
 )
 val kit = OZSmartAccountKit.create(config)
 
-// Create a wallet
+// On app start: silently restore from stored session
+val session = kit.walletOperations.connectWallet()
+if (session != null) {
+    println("Restored wallet: ${session.contractId}")
+}
+
+// User creates a new wallet (registers a passkey, deploys the contract)
 val wallet = kit.walletOperations.createWallet(
     userName = "Alice",
     autoSubmit = true,
     autoFund = true,
-    nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+    nativeTokenContract = "CDLZFC3..."
 )
-println("Wallet: ${wallet.contractId}")
+println("Created wallet: ${wallet.contractId}")
+
+// User connects to an existing wallet (prompts for passkey selection)
+val connected = kit.walletOperations.connectWallet(
+    OZWalletOperations.ConnectWalletOptions(prompt = true)
+)
 
 // Transfer tokens
 val result = kit.transactionOperations.transfer(
-    tokenContract = "CBCD1234...",
-    recipient = "GA7Q...",
-    amount = 10.0
+    tokenContract = "CDLZFC3...",
+    recipient = "GA7QYNF7...",
+    amount = "10"
 )
-if (result.success) {
-    println("Transfer succeeded: ${result.hash}")
-}
 
 // Disconnect
 kit.disconnect()
@@ -176,6 +187,32 @@ Access multi-signature operations and available signer queries.
 
 ---
 
+### Client Properties
+
+#### indexerClient
+```kotlin
+val indexerClient: OZIndexerClient?
+```
+
+Indexer client for credential-to-contract discovery. Null when no indexer URL is configured. Use for looking up contracts by credential ID or signer address, and for retrieving contract details (rules, signers, policies).
+
+```kotlin
+// Discover contracts associated with a credential
+val contracts = kit.indexerClient?.lookupByCredentialId(credentialId)
+
+// Get full contract details
+val details = kit.indexerClient?.getContract(contractId)
+```
+
+#### relayerClient
+```kotlin
+val relayerClient: OZRelayerClient?
+```
+
+Relayer client for fee-sponsored transaction submission. Null when no relayer URL is configured. The SDK uses this internally for transaction submission when a relayer is configured. Direct access is available for advanced use cases.
+
+---
+
 ### Lifecycle Methods
 
 #### disconnect
@@ -250,6 +287,42 @@ data class OZSmartAccountConfig(
 - `externalWallet`: Optional external wallet adapter for multi-signer support
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
 
+### Platform-Specific Providers
+
+#### WebAuthnProvider implementations
+
+The SDK provides ready-to-use WebAuthn providers for each platform:
+
+| Platform | Class | Constructor |
+|----------|-------|-------------|
+| Android | `AndroidWebAuthnProvider` | `AndroidWebAuthnProvider(activity)` |
+| iOS/macOS | `AppleWebAuthnProvider` | `AppleWebAuthnProvider(window)` |
+| JS/Web | `JsWebAuthnProvider` | `JsWebAuthnProvider(rpId)` |
+
+#### StorageAdapter implementations
+
+Storage adapters persist credentials and sessions across app restarts:
+
+| Platform | Class | Description |
+|----------|-------|-------------|
+| All | `InMemoryStorageAdapter` | Non-persistent, for testing only (default) |
+| Android | `AndroidKeystoreStorageAdapter` | Encrypted storage via Android Keystore |
+| iOS/macOS | `UserDefaultsStorageAdapter` | Persists to UserDefaults |
+| JS/Web | `IndexedDBStorageAdapter` | Browser IndexedDB (recommended for web) |
+| JS/Web | `LocalStorageAdapter` | Browser localStorage |
+
+#### ExternalWalletAdapter
+
+Interface for delegated (G-address) signers in multi-signer operations. Implement this to integrate external Stellar wallets (e.g., Freighter, Lobstr) that can sign auth entries on behalf of delegated signers. Key methods:
+
+- `canSignFor(address: String): Boolean` — check if the adapter can sign for an address
+- `signAuthEntry(preimageXdr: String, options: SignAuthEntryOptions?): SignAuthEntryResult` — sign an auth entry preimage
+- `connect(): ConnectedWallet?` — connect to the external wallet
+- `disconnect()` — disconnect all wallets
+- `getConnectedWallets(): List<ConnectedWallet>` — list connected wallets
+
+The SDK includes `OZExternalSignerManager` which implements this interface and manages keypair-based signers. See [External Signers](#external-signers) for details.
+
 **Factory Methods**:
 
 ```kotlin
@@ -284,13 +357,13 @@ val config = OZSmartAccountConfig.builder(
 
 **Instance Methods**:
 
-#### getDeployer
+#### effectiveDeployer
 
 ```kotlin
-suspend fun getDeployer(): KeyPair
+suspend fun effectiveDeployer(): KeyPair
 ```
 
-Returns the deployer keypair, creating the default deterministic deployer if none was explicitly configured.
+Returns the deployer keypair that will be used for contract deployment and transaction submission. If `deployerKeypair` is explicitly set in the config, that value is returned. Otherwise, a deterministic keypair is derived from `SHA256("openzeppelin-smart-account-kit")`. The derivation is deterministic and reproducible, always producing the same deployer address. The deployer only pays fees; it does not control user wallets.
 
 **Returns**: The configured deployer or the default deterministic deployer
 
@@ -302,31 +375,9 @@ Returns the deployer keypair, creating the default deterministic deployer if non
 fun effectiveIndexerUrl(): String?
 ```
 
-Returns the effective indexer URL for this configuration. If an indexer URL is explicitly configured, it is returned. Otherwise, returns the default indexer URL for the network passphrase.
+Returns the indexer URL that will be used after applying fallback logic. If `indexerUrl` is explicitly set in the config, that value is returned. Otherwise, the SDK falls back to the built-in default URL for the network. Testnet has a built-in default URL; mainnet does not (returns null unless explicitly configured).
 
-**Returns**: The indexer URL to use, or null if no URL is configured and no default exists
-
-#### createIndexerClient
-
-```kotlin
-fun createIndexerClient(
-    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
-): OZIndexerClient?
-```
-
-Creates an `OZIndexerClient` using the effective indexer URL. Falls back to the default URL for the network passphrase if no explicit URL is configured.
-
-**Parameters**:
-- `timeoutMs`: Optional request timeout in milliseconds (defaults to `OZConstants.DEFAULT_INDEXER_TIMEOUT_MS`)
-
-**Returns**: An `OZIndexerClient` instance, or null if no indexer URL is available
-
-```kotlin
-val client = config.createIndexerClient()
-if (client != null) {
-    val contracts = client.lookupByCredentialId(credentialId)
-}
-```
+**Returns**: The resolved indexer URL, or null if no URL is configured and no default exists for the network
 
 ---
 
@@ -479,7 +530,7 @@ Use this for credential discovery via indexer or pre-authentication before contr
 
 **Parameters**:
 - `challenge`: Optional challenge bytes (generates random 32 bytes if null)
-- `credentialIds`: Optional list of allowed credential IDs (currently not filtered)
+- `credentialIds`: Optional list of Base64URL-encoded credential IDs. When provided, the OS/browser only offers these specific passkeys during authentication. When null, all passkeys for this Relying Party are offered.
 
 **Returns**: `AuthenticatePasskeyResult` with credential ID, signature, and public key
 
@@ -588,6 +639,20 @@ data class DeployPendingResult(
 - `contractId`: Smart account contract address (C-address)
 - `signedTransactionXdr`: Base64-encoded signed deploy transaction envelope
 - `transactionHash`: Transaction hash if auto-submitted, null when `autoSubmit` is false
+
+#### AuthenticatePasskeyResult
+```kotlin
+data class AuthenticatePasskeyResult(
+    val credentialId: String,
+    val signature: WebAuthnSignature,
+    val publicKey: ByteArray
+)
+```
+
+**Fields**:
+- `credentialId`: Base64URL-encoded credential ID of the authenticated passkey
+- `signature`: Normalized WebAuthn signature (compact format, low-S)
+- `publicKey`: Uncompressed secp256r1 public key (65 bytes)
 
 #### AddPasskeySignerResult
 ```kotlin
@@ -1929,6 +1994,168 @@ data class ConnectedWallet(
 ```
 
 Information about a connected external wallet.
+
+---
+
+## Indexer Client
+
+The SDK includes an indexer client for reverse lookups from signer credentials to smart account contracts. The indexer is auto-configured for testnet when no explicit URL is provided.
+
+### Using via OZSmartAccountKit (Recommended)
+
+```kotlin
+val kit = OZSmartAccountKit.create(config)
+
+// Discover contracts by credential ID
+val contracts = kit.indexerClient?.lookupByCredentialId(credentialId)
+
+// Discover contracts by signer address
+val contracts = kit.indexerClient?.lookupByAddress("GABC...")
+
+// Get full contract details (rules, signers, policies)
+val details = kit.indexerClient?.getContract("CABC...")
+
+// Health and stats
+val healthy = kit.indexerClient?.isHealthy()
+val stats = kit.indexerClient?.getStats()
+```
+
+### Using OZIndexerClient Directly
+
+```kotlin
+// Create client for a specific network
+val indexer = OZIndexerClient.forNetwork("Test SDF Network ; September 2015")
+
+// Or with a custom URL
+val indexer = OZIndexerClient(
+    baseUrl = "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+    timeoutMs = 10000
+)
+```
+
+### Methods
+
+#### lookupByCredentialId
+
+```kotlin
+suspend fun lookupByCredentialId(credentialId: String): CredentialLookupResponse
+```
+
+Finds all smart account contracts where the given credential is registered as a signer. The credential ID is the Base64URL-encoded WebAuthn credential identifier.
+
+**Returns**: `CredentialLookupResponse` with `credentialId`, `contracts: List<IndexedContractSummary>`, `count`
+
+#### lookupByAddress
+
+```kotlin
+suspend fun lookupByAddress(address: String): AddressLookupResponse
+```
+
+Finds all smart account contracts where the given address is registered as a signer. Accepts both G-addresses (Stellar accounts) and C-addresses (contracts).
+
+**Returns**: `AddressLookupResponse` with `signerAddress`, `contracts: List<IndexedContractSummary>`, `count`
+
+#### getContract
+
+```kotlin
+suspend fun getContract(contractId: String): ContractDetailsResponse
+```
+
+Retrieves full details for a smart account contract including all context rules, signers, and policies.
+
+**Returns**: `ContractDetailsResponse` with `contractId`, `summary: IndexedContractSummary`, `contextRules: List<IndexedContextRule>`
+
+#### getStats
+
+```kotlin
+suspend fun getStats(): IndexerStatsResponse
+```
+
+Returns indexer service statistics (total contracts indexed, etc.).
+
+#### isHealthy
+
+```kotlin
+suspend fun isHealthy(): Boolean
+```
+
+Returns true if the indexer service is reachable and healthy.
+
+#### close
+
+```kotlin
+fun close()
+```
+
+Closes the HTTP client. The client must not be used after calling this. When using via `kit.indexerClient`, the kit's `close()` handles this automatically.
+
+---
+
+## Relayer Client
+
+The SDK includes a relayer client for fee-sponsored transaction submission. When configured, the SDK automatically routes transactions through the relayer so users don't need XLM to pay fees.
+
+### Using via OZSmartAccountKit (Recommended)
+
+When the relayer is configured, all transaction submissions use it automatically:
+
+```kotlin
+val config = OZSmartAccountConfig(
+    // ... other config
+    relayerUrl = "https://my-relayer-proxy.example.com"
+)
+val kit = OZSmartAccountKit.create(config)
+
+// Transactions automatically use the relayer
+kit.transactionOperations.transfer(tokenContract, recipient, "10")
+
+// Bypass the relayer for a specific operation
+kit.transactionOperations.transfer(
+    tokenContract, recipient, "10",
+    forceMethod = SubmissionMethod.RPC
+)
+
+// Access the relayer client directly
+kit.relayerClient?.sendXdr(signedTransactionXdr)
+```
+
+### Methods
+
+#### send
+
+```kotlin
+suspend fun send(
+    hostFunctionXdr: String,
+    authXdrs: List<String>,
+    timeoutMs: Long? = null
+): RelayerResponse
+```
+
+Submits a host function with signed authorization entries for fee sponsoring. The relayer wraps the operation in a fee-bump transaction using its own channel account.
+
+**Parameters**:
+- `hostFunctionXdr`: Base64-encoded host function XDR
+- `authXdrs`: Base64-encoded signed authorization entries
+- `timeoutMs`: Optional request timeout override
+
+**Returns**: `RelayerResponse` with `success`, `hash`, `error`, `errorCode`
+
+#### sendXdr
+
+```kotlin
+suspend fun sendXdr(
+    transactionXdr: String,
+    timeoutMs: Long? = null
+): RelayerResponse
+```
+
+Submits a fully signed transaction XDR for fee-bumping. Used when the transaction contains source_account auth entries that require the deployer signature.
+
+**Parameters**:
+- `transactionXdr`: Base64-encoded signed transaction envelope XDR
+- `timeoutMs`: Optional request timeout override
+
+**Returns**: `RelayerResponse` with `success`, `hash`, `error`, `errorCode`
 
 ---
 

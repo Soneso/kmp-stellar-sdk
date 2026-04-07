@@ -92,13 +92,15 @@ class OZSmartAccountKit private constructor(
 
     /**
      * Optional relayer client for fee-sponsored transaction submission.
+     * Null when no relayer URL is configured.
      */
-    internal val relayerClient: OZRelayerClient?,
+    val relayerClient: OZRelayerClient?,
 
     /**
      * Optional indexer client for credential-to-contract discovery.
+     * Null when no indexer URL is configured.
      */
-    internal val indexerClient: OZIndexerClient?,
+    val indexerClient: OZIndexerClient?,
 
     /**
      * Optional external wallet adapter for multi-signer support.
@@ -106,7 +108,7 @@ class OZSmartAccountKit private constructor(
     internal val externalWallet: ExternalWalletAdapter?,
 
     /**
-     * Soroban RPC server for contract operations.
+     * Soroban RPC server shared by all operation managers. Closed by [close].
      */
     internal val sorobanServer: SorobanServer
 ) {
@@ -191,7 +193,8 @@ class OZSmartAccountKit private constructor(
      * Indicates whether a wallet is currently connected.
      *
      * A wallet is connected when both the credential ID and contract ID are set.
-     * This state persists across app launches if a valid session exists.
+     * This property reflects in-memory state only. After an app restart, call
+     * [walletOperations].connectWallet() to restore a saved session.
      */
     val isConnected: Boolean
         get() = _credentialId != null && _contractId != null
@@ -240,7 +243,8 @@ class OZSmartAccountKit private constructor(
      *
      * Clears the in-memory connection state (credential ID and contract ID) and
      * removes the stored session. The stored credentials remain in storage and
-     * can be reconnected later.
+     * can be reconnected later. Emits a [SmartAccountEvent.WalletDisconnected]
+     * event if a wallet was connected at the time of the call.
      *
      * This method is safe to call even if no wallet is connected.
      *
@@ -273,8 +277,9 @@ class OZSmartAccountKit private constructor(
      * Closes the Soroban RPC server connection and the indexer HTTP client if present.
      * The relayer client manages its own per-request connections and requires no explicit cleanup.
      *
-     * The kit must not be used after calling this method. To disconnect the wallet session
-     * without releasing resources, call [disconnect] instead.
+     * This method does not clear the connection state or stored session. Call [disconnect]
+     * before [close] if you also want to end the session. The kit must not be used after
+     * calling this method.
      *
      * Example:
      * ```kotlin
@@ -322,8 +327,14 @@ class OZSmartAccountKit private constructor(
         }
     }
 
+    /** Cached deployer keypair to avoid repeated creation. See [getDeployer]. */
+    private var cachedDeployer: KeyPair? = null
+
     /**
      * Returns the deployer keypair, resolving to the default if not explicitly configured.
+     * The result is cached after the first call to avoid repeated keypair creation.
+     * The cache is not synchronized; concurrent callers may redundantly create the
+     * deployer, but the result is deterministic and idempotent.
      *
      * The deployer keypair is used for deploying smart account contracts. If no deployer
      * was provided in the configuration, a deterministic deployer is derived from
@@ -335,7 +346,7 @@ class OZSmartAccountKit private constructor(
      * @throws ConfigurationException if default deployer creation fails
      */
     internal suspend fun getDeployer(): KeyPair {
-        return config.getDeployer()
+        return cachedDeployer ?: config.effectiveDeployer().also { cachedDeployer = it }
     }
 
     /**
@@ -362,7 +373,7 @@ class OZSmartAccountKit private constructor(
          *
          * @param config The configuration for smart account operations
          * @return A new OZSmartAccountKit instance
-         * @throws ConfigurationException.InvalidConfig if the configuration is invalid
+         * @throws ConfigurationException if the configuration is invalid or required fields are missing
          *
          * Example:
          * ```kotlin
