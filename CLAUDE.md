@@ -8,6 +8,7 @@ This is a Kotlin Multiplatform (KMP) project for building a Stellar SDK. The SDK
 - Build Stellar transactions
 - Connect to Horizon (Stellar's API server)
 - Connect to Stellar RPC Server
+- Build smart account wallets with passkey authentication using [OpenZeppelin smart contracts](https://github.com/OpenZeppelin/stellar-contracts)
 
 ## Current State
 
@@ -31,12 +32,32 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **XDR**: Complete XDR type system and serialization
 - **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-53 (Sign and Verify Messages)
 
+### Smart Accounts (OpenZeppelin)
+- **Contracts**: [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) v0.7.0
+- **SDK Layer**: `stellar-sdk/src/commonMain/.../smartaccount/` with two sub-packages:
+  - `core/` — Platform-independent types, builders, errors, signatures, auth payload, CBOR parser
+  - `oz/` — OZ-specific kit, managers, clients, config, storage, WebAuthn provider interface
+- **Platform Adapters**: WebAuthn providers and storage adapters in `androidMain/`, `jsMain/`, `nativeMain/`
+- **Features**: Wallet lifecycle (create, connect, disconnect), multi-signer authorization, context rules, policies (threshold, weighted threshold, spending limit), token transfers, relayer fee sponsoring, indexer credential lookup
+- **Documentation**: `docs/smart-accounts/` (API reference, onboarding guide, platform WebAuthn guides)
+
 ### Demo Application
 - **Platforms**: Android, iOS, macOS, Desktop (JVM), Web
 - **Architecture**: Compose Multiplatform with 95% code sharing
 - **UI**: Modern celestial-themed design with color-coded cards (purple/gold/teal/blue/red)
 - **Features**: 11 comprehensive demos (key generation, funding, account details, trustlines, payments, fetch transaction, contract details, deploy contract, invoke hello world, invoke auth, invoke token contract)
 - **Location**: `demo/` directory with platform-specific apps
+
+### Smart Account Demo Application
+- **Platforms**: Android, iOS, macOS, Web
+- **Architecture**: Compose Multiplatform (Android, iOS, Web) + native SwiftUI (macOS) with Kotlin bridge
+- **Features**: Wallet creation/connection, token transfers, context rule management, policy configuration, multi-signer flows
+- **Location**: `smart-account-demo/` directory
+
+### Agent Skill
+- An [Agent Skill](https://agentskills.io) that teaches AI coding agents how to use this SDK
+- **Location**: `skills/kmp-stellar-sdk/` (`SKILL.md` + `references/`)
+- **Plugin config**: `skills/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 
 ## Architecture Notes
 

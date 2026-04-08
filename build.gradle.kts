@@ -21,7 +21,7 @@ plugins {
 
 allprojects {
     group = "com.soneso.stellar"
-    version = "1.3.1"
+    version = "1.4.0"
 
     repositories {
         mavenLocal()  // For testing locally published artifacts

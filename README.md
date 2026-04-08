@@ -1,6 +1,6 @@
 # Stellar SDK for Kotlin Multiplatform
 
-[![Version](https://img.shields.io/badge/version-1.3.1-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-blueviolet?logo=kotlin)](https://kotlinlang.org/docs/multiplatform.html)
 [![Maven Central](https://img.shields.io/maven-central/v/com.soneso.stellar/stellar-sdk)](https://search.maven.org/artifact/com.soneso.stellar/stellar-sdk)
 [![codecov](https://codecov.io/gh/Soneso/kmp-stellar-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/Soneso/kmp-stellar-sdk)
@@ -22,6 +22,8 @@ A comprehensive Kotlin Multiplatform SDK for building applications on the Stella
 
 - [Getting Started](docs/getting-started.md) - Installation and basic usage
 - [Demo App](demo/README.md) - Multi-platform sample application
+- [Smart Accounts](docs/smart-accounts/README.md) - OpenZeppelin smart account support (passkeys, multi-signer, policies)
+- [Smart Account Demo](smart-account-demo/README.md) - Smart account demo with passkey authentication
 - [Development Guide](CLAUDE.md) - Architecture and development guidelines
 - [Horizon API Compatibility](compatibility/horizon/HORIZON_COMPATIBILITY_MATRIX.md) - Supported Horizon endpoints
 - [Soroban RPC Compatibility](compatibility/rpc/RPC_COMPATIBILITY_MATRIX.md) - Supported Soroban RPC methods
@@ -34,6 +36,7 @@ The Stellar SDK for Kotlin Multiplatform enables you to:
 - Build and sign Stellar transactions
 - Connect to Horizon (Stellar's REST API server)
 - Interact with Soroban smart contracts via RPC
+- Build smart account wallets with passkey authentication using [OpenZeppelin smart contracts](https://github.com/OpenZeppelin/stellar-contracts)
 - Run the same business logic on mobile, web, desktop, and server platforms
 
 This SDK uses audited cryptographic libraries on all platforms.
@@ -42,6 +45,7 @@ This SDK uses audited cryptographic libraries on all platforms.
 
 With this SDK, you can create:
 
+- **Smart Account Wallets** - Passkey-authenticated wallets with multi-signer authorization and policy-based access control
 - **Wallets & Payment Apps** - Send/receive XLM and assets, manage accounts across platforms
 - **DEX Interfaces** - Build trading interfaces, liquidity pools, and order book managers
 - **Soroban DApps** - Deploy and interact with smart contracts from any platform
@@ -64,6 +68,7 @@ The SDK provides comprehensive Stellar functionality:
 - **Soroban RPC Client** - Transaction simulation, event queries, ledger data, contract deployment and invocation
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
+- **Smart Accounts** - [OpenZeppelin smart account](https://github.com/OpenZeppelin/stellar-contracts) support with WebAuthn passkeys, multi-signer authorization, context rules, and policies (threshold, weighted threshold, spending limit)
 - **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-53 (Sign and Verify Messages)
 
 ## Installation
@@ -73,7 +78,7 @@ Add the SDK as a Maven dependency (recommended for most projects):
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.3.1")
+    implementation("com.soneso.stellar:stellar-sdk:1.4.0")
 }
 ```
 

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-08
+
+### Added
+- **OpenZeppelin Smart Accounts**: SDK support for the [OpenZeppelin smart account contracts](https://github.com/OpenZeppelin/stellar-contracts) on Soroban
+  - `OZSmartAccountKit` as the main entry point for wallet creation, connection, and management
+  - WebAuthn passkey authentication across all platforms (Android, iOS, macOS, web)
+  - Multi-signer support with delegated and external signers
+  - Context rule management (Default, CallContract, CreateContract)
+  - Policy management (simple threshold, weighted threshold, spending limit)
+  - Token transfers and generic contract calls with single and multi-signer authorization
+  - Relayer integration for fee-sponsored transactions
+  - Indexer integration for credential-to-contract address lookup (testnet and mainnet defaults)
+  - Platform-specific storage adapters (EncryptedSharedPreferences, Keychain, UserDefaults, IndexedDB, LocalStorage)
+  - Platform-specific WebAuthn providers (CredentialManager, ASAuthorization, navigator.credentials)
+  - Documentation in `docs/smart-accounts/`
+
+- **Smart Account Demo App**: Compose Multiplatform demo with native macOS SwiftUI support
+  - Wallet creation and connection with passkey registration
+  - Token transfers (XLM and custom tokens) with single and multi-signer flows
+  - Context rule creation, editing, and removal
+  - Policy configuration (threshold, weighted threshold, spending limit)
+  - Token approval (SEP-41 allowance)
+  - Runs on Android, iOS, macOS, desktop (JVM), and web
+
 ## [1.3.1] - 2026-04-03
 
 ### Fixed

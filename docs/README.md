@@ -20,6 +20,11 @@ Welcome to the documentation for the Stellar SDK for Kotlin Multiplatform. This 
 - **[Advanced Topics](advanced.md)** - Complex patterns and optimizations
 - **[Testing Guide](testing.md)** - SDK testing (for contributors)
 
+### Smart Accounts
+- **[Smart Accounts Guide](smart-accounts/README.md)** - OpenZeppelin smart account support (passkeys, multi-signer, policies)
+- **[API Reference](smart-accounts/api-reference.md)** - Smart account API reference
+- **[Onboarding Guide](smart-accounts/onboarding.md)** - Getting started with smart accounts
+
 ### Protocols & Standards
 - **[SEP Implementations](sep/)** - Stellar Ecosystem Proposal support
 
@@ -83,6 +88,15 @@ This SDK provides an implementation of the Stellar protocol with:
 - State restoration
 - Transaction simulation
 - Result parsing with type safety
+
+### Smart Accounts (OpenZeppelin)
+- WebAuthn passkey authentication (Android, iOS, macOS, Web)
+- Multi-signer authorization (passkey + delegated Ed25519 signers)
+- Context rules (Default, CallContract, CreateContract)
+- Policies (simple threshold, weighted threshold, spending limit)
+- Relayer integration for fee-sponsored transactions
+- Indexer integration for credential discovery
+- Platform-specific storage adapters
 
 ### Security Features
 - Production-ready crypto libraries

@@ -2,10 +2,10 @@
 name: kmp-stellar-sdk
 description: Build Stellar blockchain applications with the Soneso KMP (Kotlin Multiplatform) SDK. Covers keypair generation, transaction building, Horizon queries, Soroban smart contracts, XDR encoding, and SEP integrations. Use when the developer is working with Kotlin, KMP, or Android and mentions Stellar, blockchain, or cryptocurrency operations.
 license: Apache-2.0
-compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.3.1. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
+compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.4.0. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
 metadata:
   author: soneso
-  version: "1.3.1"
+  version: "1.0.2"
   sdk_repo: https://github.com/Soneso/kmp-stellar-sdk
 ---
 
@@ -20,7 +20,7 @@ The KMP Stellar SDK (`com.soneso.stellar:stellar-sdk`) is a Kotlin Multiplatform
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.3.1")
+    implementation("com.soneso.stellar:stellar-sdk:1.4.0")
 }
 ```
 
