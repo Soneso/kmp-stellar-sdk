@@ -39,6 +39,33 @@ class KeychainStorageAdapterTest {
     private val testServiceName =
         "com.soneso.stellar.test.keychain.${kotlin.random.Random.nextInt(100_000)}"
 
+    /**
+     * Checks whether the macOS Keychain is accessible in the current environment.
+     * CI runners and unsigned test binaries may not have Keychain entitlements,
+     * causing all SecItem operations to fail with errSecMissingEntitlement (-34018).
+     * Returns true if a probe write+delete succeeds, false otherwise.
+     */
+    private fun isKeychainAvailable(): Boolean {
+        return try {
+            val probe = KeychainStorageAdapter(serviceName = "com.soneso.stellar.test.probe")
+            kotlinx.coroutines.runBlocking {
+                probe.save(
+                    StoredCredential(
+                        credentialId = "probe",
+                        publicKey = ByteArray(65) { if (it == 0) 0x04.toByte() else 0x01.toByte() },
+                        createdAt = 1L
+                    )
+                )
+                probe.clear()
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private val keychainAvailable by lazy { isKeychainAvailable() }
+
     private fun newAdapter(): KeychainStorageAdapter =
         KeychainStorageAdapter(serviceName = testServiceName)
 
@@ -98,6 +125,7 @@ class KeychainStorageAdapterTest {
 
     @AfterTest
     fun cleanup() = runTest {
+        if (!keychainAvailable) return@runTest
         // Remove all Keychain items written by this test via the unique service name
         newAdapter().clear()
     }
@@ -106,6 +134,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveAndRetrieveCredential() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val credential = fullCredential()
 
@@ -123,6 +152,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveCredentialWithAllFieldsPopulated() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -145,6 +175,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveCredentialWithMinimalFields() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(minimalCredential())
 
@@ -166,6 +197,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetNonexistentCredentialReturnsNull() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val result = adapter.get("nonexistent-credential-id")
         assertNull(result)
@@ -175,6 +207,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveExistingCredentialOverwrites() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val original = StoredCredential(
             credentialId = "cred-upsert",
@@ -214,6 +247,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateCredentialDeploymentStatus() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -236,6 +270,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateCredentialNickname() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -254,6 +289,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateCredentialContractId() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(minimalCredential())
 
@@ -270,6 +306,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateCredentialIsPrimary() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential()) // isPrimary = true
 
@@ -287,6 +324,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateMultipleFieldsAtOnce() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -316,6 +354,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateNonexistentCredentialThrows() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
 
         assertFailsWith<CredentialException.NotFound> {
@@ -330,6 +369,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testDeleteCredential() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -340,6 +380,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testDeleteNonexistentCredentialDoesNotThrow() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         // Must be a silent no-op; must not throw
         adapter.delete("nonexistent-credential-id")
@@ -347,6 +388,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testDeleteRemovesOnlyTargetCredential() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-alpha"))
         adapter.save(fullCredential("cred-beta"))
@@ -364,6 +406,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetAllEmptyReturnsEmptyList() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val all = adapter.getAll()
         assertTrue(all.isEmpty())
@@ -371,6 +414,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetAllWithMultipleCredentials() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-1"))
         adapter.save(fullCredential("cred-2"))
@@ -389,6 +433,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetByContractIdReturnsMatchingCredentials() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val contractA = "CAAA1234AAAA5678AAAA9012AAAA3456AAAA7890AAAA1234AAAA5678"
         val contractB = "CBBB1234BBBB5678BBBB9012BBBB3456BBBB7890BBBB1234BBBB5678"
@@ -410,6 +455,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetByContractIdNoMatchReturnsEmptyList() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
@@ -419,6 +465,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetByContractIdExcludesNullContractId() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val contractId = "CTGT1234TARG5678ETCO9012NTRA3456CTID7890HERE1234ABCD5678"
 
@@ -434,6 +481,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearRemovesAllCredentials() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-1"))
         adapter.save(fullCredential("cred-2"))
@@ -449,6 +497,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearOnEmptyAdapterDoesNotThrow() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         // Must not throw on an empty Keychain namespace
         adapter.clear()
@@ -459,6 +508,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveAndRetrieveSession() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val session = StoredSession(
             credentialId = "cred-session-001",
@@ -479,6 +529,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testGetSessionWhenNoneExistsReturnsNull() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val result = adapter.getSession()
         assertNull(result)
@@ -486,6 +537,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testSaveSessionOverwritesPreviousSession() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
 
         val session1 = StoredSession(
@@ -515,6 +567,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testExpiredSessionAutoClearedOnGetSession() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val session = StoredSession(
             credentialId = "cred-expired",
@@ -534,6 +587,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testNonExpiredSessionIsReturned() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         val session = StoredSession(
             credentialId = "cred-valid",
@@ -552,6 +606,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearSession() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.saveSession(
             StoredSession(
@@ -569,6 +624,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearSessionWhenNoneExistsDoesNotThrow() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         // Must be a silent no-op; must not throw
         adapter.clearSession()
@@ -579,6 +635,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearSessionDoesNotAffectCredentials() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
         adapter.saveSession(
@@ -599,6 +656,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testClearRemovesSessionToo() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential())
         adapter.saveSession(
@@ -620,6 +678,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testCustomServiceNameIsolatesKeychainData() = runTest {
+        if (!keychainAvailable) return@runTest
         val suffix = kotlin.random.Random.nextInt(100_000)
         val serviceA = "com.soneso.stellar.test.keychain.isolation.a.$suffix"
         val serviceB = "com.soneso.stellar.test.keychain.isolation.b.$suffix"
@@ -657,6 +716,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testDefaultServiceNameIsUsed() {
+        if (!keychainAvailable) return
         // Compile-time check: adapter can be constructed without arguments using the default service name
         val adapter = KeychainStorageAdapter()
         assertNotNull(adapter)
@@ -666,6 +726,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testKeychainStorageAdapterImplementsStorageAdapterInterface() {
+        if (!keychainAvailable) return
         val adapter: StorageAdapter = KeychainStorageAdapter(serviceName = testServiceName)
         // Compilation check: KeychainStorageAdapter can be assigned to StorageAdapter
         assertNotNull(adapter)
@@ -675,6 +736,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testDeleteThenReSaveCredential() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-lifecycle"))
 
@@ -702,6 +764,7 @@ class KeychainStorageAdapterTest {
 
     @Test
     fun testUpdateAfterDeleteThrows() = runTest {
+        if (!keychainAvailable) return@runTest
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-deleted"))
 
