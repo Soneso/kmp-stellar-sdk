@@ -2,7 +2,7 @@
 //  LocalStorageAdapter.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Copyright (c) 2025 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -163,18 +164,7 @@ class LocalStorageAdapter(
             )
         }
 
-        val updated = existing.copy(
-            deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-            deploymentError = updates.deploymentError ?: existing.deploymentError,
-            contractId = updates.contractId ?: existing.contractId,
-            lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-            nickname = updates.nickname ?: existing.nickname,
-            isPrimary = updates.isPrimary ?: existing.isPrimary,
-            transports = updates.transports ?: existing.transports,
-            deviceType = updates.deviceType ?: existing.deviceType,
-            backedUp = updates.backedUp ?: existing.backedUp
-        )
-
+        val updated = existing.applyUpdate(updates)
         val updatedJson = serializeCredential(updated)
         try {
             storage.setItem(key, updatedJson)
@@ -452,5 +442,5 @@ private fun deserializeSession(json: String): StoredSession {
  * Equivalent to `console.warn(message)` in JavaScript.
  */
 private fun consoleWarn(message: String) {
-    js("console.warn(message)")
+    js("console.warn")(message)
 }

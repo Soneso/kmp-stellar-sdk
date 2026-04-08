@@ -1,5 +1,5 @@
 //
-//  UserDefaultsStorageAdapterTest.kt
+//  KeychainStorageAdapterTest.kt
 //  Stellar SDK Kotlin Multiplatform
 //
 //  Copyright (c) 2026 Soneso. All rights reserved.
@@ -14,7 +14,6 @@ import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
 import kotlinx.coroutines.test.runTest
-import platform.Foundation.NSUserDefaults
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,37 +23,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for [UserDefaultsStorageAdapter] exercising the [StorageAdapter] interface contract
- * using NSUserDefaults on macOS.
+ * Tests for [KeychainStorageAdapter] exercising the [StorageAdapter] interface contract
+ * using the real macOS Keychain (Security framework).
  *
- * Each test uses a unique suite name to provide full isolation between tests and
- * prevent stale data from interfering. The [AfterTest] method removes the suite's
- * persistent domain to clean up after each test.
+ * Each test class instance uses a unique [serviceName] to provide full isolation between
+ * tests and prevent Keychain collisions from stale data. The [AfterTest] method calls
+ * [KeychainStorageAdapter.clear] to remove all Keychain items written during the test.
  *
- * NSUserDefaults is available in the macOS test environment without additional setup.
+ * The macOS Keychain is available in the test environment without additional entitlement
+ * configuration when running under `macosArm64Test` or `macosX64Test`.
  */
-class UserDefaultsStorageAdapterTest {
+class KeychainStorageAdapterTest {
 
-    // Use a unique suite name per test run to avoid collisions
-    private val testSuiteName = "com.soneso.stellar.test.${kotlin.random.Random.nextInt(100000)}"
+    // Unique service name per test class instance to prevent Keychain collisions
+    private val testServiceName =
+        "com.soneso.stellar.test.keychain.${kotlin.random.Random.nextInt(100_000)}"
 
-    private fun newAdapter(): UserDefaultsStorageAdapter =
-        UserDefaultsStorageAdapter(suiteName = testSuiteName)
+    private fun newAdapter(): KeychainStorageAdapter =
+        KeychainStorageAdapter(serviceName = testServiceName)
 
     // MARK: - Test Data Helpers
 
     /**
      * Creates a test public key (65 bytes, uncompressed secp256r1 format starting with 0x04).
+     * The [seed] parameter shifts byte values so that multiple distinct keys can be generated.
      */
-    private fun testPublicKey(seed: Int = 0): ByteArray {
-        return ByteArray(65) { i ->
+    private fun testPublicKey(seed: Int = 0): ByteArray =
+        ByteArray(65) { i ->
             if (i == 0) 0x04.toByte()
             else ((i + seed) % 256).toByte()
         }
-    }
 
     /**
-     * Creates a credential with all fields populated.
+     * Creates a [StoredCredential] with all optional fields populated.
      */
     private fun fullCredential(
         id: String = "cred-full-001",
@@ -65,8 +66,8 @@ class UserDefaultsStorageAdapterTest {
         contractId = contractId,
         deploymentStatus = CredentialDeploymentStatus.PENDING,
         deploymentError = null,
-        createdAt = 1700000000000L,
-        lastUsedAt = 1700001000000L,
+        createdAt = 1_700_000_000_000L,
+        lastUsedAt = 1_700_001_000_000L,
         nickname = "MacBook Pro Touch ID",
         isPrimary = true,
         transports = listOf("internal", "usb"),
@@ -75,7 +76,8 @@ class UserDefaultsStorageAdapterTest {
     )
 
     /**
-     * Creates a credential with only required fields (all nullable fields as null).
+     * Creates a [StoredCredential] with only required fields populated
+     * and all optional fields left as their defaults (null / false).
      */
     private fun minimalCredential(
         id: String = "cred-minimal-001"
@@ -85,7 +87,7 @@ class UserDefaultsStorageAdapterTest {
         contractId = null,
         deploymentStatus = CredentialDeploymentStatus.PENDING,
         deploymentError = null,
-        createdAt = 1700000000000L,
+        createdAt = 1_700_000_000_000L,
         lastUsedAt = null,
         nickname = null,
         isPrimary = false,
@@ -95,10 +97,9 @@ class UserDefaultsStorageAdapterTest {
     )
 
     @AfterTest
-    fun cleanup() {
-        // Remove the persistent domain for our test suite to clean up
-        NSUserDefaults.standardUserDefaults.removePersistentDomainForName(testSuiteName)
-        NSUserDefaults.standardUserDefaults.synchronize()
+    fun cleanup() = runTest {
+        // Remove all Keychain items written by this test via the unique service name
+        newAdapter().clear()
     }
 
     // MARK: - Credential: Save and Retrieve
@@ -123,10 +124,9 @@ class UserDefaultsStorageAdapterTest {
     @Test
     fun testSaveCredentialWithAllFieldsPopulated() = runTest {
         val adapter = newAdapter()
-        val credential = fullCredential()
+        adapter.save(fullCredential())
 
-        adapter.save(credential)
-        val retrieved = adapter.get(credential.credentialId)
+        val retrieved = adapter.get("cred-full-001")
 
         assertNotNull(retrieved)
         assertEquals("cred-full-001", retrieved.credentialId)
@@ -134,8 +134,8 @@ class UserDefaultsStorageAdapterTest {
         assertEquals("CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234YZAB5678", retrieved.contractId)
         assertEquals(CredentialDeploymentStatus.PENDING, retrieved.deploymentStatus)
         assertNull(retrieved.deploymentError)
-        assertEquals(1700000000000L, retrieved.createdAt)
-        assertEquals(1700001000000L, retrieved.lastUsedAt)
+        assertEquals(1_700_000_000_000L, retrieved.createdAt)
+        assertEquals(1_700_001_000_000L, retrieved.lastUsedAt)
         assertEquals("MacBook Pro Touch ID", retrieved.nickname)
         assertTrue(retrieved.isPrimary)
         assertEquals(listOf("internal", "usb"), retrieved.transports)
@@ -146,10 +146,9 @@ class UserDefaultsStorageAdapterTest {
     @Test
     fun testSaveCredentialWithMinimalFields() = runTest {
         val adapter = newAdapter()
-        val credential = minimalCredential()
+        adapter.save(minimalCredential())
 
-        adapter.save(credential)
-        val retrieved = adapter.get(credential.credentialId)
+        val retrieved = adapter.get("cred-minimal-001")
 
         assertNotNull(retrieved)
         assertEquals("cred-minimal-001", retrieved.credentialId)
@@ -168,7 +167,7 @@ class UserDefaultsStorageAdapterTest {
     @Test
     fun testGetNonexistentCredentialReturnsNull() = runTest {
         val adapter = newAdapter()
-        val result = adapter.get("nonexistent-id")
+        val result = adapter.get("nonexistent-credential-id")
         assertNull(result)
     }
 
@@ -180,9 +179,9 @@ class UserDefaultsStorageAdapterTest {
         val original = StoredCredential(
             credentialId = "cred-upsert",
             publicKey = testPublicKey(10),
-            contractId = "CONTRACT_A",
+            contractId = "CONTRACT_ORIGINAL",
             deploymentStatus = CredentialDeploymentStatus.PENDING,
-            createdAt = 1700000000000L,
+            createdAt = 1_700_000_000_000L,
             nickname = "Original Name"
         )
         adapter.save(original)
@@ -190,23 +189,23 @@ class UserDefaultsStorageAdapterTest {
         val replacement = StoredCredential(
             credentialId = "cred-upsert",
             publicKey = testPublicKey(20),
-            contractId = "CONTRACT_B",
+            contractId = "CONTRACT_REPLACED",
             deploymentStatus = CredentialDeploymentStatus.FAILED,
-            createdAt = 1700002000000L,
-            nickname = "Replaced Name",
-            deploymentError = "Insufficient balance"
+            deploymentError = "Insufficient balance",
+            createdAt = 1_700_002_000_000L,
+            nickname = "Replaced Name"
         )
         adapter.save(replacement)
 
         val retrieved = adapter.get("cred-upsert")
         assertNotNull(retrieved)
         assertTrue(testPublicKey(20).contentEquals(retrieved.publicKey))
-        assertEquals("CONTRACT_B", retrieved.contractId)
+        assertEquals("CONTRACT_REPLACED", retrieved.contractId)
         assertEquals(CredentialDeploymentStatus.FAILED, retrieved.deploymentStatus)
         assertEquals("Replaced Name", retrieved.nickname)
         assertEquals("Insufficient balance", retrieved.deploymentError)
 
-        // Upsert should not duplicate entries
+        // Upsert must not duplicate entries in the index
         val all = adapter.getAll()
         assertEquals(1, all.size)
     }
@@ -218,16 +217,19 @@ class UserDefaultsStorageAdapterTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
-        adapter.update("cred-full-001", StoredCredentialUpdate(
-            deploymentStatus = CredentialDeploymentStatus.FAILED,
-            deploymentError = "Transaction failed: insufficient balance"
-        ))
+        adapter.update(
+            "cred-full-001",
+            StoredCredentialUpdate(
+                deploymentStatus = CredentialDeploymentStatus.FAILED,
+                deploymentError = "Transaction failed: insufficient balance"
+            )
+        )
 
         val updated = adapter.get("cred-full-001")
         assertNotNull(updated)
         assertEquals(CredentialDeploymentStatus.FAILED, updated.deploymentStatus)
         assertEquals("Transaction failed: insufficient balance", updated.deploymentError)
-        // Other fields remain unchanged
+        // Unchanged fields must remain intact
         assertEquals("MacBook Pro Touch ID", updated.nickname)
         assertTrue(updated.isPrimary)
     }
@@ -237,15 +239,16 @@ class UserDefaultsStorageAdapterTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
-        adapter.update("cred-full-001", StoredCredentialUpdate(
-            nickname = "YubiKey 5"
-        ))
+        adapter.update(
+            "cred-full-001",
+            StoredCredentialUpdate(nickname = "YubiKey 5")
+        )
 
         val updated = adapter.get("cred-full-001")
         assertNotNull(updated)
         assertEquals("YubiKey 5", updated.nickname)
-        // Other fields remain unchanged
-        assertEquals(1700001000000L, updated.lastUsedAt)
+        // Unchanged fields must remain intact
+        assertEquals(1_700_001_000_000L, updated.lastUsedAt)
         assertTrue(updated.isPrimary)
     }
 
@@ -255,9 +258,10 @@ class UserDefaultsStorageAdapterTest {
         adapter.save(minimalCredential())
 
         val newContractId = "CNEW1234CONT5678RACT9012ADDR3456GOES7890HERE1234ABCD5678"
-        adapter.update("cred-minimal-001", StoredCredentialUpdate(
-            contractId = newContractId
-        ))
+        adapter.update(
+            "cred-minimal-001",
+            StoredCredentialUpdate(contractId = newContractId)
+        )
 
         val updated = adapter.get("cred-minimal-001")
         assertNotNull(updated)
@@ -265,14 +269,20 @@ class UserDefaultsStorageAdapterTest {
     }
 
     @Test
-    fun testUpdateNonexistentCredentialThrows() = runTest {
+    fun testUpdateCredentialIsPrimary() = runTest {
         val adapter = newAdapter()
+        adapter.save(fullCredential()) // isPrimary = true
 
-        assertFailsWith<CredentialException.NotFound> {
-            adapter.update("nonexistent-id", StoredCredentialUpdate(
-                nickname = "Should fail"
-            ))
-        }
+        adapter.update(
+            "cred-full-001",
+            StoredCredentialUpdate(isPrimary = false)
+        )
+
+        val updated = adapter.get("cred-full-001")
+        assertNotNull(updated)
+        assertEquals(false, updated.isPrimary)
+        // Other fields remain unchanged
+        assertEquals("MacBook Pro Touch ID", updated.nickname)
     }
 
     @Test
@@ -280,25 +290,40 @@ class UserDefaultsStorageAdapterTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
-        adapter.update("cred-full-001", StoredCredentialUpdate(
-            deploymentStatus = CredentialDeploymentStatus.FAILED,
-            deploymentError = "Network timeout",
-            lastUsedAt = 1700099000000L,
-            nickname = "Updated Device",
-            isPrimary = false
-        ))
+        adapter.update(
+            "cred-full-001",
+            StoredCredentialUpdate(
+                deploymentStatus = CredentialDeploymentStatus.FAILED,
+                deploymentError = "Network timeout",
+                lastUsedAt = 1_700_099_000_000L,
+                nickname = "Updated Device",
+                isPrimary = false
+            )
+        )
 
         val updated = adapter.get("cred-full-001")
         assertNotNull(updated)
         assertEquals(CredentialDeploymentStatus.FAILED, updated.deploymentStatus)
         assertEquals("Network timeout", updated.deploymentError)
-        assertEquals(1700099000000L, updated.lastUsedAt)
+        assertEquals(1_700_099_000_000L, updated.lastUsedAt)
         assertEquals("Updated Device", updated.nickname)
         assertEquals(false, updated.isPrimary)
-        // Unchanged fields
+        // Fields not in the update must remain unchanged
         assertEquals(listOf("internal", "usb"), updated.transports)
         assertEquals("multiDevice", updated.deviceType)
         assertEquals(true, updated.backedUp)
+    }
+
+    @Test
+    fun testUpdateNonexistentCredentialThrows() = runTest {
+        val adapter = newAdapter()
+
+        assertFailsWith<CredentialException.NotFound> {
+            adapter.update(
+                "nonexistent-id",
+                StoredCredentialUpdate(nickname = "Should fail")
+            )
+        }
     }
 
     // MARK: - Credential: Delete
@@ -310,29 +335,28 @@ class UserDefaultsStorageAdapterTest {
 
         adapter.delete("cred-full-001")
 
-        val result = adapter.get("cred-full-001")
-        assertNull(result)
+        assertNull(adapter.get("cred-full-001"))
     }
 
     @Test
     fun testDeleteNonexistentCredentialDoesNotThrow() = runTest {
         val adapter = newAdapter()
-        // Should not throw - silent no-op
-        adapter.delete("nonexistent-id")
+        // Must be a silent no-op; must not throw
+        adapter.delete("nonexistent-credential-id")
     }
 
     @Test
     fun testDeleteRemovesOnlyTargetCredential() = runTest {
         val adapter = newAdapter()
-        adapter.save(fullCredential("cred-a"))
-        adapter.save(fullCredential("cred-b"))
-        adapter.save(fullCredential("cred-c"))
+        adapter.save(fullCredential("cred-alpha"))
+        adapter.save(fullCredential("cred-beta"))
+        adapter.save(fullCredential("cred-gamma"))
 
-        adapter.delete("cred-b")
+        adapter.delete("cred-beta")
 
-        assertNotNull(adapter.get("cred-a"))
-        assertNull(adapter.get("cred-b"))
-        assertNotNull(adapter.get("cred-c"))
+        assertNotNull(adapter.get("cred-alpha"))
+        assertNull(adapter.get("cred-beta"))
+        assertNotNull(adapter.get("cred-gamma"))
         assertEquals(2, adapter.getAll().size)
     }
 
@@ -356,23 +380,12 @@ class UserDefaultsStorageAdapterTest {
         assertEquals(3, all.size)
 
         val ids = all.map { it.credentialId }.toSet()
-        assertTrue(ids.contains("cred-1"))
-        assertTrue(ids.contains("cred-2"))
-        assertTrue(ids.contains("cred-3"))
+        assertTrue("cred-1" in ids)
+        assertTrue("cred-2" in ids)
+        assertTrue("cred-3" in ids)
     }
 
     // MARK: - Credential: Get by Contract ID
-
-    @Test
-    fun testGetByContractExcludesNullContractId() = runTest {
-        val adapter = newAdapter()
-        // Save credentials with null contractId — they must not appear in getByContract results
-        adapter.save(minimalCredential("cred-no-contract-1"))
-        adapter.save(minimalCredential("cred-no-contract-2"))
-
-        val result = adapter.getByContract("someContract")
-        assertTrue(result.isEmpty())
-    }
 
     @Test
     fun testGetByContractIdReturnsMatchingCredentials() = runTest {
@@ -387,8 +400,8 @@ class UserDefaultsStorageAdapterTest {
         val resultA = adapter.getByContract(contractA)
         assertEquals(2, resultA.size)
         val idsA = resultA.map { it.credentialId }.toSet()
-        assertTrue(idsA.contains("cred-a1"))
-        assertTrue(idsA.contains("cred-a2"))
+        assertTrue("cred-a1" in idsA)
+        assertTrue("cred-a2" in idsA)
 
         val resultB = adapter.getByContract(contractB)
         assertEquals(1, resultB.size)
@@ -400,27 +413,21 @@ class UserDefaultsStorageAdapterTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
 
-        val result = adapter.getByContract("NONEXISTENT_CONTRACT_ID")
+        val result = adapter.getByContract("CNONEXISTENT_CONTRACT_ID_THAT_DOES_NOT_EXIST_IN")
         assertTrue(result.isEmpty())
     }
 
     @Test
-    fun testUpdateIsPrimaryFalseToTrue() = runTest {
+    fun testGetByContractIdExcludesNullContractId() = runTest {
         val adapter = newAdapter()
-        val credential = minimalCredential("cred-primary-upgrade")
-        // minimalCredential sets isPrimary = false
-        assertEquals(false, credential.isPrimary)
-        adapter.save(credential)
+        val contractId = "CTGT1234TARG5678ETCO9012NTRA3456CTID7890HERE1234ABCD5678"
 
-        adapter.update("cred-primary-upgrade", StoredCredentialUpdate(isPrimary = true))
+        adapter.save(fullCredential("cred-with-contract", contractId))
+        adapter.save(minimalCredential("cred-without-contract")) // contractId = null
 
-        val updated = adapter.get("cred-primary-upgrade")
-        assertNotNull(updated)
-        assertEquals(true, updated.isPrimary)
-        // Other fields remain unchanged
-        assertEquals("cred-primary-upgrade", updated.credentialId)
-        assertNull(updated.contractId)
-        assertEquals(CredentialDeploymentStatus.PENDING, updated.deploymentStatus)
+        val result = adapter.getByContract(contractId)
+        assertEquals(1, result.size)
+        assertEquals("cred-with-contract", result[0].credentialId)
     }
 
     // MARK: - Credential: Clear
@@ -434,8 +441,7 @@ class UserDefaultsStorageAdapterTest {
 
         adapter.clear()
 
-        val all = adapter.getAll()
-        assertTrue(all.isEmpty())
+        assertTrue(adapter.getAll().isEmpty())
         assertNull(adapter.get("cred-1"))
         assertNull(adapter.get("cred-2"))
         assertNull(adapter.get("cred-3"))
@@ -444,26 +450,9 @@ class UserDefaultsStorageAdapterTest {
     @Test
     fun testClearOnEmptyAdapterDoesNotThrow() = runTest {
         val adapter = newAdapter()
-        // Should not throw
+        // Must not throw on an empty Keychain namespace
         adapter.clear()
         assertTrue(adapter.getAll().isEmpty())
-    }
-
-    @Test
-    fun testClearAlsoRemovesSession() = runTest {
-        val adapter = newAdapter()
-        adapter.save(fullCredential("cred-with-session"))
-        adapter.saveSession(StoredSession(
-            credentialId = "cred-with-session",
-            contractId = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234YZAB5678",
-            connectedAt = 1700000000000L,
-            expiresAt = Long.MAX_VALUE
-        ))
-
-        adapter.clear()
-
-        assertTrue(adapter.getAll().isEmpty(), "clear() must remove all credentials")
-        assertNull(adapter.getSession(), "clear() must also remove the active session")
     }
 
     // MARK: - Session: Save and Retrieve
@@ -474,7 +463,7 @@ class UserDefaultsStorageAdapterTest {
         val session = StoredSession(
             credentialId = "cred-session-001",
             contractId = "CSESS1234CONT5678RACT9012ADDR3456GOES7890HERE1234ABCD5678",
-            connectedAt = 1700000000000L,
+            connectedAt = 1_700_000_000_000L,
             expiresAt = Long.MAX_VALUE
         )
 
@@ -484,7 +473,8 @@ class UserDefaultsStorageAdapterTest {
         assertNotNull(retrieved)
         assertEquals("cred-session-001", retrieved.credentialId)
         assertEquals("CSESS1234CONT5678RACT9012ADDR3456GOES7890HERE1234ABCD5678", retrieved.contractId)
-        assertEquals(1700000000000L, retrieved.connectedAt)
+        assertEquals(1_700_000_000_000L, retrieved.connectedAt)
+        assertEquals(Long.MAX_VALUE, retrieved.expiresAt)
     }
 
     @Test
@@ -495,21 +485,21 @@ class UserDefaultsStorageAdapterTest {
     }
 
     @Test
-    fun testSaveSessionOverwritesPrevious() = runTest {
+    fun testSaveSessionOverwritesPreviousSession() = runTest {
         val adapter = newAdapter()
 
         val session1 = StoredSession(
             credentialId = "cred-session-1",
-            contractId = "CONTRACT_1",
-            connectedAt = 1700000000000L,
+            contractId = "CONTRACT_ONE",
+            connectedAt = 1_700_000_000_000L,
             expiresAt = Long.MAX_VALUE
         )
         adapter.saveSession(session1)
 
         val session2 = StoredSession(
             credentialId = "cred-session-2",
-            contractId = "CONTRACT_2",
-            connectedAt = 1700001000000L,
+            contractId = "CONTRACT_TWO",
+            connectedAt = 1_700_001_000_000L,
             expiresAt = Long.MAX_VALUE
         )
         adapter.saveSession(session2)
@@ -517,7 +507,8 @@ class UserDefaultsStorageAdapterTest {
         val retrieved = adapter.getSession()
         assertNotNull(retrieved)
         assertEquals("cred-session-2", retrieved.credentialId)
-        assertEquals("CONTRACT_2", retrieved.contractId)
+        assertEquals("CONTRACT_TWO", retrieved.contractId)
+        assertEquals(1_700_001_000_000L, retrieved.connectedAt)
     }
 
     // MARK: - Session: Expiry Auto-Clear
@@ -528,18 +519,17 @@ class UserDefaultsStorageAdapterTest {
         val session = StoredSession(
             credentialId = "cred-expired",
             contractId = "CONTRACT_EXPIRED",
-            connectedAt = 1000L,
-            expiresAt = 2000L // well in the past
+            connectedAt = 1_000L,
+            expiresAt = 2_000L // well in the past
         )
         adapter.saveSession(session)
 
-        // getSession should detect expiry and return null
         val result = adapter.getSession()
-        assertNull(result, "Expired session should be auto-cleared and return null")
+        assertNull(result, "Expired session must be auto-cleared and return null")
 
-        // Verify the session was actually cleared (second call also returns null)
+        // Second call must also return null - the item should be gone from Keychain
         val secondResult = adapter.getSession()
-        assertNull(secondResult, "Session should remain cleared after auto-eviction")
+        assertNull(secondResult, "Session must remain cleared after auto-eviction")
     }
 
     @Test
@@ -548,7 +538,7 @@ class UserDefaultsStorageAdapterTest {
         val session = StoredSession(
             credentialId = "cred-valid",
             contractId = "CONTRACT_VALID",
-            connectedAt = 1700000000000L,
+            connectedAt = 1_700_000_000_000L,
             expiresAt = Long.MAX_VALUE // effectively never expires
         )
         adapter.saveSession(session)
@@ -563,115 +553,152 @@ class UserDefaultsStorageAdapterTest {
     @Test
     fun testClearSession() = runTest {
         val adapter = newAdapter()
-        adapter.saveSession(StoredSession(
-            credentialId = "cred-session",
-            contractId = "CONTRACT",
-            connectedAt = 1700000000000L,
-            expiresAt = Long.MAX_VALUE
-        ))
+        adapter.saveSession(
+            StoredSession(
+                credentialId = "cred-to-clear",
+                contractId = "CONTRACT_CLEAR",
+                connectedAt = 1_700_000_000_000L,
+                expiresAt = Long.MAX_VALUE
+            )
+        )
 
         adapter.clearSession()
 
-        val result = adapter.getSession()
-        assertNull(result)
+        assertNull(adapter.getSession())
     }
 
     @Test
     fun testClearSessionWhenNoneExistsDoesNotThrow() = runTest {
         val adapter = newAdapter()
-        // Should not throw
+        // Must be a silent no-op; must not throw
         adapter.clearSession()
         assertNull(adapter.getSession())
     }
 
-    // MARK: - Custom Suite Name
-
-    @Test
-    fun testCustomSuiteNameIsolatesData() = runTest {
-        val suiteA = "com.soneso.stellar.test.suiteA.${kotlin.random.Random.nextInt(100000)}"
-        val suiteB = "com.soneso.stellar.test.suiteB.${kotlin.random.Random.nextInt(100000)}"
-        val adapterA = UserDefaultsStorageAdapter(suiteName = suiteA)
-        val adapterB = UserDefaultsStorageAdapter(suiteName = suiteB)
-
-        try {
-            adapterA.save(fullCredential("cred-A"))
-            adapterB.save(fullCredential("cred-B"))
-
-            // Each adapter should only see its own credentials
-            val allA = adapterA.getAll()
-            assertEquals(1, allA.size)
-            assertEquals("cred-A", allA[0].credentialId)
-
-            val allB = adapterB.getAll()
-            assertEquals(1, allB.size)
-            assertEquals("cred-B", allB[0].credentialId)
-
-            // Clearing one should not affect the other
-            adapterA.clear()
-            assertTrue(adapterA.getAll().isEmpty())
-            assertEquals(1, adapterB.getAll().size)
-        } finally {
-            // Clean up both suites
-            NSUserDefaults.standardUserDefaults.removePersistentDomainForName(suiteA)
-            NSUserDefaults.standardUserDefaults.removePersistentDomainForName(suiteB)
-            NSUserDefaults.standardUserDefaults.synchronize()
-        }
-    }
-
-    @Test
-    fun testDefaultSuiteNameIsUsed() {
-        // Verify that the default suite name is used when no suite name is provided
-        val adapter = UserDefaultsStorageAdapter()
-        // This is a compile-time check: the adapter can be constructed with no arguments
-        assertNotNull(adapter)
-    }
-
-    // MARK: - Session and Credentials Independence
+    // MARK: - Cross-Domain Isolation
 
     @Test
     fun testClearSessionDoesNotAffectCredentials() = runTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
-        adapter.saveSession(StoredSession(
-            credentialId = "cred-full-001",
-            contractId = "CONTRACT",
-            connectedAt = 1700000000000L,
-            expiresAt = Long.MAX_VALUE
-        ))
+        adapter.saveSession(
+            StoredSession(
+                credentialId = "cred-full-001",
+                contractId = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234YZAB5678",
+                connectedAt = 1_700_000_000_000L,
+                expiresAt = Long.MAX_VALUE
+            )
+        )
 
         adapter.clearSession()
 
-        assertNull(adapter.getSession(), "Session should be cleared")
-        assertEquals(1, adapter.getAll().size, "Credentials should not be affected by clearSession()")
+        assertNull(adapter.getSession(), "Session must be cleared")
+        assertEquals(1, adapter.getAll().size, "Credentials must not be affected by clearSession()")
+        assertNotNull(adapter.get("cred-full-001"), "Individual credential must survive clearSession()")
     }
 
-    // MARK: - Edge Cases: Delete Then Re-Save
+    @Test
+    fun testClearRemovesSessionToo() = runTest {
+        val adapter = newAdapter()
+        adapter.save(fullCredential())
+        adapter.saveSession(
+            StoredSession(
+                credentialId = "cred-full-001",
+                contractId = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234YZAB5678",
+                connectedAt = 1_700_000_000_000L,
+                expiresAt = Long.MAX_VALUE
+            )
+        )
+
+        adapter.clear()
+
+        assertTrue(adapter.getAll().isEmpty(), "All credentials must be cleared")
+        assertNull(adapter.getSession(), "Session must be cleared by clear()")
+    }
+
+    // MARK: - Keychain-Specific: Service Name Isolation
 
     @Test
-    fun testDeleteThenReSave() = runTest {
+    fun testCustomServiceNameIsolatesKeychainData() = runTest {
+        val suffix = kotlin.random.Random.nextInt(100_000)
+        val serviceA = "com.soneso.stellar.test.keychain.isolation.a.$suffix"
+        val serviceB = "com.soneso.stellar.test.keychain.isolation.b.$suffix"
+
+        val adapterA = KeychainStorageAdapter(serviceName = serviceA)
+        val adapterB = KeychainStorageAdapter(serviceName = serviceB)
+
+        try {
+            adapterA.save(fullCredential("cred-in-a"))
+            adapterB.save(fullCredential("cred-in-b"))
+
+            // Each adapter must only see its own Keychain items
+            val allA = adapterA.getAll()
+            assertEquals(1, allA.size)
+            assertEquals("cred-in-a", allA[0].credentialId)
+
+            val allB = adapterB.getAll()
+            assertEquals(1, allB.size)
+            assertEquals("cred-in-b", allB[0].credentialId)
+
+            // Item from A must not be visible in B and vice versa
+            assertNull(adapterA.get("cred-in-b"))
+            assertNull(adapterB.get("cred-in-a"))
+
+            // Clearing A must not touch B
+            adapterA.clear()
+            assertTrue(adapterA.getAll().isEmpty())
+            assertEquals(1, adapterB.getAll().size)
+        } finally {
+            // Always clean up both namespaces regardless of test outcome
+            adapterA.clear()
+            adapterB.clear()
+        }
+    }
+
+    @Test
+    fun testDefaultServiceNameIsUsed() {
+        // Compile-time check: adapter can be constructed without arguments using the default service name
+        val adapter = KeychainStorageAdapter()
+        assertNotNull(adapter)
+    }
+
+    // MARK: - Interface Conformance
+
+    @Test
+    fun testKeychainStorageAdapterImplementsStorageAdapterInterface() {
+        val adapter: StorageAdapter = KeychainStorageAdapter(serviceName = testServiceName)
+        // Compilation check: KeychainStorageAdapter can be assigned to StorageAdapter
+        assertNotNull(adapter)
+    }
+
+    // MARK: - Edge Cases
+
+    @Test
+    fun testDeleteThenReSaveCredential() = runTest {
         val adapter = newAdapter()
         adapter.save(fullCredential("cred-lifecycle"))
 
         adapter.delete("cred-lifecycle")
         assertNull(adapter.get("cred-lifecycle"))
 
-        // Re-save with same ID but different data
+        // Re-save with the same ID but different data
         val newCredential = StoredCredential(
             credentialId = "cred-lifecycle",
             publicKey = testPublicKey(99),
-            contractId = "NEW_CONTRACT",
-            createdAt = 1700099000000L,
+            contractId = "CNEW_CONTRACT_ID_AFTER_RESURRECT_1234567890",
+            createdAt = 1_700_099_000_000L,
             nickname = "Reborn"
         )
         adapter.save(newCredential)
 
         val retrieved = adapter.get("cred-lifecycle")
         assertNotNull(retrieved)
-        assertEquals("NEW_CONTRACT", retrieved.contractId)
+        assertEquals("CNEW_CONTRACT_ID_AFTER_RESURRECT_1234567890", retrieved.contractId)
         assertEquals("Reborn", retrieved.nickname)
+        assertTrue(testPublicKey(99).contentEquals(retrieved.publicKey))
+        // Upsert after delete must not leave duplicate index entries
+        assertEquals(1, adapter.getAll().size)
     }
-
-    // MARK: - Edge Cases: Update After Delete Throws
 
     @Test
     fun testUpdateAfterDeleteThrows() = runTest {
@@ -681,18 +708,10 @@ class UserDefaultsStorageAdapterTest {
         adapter.delete("cred-deleted")
 
         assertFailsWith<CredentialException.NotFound> {
-            adapter.update("cred-deleted", StoredCredentialUpdate(
-                nickname = "Should fail"
-            ))
+            adapter.update(
+                "cred-deleted",
+                StoredCredentialUpdate(nickname = "Should fail")
+            )
         }
-    }
-
-    // MARK: - Interface Conformance
-
-    @Test
-    fun testUserDefaultsStorageAdapterImplementsStorageAdapterInterface() {
-        val adapter: StorageAdapter = UserDefaultsStorageAdapter(suiteName = testSuiteName)
-        // Compilation check: UserDefaultsStorageAdapter can be assigned to StorageAdapter
-        assertNotNull(adapter)
     }
 }

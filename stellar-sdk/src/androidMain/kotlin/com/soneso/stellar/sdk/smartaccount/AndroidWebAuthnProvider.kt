@@ -2,8 +2,7 @@
 //  AndroidWebAuthnProvider.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Created by Soneso on 05.10.25.
-//  Copyright (c) 2025 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
@@ -137,7 +136,10 @@ class AndroidWebAuthnProvider(
         val response: CreatePublicKeyCredentialResponse
         try {
             val credential = credentialManager.createCredential(context, createRequest)
-            response = credential as CreatePublicKeyCredentialResponse
+            response = credential as? CreatePublicKeyCredentialResponse
+                ?: throw WebAuthnException.registrationFailed(
+                    "Unexpected credential type: ${credential::class.simpleName}"
+                )
         } catch (e: CreateCredentialCancellationException) {
             throw WebAuthnException.cancelled(e)
         } catch (e: CreateCredentialException) {
@@ -188,7 +190,10 @@ class AndroidWebAuthnProvider(
         val credential: PublicKeyCredential
         try {
             val result = credentialManager.getCredential(context, getRequest)
-            credential = result.credential as PublicKeyCredential
+            credential = result.credential as? PublicKeyCredential
+                ?: throw WebAuthnException.authenticationFailed(
+                    "Unexpected credential type: ${result.credential::class.simpleName}"
+                )
         } catch (e: NoCredentialException) {
             throw WebAuthnException.authenticationFailed(
                 "No matching credential found for this relying party ($rpId)",
@@ -762,6 +767,7 @@ class AndroidWebAuthnProvider(
                     ((data[offset + 2].toInt() and 0xFF) shl 16) or
                     ((data[offset + 3].toInt() and 0xFF) shl 8) or
                     (data[offset + 4].toInt() and 0xFF)
+                if (length < 0) return null
                 dataStart = offset + 5
             }
             else -> return null
@@ -873,13 +879,14 @@ class AndroidWebAuthnProvider(
             }
             additionalInfo == 26 -> {
                 if (offset + 4 >= data.size) null
-                else Pair(
-                    ((data[offset + 1].toInt() and 0xFF) shl 24) or
+                else {
+                    val length = ((data[offset + 1].toInt() and 0xFF) shl 24) or
                         ((data[offset + 2].toInt() and 0xFF) shl 16) or
                         ((data[offset + 3].toInt() and 0xFF) shl 8) or
-                        (data[offset + 4].toInt() and 0xFF),
-                    offset + 5
-                )
+                        (data[offset + 4].toInt() and 0xFF)
+                    if (length < 0) null
+                    else Pair(length, offset + 5)
+                }
             }
             else -> null
         }

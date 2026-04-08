@@ -314,6 +314,27 @@ data class StoredCredentialUpdate(
     val backedUp: Boolean? = null
 )
 
+// MARK: - StoredCredential Update Helper
+
+/**
+ * Applies the given updates to this credential, returning a new instance.
+ * Fields in [updates] that are null are left unchanged.
+ *
+ * @param updates The partial updates to apply
+ * @return A new [StoredCredential] with non-null update fields applied
+ */
+fun StoredCredential.applyUpdate(updates: StoredCredentialUpdate): StoredCredential = copy(
+    deploymentStatus = updates.deploymentStatus ?: deploymentStatus,
+    deploymentError = updates.deploymentError ?: deploymentError,
+    contractId = updates.contractId ?: contractId,
+    lastUsedAt = updates.lastUsedAt ?: lastUsedAt,
+    nickname = updates.nickname ?: nickname,
+    isPrimary = updates.isPrimary ?: isPrimary,
+    transports = updates.transports ?: transports,
+    deviceType = updates.deviceType ?: deviceType,
+    backedUp = updates.backedUp ?: backedUp
+)
+
 // MARK: - Storage Adapter Interface
 
 /**
@@ -465,19 +486,7 @@ class InMemoryStorageAdapter : StorageAdapter {
         val credential = credentials[credentialId]
             ?: throw CredentialException.notFound(credentialId)
 
-        val updated = credential.copy(
-            deploymentStatus = updates.deploymentStatus ?: credential.deploymentStatus,
-            deploymentError = updates.deploymentError ?: credential.deploymentError,
-            contractId = updates.contractId ?: credential.contractId,
-            lastUsedAt = updates.lastUsedAt ?: credential.lastUsedAt,
-            nickname = updates.nickname ?: credential.nickname,
-            isPrimary = updates.isPrimary ?: credential.isPrimary,
-            transports = updates.transports ?: credential.transports,
-            deviceType = updates.deviceType ?: credential.deviceType,
-            backedUp = updates.backedUp ?: credential.backedUp
-        )
-
-        credentials[credentialId] = updated
+        credentials[credentialId] = credential.applyUpdate(updates)
     }
 
     override suspend fun clear(): Unit = mutex.withLock {

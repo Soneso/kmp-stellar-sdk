@@ -196,9 +196,16 @@ class AppleWebAuthnProvider(
 
         // Bit 3 (0x08): BE (Backup Eligibility) -> multi-device
         // Bit 4 (0x10): BS (Backup State) -> actually backed up
-        val backupEligible = flags != null && (flags and 0x08) != 0
-        val backedUp = flags != null && (flags and 0x10) != 0
-        val deviceType = if (backupEligible) "multiDevice" else "singleDevice"
+        // When flags is null, the authenticator data could not be parsed, so device
+        // type and backup state are genuinely unknown — report null rather than
+        // a fabricated default.
+        val backupEligible = flags?.let { (it and 0x08) != 0 }
+        val backedUp = flags?.let { (it and 0x10) != 0 }
+        val deviceType = when (backupEligible) {
+            true -> "multiDevice"
+            false -> "singleDevice"
+            null -> null
+        }
 
         return WebAuthnRegistrationResult(
             credentialId = credentialId,
@@ -222,6 +229,8 @@ class AppleWebAuthnProvider(
      * without modification.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically 32 bytes)
+     * @param allowCredentialIds Optional list of credential IDs to restrict authentication to
+     *        specific passkeys. If null, all registered passkeys are eligible.
      * @return [WebAuthnAuthenticationResult] with credential ID, authenticator data,
      *         client data JSON, and DER-encoded signature
      * @throws WebAuthnException.Cancelled if the user dismissed the authentication dialog

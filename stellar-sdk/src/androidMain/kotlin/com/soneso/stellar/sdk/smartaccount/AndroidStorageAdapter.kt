@@ -23,6 +23,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -246,19 +247,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
                 ?: throw CredentialException.notFound(credentialId)
 
             val existing = deserializeCredentialOrThrow(jsonStr, credentialId)
-
-            val updated = existing.copy(
-                deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-                deploymentError = updates.deploymentError ?: existing.deploymentError,
-                contractId = updates.contractId ?: existing.contractId,
-                lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-                nickname = updates.nickname ?: existing.nickname,
-                isPrimary = updates.isPrimary ?: existing.isPrimary,
-                transports = updates.transports ?: existing.transports,
-                deviceType = updates.deviceType ?: existing.deviceType,
-                backedUp = updates.backedUp ?: existing.backedUp
-            )
-
+            val updated = existing.applyUpdate(updates)
             val updatedJson = json.encodeToString(updated.toSerializable())
             val success = prefs.edit().putString(key, updatedJson).commit()
             if (!success) {
@@ -353,7 +342,10 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
             }
             if (session.isExpired) {
                 // Clear expired session from storage
-                prefs.edit().remove(SESSION_KEY).commit()
+                val removed = prefs.edit().remove(SESSION_KEY).commit()
+                if (!removed) {
+                    Log.w(TAG, "Failed to remove expired session from storage")
+                }
                 return@withLock null
             }
             session
@@ -399,7 +391,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
         return try {
             json.decodeFromString<SerializableCredential>(jsonStr).toStoredCredential()
         } catch (e: Exception) {
-            Log.w(TAG, "Corrupted credential data for '$credentialId', skipping: ${e.message}")
+            Log.w(TAG, "Failed to deserialize stored credential: ${e.message}")
             null
         }
     }
@@ -432,7 +424,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
         return try {
             json.decodeFromString<SerializableSession>(jsonStr).toStoredSession()
         } catch (e: Exception) {
-            Log.w(TAG, "Corrupted session data, skipping: ${e.message}")
+            Log.w(TAG, "Failed to deserialize stored session: ${e.message}")
             null
         }
     }

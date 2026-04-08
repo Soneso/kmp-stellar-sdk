@@ -2,7 +2,7 @@
 //  JsWebAuthnProvider.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Copyright (c) 2025 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
@@ -249,6 +249,8 @@ class JsWebAuthnProvider(
      * normalization before submitting to the Stellar network.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically 32 bytes)
+     * @param allowCredentialIds Optional list of credential IDs to restrict authentication to
+     *        specific passkeys. If null, all registered passkeys are eligible.
      * @return [WebAuthnAuthenticationResult] with credential ID, authenticator data,
      *         client data JSON, and DER-encoded signature
      * @throws WebAuthnException.NotSupported if WebAuthn is not available (e.g. Node.js)
@@ -379,22 +381,14 @@ class JsWebAuthnProvider(
         return try {
             // Check if getPublicKey exists on the response object
             val hasGetPublicKey = js(
-                """
-                (function() {
-                    return typeof response.getPublicKey === 'function';
-                })()
-                """
-            ).unsafeCast<Boolean>()
+                "(function(r) { return typeof r.getPublicKey === 'function'; })"
+            )(response).unsafeCast<Boolean>()
 
             if (!hasGetPublicKey) return null
 
             val spkiBuffer = js(
-                """
-                (function() {
-                    return response.getPublicKey();
-                })()
-                """
-            )
+                "(function(r) { return r.getPublicKey(); })"
+            )(response)
 
             if (spkiBuffer == null || spkiBuffer == undefined) return null
 
@@ -410,13 +404,6 @@ class JsWebAuthnProvider(
                 if (candidate[0] == SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX) {
                     return candidate
                 }
-            }
-
-            // If the returned key is exactly 65 bytes and starts with 0x04
-            if (spkiBytes.size == SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE &&
-                spkiBytes[0] == SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
-            ) {
-                return spkiBytes
             }
 
             null
@@ -671,22 +658,14 @@ class JsWebAuthnProvider(
     private fun extractTransports(response: dynamic): List<String>? {
         return try {
             val hasGetTransports = js(
-                """
-                (function() {
-                    return typeof response.getTransports === 'function';
-                })()
-                """
-            ).unsafeCast<Boolean>()
+                "(function(r) { return typeof r.getTransports === 'function'; })"
+            )(response).unsafeCast<Boolean>()
 
             if (!hasGetTransports) return null
 
             val transportsArray = js(
-                """
-                (function() {
-                    return response.getTransports();
-                })()
-                """
-            )
+                "(function(r) { return r.getTransports(); })"
+            )(response)
 
             if (transportsArray == null || transportsArray == undefined) return null
 

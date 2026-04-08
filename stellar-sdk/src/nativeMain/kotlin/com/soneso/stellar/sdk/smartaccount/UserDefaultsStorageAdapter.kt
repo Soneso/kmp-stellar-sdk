@@ -19,6 +19,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -95,8 +96,6 @@ class UserDefaultsStorageAdapter(
                 val updated = CredentialIndex(ids = index.ids + credential.credentialId)
                 writeIndex(updated)
             }
-
-
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -151,8 +150,6 @@ class UserDefaultsStorageAdapter(
             val index = readIndex()
             val updated = CredentialIndex(ids = index.ids.filter { it != credentialId })
             writeIndex(updated)
-
-
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -166,24 +163,13 @@ class UserDefaultsStorageAdapter(
             val existing = readCredential(credentialId)
                 ?: throw CredentialException.notFound(credentialId)
 
-            val updated = existing.copy(
-                deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-                deploymentError = updates.deploymentError ?: existing.deploymentError,
-                contractId = updates.contractId ?: existing.contractId,
-                lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-                nickname = updates.nickname ?: existing.nickname,
-                isPrimary = updates.isPrimary ?: existing.isPrimary,
-                transports = updates.transports ?: existing.transports,
-                deviceType = updates.deviceType ?: existing.deviceType,
-                backedUp = updates.backedUp ?: existing.backedUp
-            )
+            val updated = existing.applyUpdate(updates)
 
             val serializable = updated.toSerializable()
             val jsonString = json.encodeToString(serializable)
             val key = KEY_PREFIX_CREDENTIAL + credentialId
 
             defaults.setObject(jsonString, forKey = key)
-
         } catch (e: Exception) {
             if (e is CredentialException || e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -205,8 +191,6 @@ class UserDefaultsStorageAdapter(
 
             // Remove the session
             defaults.removeObjectForKey(KEY_SESSION)
-
-
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -222,7 +206,6 @@ class UserDefaultsStorageAdapter(
             val serializable = session.toSerializable()
             val jsonString = json.encodeToString(serializable)
             defaults.setObject(jsonString, forKey = KEY_SESSION)
-
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -233,15 +216,14 @@ class UserDefaultsStorageAdapter(
 
     override suspend fun getSession(): StoredSession? = mutex.withLock {
         try {
-            val jsonString = defaults.stringForKey(KEY_SESSION) ?: return null
+            val jsonString = defaults.stringForKey(KEY_SESSION) ?: return@withLock null
             val serializable = json.decodeFromString<SerializableSession>(jsonString)
             val session = serializable.toStoredSession()
 
             if (session.isExpired) {
                 // Clear expired session
                 defaults.removeObjectForKey(KEY_SESSION)
-    
-                return null
+                return@withLock null
             }
 
             session
@@ -256,7 +238,6 @@ class UserDefaultsStorageAdapter(
     override suspend fun clearSession(): Unit = mutex.withLock {
         try {
             defaults.removeObjectForKey(KEY_SESSION)
-
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
