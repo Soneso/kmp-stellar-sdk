@@ -319,6 +319,10 @@ class OZTransactionOperations internal constructor(
         // Validate target address (must be C-address)
         requireContractAddress(target, "target")
 
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
+
         // Build the execute invocation on the smart account contract
         val functionArgs = listOf(
             Scv.toAddress(Address(target).toSCAddress()),

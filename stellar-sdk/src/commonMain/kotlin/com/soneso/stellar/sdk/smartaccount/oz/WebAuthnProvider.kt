@@ -6,8 +6,6 @@
 //
 
 package com.soneso.stellar.sdk.smartaccount.oz
-import com.soneso.stellar.sdk.smartaccount.core.*
-
 import com.soneso.stellar.sdk.Util
 
 /**
@@ -78,9 +76,10 @@ data class WebAuthnAuthenticationResult(
  *           the key in COSE/SPKI encoding, pass the raw bytes and use
  *           [SmartAccountUtils.extractPublicKeyFromRegistration] for extraction with
  *           fallback strategies.
- * @property attestationObject Raw attestation object from WebAuthn registration. Used as
- *           a fallback source for public key extraction when [publicKey] is not directly
- *           available as a 65-byte uncompressed key.
+ * @property attestationObject Raw attestation object from WebAuthn registration. Always
+ *           provided by the WebAuthn ceremony. Used for public key extraction when the
+ *           platform returns the key in COSE or SPKI encoding rather than as a raw
+ *           65-byte uncompressed key.
  * @property transports Authenticator transport hints indicating how the browser can
  *   communicate with the authenticator (e.g., "usb", "nfc", "ble", "internal").
  *   Used when constructing allowCredentials for future authentication ceremonies.

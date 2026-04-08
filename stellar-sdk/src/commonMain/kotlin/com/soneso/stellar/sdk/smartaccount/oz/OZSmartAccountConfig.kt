@@ -62,6 +62,10 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | storage | No | InMemoryStorageAdapter |
  * | externalWallet | No | null |
  * | maxContextRuleScanId | No | 50 |
+ *
+ * @throws ConfigurationException if required parameters are blank or invalid
+ *   (e.g., accountWasmHash is not a 64-character hex string, or webauthnVerifierAddress
+ *   is not a valid C-address).
  */
 data class OZSmartAccountConfig(
     // Required Configuration
@@ -280,6 +284,9 @@ data class OZSmartAccountConfig(
 
     /**
      * Returns the deployer keypair, creating the default if needed.
+     *
+     * This is a suspend function because creating the default deployer involves
+     * cryptographic operations (SHA-256 hashing and Ed25519 seed derivation).
      *
      * @return The configured deployer or the default deterministic deployer
      * @throws ConfigurationException if default deployer creation fails
