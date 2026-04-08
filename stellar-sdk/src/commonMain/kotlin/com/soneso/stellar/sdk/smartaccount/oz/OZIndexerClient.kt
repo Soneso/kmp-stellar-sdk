@@ -254,8 +254,8 @@ class OZIndexerClient(
          * when no custom indexer URL is provided.
          */
         val DEFAULT_INDEXER_URLS: Map<String, String> = mapOf(
-            Network.TESTNET.networkPassphrase to "https://smart-account-indexer.sdf-ecosystem.workers.dev"
-            // Mainnet URL will be added when available
+            Network.TESTNET.networkPassphrase to "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+            Network.PUBLIC.networkPassphrase to "https://smart-account-indexer-mainnet.sdf-ecosystem.workers.dev"
         )
 
         /**
@@ -269,8 +269,7 @@ class OZIndexerClient(
         /**
          * Creates an OZIndexerClient for a specific network using the default indexer URL.
          *
-         * Uses the default indexer endpoint for known networks. Currently only testnet
-         * is configured; returns null for other networks including mainnet.
+         * Uses the default indexer endpoint for known networks (testnet and mainnet).
          * Returns null if no default URL is configured for the network.
          *
          * @param networkPassphrase The Stellar network passphrase

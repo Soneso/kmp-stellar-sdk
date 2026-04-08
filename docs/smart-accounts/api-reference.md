@@ -377,7 +377,7 @@ Returns the deployer keypair that will be used for contract deployment and trans
 fun effectiveIndexerUrl(): String?
 ```
 
-Returns the indexer URL that will be used after applying fallback logic. If `indexerUrl` is explicitly set in the config, that value is returned. Otherwise, the SDK falls back to the built-in default URL for the network. Testnet has a built-in default URL; mainnet does not (returns null unless explicitly configured).
+Returns the indexer URL that will be used after applying fallback logic. If `indexerUrl` is explicitly set in the config, that value is returned. Otherwise, the SDK falls back to the built-in default URL for the network (testnet and mainnet have built-in defaults).
 
 **Returns**: The resolved indexer URL, or null if no URL is configured and no default exists for the network
 
@@ -2482,7 +2482,7 @@ Platform-specific implementations should use SharedPreferences (Android), UserDe
 
 ## Indexer Client
 
-The SDK includes an indexer client for reverse lookups from signer credentials to smart account contracts. The indexer is auto-configured for testnet when no explicit URL is provided.
+The SDK includes an indexer client for reverse lookups from signer credentials to smart account contracts. The indexer is auto-configured for testnet and mainnet when no explicit URL is provided.
 
 ### Using via OZSmartAccountKit (Recommended)
 
