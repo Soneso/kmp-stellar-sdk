@@ -23,15 +23,15 @@ object DemoConfig {
      *  Passed to OZSmartAccountConfig.accountWasmHash for wallet deployment.
      *  This hash can change when the contract is upgraded or testnet is reset.
      *  See docs/smart-accounts/README.md#testnet-contract-addresses for upload instructions. */
-    const val ACCOUNT_WASM_HASH = "8537b8166c0078440a5324c12f6db48d6340d157c306a54c5ea81405abcc2611"
+    const val ACCOUNT_WASM_HASH = "86b49fe03f7df0ad1c2a28bd8361b923ab57096e09f397f92f0c00ae3bd06d28"
 
     // -- Verifier Contracts --
 
     /** WebAuthn (secp256r1) signature verifier contract. Validates passkey signatures on-chain. */
-    const val WEBAUTHN_VERIFIER_ADDRESS = "CCMR63YE5T7MPWREF3PC5XNTTGXFSB4GYUGUIT5POHP2UGCS65TBIUUU"
+    const val WEBAUTHN_VERIFIER_ADDRESS = "CB26VN37RCVNTHJZDEPK6IRO2MMTS3Z2IEO5JD5BINY2OOJ5KKJG7NKY"
 
     /** Ed25519 signature verifier contract. Validates Ed25519 signer signatures on-chain. */
-    const val ED25519_VERIFIER_ADDRESS = "CCJOUKLCZVCXS4VIBBEA7S3SPWZQS5DPE5A4YG67RA3Z7E3SJZAUJFQA"
+    const val ED25519_VERIFIER_ADDRESS = "CAW2Z46INPO5VIJEILMYSSEOLBVJIIII5GOE3TN5EUURSRM2FJCF7AJ6"
 
     // -- Token Contracts --
 
@@ -110,18 +110,18 @@ val KNOWN_POLICIES = listOf(
         type = "threshold",
         name = "Threshold (M-of-N)",
         description = "Requires M signatures out of N total signers",
-        address = "CB2WQXF2XXDGUV2CTVQ23RLN3ESI3IY5KKX3KVXWBNRTTWDHZM76NVKJ"
+        address = "CAZJ3UVRY3R3S5C5BH32GMYBRSN23N75ZEEXEOLXOUUAHDFIMVP4AXUC"
     ),
     PolicyInfo(
         type = "spending_limit",
         name = "Spending Limit",
         description = "Limits spending to a maximum amount per time period",
-        address = "CBBZ2XP4LBDEO2EELTZKJSPQZDREFKCULL6CKIUQO53S42RZABOYQUK3"
+        address = "CBQE7L3UNP5IR4I7IBKLS7NV256WHR5TTH26HTMUIK7WXJC6J64RSE2L"
     ),
     PolicyInfo(
         type = "weighted_threshold",
         name = "Weighted Threshold",
         description = "Requires minimum total weight from signers with different voting weights",
-        address = "CCF65VXVORNOZBRR3EG3GZYSFS3ALDG44CDYN5T5KRWKYX6RXLKLXER4"
+        address = "CAF4OCRIB73T5777UWAQS7KGOG6WVIZ3EFXNNUYSPFSBKW2Q5XEIOSPW"
     )
 )
