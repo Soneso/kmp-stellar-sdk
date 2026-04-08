@@ -41,7 +41,7 @@ GEMS_INSTALLED := $(VENDOR_DIR)/.make-gems-installed
 
 # --- Targets -----------------------------------------------------------------
 
-.PHONY: help generate download clean clean-xdr clean-all setup test update-snapshots
+.PHONY: help generate update download clean clean-xdr clean-all setup test update-snapshots
 
 help: ## Show available targets with descriptions
 	@echo "KMP Stellar SDK XDR Generator"
@@ -52,11 +52,14 @@ help: ## Show available targets with descriptions
 	@echo ""
 	@echo "Typical workflow:"
 	@echo "  make generate          Run the full pipeline"
+	@echo "  make update            Re-download and regenerate after changing xdr-source.cfg"
 	@echo "  make clean-all         Start fresh (remove all generated and downloaded files)"
 	@echo ""
 	@echo "To update to a new XDR spec version:"
 	@echo "  1. Edit xdr-source.cfg and set XDR_COMMIT to the new commit hash"
-	@echo "  2. Run: make clean-all generate"
+	@echo "  2. Run: make update"
+
+update: clean-all generate ## Re-download .x files and regenerate (use after changing xdr-source.cfg)
 
 generate: setup download clean _run-generator ## Full pipeline: install gems, download .x files, generate Kotlin
 	@echo ""
