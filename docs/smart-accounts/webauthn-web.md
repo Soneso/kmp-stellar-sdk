@@ -63,7 +63,7 @@ val storage = IndexedDBStorageAdapter()
 val storage = IndexedDBStorageAdapter(dbName = "my_app_smart_account")
 ```
 
-Call `storage.close()` when the adapter is no longer needed to release the database connection. The adapter reopens the connection automatically on the next operation.
+Call `storage.close()` from a coroutine when the adapter is no longer needed to release the database connection. The adapter reopens the connection automatically on the next operation.
 
 ### LocalStorageAdapter (Fallback)
 

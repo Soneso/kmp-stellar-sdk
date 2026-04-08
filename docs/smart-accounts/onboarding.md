@@ -107,7 +107,7 @@ Each context rule stores:
 - A list of policies (up to 5)
 - An optional expiration ledger number. Rules with an expiration are automatically skipped after that ledger is reached, useful for temporary authorization grants.
 
-Each smart account supports up to 15 context rules, each with up to 15 signers and 5 policies.
+Each context rule supports up to 15 signers and 5 policies.
 
 When a transaction requires authorization, the contract collects all non-expired rules that match the operation's context type, plus any Default rules, and evaluates them in order until one satisfies the requirements. Rules for a specific context type (e.g. `CallContract("CBCD1234...")`) are evaluated before Default rules, so Default acts as a fallback when no specific rule is satisfied.
 
@@ -151,7 +151,7 @@ kit.policyManager.addSimpleThreshold(
 )
 ```
 
-**Spending Limit**: Limits the total amount spent within a rolling window of ledgers. For example, 1000 XLM per day (approximately 17,280 ledgers at 5 seconds per ledger). The spending limit policy intercepts any contract call where the function name is `transfer` and extracts the amount from the third argument. In practice this is almost always a token contract's `transfer` function. If a non-token contract has a function named `transfer`, the policy will attempt to apply the limit to it as well, so scope spending limit policies to specific token contracts using context rules when this is a concern. Other function names are not subject to spending limits.
+**Spending Limit**: Limits the total token amount spent within a rolling window of ledgers. For example, 1000 tokens per day (approximately 17,280 ledgers at 5 seconds per ledger). The spending limit policy intercepts any contract call where the function name is `transfer` and extracts the amount from the third argument. In practice this is almost always a token contract's `transfer` function. If a non-token contract has a function named `transfer`, the policy will attempt to apply the limit to it as well, so scope spending limit policies to specific token contracts using context rules when this is a concern. Other function names are not subject to spending limits.
 
 On-chain: stores `spending_limit: i128, period_ledgers: u32`
 
@@ -206,7 +206,7 @@ The deployer is the Stellar account that creates the smart account contract on-c
 
 After deployment, the deployer has no privileges over the contract. It cannot move funds, change signers, or modify policies. Only the configured signers can authorize operations.
 
-The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`, where the hash is used as the Ed25519 seed to generate a deterministic keypair. Because the deployer has no privileges after deployment, its publicly derivable key is not a security concern -- it only matters for address derivation and signing the deployment transaction. This default is suitable for testing and simple deployments. The TypeScript Smart Account Kit uses the same derivation, so both SDKs produce identical results from the same inputs, which is useful for verifying correctness. Production wallet applications will typically use a custom deployer (via `deployerKeypair` in the config) for attribution and traceability, since the deployer's public key is visible on-chain.
+The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`, where the hash is used as the Ed25519 seed to generate a deterministic keypair. Because the deployer has no privileges after deployment, its publicly derivable key is not a security concern -- it only matters for address derivation and signing the deployment transaction. This default is suitable for testing and simple deployments. Other OpenZeppelin Smart Account SDK implementations use the same derivation, so all compatible SDKs produce identical results from the same inputs. Production wallet applications will typically use a custom deployer (via `deployerKeypair` in the config) for attribution and traceability, since the deployer's public key is visible on-chain.
 
 When a relayer is configured, the SDK still uses the deployer to derive the contract address and build the deployment transaction, but submits it to the relayer, which wraps it in a fee bump transaction and pays the fees. The deployer account does not need to pay fees in this case, but it must still exist on the network with the minimum XLM reserve. On testnet, the default deployer is automatically funded via Friendbot.
 
@@ -341,7 +341,7 @@ App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles t
 
 ## 6. What You Need Before Starting
 
-**Deployed contracts**: For testnet development, pre-deployed contracts are available and you just need their addresses and hashes. The smart account WASM binary is uploaded to the network once and referenced by its SHA-256 hash (a hex string). Individual smart account contracts are then deployed from this WASM. The WebAuthn verifier is a single contract instance shared by all accounts, so it is referenced by its deployed contract address (a `C...` string, 56 characters). The relayer and indexer are optional and can be added later. You do not need to deploy any contracts yourself if you use pre-deployed testnet contracts. Check the TypeScript Smart Account Kit demo configuration or the OpenZeppelin stellar-contracts repository (https://github.com/OpenZeppelin/stellar-contracts) for current testnet addresses.
+**Deployed contracts**: For testnet development, pre-deployed contracts are available and you just need their addresses and hashes. The smart account WASM binary is uploaded to the network once and referenced by its SHA-256 hash (a hex string). Individual smart account contracts are then deployed from this WASM. The WebAuthn verifier is a single contract instance shared by all accounts, so it is referenced by its deployed contract address (a `C...` string, 56 characters). The relayer and indexer are optional and can be added later. You do not need to deploy any contracts yourself if you use pre-deployed testnet contracts. Check the OpenZeppelin stellar-contracts repository (https://github.com/OpenZeppelin/stellar-contracts) for current testnet addresses.
 
 Testnet contract hashes can change when contracts are upgraded or testnet is reset. WASM entries may also expire if their TTL is not extended, though they can be restored. Current values are in [DemoConfig.kt](../../smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt). See [Testnet contract addresses](README.md#testnet-contract-addresses) for upload instructions.
 
