@@ -86,7 +86,7 @@ object DemoState {
         }
     }
 
-    fun setDeployed(deployed: Boolean) {
+    fun updateDeployed(deployed: Boolean) {
         isDeployed = deployed
     }
 

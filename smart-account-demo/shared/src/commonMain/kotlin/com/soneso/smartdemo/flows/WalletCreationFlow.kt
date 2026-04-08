@@ -129,9 +129,9 @@ suspend fun createWallet(
 
     // Track whether the contract was actually deployed on-chain.
     if (autoSubmit && result.transactionHash != null) {
-        DemoState.setDeployed(true)
+        DemoState.updateDeployed(true)
     } else {
-        DemoState.setDeployed(false)
+        DemoState.updateDeployed(false)
     }
 
     // Steps 4-5 only apply when the contract is deployed on-chain.

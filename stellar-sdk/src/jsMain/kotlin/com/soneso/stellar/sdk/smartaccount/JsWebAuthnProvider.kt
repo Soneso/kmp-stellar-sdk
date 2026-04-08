@@ -7,10 +7,10 @@
 
 package com.soneso.stellar.sdk.smartaccount
 
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
-import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
+import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
+import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
@@ -395,18 +395,7 @@ class JsWebAuthnProvider(
             val spkiBytes = spkiBuffer.unsafeCast<ArrayBuffer>().toByteArray()
             if (spkiBytes.isEmpty()) return null
 
-            // Extract the last 65 bytes from SubjectPublicKeyInfo
-            if (spkiBytes.size >= SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
-                val candidate = spkiBytes.copyOfRange(
-                    spkiBytes.size - SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
-                    spkiBytes.size
-                )
-                if (candidate[0] == SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX) {
-                    return candidate
-                }
-            }
-
-            null
+            WebAuthnCborParser.extractPublicKeyFromSpki(spkiBytes)
         } catch (_: Throwable) {
             null
         }
@@ -416,151 +405,43 @@ class JsWebAuthnProvider(
      * Strategy 2: Parse the authenticator data embedded in the CBOR-encoded
      * attestation object to extract X/Y coordinates from the COSE key structure.
      *
-     * The authenticator data is located within the attestation object by searching for
-     * the CBOR text key "authData" (encoded as `68 61 75 74 68 44 61 74 61`), followed
-     * by a CBOR byte string containing the raw authenticator data.
-     *
-     * Authenticator data layout (when the AT flag is set):
-     * ```
-     * [0..31]         rpIdHash          (32 bytes)
-     * [32]            flags             (1 byte)
-     * [33..36]        signCount         (4 bytes, big-endian)
-     * [37..52]        aaguid            (16 bytes)
-     * [53..54]        credentialIdLen   (2 bytes, big-endian)
-     * [55..55+N-1]    credentialId      (N bytes)
-     * [55+N..]        COSE public key   (variable length)
-     * ```
-     *
-     * The COSE key for ES256 (P-256) has this structure:
-     * ```
-     * 10-byte prefix:  a5 01 02 03 26 20 01 21 58 20
-     * X coordinate:    32 bytes
-     * 3-byte separator: 22 58 20
-     * Y coordinate:    32 bytes
-     * ```
+     * Delegates to [WebAuthnCborParser.extractAuthenticatorDataFromAttestation] to locate
+     * the raw authenticator data within the attestation object, then delegates to
+     * [SmartAccountUtils.extractPublicKeyFromAuthenticatorData] to extract the COSE key.
      *
      * @return The 65-byte uncompressed public key, or null if the authenticator data
      *         cannot be located or does not contain a valid key
      */
     private fun tryExtractFromAuthenticatorData(attestationObjectBytes: ByteArray): ByteArray? {
-        // CBOR text string key for "authData": 0x68 (text, length 8) + ASCII bytes
-        val authDataCborKey = byteArrayOf(
-            0x68, // CBOR text string, length 8
-            0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61 // "authData"
-        )
-
-        val keyIndex = SmartAccountUtils.findSubarray(attestationObjectBytes, authDataCborKey)
-        if (keyIndex < 0) return null
-
-        // After the key, the value is a CBOR byte string (major type 2).
-        // Decode the CBOR byte string length:
-        //   0x40-0x57 -> inline length (0-23 bytes)
-        //   0x58      -> 1-byte length follows
-        //   0x59      -> 2-byte big-endian length follows
-        val dataStart = keyIndex + authDataCborKey.size
-        if (dataStart >= attestationObjectBytes.size) return null
-
-        val lengthByte = attestationObjectBytes[dataStart].toInt() and 0xFF
-        val authDataLength: Int
-        val authDataOffset: Int
-
-        when {
-            lengthByte in 0x40..0x57 -> {
-                authDataLength = lengthByte - 0x40
-                authDataOffset = dataStart + 1
-            }
-            lengthByte == 0x58 -> {
-                if (dataStart + 1 >= attestationObjectBytes.size) return null
-                authDataLength = attestationObjectBytes[dataStart + 1].toInt() and 0xFF
-                authDataOffset = dataStart + 2
-            }
-            lengthByte == 0x59 -> {
-                if (dataStart + 2 >= attestationObjectBytes.size) return null
-                authDataLength =
-                    ((attestationObjectBytes[dataStart + 1].toInt() and 0xFF) shl 8) or
-                        (attestationObjectBytes[dataStart + 2].toInt() and 0xFF)
-                authDataOffset = dataStart + 3
-            }
-            else -> return null
+        return try {
+            val authData = WebAuthnCborParser.extractAuthenticatorDataFromAttestation(attestationObjectBytes)
+                ?: return null
+            SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
+        } catch (_: Throwable) {
+            null
         }
-
-        if (authDataOffset + authDataLength > attestationObjectBytes.size) return null
-
-        val authenticatorData = attestationObjectBytes.copyOfRange(
-            authDataOffset, authDataOffset + authDataLength
-        )
-
-        // Need at least 55 bytes to read up to the credential ID length field
-        if (authenticatorData.size < 55) return null
-
-        // Check the AT flag (bit 6 of flags byte at offset 32) to confirm attested
-        // credential data is present
-        val flags = authenticatorData[32].toInt() and 0xFF
-        if (flags and 0x40 == 0) return null
-
-        // Read credential ID length from bytes 53-54 (big-endian uint16)
-        val credentialIdLength =
-            ((authenticatorData[53].toInt() and 0xFF) shl 8) or
-                (authenticatorData[54].toInt() and 0xFF)
-
-        // COSE key starts after the credential ID
-        val coseKeyStart = 55 + credentialIdLength
-
-        // The COSE prefix for ES256 is 10 bytes, then X (32), separator (3), Y (32)
-        val xStart = coseKeyStart + 10
-        val yStart = xStart + 32 + 3
-        val requiredLength = yStart + 32
-
-        if (authenticatorData.size < requiredLength) return null
-
-        val x = authenticatorData.copyOfRange(xStart, xStart + 32)
-        val y = authenticatorData.copyOfRange(yStart, yStart + 32)
-
-        val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
-        publicKey[0] = SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
-        x.copyInto(publicKey, 1)
-        y.copyInto(publicKey, 33)
-
-        return publicKey
     }
 
     /**
      * Strategy 3: Pattern-match the raw attestation object for the COSE ES256 key
      * structure prefix and extract X/Y coordinates.
      *
-     * Searches for the 10-byte COSE key prefix for ES256 (secp256r1):
-     * `a5 01 02 03 26 20 01 21 58 20`
-     * followed by X (32 bytes), separator (`22 58 20`, 3 bytes), Y (32 bytes).
+     * Delegates to [SmartAccountUtils.extractPublicKeyFromAttestationObject], which searches
+     * for the 10-byte COSE key prefix for ES256 (secp256r1) and validates both the
+     * Y-coordinate marker and that the extracted point lies on the secp256r1 curve.
      *
      * This is the most resilient strategy because it does not depend on the surrounding
      * CBOR structure being well-formed.
      *
      * @return The 65-byte uncompressed public key, or null if the COSE prefix is not found
+     *         or validation fails
      */
     private fun tryExtractFromAttestationPattern(attestationObjectBytes: ByteArray): ByteArray? {
-        // COSE key prefix for ES256 (secp256r1)
-        val prefix = byteArrayOf(
-            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(), 0x20.toByte(),
-            0x01, 0x21, 0x58, 0x20.toByte()
-        )
-
-        val prefixIndex = SmartAccountUtils.findSubarray(attestationObjectBytes, prefix)
-        if (prefixIndex < 0) return null
-
-        val xStart = prefixIndex + prefix.size
-
-        // Need X (32 bytes) + separator (3 bytes) + Y (32 bytes)
-        if (attestationObjectBytes.size < xStart + 32 + 3 + 32) return null
-
-        val x = attestationObjectBytes.copyOfRange(xStart, xStart + 32)
-        val y = attestationObjectBytes.copyOfRange(xStart + 32 + 3, xStart + 32 + 3 + 32)
-
-        val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
-        publicKey[0] = SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
-        x.copyInto(publicKey, 1)
-        y.copyInto(publicKey, 33)
-
-        return publicKey
+        return try {
+            SmartAccountUtils.extractPublicKeyFromAttestationObject(attestationObjectBytes)
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -568,19 +449,12 @@ class JsWebAuthnProvider(
     // ---------------------------------------------------------------------------
 
     /**
-     * Holds parsed authenticator flags for device type and backup status.
-     */
-    private data class AuthenticatorFlagsInfo(
-        val deviceType: String?,
-        val backedUp: Boolean?
-    )
-
-    /**
      * Parses authenticator flags from the attestation object to determine device type
      * and backup status.
      *
-     * Locates the authenticator data within the CBOR attestation object and reads the
-     * flags byte at offset 32. The relevant flag bits are:
+     * Delegates to [WebAuthnCborParser.extractAuthenticatorDataFromAttestation] to locate
+     * the raw authenticator data, then to [WebAuthnCborParser.parseAuthenticatorFlags] to
+     * read the flags byte. The relevant flag bits are:
      *
      * - Bit 3 (BE -- Backup Eligibility): If set, the credential is eligible for
      *   multi-device sync (device type = "multiDevice"). If clear, the credential is
@@ -589,53 +463,14 @@ class JsWebAuthnProvider(
      *   synced to a cloud provider.
      *
      * @param attestationObjectBytes Raw CBOR-encoded attestation object
-     * @return Parsed flags info, or null values if the authenticator data cannot be located
+     * @return Parsed [WebAuthnCborParser.AuthenticatorFlags], with null field values if
+     *         the authenticator data cannot be located
      */
-    private fun parseAuthenticatorFlags(attestationObjectBytes: ByteArray): AuthenticatorFlagsInfo {
-        val authDataCborKey = byteArrayOf(
-            0x68,
-            0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61
-        )
-
-        val keyIndex = SmartAccountUtils.findSubarray(attestationObjectBytes, authDataCborKey)
-        if (keyIndex < 0) return AuthenticatorFlagsInfo(null, null)
-
-        val dataStart = keyIndex + authDataCborKey.size
-        if (dataStart >= attestationObjectBytes.size) return AuthenticatorFlagsInfo(null, null)
-
-        val lengthByte = attestationObjectBytes[dataStart].toInt() and 0xFF
-        val authDataOffset: Int = when {
-            lengthByte in 0x40..0x57 -> dataStart + 1
-            lengthByte == 0x58 -> {
-                if (dataStart + 1 >= attestationObjectBytes.size) return AuthenticatorFlagsInfo(null, null)
-                dataStart + 2
-            }
-            lengthByte == 0x59 -> {
-                if (dataStart + 2 >= attestationObjectBytes.size) return AuthenticatorFlagsInfo(null, null)
-                dataStart + 3
-            }
-            else -> return AuthenticatorFlagsInfo(null, null)
-        }
-
-        // The flags byte is at offset 32 within authenticator data
-        val flagsByteIndex = authDataOffset + 32
-        if (flagsByteIndex >= attestationObjectBytes.size) {
-            return AuthenticatorFlagsInfo(null, null)
-        }
-
-        val flags = attestationObjectBytes[flagsByteIndex].toInt() and 0xFF
-
-        // Bit 3 (BE): Backup Eligibility -> device type
-        val backupEligible = (flags and 0x08) != 0
-        val deviceType = if (backupEligible) "multiDevice" else "singleDevice"
-
-        // Bit 4 (BS): Backup State -> backed up
-        val backedUp = (flags and 0x10) != 0
-
-        return AuthenticatorFlagsInfo(
-            deviceType = deviceType,
-            backedUp = backedUp
-        )
+    private fun parseAuthenticatorFlags(
+        attestationObjectBytes: ByteArray
+    ): WebAuthnCborParser.AuthenticatorFlags {
+        val authData = WebAuthnCborParser.extractAuthenticatorDataFromAttestation(attestationObjectBytes)
+        return WebAuthnCborParser.parseAuthenticatorFlags(authData)
     }
 
     // ---------------------------------------------------------------------------

@@ -120,7 +120,7 @@ suspend fun quickConnect(): WalletConnectionResult? {
     // Verify the contract is actually deployed on-chain. Session restore does not
     // guarantee on-chain existence (e.g., createWallet with autoSubmit=false).
     val deployed = isContractDeployed()
-    DemoState.setDeployed(deployed)
+    DemoState.updateDeployed(deployed)
 
     if (deployed) {
         // Fetch both XLM and DEMO balances after connection so the main screen shows
@@ -180,7 +180,7 @@ suspend fun manualConnect(): WalletConnectionResult? {
     ActivityLogState.success("Connected to contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, result.credentialId)
     // A successful indexer-based connection means the contract exists on-chain.
-    DemoState.setDeployed(true)
+    DemoState.updateDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
@@ -227,7 +227,7 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
     ActivityLogState.success("Connected to contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, result.credentialId)
     // A successful address-based connection means the contract exists on-chain.
-    DemoState.setDeployed(true)
+    DemoState.updateDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
@@ -279,7 +279,7 @@ suspend fun retryPendingDeploy(
     ActivityLogState.success("Successfully deployed contract: ${result.contractId}")
     DemoState.setConnected(true, result.contractId, credentialId)
     // Deployment succeeded -- the contract now exists on-chain.
-    DemoState.setDeployed(true)
+    DemoState.updateDeployed(true)
     refreshAllBalances(result.contractId)
 
     return WalletConnectionResult(
