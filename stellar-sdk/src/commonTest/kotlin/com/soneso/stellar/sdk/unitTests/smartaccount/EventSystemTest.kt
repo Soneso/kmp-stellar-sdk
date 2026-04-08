@@ -11,6 +11,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -26,8 +28,11 @@ import kotlin.test.assertTrue
  * - removeAllListeners for specific event type
  * - Emit isolation: type-specific listeners only receive matching events
  * - SmartAccountEvent data class instantiation
- *
- * SmartAccountKitTest already covers: on<T>(), once<T>(), removeAllListeners()
+ * - once<T>() auto-unsubscribe and pre-fire cancellation
+ * - Concurrent/rapid emission safety
+ * - removeAllListeners(eventType) does not affect global listeners
+ * - Edge cases: emit with no listeners, removeAllListeners when empty
+ * - Data class equality, hashCode, copy
  */
 class EventSystemTest {
 
@@ -397,5 +402,436 @@ class EventSystemTest {
         val event = SmartAccountEvent.CredentialCreated(credential = credential)
         assertEquals("new-cred", event.credential.credentialId)
         assertEquals("Test Key", event.credential.nickname)
+    }
+
+    // MARK: - once<T>() Tests
+
+    @Test
+    fun testOnce_firesOnFirstEventOnly() {
+        val emitter = SmartAccountEventEmitter()
+        val receivedEvents = mutableListOf<SmartAccountEvent.WalletConnected>()
+
+        emitter.once<SmartAccountEvent.WalletConnected> { event ->
+            receivedEvents.add(event)
+        }
+
+        val event1 = SmartAccountEvent.WalletConnected(contractId = "C1", credentialId = "cr1")
+        val event2 = SmartAccountEvent.WalletConnected(contractId = "C2", credentialId = "cr2")
+
+        emitter.emit(event1)
+        emitter.emit(event2)
+
+        assertEquals(1, receivedEvents.size, "once listener should fire exactly once")
+        assertEquals("C1", receivedEvents[0].contractId, "once listener should receive the first event")
+    }
+
+    @Test
+    fun testOnce_unsubscribeBeforeEventFiresCancels() {
+        val emitter = SmartAccountEventEmitter()
+        var callCount = 0
+
+        val unsubscribe = emitter.once<SmartAccountEvent.WalletDisconnected> { _ ->
+            callCount++
+        }
+
+        // Cancel before any event fires
+        unsubscribe()
+
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C"))
+
+        assertEquals(0, callCount, "once listener cancelled before firing should never fire")
+    }
+
+    @Test
+    fun testOnce_listenerCountDecrementsAfterFiring() {
+        val emitter = SmartAccountEventEmitter()
+
+        emitter.once<SmartAccountEvent.TransactionSubmitted> { _ -> }
+
+        assertEquals(1, emitter.listenerCount("TransactionSubmitted"))
+
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "h", success = true))
+
+        assertEquals(0, emitter.listenerCount("TransactionSubmitted"),
+            "Listener count should decrement after once listener auto-unsubscribes")
+    }
+
+    @Test
+    fun testOnce_multipleOnceListenersForSameType() {
+        val emitter = SmartAccountEventEmitter()
+        var count1 = 0
+        var count2 = 0
+
+        emitter.once<SmartAccountEvent.SessionExpired> { _ -> count1++ }
+        emitter.once<SmartAccountEvent.SessionExpired> { _ -> count2++ }
+
+        assertEquals(2, emitter.listenerCount("SessionExpired"))
+
+        emitter.emit(SmartAccountEvent.SessionExpired(contractId = "C", credentialId = "cr"))
+
+        assertEquals(1, count1, "First once listener should fire once")
+        assertEquals(1, count2, "Second once listener should fire once")
+
+        emitter.emit(SmartAccountEvent.SessionExpired(contractId = "C2", credentialId = "cr2"))
+
+        assertEquals(1, count1, "First once listener should not fire again")
+        assertEquals(1, count2, "Second once listener should not fire again")
+        assertEquals(0, emitter.listenerCount("SessionExpired"),
+            "All once listeners should be removed after firing")
+    }
+
+    @Test
+    fun testOnce_doesNotAffectOtherEventTypes() {
+        val emitter = SmartAccountEventEmitter()
+        var onceCount = 0
+        var permanentCount = 0
+
+        emitter.once<SmartAccountEvent.WalletConnected> { _ -> onceCount++ }
+        emitter.on<SmartAccountEvent.WalletDisconnected> { _ -> permanentCount++ }
+
+        emitter.emit(SmartAccountEvent.WalletConnected(contractId = "C", credentialId = "cr"))
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C"))
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C2"))
+
+        assertEquals(1, onceCount)
+        assertEquals(2, permanentCount, "Permanent listener should still receive all events")
+    }
+
+    // MARK: - Error Handler with once Tests
+
+    @Test
+    fun testOnce_listenerThrowsOnFirstEvent_errorHandlerCalled() {
+        val emitter = SmartAccountEventEmitter()
+        var errorHandlerCalled = false
+        var capturedError: Throwable? = null
+
+        emitter.setErrorHandler { _, error ->
+            errorHandlerCalled = true
+            capturedError = error
+        }
+
+        emitter.once<SmartAccountEvent.TransactionSubmitted> { _ ->
+            throw IllegalStateException("Listener failure on first event")
+        }
+
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "h1", success = true))
+
+        assertTrue(errorHandlerCalled, "Error handler should be called when once listener throws")
+        assertEquals("Listener failure on first event", capturedError?.message)
+    }
+
+    @Test
+    fun testOnce_listenerThrowsOnFirstEvent_stillAutoUnsubscribes() {
+        val emitter = SmartAccountEventEmitter()
+        var callCount = 0
+
+        emitter.setErrorHandler { _, _ -> /* suppress */ }
+
+        emitter.once<SmartAccountEvent.WalletDisconnected> { _ ->
+            callCount++
+            throw RuntimeException("Boom")
+        }
+
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C1"))
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C2"))
+
+        // The once implementation calls unsubscribe() before the listener.
+        // So even though the listener throws, it should still auto-unsubscribe.
+        assertEquals(1, callCount,
+            "once listener should fire exactly once even when it throws")
+        assertEquals(0, emitter.listenerCount("WalletDisconnected"),
+            "once listener should be removed even when it throws")
+    }
+
+    @Test
+    fun testErrorHandler_failingTypedListenerDoesNotAffectGlobalListener() {
+        val emitter = SmartAccountEventEmitter()
+        var globalCalled = false
+
+        emitter.setErrorHandler { _, _ -> /* suppress */ }
+
+        emitter.on<SmartAccountEvent.WalletConnected> { _ ->
+            throw RuntimeException("Typed listener failure")
+        }
+        emitter.addListener { _ -> globalCalled = true }
+
+        emitter.emit(SmartAccountEvent.WalletConnected(contractId = "C", credentialId = "cr"))
+
+        assertTrue(globalCalled,
+            "Global listener should still be called when typed listener throws")
+    }
+
+    // MARK: - removeAllListeners(eventType) Does Not Remove Global Listeners
+
+    @Test
+    fun testRemoveAllListeners_specificType_doesNotRemoveGlobalListeners() {
+        val emitter = SmartAccountEventEmitter()
+        var globalCount = 0
+        var typedCount = 0
+
+        emitter.addListener { _ -> globalCount++ }
+        emitter.on<SmartAccountEvent.WalletConnected> { _ -> typedCount++ }
+
+        // Remove only WalletConnected type-specific listeners
+        emitter.removeAllListeners("WalletConnected")
+
+        emitter.emit(SmartAccountEvent.WalletConnected(contractId = "C", credentialId = "cr"))
+
+        assertEquals(0, typedCount, "Typed listener should have been removed")
+        assertEquals(1, globalCount,
+            "Global listener should NOT be removed by removeAllListeners(eventType)")
+    }
+
+    @Test
+    fun testRemoveAllListeners_specificType_globalListenerCountUnchanged() {
+        val emitter = SmartAccountEventEmitter()
+
+        emitter.addListener { _ -> }
+        emitter.on<SmartAccountEvent.WalletConnected> { _ -> }
+
+        // Before removal: 1 type-specific + 1 global = 2
+        assertEquals(2, emitter.listenerCount("WalletConnected"))
+
+        emitter.removeAllListeners("WalletConnected")
+
+        // After removal: 0 type-specific + 1 global = 1
+        assertEquals(1, emitter.listenerCount("WalletConnected"),
+            "Global listener should still be counted after removeAllListeners(eventType)")
+    }
+
+    // MARK: - Edge Cases
+
+    @Test
+    fun testEmit_withNoListeners_doesNotThrow() {
+        val emitter = SmartAccountEventEmitter()
+
+        // Should not throw
+        emitter.emit(SmartAccountEvent.WalletConnected(contractId = "C", credentialId = "cr"))
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "h", success = true))
+        emitter.emit(SmartAccountEvent.CredentialDeleted(credentialId = "cr"))
+        emitter.emit(SmartAccountEvent.SessionExpired(contractId = "C", credentialId = "cr"))
+        emitter.emit(SmartAccountEvent.TransactionSigned(contractId = "C", credentialId = null))
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C"))
+
+        val credential = StoredCredential(
+            credentialId = "cr",
+            publicKey = ByteArray(65) { if (it == 0) 0x04.toByte() else it.toByte() },
+            createdAt = 1700000000000L
+        )
+        emitter.emit(SmartAccountEvent.CredentialCreated(credential = credential))
+
+        // Reaching this point without exception confirms success
+        assertTrue(true)
+    }
+
+    @Test
+    fun testRemoveAllListeners_whenAlreadyEmpty_doesNotThrow() {
+        val emitter = SmartAccountEventEmitter()
+
+        // No listeners registered, should not throw
+        emitter.removeAllListeners()
+        emitter.removeAllListeners("WalletConnected")
+        emitter.removeAllListeners("NonExistentType")
+
+        assertTrue(true)
+    }
+
+    @Test
+    fun testUnsubscribe_calledMultipleTimes_doesNotThrow() {
+        val emitter = SmartAccountEventEmitter()
+
+        val unsubscribe = emitter.on<SmartAccountEvent.WalletConnected> { _ -> }
+
+        unsubscribe()
+        // Calling unsubscribe again should be safe (idempotent)
+        unsubscribe()
+
+        assertEquals(0, emitter.listenerCount("WalletConnected"))
+    }
+
+    @Test
+    fun testAddListenerUnsubscribe_calledMultipleTimes_doesNotThrow() {
+        val emitter = SmartAccountEventEmitter()
+
+        val unsubscribe = emitter.addListener { _ -> }
+
+        unsubscribe()
+        unsubscribe()
+
+        // Verify no global listeners remain
+        assertEquals(0, emitter.listenerCount("AnyType"))
+    }
+
+    // MARK: - Rapid/Sequential Emission Tests
+
+    @Test
+    fun testRapidEmission_allEventsDeliveredInOrder() {
+        val emitter = SmartAccountEventEmitter()
+        val receivedHashes = mutableListOf<String>()
+
+        emitter.on<SmartAccountEvent.TransactionSubmitted> { event ->
+            receivedHashes.add(event.hash)
+        }
+
+        val count = 100
+        for (i in 0 until count) {
+            emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "tx-$i", success = true))
+        }
+
+        assertEquals(count, receivedHashes.size, "All $count events should be delivered")
+        for (i in 0 until count) {
+            assertEquals("tx-$i", receivedHashes[i], "Events should arrive in emission order")
+        }
+    }
+
+    @Test
+    fun testRapidEmission_mixedEventTypes() {
+        val emitter = SmartAccountEventEmitter()
+        val allEvents = mutableListOf<SmartAccountEvent>()
+
+        emitter.addListener { event -> allEvents.add(event) }
+
+        for (i in 0 until 50) {
+            emitter.emit(SmartAccountEvent.WalletConnected(contractId = "C$i", credentialId = "cr$i"))
+            emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "tx-$i", success = i % 2 == 0))
+        }
+
+        assertEquals(100, allEvents.size, "All 100 mixed events should be delivered")
+        // Verify alternating pattern
+        for (i in 0 until 50) {
+            assertTrue(allEvents[i * 2] is SmartAccountEvent.WalletConnected)
+            assertTrue(allEvents[i * 2 + 1] is SmartAccountEvent.TransactionSubmitted)
+        }
+    }
+
+    // MARK: - Data Class Equality and Properties Tests
+
+    @Test
+    fun testWalletConnected_equalityAndCopy() {
+        val event1 = SmartAccountEvent.WalletConnected(contractId = "C1", credentialId = "cr1")
+        val event2 = SmartAccountEvent.WalletConnected(contractId = "C1", credentialId = "cr1")
+        val event3 = SmartAccountEvent.WalletConnected(contractId = "C2", credentialId = "cr1")
+
+        assertEquals(event1, event2, "Same properties should be equal")
+        assertEquals(event1.hashCode(), event2.hashCode(), "Equal objects should have equal hashCode")
+        assertNotEquals(event1, event3, "Different contractId should not be equal")
+
+        val copied = event1.copy(credentialId = "cr-new")
+        assertEquals("C1", copied.contractId, "Copy should preserve unchanged fields")
+        assertEquals("cr-new", copied.credentialId, "Copy should update specified field")
+    }
+
+    @Test
+    fun testWalletDisconnected_equalityAndCopy() {
+        val event1 = SmartAccountEvent.WalletDisconnected(contractId = "C1")
+        val event2 = SmartAccountEvent.WalletDisconnected(contractId = "C1")
+        val event3 = SmartAccountEvent.WalletDisconnected(contractId = "C2")
+
+        assertEquals(event1, event2)
+        assertEquals(event1.hashCode(), event2.hashCode())
+        assertNotEquals(event1, event3)
+
+        val copied = event1.copy(contractId = "C-new")
+        assertEquals("C-new", copied.contractId)
+    }
+
+    @Test
+    fun testTransactionSubmitted_equalityAndCopy() {
+        val event1 = SmartAccountEvent.TransactionSubmitted(hash = "h1", success = true)
+        val event2 = SmartAccountEvent.TransactionSubmitted(hash = "h1", success = true)
+        val event3 = SmartAccountEvent.TransactionSubmitted(hash = "h1", success = false)
+
+        assertEquals(event1, event2)
+        assertEquals(event1.hashCode(), event2.hashCode())
+        assertNotEquals(event1, event3, "Different success value should not be equal")
+
+        val copied = event1.copy(success = false)
+        assertEquals("h1", copied.hash)
+        assertFalse(copied.success)
+    }
+
+    @Test
+    fun testTransactionSigned_equalityWithNullCredential() {
+        val event1 = SmartAccountEvent.TransactionSigned(contractId = "C1", credentialId = null)
+        val event2 = SmartAccountEvent.TransactionSigned(contractId = "C1", credentialId = null)
+        val event3 = SmartAccountEvent.TransactionSigned(contractId = "C1", credentialId = "cr")
+
+        assertEquals(event1, event2, "Both with null credentialId should be equal")
+        assertNotEquals(event1, event3, "Null vs non-null credentialId should not be equal")
+    }
+
+    @Test
+    fun testSessionExpired_equalityAndCopy() {
+        val event1 = SmartAccountEvent.SessionExpired(contractId = "C1", credentialId = "cr1")
+        val event2 = SmartAccountEvent.SessionExpired(contractId = "C1", credentialId = "cr1")
+
+        assertEquals(event1, event2)
+        assertEquals(event1.hashCode(), event2.hashCode())
+
+        val copied = event1.copy(contractId = "C-new")
+        assertEquals("C-new", copied.contractId)
+        assertEquals("cr1", copied.credentialId)
+    }
+
+    @Test
+    fun testCredentialDeleted_equalityAndCopy() {
+        val event1 = SmartAccountEvent.CredentialDeleted(credentialId = "cr1")
+        val event2 = SmartAccountEvent.CredentialDeleted(credentialId = "cr1")
+        val event3 = SmartAccountEvent.CredentialDeleted(credentialId = "cr2")
+
+        assertEquals(event1, event2)
+        assertNotEquals(event1, event3)
+
+        val copied = event1.copy(credentialId = "cr-new")
+        assertEquals("cr-new", copied.credentialId)
+    }
+
+    @Test
+    fun testDifferentEventTypes_areNeverEqual() {
+        val connected = SmartAccountEvent.WalletConnected(contractId = "C", credentialId = "cr")
+        val disconnected = SmartAccountEvent.WalletDisconnected(contractId = "C")
+        val expired = SmartAccountEvent.SessionExpired(contractId = "C", credentialId = "cr")
+
+        assertNotEquals<SmartAccountEvent>(connected, disconnected,
+            "Different event types should never be equal")
+        assertNotEquals<SmartAccountEvent>(connected, expired,
+            "Different event types should never be equal even with same properties")
+    }
+
+    // MARK: - Listener Interaction During Emission
+
+    @Test
+    fun testListener_canUnsubscribeItselfDuringEmission() {
+        val emitter = SmartAccountEventEmitter()
+        var callCount = 0
+
+        lateinit var unsub: () -> Unit
+        unsub = emitter.on<SmartAccountEvent.WalletDisconnected> { _ ->
+            callCount++
+            unsub()
+        }
+
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C1"))
+        emitter.emit(SmartAccountEvent.WalletDisconnected(contractId = "C2"))
+
+        assertEquals(1, callCount,
+            "Listener that unsubscribes itself during emission should fire once")
+    }
+
+    @Test
+    fun testOnce_combinedWithPermanentListener() {
+        val emitter = SmartAccountEventEmitter()
+        var onceCount = 0
+        var permanentCount = 0
+
+        emitter.once<SmartAccountEvent.TransactionSubmitted> { _ -> onceCount++ }
+        emitter.on<SmartAccountEvent.TransactionSubmitted> { _ -> permanentCount++ }
+
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "tx1", success = true))
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "tx2", success = true))
+        emitter.emit(SmartAccountEvent.TransactionSubmitted(hash = "tx3", success = true))
+
+        assertEquals(1, onceCount, "once listener should fire exactly once")
+        assertEquals(3, permanentCount, "Permanent listener should fire for all events")
     }
 }

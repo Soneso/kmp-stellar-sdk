@@ -11,6 +11,9 @@ package com.soneso.smartdemo.flows
  * to sign the Soroban authorization entry before submitting the transaction.
  *
  * After a successful transfer, XLM and DEMO balances are refreshed in [DemoState].
+ *
+ * Shared signer utilities ([buildSelectedSigners], [isSinglePasskeyTransfer]) are defined
+ * in [ContextRuleEditTypes.kt] and imported here.
  */
 
 import com.soneso.smartdemo.state.ActivityLogState
@@ -20,10 +23,6 @@ import com.soneso.smartdemo.util.SignerInfo
 import com.soneso.smartdemo.util.extractSignersFromRules
 import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.refreshAllBalances
-import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
-import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 
 /**
@@ -168,60 +167,6 @@ suspend fun loadAvailableSigners(): List<SignerInfo> {
     } catch (_: Exception) {
         emptyList()
     }
-}
-
-/**
- * Converts a list of selected [SmartAccountSigner] objects from the signer picker into
- * the [SelectedSigner] list required by [multiSignerTransfer].
- *
- * - [ExternalSigner] with a credential ID → [SelectedSigner.Passkey] with full keyData.
- * - [DelegatedSigner] → [SelectedSigner.Wallet] identified by G-address.
- * - [ExternalSigner] without a credential ID → skipped (not supported in multi-signer flow).
- *
- * @param signers Selected signers from the signer picker dialog.
- * @return Mapped list of [SelectedSigner] ready for [multiSignerTransfer].
- */
-fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner> {
-    val result = mutableListOf<SelectedSigner>()
-    for (signer in signers) {
-        when (signer) {
-            is ExternalSigner -> {
-                val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer)
-                if (credIdStr != null) {
-                    result.add(
-                        SelectedSigner.Passkey(
-                            credentialId = credIdStr,
-                            credentialIdBytes = credIdBytes,
-                            keyData = signer.keyData
-                        )
-                    )
-                }
-            }
-            is DelegatedSigner -> {
-                result.add(SelectedSigner.Wallet(address = signer.address))
-            }
-        }
-    }
-    return result
-}
-
-/**
- * Determines whether a single-passkey transfer can be used instead of the multi-signer path.
- *
- * Returns true only when exactly one passkey is selected AND it is the currently connected
- * passkey. The simple [transfer] path always signs with the connected passkey, so it cannot
- * be used for other passkeys from context rules or for any delegated signers.
- *
- * @param selectedSigners Signers chosen in the signer picker dialog.
- * @return True if the single-signer [transfer] path should be used; false for [multiSignerTransfer].
- */
-fun isSinglePasskeyTransfer(selectedSigners: List<SmartAccountSigner>): Boolean {
-    if (selectedSigners.size != 1) return false
-    val signer = selectedSigners[0]
-    if (signer !is ExternalSigner) return false
-    val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-    return credIdStr != null && credIdStr == DemoState.credentialId
 }
 
 /**

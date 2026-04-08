@@ -112,9 +112,6 @@ struct TransferScreen: View {
                     tokenPicker
                     recipientField
                     amountField
-                    if availableSigners.count > 1 {
-                        signerPickerButton
-                    }
                     if let error = errorMessage {
                         errorCard(message: error)
                     }
@@ -263,31 +260,6 @@ struct TransferScreen: View {
             isEnabled: !isLoading && txHash == nil
         )
         .onChange(of: amount) { _ in errorMessage = nil }
-    }
-
-    // MARK: - Signer picker button
-
-    private var signerPickerButton: some View {
-        Button {
-            showSignerPicker = true
-        } label: {
-            HStack {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 14))
-                Text("Select Signers (\(availableSigners.count))")
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .foregroundStyle(Material3Colors.primary)
-            .frame(maxWidth: .infinity)
-            .frame(height: 40)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Material3Colors.primary, lineWidth: 1.5)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(isLoading || txHash != nil)
-        .opacity((isLoading || txHash != nil) ? 0.5 : 1.0)
     }
 
     // MARK: - Error card

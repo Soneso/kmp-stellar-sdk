@@ -2,11 +2,10 @@ package com.soneso.smartdemo.ui.screens
 
 /**
  * Wallet connection screen: Auto Connect, Connect via Indexer,
- * Connect with Address (Recovery), and Pending Deployments.
+ * Connect with Address, and Pending Deployments.
  * All connection logic is handled by WalletConnectionFlow.
  */
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,8 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -117,10 +114,7 @@ class WalletConnectionScreen : Screen {
         var indexerConnectError by remember { mutableStateOf<String?>(null) }
         var addressConnectError by remember { mutableStateOf<String?>(null) }
 
-        // UI expand/collapse state for collapsible sections
-        var indexerExpanded by remember { mutableStateOf(false) }
-        var addressExpanded by remember { mutableStateOf(false) }
-        var pendingExpanded by remember { mutableStateOf(false) }
+        // All sections are always expanded (no collapse/expand toggle).
 
         // Recovery connect input
         var contractAddressInput by remember { mutableStateOf("") }
@@ -262,60 +256,46 @@ class WalletConnectionScreen : Screen {
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { indexerExpanded = !indexerExpanded },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Connect via Indexer",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = if (indexerExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (indexerExpanded) "Collapse" else "Expand"
-                            )
-                        }
+                        Text(
+                            text = "Connect via Indexer",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                        if (indexerExpanded) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                            Text(
-                                text = "Authenticates with a passkey, then uses the indexer service " +
-                                    "to look up the smart account contract associated with that credential.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Text(
+                            text = "Authenticates with a passkey, then uses the indexer service " +
+                                "to look up the smart account contract associated with that credential.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            Button(
-                                onClick = {
-                                    launchConnection(
-                                        section = ConnectionSection.INDEXER,
-                                        setError = { indexerConnectError = it },
-                                        nullResultMessage = "No contract found for this credential",
-                                        connect = { manualConnect() }
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = activeConnection == null && DemoState.kit != null
-                            ) {
-                                LoadingButtonContent(
-                                    text = "Connect via Indexer",
-                                    isLoading = activeConnection == ConnectionSection.INDEXER
+                        Button(
+                            onClick = {
+                                launchConnection(
+                                    section = ConnectionSection.INDEXER,
+                                    setError = { indexerConnectError = it },
+                                    nullResultMessage = "No contract found for this credential",
+                                    connect = { manualConnect() }
                                 )
-                            }
-
-                            InlineError(indexerConnectError)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = activeConnection == null && DemoState.kit != null
+                        ) {
+                            LoadingButtonContent(
+                                text = "Connect via Indexer",
+                                isLoading = activeConnection == ConnectionSection.INDEXER
+                            )
                         }
+
+                        InlineError(indexerConnectError)
                     }
                 }
 
-                // 3. Connect with Address (Recovery)
+                // 3. Connect with Address
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -323,77 +303,63 @@ class WalletConnectionScreen : Screen {
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { addressExpanded = !addressExpanded },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Connect with Address (Recovery)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = if (addressExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (addressExpanded) "Collapse" else "Expand"
-                            )
-                        }
+                        Text(
+                            text = "Connect with Address",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                        if (addressExpanded) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                            Text(
-                                text = "Connect to a smart account using a known contract address. " +
-                                    "Authenticates with a passkey that is registered as a signer on the contract. " +
-                                    "Use this to reconnect with a recovery signer.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Text(
+                            text = "Connect to a smart account using a known contract address. " +
+                                "Authenticates with a passkey that is registered as a signer on the contract. " +
+                                "Use this to reconnect with a recovery signer.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            val isAddressValid = isValidContractAddress(contractAddressInput.trim())
+                        val isAddressValid = isValidContractAddress(contractAddressInput.trim())
 
-                            OutlinedTextField(
-                                value = contractAddressInput,
-                                onValueChange = {
-                                    contractAddressInput = it
-                                    addressConnectError = null
-                                },
-                                label = { Text("Contract Address") },
-                                placeholder = { Text("C...") },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = activeConnection == null,
-                                singleLine = true,
-                                isError = contractAddressInput.isNotBlank() && !isAddressValid
-                            )
+                        OutlinedTextField(
+                            value = contractAddressInput,
+                            onValueChange = {
+                                contractAddressInput = it
+                                addressConnectError = null
+                            },
+                            label = { Text("Contract Address") },
+                            placeholder = { Text("C...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = activeConnection == null,
+                            singleLine = true,
+                            isError = contractAddressInput.isNotBlank() && !isAddressValid
+                        )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            Button(
-                                onClick = {
-                                    launchConnection(
-                                        section = ConnectionSection.ADDRESS,
-                                        setError = { addressConnectError = it },
-                                        nullResultMessage = "Could not connect to the provided contract address",
-                                        connect = { connectWithAddress(contractAddressInput.trim()) }
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = activeConnection == null &&
-                                    DemoState.kit != null &&
-                                    isAddressValid
-                            ) {
-                                LoadingButtonContent(
-                                    text = "Connect",
-                                    isLoading = activeConnection == ConnectionSection.ADDRESS
+                        Button(
+                            onClick = {
+                                launchConnection(
+                                    section = ConnectionSection.ADDRESS,
+                                    setError = { addressConnectError = it },
+                                    nullResultMessage = "Could not connect to the provided contract address",
+                                    connect = { connectWithAddress(contractAddressInput.trim()) }
                                 )
-                            }
-
-                            InlineError(addressConnectError)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = activeConnection == null &&
+                                DemoState.kit != null &&
+                                isAddressValid
+                        ) {
+                            LoadingButtonContent(
+                                text = "Connect",
+                                isLoading = activeConnection == ConnectionSection.ADDRESS
+                            )
                         }
+
+                        InlineError(addressConnectError)
                     }
                 }
 
@@ -406,28 +372,23 @@ class WalletConnectionScreen : Screen {
                         )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pendingExpanded = !pendingExpanded },
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pending Deployments (${pendingCredentials.size})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Icon(
-                                    imageVector = if (pendingExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = if (pendingExpanded) "Collapse" else "Expand",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
+                            Text(
+                                text = "Pending Deployments (${pendingCredentials.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
 
-                            if (pendingExpanded) {
-                                Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "These credentials were registered but contract deployment " +
+                                    "may not have completed. Retry the deployment or delete the credential.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
 
                                 pendingCredentials.forEach { credential ->
                                     Card(
@@ -477,14 +438,9 @@ class WalletConnectionScreen : Screen {
                                                             try {
                                                                 val result = retryPendingDeploy(
                                                                     credential.credentialId,
-                                                                    credential.contractId
                                                                 )
-                                                                if (result != null) {
-                                                                    refreshPendingList()
-                                                                    navigator.pop()
-                                                                } else {
-                                                                    ActivityLogState.error("Retry failed: could not deploy contract")
-                                                                }
+                                                                refreshPendingList()
+                                                                navigator.pop()
                                                             } catch (e: Throwable) {
                                                                 ActivityLogState.error("Retry failed: ${e.message}")
                                                             } finally {
@@ -495,7 +451,17 @@ class WalletConnectionScreen : Screen {
                                                     modifier = Modifier.weight(1f),
                                                     enabled = !pendingActionInProgress
                                                 ) {
-                                                    Text("Retry Deploy")
+                                                    if (pendingActionInProgress) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Deploying...")
+                                                    } else {
+                                                        Text("Retry Deploy")
+                                                    }
                                                 }
 
                                                 OutlinedButton(
@@ -521,7 +487,6 @@ class WalletConnectionScreen : Screen {
                                         }
                                     }
                                 }
-                            }
                         }
                     }
                 }
@@ -529,3 +494,4 @@ class WalletConnectionScreen : Screen {
         }
     }
 }
+

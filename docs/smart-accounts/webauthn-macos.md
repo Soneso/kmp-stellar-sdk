@@ -82,11 +82,27 @@ val webauthnProvider = AppleWebAuthnProvider(
 )
 ```
 
-### NSWindow Presentation Context
+### NSWindow Presentation Context (Required on macOS)
 
-On macOS, `ASAuthorizationController` requires a presentation context provider to specify which window displays the authorization sheet. The current `AppleWebAuthnProvider` implementation performs requests without an explicit presentation context. For macOS apps, you may need to set the presentation context on the controller via a platform-specific integration point (e.g., a SwiftUI bridge or AppKit delegate that provides the `NSWindow`).
+On macOS, `ASAuthorizationController` requires a presentation context provider to specify which window displays the authorization sheet. Set the `presentationContextProvider` property before calling any registration or authentication methods. Without this, macOS will fail with error code 1004.
 
-A future SDK revision may accept an optional presentation context parameter.
+On iOS, this is not required — the system presents the sheet automatically.
+
+```kotlin
+// Set from Kotlin (if you have a reference to the provider)
+webauthnProvider.presentationContextProvider = windowProvider
+```
+
+From Swift (typical macOS integration):
+
+```swift
+class WindowProvider: NSObject, ASAuthorizationControllerPresentationContextProviding {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        return NSApplication.shared.keyWindow ?? NSWindow()
+    }
+}
+provider.presentationContextProvider = WindowProvider()
+```
 
 ## Storage Adapter
 
@@ -101,7 +117,7 @@ A future SDK revision may accept an optional presentation context parameter.
 ```kotlin
 import com.soneso.stellar.sdk.smartaccount.UserDefaultsStorageAdapter
 
-// Default suite (shared with iOS if using iCloud)
+// Default suite (local to this device, not synced via iCloud)
 val storage = UserDefaultsStorageAdapter()
 
 // macOS-specific suite name
@@ -161,11 +177,11 @@ macOS requires Developer ID signing or the App Sandbox entitlement for associate
 
 Without either of these, the system will not fetch or validate the `apple-app-site-association` file.
 
-### ASAuthorizationError code 1005 (not interactive)
+### ASAuthorizationError code 1004 (no host window)
 
-This error is specific to macOS and indicates the authorization controller could not present its UI. Ensure:
-- The authorization request is performed on the main thread
-- A valid `NSWindow` is available for the presentation context
+This error is specific to macOS and indicates the authorization controller has no window to present its UI. Ensure:
+- `presentationContextProvider` is set on the `AppleWebAuthnProvider` before calling register/authenticate
+- The provider returns a valid `NSWindow` from `presentationAnchor(for:)`
 - The app is in the foreground when the request is made
 
 ### Passkeys synced from iOS not appearing

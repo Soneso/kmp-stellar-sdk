@@ -24,6 +24,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc
@@ -215,17 +216,7 @@ class KeychainStorageAdapter(
             val existing = readCredential(credentialId)
                 ?: throw CredentialException.notFound(credentialId)
 
-            val updated = existing.copy(
-                deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-                deploymentError = updates.deploymentError ?: existing.deploymentError,
-                contractId = updates.contractId ?: existing.contractId,
-                lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-                nickname = updates.nickname ?: existing.nickname,
-                isPrimary = updates.isPrimary ?: existing.isPrimary,
-                transports = updates.transports ?: existing.transports,
-                deviceType = updates.deviceType ?: existing.deviceType,
-                backedUp = updates.backedUp ?: existing.backedUp
-            )
+            val updated = existing.applyUpdate(updates)
 
             val serializable = updated.toSerializable()
             val jsonString = json.encodeToString(serializable)
@@ -278,14 +269,14 @@ class KeychainStorageAdapter(
 
     override suspend fun getSession(): StoredSession? = mutex.withLock {
         try {
-            val jsonString = keychainRead(account = KEY_SESSION) ?: return null
+            val jsonString = keychainRead(account = KEY_SESSION) ?: return@withLock null
             val serializable = json.decodeFromString<SerializableSession>(jsonString)
             val session = serializable.toStoredSession()
 
             if (session.isExpired) {
                 // Clear expired session
                 keychainDelete(account = KEY_SESSION)
-                return null
+                return@withLock null
             }
 
             session
@@ -439,6 +430,10 @@ class KeychainStorageAdapter(
 
                 val updateDict = NSMutableDictionary()
                 updateDict.setObject(nsData, forKey = kSecValueData.asNSString()!!)
+                updateDict.setObject(
+                    kSecAttrAccessibleAfterFirstUnlock.asNSString()!!,
+                    forKey = kSecAttrAccessible.asNSString()!!
+                )
 
                 val updateStatus: OSStatus = SecItemUpdate(
                     searchQuery as CFDictionaryRef,

@@ -22,15 +22,22 @@ object DemoState {
      * Set during kit initialization so TransferScreen can register secret keys.
      */
     var externalSignerManager: ExternalSignerManagerAdapter? = null
+        private set
 
     /** Platform-specific WebAuthn provider, set by platform entry points (MainActivity, AppDelegate, etc.). */
     var webauthnProvider: WebAuthnProvider? = null
+        private set
 
     /** Platform-specific storage adapter, set by platform entry points. */
     var storage: StorageAdapter? = null
+        private set
 
     /** Whether a wallet is currently connected. */
     var isConnected: Boolean by mutableStateOf(false)
+        private set
+
+    /** Whether the connected wallet's contract has been deployed on-chain. */
+    var isDeployed: Boolean by mutableStateOf(false)
         private set
 
     /** The connected wallet's contract address (C-address), null if disconnected. */
@@ -57,11 +64,30 @@ object DemoState {
         kit = newKit
     }
 
+    fun setExternalSignerManager(manager: ExternalSignerManagerAdapter?) {
+        externalSignerManager = manager
+    }
+
+    fun setWebAuthnProvider(provider: WebAuthnProvider?) {
+        webauthnProvider = provider
+    }
+
+    fun setStorage(storageAdapter: StorageAdapter?) {
+        storage = storageAdapter
+    }
+
     fun setConnected(connected: Boolean, contract: String? = null, credential: String? = null) {
         isConnected = connected
         contractId = contract
         credentialId = credential
-        if (!connected) balance = null
+        if (!connected) {
+            balance = null
+            isDeployed = false
+        }
+    }
+
+    fun updateDeployed(deployed: Boolean) {
+        isDeployed = deployed
     }
 
     fun updateBalance(newBalance: String?) {
@@ -79,7 +105,10 @@ object DemoState {
     fun reset() {
         kit = null
         externalSignerManager = null
+        webauthnProvider = null
+        storage = null
         isConnected = false
+        isDeployed = false
         contractId = null
         credentialId = null
         balance = null

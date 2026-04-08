@@ -7,6 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
+import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.ConnectedWallet
@@ -248,7 +249,7 @@ class ConnectedWalletTest {
     }
 
     @Test
-    fun testMaxContextRuleScanId_builderPersistsValue() {
+    fun testMaxContextRuleScanId_builderDefaultValue() {
         val config = OZSmartAccountConfig.builder(
             rpcUrl = validRpcUrl,
             networkPassphrase = validPassphrase,
@@ -256,6 +257,17 @@ class ConnectedWalletTest {
             webauthnVerifierAddress = validVerifier
         ).build()
         assertEquals(50u, config.maxContextRuleScanId, "Builder default maxContextRuleScanId must be 50")
+    }
+
+    @Test
+    fun testMaxContextRuleScanId_builderCustomValue() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        ).maxContextRuleScanId(200u).build()
+        assertEquals(200u, config.maxContextRuleScanId)
     }
 
     // ========================================================================
@@ -298,7 +310,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_zeroThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 0,
@@ -309,7 +321,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_negativeThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = -1,
@@ -320,7 +332,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_zeroSignerWeight_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 1,
@@ -331,7 +343,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_negativeSignerWeight_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
                 threshold = 1,
@@ -342,7 +354,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightLessThanThreshold_throws() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         // Total weight = 30, threshold = 50 — should throw
         assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountBuilders.createWeightedThresholdParams(
@@ -354,7 +366,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightEqualsThreshold_doesNotThrow() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         val params = SmartAccountBuilders.createWeightedThresholdParams(
             threshold = 50,
             signerWeights = mapOf(signer to 50)
@@ -365,7 +377,7 @@ class ConnectedWalletTest {
 
     @Test
     fun testCreateWeightedThresholdParams_totalWeightExceedsThreshold_doesNotThrow() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress)
+        val signer = DelegatedSigner(validAccountAddress)
         val params = SmartAccountBuilders.createWeightedThresholdParams(
             threshold = 50,
             signerWeights = mapOf(signer to 100)
@@ -397,13 +409,4 @@ class ConnectedWalletTest {
         assertEquals(5, OZConstants.MAX_POLICIES)
     }
 
-    @Test
-    fun testOZConstants_maxContextRulesIs15() {
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
-    }
-
-    @Test
-    fun testOZConstants_authEntryExpirationBufferIs100() {
-        assertEquals(100, OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER)
-    }
 }

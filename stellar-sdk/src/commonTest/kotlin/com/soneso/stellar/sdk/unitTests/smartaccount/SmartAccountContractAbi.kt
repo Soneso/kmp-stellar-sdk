@@ -484,9 +484,6 @@ object SmartAccountContractAbi {
 
         /** Maximum number of signers per context rule. */
         const val MAX_SIGNERS = 15
-
-        /** Maximum number of context rules per smart account. */
-        const val MAX_CONTEXT_RULES = 15
     }
 
     // ========================================================================

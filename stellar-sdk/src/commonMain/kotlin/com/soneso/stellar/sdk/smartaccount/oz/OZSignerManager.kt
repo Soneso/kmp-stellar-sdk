@@ -74,28 +74,38 @@ data class AddPasskeySignerResult(
  * Each context rule can have up to 15 signers. Signers are identified by their on-chain
  * representation (address for delegated, verifier+key for external).
  *
+ * All state-changing methods accept an optional [selectedSigners] parameter for multi-signer
+ * authorization. When empty (default), the operation uses single-signer auth with the
+ * connected passkey. When non-empty, signatures are collected from all listed signers
+ * via [OZMultiSignerManager.submitWithMultipleSigners].
+ *
  * Example usage:
  * ```kotlin
  * val kit = OZSmartAccountKit.create(config)
  * val signerManager = kit.signerManager
  *
- * // Add a passkey signer to the Default context rule
+ * // Add a passkey signer to the Default context rule (single-signer)
  * val result = signerManager.addPasskey(
  *     contextRuleId = 0u,
- *     publicKey = secp256r1PublicKey,
- *     credentialId = webAuthnCredentialId
+ *     publicKey = secp256r1PublicKey,       // ByteArray, 65 bytes
+ *     credentialId = credentialIdBytes      // ByteArray, raw WebAuthn credential ID
  * )
  * println("Signer added: ${result.success}")
  *
- * // Add a delegated account signer
+ * // Add a delegated account signer (multi-signer)
  * val delegatedResult = signerManager.addDelegated(
  *     contextRuleId = 0u,
- *     address = "GA7QYNF7..."
+ *     address = "GA7QYNF7...",
+ *     selectedSigners = listOf(
+ *         SelectedSigner.Passkey(credentialId = cred1, credentialIdBytes = cred1Bytes, keyData = key1),
+ *         SelectedSigner.Wallet("GA7Q...")
+ *     )
  * )
  * ```
  *
  * Thread Safety:
- * This class is thread-safe. All operations are async and can be safely called from any coroutine context.
+ * This class holds no mutable state. Thread safety of operations depends on the
+ * parent [OZSmartAccountKit] instance which synchronizes connection state via Mutex.
  *
  * @property kit Reference to the parent OZSmartAccountKit instance
  */
@@ -128,6 +138,11 @@ class OZSignerManager internal constructor(
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param userName User-friendly name for the new passkey (displayed by the authenticator)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [AddPasskeySignerResult] containing the credential ID, public key, and transaction result
      * @throws WebAuthnException.NotSupported if no WebAuthnProvider is configured
      * @throws WalletException.NotConnected if no wallet is connected
@@ -147,7 +162,9 @@ class OZSignerManager internal constructor(
      */
     suspend fun addNewPasskeySigner(
         contextRuleId: UInt,
-        userName: String
+        userName: String,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): AddPasskeySignerResult {
         // Step 1: Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
@@ -172,7 +189,7 @@ class OZSignerManager internal constructor(
             )
         } catch (e: Exception) {
             throw WebAuthnException.registrationFailed(
-                "WebAuthn registration failed: ${e.message}",
+                e.message ?: "Unknown error",
                 e
             )
         }
@@ -180,7 +197,7 @@ class OZSignerManager internal constructor(
         // Step 5: Base64URL-encode credential ID for storage
         val credentialIdBase64url = Util.base64urlEncode(registrationResult.credentialId)
 
-        // Step 6: Save credential locally as pending
+        // Step 6: Save credential locally as pending (isPrimary defaults to false)
         val credential = kit.credentialManager.createPendingCredential(
             credentialId = credentialIdBase64url,
             publicKey = registrationResult.publicKey,
@@ -197,7 +214,9 @@ class OZSignerManager internal constructor(
         val transactionResult = addPasskey(
             contextRuleId = contextRuleId,
             publicKey = registrationResult.publicKey,
-            credentialId = registrationResult.credentialId
+            credentialId = registrationResult.credentialId,
+            selectedSigners = selectedSigners,
+            forceMethod = forceMethod
         )
 
         // Step 9: Return combined result
@@ -225,6 +244,11 @@ class OZSignerManager internal constructor(
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param publicKey The uncompressed secp256r1 public key (65 bytes, starting with 0x04)
      * @param credentialId The WebAuthn credential identifier
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails or transaction fails
      *
@@ -246,7 +270,9 @@ class OZSignerManager internal constructor(
     suspend fun addPasskey(
         contextRuleId: UInt,
         publicKey: ByteArray,
-        credentialId: ByteArray
+        credentialId: ByteArray,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate inputs
         kit.requireConnected()
@@ -278,7 +304,7 @@ class OZSignerManager internal constructor(
         )
 
         // Add signer via contract invocation
-        return addSigner(contextRuleId = contextRuleId, signer = signer)
+        return addSigner(contextRuleId = contextRuleId, signer = signer, selectedSigners = selectedSigners, forceMethod = forceMethod)
     }
 
     /**
@@ -299,27 +325,38 @@ class OZSignerManager internal constructor(
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param address The Stellar address (G-address for accounts, C-address for contracts)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails or transaction fails
      *
      * Example:
      * ```kotlin
-     * // Add an account signer
+     * // Add an account signer (single-signer)
      * val result = signerManager.addDelegated(
      *     contextRuleId = 0u,
      *     address = "GA7QYNF7SOWQ..."
      * )
      *
-     * // Add a contract signer
+     * // Add a contract signer (multi-signer)
      * val contractResult = signerManager.addDelegated(
      *     contextRuleId = 1u,
-     *     address = "CBCD1234..."
+     *     address = "CBCD1234...",
+     *     selectedSigners = listOf(
+     *         SelectedSigner.Passkey(credentialId = cred1, credentialIdBytes = cred1Bytes, keyData = key1),
+     *         SelectedSigner.Wallet("GA7Q...")
+     *     )
      * )
      * ```
      */
     suspend fun addDelegated(
         contextRuleId: UInt,
-        address: String
+        address: String,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate inputs
         kit.requireConnected()
@@ -328,7 +365,7 @@ class OZSignerManager internal constructor(
         val signer = DelegatedSigner(address = address)
 
         // Add signer via contract invocation
-        return addSigner(contextRuleId = contextRuleId, signer = signer)
+        return addSigner(contextRuleId = contextRuleId, signer = signer, selectedSigners = selectedSigners, forceMethod = forceMethod)
     }
 
     /**
@@ -350,6 +387,11 @@ class OZSignerManager internal constructor(
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
      * @param verifierAddress The Ed25519 verifier contract address (C-address)
      * @param publicKey The Ed25519 public key (32 bytes)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if validation fails or transaction fails
      *
@@ -369,7 +411,9 @@ class OZSignerManager internal constructor(
     suspend fun addEd25519(
         contextRuleId: UInt,
         verifierAddress: String,
-        publicKey: ByteArray
+        publicKey: ByteArray,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate inputs
         kit.requireConnected()
@@ -381,7 +425,7 @@ class OZSignerManager internal constructor(
         )
 
         // Add signer via contract invocation
-        return addSigner(contextRuleId = contextRuleId, signer = signer)
+        return addSigner(contextRuleId = contextRuleId, signer = signer, selectedSigners = selectedSigners, forceMethod = forceMethod)
     }
 
     // MARK: - Remove Signer
@@ -404,28 +448,34 @@ class OZSignerManager internal constructor(
      *
      * @param contextRuleId The context rule ID to remove the signer from
      * @param signerId The on-chain signer ID assigned by the contract (available from [ParsedContextRule.signerIds])
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if validation fails or transaction fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
      *
      * Example:
      * ```kotlin
-     * // Fetch the context rule to get signer IDs
-     * val contextRule = kit.contextRuleManager.getContextRule(contextRuleId = 0u)
-     * val signerIdToRemove = contextRule.signerIds.first()
+     * // Fetch the parsed context rule to get signer IDs
+     * val rules = kit.contextRuleManager.listContextRules()
+     * val rule = rules.first { it.id == 0u }
+     * val signerIdToRemove = rule.signerIds.first()
      *
      * val result = signerManager.removeSigner(
      *     contextRuleId = 0u,
      *     signerId = signerIdToRemove
      * )
-     *
-     * if (!result.success) {
-     *     println("Failed to remove signer: ${result.error ?: ""}")
-     * }
      * ```
      */
     suspend fun removeSigner(
         contextRuleId: UInt,
-        signerId: UInt
+        signerId: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate inputs
         val (_, contractId) = kit.requireConnected()
@@ -444,8 +494,69 @@ class OZSignerManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit via transaction operations (handles simulation, signing, submission)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
+    }
+
+    /**
+     * Removes a signer from a context rule by matching the signer value.
+     *
+     * Convenience overload that resolves the on-chain signer ID internally. Fetches the
+     * specified context rule (single RPC call), finds the matching signer by equality,
+     * and delegates to the ID-based [removeSigner]. Use this when you have the
+     * [SmartAccountSigner] object but not the numeric signer ID.
+     *
+     * @param contextRuleId The context rule ID to remove the signer from
+     * @param signer The signer to remove (matched by equality against the rule's signers)
+     * @param selectedSigners Optional list of [SelectedSigner] for multi-signer authorization.
+     * @param forceMethod Optional submission method override.
+     * @return TransactionResult indicating success or failure
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if the signer is not found on the context rule
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = kit.signerManager.removeSigner(
+     *     contextRuleId = 1u,
+     *     signer = DelegatedSigner(address = "GA7Q...")
+     * )
+     * ```
+     */
+    suspend fun removeSigner(
+        contextRuleId: UInt,
+        signer: SmartAccountSigner,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
+        // Fetch only the target context rule (single RPC call) and parse it
+        val ruleScVal = kit.contextRuleManager.getContextRule(contextRuleId)
+        val rule = kit.contextRuleManager.parseContextRule(ruleScVal)
+
+        // Find the matching signer index
+        val signerIndex = rule.signers.indexOfFirst { SmartAccountBuilders.signersEqual(it, signer) }
+        if (signerIndex == -1) {
+            throw ValidationException.invalidInput(
+                "signer",
+                "Signer not found on context rule $contextRuleId"
+            )
+        }
+
+        // Bounds check: signerIds must be aligned with signers
+        if (signerIndex >= rule.signerIds.size) {
+            throw ValidationException.invalidInput(
+                "signer",
+                "Signer found at index $signerIndex but signerIds has only ${rule.signerIds.size} entries"
+            )
+        }
+
+        val signerId = rule.signerIds[signerIndex]
+        return removeSigner(contextRuleId, signerId, selectedSigners, forceMethod)
     }
 
     // MARK: - Private Helpers
@@ -453,21 +564,27 @@ class OZSignerManager internal constructor(
     /**
      * Internal helper to add a signer to a context rule.
      *
-     * Builds the contract invocation for add_signer and submits it via transaction operations.
-     * The submit method handles simulation, authorization entry signing, and transaction submission.
+     * Builds the contract invocation for add_signer and submits it via the appropriate
+     * submission path. When [selectedSigners] is empty, uses single-signer submission.
+     * When non-empty, delegates to [OZMultiSignerManager.submitWithMultipleSigners].
      *
-     * Note: The contract returns a u32 signer ID for the newly added signer. The ID is emitted
-     * in a contract event and is accessible via [ParsedContextRule.signerIds] after fetching
-     * the context rule. It can be used with [OZSignerManager.removeSigner] to remove the signer.
+     * Note: The contract assigns a u32 signer ID to the newly added signer. This ID is not
+     * included in the [TransactionResult]. To discover it, fetch the context rule via
+     * [OZContextRuleManager.listContextRules] and read [ParsedContextRule.signerIds].
      *
      * @param contextRuleId The context rule ID
      * @param signer The signer to add
+     * @param selectedSigners List of signers for multi-signer authorization (empty for single-signer)
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws SmartAccountException if the operation fails
      */
     private suspend fun addSigner(
         contextRuleId: UInt,
-        signer: SmartAccountSigner
+        signer: SmartAccountSigner,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
@@ -487,7 +604,11 @@ class OZSignerManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit via transaction operations (handles simulation, signing, submission)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 }

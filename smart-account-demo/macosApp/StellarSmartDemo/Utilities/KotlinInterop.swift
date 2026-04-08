@@ -122,3 +122,20 @@ enum KotlinInterop {
         return "\(prefix)...\(suffix)"
     }
 }
+
+extension KotlinInterop {
+
+    // MARK: - Int Array Conversion
+
+    /// Converts a Kotlin `List<Int>` to a Swift `[Int32]` array.
+    ///
+    /// The Kotlin framework bridges `Int` values as `KotlinInt` (NSNumber subclass) in Swift.
+    /// This helper extracts the `.int32Value` from each element.
+    ///
+    /// - Parameter kotlinList: The value returned from a Kotlin bridge method.
+    /// - Returns: A Swift array of `Int32` values.
+    static func toIntArray(_ kotlinList: Any?) -> [Int32] {
+        guard let nsArray = kotlinList as? NSArray else { return [] }
+        return (0..<nsArray.count).compactMap { (nsArray[$0] as? NSNumber)?.int32Value }
+    }
+}

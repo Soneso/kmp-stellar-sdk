@@ -8,7 +8,8 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
-import com.soneso.stellar.sdk.currentTimeMillis
+import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
@@ -34,8 +35,6 @@ import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import io.ktor.client.request.get
-import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 
 /**
@@ -50,7 +49,7 @@ import kotlinx.coroutines.delay
  * val result = txOps.transfer(
  *     tokenContract = "CBCD...",
  *     recipient = "GA7Q...",
- *     amount = 10.0
+ *     amount = "10"
  * )
  *
  * if (result.success) {
@@ -159,28 +158,29 @@ class OZTransactionOperations internal constructor(
     /**
      * Transfers tokens from the smart account to a recipient.
      *
-     * Builds and submits a token transfer transaction from the connected smart account
-     * to the specified recipient. The amount is automatically converted from XLM to stroops.
+     * Works with any SEP-41 compatible token (XLM via SAC, custom Soroban tokens).
+     * The amount is a decimal string converted to stroops (7 decimal places) internally.
      *
      * Flow:
-     * 1. Validates inputs (addresses, amount, not sending to self)
-     * 2. Converts amount to stroops (1 XLM = 10,000,000 stroops)
-     * 3. Builds contract invocation for token transfer
-     * 4. Simulates transaction to get auth entries
-     * 5. Signs auth entries with passkey (requires user interaction)
-     * 6. Re-simulates with signed auth entries
-     * 7. Submits via relayer (if configured) or RPC
-     * 8. Polls for confirmation
+     * 1. Validates recipient address and prevents self-transfer
+     * 2. Converts amount to stroops using BigInteger arithmetic
+     * 3. Delegates to [contractCall] which builds the host function, simulates,
+     *    signs auth entries via WebAuthn, re-simulates, and submits
      *
      * IMPORTANT: This method requires WebAuthn interaction to sign auth entries.
      * The user will be prompted for biometric authentication.
      *
-     * @param tokenContract The token contract address (C-address)
+     * @param tokenContract The token contract address (C-address). Use the SAC address
+     *   for XLM or the token's contract address for custom tokens.
      * @param recipient The recipient address (G-address for accounts, C-address for contracts)
-     * @param amount The amount to transfer in XLM (will be converted to stroops)
+     * @param amount Decimal amount string (e.g., "10", "100.5"). Converted to stroops automatically.
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if validation fails, simulation fails, or submission fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if recipient address is invalid or same as smart account
+     * @throws IllegalArgumentException if amount is not a valid positive decimal
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
      *
      * Example:
      * ```kotlin
@@ -191,7 +191,7 @@ class OZTransactionOperations internal constructor(
      * )
      *
      * if (result.success) {
-     *     println("Transferred 10.5 XLM. Hash: ${result.hash ?: ""}")
+     *     println("Transferred. Hash: ${result.hash ?: ""}")
      * } else {
      *     println("Transfer failed: ${result.error ?: ""}")
      * }
@@ -203,16 +203,10 @@ class OZTransactionOperations internal constructor(
         amount: String,
         forceMethod: SubmissionMethod? = null
     ): TransactionResult {
-        // STEP 1: Validate inputs
         val (_, contractId) = kit.requireConnected()
 
-        // Validate token contract address (must be C-address)
-        requireContractAddress(tokenContract, "tokenContract")
-
-        // Validate recipient address (G or C)
         requireStellarAddress(recipient, "recipient")
 
-        // Prevent self-transfer
         if (recipient == contractId) {
             throw ValidationException.invalidInput(
                 "recipient",
@@ -220,35 +214,77 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        // STEP 2: Convert amount to stroops — validates non-empty and positive
         val stroops = Util.amountToStroops(amount)
 
-        // STEP 3: Build host function for token transfer
-        // Contract call: token.transfer(from: smartAccount, to: recipient, amount: stroops)
-        val fromAddress = Address(contractId).toSCAddress()
-        val toAddress = Address(recipient).toSCAddress()
-
-        val amountScVal = Util.stroopsToI128ScVal(stroops)
-
-        val functionArgs = listOf(
-            Scv.toAddress(fromAddress),
-            Scv.toAddress(toAddress),
-            amountScVal
+        val targetArgs = listOf(
+            Scv.toAddress(Address(contractId).toSCAddress()),
+            Scv.toAddress(Address(recipient).toSCAddress()),
+            Util.stroopsToI128ScVal(stroops)
         )
 
+        return contractCall(
+            target = tokenContract,
+            targetFn = "transfer",
+            targetArgs = targetArgs,
+            forceMethod = forceMethod
+        )
+    }
+
+    // MARK: - Direct Contract Call
+
+    /**
+     * Calls an arbitrary function on an external contract directly from the smart account.
+     *
+     * Builds a host function that invokes `target.targetFn(targetArgs)` directly (not through
+     * the smart account's `execute()` entry point). The smart account authorizes the call via
+     * `require_auth` triggered by the target contract. Context rules of type
+     * `CallContract(target)` are matched for authorization.
+     *
+     * Use this for any external contract interaction (e.g., token approve, token transfer,
+     * DeFi protocol calls) where the smart account is the authorized party.
+     *
+     * For the multi-signer equivalent, see [OZMultiSignerManager.multiSignerContractCall].
+     *
+     * @param target The contract address (C-address) to call.
+     * @param targetFn The function name to invoke on the target contract.
+     * @param targetArgs Pre-encoded SCVal arguments for the function.
+     * @param forceMethod Optional override to force relayer or RPC submission.
+     * @param resolveContextRuleIds Optional callback to resolve context rule IDs per auth entry.
+     * @return TransactionResult indicating success or failure.
+     * @throws SmartAccountException if validation fails, simulation fails, or submission fails.
+     */
+    suspend fun contractCall(
+        target: String,
+        targetFn: String,
+        targetArgs: List<SCValXdr> = emptyList(),
+        forceMethod: SubmissionMethod? = null,
+        resolveContextRuleIds: ResolveContextRuleIds? = null
+    ): TransactionResult {
+        kit.requireConnected()
+
+        requireContractAddress(target, "target")
+
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
+
         val invokeArgs = InvokeContractArgsXdr(
-            contractAddress = Address(tokenContract).toSCAddress(),
-            functionName = SCSymbolXdr("transfer"),
-            args = functionArgs
+            contractAddress = Address(target).toSCAddress(),
+            functionName = SCSymbolXdr(targetFn),
+            args = targetArgs
         )
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // STEP 4-8: Submit the transaction (will handle simulation, signing, and polling)
-        return submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        return submit(
+            hostFunction = hostFunction,
+            auth = emptyList(),
+            forceMethod = forceMethod,
+            resolveContextRuleIds = resolveContextRuleIds
+        )
     }
 
-    // MARK: - Execute Arbitrary Contract Function
+    // MARK: - Execute (Smart-Account Mediated Call)
 
     /**
      * Executes an arbitrary contract function call through the smart account's execute entry point.
@@ -282,6 +318,10 @@ class OZTransactionOperations internal constructor(
 
         // Validate target address (must be C-address)
         requireContractAddress(target, "target")
+
+        if (targetFn.isBlank()) {
+            throw ValidationException.invalidInput("targetFn", "Function name cannot be empty")
+        }
 
         // Build the execute invocation on the smart account contract
         val functionArgs = listOf(
@@ -318,28 +358,16 @@ class OZTransactionOperations internal constructor(
      *
      * Flow:
      * 1. Require connected wallet (credential ID + contract ID)
-     * 2. Get deployer account from kit
-     * 3. Build transaction with host function and provided auth (may be empty)
-     * 4. Simulate transaction to discover required auth entries
-     * 5. Extract auth entries from simulation result
-     * 6. For each auth entry matching our contract:
-     *    a. Build auth payload hash
-     *    b. Require WebAuthn provider
-     *    c. Decode credential ID bytes
-     *    d. Resolve key data from storage or on-chain context rules
-     *    e. Build ExternalSigner for context rule resolution
-     *    f. Resolve context rule IDs via contextRuleManager
-     *    g. Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
-     *    h. Authenticate with WebAuthn using auth digest as challenge
-     *    i. Normalize signature to low-S compact format
-     *    j. Build WebAuthn signature ScVal
-     *    k. Attach signature and context rule IDs to the auth entry
-     * 7. Update transaction with signed auth entries
-     * 8. Re-simulate to get correct resource fees
-     * 9. Assemble transaction from re-simulation
-     * 10. Conditionally sign envelope with deployer keypair
-     * 11. Determine submission mode (relayer vs RPC)
-     * 12. Submit and poll for confirmation
+     * 2. Build and simulate the transaction to discover required auth entries
+     * 3. For each auth entry matching the smart account contract:
+     *    - Build the auth payload hash from the entry's nonce and invocation
+     *    - Resolve context rule IDs (automatic or via callback)
+     *    - Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
+     *    - Authenticate with WebAuthn using the auth digest as challenge
+     *    - Normalize signature and attach to the auth entry
+     * 4. Rebuild transaction with signed auth entries and re-simulate
+     * 5. Assemble, optionally sign with deployer, and submit via relayer or RPC
+     * 6. Poll for on-chain confirmation
      *
      * ## Fee Sponsoring and Deployer Signing
      *
@@ -371,7 +399,11 @@ class OZTransactionOperations internal constructor(
      *   available context rules. Provide a callback when automatic resolution is ambiguous or to
      *   bypass auto-resolution entirely.
      * @return TransactionResult indicating success or failure
-     * @throws SmartAccountException if submission, simulation, signing, or polling fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if configuration is invalid
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
+     * @throws CredentialException if credential lookup fails during signing
      *
      * @see shouldUseRelayerMode2 for mode selection logic
      */
@@ -393,10 +425,10 @@ class OZTransactionOperations internal constructor(
         val operation = InvokeHostFunctionOperation(hostFunction, auth)
 
         val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         // STEP 4: Simulate transaction
@@ -414,7 +446,7 @@ class OZTransactionOperations internal constructor(
         val signedAuthEntries = if (simulatedAuthEntries.isNotEmpty()) {
             // Get latest ledger ONCE before the signing loop
             val latestLedger = kit.sorobanServer.getLatestLedger()
-            val expiration = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+            val expiration = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
 
             // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
             val contextRules = kit.contextRuleManager.listContextRules()
@@ -528,6 +560,15 @@ class OZTransactionOperations internal constructor(
             emptyList()
         }
 
+        // Update lastUsedAt timestamp after successful signing (once per transaction)
+        if (signedAuthEntries.isNotEmpty()) {
+            try {
+                kit.credentialManager.updateLastUsed(credentialId)
+            } catch (_: Exception) {
+                // Non-critical — credential tracking is best-effort
+            }
+        }
+
         // Emit transaction signed event
         kit.events.emit(
             SmartAccountEvent.TransactionSigned(
@@ -542,10 +583,10 @@ class OZTransactionOperations internal constructor(
         val refreshedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(refreshedDeployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         // STEP 10: Re-simulate with signed auth entries to get correct resource fees
@@ -587,8 +628,9 @@ class OZTransactionOperations internal constructor(
      *
      * @param hostFunction The host function for the token transfer
      * @param signedAuthEntries Auth entries with all collected signatures
-     * @param signedTransaction The transaction with signed auth entries (pre-assembly)
+     * @param signedTransaction The transaction containing signed authorization entries, prior to assembly and envelope signing
      * @param simulation The re-simulation response for transaction assembly
+     * @param forceMethod Override the submission method. Null uses the default (relayer if configured, otherwise RPC).
      * @return TransactionResult with submission outcome
      * @throws SmartAccountException if submission fails
      */
@@ -596,7 +638,8 @@ class OZTransactionOperations internal constructor(
         hostFunction: HostFunctionXdr,
         signedAuthEntries: List<SorobanAuthorizationEntryXdr>,
         signedTransaction: Transaction,
-        simulation: SimulateTransactionResponse
+        simulation: SimulateTransactionResponse,
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val deployer = kit.getDeployer()
 
@@ -604,10 +647,7 @@ class OZTransactionOperations internal constructor(
         // This correctly applies resource fees, footprint, and soroban data from simulation.
         val finalTransaction = kit.sorobanServer.prepareTransaction(signedTransaction, simulation)
 
-        // submitMultiSignerTransaction intentionally uses relayerClient presence directly
-        // rather than getSubmissionMethod(), because multi-signer transfers do not support
-        // forceMethod override.
-        val useRelayer = kit.relayerClient != null
+        val useRelayer = getSubmissionMethod(forceMethod) == SubmissionMethod.RELAYER
 
         return submitOrRelay(
             transaction = finalTransaction,
@@ -663,7 +703,9 @@ class OZTransactionOperations internal constructor(
      * @param nativeTokenContract The native token (XLM) contract address (C-address)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return The amount funded in XLM
-     * @throws SmartAccountException if funding fails at any step
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if the contract address is invalid
+     * @throws TransactionException if any step of the funding flow fails
      *
      * Example:
      * ```kotlin
@@ -763,10 +805,10 @@ class OZTransactionOperations internal constructor(
 
         // STEP 7: Simulate to get auth entries
         val transaction = TransactionBuilder(tempAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
@@ -781,7 +823,7 @@ class OZTransactionOperations internal constructor(
         // STEP 8: Convert source_account auth entries to Address credentials.
         // This allows the Relayer to use its own channel accounts for fee sponsoring.
         val latestLedger = kit.sorobanServer.getLatestLedger()
-        val expirationLedger = latestLedger.sequence.toUInt() + OZConstants.AUTH_ENTRY_EXPIRATION_BUFFER.toUInt()
+        val expirationLedger = latestLedger.sequence.toUInt() + Util.LEDGERS_PER_HOUR.toUInt()
 
         val signedAuthEntries = convertAndSignAuthEntries(
             authEntries = simulatedAuthEntries,
@@ -795,10 +837,10 @@ class OZTransactionOperations internal constructor(
 
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(tempAccountRefresh, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(signedOperation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
@@ -863,10 +905,10 @@ class OZTransactionOperations internal constructor(
         val operation = InvokeHostFunctionOperation(hostFunction, emptyList())
 
         val transaction = TransactionBuilder(deployerAccount, Network(kit.config.networkPassphrase))
-            .setBaseFee(100)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .addOperation(operation)
             .addMemo(MemoNone)
-            .setTimeout(300)
+            .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
@@ -909,7 +951,7 @@ class OZTransactionOperations internal constructor(
             // For source_account credentials, convert to Address credentials
             if (credType is SorobanCredentialsXdr.Void) {
                 // Generate a nonce for the new Address credential
-                val nonce = Int64Xdr(currentTimeMillis())
+                val nonce = Int64Xdr(generateNonce())
 
                 // Build auth payload hash
                 val payloadHash = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
@@ -922,7 +964,9 @@ class OZTransactionOperations internal constructor(
                 // Sign with temp keypair
                 val signature = tempKeypair.sign(payloadHash)
 
-                // Create signature map and vec
+                // Standard Ed25519 format: Vec([Map({public_key, signature})]).
+                // This is for a classical Stellar account (temp keypair), NOT the smart
+                // account's AuthPayload format. Do not merge with the AuthPayload path.
                 val signatureMapScVal = Scv.toMap(linkedMapOf(
                     Scv.toSymbol("public_key") to Scv.toBytes(tempKeypair.getPublicKey()),
                     Scv.toSymbol("signature") to Scv.toBytes(signature)
@@ -1173,8 +1217,8 @@ class OZTransactionOperations internal constructor(
     /**
      * Polls for transaction confirmation using the SDK's [SorobanServer.pollTransaction].
      *
-     * Uses 30 attempts with 3-second intervals (~90 seconds total) to account for
-     * testnet ledger close times and potential congestion.
+     * Uses 30 attempts with 3-second intervals to account for ledger close
+     * times and potential congestion.
      *
      * @param hash The transaction hash to poll
      * @return TransactionResult indicating success or failure
@@ -1190,12 +1234,12 @@ class OZTransactionOperations internal constructor(
             GetTransactionStatus.SUCCESS -> TransactionResult(
                 success = true,
                 hash = hash,
-                ledger = txResponse.latestLedger?.toUInt()
+                ledger = txResponse.ledger?.toUInt()
             )
             GetTransactionStatus.FAILED -> TransactionResult(
                 success = false,
                 hash = hash,
-                ledger = txResponse.latestLedger?.toUInt(),
+                ledger = txResponse.ledger?.toUInt(),
                 error = txResponse.resultXdr ?: "Transaction failed on-chain"
             )
             GetTransactionStatus.NOT_FOUND -> TransactionResult(
@@ -1204,5 +1248,18 @@ class OZTransactionOperations internal constructor(
                 error = "Transaction not confirmed after 30 polling attempts"
             )
         }
+    }
+
+    /**
+     * Generates a cryptographically random nonce for authorization credentials.
+     * Uses 8 bytes from the platform CSPRNG, interpreted as a signed 64-bit integer.
+     */
+    private suspend fun generateNonce(): Long {
+        val randomBytes = getEd25519Crypto().generatePrivateKey()
+        var nonce = 0L
+        for (i in 0..7) {
+            nonce = (nonce shl 8) or (randomBytes[i].toLong() and 0xFF)
+        }
+        return nonce
     }
 }

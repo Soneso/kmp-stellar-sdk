@@ -612,7 +612,8 @@ object SmartAccountUtils {
      * @param networkPassphrase Network passphrase (e.g., "Test SDF Network ; September 2015")
      * @return Contract address as a C-address (StrKey encoded)
      * @throws ValidationException.InvalidAddress if the deployer public key is invalid
-     * @throws TransactionException.SigningFailed if XDR encoding fails
+     * @throws ValidationException.InvalidInput if contract ID encoding fails
+     * @throws TransactionException.SigningFailed if hash computation fails
      *
      * Example:
      * ```kotlin
@@ -685,8 +686,9 @@ object SmartAccountUtils {
         return try {
             StrKey.encodeContract(contractIdBytes)
         } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to encode contract ID",
+            throw ValidationException.invalidInput(
+                "contractId",
+                "Failed to encode contract ID: ${e.message}",
                 e
             )
         }

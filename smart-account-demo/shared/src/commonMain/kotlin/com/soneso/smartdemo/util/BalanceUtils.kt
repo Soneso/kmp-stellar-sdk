@@ -88,7 +88,7 @@ suspend fun fetchDemoBalance(walletContractId: String): String {
 /**
  * Refreshes both XLM and DEMO balances for [walletContractId] and updates [DemoState].
  *
- * Fetches XLM via SAC and DEMO via ContractClient concurrently. XLM errors propagate;
+ * Fetches XLM via SAC and DEMO via ContractClient sequentially. XLM errors propagate;
  * DEMO errors silently fall back to "0.0" (contract may not be deployed yet).
  */
 suspend fun refreshAllBalances(walletContractId: String) {

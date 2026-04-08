@@ -60,13 +60,19 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.soneso.smartdemo.flows.buildSelectedSigners
+import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
+import com.soneso.smartdemo.flows.loadAvailableSigners
 import com.soneso.smartdemo.flows.loadContextRules
+import com.soneso.smartdemo.flows.registerDelegatedKeypairs
 import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.ui.components.SignerPickerDialog
 import com.soneso.smartdemo.util.describeSignerType
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
@@ -91,6 +97,12 @@ class ContextRulesScreen : Screen {
         var ruleToRemove by remember { mutableStateOf<ParsedContextRule?>(null) }
         var isRemoving by remember { mutableStateOf(false) }
 
+        // Multi-signer state for rule removal
+        var availableSigners by remember { mutableStateOf<List<SmartAccountSigner>>(emptyList()) }
+        var signersLoaded by remember { mutableStateOf(false) }
+        var showRemoveSignerPicker by remember { mutableStateOf(false) }
+        var ruleToRemoveWithSigners by remember { mutableStateOf<ParsedContextRule?>(null) }
+
         // Fetch rules on screen load
         LaunchedEffect(Unit) {
             if (DemoState.isConnected && DemoState.kit != null) {
@@ -104,6 +116,19 @@ class ContextRulesScreen : Screen {
                     ActivityLogState.error("Failed to fetch context rules: $msg")
                 } finally {
                     isLoading = false
+                }
+            }
+        }
+
+        // Load available signers for multi-signer remove authorization
+        LaunchedEffect(DemoState.isConnected, DemoState.kit) {
+            if (DemoState.isConnected && DemoState.kit != null) {
+                try {
+                    val signerInfos = loadAvailableSigners()
+                    availableSigners = signerInfos.map { it.signer }
+                    signersLoaded = true
+                } catch (_: Exception) {
+                    signersLoaded = true
                 }
             }
         }
@@ -124,29 +149,41 @@ class ContextRulesScreen : Screen {
                         onClick = {
                             val rule = ruleToRemove!!
                             ruleToRemove = null
-                            scope.launch {
-                                isRemoving = true
-                                try {
-                                    val result = removeContextRule(rule.id)
-                                    if (result.success) {
-                                        isLoading = true
-                                        errorMessage = null
-                                        try {
-                                            rules = loadContextRules()
-                                        } catch (e: Throwable) {
-                                            errorMessage = "Failed to refresh rules: ${e.message ?: "Unknown error"}"
-                                        } finally {
-                                            isLoading = false
+
+                            // Check if multi-signer authorization is needed
+                            val needsMultiSigner = signersLoaded &&
+                                availableSigners.size > 1 &&
+                                !isSinglePasskeyTransfer(availableSigners)
+
+                            if (needsMultiSigner) {
+                                ruleToRemoveWithSigners = rule
+                                showRemoveSignerPicker = true
+                            } else {
+                                // Single-signer path: remove directly
+                                scope.launch {
+                                    isRemoving = true
+                                    try {
+                                        val result = removeContextRule(rule.id)
+                                        if (result.success) {
+                                            isLoading = true
+                                            errorMessage = null
+                                            try {
+                                                rules = loadContextRules()
+                                            } catch (e: Throwable) {
+                                                errorMessage = "Failed to refresh rules: ${e.message ?: "Unknown error"}"
+                                            } finally {
+                                                isLoading = false
+                                            }
+                                        } else {
+                                            errorMessage = "Failed to remove rule: ${result.error ?: "Unknown error"}"
                                         }
-                                    } else {
-                                        errorMessage = "Failed to remove rule: ${result.error ?: "Unknown error"}"
+                                    } catch (e: Throwable) {
+                                        val msg = e.message ?: "Unknown error"
+                                        errorMessage = "Failed to remove rule: $msg"
+                                        ActivityLogState.error("Failed to remove rule: $msg")
+                                    } finally {
+                                        isRemoving = false
                                     }
-                                } catch (e: Throwable) {
-                                    val msg = e.message ?: "Unknown error"
-                                    errorMessage = "Failed to remove rule: $msg"
-                                    ActivityLogState.error("Failed to remove rule: $msg")
-                                } finally {
-                                    isRemoving = false
                                 }
                             }
                         }
@@ -157,6 +194,69 @@ class ContextRulesScreen : Screen {
                 dismissButton = {
                     TextButton(onClick = { ruleToRemove = null }) {
                         Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Signer picker for multi-signer rule removal
+        if (showRemoveSignerPicker && ruleToRemoveWithSigners != null) {
+            SignerPickerDialog(
+                isOpen = true,
+                onDismiss = {
+                    showRemoveSignerPicker = false
+                    ruleToRemoveWithSigners = null
+                },
+                availableSigners = availableSigners,
+                activeCredentialId = DemoState.credentialId,
+                title = "Select Signers",
+                description = "Choose which signers co-authorize removing this context rule. " +
+                    "For Stellar account signers, enter the secret key to enable signing.",
+                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                    showRemoveSignerPicker = false
+                    val rule = ruleToRemoveWithSigners!!
+                    ruleToRemoveWithSigners = null
+
+                    scope.launch {
+                        isRemoving = true
+                        try {
+                            val selected = if (isSinglePasskeyTransfer(selectedSigners)) {
+                                emptyList()
+                            } else {
+                                registerDelegatedKeypairs(delegatedKeyPairs)
+                                buildSelectedSigners(selectedSigners)
+                            }
+
+                            ActivityLogState.info(
+                                "Removing context rule #${rule.id} with multi-signer authorization " +
+                                    "(${if (selected.isEmpty()) "single-signer" else "${selected.size} signer(s)"})"
+                            )
+
+                            val result = removeContextRule(rule.id, selected)
+                            if (result.success) {
+                                isLoading = true
+                                errorMessage = null
+                                try {
+                                    rules = loadContextRules()
+                                } catch (e: Throwable) {
+                                    errorMessage = "Failed to refresh rules: ${e.message ?: "Unknown error"}"
+                                } finally {
+                                    isLoading = false
+                                }
+                            } else {
+                                errorMessage = "Failed to remove rule: ${result.error ?: "Unknown error"}"
+                            }
+                        } catch (e: Throwable) {
+                            val msg = e.message ?: "Unknown error"
+                            if (isUserCancellation(msg)) {
+                                errorMessage = "Passkey authentication cancelled"
+                            } else {
+                                errorMessage = "Failed to remove rule: $msg"
+                                ActivityLogState.error("Failed to remove rule: $msg")
+                            }
+                        } finally {
+                            isRemoving = false
+                        }
                     }
                 }
             )

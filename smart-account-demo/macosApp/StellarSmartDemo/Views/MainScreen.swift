@@ -17,6 +17,10 @@ import shared
 /// credential ID, balances, and navigation buttons). An activity log section is always
 /// visible below the wallet status card.
 ///
+/// When a wallet is connected but not yet deployed on-chain, a warning card is shown
+/// with a "Deploy Now" button. Navigation buttons for features that require an on-chain
+/// contract (Transfer, Context Rules, Account Signers) are disabled until deployment.
+///
 /// SDK initialization runs once via `.task` on first appear. After every bridge operation
 /// `appState.sync(from:)` is called on the `MainActor` to propagate Kotlin state changes
 /// into the observable SwiftUI state.
@@ -35,6 +39,8 @@ struct MainScreen: View {
 
     @State private var isRefreshingBalance = false
     @State private var hasInitialized = false
+    @State private var isDeploying = false
+    @State private var deployErrorMessage: String? = nil
 
     // MARK: - Init
 
@@ -177,57 +183,67 @@ struct MainScreen: View {
             Divider()
                 .background(Material3Colors.onPrimaryContainer.opacity(0.15))
 
-            // Balances + Refresh
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Balance")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(Material3Colors.onPrimaryContainer.opacity(0.7))
+            // Undeployed warning card
+            if !appState.isDeployed {
+                undeployedWarningCard
 
-                    Text("\(appState.xlmBalance ?? "Loading...") XLM")
-                        .font(.callout)
-                        .fontWeight(.bold)
-                        .foregroundColor(Material3Colors.onPrimaryContainer)
-
-                    Text("\(appState.demoTokenBalance ?? "0.0") DEMO")
-                        .font(.callout)
-                        .fontWeight(.bold)
-                        .foregroundColor(Material3Colors.onPrimaryContainer)
-                }
-
-                Spacer()
-
-                Button(action: refreshBalance) {
-                    HStack(spacing: 6) {
-                        if isRefreshingBalance {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(Material3Colors.primary)
-                            Text("Refreshing...")
-                                .font(.caption)
-                                .foregroundColor(Material3Colors.primary)
-                        } else {
-                            Text("Refresh")
-                                .font(.caption)
-                                .foregroundColor(Material3Colors.primary)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Material3Colors.primary, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isRefreshingBalance)
-                .opacity(isRefreshingBalance ? 0.5 : 1.0)
+                Divider()
+                    .background(Material3Colors.onPrimaryContainer.opacity(0.15))
             }
 
-            Divider()
-                .background(Material3Colors.onPrimaryContainer.opacity(0.15))
-                .padding(.top, 4)
+            // Balances + Refresh (only when deployed)
+            if appState.isDeployed {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Balance")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(Material3Colors.onPrimaryContainer.opacity(0.7))
+
+                        Text("\(appState.xlmBalance ?? "Loading...") XLM")
+                            .font(.callout)
+                            .fontWeight(.bold)
+                            .foregroundColor(Material3Colors.onPrimaryContainer)
+
+                        Text("\(appState.demoTokenBalance ?? "0.0") DEMO")
+                            .font(.callout)
+                            .fontWeight(.bold)
+                            .foregroundColor(Material3Colors.onPrimaryContainer)
+                    }
+
+                    Spacer()
+
+                    Button(action: refreshBalance) {
+                        HStack(spacing: 6) {
+                            if isRefreshingBalance {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Material3Colors.primary)
+                                Text("Refreshing...")
+                                    .font(.caption)
+                                    .foregroundColor(Material3Colors.primary)
+                            } else {
+                                Text("Refresh")
+                                    .font(.caption)
+                                    .foregroundColor(Material3Colors.primary)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Material3Colors.primary, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRefreshingBalance)
+                    .opacity(isRefreshingBalance ? 0.5 : 1.0)
+                }
+
+                Divider()
+                    .background(Material3Colors.onPrimaryContainer.opacity(0.15))
+                    .padding(.top, 4)
+            }
 
             // Navigation buttons
             VStack(spacing: 8) {
@@ -237,46 +253,116 @@ struct MainScreen: View {
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
-                            .foregroundColor(.white)
-                            .background(Material3Colors.primary)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
 
                     NavigationLink(destination: TransferScreen(toastManager: toastManager)) {
                         Text("Transfer")
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
-                            .foregroundColor(.white)
-                            .background(Material3Colors.primary)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
                 }
 
-                NavigationLink(destination: KnownSignersScreen(toastManager: toastManager)) {
-                    Text("Account Signers")
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .foregroundColor(.white)
-                        .background(Material3Colors.primary)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
+                HStack(spacing: 8) {
+                    NavigationLink(destination: ApproveScreen(toastManager: toastManager)) {
+                        Text("Approve")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
 
-                // Disconnect — outlined with error-ish styling
+                    NavigationLink(destination: KnownSignersScreen(toastManager: toastManager)) {
+                        Text("Account Signers")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .foregroundColor(appState.isDeployed ? .white : .gray)
+                            .background(appState.isDeployed ? Material3Colors.primary : Color.gray.opacity(0.3))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!appState.isDeployed)
+                }
+
+                // Disconnect -- outlined with error-ish styling (disabled during deployment)
                 LoadingButton(
                     action: disconnectWallet,
                     isLoading: false,
-                    isEnabled: true,
+                    isEnabled: !isDeploying,
                     text: "Disconnect",
                     loadingText: "Disconnecting...",
                     style: .outlined
                 )
             }
         }
+    }
+
+    // MARK: - Undeployed Warning Card
+
+    private var undeployedWarningCard: some View {
+        let warningColor = Color(red: 0.902, green: 0.318, blue: 0.000) // Orange 900
+        let warningBg = Color(red: 1.0, green: 0.953, blue: 0.878) // Orange 50
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Wallet Not Deployed")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(warningColor)
+
+            Text(
+                "Your passkey is registered but the smart account contract has not been " +
+                "deployed to the network. Deploy it to start using your wallet."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(warningColor)
+
+            if let error = deployErrorMessage {
+                Text(error)
+                    .font(.system(size: 12))
+                    .foregroundColor(Material3Colors.error)
+            }
+
+            if isDeploying {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(warningColor)
+                    Text("Deploying contract...")
+                        .font(.system(size: 13))
+                        .foregroundColor(warningColor)
+                }
+            }
+
+            Button(action: deployFromMainScreen) {
+                Text(isDeploying ? "Deploying..." : "Deploy Now")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .foregroundColor(.white)
+                    .background(isDeploying ? warningColor.opacity(0.5) : warningColor)
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeploying)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(warningBg)
+        .cornerRadius(8)
     }
 
     // MARK: - Activity Log Section
@@ -348,6 +434,38 @@ struct MainScreen: View {
             }
             await MainActor.run {
                 appState.sync(from: bridge)
+            }
+        }
+    }
+
+    private func deployFromMainScreen() {
+        guard let credentialId = appState.credentialId else { return }
+        let bridge = bridgeWrapper.bridge
+        isDeploying = true
+        deployErrorMessage = nil
+
+        Task {
+            do {
+                let result = try await bridge.deployPendingAndProvision(
+                    credentialId: credentialId,
+                    onProgress: { _ in }
+                )
+                await MainActor.run {
+                    appState.sync(from: bridge)
+                    if !result.success {
+                        deployErrorMessage = "Deployment failed: \(result.error ?? "Unknown error")"
+                    }
+                    isDeploying = false
+                    if result.success {
+                        toastManager.show("Wallet deployed successfully")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    deployErrorMessage = "Deployment failed: \(error.localizedDescription)"
+                    isDeploying = false
+                    appState.syncActivityLog(from: bridge)
+                }
             }
         }
     }

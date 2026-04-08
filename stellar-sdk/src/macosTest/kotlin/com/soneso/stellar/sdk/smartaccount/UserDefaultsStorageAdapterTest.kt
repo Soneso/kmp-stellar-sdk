@@ -364,6 +364,17 @@ class UserDefaultsStorageAdapterTest {
     // MARK: - Credential: Get by Contract ID
 
     @Test
+    fun testGetByContractExcludesNullContractId() = runTest {
+        val adapter = newAdapter()
+        // Save credentials with null contractId — they must not appear in getByContract results
+        adapter.save(minimalCredential("cred-no-contract-1"))
+        adapter.save(minimalCredential("cred-no-contract-2"))
+
+        val result = adapter.getByContract("someContract")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
     fun testGetByContractIdReturnsMatchingCredentials() = runTest {
         val adapter = newAdapter()
         val contractA = "CAAA1234AAAA5678AAAA9012AAAA3456AAAA7890AAAA1234AAAA5678"
@@ -393,6 +404,25 @@ class UserDefaultsStorageAdapterTest {
         assertTrue(result.isEmpty())
     }
 
+    @Test
+    fun testUpdateIsPrimaryFalseToTrue() = runTest {
+        val adapter = newAdapter()
+        val credential = minimalCredential("cred-primary-upgrade")
+        // minimalCredential sets isPrimary = false
+        assertEquals(false, credential.isPrimary)
+        adapter.save(credential)
+
+        adapter.update("cred-primary-upgrade", StoredCredentialUpdate(isPrimary = true))
+
+        val updated = adapter.get("cred-primary-upgrade")
+        assertNotNull(updated)
+        assertEquals(true, updated.isPrimary)
+        // Other fields remain unchanged
+        assertEquals("cred-primary-upgrade", updated.credentialId)
+        assertNull(updated.contractId)
+        assertEquals(CredentialDeploymentStatus.PENDING, updated.deploymentStatus)
+    }
+
     // MARK: - Credential: Clear
 
     @Test
@@ -417,6 +447,23 @@ class UserDefaultsStorageAdapterTest {
         // Should not throw
         adapter.clear()
         assertTrue(adapter.getAll().isEmpty())
+    }
+
+    @Test
+    fun testClearAlsoRemovesSession() = runTest {
+        val adapter = newAdapter()
+        adapter.save(fullCredential("cred-with-session"))
+        adapter.saveSession(StoredSession(
+            credentialId = "cred-with-session",
+            contractId = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234YZAB5678",
+            connectedAt = 1700000000000L,
+            expiresAt = Long.MAX_VALUE
+        ))
+
+        adapter.clear()
+
+        assertTrue(adapter.getAll().isEmpty(), "clear() must remove all credentials")
+        assertNull(adapter.getSession(), "clear() must also remove the active session")
     }
 
     // MARK: - Session: Save and Retrieve

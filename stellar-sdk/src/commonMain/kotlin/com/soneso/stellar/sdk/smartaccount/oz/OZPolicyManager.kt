@@ -48,21 +48,26 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  *     threshold = 100u
  * )
  *
- * // Create a spending limit (1000 XLM per day)
+ * // Create a spending limit (1000 tokens per day, in stroops)
  * val spendingPolicy = PolicyInstallParams.SpendingLimit(
- *     spendingLimit = BigInteger.fromLong(1000L * 10_000_000L), // Convert XLM to stroops
+ *     spendingLimit = Util.amountToStroops("1000"),
  *     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
  * )
  * ```
+ *
+ * Note: For most use cases, prefer the convenience methods on [OZPolicyManager]
+ * (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) which handle
+ * parameter encoding internally. Use these sealed class variants directly only when
+ * calling [OZPolicyManager.addPolicy] with custom parameters.
  */
 sealed class PolicyInstallParams {
     /**
-     * Simple threshold policy requiring exactly M-of-N signers to authorize.
+     * Simple threshold policy requiring at least M-of-N signers to authorize.
      *
      * All signers in the context rule have equal weight (1 vote each).
-     * The threshold specifies how many signers must approve.
+     * The threshold specifies the minimum number of signers that must approve.
      *
-     * @property threshold Number of signers required to authorize (1 to signer count)
+     * @property threshold Number of signers required to authorize (must be > 0)
      */
     data class SimpleThreshold(
         val threshold: UInt
@@ -74,8 +79,12 @@ sealed class PolicyInstallParams {
          * Keys are in alphabetical order (required for contract compatibility).
          *
          * @return SCVal map with installation parameters
+         * @throws ValidationException if threshold is zero
          */
         internal fun toScVal(): SCValXdr {
+            if (threshold == 0u) {
+                throw ValidationException.invalidInput("threshold", "Threshold must be greater than zero")
+            }
             // Map with alphabetically sorted keys: ["threshold"]
             val map = linkedMapOf(
                 Scv.toSymbol("threshold") to Scv.toUint32(threshold)
@@ -107,10 +116,12 @@ sealed class PolicyInstallParams {
          * Keys are in alphabetical order (required for contract compatibility).
          *
          * @return SCVal map with installation parameters
-         * @throws ValidationException if signer weights map is empty
+         * @throws ValidationException if threshold is zero or signer weights map is empty
          */
         internal fun toScVal(): SCValXdr {
-            // Validate signer weights array
+            if (threshold == 0u) {
+                throw ValidationException.invalidInput("threshold", "Threshold must be greater than zero")
+            }
             if (signerWeights.isEmpty()) {
                 throw ValidationException.invalidInput(
                     "signerWeights",
@@ -202,6 +213,11 @@ sealed class PolicyInstallParams {
  * A context rule can have multiple policies (up to [OZConstants.MAX_POLICIES]),
  * and all policies must be satisfied for a transaction to succeed.
  *
+ * All state-changing methods accept an optional [selectedSigners] parameter for multi-signer
+ * authorization. When empty (default), the operation uses single-signer auth with the
+ * connected passkey. When non-empty, signatures are collected from all listed signers
+ * via [OZMultiSignerManager.submitWithMultipleSigners].
+ *
  * Policy lifecycle:
  * 1. Deploy policy contract to network
  * 2. Add policy to context rule with installation parameters
@@ -222,18 +238,22 @@ sealed class PolicyInstallParams {
  * val kit = OZSmartAccountKit.create(config)
  * val policyManager = kit.policyManager
  *
- * // Add a simple threshold policy (2-of-3)
+ * // Add a simple threshold policy (2-of-3, single-signer)
  * val result = policyManager.addSimpleThreshold(
  *     contextRuleId = 0u,
  *     policyAddress = "CBCD1234...",
  *     threshold = 2u
  * )
  *
- * // Add a custom policy with raw install parameters
+ * // Add a custom policy with multi-signer authorization
  * val customResult = policyManager.addPolicy(
  *     contextRuleId = 0u,
  *     policyAddress = "CBCD5678...",
- *     installParams = myCustomPolicyParams
+ *     installParams = myCustomPolicyParams,
+ *     selectedSigners = listOf(
+ *         SelectedSigner.Passkey(credentialId = cred1, credentialIdBytes = cred1Bytes, keyData = key1),
+ *         SelectedSigner.Wallet("GA7Q...")
+ *     )
  * )
  *
  * if (result.success) {
@@ -263,11 +283,7 @@ class OZPolicyManager internal constructor(
      * A simple threshold policy requires a specific number of signers to authorize
      * a transaction. All signers have equal weight (1 vote each).
      *
-     * Flow:
-     * 1. Validates inputs (connected wallet, policy address format, threshold)
-     * 2. Encodes policy installation parameters
-     * 3. Builds contract invocation for add_policy
-     * 4. Submits transaction via transactionOps (handles simulation, signing, polling)
+     * Encodes the threshold parameter and delegates to [addPolicy].
      *
      * IMPORTANT: This operation requires the connected wallet to have authorization
      * on the smart account. The user will be prompted for biometric authentication
@@ -281,6 +297,11 @@ class OZPolicyManager internal constructor(
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
      * @param threshold Number of signers required to authorize (1 to signer count)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -304,10 +325,12 @@ class OZPolicyManager internal constructor(
     suspend fun addSimpleThreshold(
         contextRuleId: UInt,
         policyAddress: String,
-        threshold: UInt
+        threshold: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val params = PolicyInstallParams.SimpleThreshold(threshold)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Add Weighted Threshold Policy
@@ -318,11 +341,7 @@ class OZPolicyManager internal constructor(
      * A weighted threshold policy assigns different weights (vote power) to each signer.
      * The sum of weights from approving signers must meet or exceed the threshold.
      *
-     * Flow:
-     * 1. Validates inputs (connected wallet, policy address format, signer weights)
-     * 2. Encodes policy installation parameters
-     * 3. Builds contract invocation for add_policy
-     * 4. Submits transaction via transactionOps (handles simulation, signing, polling)
+     * Encodes the signer weights and threshold parameters and delegates to [addPolicy].
      *
      * IMPORTANT: This operation requires the connected wallet to have authorization
      * on the smart account. The user will be prompted for biometric authentication
@@ -338,6 +357,11 @@ class OZPolicyManager internal constructor(
      * @param policyAddress The policy contract address (C-address)
      * @param signerWeights Map of signers to their weights defining vote power
      * @param threshold Minimum total weight required for authorization
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -367,10 +391,12 @@ class OZPolicyManager internal constructor(
         contextRuleId: UInt,
         policyAddress: String,
         signerWeights: Map<SmartAccountSigner, UInt>,
-        threshold: UInt
+        threshold: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val params = PolicyInstallParams.WeightedThreshold(signerWeights, threshold)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Add Spending Limit Policy
@@ -382,12 +408,7 @@ class OZPolicyManager internal constructor(
      * a rolling time window. The period is specified in ledgers (approximately
      * 5 seconds per ledger, 720 per hour, 17,280 per day).
      *
-     * Flow:
-     * 1. Validates inputs (connected wallet, policy address format, limits)
-     * 2. Converts XLM amount to stroops
-     * 3. Encodes policy installation parameters
-     * 4. Builds contract invocation for add_policy
-     * 5. Submits transaction via transactionOps (handles simulation, signing, polling)
+     * Converts the amount to stroops and delegates to [addPolicy].
      *
      * IMPORTANT: This operation requires the connected wallet to have authorization
      * on the smart account. The user will be prompted for biometric authentication
@@ -401,9 +422,14 @@ class OZPolicyManager internal constructor(
      *
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
-     * @param spendingLimit Maximum amount per period in XLM as a decimal string
-     *   (e.g. "100" or "10.5"). Converted to stroops internally.
+     * @param spendingLimit Maximum amount per period as a decimal string
+     *   (e.g., "100" or "10.5"). Converted to stroops (7 decimal places) internally.
      * @param periodLedgers Period duration in ledgers (17,280 = approximately 1 day)
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -429,11 +455,13 @@ class OZPolicyManager internal constructor(
         contextRuleId: UInt,
         policyAddress: String,
         spendingLimit: String,
-        periodLedgers: UInt
+        periodLedgers: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val stroops = Util.amountToStroops(spendingLimit)
         val params = PolicyInstallParams.SpendingLimit(stroops, periodLedgers)
-        return addPolicy(contextRuleId, policyAddress, params.toScVal())
+        return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
     // MARK: - Remove Policy
@@ -457,15 +485,22 @@ class OZPolicyManager internal constructor(
      *
      * @param contextRuleId The context rule ID to remove the policy from (0 for Default rule)
      * @param policyId The on-chain policy ID assigned by the contract (available from [ParsedContextRule.policyIds])
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
-     * @throws ValidationException if validation fails
-     * @throws TransactionException if transaction submission fails
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
      *
      * Example:
      * ```kotlin
-     * // Fetch the context rule to get policy IDs
-     * val contextRule = kit.contextRuleManager.getContextRule(contextRuleId = 0u)
-     * val policyIdToRemove = contextRule.policyIds.first()
+     * // Fetch the parsed context rule to get policy IDs
+     * val rules = kit.contextRuleManager.listContextRules()
+     * val rule = rules.first { it.id == 0u }
+     * val policyIdToRemove = rule.policyIds.first()
      *
      * val result = policyManager.removePolicy(
      *     contextRuleId = 0u,
@@ -481,7 +516,9 @@ class OZPolicyManager internal constructor(
      */
     suspend fun removePolicy(
         contextRuleId: UInt,
-        policyId: UInt
+        policyId: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
@@ -493,8 +530,73 @@ class OZPolicyManager internal constructor(
             policyId = policyId
         )
 
-        // Submit transaction
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
+    }
+
+    /**
+     * Removes a policy from a context rule by matching the policy contract address.
+     *
+     * Convenience overload that resolves the on-chain policy ID internally. Fetches the
+     * specified context rule (single RPC call), finds the policy matching the given address,
+     * and delegates to the ID-based [removePolicy].
+     *
+     * @param contextRuleId The context rule ID to remove the policy from
+     * @param policyAddress The policy contract address (C-address) to remove
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
+     * @return TransactionResult indicating success or failure
+     * @throws WalletException.NotConnected if no wallet is connected
+     * @throws ValidationException if the policy address is not found on the context rule
+     * @throws TransactionException if simulation, signing, or submission fails
+     * @throws WebAuthnException if biometric authentication fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = kit.policyManager.removePolicy(
+     *     contextRuleId = 1u,
+     *     policyAddress = "CPOLICY..."
+     * )
+     * ```
+     */
+    suspend fun removePolicy(
+        contextRuleId: UInt,
+        policyAddress: String,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
+        requireContractAddress(policyAddress, "policyAddress")
+
+        // Fetch only the target context rule (single RPC call) and parse it
+        val ruleScVal = kit.contextRuleManager.getContextRule(contextRuleId)
+        val rule = kit.contextRuleManager.parseContextRule(ruleScVal)
+
+        // Find the matching policy index by address
+        val policyIndex = rule.policies.indexOfFirst { it == policyAddress }
+        if (policyIndex == -1) {
+            throw ValidationException.invalidInput(
+                "policyAddress",
+                "Policy $policyAddress not found on context rule $contextRuleId"
+            )
+        }
+
+        // Bounds check: policyIds must be aligned with policies
+        if (policyIndex >= rule.policyIds.size) {
+            throw ValidationException.invalidInput(
+                "policyAddress",
+                "Policy found at index $policyIndex but policyIds has only ${rule.policyIds.size} entries"
+            )
+        }
+
+        val policyId = rule.policyIds[policyIndex]
+        return removePolicy(contextRuleId, policyId, selectedSigners, forceMethod)
     }
 
     // MARK: - Add Generic Policy
@@ -530,6 +632,11 @@ class OZPolicyManager internal constructor(
      *   [PolicyInstallParams.SimpleThreshold.toScVal],
      *   [PolicyInstallParams.WeightedThreshold.toScVal], or
      *   [PolicyInstallParams.SpendingLimit.toScVal].
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return [TransactionResult] indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -560,7 +667,9 @@ class OZPolicyManager internal constructor(
     suspend fun addPolicy(
         contextRuleId: UInt,
         policyAddress: String,
-        installParams: SCValXdr
+        installParams: SCValXdr,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         // Validate wallet is connected
         val (_, contractId) = kit.requireConnected()
@@ -576,8 +685,12 @@ class OZPolicyManager internal constructor(
             installParams = installParams
         )
 
-        // Submit transaction
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Private Helpers
@@ -591,7 +704,7 @@ class OZPolicyManager internal constructor(
      * @param contextRuleId The context rule ID
      * @param policyAddress The policy contract address
      * @param installParams The installation parameters
-     * @return HostFunctionXDR for the add_policy invocation
+     * @return [HostFunctionXdr] for the add_policy invocation
      */
     private fun buildAddPolicyFunction(
         contractId: String,
@@ -619,7 +732,7 @@ class OZPolicyManager internal constructor(
      * @param contractId The smart account contract ID
      * @param contextRuleId The context rule ID
      * @param policyId The on-chain policy ID to remove
-     * @return HostFunctionXDR for the remove_policy invocation
+     * @return [HostFunctionXdr] for the remove_policy invocation
      */
     private fun buildRemovePolicyFunction(
         contractId: String,

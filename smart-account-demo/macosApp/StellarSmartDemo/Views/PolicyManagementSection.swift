@@ -84,6 +84,26 @@ struct PolicyManagementSection: View {
                     .background(chipColor)
                     .cornerRadius(4)
 
+                if policy.isOriginal {
+                    Text("on-chain")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Material3Colors.primary.opacity(0.7))
+                        .cornerRadius(3)
+                }
+
+                if policy.modified {
+                    Text("modified")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.orange.opacity(0.8))
+                        .cornerRadius(3)
+                }
+
                 Text(policy.label)
                     .font(.caption)
                     .foregroundColor(Material3Colors.onSurface)
@@ -103,10 +123,57 @@ struct PolicyManagementSection: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(Material3Colors.onSurfaceVariant)
                 .padding(.leading, 4)
+
+            // On-chain params display for existing policies.
+            if let params = policy.originalParams {
+                policyParamsView(params: params)
+            }
         }
         .padding(12)
         .background(chipColor.opacity(0.08))
         .cornerRadius(6)
+    }
+
+    @ViewBuilder
+    private func policyParamsView(params: PolicyParamsBridge) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            switch params.type {
+            case "threshold":
+                if let threshold = params.threshold {
+                    Text("On-chain threshold: \(threshold)")
+                        .font(.system(size: 11))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
+            case "spending_limit":
+                if let limit = params.spendingLimit {
+                    Text("On-chain limit: \(limit) XLM")
+                        .font(.system(size: 11))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
+                if let days = params.periodDays {
+                    Text("On-chain period: \(days) day(s)")
+                        .font(.system(size: 11))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
+            case "weighted_threshold":
+                if let threshold = params.threshold {
+                    Text("On-chain threshold: \(threshold)")
+                        .font(.system(size: 11))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
+                if let weights = params.signerWeights {
+                    ForEach(Array(weights.keys.sorted()), id: \.self) { key in
+                        let truncKey = KotlinInterop.truncateAddress(key, prefixLength: 8, suffixLength: 4)
+                        Text("  \(truncKey) = \(weights[key] ?? 0)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(Material3Colors.onSurfaceVariant)
+                    }
+                }
+            default:
+                EmptyView()
+            }
+        }
+        .padding(.leading, 4)
     }
 
     // MARK: - Add Policy Card

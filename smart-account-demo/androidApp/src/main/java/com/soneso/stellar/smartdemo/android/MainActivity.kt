@@ -34,8 +34,8 @@ class MainActivity : ComponentActivity() {
                 )
 
                 // Store platform providers in DemoState so shared code can use them
-                DemoState.webauthnProvider = webauthnProvider
-                DemoState.storage = storage
+                DemoState.setWebAuthnProvider(webauthnProvider)
+                DemoState.setStorage(storage)
 
                 ActivityLogState.info("Smart Account Kit initialized (Android)")
             } catch (e: Exception) {

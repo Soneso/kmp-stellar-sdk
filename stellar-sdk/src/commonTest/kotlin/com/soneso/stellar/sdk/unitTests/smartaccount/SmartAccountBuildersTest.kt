@@ -367,65 +367,6 @@ class SmartAccountBuildersTest {
     }
 
     // ========================================================================
-    // parseSigner
-    // ========================================================================
-
-    @Test
-    fun testParseSigner_validGAddress_createsDelegatedSigner() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress1)
-        assertEquals(validAccountAddress1, signer.address)
-    }
-
-    @Test
-    fun testParseSigner_validGAddress_returnsDelegatedSignerType() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress1)
-        assertTrue(SmartAccountBuilders.isDelegatedSigner(signer))
-    }
-
-    @Test
-    fun testParseSigner_anotherValidGAddress_createsDelegatedSigner() {
-        val signer = SmartAccountBuilders.parseSigner(validAccountAddress2)
-        assertEquals(validAccountAddress2, signer.address)
-    }
-
-    @Test
-    fun testParseSigner_addressNotStartingWithG_throwsValidationException() {
-        assertFailsWith<ValidationException.InvalidAddress> {
-            SmartAccountBuilders.parseSigner("XAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7")
-        }
-    }
-
-    @Test
-    fun testParseSigner_addressTooShort_throwsValidationException() {
-        assertFailsWith<ValidationException.InvalidAddress> {
-            SmartAccountBuilders.parseSigner("GABC123")
-        }
-    }
-
-    @Test
-    fun testParseSigner_addressTooLong_throwsValidationException() {
-        // 57 characters starting with G
-        assertFailsWith<ValidationException.InvalidAddress> {
-            SmartAccountBuilders.parseSigner("G" + "A".repeat(56))
-        }
-    }
-
-    @Test
-    fun testParseSigner_emptyString_throwsValidationException() {
-        assertFailsWith<ValidationException.InvalidAddress> {
-            SmartAccountBuilders.parseSigner("")
-        }
-    }
-
-    @Test
-    fun testParseSigner_contractAddress_throwsValidationException() {
-        // C-addresses fail the 'G' prefix check
-        assertFailsWith<ValidationException.InvalidAddress> {
-            SmartAccountBuilders.parseSigner(validContractAddress1)
-        }
-    }
-
-    // ========================================================================
     // signerMatchesCredential (ByteArray overload)
     // ========================================================================
 

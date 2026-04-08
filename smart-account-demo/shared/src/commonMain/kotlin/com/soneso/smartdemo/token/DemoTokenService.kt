@@ -73,21 +73,21 @@ class DemoTokenService(
         // deployed address matches this after first deployment.
         val tokenContractId = deriveTokenContractAddress(networkPassphrase)
 
-        val sorobanServer = SorobanServer(rpcUrl)
+        val alreadyExisted = SorobanServer(rpcUrl).use { sorobanServer ->
+            // Fund the token admin account if it does not yet exist on the network.
+            // FriendBot is idempotent for already-funded accounts on testnet.
+            try {
+                sorobanServer.getAccount(adminId)
+            } catch (e: AccountNotFoundException) {
+                FriendBot.fundTestnetAccount(adminId)
+                // Give the network time to process the funding transaction
+                kotlinx.coroutines.delay(5000)
+            }
 
-        // Fund the token admin account if it does not yet exist on the network.
-        // FriendBot is idempotent for already-funded accounts on testnet.
-        try {
-            sorobanServer.getAccount(adminId)
-        } catch (e: AccountNotFoundException) {
-            FriendBot.fundTestnetAccount(adminId)
-            // Give the network time to process the funding transaction
-            kotlinx.coroutines.delay(5000)
+            // Check whether the token contract already exists on-chain by querying
+            // its contract instance ledger entry. Returns null if not yet deployed.
+            contractExistsOnChain(sorobanServer, tokenContractId)
         }
-
-        // Check whether the token contract already exists on-chain by querying
-        // its contract instance ledger entry. Returns null if not yet deployed.
-        val alreadyExisted = contractExistsOnChain(sorobanServer, tokenContractId)
 
         if (!alreadyExisted) {
             val wasmBytes = loadWasmResource("soroban_token_contract.wasm")
@@ -127,15 +127,19 @@ class DemoTokenService(
 
         // Mint 10,000 DEMO (7 decimals: 10_000 * 10^7 = 100_000_000_000 stroops) to the recipient.
         // The recipient is a smart account contract, so we pass it as a contract address.
-        tokenClient.invoke<Unit>(
-            functionName = "mint",
-            arguments = mapOf(
-                "to" to recipientContractId,
-                "amount" to MINT_AMOUNT_STROOPS
-            ),
-            source = adminId,
-            signer = adminKeyPair
-        )
+        try {
+            tokenClient.invoke<Unit>(
+                functionName = "mint",
+                arguments = mapOf(
+                    "to" to recipientContractId,
+                    "amount" to MINT_AMOUNT_STROOPS
+                ),
+                source = adminId,
+                signer = adminKeyPair
+            )
+        } finally {
+            tokenClient.close()
+        }
 
         return DemoTokenResult(
             tokenContractId = tokenContractId,

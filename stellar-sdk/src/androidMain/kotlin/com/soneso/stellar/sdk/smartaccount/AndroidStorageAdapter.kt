@@ -23,6 +23,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -142,9 +143,9 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
      * @throws StorageException.ReadFailed if the read operation fails due to a storage error
      */
     override suspend fun get(credentialId: String): StoredCredential? = mutex.withLock {
-        return try {
+        return@withLock try {
             val key = credentialKey(credentialId)
-            val jsonStr = prefs.getString(key, null) ?: return null
+            val jsonStr = prefs.getString(key, null) ?: return@withLock null
             deserializeCredential(jsonStr, credentialId)
         } catch (e: StorageException) {
             throw e
@@ -246,19 +247,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
                 ?: throw CredentialException.notFound(credentialId)
 
             val existing = deserializeCredentialOrThrow(jsonStr, credentialId)
-
-            val updated = existing.copy(
-                deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-                deploymentError = updates.deploymentError ?: existing.deploymentError,
-                contractId = updates.contractId ?: existing.contractId,
-                lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-                nickname = updates.nickname ?: existing.nickname,
-                isPrimary = updates.isPrimary ?: existing.isPrimary,
-                transports = updates.transports ?: existing.transports,
-                deviceType = updates.deviceType ?: existing.deviceType,
-                backedUp = updates.backedUp ?: existing.backedUp
-            )
-
+            val updated = existing.applyUpdate(updates)
             val updatedJson = json.encodeToString(updated.toSerializable())
             val success = prefs.edit().putString(key, updatedJson).commit()
             if (!success) {
@@ -345,16 +334,19 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
      * @throws StorageException.ReadFailed if the read operation fails due to a storage error
      */
     override suspend fun getSession(): StoredSession? = mutex.withLock {
-        return try {
-            val jsonStr = prefs.getString(SESSION_KEY, null) ?: return null
+        return@withLock try {
+            val jsonStr = prefs.getString(SESSION_KEY, null) ?: return@withLock null
             val session = deserializeSession(jsonStr)
             if (session == null) {
-                return null
+                return@withLock null
             }
             if (session.isExpired) {
                 // Clear expired session from storage
-                prefs.edit().remove(SESSION_KEY).commit()
-                return null
+                val removed = prefs.edit().remove(SESSION_KEY).commit()
+                if (!removed) {
+                    Log.w(TAG, "Failed to remove expired session from storage")
+                }
+                return@withLock null
             }
             session
         } catch (e: StorageException) {
@@ -399,7 +391,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
         return try {
             json.decodeFromString<SerializableCredential>(jsonStr).toStoredCredential()
         } catch (e: Exception) {
-            Log.w(TAG, "Corrupted credential data for '$credentialId', skipping: ${e.message}")
+            Log.w(TAG, "Failed to deserialize stored credential: ${e.message}")
             null
         }
     }
@@ -432,7 +424,7 @@ class AndroidStorageAdapter(context: Context) : StorageAdapter {
         return try {
             json.decodeFromString<SerializableSession>(jsonStr).toStoredSession()
         } catch (e: Exception) {
-            Log.w(TAG, "Corrupted session data, skipping: ${e.message}")
+            Log.w(TAG, "Failed to deserialize stored session: ${e.message}")
             null
         }
     }

@@ -2,7 +2,7 @@
 //  IndexedDBStorageAdapter.kt
 //  Stellar SDK Kotlin Multiplatform
 //
-//  Copyright (c) 2025 Soneso. All rights reserved.
+//  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
 package com.soneso.stellar.sdk.smartaccount
@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredentialUpdate
 import com.soneso.stellar.sdk.smartaccount.oz.StoredSession
+import com.soneso.stellar.sdk.smartaccount.oz.applyUpdate
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -84,6 +85,8 @@ class IndexedDBStorageAdapter(
      * On first call, opens the database and creates object stores and indexes
      * if needed (via the `onupgradeneeded` event). Subsequent calls return
      * the cached connection.
+     *
+     * Must be called while holding [mutex].
      *
      * @return The IDBDatabase instance
      * @throws StorageException.ReadFailed if IndexedDB is unavailable or the open fails
@@ -177,12 +180,14 @@ class IndexedDBStorageAdapter(
      * After calling close, the adapter can be used again and will
      * reopen the database on the next operation.
      */
-    fun close() {
-        val existing = cachedDb
-        if (existing != null) {
-            existing.asDynamic().close()
+    suspend fun close() {
+        mutex.withLock {
+            val existing = cachedDb
+            if (existing != null) {
+                existing.asDynamic().close()
+            }
+            cachedDb = null
         }
-        cachedDb = null
     }
 
     // MARK: - Credential Operations
@@ -263,19 +268,7 @@ class IndexedDBStorageAdapter(
             throw CredentialException.notFound(credentialId)
         }
         val existing = jsToCredential(result)
-
-        val updated = existing.copy(
-            deploymentStatus = updates.deploymentStatus ?: existing.deploymentStatus,
-            deploymentError = updates.deploymentError ?: existing.deploymentError,
-            contractId = updates.contractId ?: existing.contractId,
-            lastUsedAt = updates.lastUsedAt ?: existing.lastUsedAt,
-            nickname = updates.nickname ?: existing.nickname,
-            isPrimary = updates.isPrimary ?: existing.isPrimary,
-            transports = updates.transports ?: existing.transports,
-            deviceType = updates.deviceType ?: existing.deviceType,
-            backedUp = updates.backedUp ?: existing.backedUp
-        )
-
+        val updated = existing.applyUpdate(updates)
         val obj = credentialToJs(updated)
         try {
             withObjectStore(database, STORE_CREDENTIALS, "readwrite") { store ->
@@ -361,10 +354,10 @@ class IndexedDBStorageAdapter(
      * This is a destructive operation that removes all stored credentials
      * and sessions permanently.
      *
-     * @param name Database name to delete. Defaults to [DEFAULT_DB_NAME].
+     * @param name Database name to delete. Defaults to this adapter's configured database name.
      * @throws StorageException.WriteFailed if deletion fails
      */
-    suspend fun deleteDatabase(name: String = DEFAULT_DB_NAME) {
+    suspend fun deleteDatabase(name: String = dbName) {
         close()
         suspendCancellableCoroutine { cont ->
             val idb = js("(typeof indexedDB !== 'undefined') ? indexedDB : null")

@@ -157,6 +157,11 @@ data class ParsedContextRule(
  * 1. Which signers are required to authorize the transaction
  * 2. Which policies must be satisfied for the transaction to execute
  *
+ * All state-changing methods accept an optional [selectedSigners] parameter for multi-signer
+ * authorization. When empty (default), the operation uses single-signer auth with the
+ * connected passkey. When non-empty, signatures are collected from all listed signers
+ * via [OZMultiSignerManager.submitWithMultipleSigners].
+ *
  * Contract limits:
  * - Maximum 15 signers per context rule
  * - Maximum 5 policies per context rule
@@ -196,7 +201,7 @@ class OZContextRuleManager internal constructor(
      * and policies that constrain how operations can be executed.
      *
      * Flow:
-     * 1. Validates inputs (name, signers count, policies count)
+     * 1. Validates inputs (name, signers count, policies count, policy addresses)
      * 2. Builds contract invocation for add_context_rule
      * 3. Simulates to get auth entries
      * 4. Signs auth entries (requires user interaction)
@@ -215,6 +220,11 @@ class OZContextRuleManager internal constructor(
      * @param validUntil Optional ledger number when this rule expires (null = no expiration)
      * @param signers List of signers who can authorize operations matching this context
      * @param policies Map of policy contract addresses to their installation parameters
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -241,7 +251,9 @@ class OZContextRuleManager internal constructor(
         name: String,
         validUntil: UInt? = null,
         signers: List<SmartAccountSigner>,
-        policies: Map<String, SCValXdr> = emptyMap()
+        policies: Map<String, SCValXdr> = emptyMap(),
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
@@ -321,8 +333,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Get Context Rule
@@ -336,17 +352,7 @@ class OZContextRuleManager internal constructor(
      * This is a query operation (read-only, no authorization required). It uses simulation
      * to extract the return value without submitting a transaction.
      *
-     * The returned ScVal structure contains:
-     * - id: u32
-     * - context_type: Vec[Symbol, ...] (Default | CallContract | CreateContract)
-     * - name: Symbol or String
-     * - signers: Vec[signer ScVals]
-     * - policies: Map[Address -> ScVal]
-     * - valid_until: Option<u32> (void for None, u32 for Some)
-     *
-     * NOTE: Parsing the full context rule from ScVal is complex due to nested structures.
-     * For initial implementation, this method returns the raw ScVal. Applications can
-     * extract specific fields as needed.
+     * For parsed context rules, use [listContextRules] which returns [ParsedContextRule] objects.
      *
      * @param id The context rule ID to retrieve
      * @return The raw SCVal response containing the context rule details
@@ -389,7 +395,7 @@ class OZContextRuleManager internal constructor(
      *
      * @return The number of context rules currently configured
      * @throws TransactionException if simulation fails
-     * @throws ValidationException if parsing fails
+     * @throws ValidationException if the result is not a U32 value
      *
      * Example:
      * ```kotlin
@@ -436,6 +442,8 @@ class OZContextRuleManager internal constructor(
      * @param maxScanId Upper bound on rule IDs to scan. Defaults to
      *   [OZSmartAccountConfig.maxContextRuleScanId].
      * @return List of raw ScVal objects, one per active context rule.
+     * @throws TransactionException if simulation fails
+     * @throws ValidationException if the count result cannot be parsed
      */
     suspend fun getAllContextRules(maxScanId: UInt = kit.config.maxContextRuleScanId): List<SCValXdr> {
         val activeCount = getContextRulesCount()
@@ -463,7 +471,7 @@ class OZContextRuleManager internal constructor(
      * Lists all active context rules as parsed objects.
      *
      * Fetches all raw ScVal rules via [getAllContextRules] and parses each one.
-     * This is the primary method for rule discovery in v0.7.0.
+     * This is the primary method for rule discovery.
      *
      * @param maxScanId Upper bound on rule IDs to scan
      * @return List of parsed context rules
@@ -486,7 +494,7 @@ class OZContextRuleManager internal constructor(
      * @return The parsed context rule
      * @throws ValidationException if the ScVal structure is invalid or required fields are missing
      */
-    private fun parseContextRule(scVal: SCValXdr): ParsedContextRule {
+    internal fun parseContextRule(scVal: SCValXdr): ParsedContextRule {
         val mapEntries = (scVal as? SCValXdr.Map)?.value?.value
             ?: throw ValidationException.invalidInput("contextRule", "Expected Map ScVal for context rule")
 
@@ -629,6 +637,8 @@ class OZContextRuleManager internal constructor(
      * Format:
      * - Delegated: Vec([Symbol("Delegated"), Address])
      * - External: Vec([Symbol("External"), Address, Bytes])
+     *
+     * @throws ValidationException for unknown signer types or malformed data
      */
     private fun parseSigner(scVal: SCValXdr): SmartAccountSigner {
         val vec = try { Scv.fromVec(scVal) } catch (e: Exception) {
@@ -675,11 +685,14 @@ class OZContextRuleManager internal constructor(
      * then matches those against the account's active rules. The resolution algorithm:
      * 1. Filter rules by context type match
      * 2. If 1 candidate: use it
-     * 3. If multiple: filter by exact signer match (same signers, same count)
+     * 3. Tier 1 — Exact signer match: same signers and same count in both directions
      * 4. If 1 match: use it
-     * 5. If multiple: filter by signer subset (rule signers subset of selected, no policies)
+     * 5. Tier 2 — Rule subset: all rule signers appear in selected signers, no policies
      * 6. If 1 match: use it
-     * 7. Otherwise: throw error
+     * 7. Tier 3 — Selected subset: all selected signers appear in the rule (handles
+     *    threshold scenarios where the user picks fewer signers than the rule has)
+     * 8. If 1 match: use it
+     * 9. Otherwise: throw error (no match, or ambiguous multi-match)
      *
      * @param entry The auth entry to resolve rules for
      * @param selectedSigners The signers that will sign this entry
@@ -687,7 +700,7 @@ class OZContextRuleManager internal constructor(
      * @throws ValidationException if no unique context rule can be resolved for any context
      * @throws TransactionException if simulation fails while fetching rules
      */
-    suspend fun resolveContextRuleIdsForEntry(
+    internal suspend fun resolveContextRuleIdsForEntry(
         entry: SorobanAuthorizationEntryXdr,
         selectedSigners: List<SmartAccountSigner>
     ): List<UInt> {
@@ -707,7 +720,7 @@ class OZContextRuleManager internal constructor(
      * @return Ordered list of context rule IDs, one per invocation context
      * @throws ValidationException if no unique context rule can be resolved for any context
      */
-    fun resolveContextRuleIdsForEntry(
+    internal fun resolveContextRuleIdsForEntry(
         entry: SorobanAuthorizationEntryXdr,
         selectedSigners: List<SmartAccountSigner>,
         rules: List<ParsedContextRule>
@@ -814,7 +827,7 @@ class OZContextRuleManager internal constructor(
      * @param entry The auth entry whose invocation tree to traverse
      * @return Ordered list of context types, one per invocation node (depth-first)
      */
-    fun buildInvocationContextTypes(entry: SorobanAuthorizationEntryXdr): List<ContextRuleType> {
+    private fun buildInvocationContextTypes(entry: SorobanAuthorizationEntryXdr): List<ContextRuleType> {
         val result = mutableListOf<ContextRuleType>()
         collectInvocationContextTypes(entry.rootInvocation.function, result)
         collectSubInvocationContextTypes(entry.rootInvocation.subInvocations, result)
@@ -880,7 +893,7 @@ class OZContextRuleManager internal constructor(
      * @param requiredType The context type required by the invocation
      * @return true if the rule's context type matches the required type
      */
-    fun contextRuleTypeMatches(ruleType: ContextRuleType, requiredType: ContextRuleType): Boolean {
+    private fun contextRuleTypeMatches(ruleType: ContextRuleType, requiredType: ContextRuleType): Boolean {
         if (ruleType is ContextRuleType.Default) return true
         return ruleType == requiredType
     }
@@ -906,6 +919,11 @@ class OZContextRuleManager internal constructor(
      *
      * @param id The ID of the context rule to update
      * @param name The new name for the context rule
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws ValidationException if validation fails
      * @throws TransactionException if transaction submission fails
@@ -921,7 +939,12 @@ class OZContextRuleManager internal constructor(
      * }
      * ```
      */
-    suspend fun updateName(id: UInt, name: String): TransactionResult {
+    suspend fun updateName(
+        id: UInt,
+        name: String,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Validate input
@@ -943,8 +966,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Update Context Rule Valid Until
@@ -967,7 +994,13 @@ class OZContextRuleManager internal constructor(
      *
      * @param id The ID of the context rule to update
      * @param validUntil The new expiration ledger number, or null for no expiration
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
+     * @throws ValidationException if the wallet is not connected
      * @throws TransactionException if transaction submission fails
      *
      * Example:
@@ -985,7 +1018,12 @@ class OZContextRuleManager internal constructor(
      * )
      * ```
      */
-    suspend fun updateValidUntil(id: UInt, validUntil: UInt?): TransactionResult {
+    suspend fun updateValidUntil(
+        id: UInt,
+        validUntil: UInt?,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Build valid_until ScVal (Option<u32>)
@@ -1009,8 +1047,12 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 
     // MARK: - Remove Context Rule
@@ -1033,6 +1075,11 @@ class OZContextRuleManager internal constructor(
      * The user will be prompted for biometric authentication.
      *
      * @param id The ID of the context rule to remove
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
      * @throws TransactionException if the rule doesn't exist or transaction submission fails
      *
@@ -1044,7 +1091,11 @@ class OZContextRuleManager internal constructor(
      * }
      * ```
      */
-    suspend fun removeContextRule(id: UInt): TransactionResult {
+    suspend fun removeContextRule(
+        id: UInt,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
         // Build invocation
@@ -1058,7 +1109,11 @@ class OZContextRuleManager internal constructor(
 
         val hostFunction = HostFunctionXdr.InvokeContract(invokeArgs)
 
-        // Submit transaction (will handle simulation, signing, and polling)
-        return kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList())
+        // Route to single-signer or multi-signer submission
+        return if (selectedSigners.isEmpty()) {
+            kit.transactionOperations.submit(hostFunction = hostFunction, auth = emptyList(), forceMethod = forceMethod)
+        } else {
+            kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
+        }
     }
 }

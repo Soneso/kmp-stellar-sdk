@@ -13,11 +13,6 @@ package com.soneso.stellar.sdk.smartaccount.oz
 object OZConstants {
 
     /**
-     * Buffer in ledgers added to the latest ledger sequence when calculating auth entry expiration.
-     */
-    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100
-
-    /**
      * Default session expiry in milliseconds (7 days).
      */
     const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L
@@ -38,7 +33,8 @@ object OZConstants {
     const val WEBAUTHN_TIMEOUT_MS = 60_000L
 
     /**
-     * XLM amount reserved by Friendbot when funding test accounts.
+     * XLM amount retained in the temporary account as minimum balance reserve
+     * when transferring Friendbot funds to a smart account wallet.
      */
     const val FRIENDBOT_RESERVE_XLM = 5
 
@@ -58,8 +54,18 @@ object OZConstants {
     const val MAX_POLICIES = 5
 
     /**
-     * Maximum context rules per smart account (OZ contract limit).
+     * HTTP header identifying the SDK name sent with indexer and relayer requests.
      */
-    const val MAX_CONTEXT_RULES = 15
+    const val CLIENT_NAME_HEADER = "X-Client-Name"
+
+    /**
+     * HTTP header identifying the SDK version sent with indexer and relayer requests.
+     */
+    const val CLIENT_VERSION_HEADER = "X-Client-Version"
+
+    /**
+     * SDK name sent in client identification headers.
+     */
+    const val CLIENT_NAME = "kmp-stellar-sdk"
 
 }

@@ -29,8 +29,8 @@ fun main() {
             )
 
             // Store platform providers in DemoState so shared code can use them
-            DemoState.webauthnProvider = webauthnProvider
-            DemoState.storage = storage
+            DemoState.setWebAuthnProvider(webauthnProvider)
+            DemoState.setStorage(storage)
             ActivityLogState.info("Smart Account Kit initialized (Web platform)")
             ActivityLogState.info("WebAuthn RP ID: $currentDomain")
         } catch (e: Exception) {

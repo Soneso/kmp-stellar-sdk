@@ -34,8 +34,8 @@ fun initSmartAccountKit() {
             suiteName = "com.soneso.stellar.smartdemo"
         )
 
-        DemoState.webauthnProvider = webauthnProvider
-        DemoState.storage = storage
+        DemoState.setWebAuthnProvider(webauthnProvider)
+        DemoState.setStorage(storage)
         ActivityLogState.info("iOS providers initialized")
     } catch (e: Exception) {
         ActivityLogState.error("Failed to initialize iOS providers: ${e.message}")

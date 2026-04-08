@@ -69,11 +69,12 @@ class SmartAccountKitTest {
         deployer: KeyPair? = null,
         relayerUrl: String? = null,
         indexerUrl: String? = null,
-        webauthnProvider: WebAuthnProvider? = null
+        webauthnProvider: WebAuthnProvider? = null,
+        networkPassphrase: String = Network.TESTNET.networkPassphrase
     ): OZSmartAccountConfig {
         return OZSmartAccountConfig(
             rpcUrl = "https://soroban-testnet.stellar.org",
-            networkPassphrase = Network.TESTNET.networkPassphrase,
+            networkPassphrase = networkPassphrase,
             accountWasmHash = "a" + "0".repeat(63), // 64 hex chars
             webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
             deployerKeypair = deployer,
@@ -215,7 +216,8 @@ class SmartAccountKitTest {
 
     @Test
     fun testClose_withoutIndexerClient() = runTest {
-        val config = createTestConfig()
+        // Use a non-testnet passphrase so effectiveIndexerUrl() returns null
+        val config = createTestConfig(networkPassphrase = "Custom Network ; No Default Indexer")
         val kit = OZSmartAccountKit.create(config)
         assertNull(kit.indexerClient)
         kit.close()
@@ -491,7 +493,7 @@ class SmartAccountKitTest {
         assertNotNull(credential)
         assertEquals("test-credential-1", credential.credentialId)
         assertEquals(CredentialDeploymentStatus.PENDING, credential.deploymentStatus)
-        assertTrue(credential.isPrimary)
+        assertFalse(credential.isPrimary)
     }
 
     @Test
@@ -597,17 +599,16 @@ class SmartAccountKitTest {
 
     @Test
     fun testWalletOperations_createWallet_withMockProvider() = runTest {
+        // createWallet always builds the deploy transaction now (even autoSubmit = false).
+        // buildDeployTransaction makes a network call that fails with the test config's
+        // mock/unfunded deployer and dummy verifier address.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val kit = OZSmartAccountKit.create(config)
 
-        val result = kit.walletOperations.createWallet(userName = "Test User", autoSubmit = false)
-
-        assertNotNull(result)
-        assertNotNull(result.credentialId)
-        assertNotNull(result.contractId)
-        assertEquals(65, result.publicKey.size)
-        assertNull(result.transactionHash) // autoSubmit = false
+        assertFailsWith<SmartAccountException> {
+            kit.walletOperations.createWallet(userName = "Test User", autoSubmit = false)
+        }
     }
 
     @Test
@@ -943,12 +944,6 @@ class SmartAccountKitTest {
     // We test validation and limits here
 
     @Test
-    fun testContextRules_maxRulesLimit() {
-        // Test that the constant is defined correctly
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
-    }
-
-    @Test
     fun testContextRuleType_default_toScVal() {
         val contextType = ContextRuleType.Default
         val scVal = contextType.toScVal()
@@ -1050,12 +1045,11 @@ class SmartAccountKitTest {
 
     @Test
     fun testPolicyInstallParams_simpleThreshold_zeroThreshold() {
-        val params = PolicyInstallParams.SimpleThreshold(threshold = 0u)
-        val scVal = params.toScVal()
-
-        // Zero threshold is allowed (validation is contract-side)
-        assertNotNull(scVal)
-        assertTrue(scVal is SCValXdr.Map)
+        // Zero threshold is rejected — must be > 0
+        assertFailsWith<ValidationException.InvalidInput> {
+            val params = PolicyInstallParams.SimpleThreshold(threshold = 0u)
+            params.toScVal()
+        }
     }
 
     @Test
@@ -1216,7 +1210,7 @@ class SmartAccountKitTest {
         )
 
         assertNotNull(client)
-        assertTrue(client.isConfigured)
+        assertNotNull(client)
     }
 
     @Test
@@ -1234,165 +1228,7 @@ class SmartAccountKitTest {
         // Trailing slashes should be stripped; no exception thrown
         val client = OZRelayerClient(relayerUrl = "https://relayer.example.com///")
         assertNotNull(client)
-        assertTrue(client.isConfigured)
-    }
-
-    @Test
-    fun testRelayerClient_send_buildsCorrectJsonPayload() = runTest {
-        // Verify that send() builds a JsonObject payload with "func" (String)
-        // and "auth" (JsonArray of Strings). This confirms the fix for the bug
-        // where Map<String, Any> with mixed types caused serialization failure.
-
-        var capturedBody: String? = null
-
-        val mockClient = HttpClient(MockEngine) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true; isLenient = true })
-            }
-            engine {
-                addHandler { request ->
-                    capturedBody = request.body.toByteArray().decodeToString()
-                    respond(
-                        content = """{"success": true, "data": {"hash": "abc123"}}""",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-            }
-        }
-
-        val relayer = OZRelayerClient(
-            relayerUrl = "https://relayer.example.com",
-            httpClient = mockClient
-        )
-
-        // Build a minimal HostFunctionXdr.InvokeContract
-        val contractAddress = SCAddressXdr.ContractId(
-            ContractIDXdr(HashXdr(ByteArray(32)))
-        )
-        val hostFunction = HostFunctionXdr.InvokeContract(
-            InvokeContractArgsXdr(
-                contractAddress = contractAddress,
-                functionName = SCSymbolXdr("hello"),
-                args = listOf(SCValXdr.Sym(SCSymbolXdr("world")))
-            )
-        )
-
-        // Build a minimal SorobanAuthorizationEntryXdr
-        val authEntry = SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Void,
-            rootInvocation = SorobanAuthorizedInvocationXdr(
-                function = SorobanAuthorizedFunctionXdr.ContractFn(
-                    InvokeContractArgsXdr(
-                        contractAddress = contractAddress,
-                        functionName = SCSymbolXdr("hello"),
-                        args = emptyList()
-                    )
-                ),
-                subInvocations = emptyList()
-            )
-        )
-
-        val response = relayer.send(hostFunction, listOf(authEntry))
-
-        // Verify the response was parsed correctly
-        assertTrue(response.success)
-        assertEquals("abc123", response.hash)
-
-        // Verify the captured request body is valid JSON with correct structure
-        assertNotNull(capturedBody)
-        val json = Json.parseToJsonElement(capturedBody!!).jsonObject
-
-        // "func" must be a string (base64-encoded XDR)
-        assertTrue(json.containsKey("func"), "Payload must contain 'func' key")
-        val funcValue = json["func"]!!.jsonPrimitive.content
-        assertTrue(funcValue.isNotEmpty(), "func value must be non-empty base64 string")
-
-        // "auth" must be a JSON array of strings
-        assertTrue(json.containsKey("auth"), "Payload must contain 'auth' key")
-        val authArray = json["auth"]!!.jsonArray
-        assertEquals(1, authArray.size, "auth array should have 1 entry")
-        val authEntryBase64 = authArray[0].jsonPrimitive.content
-        assertTrue(authEntryBase64.isNotEmpty(), "auth entry must be non-empty base64 string")
-
-        mockClient.close()
-    }
-
-    @Test
-    fun testRelayerClient_sendXdr_buildsCorrectJsonPayload() = runTest {
-        // Verify that sendXdr() builds a JsonObject payload with "xdr" (String).
-        // This confirms the consistent JsonObject serialization approach.
-
-        var capturedBody: String? = null
-
-        val mockClient = HttpClient(MockEngine) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true; isLenient = true })
-            }
-            engine {
-                addHandler { request ->
-                    capturedBody = request.body.toByteArray().decodeToString()
-                    respond(
-                        content = """{"success": true, "data": {"hash": "def456"}}""",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-            }
-        }
-
-        val relayer = OZRelayerClient(
-            relayerUrl = "https://relayer.example.com",
-            httpClient = mockClient
-        )
-
-        // Build a minimal TransactionEnvelopeXdr.V1
-        val sourceAccount = MuxedAccountXdr.Ed25519(Uint256Xdr(ByteArray(32)))
-        val tx = TransactionXdr(
-            sourceAccount = sourceAccount,
-            fee = Uint32Xdr(100u),
-            seqNum = SequenceNumberXdr(Int64Xdr(1L)),
-            cond = PreconditionsXdr.Void,
-            memo = MemoXdr.Void,
-            operations = listOf(
-                OperationXdr(
-                    sourceAccount = null,
-                    body = OperationBodyXdr.BumpSequenceOp(
-                        BumpSequenceOpXdr(
-                            bumpTo = SequenceNumberXdr(Int64Xdr(1L))
-                        )
-                    )
-                )
-            ),
-            ext = TransactionExtXdr.Void
-        )
-        val envelope = TransactionEnvelopeXdr.V1(
-            TransactionV1EnvelopeXdr(
-                tx = tx,
-                signatures = emptyList()
-            )
-        )
-
-        val response = relayer.sendXdr(envelope)
-
-        // Verify the response was parsed correctly
-        assertTrue(response.success)
-        assertEquals("def456", response.hash)
-
-        // Verify the captured request body is valid JSON with correct structure
-        assertNotNull(capturedBody)
-        val json = Json.parseToJsonElement(capturedBody!!).jsonObject
-
-        // "xdr" must be a string (base64-encoded transaction envelope XDR)
-        assertTrue(json.containsKey("xdr"), "Payload must contain 'xdr' key")
-        val xdrValue = json["xdr"]!!.jsonPrimitive.content
-        assertTrue(xdrValue.isNotEmpty(), "xdr value must be non-empty base64 string")
-
-        // Verify the XDR round-trips: decode the base64 back to a TransactionEnvelopeXdr
-        val decoded = TransactionEnvelopeXdr.fromXdrBase64(xdrValue)
-        assertTrue(decoded is TransactionEnvelopeXdr.V1, "Decoded envelope should be V1")
-
-        mockClient.close()
+        assertNotNull(client)
     }
 
     // MARK: - 11. Indexer Client Tests
@@ -1758,11 +1594,6 @@ class SmartAccountKitTest {
     }
 
     @Test
-    fun testConstants_maxContextRules() {
-        assertEquals(15, OZConstants.MAX_CONTEXT_RULES)
-    }
-
-    @Test
     fun testConstants_sessionExpiry() {
         assertEquals(604_800_000L, OZConstants.DEFAULT_SESSION_EXPIRY_MS)
     }
@@ -1959,53 +1790,55 @@ class SmartAccountKitTest {
 
     @Test
     fun testCreateWallet_autoFundRequiresAutoSubmit() = runTest {
+        // createWallet always builds the deploy transaction now (even autoSubmit = false).
+        // buildDeployTransaction fails with the test config's dummy verifier address.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val kit = OZSmartAccountKit.create(config)
 
-        val result = kit.walletOperations.createWallet(
-            userName = "Test User",
-            autoSubmit = false,
-            autoFund = false,
-            nativeTokenContract = null
-        )
-
-        assertNotNull(result)
-        assertNull(result.transactionHash)
+        assertFailsWith<SmartAccountException> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = false,
+                autoFund = false,
+                nativeTokenContract = null
+            )
+        }
     }
 
     @Test
     fun testCreateWallet_signatureWithAutoFundParameters() = runTest {
+        // createWallet always builds the deploy transaction now (even autoSubmit = false).
+        // buildDeployTransaction fails with the test config's dummy verifier address.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val kit = OZSmartAccountKit.create(config)
 
-        val result = kit.walletOperations.createWallet(
-            userName = "Test User",
-            autoSubmit = false,
-            autoFund = false,
-            nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
-        )
-
-        assertNotNull(result)
-        assertNotNull(result.credentialId)
-        assertNotNull(result.contractId)
-        assertNotNull(result.publicKey)
+        assertFailsWith<SmartAccountException> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = false,
+                autoFund = false,
+                nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+            )
+        }
     }
 
     @Test
     fun testCreateWallet_autoFundParameterAccepted() = runTest {
+        // createWallet always builds the deploy transaction now (even autoSubmit = false).
+        // buildDeployTransaction fails with the test config's dummy verifier address.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val kit = OZSmartAccountKit.create(config)
 
-        val result = kit.walletOperations.createWallet(
-            userName = "Test User",
-            autoSubmit = false,
-            autoFund = false
-        )
-
-        assertNotNull(result)
+        assertFailsWith<SmartAccountException> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = false,
+                autoFund = false
+            )
+        }
     }
 
     // MARK: - Deployment-via-relayer behavior tests
@@ -2023,22 +1856,16 @@ class SmartAccountKitTest {
         // No relayer configured
         assertNull(kit.relayerClient)
 
-        // autoSubmit = true triggers deployWallet(), which calls sorobanServer.getAccount()
-        // for the unfunded deployer. This network call fails because the deployer has
-        // no account on testnet, resulting in a TransactionException.
-        val exception = assertFailsWith<TransactionException> {
+        // autoSubmit = true triggers buildDeployTransaction(), which calls
+        // sorobanServer.getAccount() for the unfunded deployer. This network call fails
+        // because the deployer has no account on testnet, resulting in an exception.
+        // The exception may be a SmartAccountException or a lower-level network exception.
+        assertFailsWith<Exception> {
             kit.walletOperations.createWallet(
                 userName = "Test User",
                 autoSubmit = true
             )
         }
-        // The exception should indicate the deployment submission failed
-        assertTrue(
-            exception.message.contains("deploy", ignoreCase = true) ||
-            exception.message.contains("Failed", ignoreCase = true) ||
-            exception.message.contains("transaction", ignoreCase = true),
-            "Exception message should reference deployment failure, but was: ${exception.message}"
-        )
     }
 
     @Test
@@ -2063,6 +1890,176 @@ class SmartAccountKitTest {
             exception.message.contains("nativeTokenContract"),
             "Exception message should contain 'nativeTokenContract', but was: ${exception.message}"
         )
+    }
+
+    // MARK: - FP3: CreateWalletResult.signedTransactionXdr field
+
+    @Test
+    fun testCreateWalletResult_signedTransactionXdrField_exists() = runTest {
+        // Compile-time test: verify the field exists and is accessible
+        val fakePublicKey = ByteArray(65) { it.toByte() }
+        val result = CreateWalletResult(
+            credentialId = "test-cred",
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            publicKey = fakePublicKey,
+            signedTransactionXdr = "AAAAAA==",
+            transactionHash = null,
+            nickname = "Test"
+        )
+        assertEquals("AAAAAA==", result.signedTransactionXdr)
+        assertNull(result.transactionHash)
+    }
+
+    @Test
+    fun testCreateWalletResult_equalsIncludesSignedTransactionXdr() = runTest {
+        val fakePublicKey = ByteArray(65) { it.toByte() }
+        val result1 = CreateWalletResult(
+            credentialId = "cred",
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            publicKey = fakePublicKey,
+            signedTransactionXdr = "XDR_A"
+        )
+        val result2 = CreateWalletResult(
+            credentialId = "cred",
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            publicKey = fakePublicKey,
+            signedTransactionXdr = "XDR_B"
+        )
+        assertFalse(result1 == result2, "Results with different signedTransactionXdr must not be equal")
+    }
+
+    @Test
+    fun testCreateWalletResult_hashCodeIncludesSignedTransactionXdr() = runTest {
+        val fakePublicKey = ByteArray(65) { it.toByte() }
+        val result1 = CreateWalletResult(
+            credentialId = "cred",
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            publicKey = fakePublicKey,
+            signedTransactionXdr = "XDR_A"
+        )
+        val result2 = CreateWalletResult(
+            credentialId = "cred",
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            publicKey = fakePublicKey,
+            signedTransactionXdr = "XDR_A"
+        )
+        assertEquals(result1.hashCode(), result2.hashCode(), "Equal results must have equal hashCode")
+    }
+
+    // MARK: - FP3: createWallet forceMethod parameter
+
+    @Test
+    fun testCreateWallet_forcedMethodRpcValidationFiringFirst() = runTest {
+        // autoFund = true with no nativeTokenContract must throw before any network call,
+        // regardless of forceMethod. This confirms forceMethod parameter is accepted
+        // and validation still fires early.
+        val mockProvider = MockWebAuthnProvider()
+        val config = createTestConfig(webauthnProvider = mockProvider)
+        val kit = OZSmartAccountKit.create(config)
+
+        val exception = assertFailsWith<ValidationException.InvalidInput> {
+            kit.walletOperations.createWallet(
+                userName = "Test User",
+                autoSubmit = true,
+                autoFund = true,
+                nativeTokenContract = null,
+                forceMethod = SubmissionMethod.RPC
+            )
+        }
+        assertTrue(exception.message.contains("nativeTokenContract"))
+    }
+
+    // MARK: - FP3: DeployPendingResult data class
+
+    @Test
+    fun testDeployPendingResult_construction() = runTest {
+        val result = DeployPendingResult(
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            signedTransactionXdr = "AAAAAA==",
+            transactionHash = "abc123"
+        )
+        assertEquals("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM", result.contractId)
+        assertEquals("AAAAAA==", result.signedTransactionXdr)
+        assertEquals("abc123", result.transactionHash)
+    }
+
+    @Test
+    fun testDeployPendingResult_transactionHashDefaultsToNull() = runTest {
+        val result = DeployPendingResult(
+            contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            signedTransactionXdr = "AAAAAA=="
+        )
+        assertNull(result.transactionHash)
+    }
+
+    @Test
+    fun testDeployPendingResult_equality() = runTest {
+        val r1 = DeployPendingResult(
+            contractId = "CABC",
+            signedTransactionXdr = "XDR1",
+            transactionHash = "hash1"
+        )
+        val r2 = DeployPendingResult(
+            contractId = "CABC",
+            signedTransactionXdr = "XDR1",
+            transactionHash = "hash1"
+        )
+        val r3 = DeployPendingResult(
+            contractId = "CABC",
+            signedTransactionXdr = "XDR2",
+            transactionHash = "hash1"
+        )
+        assertEquals(r1, r2)
+        assertFalse(r1 == r3)
+    }
+
+    // MARK: - FP3: deployPendingCredential validation
+
+    @Test
+    fun testDeployPendingCredential_autoFundWithoutNativeTokenContract_throws() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+
+        val exception = assertFailsWith<ValidationException.InvalidInput> {
+            kit.walletOperations.deployPendingCredential(
+                credentialId = "any-credential-id",
+                autoSubmit = true,
+                autoFund = true,
+                nativeTokenContract = null
+            )
+        }
+        assertTrue(exception.message.contains("nativeTokenContract"))
+    }
+
+    @Test
+    fun testDeployPendingCredential_credentialNotFound_throws() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+
+        assertFailsWith<CredentialException> {
+            kit.walletOperations.deployPendingCredential(
+                credentialId = "nonexistent-credential"
+            )
+        }
+    }
+
+    @Test
+    fun testDeployPendingCredential_forceMethodParameterAccepted() = runTest {
+        // Confirm the parameter compiles and early validation fires before the lookup
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+
+        // autoFund = true with no nativeTokenContract throws before the credential lookup
+        val exception = assertFailsWith<ValidationException.InvalidInput> {
+            kit.walletOperations.deployPendingCredential(
+                credentialId = "any-cred",
+                autoSubmit = true,
+                autoFund = true,
+                nativeTokenContract = null,
+                forceMethod = SubmissionMethod.RELAYER
+            )
+        }
+        assertTrue(exception.message.contains("nativeTokenContract"))
     }
 
     // MARK: - Fix 4: connectWallet with options

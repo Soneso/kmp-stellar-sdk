@@ -233,8 +233,8 @@ object SmartAccountBuilders {
      *        Use [Util.LEDGERS_PER_HOUR] or [Util.LEDGERS_PER_DAY]
      *        for common periods.
      * @return Policy parameters for spending limit
-     * @throws ValidationException.InvalidInput if spending limit is not a valid positive number
-     *         or period is less than 1
+     * @throws IllegalArgumentException if spending limit is not a valid positive decimal number
+     * @throws ValidationException.InvalidInput if period is less than 1
      *
      * Example:
      * ```kotlin
@@ -258,35 +258,6 @@ object SmartAccountBuilders {
             spendingLimit = stroops,
             periodLedgers = periodLedgers
         )
-    }
-
-    // ========================================================================
-    // Signer Parsing
-    // ========================================================================
-
-    /**
-     * Parses a signer from a Stellar address string.
-     *
-     * Accepts a Stellar account address (G-address) and returns a [DelegatedSigner].
-     * For more complex signer types, construct the appropriate [SmartAccountSigner]
-     * subclass directly.
-     *
-     * @param address Stellar account address (G-address)
-     * @return A [DelegatedSigner] for the given address
-     * @throws ValidationException.InvalidAddress if the address format is invalid
-     *
-     * Example:
-     * ```kotlin
-     * val signer = SmartAccountBuilders.parseSigner("GA7Q...")
-     * ```
-     */
-    fun parseSigner(address: String): DelegatedSigner {
-        if (!address.startsWith("G") || address.length != 56) {
-            throw ValidationException.invalidAddress(
-                "Invalid Stellar account address. Must start with 'G' and be 56 characters, got: $address"
-            )
-        }
-        return DelegatedSigner(address)
     }
 
     // ========================================================================
@@ -381,7 +352,7 @@ object SmartAccountBuilders {
         }
 
         // Ed25519 signers have 32-byte public key
-        if (external.keyData.size == 32) {
+        if (external.keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
             return "Ed25519"
         }
 

@@ -4,7 +4,8 @@ Platform-specific guide for configuring WebAuthn passkey authentication in Andro
 
 ## Prerequisites
 
-- Android API 28+ (Android 9.0 Pie)
+- Android API 28+ (Android 9.0 Pie) for `AndroidWebAuthnProvider` (passkey authentication)
+- Android API 24+ for `AndroidStorageAdapter` (credential persistence)
 - AndroidX Credential Manager library
 - A domain you control for Digital Asset Links
 

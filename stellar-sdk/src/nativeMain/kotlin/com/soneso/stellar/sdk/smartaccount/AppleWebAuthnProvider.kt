@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount
 
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
+import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
@@ -173,7 +174,6 @@ class AppleWebAuthnProvider(
                 "Attestation object is null"
             )
         val attestationBytes = rawAttestationObject.toByteArray()
-        val clientDataJSON = credential.rawClientDataJSON.toByteArray()
 
         // Extract public key from attestation object using SmartAccountUtils
         // which handles CBOR parsing and COSE key extraction.
@@ -188,18 +188,10 @@ class AppleWebAuthnProvider(
 
         // Parse authenticator data from the attestation object to determine
         // device type and backup status from the flags byte.
-        val authData = extractAuthenticatorDataFromAttestation(attestationBytes)
-        val flags = if (authData != null && authData.size > 32) {
-            authData[32].toInt() and 0xFF
-        } else {
-            null
-        }
-
-        // Bit 3 (0x08): BE (Backup Eligibility) -> multi-device
-        // Bit 4 (0x10): BS (Backup State) -> actually backed up
-        val backupEligible = flags != null && (flags and 0x08) != 0
-        val backedUp = flags != null && (flags and 0x10) != 0
-        val deviceType = if (backupEligible) "multiDevice" else "singleDevice"
+        val authData = WebAuthnCborParser.extractAuthenticatorDataFromAttestation(attestationBytes)
+        val parsedFlags = WebAuthnCborParser.parseAuthenticatorFlags(authData)
+        val deviceType = parsedFlags.deviceType
+        val backedUp = parsedFlags.backedUp
 
         return WebAuthnRegistrationResult(
             credentialId = credentialId,
@@ -223,6 +215,8 @@ class AppleWebAuthnProvider(
      * without modification.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically 32 bytes)
+     * @param allowCredentialIds Optional list of credential IDs to restrict authentication to
+     *        specific passkeys. If null, all registered passkeys are eligible.
      * @return [WebAuthnAuthenticationResult] with credential ID, authenticator data,
      *         client data JSON, and DER-encoded signature
      * @throws WebAuthnException.Cancelled if the user dismissed the authentication dialog
@@ -413,76 +407,6 @@ class AppleWebAuthnProvider(
                 if (isRegistration) WebAuthnException.registrationFailed(msg)
                 else WebAuthnException.authenticationFailed(msg)
             }
-        }
-    }
-
-    /**
-     * Extracts the authenticator data from a raw CBOR-encoded attestation object.
-     *
-     * WebAuthn attestation objects are CBOR maps. This method searches for the
-     * "authData" key in the CBOR structure using a pattern-matching approach
-     * that avoids requiring a full CBOR parser.
-     *
-     * The attestation object has this CBOR structure:
-     * ```
-     * {
-     *   "fmt": "none",
-     *   "attStmt": {},
-     *   "authData": <byte string of authenticator data>
-     * }
-     * ```
-     *
-     * The method searches for the "authData" key (CBOR text string:
-     * 0x68 "authData") followed by a CBOR byte string header (0x58 or 0x59),
-     * then extracts the authenticator data bytes.
-     *
-     * @param attestationObject Raw attestation object bytes
-     * @return Authenticator data bytes, or null if parsing fails
-     */
-    private fun extractAuthenticatorDataFromAttestation(
-        attestationObject: ByteArray
-    ): ByteArray? {
-        // Search for "authData" key in the CBOR map.
-        // CBOR encoding of text string "authData" (8 chars):
-        // 0x68 (text string of length 8) + "authData" = 68 61 75 74 68 44 61 74 61
-        val authDataKey = byteArrayOf(
-            0x68, 0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61
-        )
-
-        val keyIndex = SmartAccountUtils.findSubarray(attestationObject, authDataKey)
-        if (keyIndex < 0) return null
-
-        val valueStart = keyIndex + authDataKey.size
-        if (valueStart >= attestationObject.size) return null
-
-        val majorType = attestationObject[valueStart].toInt() and 0xFF
-
-        return when {
-            // Byte string with 1-byte length (0x58 prefix, lengths 0-255)
-            majorType == 0x58 -> {
-                if (valueStart + 1 >= attestationObject.size) return null
-                val length = attestationObject[valueStart + 1].toInt() and 0xFF
-                val dataStart = valueStart + 2
-                if (dataStart + length > attestationObject.size) return null
-                attestationObject.copyOfRange(dataStart, dataStart + length)
-            }
-            // Byte string with 2-byte length (0x59 prefix, lengths 256-65535)
-            majorType == 0x59 -> {
-                if (valueStart + 2 >= attestationObject.size) return null
-                val length = ((attestationObject[valueStart + 1].toInt() and 0xFF) shl 8) or
-                    (attestationObject[valueStart + 2].toInt() and 0xFF)
-                val dataStart = valueStart + 3
-                if (dataStart + length > attestationObject.size) return null
-                attestationObject.copyOfRange(dataStart, dataStart + length)
-            }
-            // Short byte string (major type 2, length embedded in first byte: 0x40-0x57)
-            majorType in 0x40..0x57 -> {
-                val length = majorType - 0x40
-                val dataStart = valueStart + 1
-                if (dataStart + length > attestationObject.size) return null
-                attestationObject.copyOfRange(dataStart, dataStart + length)
-            }
-            else -> null
         }
     }
 

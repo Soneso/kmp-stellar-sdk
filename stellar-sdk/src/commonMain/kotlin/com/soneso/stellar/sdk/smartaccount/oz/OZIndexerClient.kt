@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Util
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -107,13 +108,13 @@ data class IndexedContextRule(
 /**
  * A signer within a context rule.
  *
- * Can be either an external signer (WebAuthn/passkey with credential ID) or a delegated
- * signer (Stellar address using built-in signature verification).
+ * Can be an external signer (WebAuthn/passkey with credential ID), a delegated
+ * signer (Stellar address), or a native signer.
  */
 @Serializable
 data class IndexedSigner(
     @SerialName("signer_type")
-    val signerType: String,  // "External" or "Delegated"
+    val signerType: String,  // "External", "Delegated", or "Native"
     @SerialName("signer_address")
     val signerAddress: String? = null,
     @SerialName("credential_id")
@@ -206,35 +207,55 @@ data class HealthCheckResponse(
  * val contractDetails = client.getContract("CABC123...")
  * println("Contract has ${contractDetails.contextRules.size} context rules")
  * ```
+ *
+ * @param indexerUrl The indexer endpoint URL (trailing slashes are stripped)
+ * @param timeoutMs Request timeout in milliseconds
+ * @param injectedClient Optional custom HTTP client for testing
+ * @throws ConfigurationException.InvalidConfig if the URL is blank or does not use HTTPS
+ *   (http://localhost is permitted for development).
  */
 class OZIndexerClient(
-    private val indexerUrl: String,
-    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
-) {
+    indexerUrl: String,
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS,
+    private val injectedClient: HttpClient? = null
+) : AutoCloseable {
+    private val baseUrl: String
+
     init {
         if (indexerUrl.isBlank()) {
             throw ConfigurationException.invalidConfig("Indexer URL is required")
         }
-        if (!indexerUrl.startsWith("https://") && !indexerUrl.startsWith("http://localhost")) {
+        if (!indexerUrl.startsWith("https://") && !isLocalhostUrl(indexerUrl)) {
             throw ConfigurationException.invalidConfig(
                 "Indexer URL must use HTTPS (or http://localhost for development): $indexerUrl"
             )
         }
+        baseUrl = indexerUrl.trimEnd('/')
     }
 
-    private val httpClient: HttpClient = createHttpClient(timeoutMs)
+    /**
+     * Persistent HTTP client for production use. Closed by [close].
+     * When [injectedClient] is provided (testing), that client is used instead.
+     */
+    private val ownedClient: HttpClient = createHttpClient(timeoutMs)
+
+    /**
+     * The effective HTTP client used for requests.
+     */
+    private val effectiveClient: HttpClient get() = injectedClient ?: ownedClient
 
     companion object {
+        private const val HEALTH_STATUS_OK = "ok"
+
         /**
          * Default indexer URLs by network passphrase.
          *
-         * Maps standard Stellar network passphrases to their corresponding indexer endpoints.
-         * These URLs are maintained by the OpenZeppelin team and should be used as defaults
+         * Default indexer endpoints for known Stellar networks. Used as defaults
          * when no custom indexer URL is provided.
          */
         val DEFAULT_INDEXER_URLS: Map<String, String> = mapOf(
-            "Test SDF Network ; September 2015" to "https://smart-account-indexer.sdf-ecosystem.workers.dev"
-            // Mainnet URL will be added when available
+            Network.TESTNET.networkPassphrase to "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+            Network.PUBLIC.networkPassphrase to "https://smart-account-indexer-mainnet.sdf-ecosystem.workers.dev"
         )
 
         /**
@@ -248,7 +269,7 @@ class OZIndexerClient(
         /**
          * Creates an OZIndexerClient for a specific network using the default indexer URL.
          *
-         * Uses the default indexer endpoint for known networks (testnet, mainnet).
+         * Uses the default indexer endpoint for known networks (testnet and mainnet).
          * Returns null if no default URL is configured for the network.
          *
          * @param networkPassphrase The Stellar network passphrase
@@ -279,6 +300,10 @@ class OZIndexerClient(
      * @return Configured HttpClient instance
      */
     private fun createHttpClient(timeoutMs: Long): HttpClient = HttpClient {
+        defaultRequest {
+            header(OZConstants.CLIENT_NAME_HEADER, OZConstants.CLIENT_NAME)
+            header(OZConstants.CLIENT_VERSION_HEADER, Util.getSdkVersion())
+        }
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -302,11 +327,13 @@ class OZIndexerClient(
      * @param credentialId The credential ID to look up (base64url-encoded, no padding).
      *                     Will be converted to hex for the API call.
      * @return A response containing the credential ID, matching contracts, and count.
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws ValidationException.InvalidInput if the credential ID is not valid base64url.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun lookupByCredentialId(credentialId: String): CredentialLookupResponse {
         val hexCredentialId = base64UrlToHex(credentialId)
-        val url = "${indexerUrl.trimEnd('/')}/api/lookup/$hexCredentialId"
+        val url = "$baseUrl/api/lookup/$hexCredentialId"
         return performRequest(url)
     }
 
@@ -319,14 +346,13 @@ class OZIndexerClient(
      * @param address The signer address to look up (G... or C... format).
      * @return A response containing the signer address, matching contracts, and count.
      * @throws ValidationException.InvalidAddress if the address format is invalid.
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun lookupByAddress(address: String): AddressLookupResponse {
-        if (!address.startsWith("G") && !address.startsWith("C")) {
-            throw ValidationException.invalidAddress("Signer address must start with 'G' or 'C', got: $address")
-        }
+        requireStellarAddress(address, "address")
 
-        val url = "${indexerUrl.trimEnd('/')}/api/lookup/address/$address"
+        val url = "$baseUrl/api/lookup/address/$address"
         return performRequest(url)
     }
 
@@ -339,14 +365,13 @@ class OZIndexerClient(
      * @param contractId The contract ID to query (C... format).
      * @return A response containing the contract ID, summary, and all context rules.
      * @throws ValidationException.InvalidAddress if the contract ID format is invalid.
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun getContract(contractId: String): ContractDetailsResponse {
-        if (!contractId.startsWith("C")) {
-            throw ValidationException.invalidAddress("Contract ID must start with 'C', got: $contractId")
-        }
+        requireContractAddress(contractId, "contractId")
 
-        val url = "${indexerUrl.trimEnd('/')}/api/contract/$contractId"
+        val url = "$baseUrl/api/contract/$contractId"
         return performRequest(url)
     }
 
@@ -363,10 +388,11 @@ class OZIndexerClient(
      * Useful for debugging and monitoring indexer health.
      *
      * @return Indexer statistics
-     * @throws ValidationException.InvalidInput if the request fails or returns invalid data.
+     * @throws IndexerException.RequestFailed if the request fails.
+     * @throws IndexerException.Timeout if the request times out.
      */
     suspend fun getStats(): IndexerStatsResponse {
-        val url = "${indexerUrl.trimEnd('/')}/api/stats"
+        val url = "$baseUrl/api/stats"
         return performRequest(url)
     }
 
@@ -386,7 +412,7 @@ class OZIndexerClient(
      */
     suspend fun isHealthy(): Boolean {
         return try {
-            val response: HttpResponse = httpClient.get("${indexerUrl.trimEnd('/')}/") {
+            val response: HttpResponse = effectiveClient.get("$baseUrl/") {
                 headers {
                     append(HttpHeaders.Accept, ContentType.Application.Json.toString())
                 }
@@ -397,7 +423,7 @@ class OZIndexerClient(
             }
 
             val healthCheck: HealthCheckResponse = response.body()
-            healthCheck.status == "ok"
+            healthCheck.status == HEALTH_STATUS_OK
         } catch (_: Throwable) {
             // Catches all errors including JS Error ("Fail to fetch") which is
             // a Throwable but not an Exception on Kotlin/JS.
@@ -406,13 +432,14 @@ class OZIndexerClient(
     }
 
     /**
-     * Closes the HTTP client and releases resources.
+     * Closes the owned HTTP client and releases resources.
      *
-     * Should be called when the client is no longer needed to free up system resources.
-     * After calling close, this client instance cannot be used again.
+     * When an injected client was provided (testing), it is not closed —
+     * the caller retains ownership. After calling close, this client
+     * instance should not be used again.
      */
-    fun close() {
-        httpClient.close()
+    override fun close() {
+        ownedClient.close()
     }
 
     // MARK: - Private Helper Methods
@@ -422,11 +449,12 @@ class OZIndexerClient(
      *
      * @param url The full URL to request
      * @return The decoded response object
-     * @throws ValidationException.InvalidInput for network, timeout, or decoding errors
+     * @throws IndexerException.RequestFailed for non-success HTTP status or network/decoding errors
+     * @throws IndexerException.Timeout if the request times out
      */
     private suspend inline fun <reified T> performRequest(url: String): T {
         try {
-            val response: HttpResponse = httpClient.get(url) {
+            val response: HttpResponse = effectiveClient.get(url) {
                 headers {
                     append(HttpHeaders.Accept, ContentType.Application.Json.toString())
                 }
@@ -436,30 +464,24 @@ class OZIndexerClient(
             if (!response.status.isSuccess()) {
                 val errorBody = try {
                     response.bodyAsText()
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     "(unable to decode response body)"
                 }
                 val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
-                throw ValidationException.InvalidInput(
-                    "Indexer returned HTTP ${response.status.value}: $truncatedBody"
+                throw IndexerException.requestFailed(
+                    "HTTP ${response.status.value}: $truncatedBody"
                 )
             }
 
             return response.body()
         } catch (e: HttpRequestTimeoutException) {
-            throw ValidationException.InvalidInput(
-                "Indexer request timed out: $url",
-                e
-            )
-        } catch (e: ValidationException) {
-            // Re-throw validation exceptions as-is
+            throw IndexerException.timeout(url, e)
+        } catch (e: SmartAccountException) {
+            // Re-throw SDK exceptions as-is (includes IndexerException, ValidationException)
             throw e
         } catch (e: Exception) {
             val errorMessage = e.message ?: e.toString()
-            throw ValidationException.InvalidInput(
-                "Indexer request failed: $errorMessage",
-                e
-            )
+            throw IndexerException.requestFailed(errorMessage, e)
         }
     }
 

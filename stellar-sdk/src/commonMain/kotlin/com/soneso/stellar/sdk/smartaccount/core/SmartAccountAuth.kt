@@ -68,11 +68,6 @@ object SmartAccountAuth {
      * ```
      *
      * Where `contextRuleIds.toXDR()` is the XDR encoding of `ScVal::Vec([ScVal::U32(id), ...])`.
-     * This matches the TypeScript SDK computation exactly:
-     * ```typescript
-     * const ruleIdsXdr = xdr.ScVal.scvVec(contextRuleIds.map(id => xdr.ScVal.scvU32(id))).toXDR();
-     * return hash(Buffer.concat([signaturePayload, ruleIdsXdr]));
-     * ```
      *
      * @param signaturePayload The 32-byte signature payload hash from [buildAuthPayloadHash]
      * @param contextRuleIds The context rule IDs to bind into the digest

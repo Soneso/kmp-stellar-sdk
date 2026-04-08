@@ -516,6 +516,124 @@ class LocalStorageAdapterTest {
         assertNull(adapter.getSession())
     }
 
+    // MARK: - Credential: Get by Contract ID (null contractId exclusion)
+
+    @Test
+    fun testGetByContractExcludesNullContractId() = runTest {
+        if (!isBrowserEnvironment()) return@runTest
+        val adapter = newAdapter()
+
+        // Save a credential without a contract ID
+        adapter.save(minimalCredential("cred-no-contract"))
+
+        // Query for any contract ID should not return the undeployed credential
+        val contractId = "CAAA1234AAAA5678AAAA9012AAAA3456AAAA7890AAAA1234AAAA5678"
+        val result = adapter.getByContract(contractId)
+        assertTrue(result.isEmpty())
+
+        // Sanity: the credential is still present via getAll()
+        val all = adapter.getAll()
+        assertEquals(1, all.size)
+        assertNull(all[0].contractId)
+    }
+
+    // MARK: - Credential: Update (field-level)
+
+    @Test
+    fun testUpdateIsPrimary() = runTest {
+        if (!isBrowserEnvironment()) return@runTest
+        val adapter = newAdapter()
+        val credential = StoredCredential(
+            credentialId = "cred-update-primary",
+            publicKey = testPublicKey(5),
+            deploymentStatus = CredentialDeploymentStatus.PENDING,
+            createdAt = 1700000000000L,
+            isPrimary = false
+        )
+        adapter.save(credential)
+
+        adapter.update("cred-update-primary", StoredCredentialUpdate(isPrimary = true))
+
+        val updated = adapter.get("cred-update-primary")
+        assertNotNull(updated)
+        assertTrue(updated.isPrimary)
+        // Unrelated fields remain unchanged
+        assertEquals(CredentialDeploymentStatus.PENDING, updated.deploymentStatus)
+    }
+
+    @Test
+    fun testUpdateTransports() = runTest {
+        if (!isBrowserEnvironment()) return@runTest
+        val adapter = newAdapter()
+        val credential = StoredCredential(
+            credentialId = "cred-update-transports",
+            publicKey = testPublicKey(6),
+            deploymentStatus = CredentialDeploymentStatus.PENDING,
+            createdAt = 1700000000000L,
+            transports = null
+        )
+        adapter.save(credential)
+
+        adapter.update("cred-update-transports", StoredCredentialUpdate(
+            transports = listOf("internal", "hybrid")
+        ))
+
+        val updated = adapter.get("cred-update-transports")
+        assertNotNull(updated)
+        assertEquals(listOf("internal", "hybrid"), updated.transports)
+        // Unrelated fields remain unchanged
+        assertNull(updated.contractId)
+    }
+
+    @Test
+    fun testUpdateContractId() = runTest {
+        if (!isBrowserEnvironment()) return@runTest
+        val adapter = newAdapter()
+        val credential = StoredCredential(
+            credentialId = "cred-update-contract",
+            publicKey = testPublicKey(7),
+            deploymentStatus = CredentialDeploymentStatus.PENDING,
+            createdAt = 1700000000000L,
+            contractId = null
+        )
+        adapter.save(credential)
+
+        val newContractId = "CBBB5678BBBB1234BBBB9012BBBB3456BBBB7890BBBB1234BBBB5678"
+        adapter.update("cred-update-contract", StoredCredentialUpdate(contractId = newContractId))
+
+        val updated = adapter.get("cred-update-contract")
+        assertNotNull(updated)
+        assertEquals(newContractId, updated.contractId)
+
+        // The updated credential is now returned by getByContract
+        val byContract = adapter.getByContract(newContractId)
+        assertEquals(1, byContract.size)
+        assertEquals("cred-update-contract", byContract[0].credentialId)
+    }
+
+    @Test
+    fun testUpdateLastUsedAt() = runTest {
+        if (!isBrowserEnvironment()) return@runTest
+        val adapter = newAdapter()
+        val credential = StoredCredential(
+            credentialId = "cred-update-lastused",
+            publicKey = testPublicKey(8),
+            deploymentStatus = CredentialDeploymentStatus.PENDING,
+            createdAt = 1700000000000L,
+            lastUsedAt = null
+        )
+        adapter.save(credential)
+
+        val usedAt = 1700005000000L
+        adapter.update("cred-update-lastused", StoredCredentialUpdate(lastUsedAt = usedAt))
+
+        val updated = adapter.get("cred-update-lastused")
+        assertNotNull(updated)
+        assertEquals(usedAt, updated.lastUsedAt)
+        // createdAt is immutable and must not be altered by the update
+        assertEquals(1700000000000L, updated.createdAt)
+    }
+
     // MARK: - Interface Conformance
 
     @Test

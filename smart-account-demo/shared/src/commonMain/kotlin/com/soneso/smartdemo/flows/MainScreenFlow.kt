@@ -72,7 +72,7 @@ suspend fun initializeKit(
     // Create the kit instance. This is the main entry point to all SDK operations.
     val kit = OZSmartAccountKit.create(config)
     DemoState.setKitInstance(kit)
-    DemoState.externalSignerManager = externalSignerManagerAdapter
+    DemoState.setExternalSignerManager(externalSignerManagerAdapter)
 
     ActivityLogState.success("SDK initialized")
 

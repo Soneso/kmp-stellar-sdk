@@ -114,10 +114,10 @@ interface WalletConnectionStorage {
 /**
  * In-memory implementation of [WalletConnectionStorage].
  *
- * Data is not persisted across application restarts. Use platform-specific
- * implementations for persistent storage.
+ * Used internally as a default when no [WalletConnectionStorage] is provided.
+ * Data is not persisted across application restarts.
  */
-class InMemoryWalletConnectionStorage : WalletConnectionStorage {
+internal class InMemoryWalletConnectionStorage : WalletConnectionStorage {
     private val data = mutableMapOf<String, String>()
     private val mutex = Mutex()
 
@@ -223,7 +223,7 @@ class OZExternalSignerManager(
      * Wallet-related operations ([addFromWallet], [restoreConnections]) require this
      * to be true.
      */
-    val hasWalletAdapter: Boolean
+    internal val hasWalletAdapter: Boolean
         get() = walletAdapter != null
 
     // MARK: - Add Signers
@@ -236,7 +236,9 @@ class OZExternalSignerManager(
      * application terminates or the manager is garbage collected.
      *
      * If a signer with the same G-address already exists (either keypair or wallet),
-     * the keypair signer takes precedence and overwrites the existing entry.
+     * the keypair signer takes precedence and overwrites the existing entry. Any
+     * persisted wallet connection for the same address is removed from storage to
+     * prevent it from reappearing on the next [restoreConnections] call.
      *
      * @param secretKey A valid Stellar secret key (S-address, 56 characters)
      * @return The derived G-address of the signer
@@ -264,6 +266,11 @@ class OZExternalSignerManager(
         mutex.withLock {
             keypairSigners[address] = keypair
         }
+
+        // Remove any stale wallet entry for the same address from storage.
+        // Keypair signers take precedence; without this cleanup the wallet
+        // would reappear on the next restoreConnections() call.
+        removeWalletFromStorage(address)
 
         return address
     }
@@ -354,7 +361,7 @@ class OZExternalSignerManager(
      * }
      * ```
      */
-    suspend fun get(address: String): ExternalSignerInfo? {
+    internal suspend fun get(address: String): ExternalSignerInfo? {
         // Check keypair signers
         val hasKeypair = mutex.withLock {
             keypairSigners.containsKey(address)
@@ -440,7 +447,7 @@ class OZExternalSignerManager(
      *
      * @return True if at least one signer is managed
      */
-    suspend fun hasSigners(): Boolean {
+    internal suspend fun hasSigners(): Boolean {
         val hasKeypairs = mutex.withLock {
             keypairSigners.isNotEmpty()
         }
@@ -523,7 +530,8 @@ class OZExternalSignerManager(
      * Removes a signer by address.
      *
      * For keypair signers, removes the keypair from memory. For wallet signers,
-     * removes the connection from storage. Both types are cleaned up if present.
+     * removes the connection from storage and calls [ExternalWalletAdapter.disconnectByAddress]
+     * to clean up the adapter's runtime state. Both types are cleaned up if present.
      *
      * @param address The G-address of the signer to remove
      *
@@ -539,7 +547,8 @@ class OZExternalSignerManager(
             keypairSigners.remove(address)
         }
 
-        // Remove from storage
+        // Disconnect from wallet adapter and remove from storage
+        walletAdapter?.disconnectByAddress(address)
         removeWalletFromStorage(address)
     }
 
@@ -762,11 +771,6 @@ class OZExternalSignerManager(
 
     /**
      * Serializes wallet connections to a JSON array string using kotlinx.serialization.
-     *
-     * Produces the same format as the previous manual serializer:
-     * ```json
-     * [{"address":"G...","walletId":"freighter","walletName":"Freighter","connectedAt":12345}]
-     * ```
      */
     private fun serializeWallets(wallets: List<StoredWalletConnection>): String {
         return json.encodeToString(wallets)
@@ -775,10 +779,9 @@ class OZExternalSignerManager(
     /**
      * Parses wallet connections from a JSON array string using kotlinx.serialization.
      *
-     * Returns all entries or an empty list on any parse failure. Unlike the previous
-     * manual parser which skipped individual malformed entries, kotlinx.serialization
-     * parses atomically. This is acceptable because the serializer always produces valid
-     * JSON — corruption would only come from external tampering or storage failure.
+     * Parses atomically — if the JSON is malformed, returns an empty list rather than
+     * partial results. This is acceptable because the serializer always produces valid
+     * JSON.
      */
     private fun parseStoredWallets(jsonString: String): List<StoredWalletConnection> {
         return try {

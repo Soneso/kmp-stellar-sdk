@@ -20,6 +20,7 @@ package com.soneso.stellar.sdk.smartaccount.core
  * - 7xxx: Validation errors
  * - 8xxx: Storage errors
  * - 9xxx: Session errors
+ * - 10xxx: Indexer errors
  */
 enum class SmartAccountErrorCode(val code: Int) {
     // 1xxx: Configuration errors
@@ -64,7 +65,11 @@ enum class SmartAccountErrorCode(val code: Int) {
 
     // 9xxx: Session errors
     SESSION_EXPIRED(9001),
-    SESSION_INVALID(9002)
+    SESSION_INVALID(9002),
+
+    // 10xxx: Indexer errors
+    INDEXER_REQUEST_FAILED(10001),
+    INDEXER_TIMEOUT(10002)
 }
 
 /**
@@ -176,6 +181,10 @@ sealed class SmartAccountException(
                     SessionException.Expired(message, err)
                 SmartAccountErrorCode.SESSION_INVALID ->
                     SessionException.Invalid(message, err)
+                SmartAccountErrorCode.INDEXER_REQUEST_FAILED ->
+                    IndexerException.RequestFailed(message, err)
+                SmartAccountErrorCode.INDEXER_TIMEOUT ->
+                    IndexerException.Timeout(message, err)
             }
         }
     }
@@ -739,6 +748,50 @@ sealed class SessionException(
          */
         fun invalid(reason: String, cause: Throwable? = null) =
             Invalid("Invalid session: $reason", cause)
+    }
+}
+
+/**
+ * Indexer-related errors (10xxx range).
+ */
+sealed class IndexerException(
+    code: SmartAccountErrorCode,
+    message: String,
+    cause: Throwable? = null
+) : SmartAccountException(code, message, cause) {
+
+    /**
+     * Indexer request failed (network error or non-success HTTP status).
+     */
+    class RequestFailed(message: String, cause: Throwable? = null) :
+        IndexerException(SmartAccountErrorCode.INDEXER_REQUEST_FAILED, message, cause)
+
+    /**
+     * Indexer request timed out.
+     */
+    class Timeout(message: String, cause: Throwable? = null) :
+        IndexerException(SmartAccountErrorCode.INDEXER_TIMEOUT, message, cause)
+
+    companion object {
+        /**
+         * Creates a [RequestFailed] exception for indexer request failures.
+         *
+         * @param reason Description of why the request failed
+         * @param cause Optional underlying exception
+         * @return An [IndexerException.RequestFailed] instance
+         */
+        fun requestFailed(reason: String, cause: Throwable? = null) =
+            RequestFailed("Indexer request failed: $reason", cause)
+
+        /**
+         * Creates a [Timeout] exception for indexer request timeouts.
+         *
+         * @param url The URL that timed out
+         * @param cause Optional underlying exception
+         * @return An [IndexerException.Timeout] instance
+         */
+        fun timeout(url: String, cause: Throwable? = null) =
+            Timeout("Indexer request timed out: $url", cause)
     }
 }
 

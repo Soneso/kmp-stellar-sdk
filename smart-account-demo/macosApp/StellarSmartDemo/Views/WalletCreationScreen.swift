@@ -8,18 +8,19 @@
 import SwiftUI
 import shared
 
-/// Screen that collects a display name, triggers passkey registration, and deploys a smart account
-/// contract to the Stellar testnet.
+/// Screen that collects a display name, triggers passkey registration, and optionally deploys a
+/// smart account contract to the Stellar testnet.
 ///
 /// The screen mirrors the Compose `WalletCreationScreen` and covers the full wallet creation
 /// lifecycle:
 /// 1. The user enters a passkey display name.
-/// 2. Tapping "Create Wallet" calls `MacOSBridge.createWallet(username:onProgress:)`.
+/// 2. Tapping "Create Wallet" calls `MacOSBridge.createWallet(username:autoSubmit:onProgress:)`.
 /// 3. Progress messages are shown in a live card while the operation is in flight.
-/// 4. On success a result card shows the credential ID, contract address, initial balances,
-///    and a "Go to Main Screen" button.
-/// 5. User cancellation (Touch ID dismissed) is distinguished from genuine errors and shown
-///    as an informational message rather than an error.
+/// 4. On success:
+///    - If autoSubmit=true: a green result card shows credentials, balances, and "Go to Main Screen".
+///    - If autoSubmit=false: a blue info card shows the passkey was registered but not deployed,
+///      with a "Deploy Now" button to retry deployment inline.
+/// 5. User cancellation (Touch ID dismissed) is distinguished from genuine errors.
 struct WalletCreationScreen: View {
 
     // MARK: - Environment
@@ -32,11 +33,17 @@ struct WalletCreationScreen: View {
     // MARK: - State
 
     @State private var username: String = ""
+    @State private var autoSubmit: Bool = true
     @State private var isLoading: Bool = false
     @State private var progressMessage: String = ""
     @State private var errorMessage: String? = nil
     @State private var infoMessage: String? = nil
     @State private var createResult: WalletCreationResult? = nil
+
+    // Deploy-from-creation-screen state (for autoSubmit=false results)
+    @State private var isDeploying: Bool = false
+    @State private var deployErrorMessage: String? = nil
+    @State private var deployedSuccessfully: Bool = false
 
     // MARK: - Derived State
 
@@ -57,6 +64,7 @@ struct WalletCreationScreen: View {
                 if let error = errorMessage { errorCard(message: error) }
                 if let info = infoMessage { infoCard(message: info) }
                 if isLoading { progressCard }
+                if createResult == nil && !isLoading { autoSubmitToggle }
                 if createResult == nil && !isLoading { createButton }
                 if let result = createResult { resultSection(result: result) }
                 Spacer().frame(height: 16)
@@ -141,6 +149,15 @@ struct WalletCreationScreen: View {
         .cornerRadius(8)
     }
 
+    // MARK: - Auto-submit Toggle
+
+    private var autoSubmitToggle: some View {
+        Toggle("Auto-deploy after passkey registration", isOn: $autoSubmit)
+            .toggleStyle(.checkbox)
+            .font(.system(size: 13))
+            .foregroundStyle(Material3Colors.onSurface)
+    }
+
     // MARK: - Create Button
 
     private var createButton: some View {
@@ -159,11 +176,16 @@ struct WalletCreationScreen: View {
     @ViewBuilder
     private func resultSection(result: WalletCreationResult) -> some View {
         VStack(spacing: 16) {
-            successCard(result: result)
+            if deployedSuccessfully {
+                deployedCard(result: result)
+            } else {
+                undeployedCard(result: result)
+            }
+
             LoadingButton(
                 action: { dismiss() },
                 isLoading: false,
-                isEnabled: true,
+                isEnabled: !isDeploying,
                 text: "Go to Main Screen",
                 loadingText: "",
                 style: .filled
@@ -171,8 +193,10 @@ struct WalletCreationScreen: View {
         }
     }
 
+    // MARK: - Deployed Success Card
+
     @ViewBuilder
-    private func successCard(result: WalletCreationResult) -> some View {
+    private func deployedCard(result: WalletCreationResult) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Wallet Created Successfully")
                 .font(.headline)
@@ -216,6 +240,80 @@ struct WalletCreationScreen: View {
         .cornerRadius(8)
     }
 
+    // MARK: - Undeployed Card
+
+    @ViewBuilder
+    private func undeployedCard(result: WalletCreationResult) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Passkey Registered")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Material3Colors.onSecondaryContainer)
+
+            CopyableField(
+                label: "Credential ID",
+                value: result.credentialId,
+                textColor: Material3Colors.onSecondaryContainer,
+                labelColor: Material3Colors.onSecondaryContainer,
+                monospace: true,
+                onCopy: { toastManager.show("Credential ID copied to clipboard") }
+            )
+
+            CopyableField(
+                label: "Contract Address (derived)",
+                value: result.contractId,
+                textColor: Material3Colors.onSecondaryContainer,
+                labelColor: Material3Colors.onSecondaryContainer,
+                monospace: true,
+                onCopy: { toastManager.show("Contract address copied to clipboard") }
+            )
+
+            // Warning message
+            warningBanner(
+                text: "The wallet contract has not been deployed to the network yet. " +
+                      "Deploy it now or later from the Connect Wallet screen."
+            )
+
+            // Deploy error
+            if let error = deployErrorMessage {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Material3Colors.onErrorContainer)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Material3Colors.errorContainer)
+                    .cornerRadius(6)
+            }
+
+            // Deploy progress
+            if isDeploying {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Deploying contract...")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Material3Colors.onSecondaryContainer)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            // Deploy Now button
+            LoadingButton(
+                action: deployFromCreationScreen,
+                isLoading: isDeploying,
+                isEnabled: !isDeploying,
+                text: "Deploy Now",
+                loadingText: "Deploying...",
+                style: .filled
+            )
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Material3Colors.secondaryContainer)
+        .cornerRadius(8)
+    }
+
     @ViewBuilder
     private func balanceSection(result: WalletCreationResult) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -236,6 +334,17 @@ struct WalletCreationScreen: View {
         }
     }
 
+    @ViewBuilder
+    private func warningBanner(text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13))
+            .foregroundStyle(Color(red: 0.902, green: 0.318, blue: 0.000)) // Orange 900
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color(red: 1.0, green: 0.953, blue: 0.878)) // Orange 50
+            .cornerRadius(6)
+    }
+
     // MARK: - Actions
 
     private func startWalletCreation() {
@@ -247,10 +356,8 @@ struct WalletCreationScreen: View {
             do {
                 let result = try await bridgeWrapper.bridge.createWallet(
                     username: username,
+                    autoSubmit: autoSubmit,
                     onProgress: { progress in
-                        // Kotlin (String) -> Unit callback runs on the coroutine dispatcher thread.
-                        // DispatchQueue.main.async is used here because this is a synchronous callback,
-                        // not a Swift async context where MainActor.run would be appropriate.
                         DispatchQueue.main.async {
                             self.progressMessage = progress
                         }
@@ -260,7 +367,12 @@ struct WalletCreationScreen: View {
                     self.createResult = result
                     self.isLoading = false
                     appState.sync(from: bridgeWrapper.bridge)
-                    toastManager.show("Wallet created successfully")
+                    self.deployedSuccessfully = appState.isDeployed
+                    if self.deployedSuccessfully {
+                        toastManager.show("Wallet created successfully")
+                    } else {
+                        toastManager.show("Passkey registered (deployment pending)")
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -275,6 +387,50 @@ struct WalletCreationScreen: View {
                             "to retry the deployment."
                     }
                     self.isLoading = false
+                }
+            }
+        }
+    }
+
+    private func deployFromCreationScreen() {
+        guard let result = createResult else { return }
+        isDeploying = true
+        deployErrorMessage = nil
+
+        Task {
+            do {
+                let provisionResult = try await bridgeWrapper.bridge.deployPendingAndProvision(
+                    credentialId: result.credentialId,
+                    onProgress: { progress in
+                        DispatchQueue.main.async {
+                            self.progressMessage = progress
+                        }
+                    }
+                )
+                await MainActor.run {
+                    appState.sync(from: bridgeWrapper.bridge)
+                    if provisionResult.success {
+                        self.deployedSuccessfully = true
+                        // Update the result with balances from provisioning
+                        self.createResult = WalletCreationResult(
+                            credentialId: result.credentialId,
+                            contractId: result.contractId,
+                            transactionHash: result.transactionHash,
+                            nickname: result.nickname,
+                            xlmBalance: provisionResult.xlmBalance,
+                            demoTokenBalance: provisionResult.demoTokenBalance
+                        )
+                        toastManager.show("Wallet deployed successfully")
+                    } else {
+                        self.deployErrorMessage = "Deployment failed: \(provisionResult.error ?? "Unknown error")"
+                    }
+                    self.isDeploying = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.deployErrorMessage = "Deployment failed: \(error.localizedDescription)"
+                    self.isDeploying = false
+                    appState.syncActivityLog(from: bridgeWrapper.bridge)
                 }
             }
         }

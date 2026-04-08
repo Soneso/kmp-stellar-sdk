@@ -122,9 +122,10 @@ val wallet = kit.walletOperations.createWallet(
     nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 )
 
-// wallet.credentialId  -- Base64URL-encoded credential ID
-// wallet.contractId    -- Stellar C-address of the deployed contract
-// wallet.transactionHash -- deployment transaction hash
+// wallet.credentialId      -- Base64URL-encoded credential ID
+// wallet.contractId        -- Stellar C-address of the deployed contract
+// wallet.signedTransactionXdr -- signed deploy transaction envelope (always present)
+// wallet.transactionHash   -- deployment transaction hash (present when autoSubmit = true)
 
 // Step 4: Transfer tokens
 //
@@ -135,7 +136,7 @@ val wallet = kit.walletOperations.createWallet(
 val result = kit.transactionOperations.transfer(
     tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     recipient = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
-    amount = 10.0  // 10 XLM (automatically converted to stroops)
+    amount = "10"  // decimal amount (automatically converted to stroops)
 )
 
 if (result.success) {
@@ -200,6 +201,18 @@ val connection = kit.walletOperations.connectWallet(
         contractId = "CABC..."
     )
 )
+```
+
+### Retrying Failed Deployments
+
+When `createWallet(autoSubmit = false)` is used, or if a deployment fails after the credential is created, use `deployPendingCredential()` to submit the deploy transaction later. The credential must exist in local storage. The `signedTransactionXdr` field on `CreateWalletResult` is always populated regardless of `autoSubmit`, so it can also be submitted externally.
+
+```kotlin
+val result = kit.walletOperations.deployPendingCredential(
+    credentialId = wallet.credentialId,
+    autoSubmit = true
+)
+println("Deployed: ${result.contractId}, tx: ${result.transactionHash}")
 ```
 
 ### Managing Signers
@@ -269,6 +282,10 @@ val result = kit.policyManager.addPolicy(
     ))
 )
 ```
+
+### Multi-Signer Operations
+
+When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers with multiple signers. `multiSignerExecuteAndSubmit()` handles arbitrary contract calls (e.g., governance votes, multisig swaps) with multiple signers -- it routes the call through the smart account's `execute` entry point.
 
 ### Error Handling
 
@@ -391,7 +408,7 @@ Contract address derivation is deterministic: given the same deployer keypair, c
 
 ### Default Deployer
 
-The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`. This default is suitable for testing and simple deployments. The [TypeScript Smart Account Kit](https://github.com/kalepail/smart-account-kit) uses the same derivation, so both SDKs produce identical results from the same inputs -- useful for verifying correctness across implementations.
+The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`. This default is suitable for testing and simple deployments. Other OpenZeppelin Smart Account SDK implementations use the same derivation, so all SDKs produce identical results from the same inputs.
 
 ```kotlin
 val deployer = OZSmartAccountConfig.createDefaultDeployer()
@@ -424,7 +441,7 @@ Given the same credential ID and deployer, `SmartAccountUtils.deriveContractAddr
 
 ### Signer Format Compatibility
 
-Signer representations (`DelegatedSigner`, `ExternalSigner`) encode to the same Soroban SCVal structure as the TypeScript Smart Account Kit. The `ExternalSigner.webAuthn()` factory produces the same `keyData` format (65-byte public key + credential ID bytes). Signers added by either SDK are recognized on-chain by both.
+Signer representations (`DelegatedSigner`, `ExternalSigner`) encode to the standard Soroban SCVal structure defined by the OpenZeppelin smart account contract. The `ExternalSigner.webAuthn()` factory produces the `keyData` format (65-byte public key + credential ID bytes) expected by the on-chain verifier. Signers added by any compatible SDK are recognized on-chain.
 
 ## Contract Limits
 
@@ -432,7 +449,6 @@ The OpenZeppelin smart account contract enforces these limits:
 
 | Limit | Value |
 |-------|-------|
-| Maximum context rules per account | 15 |
 | Maximum signers per context rule | 15 |
 | Maximum policies per context rule | 5 |
 

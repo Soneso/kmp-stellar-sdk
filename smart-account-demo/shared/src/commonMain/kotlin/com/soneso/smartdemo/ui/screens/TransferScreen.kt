@@ -60,6 +60,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.loadAvailableSigners
@@ -632,11 +633,8 @@ class TransferScreen : Screen {
 
     private fun validateRecipient(value: String): String? {
         if (value.isBlank()) return null
-        if (!value.startsWith("G") && !value.startsWith("C")) {
-            return "Must start with G (account) or C (contract)"
-        }
-        if (value.length != 56) {
-            return "Must be 56 characters"
+        if (!StrKey.isValidEd25519PublicKey(value) && !StrKey.isValidContract(value)) {
+            return "Must be a valid Stellar account (G...) or contract (C...) address"
         }
         if (value == DemoState.contractId) {
             return "Cannot transfer to your own account"

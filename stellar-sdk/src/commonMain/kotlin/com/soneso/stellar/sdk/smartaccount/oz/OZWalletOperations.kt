@@ -8,11 +8,11 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
-import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
@@ -36,18 +36,26 @@ import kotlinx.coroutines.delay
 /**
  * Result of a wallet creation operation.
  *
- * Contains the credential ID, contract address, public key, and optional transaction
- * hash if the wallet was auto-submitted to the network.
+ * Contains the credential ID, contract address, public key, the signed deploy transaction
+ * XDR (always present), and an optional transaction hash if the wallet was auto-submitted.
+ *
+ * The [signedTransactionXdr] field is always populated — the deploy transaction is built
+ * and signed regardless of `autoSubmit`. When `autoSubmit` is false, the caller can use
+ * this XDR to submit the transaction externally or store it for later submission via
+ * [OZWalletOperations.deployPendingCredential].
  *
  * @property credentialId The credential ID (Base64URL-encoded, no padding)
  * @property contractId The smart account contract address (C-address)
  * @property publicKey The uncompressed secp256r1 public key (65 bytes)
+ * @property signedTransactionXdr The base64-encoded signed deploy transaction envelope
  * @property transactionHash The transaction hash if auto-submitted, null otherwise
+ * @property nickname The user display name provided during wallet creation
  */
 data class CreateWalletResult(
     val credentialId: String,
     val contractId: String,
     val publicKey: ByteArray,
+    val signedTransactionXdr: String,
     val transactionHash: String? = null,
     val nickname: String? = null
 ) {
@@ -60,6 +68,7 @@ data class CreateWalletResult(
         if (credentialId != other.credentialId) return false
         if (contractId != other.contractId) return false
         if (!Util.constantTimeEquals(publicKey, other.publicKey)) return false
+        if (signedTransactionXdr != other.signedTransactionXdr) return false
         if (transactionHash != other.transactionHash) return false
         if (nickname != other.nickname) return false
 
@@ -70,11 +79,28 @@ data class CreateWalletResult(
         var result = credentialId.hashCode()
         result = 31 * result + contractId.hashCode()
         result = 31 * result + publicKey.contentHashCode()
+        result = 31 * result + signedTransactionXdr.hashCode()
         result = 31 * result + (transactionHash?.hashCode() ?: 0)
         result = 31 * result + (nickname?.hashCode() ?: 0)
         return result
     }
 }
+
+/**
+ * Result of deploying a pending credential.
+ *
+ * Returned by [OZWalletOperations.deployPendingCredential] when retrying a failed or
+ * deferred wallet deployment.
+ *
+ * @property contractId The smart account contract address (C-address)
+ * @property signedTransactionXdr The base64-encoded signed deploy transaction envelope
+ * @property transactionHash The transaction hash if auto-submitted, null when autoSubmit is false
+ */
+data class DeployPendingResult(
+    val contractId: String,
+    val signedTransactionXdr: String,
+    val transactionHash: String? = null
+)
 
 /**
  * Result of a wallet connection operation.
@@ -105,7 +131,8 @@ data class ConnectWalletResult(
  *
  * @property credentialId The credential ID (Base64URL-encoded, no padding)
  * @property signature The WebAuthn signature with normalized compact format
- * @property publicKey The uncompressed secp256r1 public key (65 bytes)
+ * @property publicKey The uncompressed secp256r1 public key (65 bytes) if found in local storage,
+ *   or an empty ByteArray if the credential is not stored locally.
  */
 data class AuthenticatePasskeyResult(
     val credentialId: String,
@@ -185,14 +212,15 @@ class OZWalletOperations internal constructor(
      * address, and optionally deploying the smart account contract to the network.
      *
      * Flow:
-     * 1. Generate random 32-byte challenge for WebAuthn
+     * 1. Validate WebAuthn provider and autoFund requirements
      * 2. Call WebAuthn registration (user authenticates with biometric/security key)
-     * 3. Extract secp256r1 public key from attestation
+     * 3. Extract and normalize secp256r1 public key from attestation
      * 4. Derive deterministic contract address from credential ID
      * 5. Save credential as pending in storage
-     * 6. Build deploy transaction (if autoSubmit, submit and delete credential on success)
-     * 7. Fund wallet if autoFund is enabled
-     * 8. Return result
+     * 6. Set connected state and save session (before deployment)
+     * 7. Build and sign the deploy transaction (always, regardless of autoSubmit)
+     * 8. If autoSubmit: submit the transaction, fund wallet if autoFund, delete credential
+     * 9. Return result
      *
      * ## Auto-Fund Feature
      *
@@ -213,17 +241,20 @@ class OZWalletOperations internal constructor(
      * @param autoSubmit Whether to automatically submit the deploy transaction (default: false)
      * @param autoFund Whether to automatically fund the wallet after deployment (default: false)
      * @param nativeTokenContract Contract address for the native token (required if autoFund is true)
-     * @return CreateWalletResult containing credential ID, contract address, and transaction hash
+     * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @return CreateWalletResult containing credential ID, contract address, signed transaction XDR, and optional transaction hash
      * @throws WebAuthnException if WebAuthn registration fails or no provider configured
      * @throws ValidationException if public key extraction fails or nativeTokenContract is missing when autoFund is true
      * @throws TransactionException if deployment or funding fails
+     * @throws CredentialException if credential storage fails
+     * @throws StorageException if storage write fails
      *
      * Example:
      * ```kotlin
-     * // Create wallet without deploying (for later deployment)
+     * // Create wallet without deploying — signedTransactionXdr always present for external submission
      * val wallet = walletOps.createWallet(userName = "Alice", autoSubmit = false)
      * println("Wallet address: ${wallet.contractId}")
-     * println("Credential ID: ${wallet.credentialId}")
+     * println("Signed XDR: ${wallet.signedTransactionXdr}")
      *
      * // Create and deploy immediately
      * val deployedWallet = walletOps.createWallet(userName = "Bob", autoSubmit = true)
@@ -240,12 +271,14 @@ class OZWalletOperations internal constructor(
      * ```
      *
      * @see OZTransactionOperations.fundWallet for manual funding after deployment
+     * @see deployPendingCredential for retrying a failed or deferred deployment
      */
     suspend fun createWallet(
         userName: String = "Smart Account User",
         autoSubmit: Boolean = false,
         autoFund: Boolean = false,
-        nativeTokenContract: String? = null
+        nativeTokenContract: String? = null,
+        forceMethod: SubmissionMethod? = null
     ): CreateWalletResult {
         // STEP 1: Check for WebAuthn provider
         val webauthnProvider = kit.config.webauthnProvider
@@ -278,8 +311,13 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // STEP 4: Extract public key from attestation (already extracted by provider)
-        val publicKey = registrationResult.publicKey
+        // STEP 4: Normalize and validate the public key from registration.
+        // Built-in providers return correct 65-byte uncompressed keys, but custom
+        // providers (e.g., YubiKey) might return SPKI-wrapped or COSE-encoded keys.
+        val publicKey = SmartAccountUtils.extractPublicKeyFromRegistration(
+            publicKey = registrationResult.publicKey,
+            attestationObject = registrationResult.attestationObject
+        )
 
         // STEP 5: Derive contract address
         val deployer = kit.getDeployer()
@@ -325,6 +363,13 @@ class OZWalletOperations internal constructor(
             )
         }
 
+        // Mark as primary — this is the wallet creation passkey
+        try {
+            credentialManager.setPrimary(credentialIdBase64url)
+        } catch (_: Exception) {
+            // Non-critical — isPrimary is metadata only
+        }
+
         // Emit credential created event
         kit.events.emit(SmartAccountEvent.CredentialCreated(credential = credential))
 
@@ -343,62 +388,68 @@ class OZWalletOperations internal constructor(
 
         saveSession(credentialId = credentialIdBase64url, contractId = contractId)
 
-        // STEP 9: Build deploy transaction and optionally submit
+        // STEP 9: Always build the deploy transaction (side-effect-free)
+        val deployTransaction = try {
+            buildDeployTransaction(
+                publicKey = publicKey,
+                credentialId = registrationResult.credentialId,
+                forceMethod = forceMethod
+            )
+        } catch (e: Exception) {
+            try {
+                credentialManager.markDeploymentFailed(
+                    credentialId = credentialIdBase64url,
+                    error = e.message ?: "Build failed"
+                )
+            } catch (_: Exception) {}
+            throw (e as? SmartAccountException) ?: TransactionException.submissionFailed(
+                "Failed to build deploy transaction: ${e.message}",
+                e
+            )
+        }
+        val signedTxXdr = deployTransaction.toEnvelopeXdrBase64()
+
+        // STEP 10: Optionally submit
         var transactionHash: String? = null
 
         if (autoSubmit) {
-            try {
-                transactionHash = deployWallet(
-                    publicKey = publicKey,
-                    credentialId = registrationResult.credentialId,
-                    contractId = contractId,
-                    credentialIdBase64url = credentialIdBase64url
-                )
+            transactionHash = submitDeployTransaction(
+                transaction = deployTransaction,
+                credentialIdBase64url = credentialIdBase64url,
+                forceMethod = forceMethod
+            )
 
-                // Fund wallet if requested
-                if (autoFund) {
-                    val tokenContract = nativeTokenContract
-                        ?: throw ValidationException.invalidInput(
-                            "nativeTokenContract",
-                            "nativeTokenContract is required when autoFund is true"
-                        )
-                    // Wait for the deployment transaction to propagate to Soroban RPC.
-                    // The deploy may be confirmed on Horizon but not yet visible to
-                    // RPC simulation until the next ledger close (~5s on testnet).
-                    delay(5000)
-                    kit.transactionOperations.fundWallet(nativeTokenContract = tokenContract)
-                }
-
-                // Delete credential on successful deployment
-                try {
-                    credentialManager.deleteCredential(credentialId = credentialIdBase64url)
-                } catch (e: Exception) {
-                    // Non-critical - credential is transitional
-                }
-            } catch (e: SmartAccountException) {
-                throw e
-            } catch (e: Exception) {
-                // Mark deployment as failed
-                try {
-                    credentialManager.markDeploymentFailed(
-                        credentialId = credentialIdBase64url,
-                        error = e.message ?: "Unknown error"
+            // Fund wallet if requested
+            if (autoFund) {
+                val tokenContract = nativeTokenContract
+                    ?: throw ValidationException.invalidInput(
+                        "nativeTokenContract",
+                        "nativeTokenContract is required when autoFund is true"
                     )
-                } catch (markError: Exception) {
-                    // Ignore - main error is more important
-                }
-                throw TransactionException.submissionFailed(
-                    "Failed to deploy wallet: ${e.message}",
-                    e
+                // Wait for the deployment transaction to propagate to Soroban RPC.
+                // The deploy may be confirmed on Horizon but not yet visible to
+                // RPC simulation until the next ledger close (~5s on testnet).
+                delay(5000)
+                kit.transactionOperations.fundWallet(
+                    nativeTokenContract = tokenContract,
+                    forceMethod = forceMethod
                 )
+            }
+
+            // Delete credential on successful deployment
+            try {
+                credentialManager.deleteCredential(credentialId = credentialIdBase64url)
+            } catch (_: Exception) {
+                // Non-critical - credential is transitional
             }
         }
 
-        // STEP 10: Return result
+        // STEP 11: Return result
         return CreateWalletResult(
             credentialId = credentialIdBase64url,
             contractId = contractId,
             publicKey = publicKey,
+            signedTransactionXdr = signedTxXdr,
             transactionHash = transactionHash,
             nickname = userName
         )
@@ -541,8 +592,7 @@ class OZWalletOperations internal constructor(
      * ```
      *
      * IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config
-     * when WebAuthn authentication is needed (prompt = true, fresh = true, or
-     * direct credential connection).
+     * when WebAuthn authentication is needed (prompt = true or fresh = true).
      *
      * @param options Connection options controlling the flow behavior
      * @return ConnectWalletResult on success, or null if no session and prompt is false
@@ -567,22 +617,23 @@ class OZWalletOperations internal constructor(
         if (!options.fresh) {
             val session = try {
                 kit.getStorage().getSession()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
 
             if (session != null && !session.isExpired) {
                 // Valid session exists - verify contract still exists on-chain
                 try {
-                    return connectWithCredentials(
+                    val result = connectWithCredentials(
                         credentialId = session.credentialId,
                         contractId = session.contractId
                     )
-                } catch (e: WalletException.NotFound) {
+                    return result.copy(restoredFromSession = true)
+                } catch (_: WalletException.NotFound) {
                     // Contract no longer exists on-chain (expired TTL) - clear stale session
                     try {
                         kit.getStorage().clearSession()
-                    } catch (clearError: Exception) {
+                    } catch (_: Exception) {
                         // Non-critical
                     }
                     // Fall through to prompt or return null
@@ -601,7 +652,7 @@ class OZWalletOperations internal constructor(
 
                 try {
                     kit.getStorage().clearSession()
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Non-critical - continue
                 }
             }
@@ -645,7 +696,7 @@ class OZWalletOperations internal constructor(
             if (storedCredential != null) {
                 contractId = storedCredential.contractId
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Storage lookup failed - continue to indexer
         }
 
@@ -658,7 +709,7 @@ class OZWalletOperations internal constructor(
                     if (lookupResponse.contracts.isNotEmpty()) {
                         contractId = lookupResponse.contracts.first().contractId
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Indexer lookup failed - continue to derivation
                 }
             }
@@ -758,14 +809,16 @@ class OZWalletOperations internal constructor(
      * println("Authenticated with credential: ${authResult.credentialId}")
      *
      * // Step 2: Discover contracts via indexer
-     * val indexer = kit.indexerClient
-     * val contracts = indexer?.lookupByCredentialId(authResult.credentialId)
+     * val response = kit.indexerClient?.lookupByCredentialId(authResult.credentialId)
      *
-     * // Step 3: Let user choose or connect to the first one
-     * if (!contracts.isNullOrEmpty()) {
-     *     kit.setConnectedState(
-     *         credentialId = authResult.credentialId,
-     *         contractId = contracts.first().contractId
+     * // Step 3: Connect to the first contract found
+     * val firstContract = response?.contracts?.firstOrNull()
+     * if (firstContract != null) {
+     *     val connected = walletOps.connectWallet(
+     *         ConnectWalletOptions(
+     *             credentialId = authResult.credentialId,
+     *             contractId = firstContract.contractId
+     *         )
      *     )
      * }
      * ```
@@ -840,7 +893,7 @@ class OZWalletOperations internal constructor(
             if (storedCredential != null) {
                 publicKey = storedCredential.publicKey
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Storage lookup failed - continue with empty public key
             // Caller can retrieve it from other sources if needed
         }
@@ -888,7 +941,7 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        var finalCredentialId = credentialId
+        val finalCredentialId = credentialId
         var finalContractId = contractId
 
         // If credentialId provided, look up contract ID if not provided
@@ -900,7 +953,7 @@ class OZWalletOperations internal constructor(
                     if (storedCredential != null) {
                         finalContractId = storedCredential.contractId
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Storage lookup failed - continue to indexer
                 }
             }
@@ -914,7 +967,7 @@ class OZWalletOperations internal constructor(
                         if (lookupResponse.contracts.isNotEmpty()) {
                             finalContractId = lookupResponse.contracts.first().contractId
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Indexer lookup failed - continue to derivation
                     }
                 }
@@ -927,7 +980,7 @@ class OZWalletOperations internal constructor(
                 // Decode Base64URL credential ID to raw bytes
                 val credentialIdBytes = try {
                     Util.base64urlDecode(finalCredentialId)
-                } catch (e: IllegalArgumentException) {
+                } catch (_: IllegalArgumentException) {
                     throw ValidationException.invalidInput(
                         "credentialId",
                         "Invalid Base64URL-encoded credential ID"
@@ -961,7 +1014,7 @@ class OZWalletOperations internal constructor(
         // Delete transitional credential from storage after on-chain verification
         try {
             credentialManager.deleteCredential(credentialId = finalCredentialId)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Non-critical - credential is transitional
         }
 
@@ -995,7 +1048,7 @@ class OZWalletOperations internal constructor(
      * Uses `getContractData` with the contract instance key.
      *
      * @param contractId The contract address to verify
-     * @throws WalletException.notFound if the contract does not exist
+     * @throws WalletException.NotFound if the contract does not exist
      */
     private suspend fun verifyContractExists(contractId: String) {
         val instanceEntry = try {
@@ -1034,30 +1087,196 @@ class OZWalletOperations internal constructor(
         kit.getStorage().saveSession(session = session)
     }
 
+    // MARK: - Deploy Pending Credential
+
+    /**
+     * Deploys a wallet from a previously created pending credential.
+     *
+     * Use this method to retry a failed deployment or to submit a wallet that was
+     * created with [createWallet] using `autoSubmit = false`. The credential must
+     * exist in local storage with a valid `publicKey` and `contractId`.
+     *
+     * This method sets the connected state on the kit (same as [createWallet]) so
+     * the kit is ready to use immediately after a successful deployment.
+     *
+     * Flow:
+     * 1. Look up credential from storage (throws [CredentialException] if not found or invalid)
+     * 2. Set connected state and emit [SmartAccountEvent.WalletConnected]
+     * 3. Build and sign the deploy transaction
+     * 4. If autoSubmit: submit via relayer or RPC, poll for confirmation
+     * 5. If autoFund: fund wallet via native token contract
+     * 6. Delete credential from storage on successful deployment
+     * 7. Return [DeployPendingResult] with the contract address, signed XDR, and optional hash
+     *
+     * @param credentialId The credential ID (Base64URL-encoded, no padding) to deploy
+     * @param autoSubmit Whether to automatically submit the deploy transaction (default: true)
+     * @param autoFund Whether to automatically fund the wallet after deployment (default: false)
+     * @param nativeTokenContract Contract address for the native token (required if autoFund is true)
+     * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @return DeployPendingResult with contractId, signedTransactionXdr, and optional transactionHash
+     * @throws CredentialException if the credential is not found or missing required fields
+     * @throws ValidationException if autoFund is true but nativeTokenContract is null
+     * @throws TransactionException if building, simulating, or submitting the deploy transaction fails
+     *
+     * Example (retry a failed deployment with auto-submit):
+     * ```kotlin
+     * val result = walletOps.deployPendingCredential(
+     *     credentialId = "abc123...",
+     *     autoSubmit = true
+     * )
+     * println("Deployed at tx: ${result.transactionHash}")
+     * ```
+     *
+     * Example (build the XDR without submitting, for external submission):
+     * ```kotlin
+     * val result = walletOps.deployPendingCredential(
+     *     credentialId = "abc123...",
+     *     autoSubmit = false
+     * )
+     * println("Signed XDR: ${result.signedTransactionXdr}")
+     * // Submit externally or store for later
+     * ```
+     *
+     * @see createWallet for initial wallet creation with deferred deployment
+     */
+    suspend fun deployPendingCredential(
+        credentialId: String,
+        autoSubmit: Boolean = true,
+        autoFund: Boolean = false,
+        nativeTokenContract: String? = null,
+        forceMethod: SubmissionMethod? = null
+    ): DeployPendingResult {
+        // Validate autoFund requirements early (before any network calls)
+        if (autoFund && nativeTokenContract == null) {
+            throw ValidationException.InvalidInput(
+                "nativeTokenContract is required when autoFund is true"
+            )
+        }
+
+        // Look up credential from storage
+        val credential = credentialManager.getCredential(credentialId = credentialId)
+            ?: throw CredentialException.notFound(credentialId)
+
+        // Validate credential has required fields
+        val publicKey = credential.publicKey
+        if (publicKey.isEmpty()) {
+            throw CredentialException.invalid(
+                "Credential '$credentialId' is missing publicKey"
+            )
+        }
+
+        val contractId = credential.contractId
+        if (contractId.isNullOrEmpty()) {
+            throw CredentialException.invalid(
+                "Credential '$credentialId' is missing contractId"
+            )
+        }
+
+        // Decode credentialId bytes from base64url
+        val credentialIdBytes = try {
+            Util.base64urlDecode(credentialId)
+        } catch (_: IllegalArgumentException) {
+            throw CredentialException.invalid(
+                "Invalid Base64URL-encoded credential ID: $credentialId"
+            )
+        }
+
+        // Set connected state and save session (before deployment attempt)
+        kit.setConnectedState(
+            credentialId = credentialId,
+            contractId = contractId
+        )
+
+        kit.events.emit(
+            SmartAccountEvent.WalletConnected(
+                contractId = contractId,
+                credentialId = credentialId
+            )
+        )
+
+        saveSession(credentialId = credentialId, contractId = contractId)
+
+        // Build the deploy transaction (side-effect-free)
+        val deployTransaction = try {
+            buildDeployTransaction(
+                publicKey = publicKey,
+                credentialId = credentialIdBytes,
+                forceMethod = forceMethod
+            )
+        } catch (e: Exception) {
+            try {
+                credentialManager.markDeploymentFailed(
+                    credentialId = credentialId,
+                    error = e.message ?: "Build failed"
+                )
+            } catch (_: Exception) {}
+            throw (e as? SmartAccountException) ?: TransactionException.submissionFailed(
+                "Failed to build deploy transaction: ${e.message}",
+                e
+            )
+        }
+        val signedTxXdr = deployTransaction.toEnvelopeXdrBase64()
+
+        if (!autoSubmit) {
+            return DeployPendingResult(
+                contractId = contractId,
+                signedTransactionXdr = signedTxXdr
+            )
+        }
+
+        // Submit the transaction
+        val hash = submitDeployTransaction(
+            transaction = deployTransaction,
+            credentialIdBase64url = credentialId,
+            forceMethod = forceMethod
+        )
+
+        // Fund wallet if requested
+        if (autoFund) {
+            delay(5000)
+            kit.transactionOperations.fundWallet(
+                nativeTokenContract = nativeTokenContract!!,
+                forceMethod = forceMethod
+            )
+        }
+
+        // Delete credential on successful deployment
+        try {
+            credentialManager.deleteCredential(credentialId = credentialId)
+        } catch (_: Exception) {
+            // Non-critical - credential is transitional
+        }
+
+        return DeployPendingResult(
+            contractId = contractId,
+            signedTransactionXdr = signedTxXdr,
+            transactionHash = hash
+        )
+    }
+
     // MARK: - Private Helpers
 
     /**
-     * Deploys a smart account wallet contract.
+     * Builds, simulates, assembles, and signs the deploy transaction.
      *
-     * Builds, simulates, and signs a deployment transaction. When a relayer is
-     * configured, submits the signed transaction via [OZRelayerClient.sendXdr]
-     * which fee-bumps it (relayer sponsors fees). When no relayer is configured,
-     * submits directly to Soroban RPC (deployer must be funded).
-     * Polls for confirmation and returns the transaction hash on success.
+     * This method is side-effect-free — it does not write to storage or mark
+     * credentials as failed. Callers are responsible for failure marking.
+     *
+     * When a relayer is configured (and [forceMethod] does not override this), the
+     * timeout is set to 30 seconds and the fee is set to the resource fee only
+     * (the relayer wraps it in a fee-bump with the outer fee).
      *
      * @param publicKey The uncompressed secp256r1 public key (65 bytes)
      * @param credentialId The WebAuthn credential ID (raw bytes)
-     * @param contractId The derived contract address
-     * @param credentialIdBase64url The Base64URL-encoded credential ID
-     * @return The transaction hash
-     * @throws TransactionException if deployment fails
+     * @param forceMethod Optional override to force relayer or RPC submission. When null, auto-detects based on relayer configuration.
+     * @return The signed [Transaction] ready for submission
+     * @throws TransactionException if building or simulation fails
      */
-    private suspend fun deployWallet(
+    private suspend fun buildDeployTransaction(
         publicKey: ByteArray,
         credentialId: ByteArray,
-        contractId: String,
-        credentialIdBase64url: String
-    ): String {
+        forceMethod: SubmissionMethod? = null
+    ): Transaction {
         // Build key_data = publicKey (65 bytes) + credentialId
         val keyData = publicKey + credentialId
 
@@ -1137,18 +1356,16 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Build transaction.
-        // Relayer requires maxTime <= 30 seconds from now; use 300 for direct submission.
-        val timeoutSeconds = if (kit.relayerClient != null) 30L else 300L
+        // Build transaction
         val transaction = try {
             TransactionBuilder(
                 sourceAccount = deployerAccount,
                 network = Network(networkPassphrase = kit.config.networkPassphrase)
             )
-                .setBaseFee(100)
+                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
                 .addOperation(operation)
                 .addMemo(MemoNone)
-                .setTimeout(timeoutSeconds)
+                .setTimeout(kit.config.timeoutInSeconds.toLong())
                 .build()
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
@@ -1161,15 +1378,6 @@ class OZWalletOperations internal constructor(
         val simulation = try {
             kit.sorobanServer.simulateTransaction(transaction = transaction)
         } catch (e: Exception) {
-            // Mark deployment as failed
-            try {
-                credentialManager.markDeploymentFailed(
-                    credentialId = credentialIdBase64url,
-                    error = "Simulation failed: ${e.message}"
-                )
-            } catch (markError: Exception) {
-                // Ignore
-            }
             throw TransactionException.simulationFailed(
                 "Failed to simulate deployment transaction: ${e.message}",
                 e
@@ -1177,15 +1385,6 @@ class OZWalletOperations internal constructor(
         }
 
         if (simulation.error != null) {
-            // Mark deployment as failed
-            try {
-                credentialManager.markDeploymentFailed(
-                    credentialId = credentialIdBase64url,
-                    error = "Simulation error: ${simulation.error}"
-                )
-            } catch (e: Exception) {
-                // Ignore
-            }
             throw TransactionException.simulationFailed(
                 "Simulation error: ${simulation.error}"
             )
@@ -1208,7 +1407,8 @@ class OZWalletOperations internal constructor(
         // (relayer wraps it in a fee-bump with the outer fee).
         // assembleTransaction sets fee = classicFee + resourceFee, so reconstruct
         // with fee = resourceFee only for the relayer path.
-        val updatedTransaction = if (kit.relayerClient != null) {
+        val useRelayer = resolveDeploySubmissionMethod(forceMethod) == SubmissionMethod.RELAYER
+        val updatedTransaction = if (useRelayer) {
             val minResourceFee = simulation.minResourceFee
                 ?: throw TransactionException.submissionFailed(
                     "Failed to get min resource fee from simulation"
@@ -1237,13 +1437,39 @@ class OZWalletOperations internal constructor(
             )
         }
 
+        return updatedTransaction
+    }
+
+    /**
+     * Submits a pre-built and signed deploy transaction via relayer or direct RPC.
+     *
+     * Respects [forceMethod]: when null, auto-detects (relayer if configured, otherwise RPC).
+     * Marks the credential as failed on submission or confirmation errors.
+     * Polls for on-chain confirmation and returns the transaction hash.
+     *
+     * @param transaction The signed deploy transaction
+     * @param credentialIdBase64url The Base64URL-encoded credential ID (for failure marking)
+     * @param forceMethod Optional override to force relayer or RPC submission
+     * @return The confirmed transaction hash
+     * @throws TransactionException if submission or confirmation fails
+     */
+    private suspend fun submitDeployTransaction(
+        transaction: Transaction,
+        credentialIdBase64url: String,
+        forceMethod: SubmissionMethod? = null
+    ): String {
+        val useRelayer = resolveDeploySubmissionMethod(forceMethod) == SubmissionMethod.RELAYER
+
         // Submit transaction via relayer (fee-bump) or directly to Soroban RPC
         val transactionHash: String
 
-        val relayer = kit.relayerClient
-        if (relayer != null) {
+        if (useRelayer) {
+            val relayer = kit.relayerClient
+                ?: throw TransactionException.submissionFailed(
+                    "Relayer was selected but no relayer is configured"
+                )
             // Use relayer XDR mode: relayer fee-bumps the signed transaction
-            val txEnvelope = updatedTransaction.toEnvelopeXdr()
+            val txEnvelope = transaction.toEnvelopeXdr()
             val relayerResponse = try {
                 relayer.sendXdr(txEnvelope)
             } catch (e: Exception) {
@@ -1277,10 +1503,10 @@ class OZWalletOperations internal constructor(
                     "No transaction hash returned from relayer"
                 )
         } else {
-            // No relayer configured: submit directly to Soroban RPC
-            // NOTE: The deployer account must be funded with XLM to pay fees
+            // No relayer configured (or forced RPC): submit directly to Soroban RPC.
+            // NOTE: The deployer account must be funded with XLM to pay fees.
             val sendResult = try {
-                kit.sorobanServer.sendTransaction(transaction = updatedTransaction)
+                kit.sorobanServer.sendTransaction(transaction = transaction)
             } catch (e: Exception) {
                 try {
                     credentialManager.markDeploymentFailed(
@@ -1319,20 +1545,17 @@ class OZWalletOperations internal constructor(
 
             val txStatus = try {
                 kit.sorobanServer.getTransaction(hash = transactionHash)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Network error, retry
                 if (attempt < 10) {
                     continue
                 }
-                // Mark deployment as failed
                 try {
                     credentialManager.markDeploymentFailed(
                         credentialId = credentialIdBase64url,
                         error = "Deployment confirmation timed out"
                     )
-                } catch (markError: Exception) {
-                    // Ignore
-                }
+                } catch (_: Exception) {}
                 throw TransactionException.timeout(
                     "Deployment confirmation timed out"
                 )
@@ -1343,15 +1566,12 @@ class OZWalletOperations internal constructor(
                     confirmed = true
                 }
                 GetTransactionStatus.FAILED -> {
-                    // Mark deployment as failed
                     try {
                         credentialManager.markDeploymentFailed(
                             credentialId = credentialIdBase64url,
                             error = txStatus.resultXdr ?: "Deployment failed on-chain"
                         )
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
+                    } catch (_: Exception) {}
                     throw TransactionException.submissionFailed(
                         "Deployment failed: ${txStatus.resultXdr ?: "unknown"}"
                     )
@@ -1366,20 +1586,39 @@ class OZWalletOperations internal constructor(
         }
 
         if (!confirmed) {
-            // Mark deployment as failed
             try {
                 credentialManager.markDeploymentFailed(
                     credentialId = credentialIdBase64url,
                     error = "Deployment confirmation timed out"
                 )
-            } catch (e: Exception) {
-                // Ignore
-            }
+            } catch (_: Exception) {}
             throw TransactionException.timeout(
                 "Deployment confirmation timed out"
             )
         }
 
         return transactionHash
+    }
+
+    /**
+     * Determines the submission method for deploy transactions.
+     *
+     * Priority:
+     * 1. If [forceMethod] is specified, use it directly
+     * 2. If a relayer is configured, use relayer
+     * 3. Otherwise, use RPC
+     *
+     * @param forceMethod Optional override to force a specific submission method
+     * @return The submission method to use
+     */
+    private fun resolveDeploySubmissionMethod(forceMethod: SubmissionMethod?): SubmissionMethod {
+        if (forceMethod != null) {
+            return forceMethod
+        }
+        return if (kit.relayerClient != null) {
+            SubmissionMethod.RELAYER
+        } else {
+            SubmissionMethod.RPC
+        }
     }
 }
