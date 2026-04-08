@@ -177,10 +177,10 @@ data class Ed25519Signature(
 ) : SmartAccountSignature() {
 
     init {
-        if (publicKey.size != 32) {
+        if (publicKey.size != SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
             throw ValidationException.invalidInput(
                 "publicKey",
-                "Ed25519 public key must be exactly 32 bytes, got ${publicKey.size}"
+                "Ed25519 public key must be exactly ${SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE} bytes, got ${publicKey.size}"
             )
         }
         if (signature.size != 64) {

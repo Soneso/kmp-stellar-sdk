@@ -233,8 +233,8 @@ object SmartAccountBuilders {
      *        Use [Util.LEDGERS_PER_HOUR] or [Util.LEDGERS_PER_DAY]
      *        for common periods.
      * @return Policy parameters for spending limit
-     * @throws ValidationException.InvalidInput if spending limit is not a valid positive number
-     *         or period is less than 1
+     * @throws IllegalArgumentException if spending limit is not a valid positive decimal number
+     * @throws ValidationException.InvalidInput if period is less than 1
      *
      * Example:
      * ```kotlin
@@ -352,7 +352,7 @@ object SmartAccountBuilders {
         }
 
         // Ed25519 signers have 32-byte public key
-        if (external.keyData.size == 32) {
+        if (external.keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
             return "Ed25519"
         }
 

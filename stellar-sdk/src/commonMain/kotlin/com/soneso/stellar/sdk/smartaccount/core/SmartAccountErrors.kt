@@ -773,9 +773,23 @@ sealed class IndexerException(
         IndexerException(SmartAccountErrorCode.INDEXER_TIMEOUT, message, cause)
 
     companion object {
+        /**
+         * Creates a [RequestFailed] exception for indexer request failures.
+         *
+         * @param reason Description of why the request failed
+         * @param cause Optional underlying exception
+         * @return An [IndexerException.RequestFailed] instance
+         */
         fun requestFailed(reason: String, cause: Throwable? = null) =
             RequestFailed("Indexer request failed: $reason", cause)
 
+        /**
+         * Creates a [Timeout] exception for indexer request timeouts.
+         *
+         * @param url The URL that timed out
+         * @param cause Optional underlying exception
+         * @return An [IndexerException.Timeout] instance
+         */
         fun timeout(url: String, cause: Throwable? = null) =
             Timeout("Indexer request timed out: $url", cause)
     }
