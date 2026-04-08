@@ -107,7 +107,7 @@ class MainScreen : Screen {
                             Text(
                                 text = "Testnet",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     },
