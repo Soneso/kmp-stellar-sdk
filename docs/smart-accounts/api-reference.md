@@ -2754,8 +2754,36 @@ kit.transactionOperations.transfer(
 )
 
 // Access the relayer client directly
-kit.relayerClient?.sendXdr(signedTransactionXdr)
+kit.relayerClient?.sendXdr(transactionEnvelope)
 ```
+
+### Constructor
+
+```kotlin
+class OZRelayerClient(
+    relayerUrl: String,
+    timeoutMs: Long = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS,
+    httpClient: HttpClient? = null
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `relayerUrl` | `String` | Relayer endpoint URL (must use HTTPS, or http://localhost for development) |
+| `timeoutMs` | `Long` | Default request timeout in milliseconds (default: 6 minutes for testnet retries) |
+| `httpClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null, creates per-request clients) |
+
+**Throws**: `ConfigurationException.InvalidConfig` if `relayerUrl` is blank or not HTTPS.
+
+### Properties
+
+#### isConfigured
+
+```kotlin
+val isConfigured: Boolean
+```
+
+Whether the client is properly configured with a valid URL.
 
 ### Methods
 
@@ -2763,37 +2791,87 @@ kit.relayerClient?.sendXdr(signedTransactionXdr)
 
 ```kotlin
 suspend fun send(
-    hostFunctionXdr: String,
-    authXdrs: List<String>,
-    timeoutMs: Long? = null
+    hostFunction: HostFunctionXdr,
+    authEntries: List<SorobanAuthorizationEntryXdr>,
+    perRequestTimeoutMs: Long? = null
 ): RelayerResponse
 ```
 
-Submits a host function with signed authorization entries for fee sponsoring. The relayer wraps the operation in a fee-bump transaction using its own channel account.
+Submits a host function with signed authorization entries for fee sponsoring. The relayer wraps the operation in a fee-bump transaction using its own channel account. XDR encoding to base64 is handled internally.
+
+This method does not throw. All error conditions are returned in the `RelayerResponse`.
 
 **Parameters**:
-- `hostFunctionXdr`: Base64-encoded host function XDR
-- `authXdrs`: Base64-encoded signed authorization entries
-- `timeoutMs`: Optional request timeout override
+- `hostFunction`: Host function XDR to execute
+- `authEntries`: Signed authorization entries
+- `perRequestTimeoutMs`: Optional per-request timeout override
 
-**Returns**: `RelayerResponse` with `success`, `hash`, `error`, `errorCode`
+**Returns**: `RelayerResponse`
+
+---
 
 #### sendXdr
 
 ```kotlin
 suspend fun sendXdr(
-    transactionXdr: String,
-    timeoutMs: Long? = null
+    transactionEnvelope: TransactionEnvelopeXdr,
+    perRequestTimeoutMs: Long? = null
 ): RelayerResponse
 ```
 
-Submits a fully signed transaction XDR for fee-bumping. Used when the transaction contains source_account auth entries that require the deployer signature.
+Submits a complete signed transaction envelope for fee-bumping. Used when the transaction contains source_account auth entries that require the deployer signature. XDR encoding to base64 is handled internally.
+
+This method does not throw. All error conditions are returned in the `RelayerResponse`.
 
 **Parameters**:
-- `transactionXdr`: Base64-encoded signed transaction envelope XDR
-- `timeoutMs`: Optional request timeout override
+- `transactionEnvelope`: Signed transaction envelope XDR
+- `perRequestTimeoutMs`: Optional per-request timeout override
 
-**Returns**: `RelayerResponse` with `success`, `hash`, `error`, `errorCode`
+**Returns**: `RelayerResponse`
+
+---
+
+### Response and Error Types
+
+#### RelayerResponse
+
+```kotlin
+data class RelayerResponse(
+    val success: Boolean,
+    val transactionId: String? = null,
+    val hash: String? = null,
+    val status: String? = null,
+    val error: String? = null,
+    val errorCode: String? = null,
+    val details: JsonElement? = null
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `success` | `Boolean` | Whether the transaction was successfully submitted |
+| `transactionId` | `String?` | Transaction ID assigned by the relayer |
+| `hash` | `String?` | Transaction hash on the Stellar network |
+| `status` | `String?` | Transaction status (e.g., "PENDING", "SUCCESS", "ERROR") |
+| `error` | `String?` | Error message if the request failed |
+| `errorCode` | `String?` | Error code for programmatic handling (see `RelayerErrorCodes`) |
+| `details` | `JsonElement?` | Additional error details from the relayer |
+
+#### RelayerErrorCodes
+
+```kotlin
+object RelayerErrorCodes {
+    const val INVALID_PARAMS = "INVALID_PARAMS"
+    const val INVALID_XDR = "INVALID_XDR"
+    const val POOL_CAPACITY = "POOL_CAPACITY"
+    const val SIMULATION_FAILED = "SIMULATION_FAILED"
+    const val ONCHAIN_FAILED = "ONCHAIN_FAILED"
+    const val INVALID_TIME_BOUNDS = "INVALID_TIME_BOUNDS"
+    const val FEE_LIMIT_EXCEEDED = "FEE_LIMIT_EXCEEDED"
+    const val UNAUTHORIZED = "UNAUTHORIZED"
+    const val TIMEOUT = "TIMEOUT"
+}
+```
 
 ---
 
@@ -2839,27 +2917,59 @@ sealed class SmartAccountEvent {
 }
 ```
 
-**Listening to Events**:
+### SmartAccountEventEmitter
+
+Accessed via `kit.events`. Manages event subscriptions with thread-safe listener management and error isolation (one failing listener does not affect others).
+
+#### on
 
 ```kotlin
-kit.events.on<SmartAccountEvent.WalletConnected> { event ->
+inline fun <reified T : SmartAccountEvent> on(listener: (T) -> Unit): () -> Unit
+```
+
+Subscribes to events of a specific type. Returns an unsubscribe function.
+
+Note: Uses Kotlin reified generics — not callable from Java or Swift. Use `addListener` for cross-language compatibility.
+
+```kotlin
+val unsubscribe = kit.events.on<SmartAccountEvent.WalletConnected> { event ->
     println("Connected to ${event.contractId}")
 }
 
 kit.events.on<SmartAccountEvent.TransactionSubmitted> { event ->
     println("Transaction ${event.hash}: ${if (event.success) "success" else "failed"}")
 }
+
+// Later: unsubscribe()
 ```
 
-**Cross-Language Listener (Java/Swift)**:
+---
 
-The `on<T>` method uses Kotlin reified generics and is not callable from Java or Swift. Use `addListener` for cross-language event subscription:
+#### once
+
+```kotlin
+inline fun <reified T : SmartAccountEvent> once(listener: (T) -> Unit): () -> Unit
+```
+
+Subscribes to a single occurrence of an event. The listener is automatically unsubscribed after the first matching event. Returns an unsubscribe function that can cancel the subscription before the event fires.
+
+```kotlin
+kit.events.once<SmartAccountEvent.TransactionSubmitted> { event ->
+    println("First transaction: ${event.hash}")
+}
+```
+
+---
+
+#### addListener
 
 ```kotlin
 fun addListener(listener: SmartAccountEventListener): () -> Unit
 ```
 
 Subscribes a listener that receives all event types. The listener must dispatch internally using `when` (Kotlin) or `instanceof` (Java) / pattern matching (Swift). Returns an unsubscribe function.
+
+This is the cross-language alternative to `on<T>` — callable from Java and Swift.
 
 ```kotlin
 val unsubscribe = kit.events.addListener { event ->
@@ -2873,6 +2983,62 @@ val unsubscribe = kit.events.addListener { event ->
 }
 // Later: unsubscribe()
 ```
+
+---
+
+#### removeAllListeners
+
+```kotlin
+fun removeAllListeners(eventType: String? = null)
+```
+
+Removes all listeners for a specific event type, or all listeners if no type is specified.
+
+```kotlin
+// Remove all WalletConnected listeners
+kit.events.removeAllListeners("WalletConnected")
+
+// Remove all listeners for all event types
+kit.events.removeAllListeners()
+```
+
+---
+
+#### listenerCount
+
+```kotlin
+fun listenerCount(eventType: String): Int
+```
+
+Returns the number of listeners for a specific event type. Includes both type-specific listeners (via `on`) and global listeners (via `addListener`).
+
+---
+
+#### setErrorHandler
+
+```kotlin
+fun setErrorHandler(handler: ((event: SmartAccountEvent, error: Throwable) -> Unit)?)
+```
+
+Sets an error handler for listener failures. When a listener throws, the error is caught (other listeners still execute) and passed to this handler. Pass `null` to disable.
+
+```kotlin
+kit.events.setErrorHandler { event, error ->
+    println("Listener error on $event: ${error.message}")
+}
+```
+
+---
+
+### SmartAccountEventListener
+
+```kotlin
+fun interface SmartAccountEventListener {
+    fun onEvent(event: SmartAccountEvent)
+}
+```
+
+Functional interface for event listeners. Used by `addListener` for cross-language compatibility (Java, Swift).
 
 ---
 
@@ -2892,16 +3058,59 @@ sealed class SmartAccountException(
 ) : Exception(message, cause)
 ```
 
-**Error Code Ranges**:
-- 1xxx: Configuration errors
-- 2xxx: Wallet state errors
-- 3xxx: Credential errors
-- 4xxx: WebAuthn errors
-- 5xxx: Transaction errors
-- 6xxx: Signer errors
-- 7xxx: Validation errors
-- 8xxx: Storage errors
-- 9xxx: Session errors
+### SmartAccountErrorCode
+
+```kotlin
+enum class SmartAccountErrorCode(val code: Int) {
+    // 1xxx: Configuration
+    INVALID_CONFIG(1001),
+    MISSING_CONFIG(1002),
+
+    // 2xxx: Wallet state
+    WALLET_NOT_CONNECTED(2001),
+    WALLET_ALREADY_EXISTS(2002),
+    WALLET_NOT_FOUND(2003),
+
+    // 3xxx: Credential
+    CREDENTIAL_NOT_FOUND(3001),
+    CREDENTIAL_ALREADY_EXISTS(3002),
+    CREDENTIAL_INVALID(3003),
+    CREDENTIAL_DEPLOYMENT_FAILED(3004),
+
+    // 4xxx: WebAuthn
+    WEBAUTHN_REGISTRATION_FAILED(4001),
+    WEBAUTHN_AUTHENTICATION_FAILED(4002),
+    WEBAUTHN_NOT_SUPPORTED(4003),
+    WEBAUTHN_CANCELLED(4004),
+
+    // 5xxx: Transaction
+    TRANSACTION_SIMULATION_FAILED(5001),
+    TRANSACTION_SIGNING_FAILED(5002),
+    TRANSACTION_SUBMISSION_FAILED(5003),
+    TRANSACTION_TIMEOUT(5004),
+
+    // 6xxx: Signer
+    SIGNER_NOT_FOUND(6001),
+    SIGNER_INVALID(6002),
+
+    // 7xxx: Validation
+    INVALID_ADDRESS(7001),
+    INVALID_AMOUNT(7002),
+    INVALID_INPUT(7003),
+
+    // 8xxx: Storage
+    STORAGE_READ_FAILED(8001),
+    STORAGE_WRITE_FAILED(8002),
+
+    // 9xxx: Session
+    SESSION_EXPIRED(9001),
+    SESSION_INVALID(9002),
+
+    // 10xxx: Indexer
+    INDEXER_REQUEST_FAILED(10001),
+    INDEXER_TIMEOUT(10002)
+}
+```
 
 ---
 
@@ -3154,9 +3363,9 @@ data class WebAuthnRegistrationResult(
 
 data class WebAuthnAuthenticationResult(
     val credentialId: ByteArray,
-    val signature: ByteArray,
     val authenticatorData: ByteArray,
-    val clientDataJSON: ByteArray
+    val clientDataJSON: ByteArray,
+    val signature: ByteArray
 )
 ```
 
@@ -3200,6 +3409,152 @@ data class WebAuthnSignature(
 ```
 
 Represents a WebAuthn signature with authenticator and client data.
+
+---
+
+### TransactionResult
+
+Returned by all state-changing operations (transfer, contractCall, addContextRule, etc.).
+
+```kotlin
+data class TransactionResult(
+    val success: Boolean,
+    val hash: String? = null,
+    val ledger: UInt? = null,
+    val error: String? = null
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `success` | `Boolean` | Whether the transaction was confirmed on-chain |
+| `hash` | `String?` | Transaction hash (present on success) |
+| `ledger` | `UInt?` | Ledger number where the transaction was included |
+| `error` | `String?` | Error message if the transaction failed |
+
+---
+
+### PolicyInstallParams
+
+Sealed class for policy installation parameters passed to `addContextRule` and `addPolicy`.
+
+```kotlin
+sealed class PolicyInstallParams {
+    data class SimpleThreshold(
+        val threshold: UInt
+    ) : PolicyInstallParams()
+
+    data class WeightedThreshold(
+        val signerWeights: Map<SmartAccountSigner, UInt>,
+        val threshold: UInt
+    ) : PolicyInstallParams()
+
+    data class SpendingLimit(
+        val spendingLimit: BigInteger,
+        val periodLedgers: UInt
+    ) : PolicyInstallParams()
+}
+```
+
+| Variant | Description |
+|---------|-------------|
+| `SimpleThreshold` | Requires at least M-of-N signers. All signers have equal weight. `threshold` must be > 0. |
+| `WeightedThreshold` | Each signer has a configurable weight. Sum of approving weights must meet the threshold. |
+| `SpendingLimit` | Limits spending per ledger period. `spendingLimit` is in stroops (as `BigInteger`), `periodLedgers` is the number of ledgers in the period. |
+
+---
+
+### StoredCredential
+
+WebAuthn credential with deployment and usage metadata. Returned by credential operations and the `CredentialCreated` event.
+
+```kotlin
+data class StoredCredential(
+    val credentialId: String,
+    val publicKey: ByteArray,
+    val contractId: String? = null,
+    val deploymentStatus: CredentialDeploymentStatus = CredentialDeploymentStatus.PENDING,
+    val deploymentError: String? = null,
+    val createdAt: Long = currentTimeMillis(),
+    val lastUsedAt: Long? = null,
+    val nickname: String? = null,
+    val isPrimary: Boolean = false,
+    val transports: List<String>? = null,
+    val deviceType: String? = null,
+    val backedUp: Boolean? = null
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `credentialId` | `String` | Base64URL-encoded WebAuthn credential ID |
+| `publicKey` | `ByteArray` | Uncompressed secp256r1 public key (65 bytes, 0x04 prefix) |
+| `contractId` | `String?` | Smart account contract address (C-address) |
+| `deploymentStatus` | `CredentialDeploymentStatus` | Current deployment status |
+| `deploymentError` | `String?` | Error message if deployment failed |
+| `createdAt` | `Long` | Creation timestamp (milliseconds) |
+| `lastUsedAt` | `Long?` | Last signing timestamp (milliseconds) |
+| `nickname` | `String?` | User-friendly name (e.g., "MacBook Pro Touch ID") |
+| `isPrimary` | `Boolean` | Whether this is the default signing credential |
+| `transports` | `List<String>?` | Authenticator transport hints ("usb", "nfc", "ble", "internal") |
+| `deviceType` | `String?` | "singleDevice" (hardware key) or "multiDevice" (synced passkey) |
+| `backedUp` | `Boolean?` | Whether the credential is synced to a cloud provider |
+
+---
+
+### CredentialDeploymentStatus
+
+```kotlin
+enum class CredentialDeploymentStatus {
+    PENDING,
+    FAILED
+}
+```
+
+| Value | Description |
+|-------|-------------|
+| `PENDING` | Credential created but smart account contract not yet deployed |
+| `FAILED` | Deployment transaction failed |
+
+Note: There is no `SUCCESS` status. On successful deployment the credential is removed from storage and the wallet connects using on-chain data.
+
+---
+
+### ConnectedWallet
+
+Returned by `ExternalWalletAdapter.connect()` and `restoreConnections()`.
+
+```kotlin
+data class ConnectedWallet(
+    val address: String,
+    val walletId: String,
+    val walletName: String
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `address` | `String` | Stellar G-address of the connected wallet |
+| `walletId` | `String` | Wallet identifier for reconnection (e.g., "freighter", "lobstr") |
+| `walletName` | `String` | Human-readable display name (e.g., "Freighter", "LOBSTR") |
+
+---
+
+### SignAuthEntryResult
+
+Returned by `ExternalWalletAdapter.signAuthEntry()`.
+
+```kotlin
+data class SignAuthEntryResult(
+    val signedAuthEntry: String,
+    val signerAddress: String? = null
+)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `signedAuthEntry` | `String` | Base64-encoded raw Ed25519 signature (64 bytes) |
+| `signerAddress` | `String?` | G-address that produced the signature (null if wallet does not report it) |
 
 ---
 
@@ -3275,7 +3630,6 @@ Defined in `smartaccount/oz/OZConstants.kt`. Contains OZ-specific configuration 
 
 ```kotlin
 object OZConstants {
-    const val AUTH_ENTRY_EXPIRATION_BUFFER = 100     // ledgers
     const val DEFAULT_SESSION_EXPIRY_MS = 604_800_000L  // 7 days
     const val DEFAULT_INDEXER_TIMEOUT_MS = 10_000L   // 10 seconds
     const val DEFAULT_RELAYER_TIMEOUT_MS = 360_000L  // 6 minutes
@@ -3284,7 +3638,6 @@ object OZConstants {
     const val DEFAULT_TIMEOUT_SECONDS = 30
     const val MAX_SIGNERS = 15
     const val MAX_POLICIES = 5
-    const val MAX_CONTEXT_RULES = 15
 }
 ```
 
@@ -3304,26 +3657,91 @@ object Util {
 
 ## Platform-Specific Implementations
 
-### Android WebAuthn Provider
+Each platform requires a `WebAuthnProvider` (passkey authentication) and a `StorageAdapter` (credential persistence). The SDK provides production-ready implementations for all supported platforms.
+
+### Android
+
+**WebAuthn**: `AndroidWebAuthnProvider` — Uses Android Credential Manager API (requires API 28+).
 
 ```kotlin
-// Implemented in androidMain
-// Use platform's BiometricPrompt and WebAuthn APIs
+val webauthnProvider = AndroidWebAuthnProvider(
+    context = applicationContext,
+    rpId = "example.com",
+    rpName = "My App",
+    timeout = OZConstants.WEBAUTHN_TIMEOUT_MS,          // optional, default 60s
+    authenticatorAttachment = null                       // optional, null = both platform and cross-platform
+)
 ```
 
-### iOS/macOS WebAuthn Provider
+**Storage**: `AndroidStorageAdapter` — Uses EncryptedSharedPreferences backed by Android Keystore.
 
 ```kotlin
-// Implemented in nativeMain
-// Uses Security.framework and local WebAuthn APIs
+val storage = AndroidStorageAdapter(context = applicationContext)
 ```
 
-### JavaScript WebAuthn Provider
+### iOS / macOS
+
+**WebAuthn**: `AppleWebAuthnProvider` — Uses ASAuthorization framework.
 
 ```kotlin
-// Implemented in jsMain
-// Uses WebAuthn API (credentials.create, credentials.get)
+val webauthnProvider = AppleWebAuthnProvider(
+    rpId = "example.com",
+    rpName = "My App",
+    timeout = OZConstants.WEBAUTHN_TIMEOUT_MS            // optional, default 60s
+)
 ```
+
+**Storage** (two options):
+
+`UserDefaultsStorageAdapter` — Uses NSUserDefaults. Suitable for non-sensitive credential metadata.
+
+```kotlin
+val storage = UserDefaultsStorageAdapter(
+    suiteName = "com.soneso.stellar.smartaccount"        // optional, default shown
+)
+```
+
+`KeychainStorageAdapter` — Uses Apple Keychain Services. Recommended for production (encrypted, hardware-backed).
+
+```kotlin
+val storage = KeychainStorageAdapter(
+    serviceName = "com.soneso.stellar.smartaccount"      // optional, default shown
+)
+```
+
+### JavaScript (Browser / Node.js)
+
+**WebAuthn**: `JsWebAuthnProvider` — Uses the Web Authentication API (`navigator.credentials`).
+
+```kotlin
+val webauthnProvider = JsWebAuthnProvider(
+    rpId = "example.com",
+    rpName = "My App",
+    timeout = OZConstants.WEBAUTHN_TIMEOUT_MS            // optional, default 60s
+)
+```
+
+**Storage** (two options):
+
+`IndexedDBStorageAdapter` — Uses IndexedDB. Recommended for browser apps (larger storage, async).
+
+```kotlin
+val storage = IndexedDBStorageAdapter(
+    dbName = "stellar_smart_account"                     // optional, default shown
+)
+```
+
+`LocalStorageAdapter` — Uses `window.localStorage`. Simpler alternative for small datasets.
+
+```kotlin
+val storage = LocalStorageAdapter(
+    keyPrefix = "stellar_sa_"                            // optional, default shown
+)
+```
+
+### Common (All Platforms)
+
+`InMemoryStorageAdapter` — Non-persistent, used as the default when no storage is configured. Data is lost on app restart.
 
 ---
 
@@ -3353,7 +3771,3 @@ try {
 ## License
 
 Stellar SDK Kotlin Multiplatform - Apache License 2.0
-
----
-
-**Last Updated**: April 2026

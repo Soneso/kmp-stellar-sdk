@@ -619,8 +619,14 @@ class JsWebAuthnProvider(
         val lengthByte = attestationObjectBytes[dataStart].toInt() and 0xFF
         val authDataOffset: Int = when {
             lengthByte in 0x40..0x57 -> dataStart + 1
-            lengthByte == 0x58 -> dataStart + 2
-            lengthByte == 0x59 -> dataStart + 3
+            lengthByte == 0x58 -> {
+                if (dataStart + 1 >= attestationObjectBytes.size) return AuthenticatorFlagsInfo(null, null)
+                dataStart + 2
+            }
+            lengthByte == 0x59 -> {
+                if (dataStart + 2 >= attestationObjectBytes.size) return AuthenticatorFlagsInfo(null, null)
+                dataStart + 3
+            }
             else -> return AuthenticatorFlagsInfo(null, null)
         }
 

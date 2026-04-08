@@ -177,12 +177,14 @@ class IndexedDBStorageAdapter(
      * After calling close, the adapter can be used again and will
      * reopen the database on the next operation.
      */
-    fun close() {
-        val existing = cachedDb
-        if (existing != null) {
-            existing.asDynamic().close()
+    suspend fun close() {
+        mutex.withLock {
+            val existing = cachedDb
+            if (existing != null) {
+                existing.asDynamic().close()
+            }
+            cachedDb = null
         }
-        cachedDb = null
     }
 
     // MARK: - Credential Operations
@@ -361,10 +363,10 @@ class IndexedDBStorageAdapter(
      * This is a destructive operation that removes all stored credentials
      * and sessions permanently.
      *
-     * @param name Database name to delete. Defaults to [DEFAULT_DB_NAME].
+     * @param name Database name to delete. Defaults to this adapter's configured database name.
      * @throws StorageException.WriteFailed if deletion fails
      */
-    suspend fun deleteDatabase(name: String = DEFAULT_DB_NAME) {
+    suspend fun deleteDatabase(name: String = dbName) {
         close()
         suspendCancellableCoroutine { cont ->
             val idb = js("(typeof indexedDB !== 'undefined') ? indexedDB : null")

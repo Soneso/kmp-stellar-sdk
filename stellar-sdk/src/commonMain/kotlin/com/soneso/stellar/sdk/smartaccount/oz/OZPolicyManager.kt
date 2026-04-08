@@ -761,7 +761,7 @@ class OZPolicyManager internal constructor(
          * @param map The unsorted map of ScVal key-value pairs
          * @return A new LinkedHashMap with entries sorted by XDR-encoded key bytes
          */
-        internal fun sortMapByKeyXdr(map: LinkedHashMap<SCValXdr, SCValXdr>): LinkedHashMap<SCValXdr, SCValXdr> {
+        fun sortMapByKeyXdr(map: LinkedHashMap<SCValXdr, SCValXdr>): LinkedHashMap<SCValXdr, SCValXdr> {
             val sorted = LinkedHashMap<SCValXdr, SCValXdr>()
             map.entries
                 .sortedWith(Comparator { a, b ->

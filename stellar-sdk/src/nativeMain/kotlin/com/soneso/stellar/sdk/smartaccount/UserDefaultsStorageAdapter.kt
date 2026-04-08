@@ -96,7 +96,7 @@ class UserDefaultsStorageAdapter(
                 writeIndex(updated)
             }
 
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -152,7 +152,7 @@ class UserDefaultsStorageAdapter(
             val updated = CredentialIndex(ids = index.ids.filter { it != credentialId })
             writeIndex(updated)
 
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -183,7 +183,7 @@ class UserDefaultsStorageAdapter(
             val key = KEY_PREFIX_CREDENTIAL + credentialId
 
             defaults.setObject(jsonString, forKey = key)
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is CredentialException || e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -206,7 +206,7 @@ class UserDefaultsStorageAdapter(
             // Remove the session
             defaults.removeObjectForKey(KEY_SESSION)
 
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -222,7 +222,7 @@ class UserDefaultsStorageAdapter(
             val serializable = session.toSerializable()
             val jsonString = json.encodeToString(serializable)
             defaults.setObject(jsonString, forKey = KEY_SESSION)
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(
@@ -240,7 +240,7 @@ class UserDefaultsStorageAdapter(
             if (session.isExpired) {
                 // Clear expired session
                 defaults.removeObjectForKey(KEY_SESSION)
-                defaults.synchronize()
+    
                 return null
             }
 
@@ -256,7 +256,7 @@ class UserDefaultsStorageAdapter(
     override suspend fun clearSession(): Unit = mutex.withLock {
         try {
             defaults.removeObjectForKey(KEY_SESSION)
-            defaults.synchronize()
+
         } catch (e: Exception) {
             if (e is StorageException) throw e
             throw StorageException.WriteFailed(

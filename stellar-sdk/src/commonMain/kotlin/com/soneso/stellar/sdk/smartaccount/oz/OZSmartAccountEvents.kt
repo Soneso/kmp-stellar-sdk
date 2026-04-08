@@ -36,7 +36,7 @@ sealed class SmartAccountEvent {
      * Emitted when a wallet is connected.
      *
      * This event is fired when connecting to an existing wallet, either through
-     * automatic session restoration or explicit connectWallet() call.
+     * automatic session restoration or an explicit wallet connection call.
      *
      * @property contractId The smart account contract address (C-address)
      * @property credentialId The Base64URL-encoded credential ID
@@ -61,8 +61,9 @@ sealed class SmartAccountEvent {
     /**
      * Emitted when a new credential is created (passkey registered).
      *
-     * This event is fired after successful WebAuthn registration, when the
-     * credential is stored locally. Note that the wallet may not be deployed yet.
+     * This event is fired after successful WebAuthn credential creation, whether
+     * during initial wallet setup or when adding a new signer to an existing wallet.
+     * Note that the wallet may not be deployed yet.
      *
      * @property credential The stored credential data
      */
@@ -73,7 +74,7 @@ sealed class SmartAccountEvent {
     /**
      * Emitted when a credential is deleted from storage.
      *
-     * This event is fired when a credential is manually removed. If the credential
+     * This event is fired when a credential is removed via the credential management API. If the credential
      * was connected, the wallet is automatically disconnected first.
      *
      * @property credentialId The Base64URL-encoded credential ID
@@ -114,11 +115,9 @@ sealed class SmartAccountEvent {
      * Emitted when a transaction is submitted to the network.
      *
      * This event is fired after sending the signed transaction to Soroban RPC
-     * or the relayer service. The success flag indicates whether submission
-     * succeeded (transaction accepted by network) or failed (network error).
-     *
-     * Note: A successful submission does not mean the transaction was included
-     * in a ledger.
+     * or the relayer service. The success flag indicates whether the transaction
+     * was successfully sent to the network node, not whether it was included in
+     * a ledger.
      *
      * @property hash The transaction hash
      * @property success True if submitted successfully, false if submission failed
@@ -158,8 +157,8 @@ fun interface SmartAccountEventListener {
  * This class manages event subscriptions and dispatches events to all registered
  * listeners. It provides thread-safe subscription management and error handling.
  *
- * All synchronization uses [platformSynchronized] on the [listeners] map as the single
- * lock. Event emission snapshots the listener list under the lock, then invokes
+ * All synchronization uses [platformSynchronized] on the internal listeners map as the
+ * single lock. Event emission snapshots the listener list under the lock, then invokes
  * listeners outside the lock to avoid holding the lock during callbacks.
  *
  * Features:
@@ -344,6 +343,10 @@ class SmartAccountEventEmitter {
     /**
      * Removes all listeners for a specific event type, or all listeners if no type is specified.
      *
+     * When an eventType is specified, only type-specific listeners registered via [on] are
+     * removed. Global listeners registered via [addListener] are not affected. When null,
+     * both type-specific and global listeners are removed.
+     *
      * @param eventType The event class name, or null to remove all listeners
      *
      * Example:
@@ -400,14 +403,6 @@ class SmartAccountEventEmitter {
      * This is an internal method called by the kit's operation modules.
      *
      * @param event The event to emit
-     *
-     * Example (internal usage):
-     * ```kotlin
-     * kit.events.emit(SmartAccountEvent.WalletConnected(
-     *     contractId = "CABC123...",
-     *     credentialId = "cred123"
-     * ))
-     * ```
      */
     internal fun emit(event: SmartAccountEvent) {
         val eventType = event::class.simpleName ?: return
@@ -431,6 +426,9 @@ class SmartAccountEventEmitter {
 
     /**
      * Internal helper to add a listener for a specific event type.
+     *
+     * @param eventType The event class name (e.g., "WalletConnected")
+     * @param listener The listener to register
      */
     @PublishedApi
     internal fun addListenerInternal(eventType: String, listener: SmartAccountEventListener) {
@@ -441,6 +439,9 @@ class SmartAccountEventEmitter {
 
     /**
      * Internal helper to remove a listener for a specific event type.
+     *
+     * @param eventType The event class name (e.g., "WalletConnected")
+     * @param listener The listener to unregister
      */
     @PublishedApi
     internal fun removeListenerInternal(eventType: String, listener: SmartAccountEventListener) {

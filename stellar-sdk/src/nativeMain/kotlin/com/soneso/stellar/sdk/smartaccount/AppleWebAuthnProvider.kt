@@ -173,7 +173,6 @@ class AppleWebAuthnProvider(
                 "Attestation object is null"
             )
         val attestationBytes = rawAttestationObject.toByteArray()
-        val clientDataJSON = credential.rawClientDataJSON.toByteArray()
 
         // Extract public key from attestation object using SmartAccountUtils
         // which handles CBOR parsing and COSE key extraction.

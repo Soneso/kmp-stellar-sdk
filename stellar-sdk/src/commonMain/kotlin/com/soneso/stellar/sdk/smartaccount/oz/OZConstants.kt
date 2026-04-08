@@ -53,4 +53,19 @@ object OZConstants {
      */
     const val MAX_POLICIES = 5
 
+    /**
+     * HTTP header identifying the SDK name sent with indexer and relayer requests.
+     */
+    const val CLIENT_NAME_HEADER = "X-Client-Name"
+
+    /**
+     * HTTP header identifying the SDK version sent with indexer and relayer requests.
+     */
+    const val CLIENT_VERSION_HEADER = "X-Client-Version"
+
+    /**
+     * SDK name sent in client identification headers.
+     */
+    const val CLIENT_NAME = "kmp-stellar-sdk"
+
 }

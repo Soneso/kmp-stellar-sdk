@@ -208,12 +208,16 @@ data class HealthCheckResponse(
  * println("Contract has ${contractDetails.contextRules.size} context rules")
  * ```
  *
+ * @param indexerUrl The indexer endpoint URL (trailing slashes are stripped)
+ * @param timeoutMs Request timeout in milliseconds
+ * @param injectedClient Optional custom HTTP client for testing
  * @throws ConfigurationException.InvalidConfig if the URL is blank or does not use HTTPS
  *   (http://localhost is permitted for development).
  */
 class OZIndexerClient(
     indexerUrl: String,
-    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS,
+    private val injectedClient: HttpClient? = null
 ) : AutoCloseable {
     private val baseUrl: String
 
@@ -221,7 +225,7 @@ class OZIndexerClient(
         if (indexerUrl.isBlank()) {
             throw ConfigurationException.invalidConfig("Indexer URL is required")
         }
-        if (!indexerUrl.startsWith("https://") && !indexerUrl.startsWith("http://localhost")) {
+        if (!indexerUrl.startsWith("https://") && !isLocalhostUrl(indexerUrl)) {
             throw ConfigurationException.invalidConfig(
                 "Indexer URL must use HTTPS (or http://localhost for development): $indexerUrl"
             )
@@ -229,7 +233,16 @@ class OZIndexerClient(
         baseUrl = indexerUrl.trimEnd('/')
     }
 
-    private val httpClient: HttpClient = createHttpClient(timeoutMs)
+    /**
+     * Persistent HTTP client for production use. Closed by [close].
+     * When [injectedClient] is provided (testing), that client is used instead.
+     */
+    private val ownedClient: HttpClient = createHttpClient(timeoutMs)
+
+    /**
+     * The effective HTTP client used for requests.
+     */
+    private val effectiveClient: HttpClient get() = injectedClient ?: ownedClient
 
     companion object {
         private const val HEALTH_STATUS_OK = "ok"
@@ -288,6 +301,10 @@ class OZIndexerClient(
      * @return Configured HttpClient instance
      */
     private fun createHttpClient(timeoutMs: Long): HttpClient = HttpClient {
+        defaultRequest {
+            header(OZConstants.CLIENT_NAME_HEADER, OZConstants.CLIENT_NAME)
+            header(OZConstants.CLIENT_VERSION_HEADER, Util.getSdkVersion())
+        }
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -396,7 +413,7 @@ class OZIndexerClient(
      */
     suspend fun isHealthy(): Boolean {
         return try {
-            val response: HttpResponse = httpClient.get("$baseUrl/") {
+            val response: HttpResponse = effectiveClient.get("$baseUrl/") {
                 headers {
                     append(HttpHeaders.Accept, ContentType.Application.Json.toString())
                 }
@@ -416,13 +433,14 @@ class OZIndexerClient(
     }
 
     /**
-     * Closes the HTTP client and releases resources.
+     * Closes the owned HTTP client and releases resources.
      *
-     * Should be called when the client is no longer needed to free up system resources.
-     * After calling close, this client instance cannot be used again.
+     * When an injected client was provided (testing), it is not closed —
+     * the caller retains ownership. After calling close, this client
+     * instance should not be used again.
      */
     override fun close() {
-        httpClient.close()
+        ownedClient.close()
     }
 
     // MARK: - Private Helper Methods
@@ -437,7 +455,7 @@ class OZIndexerClient(
      */
     private suspend inline fun <reified T> performRequest(url: String): T {
         try {
-            val response: HttpResponse = httpClient.get(url) {
+            val response: HttpResponse = effectiveClient.get(url) {
                 headers {
                     append(HttpHeaders.Accept, ContentType.Application.Json.toString())
                 }

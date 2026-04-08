@@ -107,14 +107,16 @@ data class RelayerResponse(
  *
  * @param relayerUrl The relayer endpoint URL (trailing slashes are stripped)
  * @param timeoutMs Default request timeout in milliseconds (default: 6 minutes for testnet retries)
- * @param httpClient Optional custom HTTP client for testing
- * @throws ConfigurationException.InvalidConfig if relayerUrl is blank
+ * @param injectedClient Optional pre-configured HTTP client, typically used for testing.
+ *   The caller retains ownership and is responsible for closing it.
+ * @throws ConfigurationException.InvalidConfig if relayerUrl is blank or does not use HTTPS
+ *   (http://localhost is permitted for development)
  */
 class OZRelayerClient(
     relayerUrl: String,
-    private val timeoutMs: Long = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS,
-    private val httpClient: HttpClient? = null
-) {
+    timeoutMs: Long = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS,
+    private val injectedClient: HttpClient? = null
+) : AutoCloseable {
     /**
      * Normalized URL with trailing slashes stripped.
      */
@@ -124,7 +126,7 @@ class OZRelayerClient(
         if (relayerUrl.isBlank()) {
             throw ConfigurationException.invalidConfig("Relayer URL is required")
         }
-        if (!relayerUrl.startsWith("https://") && !relayerUrl.startsWith("http://localhost")) {
+        if (!relayerUrl.startsWith("https://") && !isLocalhostUrl(relayerUrl)) {
             throw ConfigurationException.invalidConfig(
                 "Relayer URL must use HTTPS (or http://localhost for development): $relayerUrl"
             )
@@ -142,10 +144,16 @@ class OZRelayerClient(
     }
 
     /**
-     * Whether the client is properly configured with a valid URL.
+     * HTTP client owned by this instance. Always created on construction;
+     * closed by [close]. When [injectedClient] is provided, this client
+     * is unused but still closed on [close].
      */
-    val isConfigured: Boolean
-        get() = normalizedUrl.isNotBlank()
+    private val ownedClient: HttpClient = createHttpClient(timeoutMs)
+
+    /**
+     * The effective HTTP client used for requests.
+     */
+    private val effectiveClient: HttpClient get() = injectedClient ?: ownedClient
 
     // MARK: - Mode 1: Host Function + Auth Entries
 
@@ -154,6 +162,9 @@ class OZRelayerClient(
      *
      * The relayer will construct a full transaction from these components,
      * wrap it with a fee bump, and submit it to the Stellar network.
+     *
+     * This method does not throw exceptions; all errors are captured in the
+     * returned [RelayerResponse].
      *
      * @param hostFunction The host function to execute
      * @param authEntries Authorization entries for the transaction
@@ -203,6 +214,9 @@ class OZRelayerClient(
      * Use this for transactions that require source_account auth (e.g., deployment).
      * The relayer will fee-bump the signed transaction, preserving the inner signature.
      *
+     * This method does not throw exceptions; all errors are captured in the
+     * returned [RelayerResponse].
+     *
      * @param transactionEnvelope TransactionEnvelope XDR to submit
      * @param perRequestTimeoutMs Optional per-request timeout override in milliseconds
      * @return The relayer response with transaction hash or error
@@ -234,7 +248,6 @@ class OZRelayerClient(
     /**
      * Performs the HTTP request to the relayer.
      *
-     * - Sends X-Client-Name and X-Client-Version headers
      * - On success: extracts fields from nested `data` wrapper if present
      * - On error (including non-2xx): parses error code from multiple locations
      * - On timeout: returns a response with TIMEOUT error code
@@ -245,87 +258,83 @@ class OZRelayerClient(
      *
      * @param payload The JSON payload to send
      * @param perRequestTimeoutMs Optional per-request timeout override
-     * @return The parsed relayer response (never throws)
+     * @return The parsed relayer response; all expected errors are captured in the response
      */
     private suspend fun performRequest(
         payload: JsonObject,
         perRequestTimeoutMs: Long? = null
     ): RelayerResponse {
-        val effectiveTimeout = perRequestTimeoutMs ?: timeoutMs
-
-        return withHttpClient(effectiveTimeout) { client ->
-            val response = try {
-                client.post(normalizedUrl) {
-                    contentType(ContentType.Application.Json)
-                    header("X-Client-Name", "kmp-stellar-sdk")
-                    header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
-                    setBody(payload)
+        val response = try {
+            effectiveClient.post(normalizedUrl) {
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+                if (perRequestTimeoutMs != null) {
                     timeout {
-                        requestTimeoutMillis = effectiveTimeout
-                        connectTimeoutMillis = effectiveTimeout
-                        socketTimeoutMillis = effectiveTimeout
+                        requestTimeoutMillis = perRequestTimeoutMs
+                        connectTimeoutMillis = minOf(perRequestTimeoutMs, 30_000)
+                        socketTimeoutMillis = perRequestTimeoutMs
                     }
                 }
-            } catch (e: HttpRequestTimeoutException) {
-                return@withHttpClient RelayerResponse(
-                    success = false,
-                    error = "Relayer request timed out",
-                    errorCode = RelayerErrorCodes.TIMEOUT
-                )
-            } catch (e: Exception) {
-                return@withHttpClient RelayerResponse(
-                    success = false,
-                    error = e.message ?: "Relayer request failed"
-                )
             }
-
-            // Parse the response body as JSON
-            val responseBody = try {
-                response.bodyAsText()
-            } catch (e: Exception) {
-                return@withHttpClient RelayerResponse(
-                    success = false,
-                    error = "Failed to read relayer response body"
-                )
-            }
-
-            val responseJson = try {
-                json.parseToJsonElement(responseBody).jsonObject
-            } catch (e: Exception) {
-                val truncated = if (responseBody.length > 200) responseBody.take(200) + "..." else responseBody
-                return@withHttpClient RelayerResponse(
-                    success = false,
-                    error = "Failed to parse relayer response as JSON: $truncated"
-                )
-            }
-
-            // Check for success: HTTP 2xx AND success=true in body
-            val bodySuccess = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
-            if (response.status.isSuccess() && bodySuccess) {
-                // Extract from nested "data" wrapper if present, otherwise use top-level
-                val data = (responseJson["data"] as? JsonObject) ?: responseJson
-                return@withHttpClient RelayerResponse(
-                    success = true,
-                    transactionId = data["transactionId"]?.jsonPrimitive?.contentOrNull,
-                    hash = data["hash"]?.jsonPrimitive?.contentOrNull,
-                    status = data["status"]?.jsonPrimitive?.contentOrNull
-                )
-            }
-
-            // Error response: extract error message and code
-            val errorMessage = responseJson["error"]?.jsonPrimitive?.contentOrNull
-                ?: responseJson["message"]?.jsonPrimitive?.contentOrNull
-                ?: "Relayer request failed with status ${response.status.value}"
-            val errorCode = extractErrorCode(responseJson)
-            val details = responseJson["data"] ?: responseJson
-
-            RelayerResponse(
+        } catch (_: HttpRequestTimeoutException) {
+            return RelayerResponse(
                 success = false,
-                error = errorMessage,
-                errorCode = errorCode,
-                details = details
+                error = "Relayer request timed out",
+                errorCode = RelayerErrorCodes.TIMEOUT
+            )
+        } catch (e: Exception) {
+            return RelayerResponse(
+                success = false,
+                error = e.message ?: "Relayer request failed"
             )
         }
+
+        // Parse the response body as JSON
+        val responseBody = try {
+            response.bodyAsText()
+        } catch (_: Exception) {
+            return RelayerResponse(
+                success = false,
+                error = "Failed to read relayer response body"
+            )
+        }
+
+        val responseJson = try {
+            json.parseToJsonElement(responseBody).jsonObject
+        } catch (_: Exception) {
+            val truncated = if (responseBody.length > 200) responseBody.take(200) + "..." else responseBody
+            return RelayerResponse(
+                success = false,
+                error = "Failed to parse relayer response as JSON: $truncated"
+            )
+        }
+
+        // Check for success: HTTP 2xx AND success=true in body
+        val bodySuccess = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
+        if (response.status.isSuccess() && bodySuccess) {
+            // Extract from nested "data" wrapper if present, otherwise use top-level
+            val data = (responseJson["data"] as? JsonObject) ?: responseJson
+            return RelayerResponse(
+                success = true,
+                transactionId = data["transactionId"]?.jsonPrimitive?.contentOrNull,
+                hash = data["hash"]?.jsonPrimitive?.contentOrNull,
+                status = data["status"]?.jsonPrimitive?.contentOrNull
+            )
+        }
+
+        // Error response: extract error message and code
+        val errorMessage = responseJson["error"]?.jsonPrimitive?.contentOrNull
+            ?: responseJson["message"]?.jsonPrimitive?.contentOrNull
+            ?: "Relayer request failed with status ${response.status.value}"
+        val errorCode = extractErrorCode(responseJson)
+        val details = responseJson["data"] ?: responseJson
+
+        return RelayerResponse(
+            success = false,
+            error = errorMessage,
+            errorCode = errorCode,
+            details = details
+        )
     }
 
     /**
@@ -356,28 +365,33 @@ class OZRelayerClient(
     }
 
     /**
-     * Executes a block with an HTTP client, managing lifecycle properly.
+     * Creates the default HTTP client configured for relayer requests with
+     * content negotiation, timeout, and SDK identification headers.
+     *
+     * @param timeoutMs Default request timeout in milliseconds
      */
-    private suspend fun <T> withHttpClient(
-        effectiveTimeout: Long,
-        block: suspend (HttpClient) -> T
-    ): T {
-        val client = httpClient ?: HttpClient {
-            install(ContentNegotiation) {
-                json(json)
-            }
-            install(HttpTimeout) {
-                connectTimeoutMillis = effectiveTimeout
-                requestTimeoutMillis = effectiveTimeout
-            }
+    private fun createHttpClient(timeoutMs: Long): HttpClient = HttpClient {
+        defaultRequest {
+            header(OZConstants.CLIENT_NAME_HEADER, OZConstants.CLIENT_NAME)
+            header(OZConstants.CLIENT_VERSION_HEADER, com.soneso.stellar.sdk.Util.getSdkVersion())
         }
+        install(ContentNegotiation) {
+            json(json)
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = timeoutMs
+            connectTimeoutMillis = minOf(timeoutMs, 30_000)
+        }
+    }
 
-        return try {
-            block(client)
-        } finally {
-            if (httpClient == null) {
-                client.close()
-            }
-        }
+    /**
+     * Closes the owned HTTP client and releases resources.
+     *
+     * When an injected client was provided (testing), it is not closed —
+     * the caller retains ownership. After calling close, this client
+     * instance should not be used again.
+     */
+    override fun close() {
+        ownedClient.close()
     }
 }
