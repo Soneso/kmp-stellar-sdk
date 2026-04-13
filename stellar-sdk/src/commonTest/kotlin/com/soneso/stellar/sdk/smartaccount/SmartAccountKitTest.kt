@@ -1479,7 +1479,7 @@ class SmartAccountKitTest {
 
             override suspend fun authenticate(
                 challenge: ByteArray,
-                allowCredentialIds: List<ByteArray>?
+                allowCredentials: List<AllowCredential>?
             ): WebAuthnAuthenticationResult {
                 throw NotImplementedError()
             }
@@ -2269,7 +2269,7 @@ class MockWebAuthnProvider(
 
     override suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>?
+        allowCredentials: List<AllowCredential>?
     ): WebAuthnAuthenticationResult {
         if (shouldCancel) {
             throw Exception("User cancelled")

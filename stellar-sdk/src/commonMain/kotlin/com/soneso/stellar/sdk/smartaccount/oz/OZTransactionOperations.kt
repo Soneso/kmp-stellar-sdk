@@ -527,10 +527,13 @@ class OZTransactionOperations internal constructor(
                 // (g) Compute auth digest binding rule IDs to the payload hash
                 val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
 
-                // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt)
+                // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt).
+                // Transport hints from storage allow the OS/browser to route to the correct authenticator
+                // without an extra discovery step. null transports is the correct fallback when the
+                // credential is not in local storage (e.g. cross-device credential).
                 val authResult = webauthnProvider.authenticate(
                     authDigest,
-                    allowCredentialIds = listOf(credIdBytes)
+                    allowCredentials = listOf(AllowCredential(id = credIdBytes, transports = stored?.transports))
                 )
 
                 // (i) Normalize DER signature to compact format with low-S

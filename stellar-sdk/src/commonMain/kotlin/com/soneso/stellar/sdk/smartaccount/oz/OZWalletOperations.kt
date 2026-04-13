@@ -837,14 +837,20 @@ class OZWalletOperations internal constructor(
         val challengeData = challenge ?: secureRandomBytes(32)
 
         // STEP 3: Call WebAuthn authentication
-        // Decode base64url credential IDs to byte arrays for the WebAuthn provider.
-        // When provided, the OS/browser only offers these specific passkeys.
-        val allowCredentialIds = credentialIds?.map { Util.base64urlDecode(it) }
+        // Decode base64url credential IDs and enrich with stored transport hints so the
+        // OS/browser can route to the correct authenticator without an extra round-trip.
+        // `stored` may be null for cross-device credentials not yet in local storage — in
+        // that case null transports is the correct fallback (browser uses its defaults).
+        val allowCredentials = credentialIds?.map { credIdStr ->
+            val idBytes = Util.base64urlDecode(credIdStr)
+            val stored = try { kit.getStorage().get(credIdStr) } catch (_: Exception) { null }
+            AllowCredential(id = idBytes, transports = stored?.transports)
+        }
 
         val authenticationResult = try {
             webauthnProvider.authenticate(
                 challenge = challengeData,
-                allowCredentialIds = allowCredentialIds
+                allowCredentials = allowCredentials
             )
         } catch (e: Exception) {
             throw WebAuthnException.authenticationFailed(

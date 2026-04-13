@@ -12,6 +12,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
+import com.soneso.stellar.sdk.smartaccount.oz.AllowCredential
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
 import kotlinx.coroutines.await
@@ -249,8 +250,11 @@ class JsWebAuthnProvider(
      * normalization before submitting to the Stellar network.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically 32 bytes)
-     * @param allowCredentialIds Optional list of credential IDs to restrict authentication to
-     *        specific passkeys. If null, all registered passkeys are eligible.
+     * @param allowCredentials Optional list of credential descriptors with optional transport hints
+     *        to restrict authentication to specific passkeys. When [AllowCredential.transports] is
+     *        non-null, the transport hints are forwarded to the browser to enable cross-device
+     *        flows (e.g. QR code scanning via "hybrid"). If null, all registered passkeys for
+     *        this RP are eligible.
      * @return [WebAuthnAuthenticationResult] with credential ID, authenticator data,
      *         client data JSON, and DER-encoded signature
      * @throws WebAuthnException.NotSupported if WebAuthn is not available (e.g. Node.js)
@@ -259,7 +263,7 @@ class JsWebAuthnProvider(
      */
     override suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>?
+        allowCredentials: List<AllowCredential>?
     ): WebAuthnAuthenticationResult {
         val credentials = getNavigatorCredentials()
             ?: throw WebAuthnException.notSupported(
@@ -282,10 +286,37 @@ class JsWebAuthnProvider(
 
         // Constrain which passkey the authenticator uses. Without this, the browser
         // may pick a different passkey than intended when multiple exist for this RP.
-        if (allowCredentialIds != null && allowCredentialIds.isNotEmpty()) {
-            val idBuffers = allowCredentialIds.map { it.toArrayBuffer() }.toTypedArray()
-            val jsAllowCreds = js("(function(buffers) { return buffers.map(function(buf) { return { type: 'public-key', id: buf }; }); })")
-            publicKey.allowCredentials = jsAllowCreds(idBuffers)
+        // When transport hints are present they are forwarded to enable cross-device
+        // flows (e.g. "hybrid" for QR-code scanning via a phone).
+        if (allowCredentials != null && allowCredentials.isNotEmpty()) {
+            val idBuffers = allowCredentials.map { it.id.toArrayBuffer() }.toTypedArray()
+            // Build a parallel array of transport arrays (JS Array<String> or null).
+            // Using js("null") for entries without hints avoids emitting a transports
+            // field entirely, which is required by the WebAuthn spec — omitting the field
+            // is different from passing an empty array.
+            val transportArrays: Array<dynamic> = allowCredentials.map { cred ->
+                if (cred.transports != null && cred.transports.isNotEmpty()) {
+                    cred.transports.toTypedArray().asDynamic()
+                } else {
+                    null.asDynamic()
+                }
+            }.toTypedArray()
+
+            val jsAllowCreds = js(
+                """
+                (function(buffers, transportsPerCred) {
+                    return buffers.map(function(buf, i) {
+                        var descriptor = { type: 'public-key', id: buf };
+                        var t = transportsPerCred[i];
+                        if (t !== null && t !== undefined && t.length > 0) {
+                            descriptor.transports = t;
+                        }
+                        return descriptor;
+                    });
+                })
+                """
+            )
+            publicKey.allowCredentials = jsAllowCreds(idBuffers, transportArrays)
         }
 
         options.publicKey = publicKey

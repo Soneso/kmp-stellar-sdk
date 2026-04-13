@@ -172,7 +172,8 @@ data class ContextRuleEditResult(
  * @param signers Selected signers from the signer picker dialog.
  * @return Mapped list of [SelectedSigner] ready for multi-signer operations.
  */
-fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner> {
+suspend fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner> {
+    val storage = DemoState.storage
     val result = mutableListOf<SelectedSigner>()
     for (signer in signers) {
         when (signer) {
@@ -180,11 +181,17 @@ fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<SelectedSigner
                 val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
                 val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer)
                 if (credIdStr != null) {
+                    // Look up stored credential for transport hints (enables cross-device auth).
+                    // Null transports is the correct fallback for credentials not in local storage.
+                    val transports = try {
+                        storage?.get(credIdStr)?.transports
+                    } catch (_: Exception) { null }
                     result.add(
                         SelectedSigner.Passkey(
                             credentialId = credIdStr,
                             credentialIdBytes = credIdBytes,
-                            keyData = signer.keyData
+                            keyData = signer.keyData,
+                            transports = transports
                         )
                     )
                 }

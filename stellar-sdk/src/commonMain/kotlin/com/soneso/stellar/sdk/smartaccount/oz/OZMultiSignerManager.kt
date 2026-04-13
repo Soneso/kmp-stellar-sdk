@@ -55,11 +55,14 @@ sealed class SelectedSigner {
      * @property keyData Full key data (secp256r1 public key + credentialId bytes) for this
      *   passkey signer. When provided, the SDK uses it directly without an on-chain lookup.
      *   Must be supplied by the caller from the signer data already available client-side.
+     * @property transports Optional transport hints for this credential (e.g., "internal",
+     *   "hybrid"). Enables cross-device authentication flows such as QR code scanning.
      */
     data class Passkey(
         val credentialId: String? = null,
         val credentialIdBytes: ByteArray? = null,
-        val keyData: ByteArray? = null
+        val keyData: ByteArray? = null,
+        val transports: List<String>? = null
     ) : SelectedSigner() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -72,6 +75,7 @@ sealed class SelectedSigner {
             if (keyData != null) {
                 if (other.keyData == null || !keyData.contentEquals(other.keyData)) return false
             } else if (other.keyData != null) return false
+            if (transports != other.transports) return false
             return true
         }
 
@@ -79,6 +83,7 @@ sealed class SelectedSigner {
             var result = credentialId?.hashCode() ?: 0
             result = 31 * result + (credentialIdBytes?.contentHashCode() ?: 0)
             result = 31 * result + (keyData?.contentHashCode() ?: 0)
+            result = 31 * result + (transports?.hashCode() ?: 0)
             return result
         }
     }
@@ -527,12 +532,16 @@ class OZMultiSignerManager internal constructor(
                             )
 
                         // Trigger WebAuthn authentication (one OS prompt per passkey signer).
-                        // Pass credentialIdBytes as allowCredentials so the browser uses
-                        // the correct passkey when multiple exist for this RP.
-                        val allowCredentialIds = selectedSigner.credentialIdBytes?.let { listOf(it) }
+                        // Pass credentialIdBytes with transport hints as allowCredentials so the
+                        // browser routes to the correct passkey when multiple exist for this RP.
+                        // null transports is the correct fallback for cross-device credentials
+                        // not yet stored locally.
+                        val allowCredentials = selectedSigner.credentialIdBytes?.let { idBytes ->
+                            listOf(AllowCredential(id = idBytes, transports = selectedSigner.transports))
+                        }
 
                         val authResult = try {
-                            webauthnProvider.authenticate(authDigest, allowCredentialIds)
+                            webauthnProvider.authenticate(authDigest, allowCredentials)
                         } catch (e: Exception) {
                             throw WebAuthnException.authenticationFailed(
                                 "WebAuthn authentication failed for passkey signer " +

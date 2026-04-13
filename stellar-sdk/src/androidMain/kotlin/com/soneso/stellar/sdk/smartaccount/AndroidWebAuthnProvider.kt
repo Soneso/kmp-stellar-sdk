@@ -26,6 +26,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
+import com.soneso.stellar.sdk.smartaccount.oz.AllowCredential
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -169,6 +170,9 @@ class AndroidWebAuthnProvider(
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically
      *   32 bytes). Used as-is in the WebAuthn ceremony.
+     * @param allowCredentials Optional list of [AllowCredential] entries (credential ID plus
+     *   optional transport hints) to constrain the authenticator to specific credentials.
+     *   When null or empty, discoverable credential selection is used.
      * @return [WebAuthnAuthenticationResult] containing the credential ID, authenticator
      *   data, client data JSON, and DER-encoded ECDSA signature.
      * @throws WebAuthnException.Cancelled if the user cancels the authentication dialog.
@@ -177,9 +181,9 @@ class AndroidWebAuthnProvider(
      */
     override suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>?
+        allowCredentials: List<AllowCredential>?
     ): WebAuthnAuthenticationResult {
-        val requestJson = buildAuthenticationRequestJson(challenge, allowCredentialIds)
+        val requestJson = buildAuthenticationRequestJson(challenge, allowCredentials)
 
         val getRequest = GetCredentialRequest(
             credentialOptions = listOf(
@@ -293,27 +297,39 @@ class AndroidWebAuthnProvider(
      * Builds the PublicKeyCredentialRequestOptions JSON for an authentication ceremony.
      *
      * Constructs a JSON string conforming to the WebAuthn specification's
-     * `PublicKeyCredentialRequestOptions` dictionary. When [allowCredentialIds] is
+     * `PublicKeyCredentialRequestOptions` dictionary. When [allowCredentials] is
      * provided, the `allowCredentials` array constrains the authenticator to only
-     * the specified credentials. When null or empty, discoverable credential selection
-     * is used (the user picks which passkey to use).
+     * the specified credentials and includes transport hints where available. When null
+     * or empty, discoverable credential selection is used (the user picks which passkey
+     * to use).
      *
      * @param challenge The challenge bytes (base64url encoded in the JSON)
-     * @param allowCredentialIds Optional list of credential ID bytes to constrain selection
+     * @param allowCredentials Optional list of [AllowCredential] entries to constrain selection.
+     *   Each entry carries a credential ID and optional transport hints (e.g. "internal",
+     *   "hybrid"). When an entry's transports list is non-null it is included in the JSON;
+     *   when null the transports field is omitted for that entry.
      * @return JSON string for the authentication request
      */
     private fun buildAuthenticationRequestJson(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>? = null
+        allowCredentials: List<AllowCredential>? = null
     ): String {
         val challengeB64 = base64UrlEncode(challenge)
 
-        val allowCredentials = if (!allowCredentialIds.isNullOrEmpty()) {
-            JsonArray(allowCredentialIds.map { credId ->
-                JsonObject(mapOf(
-                    "type" to JsonPrimitive("public-key"),
-                    "id" to JsonPrimitive(base64UrlEncode(credId))
-                ))
+        val allowCredentialsJson = if (!allowCredentials.isNullOrEmpty()) {
+            JsonArray(allowCredentials.map { cred ->
+                JsonObject(
+                    buildMap {
+                        put("type", JsonPrimitive("public-key"))
+                        put("id", JsonPrimitive(base64UrlEncode(cred.id)))
+                        if (cred.transports != null) {
+                            put(
+                                "transports",
+                                JsonArray(cred.transports.map { JsonPrimitive(it) })
+                            )
+                        }
+                    }
+                )
             })
         } else {
             JsonArray(emptyList())
@@ -325,7 +341,7 @@ class AndroidWebAuthnProvider(
                 "rpId" to JsonPrimitive(rpId),
                 "timeout" to JsonPrimitive(timeout),
                 "userVerification" to JsonPrimitive("required"),
-                "allowCredentials" to allowCredentials
+                "allowCredentials" to allowCredentialsJson
             )
         )
 
