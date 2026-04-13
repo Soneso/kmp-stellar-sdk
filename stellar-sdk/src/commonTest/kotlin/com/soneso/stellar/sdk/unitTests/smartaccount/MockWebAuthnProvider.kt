@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
+import com.soneso.stellar.sdk.smartaccount.oz.AllowCredential
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
 
@@ -87,6 +88,10 @@ class MockWebAuthnProvider : WebAuthnProvider {
     var lastAuthenticateChallenge: ByteArray? = null
         private set
 
+    /** The most recent allowCredentials passed to [authenticate], or null if never called. */
+    var lastAuthenticateAllowCredentials: List<AllowCredential>? = null
+        private set
+
     // MARK: - WebAuthnProvider Implementation
 
     override suspend fun register(
@@ -106,10 +111,11 @@ class MockWebAuthnProvider : WebAuthnProvider {
 
     override suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>?
+        allowCredentials: List<AllowCredential>?
     ): WebAuthnAuthenticationResult {
         authenticateCallCount++
         lastAuthenticateChallenge = challenge.copyOf()
+        lastAuthenticateAllowCredentials = allowCredentials
 
         authenticationException?.let { throw it }
 
@@ -132,6 +138,7 @@ class MockWebAuthnProvider : WebAuthnProvider {
         lastRegisterUserId = null
         lastRegisterUserName = null
         lastAuthenticateChallenge = null
+        lastAuthenticateAllowCredentials = null
     }
 
     // MARK: - Default Responses

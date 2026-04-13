@@ -3348,7 +3348,7 @@ interface WebAuthnProvider {
 
     suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>? = null
+        allowCredentials: List<AllowCredential>? = null
     ): WebAuthnAuthenticationResult
 }
 
@@ -3368,6 +3368,40 @@ data class WebAuthnAuthenticationResult(
     val signature: ByteArray
 )
 ```
+
+**`authenticate` parameters**:
+- `challenge`: The challenge bytes to sign (authorization payload hash, 32 bytes).
+- `allowCredentials`: Optional list of `AllowCredential` descriptors. Constrains which passkeys the authenticator offers and indicates how the client can reach the authenticator. When null, discoverable credential selection is used. Including transport hints (e.g., `"hybrid"`) enables cross-device authentication flows such as QR code scanning.
+
+> **Breaking change (1.4.0)**: The `authenticate()` parameter was renamed from `allowCredentialIds: List<ByteArray>?` to `allowCredentials: List<AllowCredential>?`. Use `AllowCredential.fromIds()` to migrate existing `List<ByteArray>` values.
+
+---
+
+### AllowCredential
+
+A credential descriptor pairing a credential ID with optional transport hints. Used in `WebAuthnProvider.authenticate()` to constrain which passkeys the authenticator offers and to indicate how the client can reach the authenticator.
+
+```kotlin
+data class AllowCredential(
+    val id: ByteArray,
+    val transports: List<String>? = null
+) {
+    companion object {
+        fun fromId(id: ByteArray): AllowCredential
+        fun fromIds(ids: List<ByteArray>): List<AllowCredential>
+    }
+}
+```
+
+**Properties**:
+- `id`: The raw credential ID bytes.
+- `transports`: Optional list of transport hints. Recognized values include `"internal"`, `"hybrid"`, `"usb"`, `"ble"`, and `"nfc"`. When null, the authenticator uses its default transport selection. Unknown transport strings are passed through without validation.
+
+**Equality**: `equals()` and `hashCode()` use `contentEquals` / `contentHashCode` for the `id` byte array, ensuring correct comparison and collection behavior.
+
+**Factory methods**:
+- `AllowCredential.fromId(id)`: Creates an `AllowCredential` from a raw credential ID with no transport hints.
+- `AllowCredential.fromIds(ids)`: Creates a list of `AllowCredential` from raw credential IDs with no transport hints. Useful for migrating code that previously used `List<ByteArray>`.
 
 ---
 

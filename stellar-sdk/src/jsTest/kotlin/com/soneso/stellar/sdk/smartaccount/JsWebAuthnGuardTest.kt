@@ -7,6 +7,7 @@
 
 package com.soneso.stellar.sdk.smartaccount
 
+import com.soneso.stellar.sdk.smartaccount.oz.AllowCredential
 import com.soneso.stellar.sdk.smartaccount.core.StorageException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
@@ -78,7 +79,7 @@ class JsWebAuthnGuardTest {
         val exception = assertFailsWith<WebAuthnException.NotSupported> {
             provider.authenticate(
                 challenge = testChallenge(),
-                allowCredentialIds = null
+                allowCredentials = null
             )
         }
         assertNotNull(exception.message)
@@ -100,7 +101,7 @@ class JsWebAuthnGuardTest {
         assertFailsWith<WebAuthnException.NotSupported> {
             provider.authenticate(
                 challenge = testChallenge(),
-                allowCredentialIds = listOf(ByteArray(32) { 0xAB.toByte() })
+                allowCredentials = AllowCredential.fromIds(listOf(ByteArray(32) { 0xAB.toByte() }))
             )
         }
     }

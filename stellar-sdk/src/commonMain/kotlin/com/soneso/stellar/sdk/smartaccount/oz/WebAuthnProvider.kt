@@ -9,6 +9,44 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.Util
 
 /**
+ * A credential descriptor pairing a credential ID with optional transport hints.
+ *
+ * Used in [WebAuthnProvider.authenticate] to constrain which passkeys the
+ * authenticator offers and to indicate how the client can reach the authenticator
+ * (e.g., "internal", "hybrid", "usb", "ble", "nfc"). Including transport hints
+ * enables cross-device authentication flows such as QR code scanning.
+ *
+ * When [transports] is null, the authenticator uses its default transport selection.
+ * Unknown transport strings are passed through without validation — the browser or
+ * OS ignores values it does not recognize.
+ *
+ * @property id The raw credential ID bytes.
+ * @property transports Optional list of transport hints (e.g., "internal", "hybrid").
+ */
+data class AllowCredential(
+    val id: ByteArray,
+    val transports: List<String>? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AllowCredential) return false
+        return id.contentEquals(other.id) && transports == other.transports
+    }
+
+    override fun hashCode(): Int {
+        return 31 * id.contentHashCode() + (transports?.hashCode() ?: 0)
+    }
+
+    companion object {
+        /** Creates an [AllowCredential] from a raw credential ID with no transport hints. */
+        fun fromId(id: ByteArray): AllowCredential = AllowCredential(id = id)
+
+        /** Creates a list of [AllowCredential] from raw credential IDs with no transport hints. */
+        fun fromIds(ids: List<ByteArray>): List<AllowCredential> = ids.map { fromId(it) }
+    }
+}
+
+/**
  * WebAuthn authentication result from a passkey ceremony.
  *
  * Contains the complete attestation data required to verify biometric or
@@ -215,15 +253,16 @@ interface WebAuthnProvider {
      * be signed to authorize the transaction.
      *
      * @param challenge The challenge bytes to sign (authorization payload hash, 32 bytes)
-     * @param allowCredentialIds Optional list of raw credential ID byte arrays to set
-     *   as allowCredentials in the WebAuthn request. Constrains which passkey the
-     *   authenticator uses. Required on web where the browser may otherwise pick
-     *   a different passkey than intended.
+     * @param allowCredentials Optional list of credential descriptors with transport hints.
+     *   Constrains which passkey the authenticator uses and indicates how the client can
+     *   reach the authenticator. When null, discoverable credential selection is used
+     *   (the user picks which passkey to use). Including transport hints (e.g., "hybrid")
+     *   enables cross-device authentication flows such as QR code scanning.
      * @return WebAuthnAuthenticationResult with signature and attestation data
      * @throws WebAuthnException if authentication fails or user cancels
      */
     suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>? = null
+        allowCredentials: List<AllowCredential>? = null
     ): WebAuthnAuthenticationResult
 }

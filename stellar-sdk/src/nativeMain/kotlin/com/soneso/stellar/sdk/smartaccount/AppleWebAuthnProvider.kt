@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
+import com.soneso.stellar.sdk.smartaccount.oz.AllowCredential
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
@@ -214,9 +215,14 @@ class AppleWebAuthnProvider(
      * The challenge bytes are passed directly to the platform authenticator
      * without modification.
      *
+     * Transport hints in [AllowCredential.transports] are intentionally ignored.
+     * [ASAuthorizationPlatformPublicKeyCredentialDescriptor] has no API for transport
+     * hints — Apple manages hybrid and cross-device flows at the OS level.
+     *
      * @param challenge The challenge bytes to sign (authorization payload hash, typically 32 bytes)
-     * @param allowCredentialIds Optional list of credential IDs to restrict authentication to
-     *        specific passkeys. If null, all registered passkeys are eligible.
+     * @param allowCredentials Optional list of [AllowCredential] entries to restrict authentication
+     *        to specific passkeys. Only the credential ID is used; transport hints are ignored.
+     *        If null or empty, all registered passkeys for the relying party are eligible.
      * @return [WebAuthnAuthenticationResult] with credential ID, authenticator data,
      *         client data JSON, and DER-encoded signature
      * @throws WebAuthnException.Cancelled if the user dismissed the authentication dialog
@@ -226,7 +232,7 @@ class AppleWebAuthnProvider(
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override suspend fun authenticate(
         challenge: ByteArray,
-        allowCredentialIds: List<ByteArray>?
+        allowCredentials: List<AllowCredential>?
     ): WebAuthnAuthenticationResult {
         val challengeData = challenge.toNSData()
 
@@ -242,10 +248,13 @@ class AppleWebAuthnProvider(
 
         // Set allowed credentials to restrict which passkeys the system presents.
         // Without this, macOS shows a picker for all passkeys matching the RP ID.
-        if (!allowCredentialIds.isNullOrEmpty()) {
-            val descriptors = allowCredentialIds.map { credId ->
+        // Transport hints (AllowCredential.transports) are intentionally not passed to
+        // ASAuthorizationPlatformPublicKeyCredentialDescriptor — that API has no transport
+        // parameter; Apple handles hybrid/cross-device transport selection at the OS level.
+        if (!allowCredentials.isNullOrEmpty()) {
+            val descriptors = allowCredentials.map { allowCredential ->
                 platform.AuthenticationServices.ASAuthorizationPlatformPublicKeyCredentialDescriptor(
-                    credentialID = credId.toNSData()
+                    credentialID = allowCredential.id.toNSData()
                 )
             }
             request.allowedCredentials = descriptors
