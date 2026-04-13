@@ -27,7 +27,16 @@ allprojects {
         mavenLocal()  // For testing locally published artifacts
         google()
         mavenCentral()
-        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") {
+            content {
+                // Prevent Gradle from resolving Node.js/Yarn artifacts from this repo.
+                // The Kotlin/JS plugin resolves org.nodejs and com.yarnpkg from its own
+                // repository. When JetBrains Space returns 503, Gradle treats it as a
+                // hard error instead of "not found", breaking JS builds.
+                excludeGroup("org.nodejs")
+                excludeGroup("com.yarnpkg")
+            }
+        }
     }
 }
 
