@@ -53,6 +53,10 @@ targets:
     preBuildScripts:
       - script: |
           cd "$SRCROOT/../.."
-          ./gradlew :smart-account-demo:shared:linkDebugFrameworkIosSimulatorArm64
+          if [ "$PLATFORM_NAME" = "iphoneos" ]; then
+            ./gradlew :smart-account-demo:shared:linkDebugFrameworkIosArm64
+          else
+            ./gradlew :smart-account-demo:shared:linkDebugFrameworkIosSimulatorArm64
+          fi
         name: Build Kotlin Framework
         basedOnDependencyAnalysis: false

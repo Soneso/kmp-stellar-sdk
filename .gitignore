@@ -87,6 +87,9 @@ reports/
 */build/
 */reports/
 
+# Web production build output
+**/dist/
+
 # Android specific
 *.apk
 *.aab

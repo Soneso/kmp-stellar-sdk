@@ -124,6 +124,8 @@ In Xcode:
 2. Select the StellarSmartDemo scheme and an iOS 16.0+ simulator.
 3. Run (Cmd+R).
 
+**Running on a physical device**: The default configuration targets the iOS simulator. To run on a physical iPhone, change the framework dependency path in `iosApp/project.yml` from `iosSimulatorArm64` to `iosArm64`, regenerate the Xcode project with `xcodegen generate`, select your device in Xcode, and build. You also need a valid signing team configured in the Signing & Capabilities tab.
+
 ### macOS
 
 ```bash
@@ -210,7 +212,8 @@ Known policy contracts (threshold, spending limit, weighted threshold) are defin
 |------|---------|
 | Build Android APK | `./gradlew :smart-account-demo:androidApp:assembleDebug` |
 | Install on Android device | `./gradlew :smart-account-demo:androidApp:installDebug` |
-| Build iOS framework | `./gradlew :smart-account-demo:shared:linkDebugFrameworkIosSimulatorArm64` |
+| Build iOS framework (simulator) | `./gradlew :smart-account-demo:shared:linkDebugFrameworkIosSimulatorArm64` |
+| Build iOS framework (device) | `./gradlew :smart-account-demo:shared:linkDebugFrameworkIosArm64` |
 | Build macOS framework | `./gradlew :smart-account-demo:shared:linkDebugFrameworkMacosArm64` |
 | Generate iOS Xcode project | `cd smart-account-demo/iosApp && xcodegen generate` |
 | Generate macOS Xcode project | `cd smart-account-demo/macosApp && xcodegen generate` |
