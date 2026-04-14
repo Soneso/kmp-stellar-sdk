@@ -1,7 +1,7 @@
 {
   "name": "kmp-stellar-sdk",
   "description": "Teaches AI coding agents how to build Stellar blockchain applications using kmp-stellar-sdk.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": {
     "name": "Soneso"
   },

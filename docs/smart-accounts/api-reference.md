@@ -3373,7 +3373,7 @@ data class WebAuthnAuthenticationResult(
 - `challenge`: The challenge bytes to sign (authorization payload hash, 32 bytes).
 - `allowCredentials`: Optional list of `AllowCredential` descriptors. Constrains which passkeys the authenticator offers and indicates how the client can reach the authenticator. When null, discoverable credential selection is used. Including transport hints (e.g., `"hybrid"`) enables cross-device authentication flows such as QR code scanning.
 
-> **Breaking change (1.4.0)**: The `authenticate()` parameter was renamed from `allowCredentialIds: List<ByteArray>?` to `allowCredentials: List<AllowCredential>?`. Use `AllowCredential.fromIds()` to migrate existing `List<ByteArray>` values.
+> **Breaking change (1.5.0)**: The `authenticate()` parameter was renamed from `allowCredentialIds: List<ByteArray>?` to `allowCredentials: List<AllowCredential>?`. Use `AllowCredential.fromIds()` to migrate existing `List<ByteArray>` values.
 
 ---
 

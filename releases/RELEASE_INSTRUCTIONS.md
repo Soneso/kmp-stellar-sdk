@@ -184,11 +184,41 @@ Expected output: `BUILD SUCCESSFUL`
 
 **Note**: Some integration tests may fail if testnet is down. This is acceptable for release if unit tests pass.
 
-### Phase 3: Publish to Maven Central
+### Phase 3: Local Maven Verification
+
+Before publishing to Maven Central, verify the artifact works correctly with a local Maven repository.
+
+#### Step 8: Publish to Local Maven
+
+```bash
+./gradlew publishToMavenLocal --no-daemon
+```
+
+#### Step 9: Test with Demo App
+
+Temporarily switch a demo app to use the local artifact instead of the project dependency. Choose the demo app most relevant to the changes:
+
+- **Smart account changes**: Use the smart account demo (`smart-account-demo/`)
+- **Core SDK changes**: Use the main demo (`demo/`)
+
+In the demo app's `shared/build.gradle.kts`, replace the project dependency with the local Maven artifact:
+
+```kotlin
+// Change from:
+api(project(":stellar-sdk"))
+// To:
+api("com.soneso.stellar:stellar-sdk:X.Y.Z")
+```
+
+Ensure `mavenLocal()` is listed in the repositories block. Build, install, and verify the demo app works as expected (e.g., wallet creation, transfers). On Android this also verifies the AAR artifact is correct.
+
+**Revert the demo app change after testing.** Do not commit the Maven artifact dependency.
+
+### Phase 4: Publish to Maven Central
 
 Publish before committing to Git. This allows fixing any build or publishing issues without amending commits.
 
-#### Step 8: Publish to Staging Repository
+#### Step 10: Publish to Staging Repository
 
 Use the **Nexus Publishing Plugin** command (NOT the direct OSSRH command):
 
@@ -223,16 +253,16 @@ BUILD SUCCESSFUL in 6m 5s
 
 **Save the staging repository ID** from the output (e.g., `com.soneso--e77ef82e-2f32-48a6-bbf5-bdb77392d6cb`).
 
-#### Step 9: Verify Publication
+#### Step 11: Verify Publication
 
 Check the Central Portal:
 - URL: https://central.sonatype.com/publishing/deployments
 - Status should show "Published" or "Publishing"
 - All artifacts should be present (POM, JAR, sources, javadoc, signatures)
 
-### Phase 4: Wait for Maven Central Sync
+### Phase 5: Wait for Maven Central Sync
 
-#### Step 10: Monitor Sync Progress
+#### Step 12: Monitor Sync Progress
 
 Maven Central sync typically takes **15-30 minutes**.
 
@@ -248,9 +278,9 @@ When synced, you'll see:
 
 **Do not proceed until sync is complete** - the artifacts must be publicly available before creating the GitHub release.
 
-### Phase 5: Git Release
+### Phase 6: Git Release
 
-#### Step 11: Commit Release Changes
+#### Step 13: Commit Release Changes
 
 Include any build fixes made during publishing in this commit.
 
@@ -273,7 +303,7 @@ Generated with [Claude Code](https://claude.com/claude-code)
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-#### Step 12: Create Git Tag
+#### Step 14: Create Git Tag
 
 ```bash
 # Create annotated tag
@@ -284,9 +314,9 @@ git tag -l -n1 | tail -5
 git show vX.Y.Z --no-patch
 ```
 
-### Phase 6: Push to GitHub
+### Phase 7: Push to GitHub
 
-#### Step 13: Push Commits and Tags
+#### Step 15: Push Commits and Tags
 
 **Only after Maven Central sync is complete:**
 
@@ -301,7 +331,7 @@ git push origin vX.Y.Z
 git log --oneline -5
 ```
 
-#### Step 14: Create GitHub Release
+#### Step 16: Create GitHub Release
 
 1. Navigate to: https://github.com/Soneso/kmp-stellar-sdk/releases/new
 2. **Choose tag**: Select `vX.Y.Z`
@@ -310,9 +340,9 @@ git log --oneline -5
 5. **Set as latest release**: Check this box
 6. Click **Publish release**
 
-### Phase 7: Verify Release
+### Phase 8: Verify Release
 
-#### Step 15: Final Verification
+#### Step 17: Final Verification
 
 Verify the release is complete:
 

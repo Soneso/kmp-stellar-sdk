@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-14
+
+### Changed
+- **Smart Accounts: Cross-device passkey authentication**: Replace `allowCredentialIds: List<ByteArray>?` with `allowCredentials: List<AllowCredential>?` in `WebAuthnProvider.authenticate()`. The new `AllowCredential` data class pairs credential IDs with transport hints (e.g., "internal", "hybrid"), enabling browsers and OS credential managers to offer QR code scanning for cross-device authentication.
+- **Breaking change**: `WebAuthnProvider.authenticate()` parameter renamed and retyped. Use `AllowCredential.fromIds()` to migrate existing `List<ByteArray>` values.
+
+### Added
+- `AllowCredential` data class with `id`, `transports`, and `fromId()`/`fromIds()` factory methods
+- `SelectedSigner.Passkey.transports` field for multi-signer cross-device flows
+- Transport hints propagated through all SDK call sites (`OZWalletOperations`, `OZTransactionOperations`, `OZMultiSignerManager`)
+- 22 unit tests for `AllowCredential`
+
+### Fixed
+- JS Node CI: Exclude `org.nodejs` and `com.yarnpkg` groups from JetBrains Compose Maven repository to prevent build failures when the repository returns 503
+- iOS demo app: Pre-build script conditionally builds for device or simulator based on target platform
+
 ## [1.4.0] - 2026-04-08
 
 ### Added
