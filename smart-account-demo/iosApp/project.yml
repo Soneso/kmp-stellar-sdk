@@ -13,6 +13,9 @@ packages:
   swift-sodium:
     url: https://github.com/jedisct1/swift-sodium
     from: 0.9.1
+  reown-swift:
+    url: https://github.com/reown-com/reown-swift
+    from: 2.0.0
 targets:
   StellarSmartDemo:
     type: application
@@ -25,18 +28,24 @@ targets:
       path: StellarSmartDemo/Info.plist
       properties:
         CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: 1
+        CFBundleVersion: "1"
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CADisableMinimumFrameDurationOnPhone: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.soneso.stellar.smartdemo
+            CFBundleURLSchemes:
+              - stellar-smartdemo
     entitlements:
       path: StellarSmartDemo/StellarSmartDemo.entitlements
       properties:
         com.apple.developer.associated-domains:
           - webcredentials:soneso.com?mode=developer
+        com.apple.security.application-groups:
+          - group.com.soneso.stellar.smartdemo
     settings:
       FRAMEWORK_SEARCH_PATHS:
         - $(inherited)
@@ -50,6 +59,12 @@ targets:
         embed: true
       - package: swift-sodium
         product: Clibsodium
+      - package: reown-swift
+        product: WalletConnect
+      - package: reown-swift
+        product: WalletConnectNetworking
+      - package: reown-swift
+        product: WalletConnectPairing
     preBuildScripts:
       - script: |
           cd "$SRCROOT/../.."

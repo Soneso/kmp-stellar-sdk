@@ -120,11 +120,21 @@ open StellarSmartDemo.xcodeproj
 ```
 
 In Xcode:
-1. Add the swift-sodium package if not already added (File > Add Packages > `https://github.com/jedisct1/swift-sodium`). Select the Clibsodium product.
-2. Select the StellarSmartDemo scheme and an iOS 16.0+ simulator.
-3. Run (Cmd+R).
+1. Resolve packages: File -> Packages -> Resolve Package Versions (downloads swift-sodium and reown-swift dependencies).
+2. Set your signing team: select the StellarSmartDemo target -> Signing & Capabilities -> Team. This is required for both simulator and device builds and must be set after every `xcodegen generate`.
+3. Select the StellarSmartDemo scheme and an iOS 16.0+ simulator.
+4. Run (Cmd+R).
 
-**Running on a physical device**: The default configuration targets the iOS simulator. To run on a physical iPhone, change the framework dependency path in `iosApp/project.yml` from `iosSimulatorArm64` to `iosArm64`, regenerate the Xcode project with `xcodegen generate`, select your device in Xcode, and build. You also need a valid signing team configured in the Signing & Capabilities tab.
+**Switching between simulator and physical device:**
+
+The framework dependency in `project.yml` (line 55) must match the target platform. After changing it, run `xcodegen generate` to regenerate the Xcode project, then set your signing team again.
+
+| Target | Framework path in project.yml line 55 |
+|--------|---------------------------------------|
+| Simulator | `../shared/build/bin/iosSimulatorArm64/debugFramework/shared.framework` |
+| Physical device | `../shared/build/bin/iosArm64/debugFramework/shared.framework` |
+
+The pre-build script automatically builds the correct Kotlin framework based on the selected target platform. You only need to change the framework dependency path and regenerate.
 
 ### macOS
 
@@ -201,10 +211,40 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 | `DEFAULT_INDEXER_URL` | Credential-to-contract address lookup service |
 | `DEFAULT_RP_ID` | WebAuthn Relying Party ID (`soneso.com`) |
 | `RP_NAME` | Display name for passkey prompts |
+| `REOWN_PROJECT_ID` | Reown (WalletConnect) project ID for external wallet connection |
 
 DEMO token settings (`DEMO_TOKEN_*`) control the deterministic deployment and minting of a custom Soroban token used for testing transfers.
 
 Known policy contracts (threshold, spending limit, weighted threshold) are defined in `KNOWN_POLICIES`.
+
+## External Wallet Connection (Freighter)
+
+The demo supports connecting an external Stellar wallet (Freighter) as a delegated signer, as an alternative to entering a secret key manually.
+
+| Platform | Method | Requirement |
+|----------|--------|-------------|
+| Web | Freighter browser extension | Install from [freighter.app](https://www.freighter.app/) |
+| Android | WalletConnect v2 (Reown) | Freighter Mobile on the same device |
+| iOS | WalletConnect v2 (Reown) | Freighter Mobile on the same device |
+| macOS | Not available | Use secret key entry |
+
+Wallet connection buttons are hidden on simulators and emulators since WalletConnect requires the wallet app on a real device.
+
+### Reown Project ID
+
+Android and iOS use the [Reown](https://cloud.reown.com/) (WalletConnect v2) SDK. A project ID is required. Set `REOWN_PROJECT_ID` in `DemoConfig.kt`. Register for a free project ID at [cloud.reown.com](https://cloud.reown.com/).
+
+### iOS App Group (required for device builds)
+
+The Reown SDK requires an App Group for relay session storage. The entitlement `group.com.soneso.stellar.smartdemo` is configured in `iosApp/StellarSmartDemo/StellarSmartDemo.entitlements`.
+
+To run on a physical iOS device, register this App Group in your Apple Developer account:
+
+1. Go to [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list/applicationGroup) -> Certificates, Identifiers & Profiles -> Identifiers -> App Groups
+2. Click **+** and register `group.com.soneso.stellar.smartdemo`
+3. In Xcode, refresh the App Group capability (Signing & Capabilities -> App Groups -> refresh button)
+
+This is not needed for simulator builds (wallet connection is disabled on simulators).
 
 ## Quick Reference
 

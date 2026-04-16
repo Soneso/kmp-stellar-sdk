@@ -1,27 +1,25 @@
 package com.soneso.smartdemo.util
 
 /**
- * Implements ExternalWalletAdapter using in-memory Ed25519 keypairs for multi-signer transfers.
+ * Implements ExternalWalletAdapter for multi-signer transfers using two signing backends:
  *
- * This adapter is used with OZSmartAccountConfig.externalWallet so that
- * OZMultiSignerManager.multiSignerTransfer() can sign auth entries for delegated
- * (SelectedSigner.Wallet) signers whose secret keys are provided by the user.
+ * 1. **In-memory Ed25519 keypairs** — from secret key entry in the signer picker dialog.
+ * 2. **External wallet connector** — from a connected Freighter wallet (web or mobile).
  *
- * When multiSignerTransfer encounters a SelectedSigner.Wallet, the SDK:
- *   1. Validates via canSignFor()
- *   2. Builds the auth entry and preimage internally
- *   3. Calls signAuthEntry() with the base64-encoded HashIDPreimage XDR
+ * The SDK's OZExternalSignerManager routes SelectedSigner.Wallet signers to this adapter.
+ * This adapter reports capabilities via canSignFor() and handles signing via signAuthEntry().
  *
- * signAuthEntry() in this adapter:
+ * For keypair signers, signAuthEntry():
  *   1. Decodes the HashIDPreimage from base64
  *   2. SHA-256 hashes the preimage bytes
  *   3. Ed25519-signs the hash with the registered keypair
  *   4. Returns the raw 64-byte signature as base64
  *
- * The SDK handles auth entry construction and the {public_key, signature} format.
- * Keypairs are held in memory only and cleared when removeAll() is called.
+ * For wallet-connected signers, signAuthEntry() delegates to WalletConnector.signAuthEntry()
+ * which handles signing externally (Freighter extension or WalletConnect).
  */
 
+import com.soneso.smartdemo.wallet.WalletConnector
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.smartaccount.oz.ConnectedWallet
@@ -30,12 +28,15 @@ import com.soneso.stellar.sdk.smartaccount.oz.SignAuthEntryOptions
 import com.soneso.stellar.sdk.smartaccount.oz.SignAuthEntryResult
 
 /**
- * In-memory ExternalWalletAdapter for keypair-based delegated signers.
+ * ExternalWalletAdapter supporting both keypair and external wallet signing.
  */
 class ExternalSignerManagerAdapter : ExternalWalletAdapter {
 
     // Keypairs indexed by G-address. Populated via addFromSecret().
     private val keypairsByAddress = mutableMapOf<String, KeyPair>()
+
+    /** External wallet connector for Freighter signing. Set by DemoState injection. */
+    var walletConnector: WalletConnector? = null
 
     /**
      * Registers an Ed25519 keypair signer from a Stellar secret key (S...).
@@ -73,8 +74,14 @@ class ExternalSignerManagerAdapter : ExternalWalletAdapter {
     /** Not supported — returns null. Use addFromSecret() to register keypairs. */
     override suspend fun connect(): ConnectedWallet? = null
 
-    /** Clears all registered keypair signers. */
+    /** Clears all registered keypair signers and disconnects any active wallet session. */
     override suspend fun disconnect() {
+        // Disconnect wallet session if active
+        walletConnector?.let { connector ->
+            connector.getConnectedAddress()?.let { address ->
+                connector.disconnect(address)
+            }
+        }
         removeAll()
     }
 
@@ -96,13 +103,25 @@ class ExternalSignerManagerAdapter : ExternalWalletAdapter {
     ): SignAuthEntryResult {
         val address = options?.address
             ?: throw IllegalArgumentException(
-                "signAuthEntry requires options.address to identify the keypair"
+                "signAuthEntry requires options.address to identify the signer"
             )
 
+        // Check wallet connector first for wallet-connected addresses
+        walletConnector?.let { connector ->
+            if (connector.isConnected(address)) {
+                val signature = connector.signAuthEntry(preimageXdr, address)
+                return SignAuthEntryResult(
+                    signedAuthEntry = signature,
+                    signerAddress = address
+                )
+            }
+        }
+
+        // Fall back to keypair signing
         val keypair = keypairsByAddress[address]
             ?: throw IllegalStateException(
-                "No keypair registered for address $address. " +
-                    "Call addFromSecret() before invoking multiSignerTransfer()."
+                "No signer available for address $address. " +
+                    "Register a keypair via addFromSecret() or connect a wallet."
             )
 
         // Decode the preimage XDR and hash it
@@ -125,13 +144,14 @@ class ExternalSignerManagerAdapter : ExternalWalletAdapter {
     override fun getConnectedWallets(): List<ConnectedWallet> = emptyList()
 
     /**
-     * Returns true if a keypair has been registered for the given address via addFromSecret().
+     * Returns true if a keypair or wallet connection is available for the given address.
      *
-     * This synchronous form is required by ExternalWalletAdapter and is called by
-     * OZMultiSignerManager.multiSignerTransfer().
+     * Checks keypairs first (from secret key entry), then the wallet connector
+     * (from Freighter connection). Called synchronously by the SDK.
      */
     override fun canSignFor(address: String): Boolean {
-        return keypairsByAddress.containsKey(address)
+        if (keypairsByAddress.containsKey(address)) return true
+        return walletConnector?.isConnected(address) == true
     }
 
     /** Not supported — returns null. */

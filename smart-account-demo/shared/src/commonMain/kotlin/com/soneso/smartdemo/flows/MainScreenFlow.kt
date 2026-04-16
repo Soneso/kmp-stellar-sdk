@@ -51,6 +51,7 @@ suspend fun initializeKit(
     // This bridges the ExternalWalletAdapter interface to in-memory Ed25519 keypairs,
     // enabling multi-signer transfers where a delegated Stellar account co-signs.
     val externalSignerManagerAdapter = ExternalSignerManagerAdapter()
+    externalSignerManagerAdapter.walletConnector = DemoState.walletConnector
 
     // Build the SDK configuration from DemoConfig constants.
     // takeIf { isNotBlank() } ensures blank strings are treated as absent (no relayer/indexer).

@@ -55,10 +55,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.formatSignerForDisplay
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
+import com.soneso.smartdemo.wallet.WalletConnector
+import com.soneso.smartdemo.wallet.WalletConnection
 import kotlinx.coroutines.launch
 
 /**
@@ -72,11 +76,23 @@ data class DelegatedSignerKeyPair(
 )
 
 /**
+ * Represents how a delegated signer has been authorized for signing.
+ */
+private sealed class DelegatedSignerAuth {
+    /** Authorized via a manually-entered secret key. */
+    data class SecretKey(val keyPair: KeyPair) : DelegatedSignerAuth()
+
+    /** Authorized via an externally connected wallet (e.g., Freighter). */
+    data class Wallet(val connection: WalletConnection) : DelegatedSignerAuth()
+}
+
+/**
  * A dialog component for selecting signers in multi-signature transactions.
  *
  * Displays categorized lists of available signers (passkey, delegated, Ed25519)
  * and allows the user to select which ones to use for authorization. For delegated
- * signers, the user can enter a Stellar secret key to enable signing.
+ * signers, the user can enter a Stellar secret key or connect an external wallet
+ * (where available) to enable signing.
  *
  * @param isOpen Whether the dialog is visible
  * @param onDismiss Called when the dialog is dismissed without confirming
@@ -101,17 +117,32 @@ fun SignerPickerDialog(
     if (!isOpen) return
 
     val scope = rememberCoroutineScope()
+    val walletConnector = DemoState.walletConnector
 
     // Selection state: track selected signer unique keys
     val selectedSignerKeys = remember { mutableStateMapOf<String, Boolean>() }
 
-    // Delegated signer secret key state
-    val delegatedKeyPairs = remember { mutableStateMapOf<String, DelegatedSignerKeyPair>() }
+    // Delegated signer auth state — covers both secret-key and wallet-connected signers
+    val delegatedSignerAuth = remember { mutableStateMapOf<String, DelegatedSignerAuth>() }
+
+    // Secret key input state
     var secretKeyInputAddress by remember { mutableStateOf<String?>(null) }
     var secretKeyValue by remember { mutableStateOf("") }
     var secretKeyError by remember { mutableStateOf<String?>(null) }
     var isValidatingKey by remember { mutableStateOf(false) }
     var secretKeyVisible by remember { mutableStateOf(false) }
+
+    // Wallet connection state — address of the signer currently being connected (loading state)
+    var walletConnectingAddress by remember { mutableStateOf<String?>(null) }
+
+    // Per-signer wallet error messages
+    val walletErrors = remember { mutableStateMapOf<String, String>() }
+
+    // Track which signer address has an active wallet connection
+    // (only one delegated signer may have a wallet connection at a time)
+    val walletConnectedAddress: String? = delegatedSignerAuth.entries
+        .firstOrNull { it.value is DelegatedSignerAuth.Wallet }
+        ?.key
 
     // Categorize signers
     val passkeySigners = remember(availableSigners) {
@@ -132,7 +163,7 @@ fun SignerPickerDialog(
         }
     }
 
-    // Auto-select active passkey and signers with stored keypairs on open
+    // Auto-select active passkey and signers with stored auth on open
     LaunchedEffect(isOpen, activeCredentialId, availableSigners) {
         if (isOpen) {
             // Auto-select the active passkey
@@ -145,8 +176,8 @@ fun SignerPickerDialog(
                 }
             }
 
-            // Auto-select delegated signers that already have keypairs stored
-            for ((address, _) in delegatedKeyPairs) {
+            // Auto-select delegated signers that already have auth stored
+            for ((address, _) in delegatedSignerAuth) {
                 val matchingSigner = delegatedSigners.find { it.address == address }
                 if (matchingSigner != null) {
                     selectedSignerKeys[matchingSigner.uniqueKey] = true
@@ -155,15 +186,31 @@ fun SignerPickerDialog(
         }
     }
 
-    // Clean up secret key state on dismiss
+    // Clean up state when the dialog closes. DisposableEffect fires onDispose when
+    // isOpen changes in either direction. When opening (false->true), delegatedSignerAuth
+    // is empty so the disconnect is a no-op. When closing (true->false), any active
+    // wallet session is disconnected. Backgrounding does not trigger disposal.
     DisposableEffect(isOpen) {
         onDispose {
             secretKeyValue = ""
             secretKeyError = null
             secretKeyInputAddress = null
             secretKeyVisible = false
-            // Clear stored keypairs and selection state on dialog close
-            delegatedKeyPairs.clear()
+            walletErrors.clear()
+
+            val addressToDisconnect = delegatedSignerAuth.entries
+                .firstOrNull { it.value is DelegatedSignerAuth.Wallet }
+                ?.key
+            if (addressToDisconnect != null && walletConnector != null) {
+                scope.launch {
+                    try {
+                        walletConnector.disconnect(addressToDisconnect)
+                    } catch (_: Throwable) {
+                        // Best-effort disconnect — ignore errors on cleanup
+                    }
+                }
+            }
+            delegatedSignerAuth.clear()
             selectedSignerKeys.clear()
         }
     }
@@ -239,16 +286,21 @@ fun SignerPickerDialog(
                     if (delegatedSigners.isNotEmpty()) {
                         SignerSectionHeader(label = "Stellar Account Signers")
                         delegatedSigners.forEach { signer ->
-                            val hasKeyPair = delegatedKeyPairs.containsKey(signer.address)
+                            val signerAuth = delegatedSignerAuth[signer.address]
+                            val hasKeyPair = signerAuth is DelegatedSignerAuth.SecretKey
+                            val isWalletConnected = signerAuth is DelegatedSignerAuth.Wallet
                             val isSelected = selectedSignerKeys[signer.uniqueKey] == true
                             val isEnteringKey = secretKeyInputAddress == signer.address
+                            val isConnecting = walletConnectingAddress == signer.address
+                            val isAnotherWalletConnected = walletConnectedAddress != null &&
+                                walletConnectedAddress != signer.address
 
                             DelegatedSignerRow(
                                 signer = signer,
                                 hasKeyPair = hasKeyPair,
                                 isSelected = isSelected,
                                 onToggle = {
-                                    if (hasKeyPair) {
+                                    if (hasKeyPair || isWalletConnected) {
                                         selectedSignerKeys[signer.uniqueKey] =
                                             !(selectedSignerKeys[signer.uniqueKey] ?: false)
                                     }
@@ -259,6 +311,74 @@ fun SignerPickerDialog(
                                     secretKeyValue = ""
                                     secretKeyError = null
                                     secretKeyVisible = false
+                                },
+                                walletAvailable = walletConnector != null,
+                                isWalletConnected = isWalletConnected,
+                                isAnotherWalletConnected = isAnotherWalletConnected,
+                                walletConnecting = isConnecting,
+                                walletError = walletErrors[signer.address],
+                                onConnectWalletClick = {
+                                    walletErrors.remove(signer.address)
+                                    walletConnectingAddress = signer.address
+                                    scope.launch {
+                                        try {
+                                            val connector = walletConnector ?: return@launch
+                                            val connection = connector.connect()
+                                            if (connection == null) {
+                                                // User cancelled — nothing to do
+                                                return@launch
+                                            }
+
+                                            // Verify address matches
+                                            if (connection.address != signer.address) {
+                                                walletErrors[signer.address] =
+                                                    "Connected wallet address does not match this signer. " +
+                                                        "Expected: ${signer.address}, got: ${connection.address}"
+                                                return@launch
+                                            }
+
+                                            // Verify network
+                                            val networkPassphrase = walletConnector.getNetworkPassphrase()
+                                            if (networkPassphrase != null &&
+                                                networkPassphrase != DemoConfig.NETWORK_PASSPHRASE
+                                            ) {
+                                                walletErrors[signer.address] =
+                                                    "Wallet is connected to a different network."
+                                                // Disconnect the mismatched session
+                                                try {
+                                                    walletConnector.disconnect(connection.address)
+                                                } catch (_: Throwable) {
+                                                    // Best-effort
+                                                }
+                                                return@launch
+                                            }
+
+                                            // Success
+                                            delegatedSignerAuth[signer.address] =
+                                                DelegatedSignerAuth.Wallet(connection)
+                                            selectedSignerKeys[signer.uniqueKey] = true
+                                        } catch (e: Throwable) {
+                                            walletErrors[signer.address] =
+                                                "Connection failed: ${e.message ?: "Unknown error"}"
+                                        } finally {
+                                            walletConnectingAddress = null
+                                        }
+                                    }
+                                },
+                                onDisconnectWalletClick = {
+                                    val auth = delegatedSignerAuth[signer.address]
+                                    delegatedSignerAuth.remove(signer.address)
+                                    selectedSignerKeys[signer.uniqueKey] = false
+                                    walletErrors.remove(signer.address)
+                                    if (auth is DelegatedSignerAuth.Wallet && walletConnector != null) {
+                                        scope.launch {
+                                            try {
+                                                walletConnector.disconnect(signer.address)
+                                            } catch (_: Throwable) {
+                                                // Best-effort
+                                            }
+                                        }
+                                    }
                                 }
                             )
 
@@ -300,8 +420,9 @@ fun SignerPickerDialog(
                                                     return@launch
                                                 }
 
-                                                // Store the keypair and auto-select the signer
-                                                delegatedKeyPairs[signer.address] = DelegatedSignerKeyPair(keyPair)
+                                                // Store the auth and auto-select the signer
+                                                delegatedSignerAuth[signer.address] =
+                                                    DelegatedSignerAuth.SecretKey(keyPair)
                                                 selectedSignerKeys[signer.uniqueKey] = true
                                                 secretKeyInputAddress = null
                                                 secretKeyValue = ""
@@ -360,7 +481,12 @@ fun SignerPickerDialog(
                         val selected = availableSigners.filter { signer ->
                             selectedSignerKeys[signer.uniqueKey] == true
                         }
-                        val keyPairs = delegatedKeyPairs.mapValues { (_, value) -> value.keyPair }
+                        // Build the delegated keypairs map from secret-key-authorized signers only.
+                        // Wallet-authorized signers are handled separately by the caller via
+                        // WalletConnector.signAuthEntry and do not need a local KeyPair.
+                        val keyPairs = delegatedSignerAuth
+                            .filterValues { it is DelegatedSignerAuth.SecretKey }
+                            .mapValues { (_, auth) -> (auth as DelegatedSignerAuth.SecretKey).keyPair }
                         onConfirm(selected, keyPairs)
                     }
                 )
@@ -523,6 +649,13 @@ private fun PasskeySignerRow(
     }
 }
 
+/**
+ * Row for a delegated (Stellar account) signer.
+ *
+ * Supports two authorization modes: entering a secret key directly, or connecting
+ * an external wallet (e.g., Freighter). The wallet option is hidden when
+ * [walletAvailable] is false (e.g., macOS).
+ */
 @Composable
 private fun DelegatedSignerRow(
     signer: DelegatedSigner,
@@ -530,86 +663,217 @@ private fun DelegatedSignerRow(
     isSelected: Boolean,
     onToggle: () -> Unit,
     isEnteringKey: Boolean,
-    onEnterKeyClick: () -> Unit
+    onEnterKeyClick: () -> Unit,
+    walletAvailable: Boolean,
+    isWalletConnected: Boolean,
+    isAnotherWalletConnected: Boolean,
+    walletConnecting: Boolean,
+    walletError: String?,
+    onConnectWalletClick: () -> Unit,
+    onDisconnectWalletClick: () -> Unit
 ) {
+    val isAuthorized = hasKeyPair || isWalletConnected
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = if (isEnteringKey) 0.dp else 8.dp)
-            .clickable(enabled = hasKeyPair, onClick = onToggle),
+            .clickable(enabled = isAuthorized, onClick = onToggle),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected && hasKeyPair) {
+            containerColor = if (isSelected && isAuthorized) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             }
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggle() },
-                enabled = hasKeyPair
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = truncateAddress(signer.address, 6),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggle() },
+                    enabled = isAuthorized
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                if (hasKeyPair) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Ready to sign",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF4CAF50)
+                        text = truncateAddress(signer.address, 6),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                } else {
-                    Text(
-                        text = "Enter secret key to enable signing",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    when {
+                        hasKeyPair -> Text(
+                            text = "Ready to sign",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF4CAF50)
+                        )
+                        isWalletConnected -> Text(
+                            text = "Freighter - Ready to sign",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF4CAF50)
+                        )
+                        else -> Text(
+                            text = "Enter secret key or connect wallet to enable signing",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Badge on the right
+                when {
+                    hasKeyPair -> {
+                        Surface(
+                            color = Color(0xFF4CAF50),
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "Verified",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    isWalletConnected -> {
+                        Surface(
+                            color = Color(0xFF1565C0),
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "Freighter",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
-            if (!hasKeyPair && !isEnteringKey) {
-                OutlinedButton(
-                    onClick = onEnterKeyClick,
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+
+            // Action buttons row — shown when no auth is present and not in key-entry mode
+            if (!isAuthorized && !isEnteringKey && !walletConnecting) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Enter Key",
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    OutlinedButton(
+                        onClick = onEnterKeyClick,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Enter Key",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+
+                    if (walletAvailable) {
+                        Column {
+                            OutlinedButton(
+                                onClick = onConnectWalletClick,
+                                enabled = !isAnotherWalletConnected,
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                            ) {
+                                Text(
+                                    text = "Connect Wallet",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                            Text(
+                                text = "Freighter only",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
-            if (hasKeyPair) {
-                Surface(
-                    color = Color(0xFF4CAF50),
-                    shape = MaterialTheme.shapes.small
+
+            // Connecting / loading state
+            if (walletConnecting) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onEnterKeyClick,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                        enabled = false
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Enter Key",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Connecting...",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+
+            // Disconnect button for wallet-connected signers
+            if (isWalletConnected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = onDisconnectWalletClick,
+                    contentPadding = ButtonDefaults.TextButtonContentPadding
                 ) {
                     Text(
-                        text = "Verified",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        text = "Disconnect",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+
+            // Error message
+            if (walletError != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Error: $walletError",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

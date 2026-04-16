@@ -4,6 +4,7 @@ import com.soneso.smartdemo.App
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.wallet.FreighterConnector
 import com.soneso.stellar.sdk.smartaccount.IndexedDBStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.JsWebAuthnProvider
 import kotlinx.browser.document
@@ -13,6 +14,11 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    // Inject the Freighter wallet connector before any UI renders.
+    // FreighterConnector construction is synchronous -- no network calls occur here.
+    val walletConnector = FreighterConnector()
+    DemoState.setWalletConnector(walletConnector)
+
     // Initialize Smart Account Kit on launch
     MainScope().launch {
         try {

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
+import com.soneso.smartdemo.wallet.WalletConnector
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -30,6 +31,11 @@ object DemoState {
 
     /** Platform-specific storage adapter, set by platform entry points. */
     var storage: StorageAdapter? = null
+        private set
+
+    /** Platform-specific wallet connector for external wallet signing (Freighter).
+     *  Set by platform entry points. Null on macOS where wallet connection is not supported. */
+    var walletConnector: WalletConnector? = null
         private set
 
     /** Whether a wallet is currently connected. */
@@ -76,6 +82,10 @@ object DemoState {
         storage = storageAdapter
     }
 
+    fun setWalletConnector(connector: WalletConnector?) {
+        walletConnector = connector
+    }
+
     fun setConnected(connected: Boolean, contract: String? = null, credential: String? = null) {
         isConnected = connected
         contractId = contract
@@ -107,6 +117,9 @@ object DemoState {
         externalSignerManager = null
         webauthnProvider = null
         storage = null
+        // walletConnector is NOT reset — it is a platform-level singleton
+        // injected at app startup. Wallet sessions are disconnected in the
+        // disconnect flow before reset() is called.
         isConnected = false
         isDeployed = false
         contractId = null
