@@ -14,20 +14,14 @@ import platform.UIKit.UIViewController
 /**
  * Creates the main UIViewController for the iOS app.
  *
- * This function initializes the Smart Account Kit with Apple-specific providers
- * (AppleWebAuthnProvider and UserDefaultsStorageAdapter) before creating the
- * Compose UI controller.
- *
- * The initialization happens asynchronously on the main coroutine scope, so the
- * UI will load immediately while the kit initializes in the background.
+ * Platform initialization (AppleWebAuthnProvider, UserDefaultsStorageAdapter, and the
+ * optional Reown wallet connector) is performed by the Swift AppDelegate via
+ * [initSmartAccountKit] before this function is called. The Compose UI controller
+ * is therefore created with all providers already set in [DemoState].
  *
  * @return UIViewController wrapping the Compose Multiplatform UI
  */
 fun MainViewController(): UIViewController {
-    // Initialize Smart Account Kit with iOS-specific providers
-    initSmartAccountKit()
-
-    // Return Compose UI controller
     return ComposeUIViewController {
         App()
     }

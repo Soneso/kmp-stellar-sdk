@@ -97,6 +97,11 @@ kotlin {
             dependencies {
                 implementation("androidx.activity:activity-compose:1.8.2")
                 implementation("androidx.appcompat:appcompat:1.6.1")
+
+                // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
+                // Required by ReownConnector which implements WalletConnector for Android.
+                implementation("com.reown:android-core:1.6.12")
+                implementation("com.reown:sign:1.6.12")
             }
         }
 
@@ -140,6 +145,8 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 implementation(compose.html.core)
+                // Freighter browser extension API for web wallet signing
+                implementation(npm("@stellar/freighter-api", "6.0.1"))
             }
         }
     }

@@ -93,6 +93,16 @@ object DemoConfig {
      *  Acts as a safety cap to prevent unbounded iteration if the active count is stale.
      *  The contract uses monotonically increasing IDs with gaps from removed rules. */
     val MAX_CONTEXT_RULE_SCAN_ID = 25u
+
+    // -- Reown (WalletConnect) --
+
+    /**
+     * Reown (WalletConnect) project ID for external wallet connection via Freighter Mobile.
+     * Required for wallet connection on Android and iOS real devices. Not needed for
+     * simulators, emulators, or web (which uses the Freighter browser extension directly).
+     * Register for a free project ID at https://cloud.reown.com/.
+     */
+    const val REOWN_PROJECT_ID = ""
 }
 
 /**

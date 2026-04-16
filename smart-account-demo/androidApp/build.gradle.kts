@@ -42,4 +42,10 @@ kotlin {
 dependencies {
     implementation(project(":smart-account-demo:shared"))
     implementation("androidx.activity:activity-compose:1.8.2")
+
+    // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
+    // com.reown:android-core provides CoreClient (relay, pairing, metadata).
+    // com.reown:sign provides SignClient (session proposal, request/response, delegates).
+    implementation("com.reown:android-core:1.6.12")
+    implementation("com.reown:sign:1.6.12")
 }
