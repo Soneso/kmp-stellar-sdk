@@ -257,7 +257,11 @@ suspend fun multiSigContractCall() {
 
 For deployment examples, authorization patterns, and advanced usage, see the [Getting Started Guide](docs/getting-started.md) and [Demo App](demo/README.md).
 
-## Demo Application
+## Demo Applications
+
+This repository includes two demo applications that showcase different aspects of the SDK.
+
+### SDK Demo
 
 The [demo app](demo/README.md) showcases SDK usage across all platforms with 11 comprehensive features:
 
@@ -274,6 +278,12 @@ The [demo app](demo/README.md) showcases SDK usage across all platforms with 11 
 11. **Invoke Token Contract** - SEP-41 token contract interaction with multi-signature workflows
 
 See [demo/README.md](demo/README.md) for screenshots and platform-specific build instructions.
+
+### Smart Accounts Demo
+
+The [smart account demo](smart-account-demo/README.md) is a Kotlin Multiplatform application (Android, iOS, macOS, Web) that exercises the Smart Account Kit SDK with WebAuthn passkey authentication on Stellar testnet. It covers wallet creation and connection, XLM and token transfers, multi-signer authorization, and on-chain context rule management (context rules, policies, signer configuration).
+
+See [smart-account-demo/README.md](smart-account-demo/README.md) for feature details, architecture, and platform build instructions.
 
 ## Agent Skill
 
