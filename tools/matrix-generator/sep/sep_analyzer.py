@@ -47,6 +47,8 @@ class SEPAnalyzer:
         self.test_dir_integration = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep' / sep_dir_name
         # Special case: SEP-53 lives in KeyPair.kt, not in sep53/ directory
         self.keypair_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/KeyPair.kt'
+        # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
+        self.contract_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract'
         self.analysis_data: Dict[str, Any] = {}
 
     def find_sep_files(self) -> List[Path]:
@@ -62,6 +64,12 @@ class SEPAnalyzer:
         if self.sep_number == '0053':
             if self.keypair_file.exists():
                 files.append(self.keypair_file)
+            return sorted(files)
+
+        # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
+        if self.sep_number in ('0046', '0047', '0048'):
+            if self.contract_dir.exists() and self.contract_dir.is_dir():
+                files.extend(self.contract_dir.glob('*.kt'))
             return sorted(files)
 
         # Check if SEP directory exists
@@ -89,6 +97,13 @@ class SEPAnalyzer:
             sep53_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep53/Sep53Test.kt'
             if sep53_test_file.exists():
                 files.append(sep53_test_file)
+            return sorted(files)
+
+        # Special case: SEP-46, SEP-47, SEP-48 tests live in contract/
+        if self.sep_number in ('0046', '0047', '0048'):
+            contract_test_dir = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract'
+            if contract_test_dir.exists() and contract_test_dir.is_dir():
+                files.extend(contract_test_dir.glob('*Test.kt'))
             return sorted(files)
 
         # Check unit tests
@@ -392,6 +407,9 @@ class SEPAnalyzer:
             '0030': self.map_sep_30_fields,
             '0038': self.map_sep_38_fields,
             '0045': self.map_sep_45_fields,
+            '0046': self.map_sep_46_fields,
+            '0047': self.map_sep_47_fields,
+            '0048': self.map_sep_48_fields,
             '0053': self.map_sep_53_fields,
         }
         mapper = mappers.get(self.sep_number, self.map_generic_fields)
@@ -1513,6 +1531,212 @@ class SEPAnalyzer:
             service_mappings[field_name] = method_name if method_name in all_methods else None
 
         field_mappings['service_methods'] = service_mappings
+
+        return field_mappings
+
+    def _contract_parser_present(self) -> bool:
+        """
+        Check whether SorobanContractParser.kt is present in the contract/ directory.
+
+        Returns:
+            True if the file exists, False otherwise.
+        """
+        parser_file = self.contract_dir / 'SorobanContractParser.kt'
+        return parser_file.exists()
+
+    def map_sep_46_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-46 (Contract Meta) fields.
+
+        SEP-46 implementation lives in SorobanContractParser.kt inside the contract/ directory.
+        - parseMeta (private) handles contractmetav0_section, multiple_entries_single_section,
+          multiple_sections, binary_stream_encoding, key_value_pairs
+        - SCMetaEntryXdr is the XDR type used (scmetaentry_xdr)
+        - metaEntries property on SorobanContractInfo exposes the parsed key-value map
+        - parseContractByteCode is the public entry point
+        """
+        present = self._contract_parser_present()
+
+        metadata_storage_map: Dict[str, Optional[str]] = {
+            'contractmetav0_section': 'parseMeta' if present else None,
+            'multiple_entries_single_section': 'parseMeta' if present else None,
+            'multiple_sections': 'parseMeta' if present else None,
+        }
+
+        encoding_format_map: Dict[str, Optional[str]] = {
+            'scmetaentry_xdr': 'SCMetaEntryXdr' if present else None,
+            'binary_stream_encoding': 'parseMeta' if present else None,
+            'key_value_pairs': 'metaEntries' if present else None,
+        }
+
+        implementation_support_map: Dict[str, Optional[str]] = {
+            'parse_contract_meta': 'parseContractByteCode' if present else None,
+            'extract_meta_entries': 'metaEntries' if present else None,
+            'decode_scmetaentry': 'SCMetaEntryXdr' if present else None,
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            sep_fields = section.get('fields', [])
+            section_map = {
+                'metadata_storage': metadata_storage_map,
+                'encoding_format': encoding_format_map,
+                'implementation_support': implementation_support_map,
+            }.get(section_key, {})
+
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in sep_fields:
+                field_name = field.get('name', '')
+                section_mappings[field_name] = section_map.get(field_name)
+
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
+
+    def map_sep_47_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-47 (Contract Interface Discovery) fields.
+
+        SEP-47 implementation lives in SorobanContractParser.kt / SorobanContractInfo.
+        - supportedSeps computed property on SorobanContractInfo handles all features:
+          * reads metaEntries["sep"]
+          * splits on comma
+          * trims whitespace
+          * filters empty strings
+          * deduplicates via distinct()
+        """
+        present = self._contract_parser_present()
+
+        sep_declaration_map: Dict[str, Optional[str]] = {
+            'sep_meta_key': 'supportedSeps' if present else None,
+            'comma_separated_list': 'supportedSeps' if present else None,
+            'multiple_sep_entries': 'supportedSeps' if present else None,
+        }
+
+        meta_entry_format_map: Dict[str, Optional[str]] = {
+            'sep_number_format': 'supportedSeps' if present else None,
+            'whitespace_handling': 'supportedSeps' if present else None,
+            'empty_value_handling': 'supportedSeps' if present else None,
+        }
+
+        implementation_support_map: Dict[str, Optional[str]] = {
+            'parse_supported_seps': 'supportedSeps' if present else None,
+            'expose_supported_seps': 'supportedSeps' if present else None,
+            'validate_sep_format': 'supportedSeps' if present else None,
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            sep_fields = section.get('fields', [])
+            section_map = {
+                'sep_declaration': sep_declaration_map,
+                'meta_entry_format': meta_entry_format_map,
+                'implementation_support': implementation_support_map,
+            }.get(section_key, {})
+
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in sep_fields:
+                field_name = field.get('name', '')
+                section_mappings[field_name] = section_map.get(field_name)
+
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
+
+    def map_sep_48_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-48 (Contract Interface Specification) fields.
+
+        SEP-48 implementation lives in SorobanContractParser.kt / SorobanContractInfo.
+        - parseContractByteCode: main entry point
+        - parseContractSpec: parses all 6 spec entry kinds
+        - parseEnvironmentMeta: parses env metadata / interface version
+        - parseMeta: parses contract metadata
+        - specEntries, funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events: typed accessors
+        - XDR types: SCSpecEntryXdr, SCSpecTypeDefXdr, SCEnvMetaEntryXdr, SCMetaEntryXdr
+        - Compound types: SCSpecTypeOptionXdr, SCSpecTypeResultXdr, SCSpecTypeVecXdr,
+          SCSpecTypeMapXdr, SCSpecTypeTupleXdr, SCSpecTypeBytesNXdr, SCSpecTypeUDTXdr
+        """
+        present = self._contract_parser_present()
+
+        wasm_section_map: Dict[str, Optional[str]] = {
+            'contractspecv0_section': 'parseContractByteCode' if present else None,
+            'contractenvmetav0_section': 'parseContractByteCode' if present else None,
+            'contractmetav0_section': 'parseContractByteCode' if present else None,
+            'xdr_binary_encoding': 'SCSpecEntryXdr' if present else None,
+        }
+
+        entry_types_map: Dict[str, Optional[str]] = {
+            'function_specs': 'funcs' if present else None,
+            'struct_specs': 'udtStructs' if present else None,
+            'union_specs': 'udtUnions' if present else None,
+            'enum_specs': 'udtEnums' if present else None,
+            'error_enum_specs': 'udtErrorEnums' if present else None,
+            'event_specs': 'events' if present else None,
+        }
+
+        type_system_primitive_map: Dict[str, Optional[str]] = {
+            'boolean_type': 'SCSpecTypeDefXdr' if present else None,
+            'void_type': 'SCSpecTypeDefXdr' if present else None,
+            'numeric_types': 'SCSpecTypeDefXdr' if present else None,
+            'timepoint_duration': 'SCSpecTypeDefXdr' if present else None,
+            'bytes_string_symbol': 'SCSpecTypeDefXdr' if present else None,
+            'address_type': 'SCSpecTypeDefXdr' if present else None,
+        }
+
+        type_system_compound_map: Dict[str, Optional[str]] = {
+            'option_type': 'SCSpecTypeOptionXdr' if present else None,
+            'result_type': 'SCSpecTypeResultXdr' if present else None,
+            'vector_type': 'SCSpecTypeVecXdr' if present else None,
+            'map_type': 'SCSpecTypeMapXdr' if present else None,
+            'tuple_type': 'SCSpecTypeTupleXdr' if present else None,
+            'bytes_n_type': 'SCSpecTypeBytesNXdr' if present else None,
+            'user_defined_type': 'SCSpecTypeUDTXdr' if present else None,
+        }
+
+        parsing_support_map: Dict[str, Optional[str]] = {
+            'parse_contract_bytecode': 'parseContractByteCode' if present else None,
+            'extract_spec_entries': 'specEntries' if present else None,
+            'parse_environment_meta': 'parseContractByteCode' if present else None,
+            'parse_contract_meta': 'parseContractByteCode' if present else None,
+        }
+
+        xdr_support_map: Dict[str, Optional[str]] = {
+            'decode_scspecentry': 'SCSpecEntryXdr' if present else None,
+            'decode_scspectypedef': 'SCSpecTypeDefXdr' if present else None,
+            'decode_scenvmetaentry': 'SCEnvMetaEntryXdr' if present else None,
+            'decode_scmetaentry': 'SCMetaEntryXdr' if present else None,
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        section_dispatch: Dict[str, Dict[str, Optional[str]]] = {
+            'wasm_section': wasm_section_map,
+            'entry_types': entry_types_map,
+            'type_system_primitive': type_system_primitive_map,
+            'type_system_compound': type_system_compound_map,
+            'parsing_support': parsing_support_map,
+            'xdr_support': xdr_support_map,
+        }
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            sep_fields = section.get('fields', [])
+            section_map = section_dispatch.get(section_key, {})
+
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in sep_fields:
+                field_name = field.get('name', '')
+                section_mappings[field_name] = section_map.get(field_name)
+
+            field_mappings[section_key] = section_mappings
 
         return field_mappings
 

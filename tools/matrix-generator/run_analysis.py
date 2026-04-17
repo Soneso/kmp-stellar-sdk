@@ -37,6 +37,9 @@ KNOWN_SEPS: Dict[str, str] = {
     '0030': 'Account Recovery',
     '0038': 'Anchor RFQ API',
     '0045': 'Web Auth for Contract Accounts',
+    '0046': 'Contract Meta',
+    '0047': 'Contract Interface Discovery',
+    '0048': 'Contract Interface Specification',
     '0053': 'Message Signing',
 }
 
@@ -66,6 +69,21 @@ _KEYPAIR_FILE = (
     / "stellar"
     / "sdk"
     / "KeyPair.kt"
+)
+
+# SorobanContractParser.kt path for SEP-46/47/48 detection
+_CONTRACT_PARSER_FILE = (
+    SDK_ROOT
+    / "stellar-sdk"
+    / "src"
+    / "commonMain"
+    / "kotlin"
+    / "com"
+    / "soneso"
+    / "stellar"
+    / "sdk"
+    / "contract"
+    / "SorobanContractParser.kt"
 )
 
 
@@ -109,6 +127,17 @@ class AnalysisOrchestrator:
                 padded = '0053'
                 if padded not in sep_numbers:
                     sep_numbers.append(padded)
+
+        # SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), and
+        # SEP-48 (Contract Interface Specification) are implemented in
+        # SorobanContractParser.kt inside the contract/ directory.
+        if _CONTRACT_PARSER_FILE.exists():
+            content = _CONTRACT_PARSER_FILE.read_text(encoding='utf-8')
+            # SEP-46: contractmetav0 section parsing + SCMetaEntryXdr
+            if 'contractmetav0' in content and 'SCMetaEntryXdr' in content:
+                for padded in ('0046', '0047', '0048'):
+                    if padded not in sep_numbers:
+                        sep_numbers.append(padded)
 
         return sorted(sep_numbers)
 

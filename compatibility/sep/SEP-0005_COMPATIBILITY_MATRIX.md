@@ -1,6 +1,6 @@
 # SEP-0005 (Key Derivation Methods for Stellar Keys) Compatibility Matrix
 
-**Generated:** 2026-04-14 10:19:01
+**Generated:** 2026-04-17 13:24:45
 
 **SEP Version:** N/A  
 **SEP Status:** Final  

@@ -1,6 +1,6 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-04-14 10:19:01
+**Generated:** 2026-04-17 13:24:45
 
 **SEP Version:** 4.3.0  
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)  

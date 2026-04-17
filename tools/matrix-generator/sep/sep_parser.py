@@ -1456,6 +1456,163 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def parse_sep_46(self) -> Dict[str, Any]:
+        """Parse SEP-46 (Contract Meta) structure - hardcoded definitions"""
+        print(f"{Colors.BLUE}Using SEP-46 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # Metadata Storage
+        section = Section(title='Metadata Storage', key='metadata_storage')
+        section.fields = [
+            Field(name='contractmetav0_section', description='Support for contractmetav0 Wasm custom section', field_type='feature', required=True),
+            Field(name='multiple_entries_single_section', description='Support for multiple entries in single section', field_type='feature', required=True),
+            Field(name='multiple_sections', description='Support for multiple sections interpreted sequentially', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Metadata Storage': {len(section.fields)} fields{Colors.END}")
+
+        # Encoding Format
+        section = Section(title='Encoding Format', key='encoding_format')
+        section.fields = [
+            Field(name='scmetaentry_xdr', description='Uses SCMetaEntry XDR type for encoding', field_type='feature', required=True),
+            Field(name='binary_stream_encoding', description='Encodes entries as binary stream', field_type='feature', required=True),
+            Field(name='key_value_pairs', description='Stores metadata as key-value string pairs', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Encoding Format': {len(section.fields)} fields{Colors.END}")
+
+        # Implementation Support
+        section = Section(title='Implementation Support', key='implementation_support')
+        section.fields = [
+            Field(name='parse_contract_meta', description='Parse contract metadata from bytecode', field_type='function', required=True),
+            Field(name='extract_meta_entries', description='Extract meta entries as key-value pairs', field_type='function', required=True),
+            Field(name='decode_scmetaentry', description='Decode SCMetaEntry XDR structures', field_type='function', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Implementation Support': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
+    def parse_sep_47(self) -> Dict[str, Any]:
+        """Parse SEP-47 (Contract Interface Discovery) structure - hardcoded definitions"""
+        print(f"{Colors.BLUE}Using SEP-47 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # SEP Declaration
+        section = Section(title='SEP Declaration', key='sep_declaration')
+        section.fields = [
+            Field(name='sep_meta_key', description="Support for 'sep' meta entry key", field_type='feature', required=True),
+            Field(name='comma_separated_list', description='Parse comma-separated SEP numbers', field_type='feature', required=True),
+            Field(name='multiple_sep_entries', description="Support for multiple 'sep' meta entries", field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'SEP Declaration': {len(section.fields)} fields{Colors.END}")
+
+        # Meta Entry Format
+        section = Section(title='Meta Entry Format', key='meta_entry_format')
+        section.fields = [
+            Field(name='sep_number_format', description="Parse SEP numbers (e.g., '41', '0041', 'SEP-41')", field_type='feature', required=True),
+            Field(name='whitespace_handling', description='Trim whitespace from SEP numbers', field_type='feature', required=True),
+            Field(name='empty_value_handling', description="Handle empty/missing 'sep' entries gracefully", field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Meta Entry Format': {len(section.fields)} fields{Colors.END}")
+
+        # Implementation Support
+        section = Section(title='Implementation Support', key='implementation_support')
+        section.fields = [
+            Field(name='parse_supported_seps', description='Parse and extract list of supported SEPs', field_type='function', required=True),
+            Field(name='expose_supported_seps', description='Expose supportedSeps property on contract info', field_type='feature', required=True),
+            Field(name='validate_sep_format', description='Validate SEP number format and filter invalid entries', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Implementation Support': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
+    def parse_sep_48(self) -> Dict[str, Any]:
+        """Parse SEP-48 (Contract Interface Specification) structure - hardcoded definitions"""
+        print(f"{Colors.BLUE}Using SEP-48 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # WASM Section
+        section = Section(title='WASM Section', key='wasm_section')
+        section.fields = [
+            Field(name='contractspecv0_section', description='Contract specification Wasm custom section', field_type='feature', required=True),
+            Field(name='contractenvmetav0_section', description='Environment metadata Wasm section', field_type='feature', required=True),
+            Field(name='contractmetav0_section', description='Contract metadata Wasm section', field_type='feature', required=True),
+            Field(name='xdr_binary_encoding', description='XDR binary encoded specification entries', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'WASM Section': {len(section.fields)} fields{Colors.END}")
+
+        # Entry Types
+        section = Section(title='Entry Types', key='entry_types')
+        section.fields = [
+            Field(name='function_specs', description='Parse function specifications', field_type='feature', required=True),
+            Field(name='struct_specs', description='Parse struct type specifications', field_type='feature', required=True),
+            Field(name='union_specs', description='Parse union type specifications', field_type='feature', required=True),
+            Field(name='enum_specs', description='Parse enum type specifications', field_type='feature', required=True),
+            Field(name='error_enum_specs', description='Parse error enum specifications', field_type='feature', required=True),
+            Field(name='event_specs', description='Parse event specifications', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Entry Types': {len(section.fields)} fields{Colors.END}")
+
+        # Type System - Primitive
+        section = Section(title='Type System - Primitive', key='type_system_primitive')
+        section.fields = [
+            Field(name='boolean_type', description='Boolean type support', field_type='type', required=True),
+            Field(name='void_type', description='Void type support', field_type='type', required=True),
+            Field(name='numeric_types', description='Numeric types (u32, i32, u64, i64, u128, i128, u256, i256)', field_type='type', required=True),
+            Field(name='timepoint_duration', description='Timepoint and duration types', field_type='type', required=True),
+            Field(name='bytes_string_symbol', description='Bytes, string, symbol types', field_type='type', required=True),
+            Field(name='address_type', description='Address type support', field_type='type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Type System - Primitive': {len(section.fields)} fields{Colors.END}")
+
+        # Type System - Compound
+        section = Section(title='Type System - Compound', key='type_system_compound')
+        section.fields = [
+            Field(name='option_type', description='Option<T> type', field_type='type', required=True),
+            Field(name='result_type', description='Result<T, E> type', field_type='type', required=True),
+            Field(name='vector_type', description='Vec<T> type', field_type='type', required=True),
+            Field(name='map_type', description='Map<K, V> type', field_type='type', required=True),
+            Field(name='tuple_type', description='Tuple types', field_type='type', required=True),
+            Field(name='bytes_n_type', description='Fixed-length bytes type', field_type='type', required=True),
+            Field(name='user_defined_type', description='User-defined types', field_type='type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Type System - Compound': {len(section.fields)} fields{Colors.END}")
+
+        # Parsing Support
+        section = Section(title='Parsing Support', key='parsing_support')
+        section.fields = [
+            Field(name='parse_contract_bytecode', description='Parse contract specifications from WASM', field_type='function', required=True),
+            Field(name='extract_spec_entries', description='Extract and decode all specification entries', field_type='function', required=True),
+            Field(name='parse_environment_meta', description='Parse environment metadata (interface version)', field_type='function', required=True),
+            Field(name='parse_contract_meta', description='Parse contract metadata key-value pairs', field_type='function', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Parsing Support': {len(section.fields)} fields{Colors.END}")
+
+        # XDR Support
+        section = Section(title='XDR Support', key='xdr_support')
+        section.fields = [
+            Field(name='decode_scspecentry', description='Decode SCSpecEntry structures', field_type='xdr_type', required=True),
+            Field(name='decode_scspectypedef', description='Decode SCSpecTypeDef structures for type definitions', field_type='xdr_type', required=True),
+            Field(name='decode_scenvmetaentry', description='Decode SCEnvMetaEntry structures', field_type='xdr_type', required=True),
+            Field(name='decode_scmetaentry', description='Decode SCMetaEntry structures', field_type='xdr_type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'XDR Support': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
     def parse_sep_53(self) -> Dict[str, Any]:
         """Parse SEP-53 (Message Signing) structure - hardcoded definitions"""
         print(f"{Colors.BLUE}Using SEP-53 specific parser (hardcoded){Colors.END}")
@@ -1551,6 +1708,9 @@ class SEPParser:
             '0030': self.parse_sep_30,
             '0038': self.parse_sep_38,
             '0045': self.parse_sep_45,
+            '0046': self.parse_sep_46,
+            '0047': self.parse_sep_47,
+            '0048': self.parse_sep_48,
             '0053': self.parse_sep_53,
         }
 

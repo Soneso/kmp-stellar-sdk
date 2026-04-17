@@ -5,6 +5,11 @@
 ## Table of Contents
 
 1. [Advanced Contract Operations](#advanced-contract-operations)
+   - [Custom Authorization with Auth.Signer](#custom-authorization-with-authsigner)
+   - [Multi-Signature Contract Workflows with buildInvoke](#multi-signature-contract-workflows-with-buildinvoke)
+   - [Custom Result Parsing with funcResToNative](#custom-result-parsing-with-funcrestonative)
+   - [State Restoration Patterns](#state-restoration-patterns)
+   - [Contract Parser](#contract-parser)
 2. [Advanced Transaction Patterns](#advanced-transaction-patterns)
 3. [Working with XDR Types](#working-with-xdr-types)
 4. [Production Error Handling](#production-error-handling)
@@ -191,6 +196,91 @@ suspend fun invokeWithAutoRestore(
             source = source,
             signer = signer
         )
+    }
+}
+```
+
+### Contract Parser
+
+Parse contract Wasm bytecode to extract specifications, metadata, and environment information without deploying. The parser implements SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), and SEP-48 (Contract Interface Specification).
+
+#### Parse from Bytecode
+
+```kotlin
+import com.soneso.stellar.sdk.contract.SorobanContractParser
+import com.soneso.stellar.sdk.contract.SorobanContractInfo
+import com.soneso.stellar.sdk.contract.SorobanContractParserException
+
+val bytecode: ByteArray = // load .wasm file bytes
+
+try {
+    val contractInfo: SorobanContractInfo = SorobanContractParser.parseContractByteCode(bytecode)
+
+    // Environment interface protocol version
+    println("Protocol version: ${contractInfo.envInterfaceVersion}")
+
+    // All spec entries (functions, structs, unions, enums, error enums, events)
+    for (entry in contractInfo.specEntries) {
+        println(entry.discriminant)
+    }
+
+    // Contract metadata as key-value pairs (SEP-46)
+    val meta: Map<String, String> = contractInfo.metaEntries
+
+    // Supported SEPs declared in metadata (SEP-47 "sep" key)
+    val seps: List<String> = contractInfo.supportedSeps
+} catch (e: SorobanContractParserException) {
+    println("Failed to parse contract: ${e.message}")
+}
+```
+
+#### Typed Accessors
+
+`SorobanContractInfo` provides typed accessors for each spec entry kind:
+
+```kotlin
+// Exported functions
+val functions: List<SCSpecFunctionV0Xdr> = contractInfo.funcs
+for (func in functions) {
+    println("Function: ${func.name.value}")
+}
+
+// User-defined types
+val structs: List<SCSpecUDTStructV0Xdr> = contractInfo.udtStructs
+val unions: List<SCSpecUDTUnionV0Xdr> = contractInfo.udtUnions
+val enums: List<SCSpecUDTEnumV0Xdr> = contractInfo.udtEnums
+val errorEnums: List<SCSpecUDTErrorEnumV0Xdr> = contractInfo.udtErrorEnums
+
+// Contract events
+val events: List<SCSpecEventV0Xdr> = contractInfo.events
+```
+
+#### Parse from Network
+
+`SorobanServer` can fetch and parse contract info directly from a deployed contract, by contract ID or WASM ID:
+
+```kotlin
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.contract.SorobanContractInfo
+
+// Both methods are suspend functions — call from a coroutine scope
+suspend fun loadContractInfo() {
+    val server = SorobanServer("https://soroban-testnet.stellar.org")
+
+    // By contract address (C... format)
+    val contractInfo: SorobanContractInfo? = server.loadContractInfoForContractId(
+        contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+    )
+
+    // By WASM ID (hex-encoded hash)
+    val infoByWasm: SorobanContractInfo? = server.loadContractInfoForWasmId(
+        wasmId = "abc123..."
+    )
+
+    contractInfo?.let { info ->
+        println("Protocol version: ${info.envInterfaceVersion}")
+        info.funcs.forEach { func -> println("Function: ${func.name.value}") }
+        println("Supported SEPs: ${info.supportedSeps}")
     }
 }
 ```

@@ -72,6 +72,9 @@ class SEPCompatibilityGenerator:
         "0030": "Account Recovery: multi-party recovery of Stellar accounts using alternative authentication methods",
         "0038": "Lets anchors provide quotes for exchanging on-chain assets for off-chain assets and vice versa.",
         "0045": "Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to smart contract wallets; services supporting both account types should implement both SEPs.",
+        "0046": "Defines a standard Wasm custom section (`contractmetav0`) for embedding arbitrary key-value metadata into deployed Soroban contracts, using XDR-encoded SCMetaEntry pairs.",
+        "0047": "Defines how Soroban contracts advertise which SEPs they implement via a `sep` key in the contract metadata section, enabling clients to discover supported protocols at runtime.",
+        "0048": "Defines the binary contract interface specification stored in the `contractspecv0` Wasm custom section, covering function signatures, user-defined types, and the full XDR type system.",
         "0053": "Standardizes signing and verification of arbitrary messages using Stellar Ed25519 keypairs, enabling proof-of-ownership for off-chain scenarios without requiring on-chain transactions.",
     }
 
@@ -726,11 +729,15 @@ class SEPCompatibilityGenerator:
             f.write("**Documentation:** See `docs/sep-implementations.md` for usage examples and API reference\n\n")
             f.write(f"**Specification:** [SEP-{self.sep_number}](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-{self.sep_number}.md)\n\n")
 
-            # Special case: SEP-53 is implemented in KeyPair class, not a sep53 package
-            if self.sep_number == '0053':
-                f.write(f"**Implementation Package:** `com.soneso.stellar.sdk.KeyPair`\n")
-            else:
-                f.write(f"**Implementation Package:** `com.soneso.stellar.sdk.sep.sep{self.sep_number}`\n")
+            # Map SEP numbers to their actual implementation packages
+            package_overrides = {
+                '0046': 'com.soneso.stellar.sdk.contract',
+                '0047': 'com.soneso.stellar.sdk.contract',
+                '0048': 'com.soneso.stellar.sdk.contract',
+                '0053': 'com.soneso.stellar.sdk.KeyPair',
+            }
+            package = package_overrides.get(self.sep_number, f'com.soneso.stellar.sdk.sep.sep{self.sep_number}')
+            f.write(f"**Implementation Package:** `{package}`\n")
 
         print(f"{Colors.GREEN}✓ Markdown matrix written to {output_path}{Colors.END}")
 

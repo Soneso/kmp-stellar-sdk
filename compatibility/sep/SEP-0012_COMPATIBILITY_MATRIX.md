@@ -1,6 +1,6 @@
 # SEP-0012 (KYC API) Compatibility Matrix
 
-**Generated:** 2026-04-14 10:19:02
+**Generated:** 2026-04-17 13:24:47
 
 **SEP Version:** 1.15.0  
 **SEP Status:** Active  

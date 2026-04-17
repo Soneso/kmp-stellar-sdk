@@ -1,6 +1,6 @@
 # SEP-0053 (Sign and Verify Messages) Compatibility Matrix
 
-**Generated:** 2026-04-14 10:19:04
+**Generated:** 2026-04-17 13:24:50
 
 **SEP Version:** 0.0.1  
 **SEP Status:** Draft  
