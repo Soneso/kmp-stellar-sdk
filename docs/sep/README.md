@@ -22,6 +22,9 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-30 | Account Recovery | [sep-30.md](sep-30.md) |
 | SEP-38 | Anchor RFQ API | [sep-38.md](sep-38.md) |
 | SEP-45 | Web Authentication for Contract Accounts | [sep-45.md](sep-45.md) |
+| SEP-46 | Contract Meta | [Contract Parser](../advanced.md#contract-parser) |
+| SEP-47 | Contract Interface Discovery | [Contract Parser](../advanced.md#contract-parser) |
+| SEP-48 | Contract Interface Specification | [Contract Parser](../advanced.md#contract-parser) |
 | SEP-53 | Sign and Verify Messages | [sep-53.md](sep-53.md) |
 
 ## Compatibility Matrices
@@ -40,6 +43,9 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0030 Compatibility Matrix](../../compatibility/sep/SEP-0030_COMPATIBILITY_MATRIX.md)
 - [SEP-0038 Compatibility Matrix](../../compatibility/sep/SEP-0038_COMPATIBILITY_MATRIX.md)
 - [SEP-0045 Compatibility Matrix](../../compatibility/sep/SEP-0045_COMPATIBILITY_MATRIX.md)
+- [SEP-0046 Compatibility Matrix](../../compatibility/sep/SEP-0046_COMPATIBILITY_MATRIX.md)
+- [SEP-0047 Compatibility Matrix](../../compatibility/sep/SEP-0047_COMPATIBILITY_MATRIX.md)
+- [SEP-0048 Compatibility Matrix](../../compatibility/sep/SEP-0048_COMPATIBILITY_MATRIX.md)
 - [SEP-0053 Compatibility Matrix](../../compatibility/sep/SEP-0053_COMPATIBILITY_MATRIX.md)
 
 To regenerate all matrices: `python3 tools/matrix-generator/run_analysis.py`

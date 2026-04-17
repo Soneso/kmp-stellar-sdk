@@ -69,7 +69,7 @@ The SDK provides comprehensive Stellar functionality:
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
 - **Smart Accounts** - [OpenZeppelin smart account](https://github.com/OpenZeppelin/stellar-contracts) support with WebAuthn passkeys, multi-signer authorization, context rules, and policies (threshold, weighted threshold, spending limit)
-- **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-53 (Sign and Verify Messages)
+- **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
 
 ## Installation
 

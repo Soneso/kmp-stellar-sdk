@@ -71,6 +71,9 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-30 (Account Recovery) - Multi-party account recovery
 - SEP-38 (Anchor RFQ API) - Quote service for asset exchanges
 - SEP-45 (Web Authentication for Contract Accounts) - Contract account authentication
+- SEP-46 (Contract Meta) - Parse contract metadata from Wasm bytecode
+- SEP-47 (Contract Interface Discovery) - Discover contract-declared SEP support
+- SEP-48 (Contract Interface Specification) - Extract contract spec entries (functions, types, events)
 - SEP-53 (Sign and Verify Messages) - Off-chain message signing with Ed25519
 
 ### Soroban RPC API
