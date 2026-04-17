@@ -322,7 +322,7 @@ data class ExternalSigner(
  * val result = txOps.transfer(
  *     tokenContract = "CBCD...",
  *     recipient = "GA7Q...",
- *     amount = 10.0,
+ *     amount = "10",
  *     forceMethod = SubmissionMethod.RPC
  * )
  * ```

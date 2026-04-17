@@ -38,7 +38,7 @@ val config = OZSmartAccountConfig(
     accountWasmHash = "YOUR_ACCOUNT_WASM_HASH",
     webauthnVerifierAddress = "CWEBAUTHN_VERIFIER_ADDRESS",
     webauthnProvider = webauthnProvider,  // required for passkey auth (AndroidWebAuthnProvider / AppleWebAuthnProvider / JsWebAuthnProvider)
-    storage = storageAdapter              // defaults to InMemoryStorageAdapter (AndroidKeystoreStorageAdapter / UserDefaultsStorageAdapter / IndexedDBStorageAdapter)
+    storage = storageAdapter              // defaults to InMemoryStorageAdapter (AndroidStorageAdapter / UserDefaultsStorageAdapter / IndexedDBStorageAdapter)
 )
 val kit = OZSmartAccountKit.create(config)
 
@@ -307,7 +307,7 @@ Storage adapters persist credentials and sessions across app restarts:
 | Platform | Class | Description |
 |----------|-------|-------------|
 | All | `InMemoryStorageAdapter` | Non-persistent, for testing only (default) |
-| Android | `AndroidKeystoreStorageAdapter` | Encrypted storage via Android Keystore |
+| Android | `AndroidStorageAdapter` | Encrypted storage (EncryptedSharedPreferences) backed by Android Keystore |
 | iOS/macOS | `UserDefaultsStorageAdapter` | Persists to UserDefaults |
 | JS/Web | `IndexedDBStorageAdapter` | Browser IndexedDB (recommended for web) |
 | JS/Web | `LocalStorageAdapter` | Browser localStorage |
@@ -2877,6 +2877,27 @@ object RelayerErrorCodes {
 
 ## Events
 
+> **Scope — SDK lifecycle events only.** `kit.events` emits **kit-level** events (wallet connected/disconnected, credential created/deleted, session expired, transaction signed/submitted). It does **not** emit on-chain smart-account contract events such as `SignerAdded`, `SignerRemoved`, `PolicyInstalled`, `PolicyRemoved`, `ContextRuleAdded`, or `ContextRuleRemoved`. Those are emitted by the OpenZeppelin smart-account contract and must be queried via `SorobanServer.getEvents()` with the account's contract ID as a filter. Subscribing with `kit.events.on<SignerAdded>{}` will compile but never fire.
+>
+> To fetch on-chain contract events (after the wallet is connected):
+>
+> ```kotlin
+> val session = kit.walletOperations.connectWallet() ?: error("not connected")
+> val response = sorobanServer.getEvents(
+>     GetEventsRequest(
+>         startLedger = fromLedger,
+>         filters = listOf(
+>             GetEventsRequest.EventFilter(
+>                 type = GetEventsRequest.EventFilterType.CONTRACT,
+>                 contractIds = listOf(session.contractId)
+>             )
+>         )
+>     )
+> )
+> ```
+>
+> Inspect `response.events`; each event's `topic` and `value` are base64-XDR-encoded `SCVal` entries that can be parsed with the SDK's XDR utilities.
+
 ### SmartAccountEvent
 
 Events emitted by the Smart Account Kit during wallet operations.
@@ -3059,6 +3080,15 @@ sealed class SmartAccountException(
 ```
 
 ### SmartAccountErrorCode
+
+> **Two independent namespaces share the 3xxx range.** `SmartAccountErrorCode` is the **SDK** error enum, surfaced via `SmartAccountException.code` when the kit raises a credential/wallet/WebAuthn/etc. error locally. A separate set of error codes — also in the 3xxx range — is defined by the **on-chain** OpenZeppelin smart-account contract and surfaced in transaction simulation/result XDR (typically wrapped in `TransactionException.SimulationFailed`). The two overlap but do not collide at runtime because they arrive through different channels:
+>
+> | Numeric code | SDK meaning (`SmartAccountErrorCode`) | On-chain meaning (OZ contract) |
+> |---|---|---|
+> | 3002 | `CREDENTIAL_ALREADY_EXISTS` | `UnvalidatedContext` |
+> | 3003 | `CREDENTIAL_INVALID` | `ExternalVerificationFailed` |
+>
+> When inspecting an error code, first check the exception type to determine which namespace it belongs to. SDK-defined contract codes that the SDK interprets directly are declared in [`ContractErrorCodes`](#contracterrorcodes); the full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
 
 ```kotlin
 enum class SmartAccountErrorCode(val code: Int) {
@@ -3646,7 +3676,9 @@ object SmartAccountConstants {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. Contract-level error codes from the OZ smart account contract. These codes are returned in contract error responses and can be mapped to exceptions when interpreting failed transaction results. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract that the SDK interprets directly when decoding failed transaction results. Error code range: 3xxx.
+
+This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 
 ```kotlin
 object ContractErrorCodes {

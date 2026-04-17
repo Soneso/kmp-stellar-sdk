@@ -1,11 +1,11 @@
 ---
 name: kmp-stellar-sdk
-description: Build Stellar blockchain applications with the Soneso KMP (Kotlin Multiplatform) SDK. Covers keypair generation, transaction building, Horizon queries, Soroban smart contracts, XDR encoding, and SEP integrations. Use when the developer is working with Kotlin, KMP, or Android and mentions Stellar, blockchain, or cryptocurrency operations.
+description: Build Stellar blockchain applications with the Soneso KMP (Kotlin Multiplatform) SDK. Covers keypair generation, transaction building, Horizon queries, Soroban smart contracts, smart accounts (OpenZeppelin) with passkey / WebAuthn authentication, XDR encoding, and SEP integrations. Use when the developer is working with Kotlin, KMP, or Android and mentions Stellar, blockchain, cryptocurrency, passkey, or smart wallet operations.
 license: Apache-2.0
 compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.5.0. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
 metadata:
   author: soneso
-  version: "1.0.3"
+  version: "1.1.0"
   sdk_repo: https://github.com/Soneso/kmp-stellar-sdk
 ---
 
@@ -20,7 +20,7 @@ The KMP Stellar SDK (`com.soneso.stellar:stellar-sdk`) is a Kotlin Multiplatform
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.4.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.5.0")
 }
 ```
 
@@ -38,8 +38,9 @@ val keyPair = KeyPair.random()
 val accountId: String = keyPair.getAccountId()   // G... public address
 val secretSeed: CharArray? = keyPair.getSecretSeed() // S... secret seed (CharArray for security)
 
-// From existing seed (also suspend)
-val restored = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+// From existing seed (also suspend). Load the seed from platform-secure storage
+// (Keychain / Android Keystore / OS keyring) — NEVER commit a real seed to source.
+val restored = KeyPair.fromSecretSeed("S_YOUR_SECRET_SEED_HERE")   // 56-char S... strkey
 val publicOnly = KeyPair.fromAccountId(accountId) // public-key-only, cannot sign
 
 // WRONG: KeyPair.random() without suspend — it IS a suspend function
@@ -358,7 +359,15 @@ tx.signAndSubmit(keyPair)
 For contract authorization, multi-auth workflows, and low-level deploy/invoke:
 [Smart Contracts Guide](./references/soroban_contracts.md)
 
-## 7. XDR Encoding & Decoding
+## 7. Smart Accounts (OpenZeppelin)
+
+Passkey-authenticated Soroban smart accounts: biometric auth, multiple signers (passkey/delegated/Ed25519), context rules, policies, and optional fee sponsoring via a relayer. Entry point: `OZSmartAccountKit.create(OZSmartAccountConfig(...))` — requires `rpcUrl`, `networkPassphrase`, `accountWasmHash` (hex), `webauthnVerifierAddress` (C-address), plus platform-specific `webauthnProvider` and `storage`.
+
+- [Smart Accounts Guide](./references/smart_accounts.md) — kit config, wallet create/connect, signers, transactions, credentials, events, `submit` / `fundWallet`, external signer manager, indexer
+- [Context Rules & Policies](./references/smart_accounts_policies.md) — context rules, policies, multi-signer, common scenarios (recovery, rotation, `__check_auth` debugging), contract error codes
+- [WebAuthn Platform Setup](./references/smart_accounts_webauthn.md) — Android, iOS, macOS, Web adapters + rpId/DAL/AASA
+
+## 8. XDR Encoding & Decoding
 
 XDR (External Data Representation) is Stellar's binary serialization format.
 
@@ -402,7 +411,7 @@ To submit a pre-signed XDR envelope: `server.submitTransaction(signedXdrBase64)`
 For all Scv factory methods and type mapping:
 [XDR Reference](./references/xdr.md) | [Contract Arguments](./references/soroban_contracts.md)
 
-## 8. Error Handling & Troubleshooting
+## 9. Error Handling & Troubleshooting
 
 ### Horizon Errors
 
@@ -451,14 +460,14 @@ if (health.status != "healthy") { /* server unhealthy */ }
 // TransactionFailedException, ExpiredStateException, etc.
 ```
 
-For comprehensive error catalog and solutions:
+For the full error catalog and solutions:
 [Troubleshooting Guide](./references/troubleshooting.md)
 
-## 9. Security Best Practices
+## 10. Security Best Practices
 
 Covers secret key management (`getSecretSeed()` returns `CharArray?`), transaction verification, `StrKey` validation, and amount precision. See [Security Guide](./references/security.md).
 
-## 10. SEP Implementations
+## 11. SEP Implementations
 
 The KMP SDK implements 13 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 38, 45, 53. See [SEP Implementations Guide](./references/sep.md).
 
@@ -469,6 +478,9 @@ The KMP SDK implements 13 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 38, 45, 
 - [Horizon Streaming](./references/horizon_streaming.md) - SSE patterns for all streaming endpoints
 - [RPC](./references/rpc.md) - All Soroban RPC methods
 - [Smart Contracts](./references/soroban_contracts.md) - Contract deployment, invocation, auth
+- [Smart Accounts](./references/smart_accounts.md) - OZ kit core: config, wallet creation/connect, signers, transactions, credentials, events
+- [Smart Accounts - Policies](./references/smart_accounts_policies.md) - Context rules, policies, multi-signer operations
+- [Smart Accounts - WebAuthn](./references/smart_accounts_webauthn.md) - Platform adapters for Android, iOS, macOS, Web
 - [XDR](./references/xdr.md) - XDR encoding/decoding and debugging
 - [Troubleshooting](./references/troubleshooting.md) - Error codes, platform & environment info
 - [Security](./references/security.md) - Platform-specific key storage, production deployment
