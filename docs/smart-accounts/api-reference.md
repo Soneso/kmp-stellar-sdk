@@ -456,52 +456,92 @@ data class ConnectWalletOptions(
     val fresh: Boolean = false,
     val prompt: Boolean = false
 )
+
+sealed class ConnectWalletResult {
+    abstract val credentialId: String
+
+    data class Connected(
+        override val credentialId: String,
+        val contractId: String,
+        val restoredFromSession: Boolean
+    ) : ConnectWalletResult()
+
+    data class Ambiguous(
+        override val credentialId: String,
+        val candidates: List<String>
+    ) : ConnectWalletResult()
+}
 ```
 
 Connects to an existing smart account wallet. Returns `null` when no session exists and no WebAuthn prompt is requested, enabling a two-phase connect pattern.
+
+The non-null result is one of two arms:
+- `Connected`: a single contract was resolved; kit state is set and a session is saved.
+- `Ambiguous`: the indexer reported multiple contracts where the passkey is registered as a signer. The kit state is NOT set; the caller must let the user pick a contract from `candidates` and reconnect with the chosen `contractId` (and the `credentialId` from the result, to skip a second WebAuthn ceremony).
+
+`Ambiguous` is by-construction unreachable when `contractId` is supplied (the cascade is bypassed).
 
 **Options Decision Matrix**:
 
 | Options | Behavior |
 |---------|----------|
 | (default) | Session restore; return `null` if no session |
-| `credentialId` and/or `contractId` | Direct connect, skip session check; always returns non-null |
+| `credentialId` and/or `contractId` | Direct connect, skip session check |
 | `fresh = true` | Skip session, always trigger WebAuthn |
 | `prompt = true` | Session restore; trigger WebAuthn if no session |
 | `fresh = true, prompt = true` | `fresh` takes priority, always trigger WebAuthn |
 
-**Returns**: `ConnectWalletResult?` -- non-null on successful connection, `null` when no session exists and `prompt` is `false`
+**Contract lookup order** (when `credentialId` is provided or WebAuthn was triggered, and `contractId` is not supplied): storage → derivation → indexer.
 
-When `credentialId` and/or `contractId` are provided, the direct connect path always returns non-null.
+1. Storage hit: `FAILED` deployment status throws with a recovery hint pointing to `deployPendingCredential()`. `PENDING` entries are trusted.
+2. Derivation: derive the deterministic address under the configured deployer and verify on-chain. If no contract exists, fall through to the indexer.
+3. Indexer: 0 results → `WalletException.NotFound`. 1 result → verify on-chain and return `Connected`. N > 1 → return `Ambiguous(candidates)`.
 
 **Throws**:
 - `WebAuthnException`: Authentication failed (only when WebAuthn is triggered)
-- `WalletException.NotFound`: Wallet not found for credential
-- `ValidationException`: Invalid options
+- `WalletException.NotFound`: Contract not found at any cascade stage (no on-chain contract at the derived address and either no indexer or zero/missing indexer results), or `FAILED` storage entry detected
+- `ValidationException`: Invalid options, or malformed deployer config (from `deriveContractAddress`)
+- `TransactionException`: Internal XDR encoding failure (from `deriveContractAddress`)
 
 **Example**:
 
 ```kotlin
 // Phase 1: Silent restore at app launch (returns null if no session)
-val result = walletOps.connectWallet()
-if (result != null) {
-    println("Silently reconnected to ${result.contractId}")
-} else {
-    // Show a "Connect" button in the UI
+when (val result = walletOps.connectWallet()) {
+    null -> {
+        // No saved session — show a "Connect" button in the UI
+    }
+    is ConnectWalletResult.Connected -> {
+        println("Silently reconnected to ${result.contractId}")
+    }
+    is ConnectWalletResult.Ambiguous -> {
+        // Unreachable for the silent restore path
+    }
 }
 
-// Phase 2: User taps "Connect" -- triggers WebAuthn if no session
-val connected = walletOps.connectWallet(
-    ConnectWalletOptions(prompt = true)
-)
+// Phase 2: User taps "Connect" — triggers WebAuthn if no session
+val result = walletOps.connectWallet(ConnectWalletOptions(prompt = true))
+when (result) {
+    null -> { /* unreachable when prompt = true */ }
+    is ConnectWalletResult.Connected -> println("Connected: ${result.contractId}")
+    is ConnectWalletResult.Ambiguous -> {
+        // Let the user pick, then re-connect with credentialId + chosen contractId
+        // (no second WebAuthn ceremony required).
+        val chosen = userPicker(result.candidates)
+        walletOps.connectWallet(
+            ConnectWalletOptions(
+                credentialId = result.credentialId,
+                contractId = chosen
+            )
+        )
+    }
+}
 
 // Force fresh authentication
-val fresh = walletOps.connectWallet(
-    ConnectWalletOptions(fresh = true)
-)
+walletOps.connectWallet(ConnectWalletOptions(fresh = true))
 
-// Direct connection (always returns non-null)
-val direct = walletOps.connectWallet(
+// Direct connection (Ambiguous is by-construction unreachable)
+walletOps.connectWallet(
     ConnectWalletOptions(
         credentialId = "abc123...",
         contractId = "CBCD..."
@@ -616,17 +656,30 @@ data class CreateWalletResult(
 
 #### ConnectWalletResult
 ```kotlin
-data class ConnectWalletResult(
-    val credentialId: String,
-    val contractId: String,
-    val restoredFromSession: Boolean
-)
+sealed class ConnectWalletResult {
+    abstract val credentialId: String
+
+    data class Connected(
+        override val credentialId: String,
+        val contractId: String,
+        val restoredFromSession: Boolean
+    ) : ConnectWalletResult()
+
+    data class Ambiguous(
+        override val credentialId: String,
+        val candidates: List<String>
+    ) : ConnectWalletResult()
+}
 ```
 
-**Fields**:
+**Connected fields**:
 - `credentialId`: Base64URL-encoded credential ID
 - `contractId`: Smart account contract address
 - `restoredFromSession`: True if reconnected from saved session, false if new authentication
+
+**Ambiguous fields**:
+- `credentialId`: Base64URL-encoded credential ID; reuse this for the disambiguation reconnect to skip a second WebAuthn ceremony
+- `candidates`: Contract addresses (C-addresses) where the passkey is registered as a signer. The caller should let the user pick one and reconnect with `OZWalletOperations.ConnectWalletOptions(credentialId, contractId = chosen)`.
 
 #### DeployPendingResult
 ```kotlin

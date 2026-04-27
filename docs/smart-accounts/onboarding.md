@@ -267,7 +267,7 @@ An indexer is an optional service that maps credential IDs to contract addresses
 
 Without an indexer, the SDK derives the contract address from the credential ID and the deployer's public key. This works when the deployer keypair is known (including the default deployer). But if a custom deployer was used and the client does not have the deployer keypair, it cannot derive the address.
 
-With an indexer, `connectWallet()` queries the indexer to find the contract address for any credential, regardless of which deployer was used.
+With an indexer, `connectWallet()` falls back to it when derivation under the configured deployer doesn't find an on-chain contract — typically because the passkey was added as a signer to an existing wallet rather than deploying its own. If the indexer reports the passkey on more than one contract, `connectWallet()` returns `ConnectWalletResult.Ambiguous(candidates)` so the app can let the user pick.
 
 SDK configuration:
 ```kotlin
@@ -333,9 +333,9 @@ App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles t
 ### Reconnecting
 
 1. On app relaunch, the app calls `connectWallet()` with default options. The SDK checks for a saved session in the `StorageAdapter` (a platform-specific interface for persisting credentials and session data, covered in the [SDK guide](README.md)).
-2. If a valid (non-expired) session exists, the wallet is silently reconnected. No biometric prompt is shown. The SDK loads the credential ID and contract ID from the session and returns a non-null `ConnectWalletResult`. Sessions last 7 days by default, configurable via `sessionExpiryMs` in `OZSmartAccountConfig`.
+2. If a valid (non-expired) session exists, the wallet is silently reconnected. No biometric prompt is shown. The SDK loads the credential ID and contract ID from the session and returns `ConnectWalletResult.Connected`. Sessions last 7 days by default, configurable via `sessionExpiryMs` in `OZSmartAccountConfig`.
 3. If no session exists or it has expired, `connectWallet()` returns `null`. The app can then show a "Connect" button and call `connectWallet(ConnectWalletOptions(prompt = true))` when the user taps it, which triggers a WebAuthn biometric prompt.
-4. After authentication, the SDK derives or looks up the contract address (via derivation or indexer) and verifies it exists on-chain by querying Soroban RPC.
+4. After authentication, the SDK runs a storage → derivation → indexer cascade to resolve the contract address and verifies it exists on-chain. If the indexer reports the passkey on multiple contracts, the SDK returns `ConnectWalletResult.Ambiguous(candidates)` so the app can let the user pick (see the [SDK guide](README.md#connecting-to-an-existing-wallet) for the picker pattern).
 
 ---
 

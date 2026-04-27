@@ -929,11 +929,19 @@ constructor(message: String, cause: Throwable? = null)
 ## ConfigurationException.MissingConfig
 constructor(message: String, cause: Throwable? = null)
 
-## data ConnectWalletResult
+## sealed ConnectWalletResult
+abstract val credentialId: String
+
+## data ConnectWalletResult.Connected : ConnectWalletResult
 constructor(val credentialId: String, val contractId: String, val restoredFromSession: Boolean)
 val credentialId: String
 val contractId: String
 val restoredFromSession: Boolean
+
+## data ConnectWalletResult.Ambiguous : ConnectWalletResult
+constructor(val credentialId: String, val candidates: List<String>)
+val credentialId: String
+val candidates: List<String>
 
 ## data ConnectedWallet
 constructor(val address: String, val walletId: String, val walletName: String)

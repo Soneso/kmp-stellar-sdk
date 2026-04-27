@@ -14,8 +14,8 @@ import com.soneso.smartdemo.flows.ContextRuleResult
 import com.soneso.smartdemo.flows.FlowPolicyEntry
 import com.soneso.smartdemo.flows.SignerEntry
 import com.soneso.smartdemo.flows.TransferResult
-import com.soneso.smartdemo.flows.WalletConnectionResult
 import com.soneso.smartdemo.flows.WalletCreationResult
+import com.soneso.stellar.sdk.smartaccount.oz.ConnectWalletResult
 import com.soneso.smartdemo.flows.addContextRule
 import com.soneso.smartdemo.flows.buildDelegatedSigner
 import com.soneso.smartdemo.flows.buildEd25519Signer
@@ -23,6 +23,7 @@ import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.connectWithAddress
 import com.soneso.smartdemo.flows.deletePendingCredential
 import com.soneso.smartdemo.flows.disconnect
+import com.soneso.smartdemo.flows.finalizeConnect
 import com.soneso.smartdemo.flows.initializeKit
 import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.flows.loadAvailablePasskeySigners
@@ -82,6 +83,75 @@ import platform.AuthenticationServices.ASPresentationAnchor
 import platform.darwin.NSObject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+
+/**
+ * Bridge-friendly result for the connect-wallet flows.
+ *
+ * Kotlin sealed classes do not map cleanly to Swift, so the bridge exposes a
+ * flat shape with two mutually-exclusive arms. **Exactly one** of [connected]
+ * and [ambiguous] is non-null when the bridge returns a non-null result;
+ * Swift callers switch on which is non-nil and use the corresponding fields.
+ *
+ * The bridge methods return `WalletConnectionBridgeResult?` overall; `null`
+ * preserves the existing "no result -- show generic error" behavior.
+ */
+data class WalletConnectionBridgeResult(
+    val connected: ConnectedResult? = null,
+    val ambiguous: AmbiguousResult? = null
+) {
+    init {
+        // Enforce the "exactly one of connected / ambiguous is non-null"
+        // invariant at construction time. Without this, a future bridge
+        // entry point could accidentally produce a result with both arms
+        // null or both arms set, which Swift consumers would mishandle.
+        require((connected == null) != (ambiguous == null)) {
+            "WalletConnectionBridgeResult must have exactly one of connected / ambiguous set"
+        }
+    }
+
+    /**
+     * Single-contract connect result. Mirrors [ConnectWalletResult.Connected].
+     */
+    data class ConnectedResult(
+        val contractId: String,
+        val credentialId: String,
+        val restoredFromSession: Boolean
+    )
+
+    /**
+     * Multi-candidate result. Mirrors [ConnectWalletResult.Ambiguous].
+     *
+     * Swift should display [candidates] as a picker, then call
+     * `finalizeConnect(credentialId, chosen)` on the bridge with the
+     * `credentialId` from this result and the chosen contract address.
+     * Reusing the credentialId avoids a second WebAuthn ceremony.
+     */
+    data class AmbiguousResult(
+        val credentialId: String,
+        val candidates: List<String>
+    )
+}
+
+/**
+ * Translates the SDK's [ConnectWalletResult] sealed type into the
+ * bridge-friendly flat shape used by Swift consumers.
+ */
+private fun ConnectWalletResult.toBridgeResult(): WalletConnectionBridgeResult =
+    when (this) {
+        is ConnectWalletResult.Connected -> WalletConnectionBridgeResult(
+            connected = WalletConnectionBridgeResult.ConnectedResult(
+                contractId = contractId,
+                credentialId = credentialId,
+                restoredFromSession = restoredFromSession
+            )
+        )
+        is ConnectWalletResult.Ambiguous -> WalletConnectionBridgeResult(
+            ambiguous = WalletConnectionBridgeResult.AmbiguousResult(
+                credentialId = credentialId,
+                candidates = candidates
+            )
+        )
+    }
 
 /**
  * Bridge between native macOS SwiftUI and the Kotlin Smart Account Kit.
@@ -188,49 +258,81 @@ class MacOSBridge {
     /**
      * Attempts to restore the last session or trigger a passkey authentication prompt.
      *
-     * @return [WalletConnectionResult] on success, null if no wallet was found or restored.
+     * @return Bridge result. When non-null, exactly one of `connected` and
+     *   `ambiguous` is set. `ambiguous` indicates the indexer reported the
+     *   passkey on more than one contract; Swift should show a picker and
+     *   then call [connectWithAddress] with the chosen contract. Null means
+     *   no wallet was found or restored.
      * @throws Exception if the WebAuthn ceremony or network call fails.
      */
     @Throws(Exception::class)
-    suspend fun quickConnect(): WalletConnectionResult? =
-        com.soneso.smartdemo.flows.quickConnect()
+    suspend fun quickConnect(): WalletConnectionBridgeResult? =
+        com.soneso.smartdemo.flows.quickConnect()?.toBridgeResult()
 
     /**
      * Two-step connect: authenticates a passkey first, then resolves the contract via the indexer.
      *
-     * @return [WalletConnectionResult] on success, null if the contract cannot be resolved.
+     * @return Bridge result. See [quickConnect] for the connected/ambiguous shape.
      * @throws Exception if the WebAuthn ceremony or indexer lookup fails.
      */
     @Throws(Exception::class)
-    suspend fun manualConnect(): WalletConnectionResult? =
-        com.soneso.smartdemo.flows.manualConnect()
+    suspend fun manualConnect(): WalletConnectionBridgeResult? =
+        com.soneso.smartdemo.flows.manualConnect()?.toBridgeResult()
 
     /**
      * Connects to a known contract address using any registered passkey.
      *
+     * Supplying an explicit contractId bypasses the SDK's discovery cascade,
+     * so the result is always the connected arm (or null on failure). This
+     * is the path Swift uses to finalize an ambiguous result after the user
+     * picks from the candidates surfaced by [quickConnect] or [manualConnect].
+     *
      * @param contractAddress C-address of the smart account contract.
-     * @return [WalletConnectionResult] on success, null if connection fails.
+     * @return Bridge result with the connected arm populated, or null if the
+     *   connect failed.
      * @throws Exception if the WebAuthn ceremony or network call fails.
      */
     @Throws(Exception::class)
-    suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult? =
-        com.soneso.smartdemo.flows.connectWithAddress(contractAddress)
+    suspend fun connectWithAddress(contractAddress: String): WalletConnectionBridgeResult? =
+        com.soneso.smartdemo.flows.connectWithAddress(contractAddress)?.toBridgeResult()
+
+    /**
+     * Finalizes a connect after the user picks a contract from the
+     * ambiguous-result picker. Reuses the credential ID from the
+     * authentication that produced the Ambiguous result, skipping a second
+     * WebAuthn prompt.
+     *
+     * @param credentialId Base64URL-encoded credential ID from the original
+     *   authentication.
+     * @param contractAddress The C-address chosen by the user.
+     * @return Bridge result with the connected arm populated, or null if the
+     *   connect failed.
+     * @throws Exception if the network call fails.
+     */
+    @Throws(Exception::class)
+    suspend fun finalizeConnect(
+        credentialId: String,
+        contractAddress: String
+    ): WalletConnectionBridgeResult? =
+        com.soneso.smartdemo.flows.finalizeConnect(credentialId, contractAddress)?.toBridgeResult()
 
     /**
      * Retries a pending wallet deployment for a previously registered passkey.
      *
      * The SDK looks up the contract ID and public key from stored credential data.
+     * This path always produces a single connected contract; the bridge result
+     * always has `connected` populated and `ambiguous` null.
      *
      * @param credentialId Base64URL-encoded credential ID of the pending deployment.
-     * @return [WalletConnectionResult] on success.
+     * @return Bridge result with the connected arm populated.
      * @throws Exception if the credential is not found, missing required fields, or the
      *   deploy transaction fails.
      */
     @Throws(Exception::class)
     suspend fun retryPendingDeploy(
         credentialId: String,
-    ): WalletConnectionResult =
-        com.soneso.smartdemo.flows.retryPendingDeploy(credentialId)
+    ): WalletConnectionBridgeResult =
+        com.soneso.smartdemo.flows.retryPendingDeploy(credentialId).toBridgeResult()
 
     /**
      * Deploys a pending wallet and provisions it with XLM and DEMO tokens.

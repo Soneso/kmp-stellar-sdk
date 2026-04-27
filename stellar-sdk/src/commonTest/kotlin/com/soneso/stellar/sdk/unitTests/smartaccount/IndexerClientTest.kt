@@ -225,7 +225,7 @@ class IndexerClientTest {
     fun testLookupByCredentialId_success() = runTest {
         val responseJson = """
             {
-                "credential_id": "aabbccdd",
+                "credentialId": "aabbccdd",
                 "contracts": [$contractSummaryJson],
                 "count": 1
             }
@@ -257,7 +257,7 @@ class IndexerClientTest {
     fun testLookupByCredentialId_verifiesUrlPath() = runTest {
         val responseJson = """
             {
-                "credential_id": "aabbccdd",
+                "credentialId": "aabbccdd",
                 "contracts": [],
                 "count": 0
             }
@@ -386,7 +386,7 @@ class IndexerClientTest {
     fun testLookupByAddress_successWithGAddress() = runTest {
         val responseJson = """
             {
-                "signer_address": "$testAccountId",
+                "signerAddress": "$testAccountId",
                 "contracts": [$contractSummaryJson],
                 "count": 1
             }
@@ -415,7 +415,7 @@ class IndexerClientTest {
     fun testLookupByAddress_successWithCAddress() = runTest {
         val responseJson = """
             {
-                "signer_address": "$testContractId",
+                "signerAddress": "$testContractId",
                 "contracts": [$contractSummaryJson],
                 "count": 1
             }
@@ -443,7 +443,7 @@ class IndexerClientTest {
     fun testLookupByAddress_verifiesUrlPath() = runTest {
         val responseJson = """
             {
-                "signer_address": "$testAccountId",
+                "signerAddress": "$testAccountId",
                 "contracts": [],
                 "count": 0
             }
@@ -525,9 +525,9 @@ class IndexerClientTest {
     fun testGetContract_success() = runTest {
         val responseJson = """
             {
-                "contract_id": "$testContractId",
+                "contractId": "$testContractId",
                 "summary": $contractSummaryJson,
-                "context_rules": [
+                "contextRules": [
                     {
                         "context_rule_id": 0,
                         "signers": [
@@ -607,9 +607,9 @@ class IndexerClientTest {
     fun testGetContract_verifiesUrlPath() = runTest {
         val responseJson = """
             {
-                "contract_id": "$testContractId",
+                "contractId": "$testContractId",
                 "summary": $contractSummaryJson,
-                "context_rules": []
+                "contextRules": []
             }
         """.trimIndent()
 

@@ -861,9 +861,14 @@ fun bootstrap() {
     val kit = OZSmartAccountKit.create(config)
 
     scope.launch {
-        val restored = kit.walletOperations.connectWallet()
-        if (restored != null) {
-            console.log("Reconnected: ${restored.contractId}")
+        when (val restored = kit.walletOperations.connectWallet()) {
+            null -> { /* no saved session */ }
+            is ConnectWalletResult.Connected -> {
+                console.log("Reconnected: ${restored.contractId}")
+            }
+            is ConnectWalletResult.Ambiguous -> {
+                // Unreachable for the silent restore path
+            }
         }
     }
 }
