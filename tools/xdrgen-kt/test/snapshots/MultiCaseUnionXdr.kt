@@ -26,10 +26,9 @@ sealed class MultiCaseUnionXdr {
   }
 
   data class TextValue(
+    override val discriminant: Int,
     val value: String
-  ) : MultiCaseUnionXdr() {
-    override val discriminant: Int = 1
-  }
+  ) : MultiCaseUnionXdr()
 
   data class RawValue(
     override val discriminant: Int,
@@ -47,11 +46,11 @@ sealed class MultiCaseUnionXdr {
         }
         1 -> {
           val value = reader.readString()
-          TextValue(value)
+          TextValue(discriminant, value)
         }
         2 -> {
           val value = reader.readString()
-          TextValue(value)
+          TextValue(discriminant, value)
         }
         else -> {
           val value = reader.readVariableOpaque()

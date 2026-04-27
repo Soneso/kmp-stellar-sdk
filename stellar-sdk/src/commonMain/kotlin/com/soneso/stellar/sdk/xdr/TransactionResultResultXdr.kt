@@ -37,16 +37,14 @@ sealed class TransactionResultResultXdr {
   abstract val discriminant: TransactionResultCodeXdr
 
   data class InnerResultPair(
+    override val discriminant: TransactionResultCodeXdr,
     val value: InnerTransactionResultPairXdr
-  ) : TransactionResultResultXdr() {
-    override val discriminant: TransactionResultCodeXdr = TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS
-  }
+  ) : TransactionResultResultXdr()
 
   data class Results(
+    override val discriminant: TransactionResultCodeXdr,
     val value: List<OperationResultXdr>
-  ) : TransactionResultResultXdr() {
-    override val discriminant: TransactionResultCodeXdr = TransactionResultCodeXdr.txSUCCESS
-  }
+  ) : TransactionResultResultXdr()
 
   /** case txFEE_BUMP_INNER_FAILED: handled above */
   data class Void(
@@ -60,19 +58,19 @@ sealed class TransactionResultResultXdr {
       return when (discriminant) {
         TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS -> {
           val value = InnerTransactionResultPairXdr.decode(reader)
-          InnerResultPair(value)
+          InnerResultPair(discriminant, value)
         }
         TransactionResultCodeXdr.txFEE_BUMP_INNER_FAILED -> {
           val value = InnerTransactionResultPairXdr.decode(reader)
-          InnerResultPair(value)
+          InnerResultPair(discriminant, value)
         }
         TransactionResultCodeXdr.txSUCCESS -> {
           val value = List(reader.readInt()) { OperationResultXdr.decode(reader) }
-          Results(value)
+          Results(discriminant, value)
         }
         TransactionResultCodeXdr.txFAILED -> {
           val value = List(reader.readInt()) { OperationResultXdr.decode(reader) }
-          Results(value)
+          Results(discriminant, value)
         }
         TransactionResultCodeXdr.txTOO_EARLY -> Void(discriminant)
         TransactionResultCodeXdr.txTOO_LATE -> Void(discriminant)

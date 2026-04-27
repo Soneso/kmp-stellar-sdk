@@ -249,8 +249,11 @@ module Xdrgen
             arm_type = kotlin_type_for(arm.declaration)
             is_default = arm.is_a?(AST::Definitions::UnionDefaultArm)
 
-            if is_default
-              # Default arm needs discriminant as constructor parameter
+            if is_default || arm.cases.length > 1
+              # Default arms and multi-case arms both need discriminant as a
+              # constructor parameter so the wire-read value survives a
+              # decode/encode round trip. Hardcoding here would lose the
+              # discriminant for any case beyond the first.
               out.puts "data class #{arm_class_name}("
               out.indent do
                 out.puts "override val discriminant: #{discriminant_type},"
@@ -288,15 +291,10 @@ module Xdrgen
 
             is_default = arms.first.is_a?(AST::Definitions::UnionDefaultArm)
 
-            if is_default
-              # Default arm needs discriminant as constructor parameter
-              out.puts "data class #{arm_class_name}("
-              out.indent do
-                out.puts "override val discriminant: #{discriminant_type}"
-              end
-              out.puts ") : #{union_name}()"
-            elsif total_discriminants > 1
-              # Multiple discriminant values - need a data class with discriminant parameter
+            if is_default || total_discriminants > 1
+              # Default arms and multi-case void arms both need discriminant
+              # as a constructor parameter — the wire-read value must survive
+              # decode/encode.
               out.puts "data class #{arm_class_name}("
               out.indent do
                 out.puts "override val discriminant: #{discriminant_type}"
@@ -323,7 +321,13 @@ module Xdrgen
               out.puts "val discriminant = #{decode_expression(union.discriminant, 'reader')}"
               out.puts "return when (discriminant) {"
               out.indent do
-                # Build a map to detect void arms with multiple discriminants
+                # Build a map to detect void arms with multiple discriminants.
+                # `union.normal_arms` excludes the default arm — that case is
+                # rendered separately below in the `union.default_arm.present?`
+                # block. The class-definition predicate at the top of this method
+                # uses `is_default || ...`; the predicate here intentionally does
+                # not need the `is_default` check because the default arm never
+                # reaches this loop.
                 void_arms_by_class = {}
                 union.normal_arms.select(&:void?).each do |arm|
                   class_name = arm.name.camelize
@@ -359,7 +363,11 @@ module Xdrgen
                       out.puts "#{discriminant_value} -> {"
                       out.indent do
                         out.puts "val value = #{decode_expression(arm.declaration, 'reader')}"
-                        out.puts "#{arm_class_name}(value)"
+                        if arm.cases.length > 1
+                          out.puts "#{arm_class_name}(discriminant, value)"
+                        else
+                          out.puts "#{arm_class_name}(value)"
+                        end
                       end
                       out.puts "}"
                     end

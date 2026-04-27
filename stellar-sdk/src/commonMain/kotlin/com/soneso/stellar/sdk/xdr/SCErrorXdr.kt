@@ -31,10 +31,9 @@ sealed class SCErrorXdr {
   }
 
   data class Code(
+    override val discriminant: SCErrorTypeXdr,
     val value: SCErrorCodeXdr
-  ) : SCErrorXdr() {
-    override val discriminant: SCErrorTypeXdr = SCErrorTypeXdr.SCE_WASM_VM
-  }
+  ) : SCErrorXdr()
 
   companion object {
 
@@ -47,39 +46,39 @@ sealed class SCErrorXdr {
         }
         SCErrorTypeXdr.SCE_WASM_VM -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_CONTEXT -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_STORAGE -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_OBJECT -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_CRYPTO -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_EVENTS -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_BUDGET -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_VALUE -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         SCErrorTypeXdr.SCE_AUTH -> {
           val value = SCErrorCodeXdr.decode(reader)
-          Code(value)
+          Code(discriminant, value)
         }
         else -> throw IllegalArgumentException("Unknown SCErrorXdr discriminant: $discriminant")
       }

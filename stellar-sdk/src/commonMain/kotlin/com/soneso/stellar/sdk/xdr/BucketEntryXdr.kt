@@ -21,10 +21,9 @@ sealed class BucketEntryXdr {
   abstract val discriminant: BucketEntryTypeXdr
 
   data class LiveEntry(
+    override val discriminant: BucketEntryTypeXdr,
     val value: LedgerEntryXdr
-  ) : BucketEntryXdr() {
-    override val discriminant: BucketEntryTypeXdr = BucketEntryTypeXdr.LIVEENTRY
-  }
+  ) : BucketEntryXdr()
 
   data class DeadEntry(
     val value: LedgerKeyXdr
@@ -45,11 +44,11 @@ sealed class BucketEntryXdr {
       return when (discriminant) {
         BucketEntryTypeXdr.LIVEENTRY -> {
           val value = LedgerEntryXdr.decode(reader)
-          LiveEntry(value)
+          LiveEntry(discriminant, value)
         }
         BucketEntryTypeXdr.INITENTRY -> {
           val value = LedgerEntryXdr.decode(reader)
-          LiveEntry(value)
+          LiveEntry(discriminant, value)
         }
         BucketEntryTypeXdr.DEADENTRY -> {
           val value = LedgerKeyXdr.decode(reader)
