@@ -1408,7 +1408,7 @@ class ContractSpecTest {
         assertEquals(42u, (result as SCErrorXdr.ContractCode).value.value)
 
         // Test with WasmVm error
-        val wasmError = SCErrorXdr.Code(SCErrorCodeXdr.SCEC_ARITH_DOMAIN)
+        val wasmError = SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_ARITH_DOMAIN)
         val scValCodeError = SCValXdr.Error(wasmError)
         val codeResult = spec.scValToNative(scValCodeError, null)
 

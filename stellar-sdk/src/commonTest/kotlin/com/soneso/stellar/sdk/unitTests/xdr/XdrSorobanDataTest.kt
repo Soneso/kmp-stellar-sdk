@@ -154,7 +154,7 @@ class XdrSorobanDataTest {
     @Test
     fun testSCErrorCodeArithDomain() {
         XdrTestHelpers.assertXdrRoundTrip(
-            SCErrorXdr.Code(SCErrorCodeXdr.SCEC_ARITH_DOMAIN),
+            SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_ARITH_DOMAIN),
             { v, w -> v.encode(w) }, { r -> SCErrorXdr.decode(r) })
     }
 
@@ -207,7 +207,7 @@ class XdrSorobanDataTest {
             flags = XdrTestHelpers.uint32(0u), ext = OfferEntryExtXdr.Void
         )
         XdrTestHelpers.assertXdrRoundTrip(
-            ManageOfferSuccessResultXdr(offersClaimed = emptyList(), offer = ManageOfferSuccessResultOfferXdr.Offer(offerEntry)),
+            ManageOfferSuccessResultXdr(offersClaimed = emptyList(), offer = ManageOfferSuccessResultOfferXdr.Offer(ManageOfferEffectXdr.MANAGE_OFFER_CREATED, offerEntry)),
             { v, w -> v.encode(w) }, { r -> ManageOfferSuccessResultXdr.decode(r) })
     }
 }

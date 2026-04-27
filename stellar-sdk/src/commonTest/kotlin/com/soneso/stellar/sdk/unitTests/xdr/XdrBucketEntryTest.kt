@@ -95,7 +95,7 @@ class XdrBucketEntryTest {
 
     @Test
     fun testBucketEntryLiveEntry() {
-        val entry = BucketEntryXdr.LiveEntry(simpleLedgerEntry())
+        val entry = BucketEntryXdr.LiveEntry(BucketEntryTypeXdr.LIVEENTRY, simpleLedgerEntry())
         assertXdrRoundTrip(entry, { v, w -> v.encode(w) }, { r -> BucketEntryXdr.decode(r) })
     }
 

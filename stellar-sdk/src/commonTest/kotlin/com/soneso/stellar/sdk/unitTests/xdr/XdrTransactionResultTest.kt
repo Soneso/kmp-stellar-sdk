@@ -29,13 +29,13 @@ class XdrTransactionResultTest {
     @Test fun testResultSorobanInvalid() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txSOROBAN_INVALID))
     @Test fun testResultFrozenKeyAccessed() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txFROZEN_KEY_ACCESSED))
 
-    @Test fun testResultSuccessEmptyOps() = rtResult(TransactionResultResultXdr.Results(emptyList()))
+    @Test fun testResultSuccessEmptyOps() = rtResult(TransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, emptyList()))
 
     @Test fun testResultSuccessWithOps() {
         val opResult = OperationResultXdr.Tr(
             OperationResultTrXdr.PaymentResult(PaymentResultXdr.Void(PaymentResultCodeXdr.PAYMENT_SUCCESS))
         )
-        rtResult(TransactionResultResultXdr.Results(listOf(opResult)))
+        rtResult(TransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, listOf(opResult)))
     }
 
     @Test fun testResultSuccessMultipleOps() {
@@ -44,12 +44,12 @@ class XdrTransactionResultTest {
         val op2 = OperationResultXdr.Tr(OperationResultTrXdr.PaymentResult(
             PaymentResultXdr.Void(PaymentResultCodeXdr.PAYMENT_SUCCESS)))
         val op3 = OperationResultXdr.Void(OperationResultCodeXdr.opBAD_AUTH)
-        rtResult(TransactionResultResultXdr.Results(listOf(op1, op2, op3)))
+        rtResult(TransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, listOf(op1, op2, op3)))
     }
 
     @Test fun testFullTransactionResultSuccess() = rtTxResult(TransactionResultXdr(
         feeCharged = Int64Xdr(100L),
-        result = TransactionResultResultXdr.Results(emptyList()),
+        result = TransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, emptyList()),
         ext = TransactionResultExtXdr.Void
     ))
 
@@ -58,7 +58,7 @@ class XdrTransactionResultTest {
             ChangeTrustResultXdr.Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_MALFORMED)))
         rtTxResult(TransactionResultXdr(
             feeCharged = Int64Xdr(200L),
-            result = TransactionResultResultXdr.Results(listOf(opResult)),
+            result = TransactionResultResultXdr.Results(TransactionResultCodeXdr.txFAILED, listOf(opResult)),
             ext = TransactionResultExtXdr.Void
         ))
     }
@@ -81,7 +81,7 @@ class XdrTransactionResultTest {
             InvokeHostFunctionResultXdr.Success(XdrTestHelpers.hashXdr())))
         rtTxResult(TransactionResultXdr(
             feeCharged = Int64Xdr(1000L),
-            result = TransactionResultResultXdr.Results(listOf(opResult)),
+            result = TransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, listOf(opResult)),
             ext = TransactionResultExtXdr.Void
         ))
     }

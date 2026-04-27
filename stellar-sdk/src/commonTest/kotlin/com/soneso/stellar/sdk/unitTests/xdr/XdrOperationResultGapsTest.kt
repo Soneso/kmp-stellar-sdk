@@ -276,17 +276,29 @@ class XdrOperationResultGapsTest {
 
     // ========== SCError - all variants ==========
     @Test fun testSCErrorContract() { rtSCE(SCErrorXdr.ContractCode(uint32(1u))) }
-    @Test fun testSCErrorWasm() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_ARITH_DOMAIN)) }
-    @Test fun testSCErrorContext() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_INTERNAL_ERROR)) }
-    @Test fun testSCErrorStorage() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_EXCEEDED_LIMIT)) }
-    @Test fun testSCErrorObject() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_INVALID_ACTION)) }
-    @Test fun testSCErrorCrypto() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_MISSING_VALUE)) }
-    @Test fun testSCErrorEvents() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_UNEXPECTED_TYPE)) }
-    @Test fun testSCErrorBudget() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_UNEXPECTED_SIZE)) }
-    @Test fun testSCErrorValue() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_INVALID_INPUT)) }
-    @Test fun testSCErrorAuth() { rtSCE(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_EXISTING_VALUE)) }
+    @Test fun testSCErrorWasm() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_ARITH_DOMAIN)) }
+    @Test fun testSCErrorContext() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_CONTEXT, SCErrorCodeXdr.SCEC_INTERNAL_ERROR)) }
+    @Test fun testSCErrorStorage() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_STORAGE, SCErrorCodeXdr.SCEC_EXCEEDED_LIMIT)) }
+    @Test fun testSCErrorObject() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_OBJECT, SCErrorCodeXdr.SCEC_INVALID_ACTION)) }
+    @Test fun testSCErrorCrypto() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_CRYPTO, SCErrorCodeXdr.SCEC_MISSING_VALUE)) }
+    @Test fun testSCErrorEvents() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_EVENTS, SCErrorCodeXdr.SCEC_UNEXPECTED_TYPE)) }
+    @Test fun testSCErrorBudget() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_BUDGET, SCErrorCodeXdr.SCEC_UNEXPECTED_SIZE)) }
+    @Test fun testSCErrorValue() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_VALUE, SCErrorCodeXdr.SCEC_INVALID_INPUT)) }
+    @Test fun testSCErrorAuth() { rtSCE(SCErrorXdr.Code(SCErrorTypeXdr.SCE_AUTH, SCErrorCodeXdr.SCEC_EXISTING_VALUE)) }
 
-    private fun rtSCE(v: SCErrorXdr) = assertXdrRoundTrip(v, { v2, w -> v2.encode(w) }, { r -> SCErrorXdr.decode(r) })
+    private fun rtSCE(v: SCErrorXdr) {
+        // Round-trip via bytes and assert the discriminant survives decode.
+        // Guards against regressions where multiple SCErrorType discriminants
+        // sharing the SCErrorXdr.Code payload collapse to a single hardcoded type.
+        val writer = XdrWriter()
+        v.encode(writer)
+        val bytes = writer.toByteArray()
+        val decoded = SCErrorXdr.decode(XdrReader(bytes))
+        kotlin.test.assertEquals(v.discriminant, decoded.discriminant, "discriminant lost on decode")
+        val writer2 = XdrWriter()
+        decoded.encode(writer2)
+        kotlin.test.assertTrue(bytes.contentEquals(writer2.toByteArray()), "XDR round-trip bytes differ")
+    }
 
     // ========== ChangeTrustAsset ==========
     @Test fun testChangeTrustAssetNative() {

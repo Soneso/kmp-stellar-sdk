@@ -18,10 +18,9 @@ sealed class ManageOfferSuccessResultOfferXdr {
   abstract val discriminant: ManageOfferEffectXdr
 
   data class Offer(
+    override val discriminant: ManageOfferEffectXdr,
     val value: OfferEntryXdr
-  ) : ManageOfferSuccessResultOfferXdr() {
-    override val discriminant: ManageOfferEffectXdr = ManageOfferEffectXdr.MANAGE_OFFER_CREATED
-  }
+  ) : ManageOfferSuccessResultOfferXdr()
 
   data object Void : ManageOfferSuccessResultOfferXdr() {
     override val discriminant: ManageOfferEffectXdr = ManageOfferEffectXdr.MANAGE_OFFER_DELETED
@@ -34,11 +33,11 @@ sealed class ManageOfferSuccessResultOfferXdr {
       return when (discriminant) {
         ManageOfferEffectXdr.MANAGE_OFFER_CREATED -> {
           val value = OfferEntryXdr.decode(reader)
-          Offer(value)
+          Offer(discriminant, value)
         }
         ManageOfferEffectXdr.MANAGE_OFFER_UPDATED -> {
           val value = OfferEntryXdr.decode(reader)
-          Offer(value)
+          Offer(discriminant, value)
         }
         ManageOfferEffectXdr.MANAGE_OFFER_DELETED -> Void
         else -> throw IllegalArgumentException("Unknown ManageOfferSuccessResultOfferXdr discriminant: $discriminant")

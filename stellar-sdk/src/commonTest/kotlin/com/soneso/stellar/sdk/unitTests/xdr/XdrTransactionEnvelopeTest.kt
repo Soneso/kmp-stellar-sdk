@@ -417,7 +417,7 @@ class XdrTransactionEnvelopeTest {
         )
         val result = InnerTransactionResultXdr(
             feeCharged = int64(100L),
-            result = InnerTransactionResultResultXdr.Results(listOf(opResult)),
+            result = InnerTransactionResultResultXdr.Results(TransactionResultCodeXdr.txSUCCESS, listOf(opResult)),
             ext = InnerTransactionResultExtXdr.Void
         )
         assertXdrRoundTrip(result, { v, w -> v.encode(w) }, { r -> InnerTransactionResultXdr.decode(r) })

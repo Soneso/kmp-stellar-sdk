@@ -15,7 +15,7 @@ class XdrSCValAllTest {
     @Test fun testVoidLedgerKeyContractInstance() = rt(SCValXdr.Void(SCValTypeXdr.SCV_LEDGER_KEY_CONTRACT_INSTANCE))
 
     @Test fun testErrorContractCode() = rt(SCValXdr.Error(SCErrorXdr.ContractCode(Uint32Xdr(42u))))
-    @Test fun testErrorWasmVM() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_INTERNAL_ERROR)))
+    @Test fun testErrorWasmVM() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_INTERNAL_ERROR)))
 
     @Test fun testU32() = rt(SCValXdr.U32(Uint32Xdr(123456u)))
     @Test fun testU32Zero() = rt(SCValXdr.U32(Uint32Xdr(0u)))
@@ -94,9 +94,9 @@ class XdrSCValAllTest {
         ))))
     }
 
-    @Test fun testErrorContextType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_ARITH_DOMAIN)))
-    @Test fun testErrorStorageType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_MISSING_VALUE)))
-    @Test fun testErrorBudgetType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorCodeXdr.SCEC_EXCEEDED_LIMIT)))
+    @Test fun testErrorContextType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorTypeXdr.SCE_CONTEXT, SCErrorCodeXdr.SCEC_ARITH_DOMAIN)))
+    @Test fun testErrorStorageType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorTypeXdr.SCE_STORAGE, SCErrorCodeXdr.SCEC_MISSING_VALUE)))
+    @Test fun testErrorBudgetType() = rt(SCValXdr.Error(SCErrorXdr.Code(SCErrorTypeXdr.SCE_BUDGET, SCErrorCodeXdr.SCEC_EXCEEDED_LIMIT)))
 
     @Test fun testAddressLiquidityPool() = rt(SCValXdr.Address(SCAddressXdr.LiquidityPoolId(XdrTestHelpers.poolId())))
     @Test fun testAddressClaimableBalance() = rt(SCValXdr.Address(
