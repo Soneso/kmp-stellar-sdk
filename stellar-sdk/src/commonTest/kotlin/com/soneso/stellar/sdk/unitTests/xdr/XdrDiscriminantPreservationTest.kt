@@ -85,6 +85,19 @@ class XdrDiscriminantPreservationTest {
         assertTrue(decoded is TransactionResultResultXdr.InnerResultPair)
     }
 
+    @Test
+    fun txResultResult_feeBumpInnerSuccess_preservesDiscriminant() {
+        // stellar-xdr encode --type TransactionResultResult \
+        //   '{"tx_fee_bump_inner_success":{"transaction_hash":"0000000000000000000000000000000000000000000000000000000000000000","result":{"fee_charged":"100","result":{"tx_success":[{"op_inner":{"payment":"success"}}]},"ext":"v0"}}}'
+        val decoded = assertRoundTripBytes(
+            base64 = "AAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGQAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAA=",
+            decode = { TransactionResultResultXdr.decode(it) },
+            encode = { v, w -> v.encode(w) }
+        )
+        assertEquals(TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS, decoded.discriminant)
+        assertTrue(decoded is TransactionResultResultXdr.InnerResultPair)
+    }
+
     // ===== InnerTransactionResultResult =====
 
     @Test
@@ -155,5 +168,40 @@ class XdrDiscriminantPreservationTest {
         assertEquals(SCErrorTypeXdr.SCE_OBJECT, decoded.discriminant)
         assertTrue(decoded is SCErrorXdr.Code)
         assertEquals(SCErrorCodeXdr.SCEC_UNEXPECTED_TYPE, decoded.value)
+    }
+
+    // ===== BucketEntry =====
+    // The pre-fix `LiveEntry` data class collapsed LIVEENTRY and INITENTRY
+    // (both carrying LedgerEntry) into one hardcoded LIVEENTRY.
+
+    @Test
+    fun bucketEntry_initEntry_preservesDiscriminant() {
+        // stellar-xdr encode --type BucketEntry \
+        //   '{"initentry":{"last_modified_ledger_seq":1,"data":{"ttl":{"key_hash":"0000000000000000000000000000000000000000000000000000000000000000","live_until_ledger_seq":1000}},"ext":"v0"}}'
+        val decoded = assertRoundTripBytes(
+            base64 = "AAAAAgAAAAEAAAAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPoAAAAAA==",
+            decode = { BucketEntryXdr.decode(it) },
+            encode = { v, w -> v.encode(w) }
+        )
+        assertEquals(BucketEntryTypeXdr.INITENTRY, decoded.discriminant)
+        assertTrue(decoded is BucketEntryXdr.LiveEntry)
+    }
+
+    // ===== ManageOfferSuccessResultOffer =====
+    // The pre-fix `Offer` data class collapsed MANAGE_OFFER_CREATED and
+    // MANAGE_OFFER_UPDATED (both carrying OfferEntry) into one hardcoded
+    // MANAGE_OFFER_CREATED.
+
+    @Test
+    fun manageOfferSuccess_updated_preservesDiscriminant() {
+        // stellar-xdr encode --type ManageOfferSuccessResultOffer \
+        //   '{"updated":{"seller_id":"GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ","offer_id":"42","selling":"native","buying":{"credit_alphanum4":{"asset_code":"USD","issuer":"GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"}},"amount":"1000000000","price":{"n":1,"d":2},"flags":0,"ext":"v0"}}'
+        val decoded = assertRoundTripBytes(
+            base64 = "AAAAAQAAAAA/DDS/k60NmXHQTMyQ9wVRHIOKrZc0pKL7DXoD/H/omgAAAAAAAAAqAAAAAAAAAAFVU0QAAAAAAD8MNL+TrQ2ZcdBMzJD3BVEcg4qtlzSkovsNegP8f+iaAAAAADuaygAAAAABAAAAAgAAAAAAAAAA",
+            decode = { ManageOfferSuccessResultOfferXdr.decode(it) },
+            encode = { v, w -> v.encode(w) }
+        )
+        assertEquals(ManageOfferEffectXdr.MANAGE_OFFER_UPDATED, decoded.discriminant)
+        assertTrue(decoded is ManageOfferSuccessResultOfferXdr.Offer)
     }
 }
