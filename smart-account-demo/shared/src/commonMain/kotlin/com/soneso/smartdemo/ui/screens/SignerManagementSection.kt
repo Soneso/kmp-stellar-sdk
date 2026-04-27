@@ -268,57 +268,6 @@ fun SignerManagementSection(
 
                 when (signerAddMode) {
                     SignerAddMode.DELEGATED -> {
-                        if (DemoState.walletConnector != null) {
-                            var isGettingAddress by remember { mutableStateOf(false) }
-
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        scope.launch {
-                                            isGettingAddress = true
-                                            try {
-                                                val connection = DemoState.walletConnector?.connect()
-                                                if (connection != null) {
-                                                    onDelegatedAddressChanged(connection.address)
-                                                    onFieldErrorsChanged(fieldErrors - "delegatedAddress")
-                                                    // Ephemeral connection — fetch address only, then clean up
-                                                    try {
-                                                        DemoState.walletConnector?.disconnect(connection.address)
-                                                    } catch (_: Exception) { }
-                                                }
-                                            } catch (e: Exception) {
-                                                onFieldErrorsChanged(
-                                                    fieldErrors + ("delegatedAddress" to
-                                                            "Failed to get address from wallet: ${e.message}")
-                                                )
-                                            } finally {
-                                                isGettingAddress = false
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isGettingAddress && !isSubmitting
-                                ) {
-                                    if (isGettingAddress) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    }
-                                    Text("Get Address from Wallet")
-                                }
-                                Text(
-                                    text = "Freighter only",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
                         OutlinedTextField(
                             value = delegatedAddress,
                             onValueChange = {
@@ -334,6 +283,48 @@ fun SignerManagementSection(
                                 { Text(fieldErrors["delegatedAddress"]!!) }
                             } else null
                         )
+
+                        if (DemoState.walletConnector != null) {
+                            var isGettingAddress by remember { mutableStateOf(false) }
+
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        isGettingAddress = true
+                                        try {
+                                            val connection = DemoState.walletConnector?.connect()
+                                            if (connection != null) {
+                                                onDelegatedAddressChanged(connection.address)
+                                                onFieldErrorsChanged(fieldErrors - "delegatedAddress")
+                                                // Ephemeral connection — fetch address only, then clean up
+                                                try {
+                                                    DemoState.walletConnector?.disconnect(connection.address)
+                                                } catch (_: Exception) { }
+                                            }
+                                        } catch (e: Exception) {
+                                            onFieldErrorsChanged(
+                                                fieldErrors + ("delegatedAddress" to
+                                                        "Failed to get address from wallet: ${e.message}")
+                                            )
+                                        } finally {
+                                            isGettingAddress = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isGettingAddress && !isSubmitting
+                            ) {
+                                if (isGettingAddress) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text("Import from Freighter")
+                            }
+                        }
                         Button(
                             onClick = {
                                 val errors = mutableMapOf<String, String>()

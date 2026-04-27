@@ -785,23 +785,15 @@ private fun DelegatedSignerRow(
                     }
 
                     if (walletAvailable) {
-                        Column {
-                            OutlinedButton(
-                                onClick = onConnectWalletClick,
-                                enabled = !isAnotherWalletConnected,
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                            ) {
-                                Text(
-                                    text = "Connect Wallet",
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
+                        OutlinedButton(
+                            onClick = onConnectWalletClick,
+                            enabled = !isAnotherWalletConnected,
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                        ) {
                             Text(
-                                text = "Freighter only",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                text = "Connect Freighter",
+                                style = MaterialTheme.typography.labelSmall
                             )
                         }
                     }
