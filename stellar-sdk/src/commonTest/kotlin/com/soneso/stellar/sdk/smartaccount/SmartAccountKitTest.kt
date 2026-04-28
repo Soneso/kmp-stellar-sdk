@@ -1560,16 +1560,23 @@ class SmartAccountKitTest {
 
     @Test
     fun testStoredCredential_equality() {
+        // Pin createdAt explicitly. Default is currentTimeMillis() at
+        // construction time, and StoredCredential.equals() compares
+        // createdAt, so back-to-back constructions on a slow runner can
+        // straddle a millisecond boundary and produce unequal credentials.
+        val fixedCreatedAt = 1_700_000_000_000L
         val credential1 = StoredCredential(
             credentialId = "test-1",
             publicKey = ByteArray(65) { 0x04 },
-            contractId = "CBCD1234" + "A".repeat(48)
+            contractId = "CBCD1234" + "A".repeat(48),
+            createdAt = fixedCreatedAt
         )
 
         val credential2 = StoredCredential(
             credentialId = "test-1",
             publicKey = ByteArray(65) { 0x04 },
-            contractId = "CBCD1234" + "A".repeat(48)
+            contractId = "CBCD1234" + "A".repeat(48),
+            createdAt = fixedCreatedAt
         )
 
         assertEquals(credential1, credential2)
