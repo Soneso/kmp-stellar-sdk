@@ -413,35 +413,69 @@ On a successful direct connect, `connectWithCredentials` **removes** the matchin
 
 ### ConnectWalletResult
 
+A sealed type with two arms. `Connected` means a single contract was resolved (the kit's connected state has been set, a session has been saved). `Ambiguous` means the indexer reported multiple contracts where the passkey is registered as a signer; the connected state has NOT been set, and the caller must let the user pick a contract and reconnect with the chosen `contractId`.
+
 ```kotlin
-data class ConnectWalletResult(
-    val credentialId: String,
-    val contractId: String,
-    val restoredFromSession: Boolean
-)
+sealed class ConnectWalletResult {
+    abstract val credentialId: String
+
+    data class Connected(
+        override val credentialId: String,
+        val contractId: String,
+        val restoredFromSession: Boolean
+    ) : ConnectWalletResult()
+
+    data class Ambiguous(
+        override val credentialId: String,
+        val candidates: List<String>   // contract addresses
+    ) : ConnectWalletResult()
+}
 ```
+
+`Ambiguous` is by-construction unreachable when `contractId` is supplied to `ConnectWalletOptions` — the cascade is bypassed in that case and the result is always `Connected`.
 
 ### Phase 1: silent restore at app launch
 
 ```kotlin
 val kit = OZSmartAccountKit.create(config)
 
-val restored: ConnectWalletResult? = kit.walletOperations.connectWallet()
-if (restored != null) {
-    println("Reconnected to ${restored.contractId}")
-} else {
-    // No session — show Connect button in UI
+when (val restored = kit.walletOperations.connectWallet()) {
+    null -> {
+        // No saved session — show Connect button in UI.
+    }
+    is ConnectWalletResult.Connected -> {
+        println("Reconnected to ${restored.contractId}")
+    }
+    is ConnectWalletResult.Ambiguous -> {
+        // Unreachable for the silent restore path: the saved session
+        // supplies an explicit contractId, which bypasses the cascade.
+    }
 }
 ```
 
 ### Phase 2: user taps Connect
 
 ```kotlin
-val connected = kit.walletOperations.connectWallet(
+val result = kit.walletOperations.connectWallet(
     OZWalletOperations.ConnectWalletOptions(prompt = true)
 )
-if (connected != null) {
-    println("Connected: ${connected.contractId}")
+when (result) {
+    null -> { /* unreachable when prompt = true */ }
+    is ConnectWalletResult.Connected -> {
+        println("Connected: ${result.contractId}")
+    }
+    is ConnectWalletResult.Ambiguous -> {
+        // Show a picker to the user, then call connectWallet again with
+        // both credentialId (= result.credentialId) and the chosen contractId.
+        showPicker(result.candidates) { chosen ->
+            kit.walletOperations.connectWallet(
+                OZWalletOperations.ConnectWalletOptions(
+                    credentialId = result.credentialId,
+                    contractId = chosen
+                )
+            )
+        }
+    }
 }
 ```
 
@@ -466,7 +500,9 @@ val direct = kit.walletOperations.connectWallet(
         contractId   = "CABC..."
     )
 )
-// Always returns non-null on success; throws on contract-not-found.
+// Always returns Connected on success (Ambiguous is by-construction unreachable
+// when contractId is supplied); throws WalletException.NotFound if the
+// contract does not exist on-chain.
 ```
 
 ```kotlin
@@ -478,11 +514,26 @@ val direct = kit.walletOperations.connectWallet(
 
 When `credentialId` is provided (or after WebAuthn), the SDK resolves the contract address in this order:
 
-1. Local storage (matching credential)
-2. Indexer (if configured)
-3. Deterministic address derivation from the deployer
+1. **Local storage**. A storage hit means deployment is `PENDING` or `FAILED`
+   (successful deploy deletes the credential). `FAILED` entries throw
+   `WalletException.NotFound` with a message pointing to
+   `deployPendingCredential()` for retry. `PENDING` entries are trusted —
+   the stored `contractId` is used directly.
+2. **Deterministic address derivation** from the configured deployer. The
+   derived address is verified on-chain via `getContractData`. If no
+   contract exists at the derived address, the cascade falls through to
+   the indexer (the passkey was added as a signer to an existing wallet
+   rather than deploying its own under our deployer). RPC / network errors
+   during verification propagate as their original types.
+3. **Indexer fallback** (if configured). Looks up contracts where the
+   passkey is registered as a signer (sourced from on-chain
+   `signer_registered` events, emitted both at deploy time and on
+   `add_signer`).
+   - 0 contracts → throw `WalletException.NotFound`.
+   - 1 contract → verify on-chain and return `Connected`.
+   - N > 1 contracts → return `ConnectWalletResult.Ambiguous(credentialId, candidates)`. Connection state is NOT set; the caller must let the user pick.
 
-If derivation is used, the SDK verifies the contract instance exists on-chain via `getContractData`. If not found, throws `WalletException.NotFound`.
+When the explicit `contractId` is supplied (direct connect or session restore), the cascade is bypassed and only the on-chain verification runs.
 
 ---
 

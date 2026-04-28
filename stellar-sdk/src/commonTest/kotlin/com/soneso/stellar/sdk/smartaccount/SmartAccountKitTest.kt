@@ -34,6 +34,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -647,9 +648,13 @@ class SmartAccountKitTest {
 
     @Test
     fun testWalletOperations_connectWallet_withValidSession_noNetwork() = runTest {
-        // Session restore verifies the contract on-chain.
-        // Without network access, verification fails and the stale session is cleared.
-        // With prompt=false (default), connectWallet returns null.
+        // Session restore verifies the stored contractId on-chain. The session
+        // contractId here is malformed (it would also fail address parsing on
+        // the way to the RPC), and there is no real network in this test
+        // environment. The session-restore catch only handles
+        // WalletException.NotFound (genuine "contract is not on-chain"); other
+        // failures propagate so the calling app can show a real error and the
+        // saved session is preserved for retry once the network is healthy.
         val config = createTestConfig()
         val storage = InMemoryStorageAdapter()
         val kit = OZSmartAccountKit.create(config.copy(storage = storage))
@@ -662,11 +667,13 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
-        // On-chain verification fails -> session cleared -> returns null (prompt=false)
+        // The malformed-address case actually does throw WalletException.NotFound
+        // (verifyContractExists wraps IllegalArgumentException). It is therefore
+        // caught and clears the session. For a transient RPC error path we'd
+        // expect propagation; that path requires a fake RPC and is covered
+        // separately by future test infrastructure.
         val result = kit.walletOperations.connectWallet()
         assertNull(result)
-
-        // Session should have been cleared
         assertNull(storage.getSession())
     }
 
@@ -693,7 +700,12 @@ class SmartAccountKitTest {
 
     @Test
     fun testWalletOperations_connectWallet_expiredSessionWithPrompt_triggersWebAuthn() = runTest {
-        // prompt=true with expired session -> triggers WebAuthn, fails on lookup
+        // prompt=true with expired session -> triggers WebAuthn, then runs the
+        // discovery cascade against the mock credential. Under no real network /
+        // no usable indexer the cascade surfaces an exception (either
+        // WalletException.NotFound or a transport-level error from the
+        // indexer/RPC). The connect must not return a Connected result and
+        // must not silently succeed.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
@@ -708,8 +720,13 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
-        // Should trigger WebAuthn authentication, then fail on contract lookup
-        assertFailsWith<WalletException.NotFound> {
+        // Should trigger WebAuthn authentication, then fail on contract lookup.
+        // We use the broad assertFails (rather than assertFailsWith<NotFound>)
+        // because the exact exception depends on the test runner's network
+        // state -- WalletException.NotFound when the testnet RPC reaches a
+        // verdict, SorobanRpcException / IndexerException when transport
+        // fails. The cascade must always fail; the type is environmental.
+        assertFails {
             kit.walletOperations.connectWallet(
                 options = OZWalletOperations.ConnectWalletOptions(prompt = true)
             )
@@ -2152,6 +2169,10 @@ class SmartAccountKitTest {
 
     @Test
     fun testConnectWallet_freshOptionSkipsSession() = runTest {
+        // fresh=true bypasses the saved session and triggers WebAuthn. The
+        // resulting cascade (storage / derivation / indexer) cannot resolve a
+        // contract for the mock credential and must surface an exception
+        // (either WalletException.NotFound or an RPC/indexer transport error).
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
@@ -2165,7 +2186,7 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
-        assertFailsWith<WalletException.NotFound> {
+        assertFails {
             kit.walletOperations.connectWallet(
                 options = OZWalletOperations.ConnectWalletOptions(fresh = true)
             )
@@ -2186,13 +2207,17 @@ class SmartAccountKitTest {
 
     @Test
     fun testConnectWallet_noSessionWithPrompt_triggersWebAuthn() = runTest {
-        // No session, prompt=true -> triggers WebAuthn, fails on contract lookup
+        // No session, prompt=true -> triggers WebAuthn. The cascade then runs
+        // and cannot resolve a contract for the mock credential; an exception
+        // is surfaced (either WalletException.NotFound or an RPC/indexer
+        // transport error). The test's purpose is to verify the cascade is
+        // entered, not the specific error type.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
         val kit = OZSmartAccountKit.create(config.copy(storage = storage))
 
-        assertFailsWith<WalletException.NotFound> {
+        assertFails {
             kit.walletOperations.connectWallet(
                 options = OZWalletOperations.ConnectWalletOptions(prompt = true)
             )
@@ -2201,7 +2226,9 @@ class SmartAccountKitTest {
 
     @Test
     fun testConnectWallet_freshTakesPriorityOverPrompt() = runTest {
-        // fresh=true, prompt=true -> fresh takes priority, skips session, triggers WebAuthn
+        // fresh=true, prompt=true -> fresh takes priority, skips the saved
+        // session, triggers WebAuthn. The cascade fails to resolve the
+        // mock credential and surfaces an exception.
         val mockProvider = MockWebAuthnProvider()
         val config = createTestConfig(webauthnProvider = mockProvider)
         val storage = InMemoryStorageAdapter()
@@ -2216,8 +2243,7 @@ class SmartAccountKitTest {
         )
         storage.saveSession(session)
 
-        // fresh=true skips session even though it's valid, triggers WebAuthn, fails on lookup
-        assertFailsWith<WalletException.NotFound> {
+        assertFails {
             kit.walletOperations.connectWallet(
                 options = OZWalletOperations.ConnectWalletOptions(fresh = true, prompt = true)
             )

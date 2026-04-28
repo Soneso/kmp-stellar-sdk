@@ -52,8 +52,8 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.soneso.smartdemo.flows.WalletConnectionResult
 import com.soneso.smartdemo.flows.deletePendingCredential
+import com.soneso.smartdemo.flows.finalizeConnect
 import com.soneso.smartdemo.flows.loadPendingCredentials
 import com.soneso.smartdemo.flows.connectWithAddress
 import com.soneso.smartdemo.flows.manualConnect
@@ -61,8 +61,10 @@ import com.soneso.smartdemo.flows.quickConnect
 import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.ui.components.ContractPickerDialog
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.isValidContractAddress
+import com.soneso.stellar.sdk.smartaccount.oz.ConnectWalletResult
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
 import kotlinx.coroutines.launch
 
@@ -114,6 +116,13 @@ class WalletConnectionScreen : Screen {
         var indexerConnectError by remember { mutableStateOf<String?>(null) }
         var addressConnectError by remember { mutableStateOf<String?>(null) }
 
+        // Ambiguous-result picker state. Set when a connect flow returns
+        // ConnectWalletResult.Ambiguous (the indexer reports the passkey as
+        // a signer on more than one contract). The dialog is rendered as long
+        // as this is non-null. The user's selection routes through
+        // connectWithAddress to finalize the connect with the chosen contract.
+        var ambiguousResult by remember { mutableStateOf<ConnectWalletResult.Ambiguous?>(null) }
+
         // All sections are always expanded (no collapse/expand toggle).
 
         // Recovery connect input
@@ -139,17 +148,21 @@ class WalletConnectionScreen : Screen {
             section: ConnectionSection,
             setError: (String) -> Unit,
             nullResultMessage: String,
-            connect: suspend () -> WalletConnectionResult?
+            connect: suspend () -> ConnectWalletResult?
         ) {
             clearAllErrors()
             scope.launch {
                 activeConnection = section
                 try {
-                    val result = connect()
-                    if (result != null) {
-                        navigator.pop()
-                    } else {
-                        setError(nullResultMessage)
+                    when (val result = connect()) {
+                        null -> setError(nullResultMessage)
+                        is ConnectWalletResult.Connected -> navigator.pop()
+                        is ConnectWalletResult.Ambiguous -> {
+                            // Show the picker; do not pop yet. The picker's
+                            // onSelected callback will re-launch the connect
+                            // flow with the chosen contract address.
+                            ambiguousResult = result
+                        }
                     }
                 } catch (e: Throwable) {
                     val message = e.message ?: "Unknown error"
@@ -492,6 +505,32 @@ class WalletConnectionScreen : Screen {
                 }
             }
         }
+
+        // Picker dialog rendered when a connect flow returned Ambiguous.
+        // The user selects a contract; we then call finalizeConnect with the
+        // credentialId from the original authentication, skipping a second
+        // WebAuthn prompt. (We do not reuse connectWithAddress here because
+        // it always re-authenticates -- which would (a) prompt the user
+        // twice and (b) let them pick a different passkey on the second
+        // prompt, which would be on a different signer set than the chosen
+        // contract expects.)
+        ContractPickerDialog(
+            isOpen = ambiguousResult != null,
+            candidates = ambiguousResult?.candidates ?: emptyList(),
+            onDismiss = { ambiguousResult = null },
+            onSelected = { chosen ->
+                val authedCredentialId = ambiguousResult?.credentialId
+                ambiguousResult = null
+                if (authedCredentialId != null) {
+                    launchConnection(
+                        section = ConnectionSection.ADDRESS,
+                        setError = { addressConnectError = it },
+                        nullResultMessage = "Could not connect to the selected wallet",
+                        connect = { finalizeConnect(authedCredentialId, chosen) }
+                    )
+                }
+            }
+        )
     }
 }
 

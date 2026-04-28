@@ -27,23 +27,10 @@ import com.soneso.smartdemo.util.fetchXlmBalance
 import com.soneso.smartdemo.util.formatStroopsAsXlm
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.stellar.sdk.smartaccount.oz.ConnectWalletResult
 import com.soneso.stellar.sdk.smartaccount.oz.DeployPendingResult
 import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
-
-/**
- * Result of a successful wallet connection.
- *
- * @property contractId The C-address of the connected smart account contract.
- * @property credentialId The Base64URL-encoded passkey credential ID.
- * @property restoredFromSession True if the connection was restored from a saved session
- *   without requiring a new WebAuthn authentication ceremony.
- */
-data class WalletConnectionResult(
-    val contractId: String,
-    val credentialId: String,
-    val restoredFromSession: Boolean
-)
 
 /**
  * Result of deploying a pending credential and provisioning it with tokens.
@@ -91,7 +78,7 @@ private suspend fun isContractDeployed(): Boolean {
  * @throws Exception if the WebAuthn ceremony fails or the network is unreachable.
  *   Check [isUserCancellation] to distinguish user cancellations from hard errors.
  */
-suspend fun quickConnect(): WalletConnectionResult? {
+suspend fun quickConnect(): ConnectWalletResult? {
     val kit = DemoState.kit
         ?: throw IllegalStateException("SDK not initialized")
 
@@ -108,33 +95,38 @@ suspend fun quickConnect(): WalletConnectionResult? {
         return null
     }
 
-    if (result.restoredFromSession) {
-        ActivityLogState.success("Restored from saved session")
-    } else {
-        ActivityLogState.success("Connected via passkey authentication")
+    when (result) {
+        is ConnectWalletResult.Connected -> {
+            if (result.restoredFromSession) {
+                ActivityLogState.success("Restored from saved session")
+            } else {
+                ActivityLogState.success("Connected via passkey authentication")
+            }
+
+            // Update DemoState with the connected wallet's contract and credential.
+            DemoState.setConnected(true, result.contractId, result.credentialId)
+
+            // Verify the contract is actually deployed on-chain. Session restore does not
+            // guarantee on-chain existence (e.g., createWallet with autoSubmit=false).
+            val deployed = isContractDeployed()
+            DemoState.updateDeployed(deployed)
+
+            if (deployed) {
+                refreshAllBalances(result.contractId)
+            } else {
+                ActivityLogState.info("Wallet contract not yet deployed on-chain")
+            }
+        }
+        is ConnectWalletResult.Ambiguous -> {
+            // Indexer returned multiple contracts. Surface to the UI so the
+            // user can pick. Connection state has not been set; the picker's
+            // result will route through connectWithAddress.
+            ActivityLogState.info(
+                "Multiple wallets found for this passkey. Please pick one."
+            )
+        }
     }
-
-    // Update DemoState with the connected wallet's contract and credential.
-    DemoState.setConnected(true, result.contractId, result.credentialId)
-
-    // Verify the contract is actually deployed on-chain. Session restore does not
-    // guarantee on-chain existence (e.g., createWallet with autoSubmit=false).
-    val deployed = isContractDeployed()
-    DemoState.updateDeployed(deployed)
-
-    if (deployed) {
-        // Fetch both XLM and DEMO balances after connection so the main screen shows
-        // up-to-date values without requiring a manual refresh.
-        refreshAllBalances(result.contractId)
-    } else {
-        ActivityLogState.info("Wallet contract not yet deployed on-chain")
-    }
-
-    return WalletConnectionResult(
-        contractId = result.contractId,
-        credentialId = result.credentialId,
-        restoredFromSession = result.restoredFromSession
-    )
+    return result
 }
 
 /**
@@ -155,7 +147,7 @@ suspend fun quickConnect(): WalletConnectionResult? {
  * @throws Exception if the WebAuthn ceremony fails or the indexer lookup fails.
  *   Check [isUserCancellation] to distinguish user cancellations from hard errors.
  */
-suspend fun manualConnect(): WalletConnectionResult? {
+suspend fun manualConnect(): ConnectWalletResult? {
     val kit = DemoState.kit
         ?: throw IllegalStateException("SDK not initialized")
 
@@ -164,9 +156,9 @@ suspend fun manualConnect(): WalletConnectionResult? {
     val authResult = kit.walletOperations.authenticatePasskey()
     ActivityLogState.success("Authenticated with credential: ${authResult.credentialId.take(16)}...")
 
-    // Step 2: Connect using the credential ID. The SDK queries the indexer to map the
-    // credential to its deployed smart account contract address.
-    // Throws WalletException.NotFound if no contract is indexed for this credential.
+    // Step 2: Connect using the credential ID. The SDK runs the
+    // storage -> derivation -> indexer cascade. May return Ambiguous if the
+    // indexer reports multiple contracts for this credential.
     ActivityLogState.info("Looking up contract for credential...")
     val result = kit.walletOperations.connectWallet(
         OZWalletOperations.ConnectWalletOptions(credentialId = authResult.credentialId)
@@ -177,17 +169,22 @@ suspend fun manualConnect(): WalletConnectionResult? {
         return null
     }
 
-    ActivityLogState.success("Connected to contract: ${result.contractId}")
-    DemoState.setConnected(true, result.contractId, result.credentialId)
-    // A successful indexer-based connection means the contract exists on-chain.
-    DemoState.updateDeployed(true)
-    refreshAllBalances(result.contractId)
-
-    return WalletConnectionResult(
-        contractId = result.contractId,
-        credentialId = result.credentialId,
-        restoredFromSession = result.restoredFromSession
-    )
+    when (result) {
+        is ConnectWalletResult.Connected -> {
+            ActivityLogState.success("Connected to contract: ${result.contractId}")
+            DemoState.setConnected(true, result.contractId, result.credentialId)
+            // A successful resolution implies the contract exists on-chain
+            // (the SDK's verifyContractExists has run).
+            DemoState.updateDeployed(true)
+            refreshAllBalances(result.contractId)
+        }
+        is ConnectWalletResult.Ambiguous -> {
+            ActivityLogState.info(
+                "Multiple wallets found for this passkey. Please pick one."
+            )
+        }
+    }
+    return result
 }
 
 /**
@@ -202,7 +199,7 @@ suspend fun manualConnect(): WalletConnectionResult? {
  * @param contractAddress The C-address of the smart account contract.
  * @return [WalletConnectionResult] on success, or null if connection failed.
  */
-suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult? {
+suspend fun connectWithAddress(contractAddress: String): ConnectWalletResult.Connected? {
     val kit = DemoState.kit
         ?: throw IllegalStateException("SDK not initialized")
 
@@ -211,10 +208,39 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
     ActivityLogState.success("Authenticated with credential: ${authResult.credentialId.take(16)}...")
 
     // Step 2: Connect using both the credential ID and the provided contract address.
+    return finalizeConnect(
+        credentialId = authResult.credentialId,
+        contractAddress = contractAddress
+    )
+}
+
+/**
+ * Finalizes a connect when both the credential ID and the contract address
+ * are already known, skipping the WebAuthn ceremony.
+ *
+ * Used by the picker flow that handles `ConnectWalletResult.Ambiguous`: the
+ * user has already authenticated with a passkey to produce the ambiguous
+ * result, so we re-use that same `credentialId` rather than prompting again.
+ *
+ * @param credentialId The Base64URL-encoded credential ID from the
+ *   authentication that produced the Ambiguous result.
+ * @param contractAddress The C-address chosen by the user from the picker.
+ * @return [ConnectWalletResult.Connected] on success, or null if the connect
+ *   failed.
+ */
+suspend fun finalizeConnect(
+    credentialId: String,
+    contractAddress: String
+): ConnectWalletResult.Connected? {
+    val kit = DemoState.kit
+        ?: throw IllegalStateException("SDK not initialized")
+
+    // Supplying contractId bypasses the cascade in the SDK, so the result is
+    // always Connected (Ambiguous is by-construction unreachable on this path).
     ActivityLogState.info("Connecting to contract: ${contractAddress.take(8)}...")
     val result = kit.walletOperations.connectWallet(
         OZWalletOperations.ConnectWalletOptions(
-            credentialId = authResult.credentialId,
+            credentialId = credentialId,
             contractId = contractAddress
         )
     )
@@ -224,17 +250,19 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
         return null
     }
 
-    ActivityLogState.success("Connected to contract: ${result.contractId}")
-    DemoState.setConnected(true, result.contractId, result.credentialId)
-    // A successful address-based connection means the contract exists on-chain.
-    DemoState.updateDeployed(true)
-    refreshAllBalances(result.contractId)
+    val connected = when (result) {
+        is ConnectWalletResult.Connected -> result
+        is ConnectWalletResult.Ambiguous -> error(
+            "Unreachable: connectWallet with explicit contractId never returns Ambiguous"
+        )
+    }
 
-    return WalletConnectionResult(
-        contractId = result.contractId,
-        credentialId = result.credentialId,
-        restoredFromSession = result.restoredFromSession
-    )
+    ActivityLogState.success("Connected to contract: ${connected.contractId}")
+    DemoState.setConnected(true, connected.contractId, connected.credentialId)
+    DemoState.updateDeployed(true)
+    refreshAllBalances(connected.contractId)
+
+    return connected
 }
 
 /**
@@ -261,7 +289,7 @@ suspend fun connectWithAddress(contractAddress: String): WalletConnectionResult?
  */
 suspend fun retryPendingDeploy(
     credentialId: String,
-): WalletConnectionResult {
+): ConnectWalletResult.Connected {
     val kit = DemoState.kit
         ?: throw IllegalStateException("SDK not initialized")
 
@@ -282,9 +310,9 @@ suspend fun retryPendingDeploy(
     DemoState.updateDeployed(true)
     refreshAllBalances(result.contractId)
 
-    return WalletConnectionResult(
-        contractId = result.contractId,
+    return ConnectWalletResult.Connected(
         credentialId = credentialId,
+        contractId = result.contractId,
         restoredFromSession = false
     )
 }
@@ -316,7 +344,7 @@ suspend fun deployPendingAndProvision(
     // Step 1: Deploy the pending credential. This handles the on-chain deployment,
     // sets DemoState.isDeployed=true, and refreshes XLM + DEMO balances via
     // refreshAllBalances. On failure, the exception propagates to the caller.
-    val connectionResult: WalletConnectionResult
+    val connectionResult: ConnectWalletResult.Connected
     try {
         onProgress("Deploying contract...")
         connectionResult = retryPendingDeploy(credentialId)

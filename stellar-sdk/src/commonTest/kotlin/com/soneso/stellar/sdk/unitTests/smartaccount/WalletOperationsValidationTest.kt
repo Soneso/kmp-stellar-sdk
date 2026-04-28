@@ -409,12 +409,12 @@ class WalletOperationsValidationTest {
     }
 
     // ========================================================================
-    // ConnectWalletResult Data Class
+    // ConnectWalletResult Sealed Type
     // ========================================================================
 
     @Test
-    fun testConnectWalletResult_construction() {
-        val result = ConnectWalletResult(
+    fun testConnectWalletResult_connected_construction() {
+        val result = ConnectWalletResult.Connected(
             credentialId = "cred-abc",
             contractId = validContractAddress,
             restoredFromSession = false
@@ -425,8 +425,8 @@ class WalletOperationsValidationTest {
     }
 
     @Test
-    fun testConnectWalletResult_restoredFromSession() {
-        val result = ConnectWalletResult(
+    fun testConnectWalletResult_connected_restoredFromSession() {
+        val result = ConnectWalletResult.Connected(
             credentialId = "cred-abc",
             contractId = validContractAddress,
             restoredFromSession = true
@@ -435,21 +435,55 @@ class WalletOperationsValidationTest {
     }
 
     @Test
-    fun testConnectWalletResult_equality() {
-        val a = ConnectWalletResult("c", validContractAddress, false)
-        val b = ConnectWalletResult("c", validContractAddress, false)
-        val c = ConnectWalletResult("c", validContractAddress, true)
+    fun testConnectWalletResult_connected_equality() {
+        val a = ConnectWalletResult.Connected("c", validContractAddress, false)
+        val b = ConnectWalletResult.Connected("c", validContractAddress, false)
+        val c = ConnectWalletResult.Connected("c", validContractAddress, true)
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
         assertNotEquals(a, c)
     }
 
     @Test
-    fun testConnectWalletResult_copy() {
-        val original = ConnectWalletResult("c", validContractAddress, false)
+    fun testConnectWalletResult_connected_copy() {
+        val original = ConnectWalletResult.Connected("c", validContractAddress, false)
         val copied = original.copy(restoredFromSession = true)
         assertTrue(copied.restoredFromSession)
         assertEquals("c", copied.credentialId)
+    }
+
+    @Test
+    fun testConnectWalletResult_ambiguous_construction() {
+        val candidates = listOf(
+            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+            "CCMK6CYUEFEWKCPP6JL4EYYWTQGVPLG4F2KHE2H6DQOMXKBTHSDIH3JB"
+        )
+        val result = ConnectWalletResult.Ambiguous(
+            credentialId = "cred-abc",
+            candidates = candidates
+        )
+        assertEquals("cred-abc", result.credentialId)
+        assertEquals(candidates, result.candidates)
+        assertEquals(2, result.candidates.size)
+    }
+
+    @Test
+    fun testConnectWalletResult_sealed_when_exhaustive() {
+        // Compile-time exhaustiveness check: when on the sealed type must
+        // cover both arms. If a future change adds a new arm, this test
+        // fails to compile until the arm is handled here, surfacing the
+        // need to update every consumer.
+        val results: List<ConnectWalletResult> = listOf(
+            ConnectWalletResult.Connected("c", validContractAddress, false),
+            ConnectWalletResult.Ambiguous("c", listOf(validContractAddress))
+        )
+        for (r in results) {
+            val handled: String = when (r) {
+                is ConnectWalletResult.Connected -> "connected:${r.contractId}"
+                is ConnectWalletResult.Ambiguous -> "ambiguous:${r.candidates.size}"
+            }
+            assertTrue(handled.isNotEmpty())
+        }
     }
 
     // ========================================================================

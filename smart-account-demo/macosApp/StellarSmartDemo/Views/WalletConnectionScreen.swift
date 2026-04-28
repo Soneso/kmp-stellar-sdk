@@ -21,6 +21,14 @@ private enum ConnectionSection {
     case pending(String)
 }
 
+/// Captures the data needed to finalize an ambiguous-result connect: the
+/// credential ID from the authentication that produced the Ambiguous result,
+/// and the candidate contracts the user must pick from.
+private struct AmbiguousState {
+    let credentialId: String
+    let candidates: [String]
+}
+
 // MARK: - WalletConnectionScreen
 
 /// Screen that provides four paths for connecting a smart account wallet.
@@ -67,6 +75,13 @@ struct WalletConnectionScreen: View {
     /// Locally stored credentials with a pending deployment status.
     @State private var pendingCredentials: [StoredCredential] = []
 
+    /// State surfaced when a connect flow returns an `Ambiguous` bridge
+    /// result. While non-nil, the picker sheet is shown. The user's
+    /// selection is routed through `performFinalizeConnect`, which uses
+    /// `credentialId` from the original authentication so a second WebAuthn
+    /// prompt is not required.
+    @State private var ambiguousState: AmbiguousState? = nil
+
     // All sections are always expanded (no collapse/expand toggle).
 
     // MARK: - Derived state
@@ -100,6 +115,25 @@ struct WalletConnectionScreen: View {
         .navigationToolbar(title: "Connect Wallet")
         .task {
             await loadPending()
+        }
+        .sheet(isPresented: Binding(
+            get: { ambiguousState != nil },
+            set: { if !$0 { ambiguousState = nil } }
+        )) {
+            ContractPickerSheet(
+                candidates: ambiguousState?.candidates ?? [],
+                onCancel: { ambiguousState = nil },
+                onSelected: { chosen in
+                    let credentialId = ambiguousState?.credentialId
+                    ambiguousState = nil
+                    if let credentialId = credentialId {
+                        performFinalizeConnect(
+                            credentialId: credentialId,
+                            contractAddress: chosen
+                        )
+                    }
+                }
+            )
         }
     }
 
@@ -223,7 +257,7 @@ struct WalletConnectionScreen: View {
             Spacer().frame(height: 4)
 
             LoadingButton(
-                action: performAddressConnect,
+                action: { performAddressConnect() },
                 isLoading: isAddressLoading,
                 isEnabled: isIdle && isAddressValid,
                 text: "Connect",
@@ -366,13 +400,11 @@ struct WalletConnectionScreen: View {
                 let result = try await bridgeWrapper.bridge.quickConnect()
                 await MainActor.run {
                     activeSection = nil
-                    if result != nil {
-                        appState.sync(from: bridgeWrapper.bridge)
-                        toastManager.show("Connected successfully")
-                        dismiss()
-                    } else {
-                        autoConnectError = "No wallet found for this passkey."
-                    }
+                    handleBridgeResult(
+                        result,
+                        nullErrorSetter: { autoConnectError = $0 },
+                        nullErrorMessage: "No wallet found for this passkey."
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -396,13 +428,11 @@ struct WalletConnectionScreen: View {
                 let result = try await bridgeWrapper.bridge.manualConnect()
                 await MainActor.run {
                     activeSection = nil
-                    if result != nil {
-                        appState.sync(from: bridgeWrapper.bridge)
-                        toastManager.show("Connected successfully")
-                        dismiss()
-                    } else {
-                        indexerError = "No contract found for this credential."
-                    }
+                    handleBridgeResult(
+                        result,
+                        nullErrorSetter: { indexerError = $0 },
+                        nullErrorMessage: "No contract found for this credential."
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -418,22 +448,26 @@ struct WalletConnectionScreen: View {
         }
     }
 
-    private func performAddressConnect() {
+    /// Attempts to connect to a known contract address.
+    ///
+    /// - Parameter prefilledAddress: When provided, used directly instead of
+    ///   reading the user-entered field. The picker flow uses this to finalize
+    ///   an Ambiguous result without requiring the user to retype an address.
+    private func performAddressConnect(prefilledAddress: String? = nil) {
         clearAllErrors()
-        let address = contractAddressInput.trimmingCharacters(in: .whitespaces)
+        let address = prefilledAddress
+            ?? contractAddressInput.trimmingCharacters(in: .whitespaces)
         activeSection = .address
         Task {
             do {
                 let result = try await bridgeWrapper.bridge.connectWithAddress(contractAddress: address)
                 await MainActor.run {
                     activeSection = nil
-                    if result != nil {
-                        appState.sync(from: bridgeWrapper.bridge)
-                        toastManager.show("Connected successfully")
-                        dismiss()
-                    } else {
-                        addressError = "Could not connect to the provided contract address."
-                    }
+                    handleBridgeResult(
+                        result,
+                        nullErrorSetter: { addressError = $0 },
+                        nullErrorMessage: "Could not connect to the provided contract address."
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -444,6 +478,70 @@ struct WalletConnectionScreen: View {
                     } else {
                         addressError = msg
                     }
+                }
+            }
+        }
+    }
+
+    /// Handles a bridge connect result by routing to the right state update.
+    ///
+    /// - `nil`: invokes `nullErrorSetter` with `nullErrorMessage`.
+    /// - `result.connected != nil`: syncs app state, shows a toast, dismisses.
+    /// - `result.ambiguous != nil`: sets `ambiguousCandidates`, which triggers
+    ///   the picker sheet. Does NOT dismiss the screen.
+    private func handleBridgeResult(
+        _ result: WalletConnectionBridgeResult?,
+        nullErrorSetter: (String) -> Void,
+        nullErrorMessage: String
+    ) {
+        guard let result = result else {
+            nullErrorSetter(nullErrorMessage)
+            return
+        }
+        if result.connected != nil {
+            appState.sync(from: bridgeWrapper.bridge)
+            toastManager.show("Connected successfully")
+            dismiss()
+        } else if let ambiguous = result.ambiguous {
+            // Surface the candidates; the .sheet binding renders the picker.
+            // The credentialId is captured so the picker callback can finalize
+            // without a second WebAuthn prompt.
+            ambiguousState = AmbiguousState(
+                credentialId: ambiguous.credentialId,
+                candidates: ambiguous.candidates
+            )
+        } else {
+            // Bridge returned a non-null result with neither arm populated.
+            // This violates the bridge invariant; surface as a generic error.
+            nullErrorSetter(nullErrorMessage)
+        }
+    }
+
+    /// Finalizes a connect after the user picks a contract from the
+    /// ambiguous-result picker. Reuses the credential ID from the
+    /// authentication that produced the Ambiguous result, skipping a second
+    /// WebAuthn prompt.
+    private func performFinalizeConnect(credentialId: String, contractAddress: String) {
+        clearAllErrors()
+        activeSection = .address
+        Task {
+            do {
+                let result = try await bridgeWrapper.bridge.finalizeConnect(
+                    credentialId: credentialId,
+                    contractAddress: contractAddress
+                )
+                await MainActor.run {
+                    activeSection = nil
+                    handleBridgeResult(
+                        result,
+                        nullErrorSetter: { addressError = $0 },
+                        nullErrorMessage: "Could not connect to the selected wallet."
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    activeSection = nil
+                    addressError = error.localizedDescription
                 }
             }
         }
@@ -497,5 +595,122 @@ struct WalletConnectionScreen: View {
         } catch {
             // Non-fatal — the section simply stays hidden
         }
+    }
+}
+
+// MARK: - Contract picker sheet
+
+/// Sheet shown when a connect flow returns an `Ambiguous` bridge result.
+///
+/// The user picks one contract from the candidate list; the parent
+/// `WalletConnectionScreen` then re-runs the connect via
+/// `performAddressConnect(prefilledAddress:)` with the chosen address.
+private struct ContractPickerSheet: View {
+    let candidates: [String]
+    let onCancel: () -> Void
+    let onSelected: (String) -> Void
+
+    @State private var selected: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Select Wallet")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(Material3Colors.onSurface)
+
+            Text(
+                "This passkey is a signer on more than one wallet. " +
+                "Pick the one to connect."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(Material3Colors.onSurfaceVariant)
+
+            if candidates.isEmpty {
+                Text("No candidates available.")
+                    .font(.system(size: 13))
+                    .foregroundColor(Material3Colors.onSurfaceVariant)
+                    .padding(.vertical, 24)
+            } else {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(candidates, id: \.self) { address in
+                            ContractCandidateRow(
+                                address: address,
+                                isSelected: selected == address,
+                                onTap: { selected = address }
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 280)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("Connect") {
+                    if let selected = selected {
+                        onSelected(selected)
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selected == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .onAppear {
+            if selected == nil {
+                selected = candidates.first
+            }
+        }
+    }
+}
+
+private struct ContractCandidateRow: View {
+    let address: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: isSelected
+                ? "largecircle.fill.circle"
+                : "circle"
+            )
+            .foregroundColor(isSelected
+                ? Material3Colors.primary
+                : Material3Colors.onSurfaceVariant
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Smart Account")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Material3Colors.onSurface)
+                Text(truncate(address, prefixCount: 8, suffixCount: 8))
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(Material3Colors.onSurfaceVariant)
+            }
+
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected
+                    ? Material3Colors.primaryContainer.opacity(0.5)
+                    : Material3Colors.surfaceVariant.opacity(0.5)
+                )
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+    }
+
+    private func truncate(_ value: String, prefixCount: Int, suffixCount: Int) -> String {
+        guard value.count > prefixCount + suffixCount else { return value }
+        let prefix = value.prefix(prefixCount)
+        let suffix = value.suffix(suffixCount)
+        return "\(prefix)...\(suffix)"
     }
 }

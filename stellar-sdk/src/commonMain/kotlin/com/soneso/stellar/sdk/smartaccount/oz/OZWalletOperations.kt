@@ -105,18 +105,57 @@ data class DeployPendingResult(
 /**
  * Result of a wallet connection operation.
  *
- * Contains the credential ID, contract address, and whether the connection was
- * restored from a saved session.
+ * `connectWallet` and `connectWithCredentials` return one of two arms:
  *
- * @property credentialId The credential ID (Base64URL-encoded, no padding)
- * @property contractId The smart account contract address (C-address)
- * @property restoredFromSession Whether the connection was restored from a saved session
+ * - [Connected]: a single contract was resolved for the credential. The
+ *   connection state has been set on the kit and the session has been saved.
+ * - [Ambiguous]: the indexer reported multiple contracts for the credential
+ *   (the passkey is registered as a signer on more than one contract). The
+ *   connection state has NOT been set; the caller must let the user pick a
+ *   contract and re-call `connectWallet` (or `connectWithAddress` in the demo)
+ *   with the chosen contractId.
+ *
+ * `Ambiguous` is by-construction unreachable when an explicit `contractId` is
+ * supplied (the cascade is bypassed). The session-restore path inside
+ * `connectWallet` therefore always sees `Connected`.
  */
-data class ConnectWalletResult(
-    val credentialId: String,
-    val contractId: String,
-    val restoredFromSession: Boolean
-)
+sealed class ConnectWalletResult {
+
+    /**
+     * The credential ID (Base64URL-encoded, no padding).
+     */
+    abstract val credentialId: String
+
+    /**
+     * A single contract was resolved for the credential.
+     *
+     * The kit's connection state is set and the session has been saved.
+     *
+     * @property credentialId The credential ID (Base64URL-encoded, no padding)
+     * @property contractId The smart account contract address (C-address)
+     * @property restoredFromSession Whether the connection was restored from a saved session
+     */
+    data class Connected(
+        override val credentialId: String,
+        val contractId: String,
+        val restoredFromSession: Boolean
+    ) : ConnectWalletResult()
+
+    /**
+     * The indexer returned more than one contract for the credential.
+     *
+     * The kit's connection state is NOT set. The caller is expected to let
+     * the user select a contract from [candidates] and re-connect with the
+     * chosen `contractId`.
+     *
+     * @property credentialId The credential ID (Base64URL-encoded, no padding)
+     * @property candidates Contract addresses (C-addresses) returned by the indexer
+     */
+    data class Ambiguous(
+        override val credentialId: String,
+        val candidates: List<String>
+    ) : ConnectWalletResult()
+}
 
 /**
  * Result of standalone passkey authentication.
@@ -542,25 +581,44 @@ class OZWalletOperations internal constructor(
      * session exists and neither [ConnectWalletOptions.prompt] nor
      * [ConnectWalletOptions.fresh] is set.
      *
+     * The non-null result is one of two sealed arms:
+     * - [ConnectWalletResult.Connected]: a single contract was resolved, the
+     *   kit's connected state has been set, and a session has been saved.
+     * - [ConnectWalletResult.Ambiguous]: the indexer reported multiple
+     *   contracts where the passkey is registered as a signer. The connected
+     *   state has NOT been set; the caller must let the user pick a contract
+     *   and re-call `connectWallet(ConnectWalletOptions(credentialId,
+     *   contractId = chosen))` to finalize.
+     *
      * Connection flow:
-     * 1. If credentialId/contractId provided: direct connect (always returns non-null)
-     * 2. If fresh = true: skip session, trigger WebAuthn authentication
-     * 3. Otherwise, check storage for a valid (non-expired) session
-     * 4. If valid session found: verify contract on-chain and reconnect (clears stale sessions)
-     * 5. If no valid session and prompt = false: return null
-     * 6. If no valid session and prompt = true: trigger WebAuthn authentication
-     * 7. Look up contract address via storage, indexer, or on-chain derivation
-     * 8. Save session, set kit connected state, return result
+     * 1. If credentialId/contractId provided: direct connect via [connectWithCredentials].
+     * 2. If fresh = true: skip session, trigger WebAuthn authentication.
+     * 3. Otherwise, check storage for a valid (non-expired) session. If a
+     *    valid session is found, verify the contract on-chain and reconnect.
+     *    If verification returns NotFound (contract is not on-chain), clear
+     *    the stale session and continue. Other exceptions during session
+     *    verification propagate (the saved session is preserved so the user
+     *    can retry once their network is healthy).
+     * 4. If no valid session and prompt = false: return null.
+     * 5. If no valid session and prompt = true: trigger WebAuthn authentication.
+     * 6. Resolve the contract via the cascade: storage → derivation → indexer.
+     *    Storage with FAILED deployment status throws with a recovery hint.
+     *    Derivation under the configured deployer is checked on-chain; if
+     *    the address has no contract, falls through to the indexer. Indexer
+     *    returns 0 / 1 / N>1 contracts mapping to NotFound / Connected /
+     *    Ambiguous respectively.
+     * 7. On Connected: save session, set kit connected state, return.
+     *    On Ambiguous: return early without saving a session.
      *
      * ## Connection Options
      *
      * **Silent Session Check (default)**
      * ```kotlin
      * val result = walletOps.connectWallet()
-     * if (result != null) {
-     *     println("Connected: ${result.contractId}")
-     * } else {
-     *     println("No active session - show login UI")
+     * when (result) {
+     *     null -> println("No active session - show login UI")
+     *     is ConnectWalletResult.Connected -> println("Connected: ${result.contractId}")
+     *     is ConnectWalletResult.Ambiguous -> { /* unreachable for the silent path */ }
      * }
      * ```
      *
@@ -569,7 +627,11 @@ class OZWalletOperations internal constructor(
      * val result = walletOps.connectWallet(
      *     ConnectWalletOptions(prompt = true)
      * )
-     * // Restores session if valid, prompts WebAuthn if not
+     * when (result) {
+     *     null -> { /* unreachable when prompt = true */ }
+     *     is ConnectWalletResult.Connected -> println("Connected: ${result.contractId}")
+     *     is ConnectWalletResult.Ambiguous -> showPicker(result.candidates)
+     * }
      * ```
      *
      * **Direct Connection**
@@ -580,7 +642,8 @@ class OZWalletOperations internal constructor(
      *         contractId = "CABC..."
      *     )
      * )
-     * // Connects directly without WebAuthn or session check
+     * // Explicit contractId bypasses the cascade. The non-null result is
+     * // always Connected; Ambiguous is by-construction unreachable.
      * ```
      *
      * **Force Fresh Authentication**
@@ -588,19 +651,35 @@ class OZWalletOperations internal constructor(
      * val result = walletOps.connectWallet(
      *     ConnectWalletOptions(fresh = true)
      * )
-     * // Always prompts WebAuthn, ignoring any saved session
+     * // Always prompts WebAuthn, ignoring any saved session.
      * ```
      *
      * IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config
      * when WebAuthn authentication is needed (prompt = true or fresh = true).
      *
-     * @param options Connection options controlling the flow behavior
-     * @return ConnectWalletResult on success, or null if no session and prompt is false
-     * @throws WebAuthnException if authentication fails or no provider configured
-     * @throws WalletException if wallet not found
-     * @throws ValidationException if options are invalid (e.g., contractId without credentialId)
+     * @param options Connection options controlling the flow behavior.
+     * @return [ConnectWalletResult] on success, or null if no session and
+     *   prompt is false.
+     * @throws WebAuthnException if WebAuthn authentication fails or no
+     *   provider is configured.
+     * @throws WalletException.NotFound if no contract can be resolved for
+     *   the credential (e.g. a FAILED storage entry, no on-chain contract
+     *   at the derived address, or the indexer reports zero contracts).
+     * @throws ValidationException if options are invalid (e.g. contractId
+     *   without credentialId), or if the configured deployer's public key
+     *   is malformed.
+     * @throws TransactionException if XDR encoding of the contract-id
+     *   preimage fails (an internal SDK bug).
+     * @throws com.soneso.stellar.sdk.rpc.SorobanRpcException if a Soroban
+     *   RPC call (e.g. the on-chain `verifyContractExists` check) fails
+     *   for transport / server reasons. RPC errors propagate as their
+     *   original type rather than being laundered to NotFound, so callers
+     *   can distinguish "contract is not on-chain" from "lookup was
+     *   inconclusive."
+     * @throws com.soneso.stellar.sdk.smartaccount.core.IndexerException
+     *   if the indexer call fails for transport / server reasons.
      *
-     * @see ConnectWalletOptions for detailed option descriptions and the decision matrix
+     * @see ConnectWalletOptions for detailed option descriptions and the decision matrix.
      */
     suspend fun connectWallet(
         options: ConnectWalletOptions = ConnectWalletOptions()
@@ -628,9 +707,27 @@ class OZWalletOperations internal constructor(
                         credentialId = session.credentialId,
                         contractId = session.contractId
                     )
-                    return result.copy(restoredFromSession = true)
+                    // The session-restore path supplies an explicit contractId,
+                    // which bypasses the cascade in connectWithCredentials. The
+                    // result is therefore always Connected; Ambiguous is by
+                    // construction unreachable here.
+                    return when (result) {
+                        is ConnectWalletResult.Connected -> result.copy(restoredFromSession = true)
+                        is ConnectWalletResult.Ambiguous -> error(
+                            "Unreachable: connectWithCredentials with explicit contractId never returns Ambiguous"
+                        )
+                    }
                 } catch (_: WalletException.NotFound) {
-                    // Contract no longer exists on-chain (expired TTL) - clear stale session
+                    // The stored contract is not on-chain (it was never
+                    // deployed, or the saved contractId is malformed). Clear
+                    // the stale session and fall through. Archived contracts
+                    // do not trigger this branch -- the RPC's
+                    // getLedgerEntries returns archived entries as real
+                    // entries, so verifyContractExists passes for them.
+                    //
+                    // Other exceptions (network/RPC errors) propagate to the
+                    // caller; the saved session is preserved so the user can
+                    // retry once their network is healthy.
                     try {
                         kit.getStorage().clearSession()
                     } catch (_: Exception) {
@@ -687,59 +784,126 @@ class OZWalletOperations internal constructor(
         // STEP 5: Base64URL-encode credential ID
         val credentialIdBase64url = Util.base64urlEncode(authenticationResult.credentialId)
 
-        // STEP 6: Look up contract ID
+        // STEP 6: Look up contract ID via cascade: storage -> derivation -> indexer.
+        //
+        // Storage hit means deployment is PENDING or FAILED (successful deploys
+        // delete the credential). FAILED entries throw with a recovery hint;
+        // PENDING entries are trusted without an on-chain re-verify here.
+        //
+        // Derivation finds "the contract this passkey deployed under our
+        // configured deployer." Exceptions from deriveContractAddress
+        // (ValidationException.InvalidAddress for a malformed deployer
+        // config, TransactionException.SigningFailed for an internal
+        // encoding bug) propagate as their original types so the developer
+        // sees the actual cause rather than a misleading "not found."
+        //
+        // If derivation succeeds and the address has no on-chain contract,
+        // the WalletException.NotFound thrown by verifyContractExists is
+        // caught and we fall through to the indexer. Other RPC / network
+        // errors during verification propagate as their original types so
+        // the caller knows the lookup was inconclusive.
+        //
+        // Indexer fallback: returns contracts where the passkey is registered
+        // as a signer, sourced from on-chain signer_registered events
+        // (emitted both at deploy time and on add_signer). It is reached
+        // when derivation produces no on-chain contract -- typically because
+        // the passkey was added as a signer to an existing wallet, or the
+        // wallet was originally deployed under a different deployer than the
+        // one configured here. N=0 means not found; N=1 is verified on-chain
+        // for symmetry with the derivation arm; N>1 returns
+        // ConnectWalletResult.Ambiguous so the caller can let the user pick.
         var contractId: String? = null
 
-        // 6a. Check local storage
-        try {
-            val storedCredential = credentialManager.getCredential(credentialId = credentialIdBase64url)
-            if (storedCredential != null) {
-                contractId = storedCredential.contractId
-            }
+        // 6a. Storage
+        val storedCredential = try {
+            credentialManager.getCredential(credentialId = credentialIdBase64url)
         } catch (_: Exception) {
-            // Storage lookup failed - continue to indexer
+            null
+        }
+        if (storedCredential != null) {
+            if (storedCredential.deploymentStatus == CredentialDeploymentStatus.FAILED) {
+                throw WalletException.notFound(
+                    "Smart account deployment previously failed for credential $credentialIdBase64url. " +
+                    "Call deployPendingCredential() to retry, or deleteCredential() to start over."
+                )
+            }
+            contractId = storedCredential.contractId
         }
 
-        // 6b. If not found and indexer configured: call indexer
+        // 6b. Derivation: derive the deterministic address and check it on-chain.
+        if (contractId == null) {
+            val deployer = kit.getDeployer()
+            val derivedContractId = SmartAccountUtils.deriveContractAddress(
+                credentialId = authenticationResult.credentialId,
+                deployerPublicKey = deployer.getAccountId(),
+                networkPassphrase = kit.config.networkPassphrase
+            )
+
+            try {
+                verifyContractExists(derivedContractId)
+                contractId = derivedContractId
+            } catch (_: WalletException.NotFound) {
+                // Address is well-formed but no contract is deployed there.
+                // Typically this means the passkey was added as a signer to
+                // an existing wallet (rather than deploying its own under our
+                // configured deployer). Fall through to the indexer for
+                // discovery.
+            }
+            // Any other exception from verifyContractExists (network/RPC) propagates.
+        }
+
+        // 6c. Indexer fallback: discover contracts where the passkey is registered.
         if (contractId == null) {
             val indexer = kit.indexerClient
-            if (indexer != null) {
-                try {
-                    val lookupResponse = indexer.lookupByCredentialId(credentialIdBase64url)
-                    if (lookupResponse.contracts.isNotEmpty()) {
-                        contractId = lookupResponse.contracts.first().contractId
-                    }
-                } catch (_: Exception) {
-                    // Indexer lookup failed - continue to derivation
+                ?: throw WalletException.notFound(
+                    "Could not resolve contract for credential $credentialIdBase64url. " +
+                    "No contract was found at the derived address and no indexer is configured."
+                )
+
+            val candidates = indexer.lookupByCredentialId(credentialIdBase64url).contracts
+            when (candidates.size) {
+                0 -> throw WalletException.notFound(
+                    "No contract found for credential $credentialIdBase64url."
+                )
+                1 -> {
+                    val candidate = candidates.first().contractId
+                    verifyContractExists(candidate)
+                    contractId = candidate
+                }
+                else -> {
+                    // Multiple contracts list this passkey as a signer. We do
+                    // not pick one for the user -- return Ambiguous and let
+                    // the caller render a picker. Connection state is NOT set.
+                    return ConnectWalletResult.Ambiguous(
+                        credentialId = credentialIdBase64url,
+                        candidates = candidates.map { it.contractId }
+                    )
                 }
             }
         }
 
-        // 6c. If still not found: derive contract address and verify on-chain
-        if (contractId == null) {
-            val deployer = kit.getDeployer()
-            val derivedContractId = try {
-                SmartAccountUtils.deriveContractAddress(
-                    credentialId = authenticationResult.credentialId,
-                    deployerPublicKey = deployer.getAccountId(),
-                    networkPassphrase = kit.config.networkPassphrase
-                )
-            } catch (e: Exception) {
-                throw WalletException.notFound(
-                    "Failed to derive contract address: ${e.message}"
-                )
-            }
+        // The cascade above either set contractId to a non-null value or
+        // exited via throw / early return; the compiler smart-casts contractId
+        // to String here.
+        val finalContractId: String = contractId
 
-            // Verify contract exists by checking for its instance ledger entry
-            verifyContractExists(derivedContractId)
+        // End-of-cascade on-chain verify. For the Stage B derivation arm and
+        // the Stage C N=1 arm this is a redundant repeat of the per-stage
+        // verify. For the Stage A storage-hit arm (PENDING credential) it is
+        // the only verification, and catches the "credential is in storage
+        // but the deploy never landed on-chain" case (otherwise the user
+        // would silently connect to a non-existent contract and the next
+        // operation would fail confusingly). Mirrors connectWithCredentials.
+        verifyContractExists(finalContractId)
 
-            contractId = derivedContractId
+        // Delete transitional credential from storage after on-chain
+        // verification. No-ops cleanly when storage didn't have an entry
+        // (Stage B / Stage C paths).
+        try {
+            credentialManager.deleteCredential(credentialId = credentialIdBase64url)
+        } catch (_: Exception) {
+            // Non-critical - credential is transitional
         }
-
-        val finalContractId = contractId
-            ?: throw WalletException.notFound(
-                "Failed to resolve contract address for credential ID: $credentialIdBase64url"
-            )
 
         // Set connected state
         kit.setConnectedState(
@@ -756,7 +920,7 @@ class OZWalletOperations internal constructor(
 
         saveSession(credentialId = credentialIdBase64url, contractId = finalContractId)
 
-        return ConnectWalletResult(
+        return ConnectWalletResult.Connected(
             credentialId = credentialIdBase64url,
             contractId = finalContractId,
             restoredFromSession = false
@@ -914,26 +1078,64 @@ class OZWalletOperations internal constructor(
 
 
     /**
-     * Connects to a wallet using explicit credential ID and contract ID.
+     * Connects to a wallet using an explicit credential ID and / or contract ID.
      *
-     * This is a helper function used by connectWallet when credentialId
-     * or contractId options are provided. It skips session restoration
-     * and WebAuthn authentication, directly connecting to the specified
-     * credential/contract.
+     * Helper used by [connectWallet] when [ConnectWalletOptions.credentialId]
+     * or [ConnectWalletOptions.contractId] is provided, and by the
+     * session-restore path inside [connectWallet] STEP 2. Skips WebAuthn
+     * authentication and session restore (those are the caller's
+     * responsibility).
      *
-     * Flow:
-     * 1. If credentialId provided, look up contract ID from storage or derive it
-     * 2. If contractId provided without credentialId, throw validation error
-     * 3. Verify contract exists on-chain
-     * 4. Save new session
-     * 5. Set kit connected state
-     * 6. Return result
+     * Behavior depends on which arguments are non-null:
+     * - **Both provided** (`credentialId` and `contractId`): the cascade is
+     *   bypassed entirely. The supplied `contractId` is used directly. The
+     *   on-chain verification at the end of the function catches the case
+     *   where the explicit contract address does not exist on-chain. The
+     *   result is always [ConnectWalletResult.Connected];
+     *   [ConnectWalletResult.Ambiguous] is by construction unreachable.
+     * - **`credentialId` only** (no `contractId`): runs the
+     *   storage → derivation → indexer cascade.
+     *   - Stage A (storage): a credential with PENDING status is trusted;
+     *     FAILED throws with a recovery hint pointing at
+     *     [deployPendingCredential] or [deleteCredential].
+     *   - Stage B (derivation): derives the deterministic address under the
+     *     configured deployer and verifies it on-chain. NotFound from
+     *     verification falls through to the indexer; other RPC errors
+     *     propagate.
+     *   - Stage C (indexer): looks up contracts where the passkey is
+     *     registered. Returns [ConnectWalletResult.Connected] for N=1 (with
+     *     on-chain verify) and [ConnectWalletResult.Ambiguous] for N>1.
      *
-     * @param credentialId The credential ID (Base64URL-encoded), optional
-     * @param contractId The contract ID (C-address), optional
-     * @return ConnectWalletResult with restoredFromSession = false
-     * @throws ValidationException if contractId provided without credentialId
-     * @throws WalletException if wallet not found or contract doesn't exist
+     * After a successful resolution, the function:
+     * 1. Verifies the contract on-chain (catches the explicit-contractId case
+     *    where the caller passed an address that does not exist on-chain).
+     * 2. Deletes any transitional credential from storage (PENDING entries
+     *    are removed once the contract is confirmed live).
+     * 3. Sets the kit's connected state and saves a session.
+     *
+     * @param credentialId The credential ID (Base64URL-encoded), optional.
+     * @param contractId The contract ID (C-address), optional. Must be
+     *   accompanied by `credentialId` if provided.
+     * @return [ConnectWalletResult.Connected] when a single contract is
+     *   resolved, or [ConnectWalletResult.Ambiguous] when the indexer
+     *   reports multiple contracts (cascade path only).
+     * @throws ValidationException if `contractId` is provided without
+     *   `credentialId`, or if the configured deployer's public key is
+     *   malformed (the latter is from `deriveContractAddress`).
+     * @throws WalletException.NotFound if the contract can't be resolved
+     *   (FAILED storage entry, no on-chain contract at the derived address,
+     *   indexer returns zero results, or the explicit `contractId` is not
+     *   on-chain).
+     * @throws TransactionException if XDR encoding of the contract-id
+     *   preimage fails (an internal SDK bug).
+     * @throws com.soneso.stellar.sdk.rpc.SorobanRpcException if a Soroban
+     *   RPC call (e.g. the on-chain `verifyContractExists` check) fails
+     *   for transport / server reasons. RPC errors propagate as their
+     *   original type rather than being laundered to NotFound, so callers
+     *   can distinguish "contract is not on-chain" from "lookup was
+     *   inconclusive."
+     * @throws com.soneso.stellar.sdk.smartaccount.core.IndexerException
+     *   if the indexer call fails for transport / server reasons.
      */
     private suspend fun connectWithCredentials(
         credentialId: String?,
@@ -947,45 +1149,52 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        val finalCredentialId = credentialId
+        // contractId is reassigned during the cascade so it needs a local var;
+        // credentialId is read-only and used as the function parameter directly.
         var finalContractId = contractId
 
-        // If credentialId provided, look up contract ID if not provided
-        if (finalCredentialId != null) {
-            // Look up in storage first
-            if (finalContractId == null) {
-                try {
-                    val storedCredential = credentialManager.getCredential(credentialId = finalCredentialId)
-                    if (storedCredential != null) {
-                        finalContractId = storedCredential.contractId
-                    }
-                } catch (_: Exception) {
-                    // Storage lookup failed - continue to indexer
+        // When credentialId is provided without contractId, run the cascade:
+        // storage -> derivation -> indexer. When contractId is provided, the
+        // cascade is bypassed entirely (caller-supplied contractId wins) and
+        // Ambiguous is by-construction unreachable.
+        if (credentialId != null && finalContractId == null) {
+
+            // Stage A: Storage. A storage hit means deployment is PENDING or
+            // FAILED (successful deploy deletes the credential). FAILED entries
+            // throw with a recovery hint; PENDING entries are trusted without
+            // an on-chain re-verify here.
+            val storedCredential = try {
+                credentialManager.getCredential(credentialId = credentialId)
+            } catch (_: Exception) {
+                null
+            }
+            if (storedCredential != null) {
+                if (storedCredential.deploymentStatus == CredentialDeploymentStatus.FAILED) {
+                    throw WalletException.notFound(
+                        "Smart account deployment previously failed for credential $credentialId. " +
+                        "Call deployPendingCredential() to retry, or deleteCredential() to start over."
+                    )
                 }
+                finalContractId = storedCredential.contractId
             }
 
-            // If not found, try indexer
-            if (finalContractId == null) {
-                val indexer = kit.indexerClient
-                if (indexer != null) {
-                    try {
-                        val lookupResponse = indexer.lookupByCredentialId(finalCredentialId)
-                        if (lookupResponse.contracts.isNotEmpty()) {
-                            finalContractId = lookupResponse.contracts.first().contractId
-                        }
-                    } catch (_: Exception) {
-                        // Indexer lookup failed - continue to derivation
-                    }
-                }
-            }
-
-            // If still not found, derive contract address
+            // Stage B: Derivation. Derive the deterministic address and check
+            // it on-chain. Exceptions from deriveContractAddress
+            // (ValidationException.InvalidAddress for a malformed deployer
+            // config, TransactionException.SigningFailed for an internal
+            // encoding bug) propagate as their original types.
+            //
+            // NotFound from verifyContractExists falls through to the indexer
+            // (the passkey was added as a signer to an existing wallet rather
+            // than deploying its own under our configured deployer). Other
+            // RPC errors during verification propagate as their original types
+            // so the caller knows the lookup was inconclusive.
             if (finalContractId == null) {
                 val deployer = kit.getDeployer()
 
                 // Decode Base64URL credential ID to raw bytes
                 val credentialIdBytes = try {
-                    Util.base64urlDecode(finalCredentialId)
+                    Util.base64urlDecode(credentialId)
                 } catch (_: IllegalArgumentException) {
                     throw ValidationException.invalidInput(
                         "credentialId",
@@ -993,54 +1202,94 @@ class OZWalletOperations internal constructor(
                     )
                 }
 
-                finalContractId = try {
-                    SmartAccountUtils.deriveContractAddress(
-                        credentialId = credentialIdBytes,
-                        deployerPublicKey = deployer.getAccountId(),
-                        networkPassphrase = kit.config.networkPassphrase
+                val derivedContractId = SmartAccountUtils.deriveContractAddress(
+                    credentialId = credentialIdBytes,
+                    deployerPublicKey = deployer.getAccountId(),
+                    networkPassphrase = kit.config.networkPassphrase
+                )
+
+                try {
+                    verifyContractExists(derivedContractId)
+                    finalContractId = derivedContractId
+                } catch (_: WalletException.NotFound) {
+                    // Address is well-formed but no contract is deployed there.
+                    // Typically the passkey was added as a signer to an
+                    // existing wallet rather than deploying its own under our
+                    // configured deployer. Fall through to the indexer.
+                }
+                // Any other exception from verifyContractExists propagates.
+            }
+
+            // Stage C: Indexer fallback.
+            if (finalContractId == null) {
+                val indexer = kit.indexerClient
+                    ?: throw WalletException.notFound(
+                        "Could not resolve contract for credential $credentialId. " +
+                        "No contract was found at the derived address and no indexer is configured."
                     )
-                } catch (e: Exception) {
-                    throw WalletException.notFound(
-                        "Failed to derive contract address: ${e.message}"
+
+                val candidates = indexer.lookupByCredentialId(credentialId).contracts
+                when (candidates.size) {
+                    0 -> throw WalletException.notFound(
+                        "No contract found for credential $credentialId."
                     )
+                    1 -> {
+                        val candidate = candidates.first().contractId
+                        verifyContractExists(candidate)
+                        finalContractId = candidate
+                    }
+                    else -> {
+                        // Multiple contracts list this passkey as a signer.
+                        // Return Ambiguous; do NOT set connected state, do
+                        // NOT delete the transitional credential.
+                        return ConnectWalletResult.Ambiguous(
+                            credentialId = credentialId,
+                            candidates = candidates.map { it.contractId }
+                        )
+                    }
                 }
             }
         }
 
         // At this point, we must have both credentialId and contractId
-        if (finalCredentialId == null || finalContractId == null) {
+        if (credentialId == null || finalContractId == null) {
             throw WalletException.notFound(
                 "Could not determine credential ID or contract ID"
             )
         }
 
-        // Verify contract exists on-chain by checking for its instance ledger entry
+        // Verify contract exists on-chain by checking for its instance ledger entry.
+        // For the storage-hit and explicit-contractId paths this is the only
+        // verification; for the derivation and indexer-N=1 paths it is a no-op
+        // repeat (already verified during the cascade) but kept for symmetry
+        // and to catch the explicit-contractId case where the caller passes a
+        // contract address that does not exist on-chain.
         verifyContractExists(finalContractId)
 
         // Delete transitional credential from storage after on-chain verification
         try {
-            credentialManager.deleteCredential(credentialId = finalCredentialId)
+            credentialManager.deleteCredential(credentialId = credentialId)
         } catch (_: Exception) {
             // Non-critical - credential is transitional
         }
 
         // Set connected state
         kit.setConnectedState(
-            credentialId = finalCredentialId,
+            credentialId = credentialId,
             contractId = finalContractId
         )
 
         kit.events.emit(
             SmartAccountEvent.WalletConnected(
                 contractId = finalContractId,
-                credentialId = finalCredentialId
+                credentialId = credentialId
             )
         )
 
-        saveSession(credentialId = finalCredentialId, contractId = finalContractId)
+        saveSession(credentialId = credentialId, contractId = finalContractId)
 
-        return ConnectWalletResult(
-            credentialId = finalCredentialId,
+        return ConnectWalletResult.Connected(
+            credentialId = credentialId,
             contractId = finalContractId,
             restoredFromSession = false
         )
@@ -1051,10 +1300,23 @@ class OZWalletOperations internal constructor(
     /**
      * Verifies a smart account contract exists on-chain by checking its instance ledger entry.
      *
-     * Uses `getContractData` with the contract instance key.
+     * Distinguishes three outcomes so callers can react correctly:
+     * - **Entry returned (live or archived)**: returns normally. The Soroban
+     *   RPC's `getLedgerEntries` returns archived entries as real entries
+     *   (with a TTL marker indicating archived state); a state-archived
+     *   contract therefore passes this check. The next operation against the
+     *   contract auto-restores the entry on Protocol 23+.
+     * - **Malformed address** (`IllegalArgumentException` from `Address(contractId)`)
+     *   or **no entry on-chain** (`getContractData` returns `null` because
+     *   the RPC reports the key as `NotFound`): throws [WalletException.NotFound].
+     *   Both mean "no contract exists at this address" -- a malformed
+     *   address by definition cannot have one.
+     * - **Lookup failed** (network / RPC exception from `SorobanServer.getContractData`):
+     *   the original exception propagates as its original type. The caller
+     *   knows the lookup was inconclusive rather than authoritatively "not found."
      *
      * @param contractId The contract address to verify
-     * @throws WalletException.NotFound if the contract does not exist
+     * @throws WalletException.NotFound if the contract does not exist on-chain
      */
     private suspend fun verifyContractExists(contractId: String) {
         val instanceEntry = try {
@@ -1063,9 +1325,10 @@ class OZWalletOperations internal constructor(
                 key = Scv.toLedgerKeyContractInstance(),
                 durability = SorobanServer.Durability.PERSISTENT
             )
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
+            // Malformed C-address. By definition no contract exists at it.
             throw WalletException.notFound(
-                "Contract not found at address: $contractId (${e.message})"
+                "Invalid contract address: $contractId (${e.message})"
             )
         }
 

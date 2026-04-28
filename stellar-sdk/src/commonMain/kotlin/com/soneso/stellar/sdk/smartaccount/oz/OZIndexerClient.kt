@@ -32,7 +32,8 @@ import kotlinx.serialization.json.*
  */
 @Serializable
 data class CredentialLookupResponse(
-    @SerialName("credential_id")
+    // Indexer's JSON uses the JS variable name (camelCase) at the top level,
+    // even though the inner contracts use snake_case column names.
     val credentialId: String,
     val contracts: List<IndexedContractSummary>,
     val count: Int
@@ -46,7 +47,7 @@ data class CredentialLookupResponse(
  */
 @Serializable
 data class AddressLookupResponse(
-    @SerialName("signer_address")
+    // Same camelCase top-level convention as CredentialLookupResponse.
     val signerAddress: String,
     val contracts: List<IndexedContractSummary>,
     val count: Int
@@ -59,10 +60,10 @@ data class AddressLookupResponse(
  */
 @Serializable
 data class ContractDetailsResponse(
-    @SerialName("contract_id")
+    // Indexer returns the top-level keys in camelCase (JS variable names);
+    // only the inner fields use snake_case (SQL column names).
     val contractId: String,
     val summary: IndexedContractSummary,
-    @SerialName("context_rules")
     val contextRules: List<IndexedContextRule>
 )
 

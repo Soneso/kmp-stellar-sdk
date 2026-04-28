@@ -168,19 +168,37 @@ val config = OZSmartAccountConfig(
 val kit = OZSmartAccountKit.create(config)
 
 // Phase 1: Silent restore at app launch (no biometric prompt)
-val result = kit.walletOperations.connectWallet()
-if (result != null) {
-    println("Reconnected to ${result.contractId}")
-} else {
-    // No saved session -- show a "Connect" button in the UI
+when (val result = kit.walletOperations.connectWallet()) {
+    null -> {
+        // No saved session -- show a "Connect" button in the UI
+    }
+    is ConnectWalletResult.Connected -> {
+        println("Reconnected to ${result.contractId}")
+    }
+    is ConnectWalletResult.Ambiguous -> {
+        // Unreachable for the silent restore path
+    }
 }
 
 // Phase 2: User taps "Connect" -- triggers WebAuthn if no session
-val connected = kit.walletOperations.connectWallet(
+val result = kit.walletOperations.connectWallet(
     OZWalletOperations.ConnectWalletOptions(prompt = true)
 )
-if (connected != null) {
-    println("Connected to ${connected.contractId}")
+when (result) {
+    null -> { /* unreachable when prompt = true */ }
+    is ConnectWalletResult.Connected -> println("Connected to ${result.contractId}")
+    is ConnectWalletResult.Ambiguous -> {
+        // Indexer reported multiple contracts for this passkey. Show a picker
+        // and reconnect with the chosen contract address (no second WebAuthn
+        // ceremony required because we re-use result.credentialId).
+        val chosen = showContractPicker(result.candidates)
+        kit.walletOperations.connectWallet(
+            OZWalletOperations.ConnectWalletOptions(
+                credentialId = result.credentialId,
+                contractId = chosen
+            )
+        )
+    }
 }
 ```
 
@@ -192,7 +210,7 @@ val connection = kit.walletOperations.connectWallet(
 )
 ```
 
-Connect directly with known credentials (skips WebAuthn and session check, always returns non-null):
+Connect directly with known credentials (skips WebAuthn and session check; the cascade is bypassed so the result is always `Connected` on success):
 
 ```kotlin
 val connection = kit.walletOperations.connectWallet(
