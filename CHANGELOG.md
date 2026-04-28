@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-04-28
+
+### Changed
+- **Smart-account connect: cascade order improved** (#24): The connection cascade now runs storage → derivation → indexer (was storage → indexer → derivation). When a passkey is registered as a signer on multiple smart accounts, multi-result indexer responses surface as the new `ConnectWalletResult.Ambiguous(candidates)` arm so the caller can let the user pick. Previously the indexer's first result (lex-first by contract address) was picked, with no signal that the choice was ambiguous.
+- **Breaking change** (#24): `ConnectWalletResult` is now a sealed type with `Connected` and `Ambiguous` arms. Direct field access (`result.contractId`) becomes a `when` switch.
+- **Breaking change** (#23): XDR constructor signatures changed for the five types affected by the discriminant fix — `TransactionResultResultXdr.Results`, `InnerResultPair`, `BucketEntryXdr.LiveEntry`, `ManageOfferSuccessResultOfferXdr.Offer`, `SCErrorXdr.Code` now take `discriminant` as the first constructor argument. High-level helper users (Horizon, RPC, `AssembledTransaction`, `ContractClient`) are unaffected.
+
+### Fixed
+- **XDR generator multi-case discriminant collapse** (#23): XDR unions where multiple discriminant cases shared one non-void payload were generated with the discriminant hardcoded to the first case. As a result `txFAILED` round-tripped as `txSUCCESS`, and all `SCError` types collapsed to `SCE_WASM_VM` (though the error code was correct). High-level helpers (Horizon `successful`, RPC `status`, `AssembledTransaction`, `ContractClient`) flow through JSON and were not affected. The bug surfaced for code that decoded `TransactionResultResultXdr.discriminant` directly or read Soroban contract errors via `Scv.fromError()` / `ContractSpec.scValToNative()`.
+- **Smart-account connect: FAILED-status credentials** (#24): A credential whose deployment previously failed silently connected to a non-existent contract. It now throws with a message pointing the user at `deployPendingCredential()` for retry.
+- **Smart-account connect: transport-error masking** (#24): RPC and indexer transport errors propagate as their original types instead of being laundered as "contract not found." Callers can now distinguish "contract is not on-chain" from "the lookup itself failed."
+- **Smart-account indexer JSON parsing** (#24): `OZIndexerClient` data classes (`CredentialLookupResponse`, `AddressLookupResponse`, `ContractDetailsResponse`) expected snake_case top-level fields, but the hosted indexer returns camelCase top-level keys (with snake_case for inner fields). Removed the incorrect `@SerialName` annotations on top-level fields. The previous cascade ordering swallowed the deserialization failure silently; the new ordering surfaced it.
+- **Test stability**: `testStoredCredential_equality` no longer flakes on slow JVM runners. Pinned `createdAt` explicitly in the test (the default `currentTimeMillis()` could produce different values for back-to-back constructions).
+
 ## [1.5.0] - 2026-04-14
 
 ### Changed

@@ -51,7 +51,7 @@ Smart accounts are in the same artifact as the rest of the KMP SDK:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.5.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.5.1")
 }
 ```
 
