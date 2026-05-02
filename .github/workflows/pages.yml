@@ -73,7 +73,7 @@ jobs:
           echo "Documentation copied to docs/api/$VERSION and docs/api/latest"
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
