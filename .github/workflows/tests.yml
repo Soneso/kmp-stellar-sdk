@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: always() && matrix.java == '25'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: stellar-sdk/build/reports/kover/reportJvmOnly.xml
