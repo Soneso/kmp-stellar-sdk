@@ -5,9 +5,12 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep31
 
 import com.soneso.stellar.sdk.sep.sep31.Sep31FeeDetails
+import com.soneso.stellar.sdk.sep.sep31.Sep31FeeDetailsDetails
 import com.soneso.stellar.sdk.sep.sep31.Sep31InfoResponse
 import com.soneso.stellar.sdk.sep.sep31.Sep31PostTransactionsResponse
+import com.soneso.stellar.sdk.sep.sep31.Sep31RefundPayment
 import com.soneso.stellar.sdk.sep.sep31.Sep31Refunds
+import com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo
 import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionResponse
 import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionStatus
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
@@ -15,11 +18,14 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class Sep31ResponseParsingTest {
 
@@ -496,6 +502,435 @@ class Sep31ResponseParsingTest {
     fun transactionStatus_fromString_caseSensitive_returnsNullForUppercase() = runTest {
         val result = Sep31TransactionStatus.fromString("COMPLETED")
         assertNull(result)
+    }
+
+    // ==================== Refunds defensive paths ====================
+
+    @Test
+    fun refunds_missingAmountRefunded_throwsSep31InvalidResponseException() = runTest {
+        val refundsJson = """{"amount_fee":"5.00","payments":[]}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), refundsJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31Refunds.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("amount_refunded") == true)
+    }
+
+    @Test
+    fun refunds_missingAmountFee_throwsSep31InvalidResponseException() = runTest {
+        val refundsJson = """{"amount_refunded":"10.00","payments":[]}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), refundsJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31Refunds.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("amount_fee") == true)
+    }
+
+    @Test
+    fun refunds_missingPayments_throwsSep31InvalidResponseException() = runTest {
+        val refundsJson = """{"amount_refunded":"10.00","amount_fee":"5.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), refundsJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31Refunds.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("payments") == true)
+    }
+
+    @Test
+    fun refunds_paymentsElementNotObject_throwsSep31InvalidResponseException() = runTest {
+        // payments array contains a string instead of a JSON object.
+        val refundsJson = """
+            {
+              "amount_refunded": "10.00",
+              "amount_fee": "5.00",
+              "payments": ["not-an-object"]
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), refundsJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31Refunds.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("Malformed") == true)
+    }
+
+    @Test
+    fun refunds_amountRefundedNotPrimitive_wrapsAsSep31InvalidResponseException() = runTest {
+        // amount_refunded is a JSON object instead of a primitive. The `jsonPrimitive`
+        // accessor throws IllegalArgumentException, which the outer IAE catch arm
+        // rewraps as Sep31InvalidResponseException.
+        val refunds = buildJsonObject {
+            put("amount_refunded", buildJsonObject {})
+            put("amount_fee", "5.00")
+        }
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31Refunds.fromJson(refunds)
+        }
+        assertTrue(
+            ex.message?.contains("Malformed SEP-31 refunds") == true,
+            "outer IAE catch must rewrap with the 'Malformed SEP-31 refunds' prefix; was: ${ex.message}",
+        )
+    }
+
+    // ==================== RefundPayment defensive paths ====================
+
+    @Test
+    fun refundPayment_missingId_throwsSep31InvalidResponseException() = runTest {
+        val paymentJson = """{"amount":"10.00","fee":"5.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), paymentJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31RefundPayment.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'id'") == true)
+    }
+
+    @Test
+    fun refundPayment_missingAmount_throwsSep31InvalidResponseException() = runTest {
+        val paymentJson = """{"id":"abc","fee":"5.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), paymentJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31RefundPayment.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'amount'") == true)
+    }
+
+    @Test
+    fun refundPayment_missingFee_throwsSep31InvalidResponseException() = runTest {
+        val paymentJson = """{"id":"abc","amount":"10.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), paymentJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31RefundPayment.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'fee'") == true)
+    }
+
+    @Test
+    fun refundPayment_idNotPrimitive_wrapsAsSep31InvalidResponseException() = runTest {
+        // `id` is a JSON object instead of a primitive. The `jsonPrimitive` accessor
+        // raises IllegalArgumentException, which the outer IAE catch arm rewraps.
+        val payment = buildJsonObject {
+            put("id", buildJsonObject {})
+            put("amount", "10.00")
+            put("fee", "5.00")
+        }
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31RefundPayment.fromJson(payment)
+        }
+        assertTrue(
+            ex.message?.contains("Malformed SEP-31 refund payment") == true,
+            "outer IAE catch must rewrap with the 'Malformed SEP-31 refund payment' prefix; was: ${ex.message}",
+        )
+    }
+
+    // ==================== FeeDetails defensive paths ====================
+
+    @Test
+    fun feeDetails_missingTotal_throwsSep31InvalidResponseException() = runTest {
+        val feeJson = """{"asset":"stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), feeJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetails.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'total'") == true)
+    }
+
+    @Test
+    fun feeDetails_missingAsset_throwsSep31InvalidResponseException() = runTest {
+        val feeJson = """{"total":"5.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), feeJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetails.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'asset'") == true)
+    }
+
+    @Test
+    fun feeDetails_detailsElementNotObject_throwsSep31InvalidResponseException() = runTest {
+        // details array contains a string instead of an object.
+        val feeJson = """
+            {
+              "total": "5.00",
+              "asset": "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+              "details": ["not-an-object"]
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), feeJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetails.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("Malformed") == true)
+    }
+
+    @Test
+    fun feeDetails_totalNotPrimitive_wrapsAsSep31InvalidResponseException() = runTest {
+        // `total` is a JSON object instead of a primitive. The `jsonPrimitive`
+        // accessor raises IllegalArgumentException; the outer IAE catch rewraps.
+        val fee = buildJsonObject {
+            put("total", buildJsonObject {})
+            put("asset", "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
+        }
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetails.fromJson(fee)
+        }
+        assertTrue(
+            ex.message?.contains("Malformed SEP-31 fee details") == true,
+            "outer IAE catch must rewrap with the 'Malformed SEP-31 fee details' prefix; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun feeDetails_detailsLineItemMissingField_throwsSep31InvalidResponseException() = runTest {
+        // A line item missing its `amount` field bubbles up through the outer map call
+        // because Sep31FeeDetailsDetails.fromJson throws Sep31InvalidResponseException
+        // and that is re-thrown by the outer catch block.
+        val feeJson = """
+            {
+              "total": "5.00",
+              "asset": "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+              "details": [{"name":"Service fee"}]
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), feeJson)
+        assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetails.fromJson(obj)
+        }
+    }
+
+    // ==================== FeeDetailsDetails defensive paths ====================
+
+    @Test
+    fun feeDetailsDetails_validJson_parsesNameAmountAndDescription() = runTest {
+        val lineJson = """{"name":"Service fee","amount":"8.00","description":"Anchor service charge"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), lineJson)
+        val line = Sep31FeeDetailsDetails.fromJson(obj)
+        assertEquals("Service fee", line.name)
+        assertEquals("8.00", line.amount)
+        assertEquals("Anchor service charge", line.description)
+    }
+
+    @Test
+    fun feeDetailsDetails_missingName_throwsSep31InvalidResponseException() = runTest {
+        val lineJson = """{"amount":"8.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), lineJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetailsDetails.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'name'") == true)
+    }
+
+    @Test
+    fun feeDetailsDetails_missingAmount_throwsSep31InvalidResponseException() = runTest {
+        val lineJson = """{"name":"Service fee"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), lineJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetailsDetails.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("'amount'") == true)
+    }
+
+    @Test
+    fun feeDetailsDetails_nameNotPrimitive_wrapsAsSep31InvalidResponseException() = runTest {
+        // `name` is a JSON object instead of a primitive — jsonPrimitive throws IAE
+        // which the outer IAE catch rewraps with the 'Malformed' prefix for line items.
+        val line = buildJsonObject {
+            put("name", buildJsonObject {})
+            put("amount", "5.00")
+        }
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31FeeDetailsDetails.fromJson(line)
+        }
+        assertTrue(
+            ex.message?.contains("Malformed SEP-31 fee details line item") == true,
+            "outer IAE catch must rewrap with the 'Malformed' line-item prefix; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun feeDetailsDetails_noDescription_parsesWithNullDescription() = runTest {
+        val lineJson = """{"name":"Service fee","amount":"8.00"}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), lineJson)
+        val line = Sep31FeeDetailsDetails.fromJson(obj)
+        assertEquals("Service fee", line.name)
+        assertEquals("8.00", line.amount)
+        assertNull(line.description)
+    }
+
+    // ==================== InfoResponse defensive paths ====================
+
+    @Test
+    fun infoResponse_missingReceive_returnsEmptyMap() = runTest {
+        val noReceiveJson = """{}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), noReceiveJson)
+        val response = Sep31InfoResponse.fromJson(obj)
+        assertEquals(emptyMap(), response.receiveAssets)
+    }
+
+    @Test
+    fun infoResponse_receiveEntryNotObject_throwsSep31InvalidResponseException() = runTest {
+        // Asset entry under `receive` is a string instead of a JSON object.
+        val badJson = """{"receive":{"USDC":"not-an-object"}}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), badJson)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            Sep31InfoResponse.fromJson(obj)
+        }
+        assertTrue(ex.message?.contains("Malformed entry") == true)
+        assertTrue(ex.message?.contains("USDC") == true)
+    }
+
+    @Test
+    fun receiveAssetInfo_deprecatedFieldsMapPresent_parsedToPrimitiveLeafMap() = runTest {
+        // The deprecated `fields` map in `receive[<code>]` must be parsed into a primitive-leaf
+        // `Map<String, Any?>` via jsonElementToAny. This exercises the `fieldsObject?.let { obj ->
+        // jsonElementToAny(obj) as Map<String, Any?> }` branch.
+        val withFields = """
+            {
+              "receive": {
+                "USDC": {
+                  "fields": {
+                    "transaction": {
+                      "receiver_account_number": {
+                        "description": "The receiver's bank account number"
+                      }
+                    }
+                  },
+                  "sep12": { "sender": { "types": {} }, "receiver": { "types": {} } }
+                }
+              }
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), withFields)
+        val response = Sep31InfoResponse.fromJson(obj)
+        val usdc = response.receiveAssets.getValue("USDC")
+        @Suppress("DEPRECATION")
+        val fields = usdc.fields
+        assertNotNull(fields)
+        assertNoJsonElementLeaves(fields)
+    }
+
+    @Test
+    fun infoResponse_receiveEntryMalformedSep12_throwsSep31InvalidResponseException() = runTest {
+        // sep12 object exists but `sender` is a string instead of an object, which
+        // forces extractTypes to fall through to the safe-cast branch (returns empty),
+        // but if the underlying tree is corrupted enough to surface IllegalArgumentException
+        // from kotlinx-serialization, the outer fromJson catches it and rethrows.
+        // Here we cover the standard malformed-receive path: a primitive at receive[code].
+        val badJson = """{"receive":{"USDC":true}}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), badJson)
+        assertFailsWith<Sep31InvalidResponseException> {
+            Sep31InfoResponse.fromJson(obj)
+        }
+    }
+
+    // ==================== PostTransactionsResponse defensive paths ====================
+
+    @Test
+    fun postTransactionsResponse_idFieldWrongType_throwsSep31InvalidResponseException() = runTest {
+        // `id` field is present but is an object instead of a primitive. `jsonPrimitive`
+        // throws IllegalArgumentException, which the outer catch block rewraps as
+        // Sep31InvalidResponseException.
+        val badResponse = buildJsonObject {
+            put("id", buildJsonObject {})
+        }
+        assertFailsWith<Sep31InvalidResponseException> {
+            Sep31PostTransactionsResponse.fromJson(badResponse)
+        }
+    }
+
+    // ==================== Sep31Sep12TypesInfo defensive paths ====================
+
+    @Test
+    fun sep12TypesInfo_emptyJson_returnsEmptyMaps() = runTest {
+        // No sender / receiver keys at all - extractTypes returns emptyMap on each side.
+        val emptyJson = """{}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), emptyJson)
+        val info = Sep31Sep12TypesInfo.fromJson(obj)
+        assertEquals(emptyMap(), info.senderTypes)
+        assertEquals(emptyMap(), info.receiverTypes)
+    }
+
+    @Test
+    fun sep12TypesInfo_senderTypesNotObject_skipsAndReturnsEmpty() = runTest {
+        // sender.types is a string; extractTypes returns emptyMap for that side.
+        val badJson = """{"sender":{"types":"not-an-object"},"receiver":{"types":{}}}"""
+        val obj = json.decodeFromString(JsonObject.serializer(), badJson)
+        val info = Sep31Sep12TypesInfo.fromJson(obj)
+        assertEquals(emptyMap(), info.senderTypes)
+        assertEquals(emptyMap(), info.receiverTypes)
+    }
+
+    @Test
+    fun sep12TypesInfo_typeEntryNotObject_silentlySkipped() = runTest {
+        // A type entry whose value is a primitive (not an object) is silently skipped.
+        val badJson = """
+            {
+              "sender": {
+                "types": {
+                  "sep31-sender": "not-an-object",
+                  "valid-type": { "description": "valid description" }
+                }
+              }
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), badJson)
+        val info = Sep31Sep12TypesInfo.fromJson(obj)
+        assertEquals(1, info.senderTypes.size)
+        assertEquals("valid description", info.senderTypes["valid-type"])
+    }
+
+    @Test
+    fun sep12TypesInfo_typeMissingDescription_silentlySkipped() = runTest {
+        // A type whose description field is absent or non-string is silently skipped.
+        val badJson = """
+            {
+              "sender": {
+                "types": {
+                  "no-desc-type": {},
+                  "valid-type": { "description": "valid description" }
+                }
+              }
+            }
+        """.trimIndent()
+        val obj = json.decodeFromString(JsonObject.serializer(), badJson)
+        val info = Sep31Sep12TypesInfo.fromJson(obj)
+        assertEquals(1, info.senderTypes.size)
+        assertEquals("valid description", info.senderTypes["valid-type"])
+    }
+
+    // ==================== TransactionResponse defensive paths ====================
+
+    @Test
+    fun transactionResponse_idFieldWrongType_throwsSep31InvalidResponseException() = runTest {
+        // `id` field is present but is a nested object. `jsonPrimitive` raises
+        // IllegalArgumentException which propagates through the outer catch and
+        // is rewrapped as Sep31InvalidResponseException.
+        val tx = buildJsonObject {
+            put("transaction", buildJsonObject {
+                put("id", buildJsonObject {})
+                put("status", "pending_sender")
+            })
+        }
+        assertFailsWith<Sep31InvalidResponseException> {
+            Sep31TransactionResponse.fromJson(tx)
+        }
+    }
+
+    @Test
+    fun transactionResponse_feeDetailsNested_propagatesNestedFailureAsSep31InvalidResponseException() = runTest {
+        // The transaction is otherwise valid but the nested fee_details object is missing
+        // required fields. The inner fromJson throws Sep31InvalidResponseException, which
+        // the outer try/catch re-throws unchanged.
+        val tx = buildJsonObject {
+            put("transaction", buildJsonObject {
+                put("id", "tx-1")
+                put("status", "completed")
+                put("fee_details", buildJsonObject {
+                    put("total", "5.00")
+                    // asset is missing
+                })
+            })
+        }
+        assertFailsWith<Sep31InvalidResponseException> {
+            Sep31TransactionResponse.fromJson(tx)
+        }
     }
 }
 

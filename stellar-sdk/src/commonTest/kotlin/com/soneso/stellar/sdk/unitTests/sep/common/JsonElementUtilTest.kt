@@ -192,6 +192,20 @@ class JsonElementUtilTest {
         assertEquals("100", result)
     }
 
+    @Test
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    fun jsonElementToAny_unquotedLiteralNonNumericNonBoolean_returnsRawContentString() = runTest {
+        // The fallback in jsonElementToAny returns `element.content` (String) when an
+        // unquoted JSON primitive can be parsed as neither Boolean, Long, nor Double.
+        // JsonUnquotedLiteral creates exactly this shape: isString=false with content
+        // that is not a parseable JSON number or boolean. This locks in the defensive
+        // string fallback at the end of the branch chain.
+        val literal = kotlinx.serialization.json.JsonUnquotedLiteral("not-a-number")
+        val result = jsonElementToAny(literal)
+        assertIs<String>(result)
+        assertEquals("not-a-number", result)
+    }
+
     // ==================== sanitizeAnchorString ====================
 
     private val jwtFixture = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig123"

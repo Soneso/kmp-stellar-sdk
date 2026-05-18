@@ -299,6 +299,110 @@ class Sep31ExceptionsTest {
         assertTrue(str.startsWith("SEP-31 error:"), "Base toString must use 'SEP-31 error:' prefix")
         assertTrue(str.contains("custom error"))
     }
+
+    // ==================== toString contract for typed exceptions ====================
+    //
+    // Each subclass overrides toString to produce a human-readable prefix that
+    // identifies the SEP-31 failure path. These tests pin the exact prefix per
+    // class so structured log consumers can rely on it.
+
+    @Test
+    fun unauthorized_toString_includesPrefixAndStatusCode() {
+        val ex = Sep31UnauthorizedException("missing token", statusCode = 401)
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 unauthorized"), "toString must mention SEP-31 unauthorized")
+        assertTrue(str.contains("401"), "toString must include status code")
+        assertTrue(str.contains("missing token"), "toString must include message")
+    }
+
+    @Test
+    fun forbidden_toString_includesPrefixAndStatusCode() {
+        val ex = Sep31ForbiddenException("denied", statusCode = 403)
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 forbidden"), "toString must mention SEP-31 forbidden")
+        assertTrue(str.contains("403"))
+        assertTrue(str.contains("denied"))
+    }
+
+    @Test
+    fun transactionNotFound_toString_includesPrefixAndStatusCode() {
+        val ex = Sep31TransactionNotFoundException("tx not found", statusCode = 404)
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 transaction not found"), "toString must mention transaction not found")
+        assertTrue(str.contains("404"))
+        assertTrue(str.contains("tx not found"))
+    }
+
+    @Test
+    fun callbackNotSupported_toString_includesPrefixAndStatusCode() {
+        val ex = Sep31TransactionCallbackNotSupportedException("not supported", statusCode = 404)
+        val str = ex.toString()
+        assertTrue(
+            str.contains("SEP-31 transaction callback not supported"),
+            "toString must mention callback not supported",
+        )
+        assertTrue(str.contains("404"))
+        assertTrue(str.contains("not supported"))
+    }
+
+    @Test
+    fun invalidResponse_toString_includesPrefixAndStatusCode() {
+        val ex = Sep31InvalidResponseException("malformed body", statusCode = 200)
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 invalid response"), "toString must mention invalid response")
+        assertTrue(str.contains("200"))
+        assertTrue(str.contains("malformed body"))
+    }
+
+    @Test
+    fun customerInfoNeeded_toString_includesTypeAndPrefix() {
+        val ex = Sep31CustomerInfoNeededException(type = "sep31-sender")
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 customer info needed"), "toString must mention customer info needed")
+        assertTrue(str.contains("sep31-sender"), "toString must echo the customer type")
+    }
+
+    @Test
+    fun customerInfoNeeded_toString_nullType_includesPrefixAndNullSentinel() {
+        val ex = Sep31CustomerInfoNeededException(type = null)
+        val str = ex.toString()
+        assertTrue(str.contains("SEP-31 customer info needed"))
+        // sanitizeAnchorString(null) returns its safe placeholder; we only require the prefix
+        // here so this assertion does not couple to the sanitizer's null-placeholder string.
+    }
+
+    @Test
+    fun transactionInfoNeeded_toString_includesFixedMessage() {
+        @Suppress("DEPRECATION")
+        val ex = Sep31TransactionInfoNeededException(fields = null)
+        val str = ex.toString()
+        assertTrue(
+            str.contains("SEP-31 transaction info needed"),
+            "toString must mention transaction info needed",
+        )
+        assertTrue(str.contains("fields"), "toString must reference fields hint")
+    }
+
+    @Test
+    fun customerInfoNeeded_toString_sanitizesControlCharsInType() {
+        // Control characters in the type field must not survive in toString; sanitizeAnchorString
+        // strips them. This locks in defense-in-depth against log injection.
+        val ex = Sep31CustomerInfoNeededException(type = "type[31m")
+        val str = ex.toString()
+        assertTrue(!str.contains(''), "control characters must be stripped")
+    }
+
+    @Test
+    fun badRequest_responseBodyExposed_onInstance() {
+        // Lock in that rawResponseBody is exposed verbatim on the exception so debug
+        // tooling can inspect bytes the anchor returned.
+        val ex = Sep31BadRequestException(
+            "invalid amount",
+            statusCode = 400,
+            rawResponseBody = "{\"error\":\"invalid amount\"}",
+        )
+        assertEquals("{\"error\":\"invalid amount\"}", ex.rawResponseBody)
+    }
 }
 
 /**

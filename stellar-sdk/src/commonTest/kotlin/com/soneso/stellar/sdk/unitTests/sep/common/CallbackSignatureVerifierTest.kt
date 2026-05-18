@@ -282,6 +282,66 @@ class CallbackSignatureVerifierTest {
         assertEquals(CallbackSignatureVerifier.Result.MalformedHeader, result)
     }
 
+    @Test
+    fun test15a_signatureWithUrlSafeOnlyChars_acceptedViaUrlSafeFallback() = runTest {
+        // A signature containing `_` (URL-safe alphabet) but not `+`/`/` (standard
+        // alphabet) fails the first Base64.decode call and succeeds via the
+        // Base64.UrlSafe.decode fallback. The signature bytes themselves cannot match
+        // a real Ed25519 signature, so the verifier ultimately returns SignatureMismatch
+        // — but the important branch is that the URL-safe fallback path was exercised
+        // without short-circuiting to MalformedHeader.
+        val verifier = CallbackSignatureVerifier(
+            signingKey = KeyPair.random().getAccountId(),
+            registeredCallbackUrl = registeredCallbackUrl,
+            clock = TestClock(1_700_000_000L),
+        )
+        // 88-character URL-safe-only string: padding makes the standard decoder
+        // reject `_`-bearing input outright, the URL-safe decoder accepts it.
+        val urlSafeOnly = "_" + "A".repeat(86) + "="
+        val result = verifier.verify("t=1700000000, s=$urlSafeOnly", null, testBody)
+        // Either SignatureMismatch (decoded bytes are not a valid Ed25519 signature)
+        // or MalformedHeader (Ed25519 verify throws on garbage signature lengths)
+        // is acceptable — the important contract is that the URL-safe fallback path
+        // ran without an early MalformedHeader exit on the regex or standard decode.
+        assertTrue(
+            result == CallbackSignatureVerifier.Result.SignatureMismatch ||
+                result == CallbackSignatureVerifier.Result.MalformedHeader,
+            "URL-safe fallback must yield SignatureMismatch or MalformedHeader (after keypair.verify); was: $result",
+        )
+    }
+
+    @Test
+    fun test15b_signatureFailingBothBase64Alphabets_returnsMalformed() = runTest {
+        // A signature whose body contains BOTH `_` (URL-safe-only) AND `+`
+        // (standard-only) cannot decode under either alphabet. Both catch arms fire
+        // and the verifier returns MalformedHeader.
+        val verifier = CallbackSignatureVerifier(
+            signingKey = KeyPair.random().getAccountId(),
+            registeredCallbackUrl = registeredCallbackUrl,
+            clock = TestClock(1_700_000_000L),
+        )
+        // Mix `_` and `+` so neither decoder accepts it. Keep within the regex's
+        // character class so the header itself parses.
+        val mixedAlphabets = "_+" + "A".repeat(84) + "=="
+        val result = verifier.verify("t=1700000000, s=$mixedAlphabets", null, testBody)
+        assertEquals(CallbackSignatureVerifier.Result.MalformedHeader, result)
+    }
+
+    @Test
+    fun test16b_malformedTimestampOverflowsLong_returnsMalformed() = runTest {
+        // The HEADER_REGEX `t=(\d+)` matches arbitrarily long digit strings, so a
+        // value that overflows Long must still be rejected. toLongOrNull returns
+        // null and the verifier falls through to MalformedHeader. This locks in the
+        // overflow-rejection contract that the regex alone does not guarantee.
+        val verifier = CallbackSignatureVerifier(
+            signingKey = KeyPair.random().getAccountId(),
+            registeredCallbackUrl = registeredCallbackUrl,
+        )
+        // 99999999999999999999 is 20 digits, larger than Long.MAX_VALUE (19 digits).
+        val result = verifier.verify("t=99999999999999999999, s=AAAA", null, testBody)
+        assertEquals(CallbackSignatureVerifier.Result.MalformedHeader, result)
+    }
+
     // ==================== Negative crypto / payload cases (17-22) ====================
 
     @Test

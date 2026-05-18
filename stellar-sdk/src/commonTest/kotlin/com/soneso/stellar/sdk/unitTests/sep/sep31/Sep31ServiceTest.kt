@@ -555,7 +555,9 @@ class Sep31ServiceTest {
         val response = service.postTransactions(request, jwt)
 
         assertEquals("11111111-1111-1111-1111-111111111111", response.id)
-        assertNotNull(response.stellarAccountId)
+        assertEquals("GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H", response.stellarAccountId)
+        assertEquals("id", response.stellarMemoType)
+        assertEquals("987654321", response.stellarMemo)
     }
 
     @Test
@@ -681,8 +683,14 @@ class Sep31ServiceTest {
     @Test
     fun postTransactions_sendsCustomHeaders() = runTest {
         var capturedCustomHeader: String? = null
+        var capturedAuthHeader: String? = null
+        var capturedBodyContentType: String? = null
         val client = mockClient(postTransactionsResponseJson) { request ->
             capturedCustomHeader = request.headers["X-Custom-Header"]
+            capturedAuthHeader = request.headers[HttpHeaders.Authorization]
+            // Ktor's ContentNegotiation plugin attaches Content-Type to the OutgoingContent,
+            // not to the request header bag, so we read it from request.body.contentType.
+            capturedBodyContentType = request.body.contentType?.toString()
         }
         val service = Sep31Service(
             serviceUrl = serviceUrl,
@@ -692,6 +700,12 @@ class Sep31ServiceTest {
         service.postTransactions(Sep31PostTransactionsRequest(100.0, "USDC", "SWIFT"), jwt)
 
         assertEquals("custom-value", capturedCustomHeader)
+        // Custom headers must not override the SDK-managed Authorization or the JSON body Content-Type.
+        assertEquals("Bearer $jwt", capturedAuthHeader)
+        assertTrue(
+            capturedBodyContentType?.startsWith("application/json") == true,
+            "POST body Content-Type must remain application/json; was: $capturedBodyContentType",
+        )
     }
 
     @Test
@@ -959,6 +973,7 @@ class Sep31ServiceTest {
             service.getTransaction(txId, jwt)
         }
         assertEquals(400, ex.statusCode)
+        assertTrue(ex.message?.contains("Something went wrong") == true, "anchor error string must surface in message; was: ${ex.message}")
     }
 
     @Test
@@ -968,6 +983,7 @@ class Sep31ServiceTest {
             service.getTransaction(txId, jwt)
         }
         assertEquals(401, ex.statusCode)
+        assertTrue(ex.message?.contains("unauthorized") == true, "anchor error string must surface in message; was: ${ex.message}")
     }
 
     @Test
@@ -977,6 +993,7 @@ class Sep31ServiceTest {
             service.getTransaction(txId, jwt)
         }
         assertEquals(403, ex.statusCode)
+        assertTrue(ex.message?.contains("forbidden") == true, "anchor error string must surface in message; was: ${ex.message}")
     }
 
     @Test
@@ -986,6 +1003,7 @@ class Sep31ServiceTest {
             service.getTransaction(txId, jwt)
         }
         assertEquals(404, ex.statusCode)
+        assertTrue(ex.message?.contains("not found") == true, "anchor error string must surface in message; was: ${ex.message}")
     }
 
     @Test
@@ -1086,6 +1104,10 @@ class Sep31ServiceTest {
 
         assertIs<Sep31TransactionResponse>(result)
         assertEquals("82fhs729f63dh0v4", result.id)
+        assertEquals("pending_sender", result.status)
+        assertEquals(3600L, result.statusEta)
+        assertEquals("18.34", result.amountIn)
+        assertEquals("18.24", result.amountOut)
     }
 
     @Test
@@ -1277,9 +1299,17 @@ class Sep31ServiceTest {
             }
         }
         val service = Sep31Service(serviceUrl, client)
-        assertFailsWith<Sep31InvalidResponseException> {
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
             service.getTransaction(txId, jwt)
         }
+        // Pre-read Content-Length check should mention the cap or oversized condition.
+        val msg = ex.message ?: ""
+        assertTrue(
+            msg.contains("too large", ignoreCase = true) || msg.contains("exceeds", ignoreCase = true) ||
+                msg.contains("oversized", ignoreCase = true) || msg.contains("cap", ignoreCase = true) ||
+                msg.contains("size", ignoreCase = true),
+            "oversized-body exception must explain the cap; was: $msg",
+        )
     }
 
     @Test
@@ -1316,9 +1346,542 @@ class Sep31ServiceTest {
                 contentType = "text/html; charset=utf-8",
             ),
         )
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        // Verifier must call out the unexpected media type so callers know it was a Content-Type
+        // mismatch, not a JSON parse failure or transport error.
+        assertTrue(
+            ex.message?.contains("Content-Type", ignoreCase = true) == true,
+            "exception must mention Content-Type; was: ${ex.message}",
+        )
+    }
+
+    // ==================== Sep31Service.fromDomain TOML fetch failure ====================
+
+    @Test
+    fun fromDomain_tomlFetchHttp500_throwsSep31ConfigurationException() = runTest {
+        // StellarToml.fromDomain raises when the TOML endpoint returns a non-2xx
+        // status. The outer try/catch in Sep31Service.fromDomain wraps any such
+        // exception in Sep31ConfigurationException with the underlying cause attached.
+        val engine = MockEngine { _ ->
+            respond(
+                content = "internal error",
+                status = HttpStatusCode.InternalServerError,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain"),
+            )
+        }
+        val tomlClient = HttpClient(engine)
+
+        val ex = assertFailsWith<Sep31ConfigurationException> {
+            Sep31Service.fromDomain("anchor.example.org", tomlClient)
+        }
+        assertNotNull(ex.message)
+        assertTrue(
+            ex.message!!.contains("stellar.toml") || ex.message!!.contains("SEP-31"),
+            "exception message must reference stellar.toml or SEP-31; was: ${ex.message}",
+        )
+        // The underlying TOML failure must propagate as the cause so callers can
+        // diagnose root cause.
+        assertNotNull(ex.cause, "cause must be set from the wrapped TOML failure")
+    }
+
+    // ==================== validatePathSegment percent-decode UTF-8 paths ====================
+    //
+    // The percent-decoder must accept syntactically-valid `%HH` sequences, then re-encode
+    // the surrounding String to UTF-8 bytes and decode strict-UTF-8. Multi-byte UTF-8
+    // sequences ultimately fail the RFC 3986 pchar regex (so the call raises
+    // IllegalArgumentException), but the bytes-side decoder paths must still be exercised
+    // so we have evidence the parser does not crash or silently accept malformed input.
+
+    @Test
+    fun getTransaction_idWithPercentEncoded2ByteUtf8_throwsIllegalArgumentException() = runTest {
+        // %C3%A9 is UTF-8 for U+00E9 (é). Hits the 2-byte UTF-8 decoder branch in
+        // decodeUtf8OrNull. The decoded é fails the ASCII-only pchar regex and is
+        // rejected as an invalid transaction id.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%C3%A9def", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithPercentEncoded3ByteUtf8_throwsIllegalArgumentException() = runTest {
+        // %E4%B8%AD is UTF-8 for U+4E2D (Chinese character "zhong"/中). Hits the 3-byte
+        // UTF-8 decoder branch.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%E4%B8%ADdef", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithPercentEncoded4ByteUtf8_throwsIllegalArgumentException() = runTest {
+        // %F0%90%80%80 is UTF-8 for U+10000 (the first non-BMP codepoint). Hits the
+        // 4-byte UTF-8 decoder branch AND the surrogate-pair output branch in the
+        // codepoint > 0xFFFF case.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%F0%90%80%80def", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithInvalidHexInPercentEscape_throwsIllegalArgumentException() = runTest {
+        // %ZZ has invalid hex digits; hexDigitValue returns null and decodePercentOnce
+        // returns null, surfacing as an invalid transaction id.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%ZZ", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithTruncatedPercentEscape_throwsIllegalArgumentException() = runTest {
+        // `%` not followed by exactly two characters. The early-exit at `i + 2 >= value.length`
+        // returns null from decodePercentOnce.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%a", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithInvalidUtf8Sequence_throwsIllegalArgumentException() = runTest {
+        // %C0%80 is an over-long encoding of U+0000 (NUL) — strict UTF-8 forbids it
+        // (the 2-byte decoder rejects code points below 0x80). decodeUtf8OrNull returns
+        // null, which bubbles up as IllegalArgumentException.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%C0%80", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithIncompleteMultiByteUtf8_throwsIllegalArgumentException() = runTest {
+        // %C3 alone is the lead byte of a 2-byte UTF-8 sequence without its continuation
+        // byte. decodeUtf8OrNull's `if (i + 1 >= bytes.size) return null` triggers.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%C3", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithBadContinuationByteIn4ByteUtf8_throwsIllegalArgumentException() = runTest {
+        // %F0%80%80%C0 — 4-byte UTF-8 lead byte followed by three would-be continuations,
+        // but the last byte %C0 has top bits 11 (not 10 as required). The check
+        // `b3 and 0xC0 != 0x80` fires inside the 4-byte decoder branch.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("%F0%80%80%C0", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithInvalidUtf8LeadByte_throwsIllegalArgumentException() = runTest {
+        // %F8 is in the 0xF8-0xFF range — outside every accepted UTF-8 lead-byte pattern.
+        // decodeUtf8OrNull's terminal `else -> return null` arm fires.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("%F8%80%80%80%80", jwt)
+        }
+    }
+
+    @Test
+    fun fromDomain_emptyDomain_throwsSep31ConfigurationException() = runTest {
+        // validateDomain rejects empty domain strings before any TOML fetch is attempted.
+        val ex = assertFailsWith<Sep31ConfigurationException> {
+            Sep31Service.fromDomain("")
+        }
+        assertNotNull(ex.message)
+    }
+
+    @Test
+    fun getTransaction_idWithNonAsciiCharAndPercentEscape_throwsIllegalArgumentException() = runTest {
+        // The input string contains BOTH a non-ASCII character (é, U+00E9) AND a percent
+        // escape (%41 = 'A'). The presence of '%' forces decodePercentOnce into its
+        // UTF-8 encoding loop; the non-ASCII char (codepoint 233, < 0x800) hits the
+        // 2-byte encoder branch. The combined output bytes fail the ASCII pchar regex.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            // Kotlin source: literal é and the percent-encoded 'A'.
+            service.getTransaction("é%41", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithBmp3ByteCharAndPercentEscape_throwsIllegalArgumentException() = runTest {
+        // BMP character above 0x800 (Chinese "zhong" / 中, codepoint 0x4E2D) plus a percent
+        // escape forces the 3-byte UTF-8 encoder branch in decodePercentOnce.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("中%41", jwt)
+        }
+    }
+
+    // ==================== dispatchPostTransactionsBadRequest JSON parse failure ====================
+
+    @Test
+    fun postTransactions_400MalformedJsonBody_fallsBackToGenericBadRequest() = runTest {
+        // The body claims to be JSON but is syntactically invalid. The catch arms in
+        // dispatchPostTransactionsBadRequest reduce `parsed` to null and the function
+        // falls through to the generic Sep31BadRequestException.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "not-a-valid-json-{",
+                statusCode = HttpStatusCode.BadRequest,
+            ),
+        )
+        val request = Sep31PostTransactionsRequest(
+            amount = 100.0,
+            assetCode = "USDC",
+            fundingMethod = "SWIFT",
+            senderId = "sender-1",
+            receiverId = "receiver-1",
+        )
+        val ex = assertFailsWith<Sep31BadRequestException> {
+            service.postTransactions(request, jwt)
+        }
+        assertEquals(400, ex.statusCode)
+    }
+
+    @Test
+    fun postTransactions_400JsonObjectButNotJsonObject_fallsBackToGenericBadRequest() = runTest {
+        // A valid JSON array at the top level (not a JSON object) causes the
+        // SerializationException-or-IAE catch in dispatchPostTransactionsBadRequest to
+        // null `parsed`. The fall-through then yields a generic Sep31BadRequestException.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "[\"error\",\"unexpected\"]",
+                statusCode = HttpStatusCode.BadRequest,
+            ),
+        )
+        val request = Sep31PostTransactionsRequest(
+            amount = 100.0,
+            assetCode = "USDC",
+            fundingMethod = "SWIFT",
+            senderId = "sender-1",
+            receiverId = "receiver-1",
+        )
+        val ex = assertFailsWith<Sep31BadRequestException> {
+            service.postTransactions(request, jwt)
+        }
+        assertEquals(400, ex.statusCode)
+    }
+
+    // ==================== readBoundedErrorContext: non-JSON Content-Type ====================
+
+    @Test
+    fun info_401WithTextPlainBody_returnsDefaultAuthFailureMessage() = runTest {
+        // 401 with `text/plain` Content-Type. readBoundedErrorContext detects the
+        // non-JSON content-type and returns DEFAULT_AUTH_FAILURE_MESSAGE without
+        // attempting to parse. rawResponseBody must be null because no body was captured.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "the wallet is on fire",
+                statusCode = HttpStatusCode.Unauthorized,
+                contentType = "text/plain; charset=utf-8",
+            ),
+        )
+        val ex = assertFailsWith<Sep31UnauthorizedException> {
+            service.info(jwt = jwt)
+        }
+        assertEquals(401, ex.statusCode)
+        assertNull(ex.rawResponseBody, "non-JSON 401 body must not be captured as rawResponseBody")
+    }
+
+    @Test
+    fun info_403WithTextPlainBody_returnsDefaultAuthFailureMessage() = runTest {
+        // Same non-JSON branch as the 401 case but routed through the Forbidden exception.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "denied",
+                statusCode = HttpStatusCode.Forbidden,
+                contentType = "text/plain; charset=utf-8",
+            ),
+        )
+        val ex = assertFailsWith<Sep31ForbiddenException> {
+            service.info(jwt = jwt)
+        }
+        assertEquals(403, ex.statusCode)
+        assertNull(ex.rawResponseBody)
+    }
+
+    @Test
+    fun info_401WithJsonContentTypeButOversizedBody_returnsDefaultAuthFailureMessage() = runTest {
+        // 401 with `application/json` Content-Type plus a Content-Length advertising
+        // a body larger than the 2 MB info cap. `readBoundedText` raises
+        // Sep31InvalidResponseException, which `readBoundedErrorContext`'s inner catch
+        // converts to the default auth-failure message and null rawResponseBody. This
+        // locks in the safe fallback for oversized error bodies.
+        val oversizeBytes = 3 * 1024 * 1024L // 3 MB - over the 2 MB info cap.
+        val engine = MockEngine { _ ->
+            respond(
+                content = "{\"error\":\"" + "x".repeat(oversizeBytes.toInt() - 12) + "\"}",
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                    HttpHeaders.ContentLength to listOf(oversizeBytes.toString()),
+                ),
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep31Service(serviceUrl, client)
+        val ex = assertFailsWith<Sep31UnauthorizedException> {
+            service.info(jwt = jwt)
+        }
+        assertEquals(401, ex.statusCode)
+        // Default message must surface (no body was successfully captured).
+        assertNull(ex.rawResponseBody)
+    }
+
+    // ==================== Content-Type validation paths ====================
+
+    @Test
+    fun info_200MissingContentType_throwsSep31InvalidResponseException() = runTest {
+        // No Content-Type header at all on a 200 response triggers the "missing
+        // Content-Type" branch in verifyJsonContentType.
+        val engine = MockEngine { _ ->
+            respond(
+                content = "{}",
+                status = HttpStatusCode.OK,
+                headers = headersOf(),
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep31Service(serviceUrl, client)
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertTrue(
+            ex.message?.contains("Content-Type") == true,
+            "exception message must mention Content-Type; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun info_200ApplicationProblemJsonContentType_acceptedAsJson() = runTest {
+        // `application/problem+json` is the RFC 7807 problem-details media type and is
+        // explicitly listed as an accepted content type. The 200 path must parse the
+        // body normally without raising on the unusual subtype.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                infoResponseJson,
+                statusCode = HttpStatusCode.OK,
+                contentType = "application/problem+json",
+            ),
+        )
+        val response = service.info(jwt = jwt)
+        assertNotNull(response.receiveAssets["USDC"])
+    }
+
+    @Test
+    fun info_200MalformedContentTypeHeader_throwsSep31InvalidResponseException() = runTest {
+        // `ContentType.parse` raises on a malformed Content-Type header (for example, no
+        // slash separator). The catch in isAcceptableContentType returns false and
+        // verifyJsonContentType raises Sep31InvalidResponseException.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "{}",
+                statusCode = HttpStatusCode.OK,
+                contentType = "not-a-valid-content-type-header",
+            ),
+        )
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertTrue(
+            ex.message?.contains("Content-Type") == true,
+            "exception message must mention Content-Type; was: ${ex.message}",
+        )
+    }
+
+    // ==================== parseJsonBody failure paths ====================
+
+    @Test
+    fun info_200MalformedJsonBody_throwsSep31InvalidResponseException() = runTest {
+        // 200 with `application/json` Content-Type but a body that does not parse as a
+        // JSON object surfaces as Sep31InvalidResponseException via the
+        // SerializationException catch in parseJsonBody.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "{not valid json",
+                statusCode = HttpStatusCode.OK,
+            ),
+        )
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertTrue(
+            ex.message?.contains("parse") == true || ex.message?.contains("decode") == true,
+            "exception message must indicate parse failure; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun info_200BodyIsJsonArrayNotObject_throwsSep31InvalidResponseException() = runTest {
+        // The body parses as a JSON value but not as a JSON object. SerializationException
+        // is raised when the strict JsonObject deserializer encounters an array.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "[1, 2, 3]",
+                statusCode = HttpStatusCode.OK,
+            ),
+        )
         assertFailsWith<Sep31InvalidResponseException> {
             service.info(jwt = jwt)
         }
+    }
+
+    @Test
+    fun info_200JsonObjectButFromJsonFails_wrapsAndIncludesRawBody() = runTest {
+        // A syntactically valid JSON object that the inner fromJson rejects (here, the
+        // `receive` map's value is a primitive instead of an object) surfaces as a
+        // Sep31InvalidResponseException with rawResponseBody populated by the outer
+        // parseJsonBody wrapper. This locks in that fromJson failures preserve the raw
+        // body for debugging.
+        val malformedBody = """{"receive":{"USDC":"not-an-object"}}"""
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                malformedBody,
+                statusCode = HttpStatusCode.OK,
+            ),
+        )
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertNotNull(ex.rawResponseBody, "rawResponseBody must be populated for fromJson failures")
+        assertTrue(
+            ex.rawResponseBody!!.contains("USDC"),
+            "rawResponseBody must carry the offending body; was: ${ex.rawResponseBody}",
+        )
+    }
+
+    // ==================== throwUnknownResponse: bounded-read failure ====================
+
+    @Test
+    fun service_500WithOversizedBody_throwsSep31UnknownResponseExceptionWithEmptyBody() = runTest {
+        // 500 with a Content-Length header that exceeds the per-endpoint cap forces
+        // throwUnknownResponse's `readBoundedText` to raise Sep31InvalidResponseException.
+        // The catch arm reduces the captured body to an empty string and the
+        // Sep31UnknownResponseException still carries the original 500 status.
+        val oversizeBytes = 3 * 1024 * 1024L // 3 MB - over the 2 MB info cap.
+        val engine = MockEngine { _ ->
+            respond(
+                content = "x".repeat(oversizeBytes.toInt()),
+                status = HttpStatusCode.InternalServerError,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                    HttpHeaders.ContentLength to listOf(oversizeBytes.toString()),
+                ),
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep31Service(serviceUrl, client)
+        val ex = assertFailsWith<Sep31UnknownResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertEquals(500, ex.statusCode)
+        // The body was rejected by the size cap, so neither the sanitized responseBody
+        // nor the raw debug-only body should leak the oversized content.
+        assertEquals("", ex.responseBody)
+        assertNull(ex.rawResponseBody)
+    }
+
+    // ==================== extractErrorMessage with non-JSON body ====================
+
+    @Test
+    fun getTransaction_400WithNonJsonAcceptableContent_treatsBodyAsError() = runTest {
+        // A 400 response whose JSON body is parseable but contains no `error` field.
+        // extractErrorMessage's `parsed?.get("error")` resolves to null and the body
+        // itself becomes the message after sanitization. Locks in the "missing error
+        // field" fallback path.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                """{"detail":"something else"}""",
+                statusCode = HttpStatusCode.BadRequest,
+            ),
+        )
+        val ex = assertFailsWith<Sep31BadRequestException> {
+            service.getTransaction(txId, jwt)
+        }
+        assertEquals(400, ex.statusCode)
+        // The fallback uses the body string itself (sanitized) as the error message.
+        assertTrue(
+            ex.message?.contains("detail") == true || ex.message?.contains("something else") == true,
+            "fallback message must derive from body content; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun getTransaction_400WithMalformedJsonBody_treatsBodyAsError() = runTest {
+        // 400 with malformed JSON. extractErrorMessage's SerializationException catch
+        // nulls `parsed`, and extractErrorMessageFromParsed falls back to the body
+        // itself (sanitized) as the error message.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "not-json-at-all",
+                statusCode = HttpStatusCode.BadRequest,
+            ),
+        )
+        val ex = assertFailsWith<Sep31BadRequestException> {
+            service.getTransaction(txId, jwt)
+        }
+        assertEquals(400, ex.statusCode)
+        assertTrue(
+            ex.message?.contains("not-json-at-all") == true,
+            "fallback must surface raw body when JSON parsing fails; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun getTransaction_400WithErrorFieldAsNestedObject_fallsBackToBodyMessage() = runTest {
+        // 400 with `error` as a nested JSON object. extractErrorMessageFromParsed's
+        // `parsed?.get("error")?.jsonPrimitive` raises IllegalArgumentException; the
+        // catch arm returns null and the final message falls back to the raw body.
+        val nestedErrorBody = """{"error":{"code":42,"detail":"complex error shape"}}"""
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                nestedErrorBody,
+                statusCode = HttpStatusCode.BadRequest,
+            ),
+        )
+        val ex = assertFailsWith<Sep31BadRequestException> {
+            service.getTransaction(txId, jwt)
+        }
+        assertEquals(400, ex.statusCode)
+        // The error field was non-primitive, so the helper falls back to the body
+        // string itself. The message must contain the body contents (sanitized).
+        assertTrue(
+            ex.message?.contains("error") == true ||
+                ex.message?.contains("complex error shape") == true,
+            "fallback must surface body contents when error field is non-primitive; was: ${ex.message}",
+        )
     }
 }
 

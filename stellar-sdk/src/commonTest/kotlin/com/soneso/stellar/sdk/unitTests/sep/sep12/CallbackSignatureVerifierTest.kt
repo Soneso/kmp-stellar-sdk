@@ -391,4 +391,28 @@ class CallbackSignatureVerifierTest {
 
         assertFalse(isValid)
     }
+
+    @Test
+    fun testDefaultMaxAgeSeconds_omittedParameter_invokesWithFiveMinuteDefault() = runTest {
+        // Calling the shim without the `maxAgeSeconds` argument exercises the
+        // default-parameter binding (= 300 seconds, 5 minutes). The signature payload
+        // is constructed with a current timestamp, so a 300-second freshness window
+        // is comfortably wide and the verification must succeed.
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        val payload = "$timestamp.$testHost.$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$timestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = testHost,
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            // maxAgeSeconds intentionally omitted — exercises default 300-second value.
+        )
+
+        assertTrue(isValid)
+    }
 }
