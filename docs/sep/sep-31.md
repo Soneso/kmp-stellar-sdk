@@ -608,71 +608,50 @@ suspend fun registerCallback() {
 }
 ```
 
-### Verifying callback signatures (consumer responsibility)
+### Verifying callback signatures
 
-The SDK exposes [putTransactionCallback] for registration but does **not** ship a callback verifier for SEP-31. Verifying incoming callbacks is the Sending Anchor application's responsibility.
+The SDK exposes [putTransactionCallback] for registration and [CallbackSignatureVerifier] (in `com.soneso.stellar.sdk.sep.common`) for verifying incoming callback signatures.
 
 > **Security callout — common implementation mistakes**
 >
 > 1. **Not verifying the signature at all.** An unsigned callback can be forged by any caller that knows the URL.
-> 2. **Verifying the signature but not the timestamp.** A captured-and-replayed payload remains cryptographically valid forever unless the timestamp is checked against a freshness window.
-> 3. **Incorrect canonicalization.** The signed payload is `$timestamp.$host.$body`. The body must be the byte-exact inbound request body, and `host` must come from the Sending Anchor's previously-registered callback URL — not from any inbound header.
-> 4. **Wrong `SIGNING_KEY` lookup.** The Receiving Anchor's stellar.toml `SIGNING_KEY` is the only correct verification key. Do not reuse the JWT-issuer key from SEP-10 — it may differ from `SIGNING_KEY`.
-> 5. **Treating callbacks as non-idempotent.** The same `(transaction_id, new_status)` may legitimately be delivered more than once when the Receiving Anchor retries. Consumer state machines must dedupe by `(transaction_id, status)` so duplicate state transitions and duplicate customer notifications are avoided.
+> 2. **Verifying the signature but not the timestamp.** The verifier handles freshness for you; do not override `freshnessSeconds` above 120 in production.
+> 3. **Incorrect canonicalization.** The verifier assembles the canonical payload internally.
+> 4. **Wrong `SIGNING_KEY` lookup.** The Receiving Anchor's stellar.toml `SIGNING_KEY` is the only correct verification key. Do not reuse the JWT-issuer key from SEP-10 — it may differ from `SIGNING_KEY`. You pass the key to the verifier's constructor.
+> 5. **Treating callbacks as non-idempotent.** The same `(transaction_id, new_status)` may legitimately be delivered more than once when the Receiving Anchor retries. Consumer state machines must dedupe by `(transaction_id, status)` so duplicate state transitions and duplicate customer notifications are avoided. The verifier returns `Valid` for legitimate retries by design.
 
-The Receiving Anchor sends the signature in either the `Signature` HTTP header (preferred) or the deprecated `X-Stellar-Signature` header. The example below parses both, preferring `Signature` when both are present.
+The Receiving Anchor sends the signature in either the `Signature` HTTP header (preferred) or the deprecated `X-Stellar-Signature` header. Pass both header values to the verifier; it prefers `Signature` when both are present.
 
 ```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import io.ktor.http.Url
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
 
-@OptIn(ExperimentalEncodingApi::class, ExperimentalTime::class)
+// `signingKey` is the Receiving Anchor's SIGNING_KEY from its stellar.toml.
+// Fetch once via `StellarToml.fromDomain(anchorDomain).generalInformation.signingKey`
+// and cache for the lifetime of the anchor connection — TOML rarely changes and
+// the fetch would otherwise add latency to every callback.
 suspend fun verifyCallback(
-    signatureHeader: String?,            // value of "Signature" header
-    xStellarSignatureHeader: String?,    // value of legacy "X-Stellar-Signature" header
-    body: String,                        // byte-exact inbound request body, UTF-8 decoded
-    registeredCallbackUrl: String,       // URL the Sending Anchor passed to putTransactionCallback
-    signingKey: String,                  // Receiving Anchor's SIGNING_KEY from its stellar.toml
+    signingKey: String,
+    signatureHeader: String?,
+    xStellarSignatureHeader: String?,
+    body: String,
 ): Boolean {
-    // Prefer the new "Signature" header when both are present.
-    val header = signatureHeader ?: xStellarSignatureHeader ?: return false
+    val verifier = CallbackSignatureVerifier(
+        signingKey = signingKey,
+        registeredCallbackUrl = "https://wallet.example.org/sep31-callback",
+    )
 
-    // Header shape: "t=<unix-seconds>, s=<base64-signature>"
-    val match = Regex("t=(\\d+),\\s*s=(.+)").matchEntire(header.trim()) ?: return false
-    val timestamp = match.groupValues[1].toLongOrNull() ?: return false
-    val signatureBase64 = match.groupValues[2]
-
-    // Freshness window: 120 seconds. Reject older signatures even when otherwise valid
-    // to defeat replay of a captured callback after the original delivery completed.
-    val now = Clock.System.now().epochSeconds
-    if (now - timestamp >= 120) return false
-
-    // Pin the host source to the Sending Anchor's own registered callback URL.
-    // NEVER read host from the inbound HTTP Host header — that header is
-    // attacker-controllable and would let a man-in-the-middle change the signed
-    // canonical payload while passing verification.
-    val host = Url(registeredCallbackUrl).host
-
-    // Canonical payload: "$timestamp.$host.$body" as UTF-8.
-    val payload = "$timestamp.$host.$body".encodeToByteArray()
-
-    // SIGNING_KEY is a G... ed25519 public key fetched from the Receiving Anchor's
-    // stellar.toml ahead of time. Example call site:
-    //     val signingKey = StellarToml.fromDomain("anchor.example.org")
-    //         .generalInformation.signingKey
-    //         ?: error("Receiving Anchor stellar.toml has no SIGNING_KEY")
-    val keyPair = KeyPair.fromAccountId(signingKey)
-
-    // KeyPair.verify uses constant-time Ed25519 (libsodium / BouncyCastle); no additional MessageDigest.isEqual needed.
-    return keyPair.verify(payload, Base64.decode(signatureBase64))
+    return when (val result = verifier.verify(signatureHeader, xStellarSignatureHeader, body)) {
+        CallbackSignatureVerifier.Result.Valid -> true
+        is CallbackSignatureVerifier.Result.Stale -> {
+            println("Callback stale by ${result.ageSeconds}s")
+            false
+        }
+        CallbackSignatureVerifier.Result.SignatureMismatch,
+        CallbackSignatureVerifier.Result.MalformedHeader,
+        CallbackSignatureVerifier.Result.MissingHeader -> false
+    }
 }
 ```
-
-A future SDK release may ship `Sep31CallbackVerifier` to remove this responsibility from application code; see plans/sep-31-implementation.md §8.
 
 ## Error handling
 

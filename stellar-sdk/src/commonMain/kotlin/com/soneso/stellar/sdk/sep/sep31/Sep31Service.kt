@@ -324,13 +324,8 @@ public class Sep31Service(
             if (!url.startsWith(prefix, ignoreCase = false)) return false
             val afterScheme = url.substring(prefix.length)
             val end = afterScheme.indexOfAny(charArrayOf('/', '?', '#'))
-            val authority = (if (end < 0) afterScheme else afterScheme.substring(0, end)).lowercase()
-            return authority == "localhost" ||
-                authority.startsWith("localhost:") ||
-                authority == "127.0.0.1" ||
-                authority.startsWith("127.0.0.1:") ||
-                authority == "[::1]" ||
-                authority.startsWith("[::1]:")
+            val authority = if (end < 0) afterScheme else afterScheme.substring(0, end)
+            return com.soneso.stellar.sdk.sep.common.isLoopbackHost(authority)
         }
 
         /**

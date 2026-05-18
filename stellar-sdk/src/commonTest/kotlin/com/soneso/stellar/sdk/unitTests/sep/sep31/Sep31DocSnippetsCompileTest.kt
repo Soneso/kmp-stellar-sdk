@@ -602,7 +602,6 @@ class Sep31DocSnippetsCompileTest {
 
     // ==================== Snippet 11: Verifying callback signatures ====================
 
-    @Suppress("LongParameterList")
     @OptIn(ExperimentalEncodingApi::class, ExperimentalTime::class)
     @Test
     fun verifyCallback_freshSignature_returnsTrue() = runTest {
@@ -618,34 +617,34 @@ class Sep31DocSnippetsCompileTest {
         val header = "t=$timestamp, s=${Base64.encode(signature)}"
 
         // Define the verifier inline — mirrors the doc snippet body verbatim.
-        @OptIn(ExperimentalEncodingApi::class, ExperimentalTime::class)
         suspend fun verifyCallback(
+            signingKey: String,
             signatureHeader: String?,
             xStellarSignatureHeader: String?,
             body: String,
-            registeredCallbackUrl: String,
-            signingKey: String,
         ): Boolean {
-            val rawHeader = signatureHeader ?: xStellarSignatureHeader ?: return false
-            val match = Regex("t=(\\d+),\\s*s=(.+)").matchEntire(rawHeader.trim()) ?: return false
-            val ts = match.groupValues[1].toLongOrNull() ?: return false
-            val signatureBase64 = match.groupValues[2]
+            val verifier = com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier(
+                signingKey = signingKey,
+                registeredCallbackUrl = "https://wallet.example.org/sep31-callback",
+            )
 
-            val now = Clock.System.now().epochSeconds
-            if (now - ts >= 120) return false
-
-            val derivedHost = Url(registeredCallbackUrl).host
-            val pl = "$ts.$derivedHost.$body".encodeToByteArray()
-            val keyPair = KeyPair.fromAccountId(signingKey)
-            return keyPair.verify(pl, Base64.decode(signatureBase64))
+            return when (val result = verifier.verify(signatureHeader, xStellarSignatureHeader, body)) {
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.Valid -> true
+                is com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.Stale -> {
+                    println("Callback stale by ${result.ageSeconds}s")
+                    false
+                }
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.SignatureMismatch,
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.MalformedHeader,
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.MissingHeader -> false
+            }
         }
 
         val result = verifyCallback(
+            signingKey = signingAccountId,
             signatureHeader = header,
             xStellarSignatureHeader = null,
             body = body,
-            registeredCallbackUrl = registeredCallbackUrl,
-            signingKey = signingAccountId,
         )
         assertTrue(result, "valid fresh signature must verify")
     }
@@ -663,30 +662,33 @@ class Sep31DocSnippetsCompileTest {
         val header = "t=$staleTimestamp, s=${Base64.encode(signature)}"
 
         suspend fun verifyCallback(
+            signingKey: String,
             signatureHeader: String?,
             xStellarSignatureHeader: String?,
             body: String,
-            registeredCallbackUrl: String,
-            signingKey: String,
         ): Boolean {
-            val rawHeader = signatureHeader ?: xStellarSignatureHeader ?: return false
-            val match = Regex("t=(\\d+),\\s*s=(.+)").matchEntire(rawHeader.trim()) ?: return false
-            val ts = match.groupValues[1].toLongOrNull() ?: return false
-            val signatureBase64 = match.groupValues[2]
-            val now = Clock.System.now().epochSeconds
-            if (now - ts >= 120) return false
-            val derivedHost = Url(registeredCallbackUrl).host
-            val pl = "$ts.$derivedHost.$body".encodeToByteArray()
-            val keyPair = KeyPair.fromAccountId(signingKey)
-            return keyPair.verify(pl, Base64.decode(signatureBase64))
+            val verifier = com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier(
+                signingKey = signingKey,
+                registeredCallbackUrl = "https://wallet.example.org/sep31-callback",
+            )
+
+            return when (val result = verifier.verify(signatureHeader, xStellarSignatureHeader, body)) {
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.Valid -> true
+                is com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.Stale -> {
+                    println("Callback stale by ${result.ageSeconds}s")
+                    false
+                }
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.SignatureMismatch,
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.MalformedHeader,
+                com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.MissingHeader -> false
+            }
         }
 
         val result = verifyCallback(
+            signingKey = anchorKey.getAccountId(),
             signatureHeader = header,
             xStellarSignatureHeader = null,
             body = body,
-            registeredCallbackUrl = registeredCallbackUrl,
-            signingKey = anchorKey.getAccountId(),
         )
         assertEquals(false, result, "stale signature must be rejected")
     }

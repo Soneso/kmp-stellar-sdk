@@ -368,30 +368,33 @@ kycService.putCustomerCallback(request)
 Anchors sign callback requests with their SIGNING_KEY. Always verify signatures:
 
 ```kotlin
+import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
-import com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier
 import com.soneso.stellar.sdk.sep.sep12.GetCustomerInfoResponse
 import kotlinx.serialization.json.Json
 
 // In your webhook handler
 suspend fun handleKYCCallback(
-    signatureHeader: String,  // From "Signature" or "X-Stellar-Signature" header
+    signatureHeader: String?,            // value of "Signature" header
+    xStellarSignatureHeader: String?,    // value of legacy "X-Stellar-Signature" header
     requestBody: String,
-    expectedHost: String      // Host from your callback URL (e.g., "myapp.com")
+    registeredCallbackUrl: String,        // URL you registered with the anchor
 ) {
-    // Get anchor's signing key from stellar.toml
+    // Get anchor's signing key from stellar.toml (fetch once, cache for the connection lifetime).
     val stellarToml = StellarToml.fromDomain("testanchor.stellar.org")
     val signingKey = stellarToml.generalInformation.signingKey
         ?: throw IllegalStateException("Anchor signing key not found")
 
-    // Verify signature
-    val isValid = CallbackSignatureVerifier.verify(
-        signatureHeader = signatureHeader,
-        requestBody = requestBody,
-        expectedHost = expectedHost,
-        anchorSigningKey = signingKey,
-        maxAgeSeconds = 300  // 5 minutes (default)
+    val verifier = CallbackSignatureVerifier(
+        signingKey = signingKey,
+        registeredCallbackUrl = registeredCallbackUrl,
+        freshnessSeconds = 120,  // default; do not raise above 120 in production
     )
+
+    val isValid = when (verifier.verify(signatureHeader, xStellarSignatureHeader, requestBody)) {
+        CallbackSignatureVerifier.Result.Valid -> true
+        else -> false
+    }
 
     if (!isValid) {
         throw SecurityException("Invalid callback signature")
@@ -404,14 +407,9 @@ suspend fun handleKYCCallback(
 }
 ```
 
-Signature header format: `t=<timestamp>, s=<base64_signature>`
+Signature header format: `t=<timestamp>, s=<base64_signature>`. The verifier handles header parsing, freshness, and signature verification; callers do not need to parse the header themselves.
 
-Parse the header manually if needed:
-
-```kotlin
-val (timestamp, signature) = CallbackSignatureVerifier.parseSignatureHeader(signatureHeader)
-println("Callback signed at: $timestamp")
-```
+> The previous `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` object is deprecated. It remains in the SDK as a thin shim over the new shared class for backwards compatibility and will be removed in a future minor release; see the project `CHANGELOG.md` for the exact removal target.
 
 ## Customer Deletion (GDPR)
 
@@ -504,7 +502,8 @@ try {
 - `FieldStatus` - ACCEPTED, PROCESSING, REJECTED, VERIFICATION_REQUIRED
 
 **Utilities**:
-- `CallbackSignatureVerifier` - Verify webhook signatures
+- `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` - Verify webhook signatures (shared across SEP-12 and SEP-31)
+- `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` - Deprecated shim retained for backwards compatibility; delegates to the shared class
 
 **Exceptions**:
 - `KYCException` - Base class for all SEP-12 errors

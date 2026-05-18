@@ -3733,7 +3733,12 @@ val account: String?
 val memo: String?
 fun isExpired(): Boolean
 
-## object CallbackSignatureVerifier
+## class com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
+constructor(signingKey: String, registeredCallbackUrl: String, freshnessSeconds: Long = 120, clock: kotlin.time.Clock = Clock.System)
+suspend fun verify(signatureHeader: String?, xStellarSignatureHeader: String?, body: String): CallbackSignatureVerifier.Result
+sealed interface Result { Valid; MissingHeader; MalformedHeader; data class Stale(val ageSeconds: Long); SignatureMismatch }
+
+## object com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier (DEPRECATED)
 suspend fun verify(signatureHeader: String, requestBody: String, expectedHost: String, anchorSigningKey: String, maxAgeSeconds: Long = 300): Boolean
 fun parseSignatureHeader(header: String): Pair<Long, String>
 
