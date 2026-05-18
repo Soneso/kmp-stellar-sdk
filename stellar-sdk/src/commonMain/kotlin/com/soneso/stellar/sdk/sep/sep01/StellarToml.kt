@@ -195,20 +195,12 @@ class StellarToml(
          * Comparison is case-insensitive. Used by [fromDomain] to switch the fetch
          * scheme from `https` to `http` for local development.
          *
-         * The check is a literal string comparison against the three exact host
-         * tokens. Authorities like `localhost.evil.com`, `127.0.0.1.evil.com`, or
-         * `user@localhost` do not match — only the three reserved loopback names
-         * pass, eliminating DNS-rebinding and look-alike-host risks at this layer.
+         * Delegates to [com.soneso.stellar.sdk.sep.common.isLoopbackHost] so the
+         * loopback recognition rules are shared with the SEP-31 and callback-signature
+         * verifier layers.
          */
-        internal fun isLoopbackDomain(domain: String): Boolean {
-            val lower = domain.lowercase()
-            return lower == "localhost" ||
-                lower.startsWith("localhost:") ||
-                lower == "127.0.0.1" ||
-                lower.startsWith("127.0.0.1:") ||
-                lower == "[::1]" ||
-                lower.startsWith("[::1]:")
-        }
+        internal fun isLoopbackDomain(domain: String): Boolean =
+            com.soneso.stellar.sdk.sep.common.isLoopbackHost(domain)
 
         /**
          * Loads detailed currency information from an external TOML file.

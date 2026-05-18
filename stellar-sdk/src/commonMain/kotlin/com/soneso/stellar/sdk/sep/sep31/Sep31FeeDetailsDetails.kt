@@ -4,9 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -37,12 +35,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property description Optional longer description of the fee component.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#fee-details-object-schema">SEP-0031 Fee Details Object Schema</a>
  */
-data class Sep31FeeDetailsDetails(
+public data class Sep31FeeDetailsDetails(
     val name: String,
     val amount: String,
     val description: String? = null
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a fee-details line item JSON object into a [Sep31FeeDetailsDetails].
          *
@@ -50,8 +48,8 @@ data class Sep31FeeDetailsDetails(
          * @return The parsed line item.
          * @throws Sep31InvalidResponseException if `name` or `amount` is missing or the body is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31FeeDetailsDetails {
-            try {
+        public fun fromJson(json: JsonObject): Sep31FeeDetailsDetails =
+            sep31Rewrap("Malformed SEP-31 fee details line item") {
                 val name = json["name"]?.jsonPrimitive?.contentOrNull
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'name' field in SEP-31 fee details line item"
@@ -60,22 +58,11 @@ data class Sep31FeeDetailsDetails(
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'amount' field in SEP-31 fee details line item"
                     )
-                return Sep31FeeDetailsDetails(
+                Sep31FeeDetailsDetails(
                     name = name,
                     amount = amount,
                     description = json["description"]?.jsonPrimitive?.contentOrNull
                 )
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 fee details line item: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 fee details line item: ${sanitizeAnchorString(e.message)}"
-                )
             }
-        }
     }
 }

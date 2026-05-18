@@ -37,12 +37,192 @@ import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+
+/**
+ * Maximum length (after percent-decoding) of a transaction id used as a URL
+ * path segment. Bounded so anchor-supplied identifiers stay log-friendly and
+ * cannot be used to inflate URLs beyond reasonable limits.
+ */
+private const val PATH_SEGMENT_MAX_LENGTH: Int = 256
+
+/**
+ * Path-segment allow-list. RFC 3986 `pchar` minus `/`, `?`, and `#`, plus `-`.
+ * Applied after a single percent-decoding pass — see [validatePathSegment].
+ */
+private val PATH_SEGMENT_REGEX: Regex =
+    Regex("^[A-Za-z0-9._~!\$&'()*+,;=:@-]{1,$PATH_SEGMENT_MAX_LENGTH}$")
+
+/**
+ * Domain validation reject set per [validateDomain]: rejects empty strings,
+ * whitespace, control characters, and the URL-meaningful characters `/`, `?`,
+ * `#`. Accepts any remaining printable ASCII or non-ASCII domain content so
+ * internationalized domain names (IDN) are not blocked at this layer.
+ */
+private val DOMAIN_REJECT_CHARS: Set<Char> = setOf('/', '?', '#')
+
+/**
+ * Discriminator used by [validateHttpsRequired] to pick the right exception
+ * type without echoing user input back into the message.
+ */
+internal sealed class ErrorTarget {
+    object ServiceUrl : ErrorTarget()
+    object CallbackUrl : ErrorTarget()
+    class DirectPaymentServerForDomain(val domain: String) : ErrorTarget()
+}
+
+/**
+ * Validates that [url] begins with the lowercase `https://` scheme, OR is an
+ * `http://` URL whose host is a loopback address (`localhost`, `127.0.0.1`,
+ * or `[::1]`). The loopback carve-out exists so that callers can integrate
+ * against a local Anchor Platform instance (commonly `http://localhost:8080`)
+ * without standing up a TLS-terminating proxy. Defensive against
+ * attacker-supplied or misconfigured anchor URLs: the exception message
+ * deliberately omits the offending value to avoid log injection.
+ */
+private fun validateHttpsRequired(url: String, target: ErrorTarget) {
+    if (url.startsWith("https://", ignoreCase = false)) return
+    if (isLoopbackHttpUrl(url)) return
+    when (target) {
+        ErrorTarget.ServiceUrl ->
+            throw IllegalArgumentException(
+                "SEP-31 service URL must use HTTPS (HTTP allowed only for localhost)",
+            )
+        is ErrorTarget.DirectPaymentServerForDomain ->
+            throw Sep31ConfigurationException(
+                "DIRECT_PAYMENT_SERVER for domain ${target.domain} is not HTTPS (HTTP allowed only for localhost)",
+            )
+        ErrorTarget.CallbackUrl ->
+            throw IllegalArgumentException(
+                "SEP-31 callback URL must use HTTPS (HTTP allowed only for localhost)",
+            )
+    }
+}
+
+/**
+ * Returns `true` if [url] begins with `http://` and has authority equal to
+ * one of the three IETF loopback designations: `localhost`, `127.0.0.1`,
+ * `[::1]` (each optionally followed by `:port`). Comparison is
+ * case-insensitive on the host. Userinfo (`user@host`) and any other host
+ * value cause the check to return `false`.
+ *
+ * The implementation deliberately does string-level extraction instead of
+ * delegating to a URL parser. Parsers have implementation-defined
+ * behavior on malformed inputs and a permissive parser would accept
+ * hosts like `attacker.com@localhost`; the explicit substring check
+ * rejects every authority that does not match one of the three exact
+ * tokens.
+ */
+private fun isLoopbackHttpUrl(url: String): Boolean {
+    val prefix = "http://"
+    if (!url.startsWith(prefix, ignoreCase = false)) return false
+    val afterScheme = url.substring(prefix.length)
+    val end = afterScheme.indexOfAny(charArrayOf('/', '?', '#'))
+    val authority = if (end < 0) afterScheme else afterScheme.substring(0, end)
+    return com.soneso.stellar.sdk.sep.common.isLoopbackHost(authority)
+}
+
+/**
+ * Validates the [domain] string. Rejects empty values, whitespace, control
+ * characters, and the URL-meaningful characters `/`, `?`, `#`.
+ */
+private fun validateDomain(domain: String) {
+    if (domain.isEmpty()) {
+        throw Sep31ConfigurationException("SEP-31 domain must not be empty")
+    }
+    for (ch in domain) {
+        if (ch.isWhitespace() || ch.isISOControl() || ch in DOMAIN_REJECT_CHARS) {
+            throw Sep31ConfigurationException("SEP-31 domain contains an invalid character")
+        }
+    }
+}
+
+/**
+ * Validates a transaction id used as a URL path segment. Performs a single
+ * percent-decoding pass, then enforces the RFC 3986 `pchar` allow-list (minus
+ * `/`, `?`, `#`) and rejects the substring `..`. Validation errors do not echo
+ * the offending input.
+ */
+internal fun validatePathSegment(id: String) {
+    if (id.isEmpty()) {
+        throw IllegalArgumentException("invalid transaction id")
+    }
+    val decoded = decodePercentOnce(id)
+        ?: throw IllegalArgumentException("invalid transaction id")
+    if (!PATH_SEGMENT_REGEX.matches(decoded)) {
+        throw IllegalArgumentException("invalid transaction id")
+    }
+    if (decoded.contains("..")) {
+        throw IllegalArgumentException("invalid transaction id")
+    }
+}
+
+/**
+ * Single-pass percent-decoder. Returns `null` if [value] contains a malformed
+ * percent escape (`%` not followed by exactly two hex digits) or decodes to a
+ * byte sequence that is not valid UTF-8.
+ */
+private fun decodePercentOnce(value: String): String? {
+    if (!value.contains('%')) return value
+    val bytes = mutableListOf<Byte>()
+    var i = 0
+    while (i < value.length) {
+        val ch = value[i]
+        if (ch == '%') {
+            if (i + 2 >= value.length) return null
+            val hi = hexDigitValue(value[i + 1]) ?: return null
+            val lo = hexDigitValue(value[i + 2]) ?: return null
+            bytes.add(((hi shl 4) or lo).toByte())
+            i += 3
+        } else {
+            // Encode the character as UTF-8 bytes.
+            val codePoint = ch.code
+            when {
+                codePoint < 0x80 -> bytes.add(codePoint.toByte())
+                codePoint < 0x800 -> {
+                    bytes.add((0xC0 or (codePoint shr 6)).toByte())
+                    bytes.add((0x80 or (codePoint and 0x3F)).toByte())
+                }
+                else -> {
+                    // Re-encode the UTF-16 code unit naively as a 3-byte UTF-8 sequence. This is
+                    // intentionally lax: surrogate halves (0xD800..0xDFFF) and split surrogate
+                    // pairs synthesise invalid UTF-8 byte sequences, which the strict-mode
+                    // decoder downstream then rejects. The end result is rejection of any
+                    // non-ASCII path segment, which is what the RFC 3986 pchar allow-list
+                    // requires anyway. Production transaction IDs are ASCII only.
+                    bytes.add((0xE0 or (codePoint shr 12)).toByte())
+                    bytes.add((0x80 or ((codePoint shr 6) and 0x3F)).toByte())
+                    bytes.add((0x80 or (codePoint and 0x3F)).toByte())
+                }
+            }
+            i += 1
+        }
+    }
+    return decodeUtf8OrNull(bytes.toByteArray())
+}
+
+/**
+ * Returns the integer value of an ASCII hex digit, or `null` if [ch] is not a
+ * hex digit. Accepts both upper-case and lower-case.
+ */
+private fun hexDigitValue(ch: Char): Int? = when (ch) {
+    in '0'..'9' -> ch.code - '0'.code
+    in 'a'..'f' -> ch.code - 'a'.code + 10
+    in 'A'..'F' -> ch.code - 'A'.code + 10
+    else -> null
+}
+
+/**
+ * Decodes [bytes] as UTF-8 in strict mode, returning `null` on malformed input.
+ * Delegates to the stdlib's `decodeToString(throwOnInvalidSequence = true)`,
+ * which has identical strict-mode semantics across all KMP targets.
+ */
+private fun decodeUtf8OrNull(bytes: ByteArray): String? =
+    runCatching { bytes.decodeToString(throwOnInvalidSequence = true) }.getOrNull()
 
 /**
  * SEP-31 Cross-Border Payments service client.
@@ -69,8 +249,8 @@ import kotlinx.serialization.json.jsonPrimitive
  * - **Path-segment validation.** Every transaction id interpolated into a URL is
  *   percent-decoded once and matched against the RFC 3986 `pchar` allow-list
  *   (`A-Z`, `a-z`, `0-9`, `-`, `.`, `_`, `~`, `!`, `$`, `&`, `'`, `(`, `)`, `*`, `+`,
- *   `,`, `;`, `=`, `:`, `@`). The substring `..` is also rejected. This is intentionally
- *   stricter than RFC 3986 — see the plan's §1.1 rule 12 for the rationale.
+ *   `,`, `;`, `=`, `:`, `@`). The substring `..` is additionally rejected to prevent
+ *   path-traversal attempts, which is stricter than what RFC 3986 alone requires.
  * - **Redirect handling.** The default HTTP client used by this service sets
  *   `followRedirects = false`. The anchor URL is authoritative; a redirect indicates
  *   misconfiguration or an attack. A caller-supplied [httpClient] is used as-is —
@@ -94,11 +274,6 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * ## Spec divergences worth knowing
  *
- * - [info] accepts a nullable JWT. The SEP-31 spec mandates authentication on every
- *   endpoint. This SDK relaxes that for `info` only, because several testnet anchors
- *   expose `/info` unauthenticated so Sending Anchors can probe asset support before
- *   completing SEP-10. The HTTPS requirement still applies to unauthenticated calls.
- *   Production callers should always pass a JWT.
  * - [Sep31TransactionResponse.fromJson] requires the `{"transaction": {...}}` wrapper
  *   defined by the spec — flat responses are rejected. See [Sep31TransactionResponse].
  *
@@ -108,7 +283,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * // 1. Initialize from the receiving anchor's domain.
  * val sep31 = Sep31Service.fromDomain("anchor.example.org")
  *
- * // 2. Discover available assets (JWT optional for /info on some anchors).
+ * // 2. Discover available assets.
  * val info = sep31.info(jwt = jwtToken)
  * val usdc = info.receiveAssets["USDC"] ?: error("USDC not supported")
  *
@@ -151,7 +326,7 @@ public class Sep31Service(
 ) {
 
     init {
-        validateHttpsRequired(serviceUrl, ErrorTarget.SERVICE_URL)
+        validateHttpsRequired(serviceUrl, ErrorTarget.ServiceUrl)
     }
 
     /**
@@ -179,21 +354,6 @@ public class Sep31Service(
 
         /** Maximum body size for transaction-shaped responses. */
         private const val TRANSACTION_RESPONSE_CAP_BYTES: Long = 256L * 1024
-
-        /**
-         * Path-segment allow-list. RFC 3986 `pchar` minus `/`, `?`, and `#`, plus `-`.
-         * Applied after a single percent-decoding pass — see [validatePathSegment].
-         */
-        private val PATH_SEGMENT_REGEX: Regex =
-            Regex("^[A-Za-z0-9._~!\$&'()*+,;=:@-]{1,256}$")
-
-        /**
-         * Domain validation reject set per [validateDomain]: rejects empty strings,
-         * whitespace, control characters, and the URL-meaningful characters `/`, `?`,
-         * `#`. Accepts any remaining printable ASCII or non-ASCII domain content so
-         * internationalized domain names (IDN) are not blocked at this layer.
-         */
-        private val DOMAIN_REJECT_CHARS: Set<Char> = setOf('/', '?', '#')
 
         /** Connection timeout for SDK-built clients (milliseconds). */
         private const val CONNECT_TIMEOUT_MS: Long = 10_000
@@ -246,8 +406,7 @@ public class Sep31Service(
 
             // [StellarToml.fromDomain] does not declare or throw [Sep31ConfigurationException],
             // so the catch block only needs to wrap unexpected exceptions in the configuration
-            // error type. A previous dedicated `catch (Sep31ConfigurationException)` arm was
-            // removed as dead code after Phase 2 review.
+            // error type.
             val toml = try {
                 StellarToml.fromDomain(
                     domain = domain,
@@ -268,7 +427,7 @@ public class Sep31Service(
                 )
             }
 
-            validateHttpsRequired(directPaymentServer, ErrorTarget.DIRECT_PAYMENT_SERVER_FOR_DOMAIN(domain))
+            validateHttpsRequired(directPaymentServer, ErrorTarget.DirectPaymentServerForDomain(domain))
 
             return Sep31Service(
                 serviceUrl = directPaymentServer,
@@ -277,215 +436,6 @@ public class Sep31Service(
             )
         }
 
-        /**
-         * Validates that [url] begins with the lowercase `https://` scheme, OR is an
-         * `http://` URL whose host is a loopback address (`localhost`, `127.0.0.1`,
-         * or `[::1]`). The loopback carve-out exists so that callers can integrate
-         * against a local Anchor Platform instance (commonly `http://localhost:8080`)
-         * without standing up a TLS-terminating proxy. Defensive against
-         * attacker-supplied or misconfigured anchor URLs: the exception message
-         * deliberately omits the offending value to avoid log injection.
-         */
-        private fun validateHttpsRequired(url: String, target: ErrorTarget) {
-            if (url.startsWith("https://", ignoreCase = false)) return
-            if (isLoopbackHttpUrl(url)) return
-            when (target) {
-                ErrorTarget.SERVICE_URL ->
-                    throw IllegalArgumentException(
-                        "SEP-31 service URL must use HTTPS (HTTP allowed only for localhost)",
-                    )
-                is ErrorTarget.DIRECT_PAYMENT_SERVER_FOR_DOMAIN ->
-                    throw Sep31ConfigurationException(
-                        "DIRECT_PAYMENT_SERVER for domain ${target.domain} is not HTTPS (HTTP allowed only for localhost)",
-                    )
-                ErrorTarget.CALLBACK_URL ->
-                    throw IllegalArgumentException(
-                        "SEP-31 callback URL must use HTTPS (HTTP allowed only for localhost)",
-                    )
-            }
-        }
-
-        /**
-         * Returns `true` if [url] begins with `http://` and has authority equal to
-         * one of the three IETF loopback designations: `localhost`, `127.0.0.1`,
-         * `[::1]` (each optionally followed by `:port`). Comparison is
-         * case-insensitive on the host. Userinfo (`user@host`) and any other host
-         * value cause the check to return `false`.
-         *
-         * The implementation deliberately does string-level extraction instead of
-         * delegating to a URL parser. Parsers have implementation-defined
-         * behavior on malformed inputs and a permissive parser would accept
-         * hosts like `attacker.com@localhost`; the explicit substring check
-         * rejects every authority that does not match one of the three exact
-         * tokens.
-         */
-        private fun isLoopbackHttpUrl(url: String): Boolean {
-            val prefix = "http://"
-            if (!url.startsWith(prefix, ignoreCase = false)) return false
-            val afterScheme = url.substring(prefix.length)
-            val end = afterScheme.indexOfAny(charArrayOf('/', '?', '#'))
-            val authority = if (end < 0) afterScheme else afterScheme.substring(0, end)
-            return com.soneso.stellar.sdk.sep.common.isLoopbackHost(authority)
-        }
-
-        /**
-         * Validates the [domain] string. Rejects empty values, whitespace, control
-         * characters, and the URL-meaningful characters `/`, `?`, `#`.
-         */
-        private fun validateDomain(domain: String) {
-            if (domain.isEmpty()) {
-                throw Sep31ConfigurationException("SEP-31 domain must not be empty")
-            }
-            for (ch in domain) {
-                if (ch.isWhitespace() || ch.isISOControl() || ch in DOMAIN_REJECT_CHARS) {
-                    throw Sep31ConfigurationException("SEP-31 domain contains an invalid character")
-                }
-            }
-        }
-
-        /**
-         * Validates a transaction id used as a URL path segment. Performs a single
-         * percent-decoding pass, then enforces the RFC 3986 `pchar` allow-list (minus
-         * `/`, `?`, `#`) and rejects the substring `..`. Validation errors do not echo
-         * the offending input.
-         */
-        internal fun validatePathSegment(id: String) {
-            if (id.isEmpty()) {
-                throw IllegalArgumentException("invalid transaction id")
-            }
-            val decoded = decodePercentOnce(id)
-                ?: throw IllegalArgumentException("invalid transaction id")
-            if (!PATH_SEGMENT_REGEX.matches(decoded)) {
-                throw IllegalArgumentException("invalid transaction id")
-            }
-            if (decoded.contains("..")) {
-                throw IllegalArgumentException("invalid transaction id")
-            }
-        }
-
-        /**
-         * Single-pass percent-decoder. Returns `null` if [value] contains a malformed
-         * percent escape (`%` not followed by exactly two hex digits) or decodes to a
-         * byte sequence that is not valid UTF-8.
-         */
-        private fun decodePercentOnce(value: String): String? {
-            if (!value.contains('%')) return value
-            val bytes = mutableListOf<Byte>()
-            var i = 0
-            while (i < value.length) {
-                val ch = value[i]
-                if (ch == '%') {
-                    if (i + 2 >= value.length) return null
-                    val hi = hexDigitValue(value[i + 1]) ?: return null
-                    val lo = hexDigitValue(value[i + 2]) ?: return null
-                    bytes.add(((hi shl 4) or lo).toByte())
-                    i += 3
-                } else {
-                    // Encode the character as UTF-8 bytes.
-                    val codePoint = ch.code
-                    when {
-                        codePoint < 0x80 -> bytes.add(codePoint.toByte())
-                        codePoint < 0x800 -> {
-                            bytes.add((0xC0 or (codePoint shr 6)).toByte())
-                            bytes.add((0x80 or (codePoint and 0x3F)).toByte())
-                        }
-                        else -> {
-                            // Non-ASCII code units (including BMP-range characters that surrogate pairs
-                            // would represent on Kotlin/JVM, which sees UTF-16 code units) are rejected
-                            // downstream by the RFC 3986 pchar allow-list; this UTF-8 re-encoding handles
-                            // only BMP characters and is sufficient for path-segment validation use.
-                            bytes.add((0xE0 or (codePoint shr 12)).toByte())
-                            bytes.add((0x80 or ((codePoint shr 6) and 0x3F)).toByte())
-                            bytes.add((0x80 or (codePoint and 0x3F)).toByte())
-                        }
-                    }
-                    i += 1
-                }
-            }
-            return decodeUtf8OrNull(bytes.toByteArray())
-        }
-
-        /**
-         * Returns the integer value of an ASCII hex digit, or `null` if [ch] is not a
-         * hex digit. Accepts both upper-case and lower-case.
-         */
-        private fun hexDigitValue(ch: Char): Int? = when (ch) {
-            in '0'..'9' -> ch.code - '0'.code
-            in 'a'..'f' -> ch.code - 'a'.code + 10
-            in 'A'..'F' -> ch.code - 'A'.code + 10
-            else -> null
-        }
-
-        /**
-         * Decodes [bytes] as UTF-8 in strict mode, returning `null` on malformed input.
-         */
-        private fun decodeUtf8OrNull(bytes: ByteArray): String? {
-            val out = StringBuilder()
-            var i = 0
-            while (i < bytes.size) {
-                val b0 = bytes[i].toInt() and 0xFF
-                val codePoint: Int
-                val width: Int
-                when {
-                    b0 < 0x80 -> { codePoint = b0; width = 1 }
-                    b0 and 0xE0 == 0xC0 -> {
-                        if (i + 1 >= bytes.size) return null
-                        val b1 = bytes[i + 1].toInt() and 0xFF
-                        if (b1 and 0xC0 != 0x80) return null
-                        codePoint = ((b0 and 0x1F) shl 6) or (b1 and 0x3F)
-                        if (codePoint < 0x80) return null
-                        width = 2
-                    }
-                    b0 and 0xF0 == 0xE0 -> {
-                        if (i + 2 >= bytes.size) return null
-                        val b1 = bytes[i + 1].toInt() and 0xFF
-                        val b2 = bytes[i + 2].toInt() and 0xFF
-                        if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80) return null
-                        codePoint = ((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F)
-                        if (codePoint < 0x800) return null
-                        if (codePoint in 0xD800..0xDFFF) return null
-                        width = 3
-                    }
-                    b0 and 0xF8 == 0xF0 -> {
-                        if (i + 3 >= bytes.size) return null
-                        val b1 = bytes[i + 1].toInt() and 0xFF
-                        val b2 = bytes[i + 2].toInt() and 0xFF
-                        val b3 = bytes[i + 3].toInt() and 0xFF
-                        if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80 || b3 and 0xC0 != 0x80) {
-                            return null
-                        }
-                        codePoint = ((b0 and 0x07) shl 18) or
-                            ((b1 and 0x3F) shl 12) or
-                            ((b2 and 0x3F) shl 6) or
-                            (b3 and 0x3F)
-                        if (codePoint < 0x10000 || codePoint > 0x10FFFF) return null
-                        width = 4
-                    }
-                    else -> return null
-                }
-                if (codePoint <= 0xFFFF) {
-                    out.append(codePoint.toChar())
-                } else {
-                    val offset = codePoint - 0x10000
-                    out.append((0xD800 or (offset shr 10)).toChar())
-                    out.append((0xDC00 or (offset and 0x3FF)).toChar())
-                }
-                i += width
-            }
-            return out.toString()
-        }
-    }
-
-    /**
-     * Discriminator used by [validateHttpsRequired] to pick the right exception
-     * type without echoing user input back into the message.
-     */
-    private sealed class ErrorTarget {
-        object SERVICE_URL : ErrorTarget()
-        object CALLBACK_URL : ErrorTarget()
-
-        @Suppress("ClassName")
-        class DIRECT_PAYMENT_SERVER_FOR_DOMAIN(val domain: String) : ErrorTarget()
     }
 
     /**
@@ -569,7 +519,6 @@ public class Sep31Service(
      *   Content-Type, or a response that exceeds 256 KB.
      * @throws Sep31UnknownResponseException on any other HTTP status code.
      */
-    @Suppress("DEPRECATION")
     public suspend fun postTransactions(
         request: Sep31PostTransactionsRequest,
         jwt: String,
@@ -668,7 +617,7 @@ public class Sep31Service(
         jwt: String,
     ): Unit = withHttpClient { client ->
         validatePathSegment(id)
-        validateHttpsRequired(callbackUrl, ErrorTarget.CALLBACK_URL)
+        validateHttpsRequired(callbackUrl, ErrorTarget.CallbackUrl)
         val url = buildServiceUrl("transactions/$id/callback")
         val response = client.put(url) {
             applyHeaders(jwt)
@@ -758,50 +707,33 @@ public class Sep31Service(
     // ===================================================================================
 
     /**
-     * Handles `GET /info` responses per the dispatch matrix in plan §B.1.7.
+     * Handles `GET /info` responses: 200 parses the body; 400/401/403 raise typed
+     * exceptions with sanitized error context; any other status raises
+     * [Sep31UnknownResponseException].
      */
     private suspend fun handleInfoResponse(response: HttpResponse): Sep31InfoResponse {
-        return when (response.status.value) {
+        return when (val status = response.status.value) {
             200 -> {
                 val body = readJsonBody(response, INFO_RESPONSE_CAP_BYTES)
                 parseJsonBody(body) { Sep31InfoResponse.fromJson(it) }
             }
-            400 -> {
-                val body = readJsonBody(response, INFO_RESPONSE_CAP_BYTES)
-                throw Sep31BadRequestException(
-                    message = extractErrorMessage(body),
-                    statusCode = 400,
-                    rawResponseBody = rawResponseBodyFor(body),
-                )
-            }
-            401 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, INFO_RESPONSE_CAP_BYTES)
-                throw Sep31UnauthorizedException(
-                    message = message,
-                    statusCode = 401,
-                    rawResponseBody = rawBody,
-                )
-            }
-            403 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, INFO_RESPONSE_CAP_BYTES)
-                throw Sep31ForbiddenException(
-                    message = message,
-                    statusCode = 403,
-                    rawResponseBody = rawBody,
-                )
-            }
+            400 -> throwBadRequest(response, INFO_RESPONSE_CAP_BYTES)
+            401, 403 -> throwAuthFailure(response, status, INFO_RESPONSE_CAP_BYTES)
             else -> throwUnknownResponse(response, INFO_RESPONSE_CAP_BYTES)
         }
     }
 
     /**
-     * Handles `POST /transactions` responses per the dispatch matrix in plan §B.1.7,
-     * including the two domain-specific 400 sub-cases.
+     * Handles `POST /transactions` responses. 200 and 201 both succeed and parse the
+     * body. 400 routes through [dispatchPostTransactionsBadRequest] for the two
+     * domain-specific sub-cases (`customer_info_needed`, `transaction_info_needed`).
+     * 401/403 raise typed exceptions; any other status raises
+     * [Sep31UnknownResponseException].
      */
     private suspend fun handlePostTransactionsResponse(
         response: HttpResponse,
     ): Sep31PostTransactionsResponse {
-        return when (response.status.value) {
+        return when (val status = response.status.value) {
             200, 201 -> {
                 val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
                 parseJsonBody(body) { Sep31PostTransactionsResponse.fromJson(it) }
@@ -810,22 +742,7 @@ public class Sep31Service(
                 val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
                 dispatchPostTransactionsBadRequest(body)
             }
-            401 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31UnauthorizedException(
-                    message = message,
-                    statusCode = 401,
-                    rawResponseBody = rawBody,
-                )
-            }
-            403 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31ForbiddenException(
-                    message = message,
-                    statusCode = 403,
-                    rawResponseBody = rawBody,
-                )
-            }
+            401, 403 -> throwAuthFailure(response, status, TRANSACTION_RESPONSE_CAP_BYTES)
             else -> throwUnknownResponse(response, TRANSACTION_RESPONSE_CAP_BYTES)
         }
     }
@@ -841,14 +758,10 @@ public class Sep31Service(
     private fun dispatchPostTransactionsBadRequest(body: String): Nothing {
         val parsed: JsonObject? = try {
             json.decodeFromString(JsonObject.serializer(), body)
-        } catch (_: SerializationException) {
-            null
         } catch (_: IllegalArgumentException) {
             null
         }
 
-        // Safe casts (`as?`) cannot throw, so the surrounding try/catch wrappers seen in
-        // earlier revisions were dead code and have been removed.
         val errorTag: String? = (parsed?.get("error") as? JsonPrimitive)?.contentOrNull
         val rawBody = rawResponseBodyFor(body)
 
@@ -874,149 +787,140 @@ public class Sep31Service(
     }
 
     /**
-     * Handles `GET /transactions/:id` responses per the dispatch matrix in plan §B.1.7.
-     * The supplied [transactionId] has already passed [validatePathSegment], so
-     * interpolating it into the 404 message is safe (no log-injection risk).
+     * Handles `GET /transactions/:id` responses: 200 parses the body; 400/401/403/404
+     * raise typed exceptions. The supplied [transactionId] has already passed
+     * [validatePathSegment], so interpolating it into the 404 message is safe (no
+     * log-injection risk). Any other status raises [Sep31UnknownResponseException].
      */
     private suspend fun handleTransactionResponse(
         response: HttpResponse,
         transactionId: String,
     ): Sep31TransactionResponse {
-        return when (response.status.value) {
+        return when (val status = response.status.value) {
             200 -> {
                 val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
                 parseJsonBody(body) { Sep31TransactionResponse.fromJson(it) }
             }
-            400 -> {
-                val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31BadRequestException(
-                    message = extractErrorMessage(body),
-                    statusCode = 400,
-                    rawResponseBody = rawResponseBodyFor(body),
-                )
-            }
-            401 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31UnauthorizedException(
-                    message = message,
-                    statusCode = 401,
-                    rawResponseBody = rawBody,
-                )
-            }
-            403 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31ForbiddenException(
-                    message = message,
-                    statusCode = 403,
-                    rawResponseBody = rawBody,
-                )
-            }
-            404 -> {
-                // Body read for rawResponseBody only; the message does not interpolate
-                // anchor content (already domain-specific via the validated transactionId).
-                val (_, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31TransactionNotFoundException(
-                    message = "transaction not found for id $transactionId",
-                    statusCode = 404,
-                    rawResponseBody = rawBody,
-                )
-            }
+            400 -> throwBadRequest(response, TRANSACTION_RESPONSE_CAP_BYTES)
+            401, 403 -> throwAuthFailure(response, status, TRANSACTION_RESPONSE_CAP_BYTES)
+            404 -> throwTransactionNotFound(response, transactionId, TRANSACTION_RESPONSE_CAP_BYTES)
             else -> throwUnknownResponse(response, TRANSACTION_RESPONSE_CAP_BYTES)
         }
     }
 
     /**
-     * Handles `PUT /transactions/:id/callback` responses per the dispatch matrix in
-     * plan §B.1.7. 204 No Content is the success path; 404 maps to the
+     * Handles `PUT /transactions/:id/callback` responses. 204 No Content is the
+     * success path; 400/401/403 raise typed exceptions; 404 maps to the
      * callback-not-supported exception (not [Sep31TransactionNotFoundException]).
+     * Any other status raises [Sep31UnknownResponseException].
      */
     private suspend fun handlePutCallbackResponse(response: HttpResponse) {
-        when (response.status.value) {
+        when (val status = response.status.value) {
             204 -> return
-            400 -> {
-                val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31BadRequestException(
-                    message = extractErrorMessage(body),
-                    statusCode = 400,
-                    rawResponseBody = rawResponseBodyFor(body),
-                )
-            }
-            401 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31UnauthorizedException(
-                    message = message,
-                    statusCode = 401,
-                    rawResponseBody = rawBody,
-                )
-            }
-            403 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31ForbiddenException(
-                    message = message,
-                    statusCode = 403,
-                    rawResponseBody = rawBody,
-                )
-            }
-            404 -> {
-                val (_, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31TransactionCallbackNotSupportedException(
-                    message = "transaction callback not supported",
-                    statusCode = 404,
-                    rawResponseBody = rawBody,
-                )
-            }
+            400 -> throwBadRequest(response, TRANSACTION_RESPONSE_CAP_BYTES)
+            401, 403 -> throwAuthFailure(response, status, TRANSACTION_RESPONSE_CAP_BYTES)
+            404 -> throwCallbackNotSupported(response, TRANSACTION_RESPONSE_CAP_BYTES)
             else -> throwUnknownResponse(response, TRANSACTION_RESPONSE_CAP_BYTES)
         }
     }
 
     /**
-     * Handles `PATCH /transactions/:id` responses per the dispatch matrix in plan
-     * §B.1.7. Unlike [handlePostTransactionsResponse], a 400 here is always generic
-     * — `customer_info_needed` and `transaction_info_needed` are POST-only per spec.
+     * Handles `PATCH /transactions/:id` responses: 200 parses the body; 400/401/403/404
+     * raise typed exceptions; any other status raises [Sep31UnknownResponseException].
+     * Unlike [handlePostTransactionsResponse], a 400 here is always generic —
+     * `customer_info_needed` and `transaction_info_needed` are POST-only per spec.
      */
     private suspend fun handlePatchTransactionResponse(
         response: HttpResponse,
         transactionId: String,
     ): Sep31TransactionResponse {
-        return when (response.status.value) {
+        return when (val status = response.status.value) {
             200 -> {
                 val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
                 parseJsonBody(body) { Sep31TransactionResponse.fromJson(it) }
             }
-            400 -> {
-                val body = readJsonBody(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31BadRequestException(
-                    message = extractErrorMessage(body),
-                    statusCode = 400,
-                    rawResponseBody = rawResponseBodyFor(body),
-                )
-            }
-            401 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31UnauthorizedException(
-                    message = message,
-                    statusCode = 401,
-                    rawResponseBody = rawBody,
-                )
-            }
-            403 -> {
-                val (message, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31ForbiddenException(
-                    message = message,
-                    statusCode = 403,
-                    rawResponseBody = rawBody,
-                )
-            }
-            404 -> {
-                val (_, rawBody) = readBoundedErrorContext(response, TRANSACTION_RESPONSE_CAP_BYTES)
-                throw Sep31TransactionNotFoundException(
-                    message = "transaction not found for id $transactionId",
-                    statusCode = 404,
-                    rawResponseBody = rawBody,
-                )
-            }
+            400 -> throwBadRequest(response, TRANSACTION_RESPONSE_CAP_BYTES)
+            401, 403 -> throwAuthFailure(response, status, TRANSACTION_RESPONSE_CAP_BYTES)
+            404 -> throwTransactionNotFound(response, transactionId, TRANSACTION_RESPONSE_CAP_BYTES)
             else -> throwUnknownResponse(response, TRANSACTION_RESPONSE_CAP_BYTES)
         }
+    }
+
+    /**
+     * Reads the response body once, then throws the auth-failure exception matching
+     * [statusCode] (401 → [Sep31UnauthorizedException], 403 → [Sep31ForbiddenException]).
+     */
+    private suspend fun throwAuthFailure(
+        response: HttpResponse,
+        statusCode: Int,
+        maxBytes: Long,
+    ): Nothing {
+        val (message, rawBody) = readBoundedErrorContext(response, maxBytes)
+        when (statusCode) {
+            401 -> throw Sep31UnauthorizedException(
+                message = message,
+                statusCode = 401,
+                rawResponseBody = rawBody,
+            )
+            403 -> throw Sep31ForbiddenException(
+                message = message,
+                statusCode = 403,
+                rawResponseBody = rawBody,
+            )
+            else -> error("throwAuthFailure called with non-auth status $statusCode")
+        }
+    }
+
+    /**
+     * Reads the response body once, extracts a sanitized error message, and throws
+     * [Sep31BadRequestException].
+     */
+    private suspend fun throwBadRequest(
+        response: HttpResponse,
+        maxBytes: Long,
+    ): Nothing {
+        val body = readJsonBody(response, maxBytes)
+        throw Sep31BadRequestException(
+            message = extractErrorMessage(body),
+            statusCode = 400,
+            rawResponseBody = rawResponseBodyFor(body),
+        )
+    }
+
+    /**
+     * Reads the response body once (for `rawResponseBody` only) and throws
+     * [Sep31TransactionNotFoundException]. The message is fully derived from the
+     * caller-supplied [transactionId], which has already passed [validatePathSegment],
+     * so no anchor-supplied content is interpolated.
+     */
+    private suspend fun throwTransactionNotFound(
+        response: HttpResponse,
+        transactionId: String,
+        maxBytes: Long,
+    ): Nothing {
+        val (_, rawBody) = readBoundedErrorContext(response, maxBytes)
+        throw Sep31TransactionNotFoundException(
+            message = "transaction not found for id $transactionId",
+            statusCode = 404,
+            rawResponseBody = rawBody,
+        )
+    }
+
+    /**
+     * Reads the response body once (for `rawResponseBody` only) and throws
+     * [Sep31TransactionCallbackNotSupportedException]. The message is a fixed string
+     * (no anchor content interpolated).
+     */
+    private suspend fun throwCallbackNotSupported(
+        response: HttpResponse,
+        maxBytes: Long,
+    ): Nothing {
+        val (_, rawBody) = readBoundedErrorContext(response, maxBytes)
+        throw Sep31TransactionCallbackNotSupportedException(
+            message = "transaction callback not supported",
+            statusCode = 404,
+            rawResponseBody = rawBody,
+        )
     }
 
     // ===================================================================================
@@ -1024,8 +928,7 @@ public class Sep31Service(
     // ===================================================================================
 
     /**
-     * Reads a JSON-bodied response with size and Content-Type checks applied
-     * per §1.1 rules 21 and 21a.
+     * Reads a JSON-bodied response with size and Content-Type checks applied.
      *
      * Steps:
      * 1. Verify the Content-Type is `application/json` or `application/problem+json`,
@@ -1037,19 +940,6 @@ public class Sep31Service(
     private suspend fun readJsonBody(response: HttpResponse, maxBytes: Long): String {
         verifyJsonContentType(response)
         return readBoundedText(response, maxBytes)
-    }
-
-    /**
-     * Same as [readJsonBody] but for status codes where the SDK does not need to parse
-     * the body for typed data — only for the sanitized error message. Returns an empty
-     * string when the Content-Type is not JSON, so unauthorized/forbidden responses with
-     * plaintext bodies do not raise [Sep31InvalidResponseException].
-     */
-    private suspend fun errorMessageFromBoundedBody(
-        response: HttpResponse,
-        maxBytes: Long,
-    ): String {
-        return readBoundedErrorContext(response, maxBytes).first
     }
 
     /**
@@ -1150,8 +1040,8 @@ public class Sep31Service(
 
     /**
      * Parses [body] as a [JsonObject] and applies [transform]. Wraps
-     * [SerializationException] and [IllegalArgumentException] in
-     * [Sep31InvalidResponseException] so callers see a typed SEP-31 failure.
+     * [IllegalArgumentException] (which `kotlinx.serialization.SerializationException`
+     * extends) in [Sep31InvalidResponseException] so callers see a typed SEP-31 failure.
      */
     private inline fun <T> parseJsonBody(
         body: String,
@@ -1160,11 +1050,6 @@ public class Sep31Service(
         val rawBody = rawResponseBodyFor(body)
         val parsed = try {
             json.decodeFromString(JsonObject.serializer(), body)
-        } catch (e: SerializationException) {
-            throw Sep31InvalidResponseException(
-                message = "Failed to parse SEP-31 response: ${sanitizeAnchorString(e.message ?: "malformed JSON")}",
-                rawResponseBody = rawBody,
-            )
         } catch (e: IllegalArgumentException) {
             throw Sep31InvalidResponseException(
                 message = "Failed to parse SEP-31 response: ${sanitizeAnchorString(e.message ?: "malformed JSON")}",
@@ -1179,12 +1064,6 @@ public class Sep31Service(
             // here, preserving the original message verbatim.
             throw Sep31InvalidResponseException(
                 message = e.message ?: "Invalid SEP-31 response",
-                statusCode = e.statusCode,
-                rawResponseBody = rawBody,
-            )
-        } catch (e: SerializationException) {
-            throw Sep31InvalidResponseException(
-                message = "Failed to decode SEP-31 response: ${sanitizeAnchorString(e.message ?: "malformed JSON")}",
                 rawResponseBody = rawBody,
             )
         } catch (e: IllegalArgumentException) {
@@ -1227,8 +1106,6 @@ public class Sep31Service(
     private fun extractErrorMessage(body: String): String {
         val parsed: JsonObject? = try {
             json.decodeFromString(JsonObject.serializer(), body)
-        } catch (_: SerializationException) {
-            null
         } catch (_: IllegalArgumentException) {
             null
         }
@@ -1263,33 +1140,13 @@ public class Sep31Service(
     private fun buildServiceUrl(segment: String): String = "$baseUrl/$segment"
 
     /**
-     * Re-exposes [Companion.validatePathSegment] as an instance-level helper so the
-     * mutating method bodies read cleanly. The validation logic is identical.
+     * Adds the `Authorization: Bearer $jwt` header plus every entry from
+     * [httpRequestHeaders]. Generic helper used by every public method to apply the
+     * Authorization header alongside caller-supplied headers uniformly.
      */
-    private fun validatePathSegment(id: String) {
-        Companion.validatePathSegment(id)
-    }
-
-    /**
-     * Adds the `Authorization: Bearer $jwt` header when [jwt] is non-null, plus every
-     * entry from [httpRequestHeaders]. Used by every public method so the spec
-     * Authorization rule, the nullable-JWT `info` exception, and caller-supplied
-     * headers are applied uniformly.
-     */
-    private fun HttpRequestBuilder.applyHeaders(jwt: String?) {
-        if (jwt != null) {
-            header(HttpHeaders.Authorization, "Bearer $jwt")
-        }
+    private fun HttpRequestBuilder.applyHeaders(jwt: String) {
+        header(HttpHeaders.Authorization, "Bearer $jwt")
         httpRequestHeaders?.forEach { (key, value) -> header(key, value) }
-    }
-
-    /**
-     * Validates an arbitrary URL against the HTTPS-only rule. Wrapper around
-     * [Companion.validateHttpsRequired] so callers can express intent via the typed
-     * [ErrorTarget] discriminator.
-     */
-    private fun validateHttpsRequired(url: String, target: ErrorTarget) {
-        Companion.validateHttpsRequired(url, target)
     }
 
     /**

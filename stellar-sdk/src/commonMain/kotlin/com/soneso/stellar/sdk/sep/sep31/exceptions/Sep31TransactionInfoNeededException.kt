@@ -46,7 +46,7 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * @property rawResponseBody Anchor response body preserved for local debugging only.
  *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
  *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated to 1024 chars and stripped of control characters, so this field is safe
+ *   Truncated and stripped of control characters, so this field is safe
  *   against log-injection — but it is NOT safe to ship to shared log aggregators
  *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
  *   other sensitive context in error responses. For production logging, use [message]
@@ -56,12 +56,12 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
     message = "SEP-31 v2.5.0 deprecated per-transaction fields. Use SEP-12 PUT /customer instead.",
     level = DeprecationLevel.WARNING
 )
-class Sep31TransactionInfoNeededException(
-    val fields: Map<String, Any?>?,
-    val rawResponseBody: String? = null,
+public class Sep31TransactionInfoNeededException(
+    public val fields: Map<String, Any?>?,
+    public val rawResponseBody: String? = null,
 ) : Sep31Exception("Transaction info needed; see fields") {
     /** The literal error tag returned by the Receiving Anchor for this condition. */
-    val error: String = "transaction_info_needed"
+    public val error: String = "transaction_info_needed"
 
     override fun toString(): String {
         return "SEP-31 transaction info needed; see fields"

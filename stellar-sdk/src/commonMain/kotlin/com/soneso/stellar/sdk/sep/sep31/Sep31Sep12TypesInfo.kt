@@ -4,9 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -56,11 +54,11 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property receiverTypes Map of SEP-12 receiver type identifier to human-readable description. Empty when the anchor omits `sep12.receiver.types`.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#get-info">SEP-0031 GET Info</a>
  */
-data class Sep31Sep12TypesInfo(
+public data class Sep31Sep12TypesInfo(
     val senderTypes: Map<String, String>,
     val receiverTypes: Map<String, String>
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a SEP-31 `sep12` JSON object into a [Sep31Sep12TypesInfo].
          *
@@ -73,22 +71,13 @@ data class Sep31Sep12TypesInfo(
          * @return The parsed [Sep31Sep12TypesInfo].
          * @throws Sep31InvalidResponseException if the underlying JSON shape is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31Sep12TypesInfo {
-            try {
-                return Sep31Sep12TypesInfo(
+        public fun fromJson(json: JsonObject): Sep31Sep12TypesInfo =
+            sep31Rewrap("Malformed sep12 object in SEP-31 info response") {
+                Sep31Sep12TypesInfo(
                     senderTypes = extractTypes(json["sender"]),
                     receiverTypes = extractTypes(json["receiver"])
                 )
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed sep12 object in SEP-31 info response: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed sep12 object in SEP-31 info response: ${sanitizeAnchorString(e.message)}"
-                )
             }
-        }
 
         private fun extractTypes(roleElement: kotlinx.serialization.json.JsonElement?): Map<String, String> {
             val role = (roleElement as? JsonObject) ?: return emptyMap()

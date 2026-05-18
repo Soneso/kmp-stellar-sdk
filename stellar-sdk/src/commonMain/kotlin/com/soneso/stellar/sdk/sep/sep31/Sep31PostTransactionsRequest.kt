@@ -48,7 +48,7 @@ package com.soneso.stellar.sdk.sep.sep31
  * @property refundMemoType Type of [refundMemo] (`id`, `text`, or `hash`). If specified, [refundMemo] must also be specified.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#post-transactions">SEP-0031 POST Transactions</a>
  */
-data class Sep31PostTransactionsRequest(
+public data class Sep31PostTransactionsRequest(
     val amount: Double,
     val assetCode: String,
     val fundingMethod: String,
@@ -77,7 +77,7 @@ data class Sep31PostTransactionsRequest(
      * @return The ordered key-value map suitable for passing to `JsonElement` conversion helpers.
      */
     @Suppress("DEPRECATION")
-    fun toJson(): Map<String, Any?> {
+    public fun toJson(): Map<String, Any?> {
         val result = LinkedHashMap<String, Any?>()
         result["amount"] = amount
         result["asset_code"] = assetCode

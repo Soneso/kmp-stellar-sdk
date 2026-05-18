@@ -63,6 +63,14 @@ import kotlin.time.ExperimentalTime
 object CallbackSignatureVerifier {
 
     /**
+     * Default value for the shim's [verify] `maxAgeSeconds` parameter. Preserves the
+     * v0.6.0 SEP-12 verifier's 5-minute freshness window. The new shared verifier in
+     * `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` uses a tighter
+     * 120-second default; migrate to that class for spec-aligned freshness.
+     */
+    private const val DEFAULT_SHIM_MAX_AGE_SECONDS: Long = 300
+
+    /**
      * Verifies a callback signature from a SEP-12 anchor.
      *
      * This shim delegates to [com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier]
@@ -100,7 +108,7 @@ object CallbackSignatureVerifier {
         requestBody: String,
         expectedHost: String,
         anchorSigningKey: String,
-        maxAgeSeconds: Long = 300,
+        maxAgeSeconds: Long = DEFAULT_SHIM_MAX_AGE_SECONDS,
     ): Boolean {
         return try {
             // Use the `internal` shim factory so `expectedHost` is honoured verbatim

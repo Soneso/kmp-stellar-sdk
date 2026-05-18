@@ -5,9 +5,7 @@
 package com.soneso.stellar.sdk.sep.sep31
 
 import com.soneso.stellar.sdk.sep.common.jsonElementToAny
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -61,7 +59,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property fundingMethods Methods the anchor supports for delivering the off-chain asset (for example `SEPA`, `SWIFT`). `null` when the anchor does not advertise any.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#get-info">SEP-0031 GET Info</a>
  */
-data class Sep31ReceiveAssetInfo(
+public data class Sep31ReceiveAssetInfo(
     val sep12Info: Sep31Sep12TypesInfo,
     val minAmount: Double? = null,
     val maxAmount: Double? = null,
@@ -86,7 +84,7 @@ data class Sep31ReceiveAssetInfo(
     val quotesRequired: Boolean? = null,
     val fundingMethods: List<String>? = null
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a `receive[<code>]` JSON object from the SEP-31 `GET /info` response.
          *
@@ -100,8 +98,8 @@ data class Sep31ReceiveAssetInfo(
          * @throws Sep31InvalidResponseException when required fields are missing or malformed.
          */
         @Suppress("DEPRECATION")
-        fun fromJson(json: JsonObject): Sep31ReceiveAssetInfo {
-            try {
+        public fun fromJson(json: JsonObject): Sep31ReceiveAssetInfo =
+            sep31Rewrap("Malformed receive asset info in SEP-31 response") {
                 // Per SEP-31 v3.1.0, the per-asset `sep12` object is marked
                 // "(Deprecated, optional)". Default to empty sender/receiver maps when
                 // omitted — an anchor that requires no KYC is spec-conformant to leave
@@ -125,12 +123,12 @@ data class Sep31ReceiveAssetInfo(
                     jsonElementToAny(obj) as Map<String, Any?>
                 }
 
-                return Sep31ReceiveAssetInfo(
+                Sep31ReceiveAssetInfo(
                     sep12Info = sep12Info,
-                    minAmount = parseDoubleTolerant(json["min_amount"]),
-                    maxAmount = parseDoubleTolerant(json["max_amount"]),
-                    feeFixed = parseDoubleTolerant(json["fee_fixed"]),
-                    feePercent = parseDoubleTolerant(json["fee_percent"]),
+                    minAmount = (json["min_amount"] as? JsonPrimitive)?.doubleOrNull,
+                    maxAmount = (json["max_amount"] as? JsonPrimitive)?.doubleOrNull,
+                    feeFixed = (json["fee_fixed"] as? JsonPrimitive)?.doubleOrNull,
+                    feePercent = (json["fee_percent"] as? JsonPrimitive)?.doubleOrNull,
                     senderSep12Type = json["sender_sep12_type"]?.jsonPrimitive?.contentOrNull,
                     receiverSep12Type = json["receiver_sep12_type"]?.jsonPrimitive?.contentOrNull,
                     fields = fields,
@@ -138,22 +136,6 @@ data class Sep31ReceiveAssetInfo(
                     quotesRequired = json["quotes_required"]?.jsonPrimitive?.booleanOrNull,
                     fundingMethods = fundingMethods
                 )
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed receive asset info in SEP-31 response: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed receive asset info in SEP-31 response: ${sanitizeAnchorString(e.message)}"
-                )
             }
-        }
-
-        private fun parseDoubleTolerant(element: kotlinx.serialization.json.JsonElement?): Double? {
-            val primitive = element as? JsonPrimitive ?: return null
-            return primitive.doubleOrNull
-        }
     }
 }

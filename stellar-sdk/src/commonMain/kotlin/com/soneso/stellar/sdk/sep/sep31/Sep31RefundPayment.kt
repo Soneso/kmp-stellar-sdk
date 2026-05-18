@@ -4,9 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -27,12 +25,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property fee Fee charged for processing this refund payment, in units of `amount_in_asset`.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#refund-payment-object-schema">SEP-0031 Refund Payment Object Schema</a>
  */
-data class Sep31RefundPayment(
+public data class Sep31RefundPayment(
     val id: String,
     val amount: String,
     val fee: String
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a refund-payment JSON object into a [Sep31RefundPayment].
          *
@@ -40,8 +38,8 @@ data class Sep31RefundPayment(
          * @return The parsed refund payment.
          * @throws Sep31InvalidResponseException if `id`, `amount`, or `fee` is missing or the body is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31RefundPayment {
-            try {
+        public fun fromJson(json: JsonObject): Sep31RefundPayment =
+            sep31Rewrap("Malformed SEP-31 refund payment") {
                 val id = json["id"]?.jsonPrimitive?.contentOrNull
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'id' field in SEP-31 refund payment"
@@ -54,18 +52,7 @@ data class Sep31RefundPayment(
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'fee' field in SEP-31 refund payment"
                     )
-                return Sep31RefundPayment(id = id, amount = amount, fee = fee)
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 refund payment: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 refund payment: ${sanitizeAnchorString(e.message)}"
-                )
+                Sep31RefundPayment(id = id, amount = amount, fee = fee)
             }
-        }
     }
 }

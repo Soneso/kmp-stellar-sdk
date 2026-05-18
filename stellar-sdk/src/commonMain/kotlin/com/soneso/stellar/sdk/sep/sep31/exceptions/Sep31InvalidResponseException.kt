@@ -40,7 +40,7 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * @property rawResponseBody Anchor response body preserved for local debugging only.
  *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
  *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated to 1024 chars and stripped of control characters, so this field is safe
+ *   Truncated and stripped of control characters, so this field is safe
  *   against log-injection — but it is NOT safe to ship to shared log aggregators
  *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
  *   other sensitive context in error responses. For production logging, use [message]
@@ -48,10 +48,10 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  *   (for example, content-type rejection before any body was read).
  * @param message Sanitized error message describing the parsing failure.
  */
-class Sep31InvalidResponseException(
+public class Sep31InvalidResponseException(
     message: String,
-    val statusCode: Int = 200,
-    val rawResponseBody: String? = null,
+    public val statusCode: Int = 200,
+    public val rawResponseBody: String? = null,
 ) : Sep31Exception(message) {
     override fun toString(): String {
         return "SEP-31 invalid response (HTTP $statusCode): $message"

@@ -24,7 +24,7 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * - [Sep31TransactionInfoNeededException]: HTTP 400 with `error="transaction_info_needed"` (legacy fields path)
  * - [Sep31TransactionNotFoundException]: HTTP 404 when fetching or patching a transaction
  * - [Sep31TransactionCallbackNotSupportedException]: HTTP 404 on `PUT /transactions/:id/callback`
- * - [Sep31InvalidResponseException]: HTTP 200 with malformed body
+ * - [Sep31InvalidResponseException]: HTTP 2xx with malformed body
  * - [Sep31UnknownResponseException]: Receiving Anchor returned an unexpected HTTP status code
  * - [Sep31ConfigurationException]: `fromDomain` cannot resolve a valid `DIRECT_PAYMENT_SERVER`
  *
@@ -45,7 +45,7 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * @property message Human-readable error description
  * @property cause Optional underlying cause of the error
  */
-open class Sep31Exception(
+public open class Sep31Exception(
     message: String,
     cause: Throwable? = null
 ) : Exception(message, cause) {

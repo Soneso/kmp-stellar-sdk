@@ -1232,11 +1232,11 @@ class Sep31ServiceTest {
 
     @Test
     fun fromDomain_tomlRedirects_resolvesSuccessfully() = runTest {
-        // SEP-31 plan §1.1 rule 14: the followRedirects=false rule applies to Sep31Service's
-        // own HTTP calls (info, postTransactions, etc.), NOT to the StellarToml.fromDomain
-        // fetch. The TOML client retains its default redirect behavior so that anchors which
-        // serve their stellar.toml from a redirected canonical host (a common production setup
-        // behind hostname migrations or CDN rewrites) remain reachable.
+        // The followRedirects=false rule applies only to Sep31Service's own HTTP calls
+        // (info, postTransactions, etc.), NOT to the StellarToml.fromDomain fetch. The TOML
+        // client retains its default redirect behavior so that anchors which serve their
+        // stellar.toml from a redirected canonical host (a common production setup behind
+        // hostname migrations or CDN rewrites) remain reachable.
         //
         // This test models the production redirect chain explicitly:
         //   1. GET https://anchor.example.org/.well-known/stellar.toml -> 301 with Location

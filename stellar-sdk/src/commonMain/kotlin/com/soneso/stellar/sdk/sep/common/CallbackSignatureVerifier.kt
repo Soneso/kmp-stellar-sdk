@@ -150,7 +150,7 @@ public class CallbackSignatureVerifier internal constructor(
     public constructor(
         signingKey: String,
         registeredCallbackUrl: String,
-        freshnessSeconds: Long = 120,
+        freshnessSeconds: Long = DEFAULT_FRESHNESS_SECONDS,
         clock: Clock = Clock.System,
     ) : this(
         signingKey = signingKey,
@@ -165,8 +165,8 @@ public class CallbackSignatureVerifier internal constructor(
     private val canonicalHost: String
 
     init {
-        require(freshnessSeconds in 1..600) {
-            "freshnessSeconds must be 1..600 (spec recommends <=120; >120 deviates and is for clock-skew tolerance only)"
+        require(freshnessSeconds in 1..MAX_FRESHNESS_SECONDS) {
+            "freshnessSeconds must be 1..$MAX_FRESHNESS_SECONDS (spec recommends <=$DEFAULT_FRESHNESS_SECONDS; >$DEFAULT_FRESHNESS_SECONDS deviates and is for clock-skew tolerance only)"
         }
         keyPair = KeyPair.fromAccountId(signingKey)
         canonicalHost = if (hostOverride != null) {
@@ -178,15 +178,17 @@ public class CallbackSignatureVerifier internal constructor(
             // host-with-port (e.g. "localhost:8080", "myapp.com:8443") for the same reason.
             hostOverride
         } else {
-            // Unreachable from the public constructor (which always passes non-null);
-            // the `forShim` factory always sets `hostOverride`, so this else-branch sees a
-            // non-null `registeredCallbackUrl`. The `!!` is defensive against future
-            // factory additions that forget to set `hostOverride`.
+            // Reached only from the public constructor (which always passes a non-null
+            // `registeredCallbackUrl`). `requireNotNull` defends against future factory
+            // additions that forget to set `hostOverride`.
+            val callbackUrl = requireNotNull(registeredCallbackUrl) {
+                "registeredCallbackUrl must be non-null in the public-constructor branch"
+            }
             val parsed = try {
-                Url(registeredCallbackUrl!!)
+                Url(callbackUrl)
             } catch (e: Exception) {
                 throw IllegalArgumentException(
-                    "registeredCallbackUrl is not a valid URL: $registeredCallbackUrl",
+                    "registeredCallbackUrl is not a valid URL: $callbackUrl",
                     e,
                 )
             }
@@ -298,6 +300,20 @@ public class CallbackSignatureVerifier internal constructor(
     }
 
     public companion object {
+        /**
+         * Default freshness window in seconds. Matches the SEP-31 specification's
+         * recommendation; setting [freshnessSeconds] above this value deviates from
+         * the spec and should only be used to absorb test-environment clock skew.
+         */
+        public const val DEFAULT_FRESHNESS_SECONDS: Long = 120
+
+        /**
+         * Maximum permitted [freshnessSeconds] value. Values above this are rejected
+         * with [IllegalArgumentException] at construction time; the upper bound exists
+         * to keep the freshness window from becoming a security footgun.
+         */
+        public const val MAX_FRESHNESS_SECONDS: Long = 600
+
         private val HEADER_REGEX = Regex("^t=(\\d+),\\s*s=([A-Za-z0-9+/_\\-=]+)$")
 
         /**

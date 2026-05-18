@@ -6,7 +6,6 @@ package com.soneso.stellar.sdk.sep.sep31
 
 import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -47,10 +46,10 @@ import kotlinx.serialization.json.JsonObject
  *   anchor does not currently accept any assets.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#get-info">SEP-0031 GET Info</a>
  */
-data class Sep31InfoResponse(
+public data class Sep31InfoResponse(
     val receiveAssets: Map<String, Sep31ReceiveAssetInfo>
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses the `GET /info` JSON response into a [Sep31InfoResponse].
          *
@@ -63,32 +62,18 @@ data class Sep31InfoResponse(
          * @return The parsed info response.
          * @throws Sep31InvalidResponseException when a `receive[<code>]` entry is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31InfoResponse {
-            try {
-                val receiveObject = json["receive"] as? JsonObject
-                if (receiveObject == null) {
-                    return Sep31InfoResponse(receiveAssets = emptyMap())
-                }
-                val out = LinkedHashMap<String, Sep31ReceiveAssetInfo>(receiveObject.size)
-                for ((code, element) in receiveObject) {
-                    val assetObject = (element as? JsonObject)
-                        ?: throw Sep31InvalidResponseException(
-                            "Malformed entry for asset code '${sanitizeAnchorString(code)}' in SEP-31 info response"
-                        )
-                    out[code] = Sep31ReceiveAssetInfo.fromJson(assetObject)
-                }
-                return Sep31InfoResponse(receiveAssets = out)
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 info response: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 info response: ${sanitizeAnchorString(e.message)}"
-                )
+        public fun fromJson(json: JsonObject): Sep31InfoResponse = sep31Rewrap("Malformed SEP-31 info response") {
+            val receiveObject = json["receive"] as? JsonObject
+                ?: return@sep31Rewrap Sep31InfoResponse(receiveAssets = emptyMap())
+            val out = LinkedHashMap<String, Sep31ReceiveAssetInfo>(receiveObject.size)
+            for ((code, element) in receiveObject) {
+                val assetObject = (element as? JsonObject)
+                    ?: throw Sep31InvalidResponseException(
+                        "Malformed entry for asset code '${sanitizeAnchorString(code)}' in SEP-31 info response"
+                    )
+                out[code] = Sep31ReceiveAssetInfo.fromJson(assetObject)
             }
+            Sep31InfoResponse(receiveAssets = out)
         }
     }
 }

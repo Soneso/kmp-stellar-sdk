@@ -4,9 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -51,13 +49,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property stellarMemo Memo to attach to the on-chain payment. `null` while the anchor is still processing.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#post-transactions">SEP-0031 POST Transactions</a>
  */
-data class Sep31PostTransactionsResponse(
+public data class Sep31PostTransactionsResponse(
     val id: String,
     val stellarAccountId: String? = null,
     val stellarMemoType: String? = null,
     val stellarMemo: String? = null
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses the `POST /transactions` JSON response into a [Sep31PostTransactionsResponse].
          *
@@ -65,29 +63,18 @@ data class Sep31PostTransactionsResponse(
          * @return The parsed response.
          * @throws Sep31InvalidResponseException if the `id` field is missing or the body is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31PostTransactionsResponse {
-            try {
+        public fun fromJson(json: JsonObject): Sep31PostTransactionsResponse =
+            sep31Rewrap("Malformed SEP-31 post transactions response") {
                 val id = json["id"]?.jsonPrimitive?.contentOrNull
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'id' field in SEP-31 post transactions response"
                     )
-                return Sep31PostTransactionsResponse(
+                Sep31PostTransactionsResponse(
                     id = id,
                     stellarAccountId = json["stellar_account_id"]?.jsonPrimitive?.contentOrNull,
                     stellarMemoType = json["stellar_memo_type"]?.jsonPrimitive?.contentOrNull,
                     stellarMemo = json["stellar_memo"]?.jsonPrimitive?.contentOrNull
                 )
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 post transactions response: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 post transactions response: ${sanitizeAnchorString(e.message)}"
-                )
             }
-        }
     }
 }

@@ -5,9 +5,7 @@
 package com.soneso.stellar.sdk.sep.sep31
 
 import com.soneso.stellar.sdk.sep.common.jsonElementToAny
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -73,7 +71,7 @@ import kotlinx.serialization.json.longOrNull
  * @property requiredInfoUpdates Fields requiring updates from the Sending Anchor. Leaves are primitive Kotlin types only.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#transaction-object">SEP-0031 Transaction Object</a>
  */
-data class Sep31TransactionResponse(
+public data class Sep31TransactionResponse(
     val id: String,
     val status: String,
     val statusEta: Long? = null,
@@ -111,7 +109,7 @@ data class Sep31TransactionResponse(
     val requiredInfoMessage: String? = null,
     val requiredInfoUpdates: Map<String, Any?>? = null
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a SEP-31 transaction-response JSON payload into a [Sep31TransactionResponse].
          *
@@ -126,8 +124,8 @@ data class Sep31TransactionResponse(
          * @throws Sep31InvalidResponseException if the `transaction` wrapper is missing, any required field is absent, or the body is malformed.
          */
         @Suppress("DEPRECATION")
-        fun fromJson(json: JsonObject): Sep31TransactionResponse {
-            try {
+        public fun fromJson(json: JsonObject): Sep31TransactionResponse =
+            sep31Rewrap("Malformed SEP-31 transaction response") {
                 val txObject = (json["transaction"] as? JsonObject)
                     ?: throw Sep31InvalidResponseException(
                         "missing required 'transaction' key in SEP-31 transaction response"
@@ -154,7 +152,7 @@ data class Sep31TransactionResponse(
                     jsonElementToAny(obj) as Map<String, Any?>
                 }
 
-                return Sep31TransactionResponse(
+                Sep31TransactionResponse(
                     id = id,
                     status = status,
                     statusEta = txObject["status_eta"]?.jsonPrimitive?.longOrNull,
@@ -180,17 +178,6 @@ data class Sep31TransactionResponse(
                     requiredInfoMessage = txObject["required_info_message"]?.jsonPrimitive?.contentOrNull,
                     requiredInfoUpdates = requiredInfoUpdates
                 )
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 transaction response: ${sanitizeAnchorString(e.message)}"
-                )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 transaction response: ${sanitizeAnchorString(e.message)}"
-                )
             }
-        }
     }
 }

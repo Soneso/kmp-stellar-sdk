@@ -11,13 +11,8 @@
  * the SEP-31 layer accept and emit arbitrary `Map<String, Any?>` payloads without
  * declaring an exhaustive serializer for every shape.
  *
- * Out of scope for this file: the visually identical helpers duplicated in
- * `Sep30Service.kt` lines 371-396 are intentionally NOT removed here. The SEP-30
- * dedup is tracked as deferred decision #3 in the SEP-31 implementation plan §8
- * and will be handled by a follow-up PR. Future maintainers MUST NOT widen the
- * visibility of these functions beyond `internal` without first coordinating with
- * that follow-up — a public API surface would lock in a contract that the SEP-30
- * consolidation is expected to refine.
+ * These helpers duplicate logic in `Sep30Service.kt`; consolidation is deferred.
+ * Do not widen visibility beyond `internal` without coordinating that consolidation.
  */
 
 package com.soneso.stellar.sdk.sep.common
@@ -177,6 +172,14 @@ internal fun jsonElementToAny(element: JsonElement): Any? = when (element) {
 private val JWT_PATTERN = Regex("eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+")
 
 /**
+ * Maximum number of characters retained from anchor-supplied or untrusted strings
+ * before truncation in [sanitizeAnchorString]. Bounded so exception messages and
+ * the public `responseBody` field on SEP-31 exceptions stay log-friendly even when
+ * an anchor returns a multi-megabyte error page.
+ */
+private const val SANITIZER_MAX_CHARS = 1024
+
+/**
  * Truncates anchor-supplied or untrusted strings to 1024 characters, replaces
  * control characters (U+0000..U+001F, except tab) with `?`, and optionally
  * redacts any substring that matches the canonical JWT shape
@@ -215,8 +218,7 @@ private val JWT_PATTERN = Regex("eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+\\.[A-Za-
  */
 internal fun sanitizeAnchorString(raw: String?, redactJwts: Boolean = true): String {
     if (raw.isNullOrEmpty()) return ""
-    val maxChars = 1024
-    val truncated = if (raw.length > maxChars) raw.substring(0, maxChars) else raw
+    val truncated = if (raw.length > SANITIZER_MAX_CHARS) raw.substring(0, SANITIZER_MAX_CHARS) else raw
     val sb = StringBuilder(truncated.length)
     for (ch in truncated) {
         val needsScrub = ch.code in 0x00..0x1F && ch.code != 0x09

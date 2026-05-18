@@ -4,9 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
-import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31InvalidResponseException
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -40,12 +38,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property details Optional list of fee line items whose [Sep31FeeDetailsDetails.amount] values sum to [total]. `null` when the anchor does not decompose the fee.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#fee-details-object-schema">SEP-0031 Fee Details Object Schema</a>
  */
-data class Sep31FeeDetails(
+public data class Sep31FeeDetails(
     val total: String,
     val asset: String,
     val details: List<Sep31FeeDetailsDetails>? = null
 ) {
-    companion object {
+    public companion object {
         /**
          * Parses a SEP-31 `fee_details` JSON object into a [Sep31FeeDetails].
          *
@@ -53,36 +51,24 @@ data class Sep31FeeDetails(
          * @return The parsed fee breakdown.
          * @throws Sep31InvalidResponseException if `total` or `asset` is missing or the body is malformed.
          */
-        fun fromJson(json: JsonObject): Sep31FeeDetails {
-            try {
-                val total = json["total"]?.jsonPrimitive?.contentOrNull
-                    ?: throw Sep31InvalidResponseException(
-                        "missing required 'total' field in SEP-31 fee details"
-                    )
-                val asset = json["asset"]?.jsonPrimitive?.contentOrNull
-                    ?: throw Sep31InvalidResponseException(
-                        "missing required 'asset' field in SEP-31 fee details"
-                    )
-                val detailsArray = json["details"] as? JsonArray
-                val details = detailsArray?.map { element ->
-                    val obj = (element as? JsonObject)
-                        ?: throw Sep31InvalidResponseException(
-                            "Malformed SEP-31 fee details line item: expected JSON object"
-                        )
-                    Sep31FeeDetailsDetails.fromJson(obj)
-                }
-                return Sep31FeeDetails(total = total, asset = asset, details = details)
-            } catch (e: Sep31InvalidResponseException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 fee details: ${sanitizeAnchorString(e.message)}"
+        public fun fromJson(json: JsonObject): Sep31FeeDetails = sep31Rewrap("Malformed SEP-31 fee details") {
+            val total = json["total"]?.jsonPrimitive?.contentOrNull
+                ?: throw Sep31InvalidResponseException(
+                    "missing required 'total' field in SEP-31 fee details"
                 )
-            } catch (e: SerializationException) {
-                throw Sep31InvalidResponseException(
-                    "Malformed SEP-31 fee details: ${sanitizeAnchorString(e.message)}"
+            val asset = json["asset"]?.jsonPrimitive?.contentOrNull
+                ?: throw Sep31InvalidResponseException(
+                    "missing required 'asset' field in SEP-31 fee details"
                 )
+            val detailsArray = json["details"] as? JsonArray
+            val details = detailsArray?.map { element ->
+                val obj = (element as? JsonObject)
+                    ?: throw Sep31InvalidResponseException(
+                        "Malformed SEP-31 fee details line item: expected JSON object"
+                    )
+                Sep31FeeDetailsDetails.fromJson(obj)
             }
+            Sep31FeeDetails(total = total, asset = asset, details = details)
         }
     }
 }

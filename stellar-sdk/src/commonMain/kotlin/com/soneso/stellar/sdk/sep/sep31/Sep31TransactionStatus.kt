@@ -28,7 +28,7 @@ package com.soneso.stellar.sdk.sep.sep31
  * @property value The exact lowercase wire form used in SEP-31 JSON payloads.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#transaction-object">SEP-0031 Transaction Object</a>
  */
-enum class Sep31TransactionStatus(val value: String) {
+public enum class Sep31TransactionStatus(public val value: String) {
     /** Awaiting payment from the Sending Anchor. */
     PENDING_SENDER("pending_sender"),
 
@@ -59,7 +59,7 @@ enum class Sep31TransactionStatus(val value: String) {
     /** Catch-all for unspecified errors; inspect [Sep31TransactionResponse.statusMessage] for context. */
     ERROR("error");
 
-    companion object {
+    public companion object {
         /**
          * Resolves a wire-form status string to the matching enum constant.
          *
@@ -79,7 +79,7 @@ enum class Sep31TransactionStatus(val value: String) {
          * @param value The wire-form status string to resolve.
          * @return The matching enum constant, or `null` if [value] is not a known status.
          */
-        fun fromString(value: String): Sep31TransactionStatus? =
+        public fun fromString(value: String): Sep31TransactionStatus? =
             entries.firstOrNull { it.value == value }
     }
 }

@@ -45,18 +45,18 @@ import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
  * @property rawResponseBody Anchor response body preserved for local debugging only.
  *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
  *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated to 1024 chars and stripped of control characters, so this field is safe
+ *   Truncated and stripped of control characters, so this field is safe
  *   against log-injection — but it is NOT safe to ship to shared log aggregators
  *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
  *   other sensitive context in error responses. For production logging, use [message]
  *   instead. `null` when the SDK had no response body to capture for this error path.
  */
-class Sep31CustomerInfoNeededException(
-    val type: String?,
-    val rawResponseBody: String? = null,
+public class Sep31CustomerInfoNeededException(
+    public val type: String?,
+    public val rawResponseBody: String? = null,
 ) : Sep31Exception("Customer info needed; type=${sanitizeAnchorString(type)}") {
     /** The literal error tag returned by the Receiving Anchor for this condition. */
-    val error: String = "customer_info_needed"
+    public val error: String = "customer_info_needed"
 
     override fun toString(): String {
         return "SEP-31 customer info needed; type=${sanitizeAnchorString(type)}"

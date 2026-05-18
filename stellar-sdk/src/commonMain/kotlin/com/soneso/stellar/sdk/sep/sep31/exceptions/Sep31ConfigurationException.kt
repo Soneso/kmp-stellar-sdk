@@ -37,7 +37,7 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * @param message Detailed error message describing the configuration failure.
  * @param cause Optional underlying cause (for example, a TOML fetch failure).
  */
-class Sep31ConfigurationException(
+public class Sep31ConfigurationException(
     message: String,
     cause: Throwable? = null
 ) : Sep31Exception(message, cause) {
