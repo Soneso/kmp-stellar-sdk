@@ -52,7 +52,7 @@ class Sep31ServiceTest {
 
     // ==================== Fixtures ====================
 
-    // SEP-31 v3.1.0 GET /info - spec example (sep-0031.md L386-400) captured 2026-05-16
+    // SEP-31 GET /info — spec example.
     private val infoResponseJson = """
         {
           "receive": {
@@ -73,7 +73,7 @@ class Sep31ServiceTest {
         }
     """.trimIndent()
 
-    // SEP-31 v3.1.0 transaction object - SYNTHESIZED from spec sep-0031.md L786-802 with status="pending_sender" - captured 2026-05-16
+    // SEP-31 transaction object with status="pending_sender".
     private val pendingSenderTransactionJson = """
         {
           "transaction": {
@@ -1197,19 +1197,13 @@ class Sep31ServiceTest {
     @Test
     fun service_redirectIsTreatedAsUnknownResponse_dispatchValidation() = runTest {
         // SCOPE: This test validates that when the client passed into Sep31Service is configured
-        // with followRedirects=false, a 3xx response from the anchor surfaces as
-        // Sep31UnknownResponseException carrying the original 3xx status code. The
-        // followRedirects=false setting matches what Sep31Service applies to its internally-
-        // built client at the call site `withHttpClient` in Sep31Service.kt (the production
-        // builder is `HttpClient(<engine>) { followRedirects = false; ... }`).
-        //
-        // LIMITATION: This unit test cannot directly observe the followRedirects=false setting
-        // on the SDK's internally-built client because Ktor exposes no introspection API for
-        // the live client config and the SDK does not surface the config object. The production
-        // guarantee is enforced structurally by the source-level `followRedirects = false` line
-        // in Sep31Service.kt's `withHttpClient` private helper. End-to-end verification of that
-        // line is the responsibility of integration tests (Phase 4) against a live anchor that
-        // serves a 3xx — those tests use no injected client.
+        // With followRedirects=false, a 3xx response from the anchor surfaces as
+        // Sep31UnknownResponseException carrying the original 3xx status code. This test
+        // uses an injected MockEngine client because Ktor exposes no introspection API for
+        // the internally-built client config. The production guarantee is enforced
+        // structurally by the `followRedirects = false` line in Sep31Service.kt's
+        // `withHttpClient` helper; end-to-end verification of that line belongs to
+        // integration tests against a live anchor that serves a 3xx.
         val engine = MockEngine { _ ->
             respond(
                 content = "Moved",

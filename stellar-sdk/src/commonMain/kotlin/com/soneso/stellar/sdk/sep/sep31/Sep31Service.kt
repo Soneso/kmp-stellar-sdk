@@ -228,7 +228,7 @@ private fun decodeUtf8OrNull(bytes: ByteArray): String? =
  * SEP-31 Cross-Border Payments service client.
  *
  * Provides the Sending Anchor side of SEP-31 by talking to a Receiving Anchor's
- * `DIRECT_PAYMENT_SERVER`. Wraps the five HTTP endpoints defined by SEP-0031 v3.1.0:
+ * `DIRECT_PAYMENT_SERVER`. Wraps the five HTTP endpoints defined by SEP-0031:
  *
  * - `GET /info` — discover supported assets, limits, and KYC requirements.
  * - `POST /transactions` — initiate a cross-border payment and receive on-chain instructions.
@@ -642,8 +642,8 @@ public class Sep31Service(
      * [Sep31BadRequestException]; the `customer_info_needed` and
      * `transaction_info_needed` error tags are POST-only per spec.
      *
-     * Returns [Sep31TransactionResponse] because SEP-31 v3.1.0 §"PATCH Transaction
-     * Success 200 OK" specifies the response body must match `GET /transactions/:id`.
+     * Returns [Sep31TransactionResponse] because the SEP-31 spec specifies the PATCH
+     * response body must match `GET /transactions/:id`.
      * Surfacing the parsed response makes it observable without a follow-up
      * [getTransaction] call.
      *

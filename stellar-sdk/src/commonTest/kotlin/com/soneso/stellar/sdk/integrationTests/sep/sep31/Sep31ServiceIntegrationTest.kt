@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31CustomerInfoNeededExcept
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31ForbiddenException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionCallbackNotSupportedException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionNotFoundException
+import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnauthorizedException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -27,28 +28,18 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Integration tests for [Sep31Service] against the live Stellar testnet.
  *
- * Chosen anchor: testanchor.stellar.org
+ * Anchor: testanchor.stellar.org
  * - DIRECT_PAYMENT_SERVER: https://testanchor.stellar.org/sep31
- * - SIGNING_KEY: GCHLHDBOKG2JWMJQBTLSL5XG6NO7ESXI2TAQKZXCXWXB5WI2X6W233PR
  * - NETWORK_PASSPHRASE: Test SDF Network ; September 2015
  *
- * Anchor selection date: 2026-05-16 (Phase 0 RESEARCH).
- * Phase 0 RESEARCH report reference: plans/sep-31-implementation.md §8 Open decisions item #1.
+ * The anchor's `GET /info` returns `{"receive":{}}` (no assets configured), so the
+ * tests exercise discovery and error-path branches against the live wire. Full
+ * lifecycle assertions (status transitions, fee_details, refunds, callback success)
+ * are covered by the mock-engine unit tests in `Sep31ServiceTest.kt`.
  *
- * Spec divergence observed and exercised here:
- * - GET /info returns HTTP 200 with body `{"receive":{}}` when called without a JWT.
- *   The SEP-31 spec mandates authentication on all endpoints, but this anchor exposes
- *   /info unauthenticated. Both paths (with and without JWT) are tested.
- * - The anchor returns HTTP 403 (not 404) for requests to /transactions/:id and
- *   /transactions/:id/callback when the supplied JWT is invalid. A valid JWT obtained
- *   via SEP-10 is required to exercise the 404 path for a nonexistent transaction id.
- * - GET /info returns `{"receive":{}}` — the receive map is intentionally empty for this
- *   test account on testanchor. The test asserts the map is not null (it exists and is
- *   parseable), not that it is non-empty.
- *
- * Authentication: SEP-10 via [WebAuth.fromDomain] + [WebAuth.jwtToken]. Each test that
- * requires a JWT calls [obtainJwtToken], which generates a random keypair, funds it via
- * Friendbot, and authenticates. Account funding takes approximately one ledger close
+ * Authentication: SEP-10 via [WebAuth.fromDomain] + [WebAuth.jwtToken]. Each test
+ * that needs a JWT calls [obtainJwtToken], which generates a random keypair, funds
+ * it via Friendbot, and authenticates. Account funding takes about one ledger close
  * (~5 s); [realDelay] is used to wait for testnet settlement.
  *
  * Note: These tests are not marked @Ignore. They require connectivity to
@@ -56,7 +47,6 @@ import kotlin.time.Duration.Companion.seconds
  */
 class Sep31ServiceIntegrationTest {
 
-    // testanchor.stellar.org — anchor selected by Phase 0 RESEARCH on 2026-05-16.
     private val anchorDomain = "testanchor.stellar.org"
     private val directPaymentServer = "https://testanchor.stellar.org/sep31"
     private val network = Network.TESTNET
@@ -92,10 +82,6 @@ class Sep31ServiceIntegrationTest {
     /**
      * Validates that [Sep31Service.fromDomain] resolves the anchor's stellar.toml and
      * returns a service configured with the advertised DIRECT_PAYMENT_SERVER URL.
-     *
-     * Flow:
-     * 1. Call Sep31Service.fromDomain("testanchor.stellar.org").
-     * 2. Assert the returned service's serviceUrl matches the anchor's advertised URL.
      */
     @Test
     fun fromDomain_validDomain_resolvesService() = runTest(timeout = 60.seconds) {
@@ -104,7 +90,7 @@ class Sep31ServiceIntegrationTest {
         assertNotNull(service, "fromDomain must return a non-null Sep31Service")
         assertTrue(
             service.serviceUrl.startsWith("https://"),
-            "Resolved serviceUrl must use HTTPS; got: (redacted for log-injection prevention)"
+            "Resolved serviceUrl must use HTTPS"
         )
         assertTrue(
             service.serviceUrl.contains("testanchor.stellar.org"),
@@ -114,18 +100,8 @@ class Sep31ServiceIntegrationTest {
 
     /**
      * Validates that [Sep31Service.info] with a valid SEP-10 JWT returns a parseable
-     * response. The receive map may be empty for this anchor/account combination;
-     * the test asserts the map is not null (the response is well-formed).
-     *
-     * testanchor.stellar.org returns `{"receive":{}}` for the test account, which is
-     * spec-conformant. [Sep31InfoResponse.receiveAssets] is typed as
-     * `Map<String, Sep31ReceiveAssetInfo>` and is therefore always non-null.
-     *
-     * Flow:
-     * 1. Obtain SEP-10 JWT.
-     * 2. Call info(jwt = jwtToken).
-     * 3. Assert the response is parsed without exception.
-     * 4. Assert receiveAssets is a Map (even if empty).
+     * response. The anchor returns `{"receive":{}}`, so the assertion is structural
+     * (the response parses) rather than content-based.
      */
     @Test
     fun info_returnsOkResponse() = runTest(timeout = 90.seconds) {
@@ -134,25 +110,26 @@ class Sep31ServiceIntegrationTest {
 
         val response = service.info(jwt = jwtToken)
 
-        // receiveAssets is Map<String, Sep31ReceiveAssetInfo> — always non-null by type.
-        assertIs<Map<*, *>>(
-            response.receiveAssets,
-            "receiveAssets must be a Map (may be empty for testanchor test account)"
-        )
+        assertIs<Map<*, *>>(response.receiveAssets)
+    }
+
+    /**
+     * Validates that [Sep31Service.info] accepts the optional `lang` query parameter
+     * without altering response parsing.
+     */
+    @Test
+    fun info_withLang_returnsOkResponse() = runTest(timeout = 90.seconds) {
+        val jwtToken = obtainJwtToken()
+        val service = Sep31Service.fromDomain(domain = anchorDomain)
+
+        val response = service.info(jwt = jwtToken, lang = "en")
+
+        assertIs<Map<*, *>>(response.receiveAssets)
     }
 
     /**
      * Validates that [Sep31Service.getTransaction] throws [Sep31TransactionNotFoundException]
      * when the anchor cannot locate a transaction matching the supplied id.
-     *
-     * The id `82fhs729f63dh0v4-nonexistent` is spec-example-shaped (RFC 3986 pchar-safe)
-     * and cannot exist in the anchor's database.
-     *
-     * Flow:
-     * 1. Obtain SEP-10 JWT (required — anchor returns 403 for unauthenticated requests).
-     * 2. Call getTransaction("82fhs729f63dh0v4-nonexistent", jwt = jwtToken).
-     * 3. Assert Sep31TransactionNotFoundException is thrown.
-     * 4. Assert exception.statusCode == 404.
      */
     @Test
     fun getTransaction_nonexistentId_throwsSep31TransactionNotFoundException() =
@@ -174,27 +151,40 @@ class Sep31ServiceIntegrationTest {
         }
 
     /**
-     * Validates the PUT /transactions/:id/callback error path.
+     * Validates that [Sep31Service.patchTransaction] throws
+     * [Sep31TransactionNotFoundException] when the anchor cannot locate the supplied
+     * transaction id. The endpoint is part of the deprecated info-update flow and
+     * shares the SDK's 404 mapping with [Sep31Service.getTransaction].
+     */
+    @Test
+    fun patchTransaction_nonexistentId_throwsSep31TransactionNotFoundException() =
+        runTest(timeout = 90.seconds) {
+            val jwtToken = obtainJwtToken()
+            val service = Sep31Service.fromDomain(domain = anchorDomain)
+
+            val exception = assertFailsWith<Sep31TransactionNotFoundException> {
+                service.patchTransaction(
+                    id = "82fhs729f63dh0v4-nonexistent",
+                    fields = mapOf(
+                        "transaction" to mapOf("receiver_bank_account" to "1234567890"),
+                    ),
+                    jwt = jwtToken,
+                )
+            }
+
+            assertTrue(
+                exception.statusCode == 404,
+                "Exception statusCode must be 404; got ${exception.statusCode}"
+            )
+        }
+
+    /**
+     * Validates the PUT /transactions/:id/callback 404 path.
      *
-     * testanchor.stellar.org does not support callback registration via
-     * PUT /transactions/:id/callback — it returns HTTP 404. When the supplied
-     * transaction id is also nonexistent, the anchor returns 404 for both reasons.
-     * The test accepts either [Sep31TransactionCallbackNotSupportedException] or
-     * [Sep31TransactionNotFoundException] as a valid outcome, because the anchor does
-     * not distinguish between "transaction not found" and "callbacks not supported"
-     * at the HTTP level.
-     *
-     * Live run result (2026-05-16): anchor returns HTTP 404 for this endpoint with any
-     * valid JWT and any transaction id — mapped to
-     * [Sep31TransactionCallbackNotSupportedException] by the SDK's PUT /callback
-     * dispatch logic.
-     *
-     * Flow:
-     * 1. Obtain SEP-10 JWT.
-     * 2. Call putTransactionCallback("82fhs729f63dh0v4-nonexistent", callbackUrl, jwtToken).
-     * 3. Assert Sep31TransactionCallbackNotSupportedException OR
-     *    Sep31TransactionNotFoundException is thrown.
-     * 4. Assert exception.statusCode == 404.
+     * Anchors may map "transaction not found" and "callbacks not supported" to the
+     * same HTTP 404 response, so the test accepts either
+     * [Sep31TransactionCallbackNotSupportedException] or
+     * [Sep31TransactionNotFoundException].
      */
     @Test
     fun putTransactionCallback_unknownId_throwsAppropriateException() =
@@ -204,7 +194,7 @@ class Sep31ServiceIntegrationTest {
 
             var caughtStatusCode: Int? = null
             var caughtIsCallbackException = false
-            var caughtIsNotFoundExceptionn = false
+            var caughtIsNotFoundException = false
 
             try {
                 service.putTransactionCallback(
@@ -216,12 +206,12 @@ class Sep31ServiceIntegrationTest {
                 caughtIsCallbackException = true
                 caughtStatusCode = e.statusCode
             } catch (e: Sep31TransactionNotFoundException) {
-                caughtIsNotFoundExceptionn = true
+                caughtIsNotFoundException = true
                 caughtStatusCode = e.statusCode
             }
 
             assertTrue(
-                caughtIsCallbackException || caughtIsNotFoundExceptionn,
+                caughtIsCallbackException || caughtIsNotFoundException,
                 "Must throw Sep31TransactionCallbackNotSupportedException or " +
                     "Sep31TransactionNotFoundException; anchor returned no exception"
             )
@@ -235,21 +225,11 @@ class Sep31ServiceIntegrationTest {
      * Validates that [Sep31Service.postTransactions] throws a typed SEP-31 exception
      * when the anchor rejects the request.
      *
-     * testanchor.stellar.org returns HTTP 400 for POST /transactions requests from
-     * accounts that have not completed SEP-12 KYC registration. The expected exception
-     * is [Sep31CustomerInfoNeededException] (error tag "customer_info_needed") if the
-     * anchor signals which SEP-12 type to collect, or [Sep31BadRequestException] for
-     * other generic 400 responses.
-     *
-     * Live run result (2026-05-16): testanchor returns HTTP 400 with
-     * `error: "customer_info_needed"` for POST /transactions from an unregistered
-     * account — mapped to [Sep31CustomerInfoNeededException] by the SDK.
-     *
-     * Flow:
-     * 1. Obtain SEP-10 JWT.
-     * 2. Call postTransactions with a minimal request (USDC, amount 100).
-     * 3. Assert Sep31CustomerInfoNeededException OR Sep31BadRequestException is thrown.
-     * 4. For Sep31CustomerInfoNeededException, assert error == "customer_info_needed".
+     * The anchor returns HTTP 400 (`error: "customer_info_needed"`) for accounts that
+     * have not completed SEP-12 KYC registration; this maps to
+     * [Sep31CustomerInfoNeededException]. Other deployments may surface
+     * [Sep31BadRequestException] or [Sep31ForbiddenException] depending on
+     * configuration.
      */
     @Test
     fun postTransactions_throwsExpectedExceptionForTestAccount() =
@@ -313,4 +293,89 @@ class Sep31ServiceIntegrationTest {
                 )
             }
         }
+
+    /**
+     * Validates that each protected SEP-31 endpoint rejects an invalid JWT with a typed
+     * auth-failure exception.
+     *
+     * Anchors map invalid-JWT to either HTTP 401 or 403; some return 400 instead. The
+     * test accepts [Sep31UnauthorizedException], [Sep31ForbiddenException], or
+     * [Sep31BadRequestException] for every endpoint, and additionally accepts
+     * [Sep31TransactionCallbackNotSupportedException] and
+     * [Sep31TransactionNotFoundException] for the endpoints that share a 404 path with
+     * those exception types.
+     */
+    @Test
+    fun protectedEndpoints_invalidJwt_rejected() = runTest(timeout = 90.seconds) {
+        val service = Sep31Service.fromDomain(domain = anchorDomain)
+        val invalidJwt = "invalid_token_12345"
+        val nonexistentId = "82fhs729f63dh0v4-nonexistent"
+
+        // POST /transactions
+        val postError = runCatching {
+            service.postTransactions(
+                request = Sep31PostTransactionsRequest(
+                    amount = 100.0,
+                    assetCode = "USDC",
+                    fundingMethod = "SWIFT",
+                ),
+                jwt = invalidJwt,
+            )
+        }.exceptionOrNull()
+        assertTrue(
+            postError is Sep31UnauthorizedException ||
+                postError is Sep31ForbiddenException ||
+                postError is Sep31BadRequestException,
+            "postTransactions with invalid JWT must throw 401/403/400; got: " +
+                "${postError?.let { it::class.simpleName }}"
+        )
+
+        // GET /transactions/:id
+        val getError = runCatching {
+            service.getTransaction(id = nonexistentId, jwt = invalidJwt)
+        }.exceptionOrNull()
+        assertTrue(
+            getError is Sep31UnauthorizedException ||
+                getError is Sep31ForbiddenException ||
+                getError is Sep31BadRequestException,
+            "getTransaction with invalid JWT must throw 401/403/400; got: " +
+                "${getError?.let { it::class.simpleName }}"
+        )
+
+        // PUT /transactions/:id/callback
+        val callbackError = runCatching {
+            service.putTransactionCallback(
+                id = nonexistentId,
+                callbackUrl = "https://example.com/sep31-callback",
+                jwt = invalidJwt,
+            )
+        }.exceptionOrNull()
+        assertTrue(
+            callbackError is Sep31UnauthorizedException ||
+                callbackError is Sep31ForbiddenException ||
+                callbackError is Sep31BadRequestException ||
+                callbackError is Sep31TransactionCallbackNotSupportedException,
+            "putTransactionCallback with invalid JWT must throw 401/403/400/404; got: " +
+                "${callbackError?.let { it::class.simpleName }}"
+        )
+
+        // PATCH /transactions/:id
+        val patchError = runCatching {
+            service.patchTransaction(
+                id = nonexistentId,
+                fields = mapOf(
+                    "transaction" to mapOf("receiver_bank_account" to "1234567890"),
+                ),
+                jwt = invalidJwt,
+            )
+        }.exceptionOrNull()
+        assertTrue(
+            patchError is Sep31UnauthorizedException ||
+                patchError is Sep31ForbiddenException ||
+                patchError is Sep31BadRequestException ||
+                patchError is Sep31TransactionNotFoundException,
+            "patchTransaction with invalid JWT must throw 401/403/400/404; got: " +
+                "${patchError?.let { it::class.simpleName }}"
+        )
+    }
 }

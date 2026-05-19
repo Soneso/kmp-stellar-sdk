@@ -33,7 +33,7 @@ class Sep31ResponseParsingTest {
 
     // ==================== Fixtures ====================
 
-    // SEP-31 v3.1.0 GET /info — spec example (sep-0031.md L386-400) captured 2026-05-16
+    // SEP-31 GET /info — spec example.
     private val infoResponseJson = """
         {
           "receive": {
@@ -54,7 +54,7 @@ class Sep31ResponseParsingTest {
         }
     """.trimIndent()
 
-    // SEP-31 v3.1.0 receive asset with sep12 KYC required — synthesized for fixture purposes captured 2026-05-16
+    // SEP-31 receive asset with sep12 KYC required (test fixture).
     private val infoWithSep12Json = """
         {
           "receive": {
@@ -82,7 +82,7 @@ class Sep31ResponseParsingTest {
         }
     """.trimIndent()
 
-    // SEP-31 v3.1.0 transaction object — SYNTHESIZED from spec sep-0031.md L786-802 with status="pending_sender" — captured 2026-05-16
+    // SEP-31 transaction object with status="pending_sender".
     private val pendingSenderTransactionJson = """
         {
           "transaction": {
@@ -101,7 +101,7 @@ class Sep31ResponseParsingTest {
         }
     """.trimIndent()
 
-    // SEP-31 v3.1.0 transaction object — SYNTHESIZED merging spec L838-866 (refunds) + L870-891 (quote/fee_details) — captured 2026-05-16
+    // SEP-31 transaction object with refunds and quote/fee_details.
     private val completedTransactionJson = """
         {
           "transaction": {

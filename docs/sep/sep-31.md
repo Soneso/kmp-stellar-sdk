@@ -268,7 +268,7 @@ suspend fun fullPaymentFlow() {
 
 Step 4 above accepts `senderId` and `receiverId` as opaque strings. Use `KYCService.putCustomerInfo` to produce them. The `type` argument must match a key exposed by `Sep31ReceiveAssetInfo.sep12Info.senderTypes` or `receiverTypes`; the anchor declares which KYC type each role must use.
 
-> **Spec note on the `sep12` deprecation marker.** SEP-31 v3.1.0's asset-object schema row marks the wire `sep12` field "(Deprecated, optional)". This is editorially inconsistent with the surrounding prose, which still names `sep12.sender.types` / `sep12.receiver.types` as the canonical customer-type discovery path, and with SEP-12 §"Type Specification", which defers `type` discovery back to the calling protocol with no alternative. No successor field has been specified. The SDK accordingly exposes `Sep31ReceiveAssetInfo.sep12Info` as canonical (not `@Deprecated`). The genuinely-deprecated older flat fields `senderSep12Type` / `receiverSep12Type` and the per-transaction `fields` map ARE flagged `@Deprecated` in the SDK.
+> **Spec note on the `sep12` deprecation marker.** The SEP-31 asset-object schema row marks the wire `sep12` field "(Deprecated, optional)". This is editorially inconsistent with the surrounding prose, which still names `sep12.sender.types` / `sep12.receiver.types` as the canonical customer-type discovery path, and with SEP-12 §"Type Specification", which defers `type` discovery back to the calling protocol with no alternative. No successor field has been specified. The SDK accordingly exposes `Sep31ReceiveAssetInfo.sep12Info` as canonical (not `@Deprecated`). The genuinely-deprecated older flat fields `senderSep12Type` / `receiverSep12Type` and the per-transaction `fields` map ARE flagged `@Deprecated` in the SDK.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.NaturalPersonKYCFields
@@ -766,7 +766,7 @@ suspend fun legacyPatch() {
 }
 ```
 
-The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the updated transaction response (the SEP-31 v3.1.0 spec mandates the PATCH response body match `GET /transactions/:id`).
+The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the updated transaction response (the SEP-31 spec mandates the PATCH response body match `GET /transactions/:id`).
 
 ## Related SEPs
 

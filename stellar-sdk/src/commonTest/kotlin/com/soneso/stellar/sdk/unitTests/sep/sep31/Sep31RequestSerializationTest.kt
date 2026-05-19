@@ -27,7 +27,7 @@ class Sep31RequestSerializationTest {
         assertEquals(50.0, map["amount"])
         assertEquals("USDC", map["asset_code"])
         assertEquals("SWIFT", map["funding_method"])
-        // Per SEP-31 v3.1.0, the three required keys are amount, asset_code, funding_method.
+        // Per SEP-31, the three required keys are amount, asset_code, funding_method.
         assertEquals(3, map.size)
     }
 
@@ -98,7 +98,7 @@ class Sep31RequestSerializationTest {
 
     @Test
     fun toJson_fundingMethodAlwaysSerializesAsSnakeCase() = runTest {
-        // Per SEP-31 v3.1.0, funding_method is required and must always appear in the
+        // Per SEP-31, funding_method is required and must always appear in the
         // serialized body. Verify both the snake_case key and the value pass-through.
         val request = Sep31PostTransactionsRequest(
             amount = 100.0,

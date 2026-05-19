@@ -45,7 +45,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * @property sep12Info SEP-12 customer type requirements for sender and receiver. Defaults
  *   to empty sender/receiver maps when the anchor omits the per-asset `sep12` object —
- *   anchors that require no KYC may leave it out entirely. Note: SEP-31 v3.1.0 marks
+ *   anchors that require no KYC may leave it out entirely. Note: the SEP-31 spec marks
  *   the wire `sep12` field "(Deprecated, optional)", but the spec prose still recommends
  *   `sep12.sender.types` / `sep12.receiver.types` over the older flat
  *   [senderSep12Type] / [receiverSep12Type] fields, and SEP-12 defers customer-type
@@ -104,7 +104,7 @@ public data class Sep31ReceiveAssetInfo(
         @Suppress("DEPRECATION")
         public fun fromJson(json: JsonObject): Sep31ReceiveAssetInfo =
             sep31Rewrap("Malformed receive asset info in SEP-31 response") {
-                // Per SEP-31 v3.1.0, the schema row marks the per-asset `sep12` object
+                // Per SEP-31, the schema row marks the per-asset `sep12` object
                 // "(Deprecated, optional)" — but the surrounding spec prose still
                 // recommends `sep12.sender.types` / `sep12.receiver.types` for
                 // customer-type discovery with no documented alternative, so we treat

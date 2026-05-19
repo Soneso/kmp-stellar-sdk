@@ -70,7 +70,6 @@ import kotlinx.serialization.json.Json
  * Every fenced kotlin block is mirrored here as a self-contained `@Test` so that
  * documentation drift (stale class names, wrong overload signatures, removed
  * parameters) breaks the build instead of silently misleading users.
- * Do NOT delete this file during refactors — see plans/sep-31-implementation.md §5.D.
  */
 class Sep31DocSnippetsCompileTest {
 
