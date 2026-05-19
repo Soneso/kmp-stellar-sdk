@@ -2,16 +2,13 @@
 
 ## Overview
 
-SEP-31 defines an API a Sending Anchor uses to deliver a cross-border payment through a Receiving Anchor. The Sending Anchor authenticates with SEP-10, discovers the Receiving Anchor's supported assets through `GET /info`, optionally collects SEP-12 KYC and a SEP-38 firm quote, then `POST /transactions` to obtain the on-chain Stellar account, memo, and memo type that route the payment to a single transaction record on the Receiving Anchor.
+[SEP-31](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md) defines an API a Sending Anchor uses to deliver a cross-border payment through a Receiving Anchor. The Sending Anchor authenticates with SEP-10, discovers the Receiving Anchor's supported assets through `GET /info`, optionally collects SEP-12 KYC and a SEP-38 firm quote, then `POST /transactions` to obtain the on-chain Stellar account, memo, and memo type that route the payment to a single transaction record on the Receiving Anchor.
 
-This SDK implements the **Sending Anchor** side of the protocol — that is, the client of the Receiving Anchor's `DIRECT_PAYMENT_SERVER`. There is no Receiving Anchor server scaffolding in this SDK.
+This SDK implements the **Sending Anchor** side of the protocol (the client of the Receiving Anchor's `DIRECT_PAYMENT_SERVER`). There is no Receiving Anchor server scaffolding in this SDK.
 
-**Use Cases**:
-- Build a wallet that initiates remittance payments through a Receiving Anchor
-- Integrate a Sending Anchor backend that converts incoming user funds into Stellar payments routed to a partner anchor
-- Track lifecycle status (including refunds) of cross-border transactions originated through SEP-31
+## Quick example
 
-## Quick Example
+**Prerequisites**: a SEP-10 JWT for the Sending Anchor account, and the `senderId` / `receiverId` returned from SEP-12 `PUT /customer`. If the anchor advertises `quotesRequired = true` for the asset, a SEP-38 `quoteId` is also required.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep31.Sep31PostTransactionsRequest
@@ -31,9 +28,8 @@ suspend fun sendingAnchorQuickExample() {
         ?: error("Receiving Anchor does not accept USDC")
     println("USDC accepted: min=${usdc.minAmount} max=${usdc.maxAmount}")
 
-    // 4. Initiate the transaction. fundingMethod is required by SEP-31 v3.1.0 and
-    //    must match a value advertised in usdc.fundingMethods. senderId / receiverId
-    //    are SEP-12 customer ids collected from PUT /customer prior to this call
+    // 4. Initiate the transaction. fundingMethod must match one of usdc.fundingMethods.
+    //    senderId / receiverId are SEP-12 customer ids collected from PUT /customer
     //    when the anchor requires KYC.
     val request = Sep31PostTransactionsRequest(
         amount = 100.0,
@@ -58,7 +54,7 @@ suspend fun sendingAnchorQuickExample() {
 
 ## Creating the service
 
-The SDK exposes two construction paths. Prefer [fromDomain] when the Receiving Anchor publishes a stellar.toml; fall back to the direct constructor for closed integrations.
+Prefer [fromDomain] when the Receiving Anchor publishes a stellar.toml; fall back to the direct constructor for closed integrations.
 
 ### fromDomain (preferred)
 
@@ -84,11 +80,11 @@ suspend fun createServiceDirect() {
 }
 ```
 
-Both forms accept an optional `httpClient: HttpClient` and `httpRequestHeaders: Map<String, String>` for advanced setups (custom TLS pinning, additional headers). A caller-supplied client is used as-is and is never closed by the service.
+Both forms accept an optional `httpClient: HttpClient` and `httpRequestHeaders: Map<String, String>` for additional configuration (custom TLS pinning, request headers). A caller-supplied client is used as-is and is never closed by the service.
 
 ### HTTPS enforcement and the loopback carve-out
 
-The SDK requires HTTPS at four boundaries: the constructor `serviceUrl`, the `stellar.toml` fetch performed by `fromDomain`, the resolved `DIRECT_PAYMENT_SERVER` from that TOML, and the `callbackUrl` passed to `putTransactionCallback`. Every other host must use HTTPS. As a development convenience, `http://` is accepted only against the three IETF loopback authorities — `localhost`, `127.0.0.1`, and `[::1]`, each optionally with a `:port`. This lets you point the service at a local Anchor Platform instance (typically `http://localhost:8080`) without standing up a TLS-terminating proxy.
+The SDK requires HTTPS at four boundaries: the constructor `serviceUrl`, the `stellar.toml` fetch performed by `fromDomain`, the resolved `DIRECT_PAYMENT_SERVER` from that TOML, and the `callbackUrl` passed to `putTransactionCallback`. Every other host must use HTTPS. As a development convenience, `http://` is accepted only against the three IETF loopback authorities `localhost`, `127.0.0.1`, and `[::1]`, each optionally with a `:port`. This lets you point the service at a local Anchor Platform instance (typically `http://localhost:8080`) without standing up a TLS-terminating proxy.
 
 ```kotlin
 // Production deployment — TOML fetched over https, service URL over https.
@@ -134,14 +130,12 @@ fun createServiceWithCustomClient(): Sep31Service {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; isLenient = true })
         }
-        // Application policy decision: follow same-origin redirects, for example.
-        followRedirects = false
     }
     return Sep31Service("https://anchor.example.org", httpClient = customClient)
 }
 ```
 
-The SDK still enforces HTTPS, path-segment validation, content-type allow-listing, response-body size caps, and JWT redaction in error messages regardless of which `HttpClient` is passed — those rules live in the service layer, not the HTTP client.
+The SDK still enforces HTTPS, path-segment validation, content-type allow-listing, response-body size caps, and JWT redaction in error messages regardless of which `HttpClient` is passed. Those rules live in the service layer, not the HTTP client.
 
 ## Getting anchor information
 
@@ -166,7 +160,7 @@ suspend fun fetchInfo() {
 }
 ```
 
-Per SEP-31 §"Authentication", a SEP-10 JWT is required on every endpoint, including `GET /info`. The SDK enforces this at the type level — `info(jwt: String, lang: String? = null)` does not accept a `null` token.
+Per SEP-31 §"Authentication", a SEP-10 JWT is required on every endpoint, including `GET /info`. The SDK enforces this at the type level: `info(jwt: String, lang: String? = null)` does not accept a `null` token.
 
 ### Inspecting funding methods and quote requirements
 
@@ -196,20 +190,12 @@ suspend fun inspectAssetCapabilities() {
 
 ## Full payment flow
 
-The Sending Anchor flow has many spec-defined steps. The numbered list below shows the SDK-side path; the spec's "Detailed Sending Anchor Flow" enumerates additional out-of-band steps (deposit collection from the user, regulatory checks, on-chain submission).
-
-See [SEP-0031 §Detailed Sending Anchor Flow](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#detailed-sending-anchor-flow) for the full sequence.
+The numbered comments below mark the SDK calls. Non-SDK steps (deposit collection from the user, regulatory checks, on-chain submission) are out of scope; see [SEP-0031 §Detailed Sending Anchor Flow](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#detailed-sending-anchor-flow) for the full sequence.
 
 ```kotlin
-import com.soneso.stellar.sdk.Asset
-import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoHash
 import com.soneso.stellar.sdk.MemoId
 import com.soneso.stellar.sdk.MemoText
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.PaymentOperation
-import com.soneso.stellar.sdk.TransactionBuilder
-import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.sep.sep31.Sep31PostTransactionsRequest
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import kotlin.io.encoding.Base64
@@ -239,9 +225,8 @@ suspend fun fullPaymentFlow() {
     val quoteId: String? =
         if (usdc.quotesRequired == true) "33333333-3333-3333-3333-333333333333" else null
 
-    // 6. Initiate the transaction. fundingMethod is required by SEP-31 v3.1.0 and
-    //    must match a value advertised in usdc.fundingMethods. Refund memo and the
-    //    SEP-38 quoteId remain optional.
+    // 6. Initiate the transaction. fundingMethod must match one of usdc.fundingMethods.
+    //    refundMemo and quoteId are optional.
     val request = Sep31PostTransactionsRequest(
         amount = 100.0,
         assetCode = "USDC",
@@ -254,15 +239,11 @@ suspend fun fullPaymentFlow() {
     )
     val post = sep31.postTransactions(request, jwt)
 
-    // 7. Build the Stellar payment using the exact memo returned by the anchor.
-    val sendingKeyPair = KeyPair.fromSecretSeed(
-        "SCH27VUZZ6UAKB67BDNF6FA42YMBMQCBKXWGMFD5TZ6S5ZZCZFLRXKHS",
-    )
-    val horizon = HorizonServer("https://horizon-testnet.stellar.org")
-    val sourceAccount = horizon.loadAccount(sendingKeyPair.getAccountId())
-
+    // 7. Build the Memo from the values returned by the anchor. The exact memo
+    //    is the only field the Receiving Anchor uses to match the incoming
+    //    Stellar payment to this transaction record.
     val destination = post.stellarAccountId
-        ?: error("Anchor has not issued payment instructions yet; poll until pending_sender")
+        ?: error("Anchor has not issued payment instructions yet; see 'When stellarAccountId is null' for the polling pattern")
     val memo = when (post.stellarMemoType) {
         "id" -> MemoId(post.stellarMemo!!.toULong())
         "text" -> MemoText(post.stellarMemo!!)
@@ -273,25 +254,11 @@ suspend fun fullPaymentFlow() {
         else -> error("Unsupported memo type: ${post.stellarMemoType}")
     }
 
-    val usdcAsset = Asset.createNonNativeAsset(
-        "USDC",
-        "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
-    )
-    val payment = PaymentOperation(
-        destination = destination,
-        asset = usdcAsset,
-        amount = "100.00",
-    )
-    val tx = TransactionBuilder(sourceAccount, Network.TESTNET)
-        .addOperation(payment)
-        .addMemo(memo)
-        .setBaseFee(100)
-        .setTimeout(180)
-        .build()
-    tx.sign(sendingKeyPair)
-    horizon.submitTransaction(tx.toEnvelopeXdrBase64())
+    // 8. Submit the Stellar payment to `destination` with the `memo` constructed
+    //    above. See docs/sdk-usage-examples.md for the TransactionBuilder pattern;
+    //    SEP-31 has no further constraints on the on-chain transaction.
 
-    // 8. Poll for status.
+    // 9. Track status.
     val current = sep31.getTransaction(post.id, jwt)
     println("Transaction status: ${current.status}")
 }
@@ -299,7 +266,9 @@ suspend fun fullPaymentFlow() {
 
 ### Registering sender and receiver via SEP-12
 
-Step 4 above accepts `senderId` and `receiverId` as opaque strings. Use `KYCService.putCustomerInfo` to produce them. The `type` argument must match a key exposed by `Sep31ReceiveAssetInfo.sep12Info.senderTypes` or `receiverTypes` — the anchor declares which KYC type each role must use.
+Step 4 above accepts `senderId` and `receiverId` as opaque strings. Use `KYCService.putCustomerInfo` to produce them. The `type` argument must match a key exposed by `Sep31ReceiveAssetInfo.sep12Info.senderTypes` or `receiverTypes`; the anchor declares which KYC type each role must use.
+
+> **Spec note on the `sep12` deprecation marker.** SEP-31 v3.1.0's asset-object schema row marks the wire `sep12` field "(Deprecated, optional)". This is editorially inconsistent with the surrounding prose, which still names `sep12.sender.types` / `sep12.receiver.types` as the canonical customer-type discovery path, and with SEP-12 §"Type Specification", which defers `type` discovery back to the calling protocol with no alternative. No successor field has been specified. The SDK accordingly exposes `Sep31ReceiveAssetInfo.sep12Info` as canonical (not `@Deprecated`). The genuinely-deprecated older flat fields `senderSep12Type` / `receiverSep12Type` and the per-transaction `fields` map ARE flagged `@Deprecated` in the SDK.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.NaturalPersonKYCFields
@@ -372,9 +341,7 @@ See [SEP-38: Anchor RFQ API](sep-38.md) for the full request shape, indicative p
 
 ## Tracking transaction status
 
-SEP-31 defines ten lifecycle statuses. [Sep31TransactionResponse.status] is a raw `String`; use [Sep31TransactionStatus.fromString] for typed dispatch.
-
-The ten statuses are: `pending_sender`, `pending_stellar`, `pending_customer_info_update`, `pending_transaction_info_update`, `pending_receiver`, `pending_external`, `completed`, `refunded`, `expired`, `error`.
+SEP-31 defines ten lifecycle statuses (see [SEP-0031 §"GET Transaction"](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#get-transaction) for the canonical definitions). [Sep31TransactionResponse.status] is a raw `String`; use [Sep31TransactionStatus.fromString] for typed dispatch.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
@@ -386,116 +353,67 @@ suspend fun handleStatus(sep31: Sep31Service, txId: String, jwt: String): Sep31T
 
     when (Sep31TransactionStatus.fromString(response.status)) {
         Sep31TransactionStatus.PENDING_SENDER ->
+            // Action: submit the Stellar payment with the anchor-supplied memo, then continue polling.
             println("Submit Stellar payment to ${response.stellarAccountId} with memo ${response.stellarMemo}")
         Sep31TransactionStatus.PENDING_STELLAR ->
+            // Action: continue polling; no caller-side work needed while the anchor confirms.
             println("Stellar payment seen; waiting for on-network confirmation")
         Sep31TransactionStatus.PENDING_CUSTOMER_INFO_UPDATE ->
+            // Action: call KYCService.getCustomerInfo with transactionId, then putCustomerInfo with the missing fields.
             println("KYC update required; see the Handling KYC update requests section below")
         Sep31TransactionStatus.PENDING_TRANSACTION_INFO_UPDATE ->
+            // Action: legacy v2.5.0 flow — submit via the deprecated patchTransaction. New integrations should never see this.
             println("Legacy per-transaction fields update required; see required_info_updates")
         Sep31TransactionStatus.PENDING_RECEIVER ->
-            println("Receiving Anchor is processing the off-chain delivery")
+            // Action: continue polling; anchor is either preparing payment instructions or settling off-chain.
+            println("Receiving Anchor is processing the transaction")
         Sep31TransactionStatus.PENDING_EXTERNAL ->
+            // Action: continue polling; external rail (e.g., bank) is in flight.
             println("Off-chain payment submitted; awaiting external confirmation")
         Sep31TransactionStatus.COMPLETED ->
+            // Action: terminal success — notify the user and mark the transaction complete.
             println("Delivered to Receiving Client")
         Sep31TransactionStatus.REFUNDED ->
+            // Action: terminal — surface the refund details to the user; inspect response.refunds.
             println("Funds refunded; see refunds field for details")
         Sep31TransactionStatus.EXPIRED ->
+            // Action: terminal failure — surface to the user; do not retry without re-quoting.
             println("Transaction expired (quote expiry, payment window timeout, etc.)")
         Sep31TransactionStatus.ERROR ->
+            // Action: terminal failure — surface response.statusMessage to the user; do not retry without manual intervention.
             println("Error: ${response.statusMessage}")
         null ->
-            println("Unknown status: ${response.status}") // forward-compatible
+            // Action: forward-compatibility — the anchor returned a status the SDK does not know. Log and keep polling.
+            println("Unknown status: ${response.status}")
     }
     return response
 }
 ```
 
-### Amount-formula identities
+### When `stellarAccountId` is null
 
-The SEP-31 spec defines four equality identities that hold for every completed or partially-refunded transaction. The Sending Anchor must compute these locally rather than trust anchor-supplied aggregates.
+`Sep31PostTransactionsResponse.stellarAccountId`, `stellarMemo`, and `stellarMemoType` are nullable. Per SEP-31 §"POST Transactions → Success", the Receiving Anchor returns them as `null` when it is still processing the request and has not yet determined whether the transaction can proceed. The response's `id` is valid; the transaction is in `pending_receiver` status. The Receiving Anchor will advance the status to `pending_sender` once the payment fields are populated, or to `error` if the transaction cannot proceed.
+
+Call `getTransaction` on a backoff until the payment fields appear (`pending_sender`) or the transaction terminates in `error`. Do not synthesize a memo or guess a destination; the anchor's exact values are the only valid routing target.
 
 ```kotlin
+import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionResponse
-import kotlin.math.abs
+import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionStatus
+import kotlinx.coroutines.delay
 
-// Example uses Double for compactness; production code should plug in a
-// precision-preserving decimal type (java.math.BigDecimal on JVM, a
-// platform-specific decimal elsewhere). SEP-31 amount fields are String?
-// precisely so the application picks the arithmetic type.
-private const val TOLERANCE = 1e-9
-
-fun verifyAmountIdentities(
-    tx: Sep31TransactionResponse,
-    quoteSellAmount: String?,
-    quoteBuyAmount: String?,
-) {
-    // Spec identity 1: amount_out = amount_in - amount_fee - refunds.amount_refunded - refunds.amount_fee
-    val amountIn = tx.amountIn!!.toDouble()
-    val amountOut = tx.amountOut!!.toDouble()
-    val totalFee = tx.feeDetails?.total?.toDouble()
-        ?: error("fee_details required to recompute amount_out")
-    val refundedAmount = tx.refunds?.amountRefunded?.toDouble() ?: 0.0
-    val refundFee = tx.refunds?.amountFee?.toDouble() ?: 0.0
-    val recomputedOut = amountIn - totalFee - refundedAmount - refundFee
-    require(abs(recomputedOut - amountOut) < TOLERANCE) {
-        "amount_out identity failed: expected=$amountOut recomputed=$recomputedOut"
-    }
-
-    // Spec identity 2: refunds.amount_refunded = sum(refunds.payments[].amount)
-    tx.refunds?.let { refunds ->
-        val sumAmounts = refunds.payments.sumOf { it.amount.toDouble() }
-        require(abs(sumAmounts - refunds.amountRefunded.toDouble()) < TOLERANCE) {
-            "refunds.amount_refunded identity failed"
+suspend fun awaitPaymentInstructions(
+    sep31: Sep31Service,
+    txId: String,
+    jwt: String,
+): Sep31TransactionResponse {
+    while (true) {
+        val tx = sep31.getTransaction(txId, jwt)
+        if (tx.stellarAccountId != null && tx.stellarMemo != null) return tx
+        if (Sep31TransactionStatus.fromString(tx.status) == Sep31TransactionStatus.ERROR) {
+            error("Anchor cannot proceed: ${tx.statusMessage}")
         }
-
-        // Spec identity 3: refunds.amount_fee = sum(refunds.payments[].fee)
-        val sumFees = refunds.payments.sumOf { it.fee.toDouble() }
-        require(abs(sumFees - refunds.amountFee.toDouble()) < TOLERANCE) {
-            "refunds.amount_fee identity failed"
-        }
-    }
-
-    // Spec identity 4 (only when quote_id is used):
-    //   amount_in == quote.sell_amount and amount_out == quote.buy_amount
-    if (tx.quoteId != null) {
-        require(quoteSellAmount != null && tx.amountIn == quoteSellAmount) {
-            "amount_in must equal quote.sell_amount for quoted transactions"
-        }
-        require(quoteBuyAmount != null && tx.amountOut == quoteBuyAmount) {
-            "amount_out must equal quote.buy_amount for quoted transactions"
-        }
-    }
-}
-```
-
-### Fee breakdown
-
-When `fee_details.details` is non-null, the line-item amounts sum to `fee_details.total`.
-
-```kotlin
-suspend fun printFeeBreakdown(tx: Sep31TransactionResponse) {
-    val fees = tx.feeDetails ?: return
-    println("Total fee: ${fees.total} ${fees.asset}")
-    for (line in fees.details.orEmpty()) {
-        val description = line.description ?: "no description"
-        println("  ${line.name}: ${line.amount} ($description)")
-    }
-}
-```
-
-### Refund handling
-
-When the `refunds` aggregate is present, walk the `payments` list for individual on-chain refund transactions.
-
-```kotlin
-suspend fun printRefunds(tx: Sep31TransactionResponse) {
-    val refunds = tx.refunds ?: return
-    println("Total refunded: ${refunds.amountRefunded} (refund fees: ${refunds.amountFee})")
-    for (payment in refunds.payments) {
-        // payment.id is the Stellar transaction hash of the refund payment.
-        println("  refund ${payment.id}: amount=${payment.amount} fee=${payment.fee}")
+        delay(2_000L)
     }
 }
 ```
@@ -537,6 +455,46 @@ suspend fun pollUntilTerminal(
     }
 }
 ```
+
+### Fee breakdown
+
+When `fee_details.details` is non-null, the line-item amounts sum to `fee_details.total`.
+
+```kotlin
+import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionResponse
+
+suspend fun printFeeBreakdown(tx: Sep31TransactionResponse) {
+    val fees = tx.feeDetails ?: return
+    println("Total fee: ${fees.total} ${fees.asset}")
+    for (line in fees.details.orEmpty()) {
+        val description = line.description ?: "no description"
+        println("  ${line.name}: ${line.amount} ($description)")
+    }
+}
+```
+
+### Refund handling
+
+When the `refunds` aggregate is present, walk the `payments` list for individual on-chain refund transactions.
+
+```kotlin
+import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionResponse
+
+suspend fun printRefunds(tx: Sep31TransactionResponse) {
+    val refunds = tx.refunds ?: return
+    println("Total refunded: ${refunds.amountRefunded} (refund fees: ${refunds.amountFee})")
+    for (payment in refunds.payments) {
+        // payment.id is the Stellar transaction hash of the refund payment.
+        println("  refund ${payment.id}: amount=${payment.amount} fee=${payment.fee}")
+    }
+}
+```
+
+### Amount-formula identities
+
+The SEP-31 spec defines equality identities relating `amount_in`, `amount_out`, `fee_details.total`, `refunds.amount_refunded`, `refunds.amount_fee`, and (when a quote is used) `quote.sell_amount` / `quote.buy_amount`. The SDK exposes the raw `String?` fields and does not enforce these. Application code chooses an arithmetic library appropriate to the platform (for example `java.math.BigDecimal` on JVM) and compares with a small tolerance.
+
+See [SEP-0031 §"Amount Formulas"](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#amount-formulas) for the canonical equations.
 
 ### Handling KYC update requests
 
@@ -595,7 +553,7 @@ suspend fun registerCallback() {
     val sep31 = Sep31Service.fromDomain("anchor.example.org")
     val jwt = "eyJ..."
     val txId = "11111111-1111-1111-1111-111111111111"
-    val callbackUrl = "https://wallet.example.org/sep31-callback"
+    val callbackUrl = "https://sending-anchor.example.org/sep31-callback"
 
     try {
         sep31.putTransactionCallback(id = txId, callbackUrl = callbackUrl, jwt = jwt)
@@ -612,13 +570,12 @@ suspend fun registerCallback() {
 
 The SDK exposes [putTransactionCallback] for registration and [CallbackSignatureVerifier] (in `com.soneso.stellar.sdk.sep.common`) for verifying incoming callback signatures.
 
-> **Security callout — common implementation mistakes**
+> **Security callout: common implementation mistakes**
 >
 > 1. **Not verifying the signature at all.** An unsigned callback can be forged by any caller that knows the URL.
 > 2. **Verifying the signature but not the timestamp.** The verifier handles freshness for you; do not override `freshnessSeconds` above 120 in production.
-> 3. **Incorrect canonicalization.** The verifier assembles the canonical payload internally.
-> 4. **Wrong `SIGNING_KEY` lookup.** The Receiving Anchor's stellar.toml `SIGNING_KEY` is the only correct verification key. Do not reuse the JWT-issuer key from SEP-10 — it may differ from `SIGNING_KEY`. You pass the key to the verifier's constructor.
-> 5. **Treating callbacks as non-idempotent.** The same `(transaction_id, new_status)` may legitimately be delivered more than once when the Receiving Anchor retries. Consumer state machines must dedupe by `(transaction_id, status)` so duplicate state transitions and duplicate customer notifications are avoided. The verifier returns `Valid` for legitimate retries by design.
+> 3. **Wrong `SIGNING_KEY` lookup.** The Receiving Anchor's stellar.toml `SIGNING_KEY` is the only correct verification key. Do not reuse the JWT-issuer key from SEP-10; it may differ from `SIGNING_KEY`. You pass the key to the verifier's constructor.
+> 4. **Treating callbacks as non-idempotent.** The same `(transaction_id, new_status)` may legitimately be delivered more than once when the Receiving Anchor retries. Consumer state machines must dedupe by `(transaction_id, status)` so duplicate state transitions and duplicate customer notifications are avoided. The verifier returns `Valid` for legitimate retries by design.
 
 The Receiving Anchor sends the signature in either the `Signature` HTTP header (preferred) or the deprecated `X-Stellar-Signature` header. Pass both header values to the verifier; it prefers `Signature` when both are present.
 
@@ -627,8 +584,8 @@ import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
 
 // `signingKey` is the Receiving Anchor's SIGNING_KEY from its stellar.toml.
 // Fetch once via `StellarToml.fromDomain(anchorDomain).generalInformation.signingKey`
-// and cache for the lifetime of the anchor connection — TOML rarely changes and
-// the fetch would otherwise add latency to every callback.
+// and cache for the lifetime of the anchor connection — fetching on every callback
+// adds latency to the verification path.
 suspend fun verifyCallback(
     signingKey: String,
     signatureHeader: String?,
@@ -637,7 +594,7 @@ suspend fun verifyCallback(
 ): Boolean {
     val verifier = CallbackSignatureVerifier(
         signingKey = signingKey,
-        registeredCallbackUrl = "https://wallet.example.org/sep31-callback",
+        registeredCallbackUrl = "https://sending-anchor.example.org/sep31-callback",
     )
 
     return when (val result = verifier.verify(signatureHeader, xStellarSignatureHeader, body)) {
@@ -689,7 +646,7 @@ suspend fun errorMatrix() {
         sep31.getTransaction("11111111-1111-1111-1111-111111111111", jwt)
         sep31.putTransactionCallback(
             id = "11111111-1111-1111-1111-111111111111",
-            callbackUrl = "https://wallet.example.org/cb",
+            callbackUrl = "https://sending-anchor.example.org/cb",
             jwt = jwt,
         )
     } catch (e: Sep31ConfigurationException) {
@@ -731,11 +688,15 @@ suspend fun errorMatrix() {
 }
 ```
 
+### Retry and idempotency
+
+`postTransactions` is not retried by the SDK on network failure. Retrying without out-of-band reconciliation can create duplicate transaction records at the anchor. Application code that retries `postTransactions` should first call `getTransaction` against any previously-returned `id`, or coordinate idempotency with the Receiving Anchor out-of-band.
+
 ### Debugging anchor responses with `rawResponseBody`
 
-`Sep31*Exception.message` (and `Sep31UnknownResponseException.responseBody`) are sanitized: JWT-shaped substrings are replaced with `<redacted-jwt>`, control characters are stripped, and the body is truncated to 1024 chars. This is the only string the SDK exposes that is safe to log in production.
+`Sep31*Exception.message` (and `Sep31UnknownResponseException.responseBody`) are sanitized: JWT-shaped substrings are replaced with `<redacted-jwt>`, control characters are stripped, and the body is truncated to 1024 chars. These are the only fields that surface anchor response body content in a form safe to log in production.
 
-Every exception that surfaces anchor response content also exposes a sibling `rawResponseBody: String?` field that preserves the original body **without** JWT redaction. The field is intended for local debugging — for example, when an anchor returns an error whose meaning depends on the token it rejected. The 1024-char cap and the control-character scrub still apply, so the field is log-injection-safe; only JWT redaction is disabled.
+Every exception that surfaces anchor response content also exposes a sibling `rawResponseBody: String?` field that preserves the original body **without** JWT redaction. The field is intended for local debugging, for example when an anchor returns an error whose meaning depends on the token it rejected. The 1024-char cap and the control-character scrub still apply, so the field is log-injection-safe; only JWT redaction is disabled.
 
 ```kotlin
 try {
@@ -754,44 +715,6 @@ try {
 
 `rawResponseBody` is `null` only when the SDK had no body to capture for that error path (for example, a content-type rejection that fails before any body bytes are read).
 
-## Deprecated PATCH transaction info
-
-The PATCH endpoint supports the legacy `pending_transaction_info_update` workflow defined by SEP-31 v2.5.0. New integrations register customer KYC via SEP-12 `PUT /customer` and pass `senderId` / `receiverId` on the original [postTransactions] request instead.
-
-```kotlin
-suspend fun legacyPatch() {
-    val sep31 = Sep31Service.fromDomain("anchor.example.org")
-    val jwt = "eyJ..."
-
-    @Suppress("DEPRECATION")
-    val updated = sep31.patchTransaction(
-        id = "11111111-1111-1111-1111-111111111111",
-        fields = mapOf(
-            "transaction" to mapOf("receiver_account_number" to "0987654321"),
-        ),
-        jwt = jwt,
-    )
-    println("Updated status: ${updated.status}")
-}
-```
-
-The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the updated transaction response (the SEP-31 v3.1.0 spec mandates the PATCH response body match `GET /transactions/:id`).
-
-## Transaction statuses
-
-| Status | Meaning |
-|--------|---------|
-| `pending_sender` | Receiving Anchor awaits the on-chain Stellar payment from the Sending Anchor. |
-| `pending_stellar` | Stellar payment submitted; awaiting on-network confirmation. |
-| `pending_customer_info_update` | SEP-12 customer KYC must be updated before the transaction can advance. |
-| `pending_transaction_info_update` | Legacy per-transaction fields require an update (superseded by SEP-12). |
-| `pending_receiver` | Receiving Anchor is processing the off-chain delivery. |
-| `pending_external` | Off-chain payment submitted; awaiting external (e.g., bank) confirmation. |
-| `completed` | Funds delivered to the Receiving Client. |
-| `refunded` | Funds returned to the Sending Anchor; inspect `refunds` for details. |
-| `expired` | Transaction abandoned (quote expired, payment window timed out, etc.). |
-| `error` | Unspecified terminal error; inspect `statusMessage` for context. |
-
 ## SDK classes and exceptions
 
 | Class | Description |
@@ -800,7 +723,7 @@ The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the u
 | `Sep31InfoResponse` | Parsed `GET /info` response. Exposes `receiveAssets: Map<String, Sep31ReceiveAssetInfo>`. |
 | `Sep31ReceiveAssetInfo` | Per-asset configuration: limits, fee model, SEP-12 customer types, SEP-38 quote requirements, funding methods. |
 | `Sep31Sep12TypesInfo` | SEP-12 sender and receiver customer type maps for one asset. |
-| `Sep31PostTransactionsRequest` | Request body for `POST /transactions`. |
+| `Sep31PostTransactionsRequest` | Request body for `POST /transactions`. Optional `lang` (ISO 639-1) localizes anchor-returned error messages and field descriptions. |
 | `Sep31PostTransactionsResponse` | Response from `POST /transactions`. Carries `id`, `stellarAccountId`, `stellarMemoType`, `stellarMemo`. |
 | `Sep31TransactionResponse` | Full transaction state returned by `GET /transactions/:id` and `PATCH /transactions/:id`. |
 | `Sep31TransactionStatus` | Enum of the ten lifecycle statuses with `fromString(value)` for typed dispatch. |
@@ -820,17 +743,33 @@ The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the u
 | `Sep31UnknownResponseException` | Unmapped HTTP status code. Carries `statusCode` and `responseBody`. |
 | `Sep31ConfigurationException` | `fromDomain` configuration failure (bad domain, missing `DIRECT_PAYMENT_SERVER`, non-HTTPS URL, TOML fetch failure). |
 
-## Important notes and related SEPs
+## Deprecated PATCH transaction info
 
-> The Sending Anchor application must attach the exact `stellarMemo` returned by `Sep31Service.postTransactions` (or by a subsequent `getTransaction`) to the Stellar payment, using the matching `stellarMemoType`. Per SEP-31 §"Authentication", the Receiving Anchor matches incoming Stellar payments to its transaction record using only the memo. The Stellar source account may differ from the SEP-10 authentication account and must not be relied on for matching. Sending the wrong memo will route the payment to a different transaction (or none), and the funds will not be delivered as expected.
+The PATCH endpoint supports the legacy `pending_transaction_info_update` workflow defined by SEP-31 v2.5.0. New integrations register customer KYC via SEP-12 `PUT /customer` and pass `senderId` / `receiverId` on the original [postTransactions] request instead.
 
-- **Source account independence.** The Stellar account that submits the on-chain payment is not authenticated to the Receiving Anchor by Stellar protocol mechanisms. SEP-10 establishes who the Sending Anchor is at the API level; the memo establishes which transaction record the on-chain payment refunds against.
-- **Quote expiration.** When the anchor returns a SEP-38 `quote_id`, the guaranteed rate is only honored if the Stellar payment lands before the quote's `expires_at`. After expiry the anchor may reject the payment, refund it at the spot rate, or mark the transaction `expired`.
-- **KYC must precede the transaction.** When the anchor advertises `sep12.sender.types` or `sep12.receiver.types`, register the customers via SEP-12 `PUT /customer` and pass the resulting customer ids as `senderId` / `receiverId` on `postTransactions`. Without valid customer ids the anchor returns HTTP 400 with `error="customer_info_needed"`.
-- **HTTPS only (loopback excepted).** Every URL the SDK accepts must use `https://`, except `http://` against the loopback authorities `localhost`, `127.0.0.1`, and `[::1]` (each optionally with a port) for local development. The constructor, `fromDomain` factory, and `putTransactionCallback` all enforce this rule before sending the JWT on the wire.
-- **Authentication.** Every endpoint requires a SEP-10 JWT in the `Authorization: Bearer <jwt>` header, including `info()`. The SDK enforces this at the type level — there is no nullable-JWT escape hatch.
+```kotlin
+import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 
-**Related SEPs**:
+suspend fun legacyPatch() {
+    val sep31 = Sep31Service.fromDomain("anchor.example.org")
+    val jwt = "eyJ..."
+
+    @Suppress("DEPRECATION")
+    val updated = sep31.patchTransaction(
+        id = "11111111-1111-1111-1111-111111111111",
+        fields = mapOf(
+            "transaction" to mapOf("receiver_account_number" to "0987654321"),
+        ),
+        jwt = jwt,
+    )
+    println("Updated status: ${updated.status}")
+}
+```
+
+The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the updated transaction response (the SEP-31 v3.1.0 spec mandates the PATCH response body match `GET /transactions/:id`).
+
+## Related SEPs
+
 - [SEP-1: Stellar TOML](sep-01.md) — `DIRECT_PAYMENT_SERVER` and `SIGNING_KEY` discovery
 - [SEP-10: Stellar Web Authentication](sep-10.md) — JWT acquisition
 - [SEP-12: KYC API](sep-12.md) — customer registration prior to `postTransactions`
@@ -840,4 +779,4 @@ The method is annotated [`@Deprecated`][Deprecated]. The SDK still returns the u
 
 **Implementation**: `com.soneso.stellar.sdk.sep.sep31`
 
-**Last Updated**: 2026-05-16
+**Last Updated**: 2026-05-19

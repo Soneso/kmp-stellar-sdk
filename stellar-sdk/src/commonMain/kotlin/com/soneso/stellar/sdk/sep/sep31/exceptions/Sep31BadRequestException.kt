@@ -40,14 +40,8 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * - [SEP-0031 Specification](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md)
  *
  * @property statusCode The HTTP status code returned by the Receiving Anchor (always 400 for this exception).
- * @property rawResponseBody Anchor response body preserved for local debugging only.
- *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
- *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated and stripped of control characters, so this field is safe
- *   against log-injection — but it is NOT safe to ship to shared log aggregators
- *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
- *   other sensitive context in error responses. For production logging, use [message]
- *   instead. `null` when the SDK had no response body to capture for this error path.
+ * @property rawResponseBody Anchor response body for local debugging — see the
+ *   rawResponseBody convention on [Sep31Exception]. `null` when no body was captured.
  * @param message Sanitized error message extracted from the anchor response.
  */
 public class Sep31BadRequestException(

@@ -39,6 +39,23 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * }
  * ```
  *
+ * ## rawResponseBody convention
+ *
+ * Every subclass that surfaces anchor response content also exposes a `rawResponseBody:
+ * String?` property. The convention is identical across subclasses and is documented
+ * here once so individual subclass KDoc can stay short:
+ *
+ * - Same sanitization pipeline as [message] except JWT-shaped substrings are **not**
+ *   redacted. May therefore contain bearer tokens.
+ * - Truncated to 1024 chars and stripped of control characters, so the field is safe
+ *   against log injection.
+ * - **Not** safe to ship to shared log aggregators (Sentry, Datadog, Splunk) in
+ *   production — use [message] for production logging.
+ * - Intended for local debugging only — e.g. inspecting an anchor that echoes the
+ *   rejected JWT in its error response.
+ * - `null` when the SDK had no response body to capture for that error path
+ *   (for example, a content-type rejection that fails before any body bytes are read).
+ *
  * See also:
  * - [SEP-0031 Specification](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md)
  *

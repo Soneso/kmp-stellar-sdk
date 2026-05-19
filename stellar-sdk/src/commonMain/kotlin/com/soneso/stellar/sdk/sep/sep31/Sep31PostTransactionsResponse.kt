@@ -16,8 +16,10 @@ import kotlinx.serialization.json.jsonPrimitive
  * determined the on-chain payment instructions — the Stellar account and memo
  * the Sending Anchor must use. The Stellar fields are optional: per spec
  * "Success (201 Created)", absent values indicate the anchor is still processing
- * the transaction and the Sending Anchor should poll or register a callback until
- * the status moves to `pending_sender`.
+ * the request. The transaction is in `pending_receiver` status; the anchor will
+ * advance it to `pending_sender` once payment fields are populated, or to `error`
+ * if the transaction cannot proceed. The Sending Anchor should poll or register a
+ * callback until one of those two transitions occurs.
  *
  * Both HTTP 200 and HTTP 201 responses are accepted as success by the SDK.
  *

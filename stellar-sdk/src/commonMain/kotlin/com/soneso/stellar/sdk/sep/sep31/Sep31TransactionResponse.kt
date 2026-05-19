@@ -67,8 +67,14 @@ import kotlinx.serialization.json.longOrNull
  * @property externalTransactionId External (off-chain) transaction identifier for the final delivery.
  * @property refunded Deprecated boolean indicating full refund. Use [refunds] instead.
  * @property refunds Structured refund aggregate.
- * @property requiredInfoMessage Human-readable message accompanying [requiredInfoUpdates].
- * @property requiredInfoUpdates Fields requiring updates from the Sending Anchor. Leaves are primitive Kotlin types only.
+ * @property requiredInfoMessage Human-readable message accompanying [requiredInfoUpdates]. Populated
+ *   only when [status] is `pending_transaction_info_update`. That flow is deprecated as of SEP-31
+ *   v3.0.0 — new integrations route updates through the SEP-12 `pending_customer_info_update` path
+ *   instead and will never observe this field set.
+ * @property requiredInfoUpdates Fields requiring updates from the Sending Anchor, in the same shape
+ *   as the asset object's deprecated `fields` map. Leaves are primitive Kotlin types only.
+ *   Populated only when [status] is `pending_transaction_info_update`; see the note on
+ *   [requiredInfoMessage] for why new integrations should not depend on this field.
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#transaction-object">SEP-0031 Transaction Object</a>
  */
 public data class Sep31TransactionResponse(
@@ -101,7 +107,7 @@ public data class Sep31TransactionResponse(
     val stellarTransactionId: String? = null,
     val externalTransactionId: String? = null,
     @Deprecated(
-        message = "Deprecated in SEP-31 v2.5.0. Use refunds instead.",
+        message = "Deprecated in SEP-31 v1.5.0. Use refunds instead.",
         level = DeprecationLevel.WARNING
     )
     val refunded: Boolean? = null,

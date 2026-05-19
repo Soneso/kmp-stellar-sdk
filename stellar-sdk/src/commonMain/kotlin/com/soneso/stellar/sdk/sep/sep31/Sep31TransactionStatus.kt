@@ -8,10 +8,9 @@ package com.soneso.stellar.sdk.sep.sep31
  * Enumeration of SEP-31 transaction lifecycle statuses defined by the spec.
  *
  * Each constant carries the lowercase wire form ([value]) used by the Receiving Anchor in
- * `GET /transactions/:id` responses. The enum exists as a downstream helper for consumers
- * that prefer typed status handling. The SDK itself keeps
- * [Sep31TransactionResponse.status] as a raw `String` so a new spec status does not
- * require an SDK release; this enum is intentionally not consulted inside `Sep31Service`.
+ * `GET /transactions/:id` responses. The SDK keeps [Sep31TransactionResponse.status] as a
+ * raw `String` so new spec statuses are accepted without an SDK release; use
+ * [fromString] when typed dispatch is preferred.
  *
  * ## Usage
  *

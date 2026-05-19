@@ -7,11 +7,14 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
 /**
  * Exception thrown when the Receiving Anchor returns HTTP 404 for callback registration.
  *
- * Raised exclusively from `PUT /transactions/:id/callback` when the anchor signals
- * that it does not support callback-based status notifications. This is distinct
- * from [Sep31TransactionNotFoundException], which signals that the transaction id
- * itself is unknown — here the anchor recognises the transaction but refuses the
- * callback registration.
+ * Raised from `PUT /transactions/:id/callback` when the anchor returns HTTP 404.
+ * Per SEP-31 §"PUT Transaction Callback", a 404 on this endpoint indicates that
+ * the Receiving Anchor does not support callback-based status notifications.
+ * Note: the spec does not separately define a response code for an unknown
+ * transaction id on this endpoint, so a 404 here could in principle also reflect
+ * a transaction-not-found condition — the SDK maps every 404 on PUT /callback to
+ * this exception. Lookups against `GET` / `PATCH /transactions/:id` continue to
+ * surface unknown-transaction 404s as [Sep31TransactionNotFoundException].
  *
  * Recovery actions:
  * - Switch to polling `GET /transactions/:id` to track transaction status
@@ -37,14 +40,8 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * - [SEP-0031 Specification](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md)
  *
  * @property statusCode The HTTP status code returned by the Receiving Anchor (always 404 for this exception).
- * @property rawResponseBody Anchor response body preserved for local debugging only.
- *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
- *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated and stripped of control characters, so this field is safe
- *   against log-injection — but it is NOT safe to ship to shared log aggregators
- *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
- *   other sensitive context in error responses. For production logging, use [message]
- *   instead. `null` when the SDK had no response body to capture for this error path.
+ * @property rawResponseBody Anchor response body for local debugging — see the
+ *   rawResponseBody convention on [Sep31Exception]. `null` when no body was captured.
  * @param message Sanitized error message describing the callback rejection.
  */
 public class Sep31TransactionCallbackNotSupportedException(

@@ -42,14 +42,8 @@ import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
  *
  * @property type The SEP-12 customer type the Sending Anchor must collect, or `null` if the anchor did not specify one.
  * @property error The literal error tag returned by the anchor; always `"customer_info_needed"`.
- * @property rawResponseBody Anchor response body preserved for local debugging only.
- *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
- *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated and stripped of control characters, so this field is safe
- *   against log-injection — but it is NOT safe to ship to shared log aggregators
- *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
- *   other sensitive context in error responses. For production logging, use [message]
- *   instead. `null` when the SDK had no response body to capture for this error path.
+ * @property rawResponseBody Anchor response body for local debugging — see the
+ *   rawResponseBody convention on [Sep31Exception]. `null` when no body was captured.
  */
 public class Sep31CustomerInfoNeededException(
     public val type: String?,

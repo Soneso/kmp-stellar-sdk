@@ -100,7 +100,7 @@ import kotlin.time.ExperimentalTime
  * ```kotlin
  * val verifier = CallbackSignatureVerifier(
  *     signingKey = receivingAnchorSigningKey,
- *     registeredCallbackUrl = "https://wallet.example.org/sep31-callback",
+ *     registeredCallbackUrl = "https://sending-anchor.example.org/sep31-callback",
  * )
  *
  * when (val result = verifier.verify(

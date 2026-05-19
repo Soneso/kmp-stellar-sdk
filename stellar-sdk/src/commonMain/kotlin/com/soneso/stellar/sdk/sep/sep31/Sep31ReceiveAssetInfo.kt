@@ -45,8 +45,12 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * @property sep12Info SEP-12 customer type requirements for sender and receiver. Defaults
  *   to empty sender/receiver maps when the anchor omits the per-asset `sep12` object —
- *   the spec marks the field as deprecated and optional, so anchors that require no KYC
- *   may leave it out entirely.
+ *   anchors that require no KYC may leave it out entirely. Note: SEP-31 v3.1.0 marks
+ *   the wire `sep12` field "(Deprecated, optional)", but the spec prose still recommends
+ *   `sep12.sender.types` / `sep12.receiver.types` over the older flat
+ *   [senderSep12Type] / [receiverSep12Type] fields, and SEP-12 defers customer-type
+ *   discovery back to the calling protocol with no alternative. The SDK therefore
+ *   treats this field as canonical (not `@Deprecated`) despite the schema marker.
  * @property minAmount Minimum amount the anchor accepts; `null` when unlimited.
  * @property maxAmount Maximum amount the anchor accepts; `null` when unlimited.
  * @property feeFixed Fixed fee component charged by the anchor; `null` when the fee model does not decompose into fixed + percent.
@@ -66,12 +70,12 @@ public data class Sep31ReceiveAssetInfo(
     val feeFixed: Double? = null,
     val feePercent: Double? = null,
     @Deprecated(
-        message = "Deprecated in SEP-31 v3.1.0. Use sep12Info.senderTypes instead when any entries are present.",
+        message = "Deprecated in SEP-31 v1.2.0. Use sep12Info.senderTypes instead when any entries are present.",
         level = DeprecationLevel.WARNING
     )
     val senderSep12Type: String? = null,
     @Deprecated(
-        message = "Deprecated in SEP-31 v3.1.0. Use sep12Info.receiverTypes instead when any entries are present.",
+        message = "Deprecated in SEP-31 v1.2.0. Use sep12Info.receiverTypes instead when any entries are present.",
         level = DeprecationLevel.WARNING
     )
     val receiverSep12Type: String? = null,
@@ -100,11 +104,13 @@ public data class Sep31ReceiveAssetInfo(
         @Suppress("DEPRECATION")
         public fun fromJson(json: JsonObject): Sep31ReceiveAssetInfo =
             sep31Rewrap("Malformed receive asset info in SEP-31 response") {
-                // Per SEP-31 v3.1.0, the per-asset `sep12` object is marked
-                // "(Deprecated, optional)". Default to empty sender/receiver maps when
-                // omitted — an anchor that requires no KYC is spec-conformant to leave
-                // the key out entirely. Treating absence as a parse failure would reject
-                // valid responses.
+                // Per SEP-31 v3.1.0, the schema row marks the per-asset `sep12` object
+                // "(Deprecated, optional)" — but the surrounding spec prose still
+                // recommends `sep12.sender.types` / `sep12.receiver.types` for
+                // customer-type discovery with no documented alternative, so we treat
+                // it as canonical. The "optional" half is real: an anchor that requires
+                // no KYC may legitimately omit the key, hence the empty-map default
+                // below. Treating absence as a parse failure would reject valid responses.
                 val sep12Object = json["sep12"] as? JsonObject
                 val sep12Info = if (sep12Object != null) {
                     Sep31Sep12TypesInfo.fromJson(sep12Object)

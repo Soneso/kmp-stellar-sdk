@@ -17,10 +17,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * identifier (the value passed as the `type` parameter to SEP-12 `GET /customer`)
  * with a human-readable description supplied by the Receiving Anchor.
  *
- * The class is prefixed `Sep31` to keep all SEP-31 types under a single namespace
- * and to avoid naming collisions with the existing `com.soneso.stellar.sdk.sep.sep12`
- * package.
- *
  * ## Usage
  *
  * ```kotlin

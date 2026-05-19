@@ -43,14 +43,8 @@ package com.soneso.stellar.sdk.sep.sep31.exceptions
  * @property fields The per-transaction parameters the Sending Anchor must supply on retry.
  *   Leaves are primitive Kotlin types only; `null` when the anchor did not include a `fields` object.
  * @property error The literal error tag returned by the anchor; always `"transaction_info_needed"`.
- * @property rawResponseBody Anchor response body preserved for local debugging only.
- *   Identical to the sanitized form used in [message] except that JWT-shaped substrings
- *   are NOT replaced with `<redacted-jwt>`. May therefore contain bearer tokens.
- *   Truncated and stripped of control characters, so this field is safe
- *   against log-injection — but it is NOT safe to ship to shared log aggregators
- *   (Sentry, Datadog, Splunk) in production. Use to debug anchors that echo tokens or
- *   other sensitive context in error responses. For production logging, use [message]
- *   instead. `null` when the SDK had no response body to capture for this error path.
+ * @property rawResponseBody Anchor response body for local debugging — see the
+ *   rawResponseBody convention on [Sep31Exception]. `null` when no body was captured.
  */
 @Deprecated(
     message = "SEP-31 v2.5.0 deprecated per-transaction fields. Use SEP-12 PUT /customer instead.",

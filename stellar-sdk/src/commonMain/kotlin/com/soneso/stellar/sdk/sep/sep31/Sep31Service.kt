@@ -272,11 +272,6 @@ private fun decodeUtf8OrNull(bytes: ByteArray): String? =
  *   floor should construct an `HttpClient` with their engine's pinning policy and pass
  *   it via the [httpClient] constructor parameter.
  *
- * ## Spec divergences worth knowing
- *
- * - [Sep31TransactionResponse.fromJson] requires the `{"transaction": {...}}` wrapper
- *   defined by the spec — flat responses are rejected. See [Sep31TransactionResponse].
- *
  * ## Typical workflow
  *
  * ```kotlin
@@ -291,6 +286,7 @@ private fun decodeUtf8OrNull(bytes: ByteArray): String? =
  * val request = Sep31PostTransactionsRequest(
  *     amount = 100.0,
  *     assetCode = "USDC",
+ *     fundingMethod = "SWIFT",
  *     senderId = "11111111-1111-1111-1111-111111111111",
  *     receiverId = "22222222-2222-2222-2222-222222222222"
  * )
@@ -500,6 +496,7 @@ public class Sep31Service(
      * val request = Sep31PostTransactionsRequest(
      *     amount = 100.0,
      *     assetCode = "USDC",
+     *     fundingMethod = "SWIFT",
      *     senderId = "11111111-1111-1111-1111-111111111111",
      *     receiverId = "22222222-2222-2222-2222-222222222222"
      * )
@@ -585,15 +582,17 @@ public class Sep31Service(
      * [Sep31TransactionNotFoundException], which signals an unknown transaction id).
      *
      * Callback signature verification is the Sending Anchor application's
-     * responsibility per spec. This SDK does not provide a verification helper;
-     * downstream callers should use existing `KeyPair.verify` once they have parsed
-     * the SEP-1 `SIGNING_KEY` from the Receiving Anchor's stellar.toml.
+     * responsibility per spec. Use
+     * [com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier] to verify
+     * inbound `Signature` (or legacy `X-Stellar-Signature`) headers against the
+     * Receiving Anchor's `SIGNING_KEY`; the verifier handles header parsing,
+     * canonical payload assembly, timestamp freshness, and Ed25519 verification.
      *
      * Example:
      * ```kotlin
      * sep31Service.putTransactionCallback(
      *     id = "11111111-1111-1111-1111-111111111111",
-     *     callbackUrl = "https://wallet.example.org/sep31-callback",
+     *     callbackUrl = "https://sending-anchor.example.org/sep31-callback",
      *     jwt = jwtToken
      * )
      * ```

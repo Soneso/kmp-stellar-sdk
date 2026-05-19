@@ -7,10 +7,10 @@ package com.soneso.stellar.sdk.sep.sep31
 /**
  * Request body for the SEP-31 `POST /transactions` endpoint.
  *
- * Initiates a cross-border payment by describing the amount, asset, optional SEP-38
- * quote, optional SEP-12 customer ids, optional refund memo, and optional funding
- * method. The Receiving Anchor responds with a [Sep31PostTransactionsResponse]
- * containing the on-chain payment instructions.
+ * Initiates a cross-border payment by describing the amount, asset, funding method,
+ * optional SEP-38 quote, optional SEP-12 customer ids, and optional refund memo.
+ * The Receiving Anchor responds with a [Sep31PostTransactionsResponse] containing
+ * the on-chain payment instructions.
  *
  * Field naming follows the spec: every JSON key is snake_case, every Kotlin property
  * is camelCase. The [toJson] helper omits null entries and preserves insertion order
@@ -35,8 +35,8 @@ package com.soneso.stellar.sdk.sep.sep31
  * @property amount Amount of the Stellar asset to send to the Receiving Anchor.
  * @property assetCode Code of the Stellar asset; must match a key in the `/info` response.
  * @property fundingMethod Funding method the Receiving Anchor will use to deliver the asset
- *   (for example `SWIFT`, `SEPA`). Must match a value advertised in `/info`. Required by
- *   SEP-31 v3.1.0 so the anchor can determine the KYC fields to collect.
+ *   (for example `SWIFT`, `SEPA`). Must match a value advertised in `/info`. The anchor
+ *   uses this to determine which KYC fields to collect.
  * @property assetIssuer Issuer of the Stellar asset; omit when the Receiving Anchor itself issues the asset.
  * @property destinationAsset SEP-38 asset identification string for the off-chain delivery asset. Omit when not using SEP-38.
  * @property quoteId SEP-38 firm quote id returned by `POST /quote`. Required when [destinationAsset] is set with an off-chain delivery rate.
