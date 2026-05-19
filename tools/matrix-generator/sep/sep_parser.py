@@ -1456,6 +1456,174 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def parse_sep_31(self) -> Dict[str, Any]:
+        """Parse SEP-31 (Cross-Border Payments) structure - hardcoded definitions.
+
+        Section structure and field selection follow the SEP-31 specification at
+        https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md.
+        The 11 sections enumerate every JSON field exposed by the Sending Anchor's
+        client-side surface area: service endpoints, GET /info response, POST
+        /transactions request/response, GET /transactions/:id response, and the
+        embedded refund and fee-detail sub-objects.
+
+        Field `required` flags reflect what the spec marks as MUST or
+        unconditionally required; fields marked "(optional)" or "(Deprecated,
+        optional)" are recorded as required=False.
+        """
+        print(f"{Colors.BLUE}Using SEP-31 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # Service Endpoints
+        section = Section(title='Service Endpoints', key='service_endpoints')
+        section.fields = [
+            Field(name='GET /info', description='Discover assets, limits, fees, and KYC requirements', field_type='endpoint', required=True),
+            Field(name='POST /transactions', description='Initiate a cross-border payment', field_type='endpoint', required=True),
+            Field(name='GET /transactions/:id', description='Fetch transaction status', field_type='endpoint', required=True),
+            Field(name='PATCH /transactions/:id', description='Update transaction info (deprecated)', field_type='endpoint', required=True),
+            Field(name='PUT /transactions/:id/callback', description='Register status callback URL', field_type='endpoint', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Service Endpoints': {len(section.fields)} fields{Colors.END}")
+
+        # Info Response Fields
+        section = Section(title='Info Response Fields', key='info_response_fields')
+        section.fields = [
+            Field(name='receive', description='Map of asset code to per-asset receive configuration', field_type='object', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Info Response Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Receive Asset Info Fields
+        section = Section(title='Receive Asset Info Fields', key='receive_asset_info_fields')
+        section.fields = [
+            Field(name='sep12', description='Per-asset SEP-12 customer type requirements (deprecated)', field_type='object', required=False),
+            Field(name='min_amount', description='Minimum amount the anchor accepts', field_type='number', required=False),
+            Field(name='max_amount', description='Maximum amount the anchor accepts', field_type='number', required=False),
+            Field(name='fee_fixed', description='Fixed fee charged by the anchor', field_type='number', required=False),
+            Field(name='fee_percent', description='Percentage fee charged by the anchor', field_type='number', required=False),
+            Field(name='sender_sep12_type', description='Deprecated sender SEP-12 type identifier', field_type='string', required=False),
+            Field(name='receiver_sep12_type', description='Deprecated receiver SEP-12 type identifier', field_type='string', required=False),
+            Field(name='fields', description='Deprecated per-transaction field requirements', field_type='object', required=False),
+            Field(name='quotes_supported', description='Whether anchor accepts an optional SEP-38 quote_id', field_type='boolean', required=False),
+            Field(name='quotes_required', description='Whether anchor requires a SEP-38 quote_id', field_type='boolean', required=False),
+            Field(name='funding_methods', description='Methods the anchor uses to deliver the off-chain asset', field_type='array', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Receive Asset Info Fields': {len(section.fields)} fields{Colors.END}")
+
+        # SEP-12 Types Info Fields
+        section = Section(title='SEP-12 Types Info Fields', key='sep12_types_info_fields')
+        section.fields = [
+            Field(name='sender', description='SEP-12 sender customer types map', field_type='object', required=True),
+            Field(name='receiver', description='SEP-12 receiver customer types map', field_type='object', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'SEP-12 Types Info Fields': {len(section.fields)} fields{Colors.END}")
+
+        # POST /transactions Request Fields
+        section = Section(title='POST /transactions Request Fields', key='post_transactions_request_fields')
+        section.fields = [
+            Field(name='amount', description='Amount of the Stellar asset to send', field_type='number', required=True),
+            Field(name='asset_code', description='Code of the Stellar asset being sent', field_type='string', required=True),
+            Field(name='asset_issuer', description='Issuer of the Stellar asset', field_type='string', required=False),
+            Field(name='destination_asset', description='SEP-38 off-chain asset to deliver', field_type='string', required=False),
+            Field(name='quote_id', description='SEP-38 firm quote id', field_type='string', required=False),
+            Field(name='sender_id', description='SEP-12 customer id of the Sending Client', field_type='string', required=False),
+            Field(name='receiver_id', description='SEP-12 customer id of the Receiving Client', field_type='string', required=False),
+            Field(name='fields', description='Deprecated per-transaction field values', field_type='object', required=False),
+            Field(name='lang', description='ISO 639-1 language code', field_type='string', required=False),
+            Field(name='refund_memo', description='Memo to attach when issuing refunds', field_type='string', required=False),
+            Field(name='refund_memo_type', description='Type of refund_memo (id, text, or hash)', field_type='string', required=False),
+            Field(name='funding_method', description='Anchor funding method to use for delivery', field_type='string', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'POST /transactions Request Fields': {len(section.fields)} fields{Colors.END}")
+
+        # POST /transactions Response Fields
+        section = Section(title='POST /transactions Response Fields', key='post_transactions_response_fields')
+        section.fields = [
+            Field(name='id', description='Persistent transaction identifier', field_type='string', required=True),
+            Field(name='stellar_account_id', description='Receiving Anchor Stellar account to pay', field_type='string', required=False),
+            Field(name='stellar_memo_type', description='Type of stellar_memo (text, hash, or id)', field_type='string', required=False),
+            Field(name='stellar_memo', description='Memo to attach to the on-chain payment', field_type='string', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'POST /transactions Response Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Transaction Response Fields
+        section = Section(title='Transaction Response Fields', key='transaction_response_fields')
+        section.fields = [
+            Field(name='id', description='Transaction identifier matching POST /transactions', field_type='string', required=True),
+            Field(name='status', description='Lifecycle status of the transaction', field_type='string', required=True),
+            Field(name='status_eta', description='Estimated seconds until next status change', field_type='number', required=False),
+            Field(name='status_message', description='Human-readable status description', field_type='string', required=False),
+            Field(name='amount_in', description='Amount received by the Receiving Anchor', field_type='string', required=False),
+            Field(name='amount_in_asset', description='SEP-38 asset of the inbound amount', field_type='string', required=False),
+            Field(name='amount_out', description='Amount sent to the Receiving Client', field_type='string', required=False),
+            Field(name='amount_out_asset', description='SEP-38 asset of the delivered amount', field_type='string', required=False),
+            Field(name='amount_fee', description='Deprecated aggregate fee charged', field_type='string', required=False),
+            Field(name='amount_fee_asset', description='Deprecated fee asset', field_type='string', required=False),
+            Field(name='fee_details', description='Structured fee breakdown', field_type='object', required=True),
+            Field(name='quote_id', description='SEP-38 quote id used by this transaction', field_type='string', required=False),
+            Field(name='stellar_account_id', description='Receiving Anchor Stellar account', field_type='string', required=False),
+            Field(name='stellar_memo_type', description='Type of stellar_memo', field_type='string', required=False),
+            Field(name='stellar_memo', description='Memo attached to the on-chain payment', field_type='string', required=False),
+            Field(name='started_at', description='UTC ISO 8601 transaction creation timestamp', field_type='string', required=False),
+            Field(name='updated_at', description='UTC ISO 8601 last status transition timestamp', field_type='string', required=False),
+            Field(name='completed_at', description='UTC ISO 8601 completion timestamp', field_type='string', required=False),
+            Field(name='stellar_transaction_id', description='Stellar transaction hash of the on-chain payment', field_type='string', required=False),
+            Field(name='external_transaction_id', description='External off-chain transaction identifier', field_type='string', required=False),
+            Field(name='refunded', description='Deprecated full-refund flag', field_type='boolean', required=False),
+            Field(name='refunds', description='Structured refund aggregate', field_type='object', required=False),
+            Field(name='required_info_message', description='Message accompanying required_info_updates', field_type='string', required=False),
+            Field(name='required_info_updates', description='Fields requiring update from the Sending Anchor', field_type='object', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Transaction Response Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Refunds Fields
+        section = Section(title='Refunds Fields', key='refunds_fields')
+        section.fields = [
+            Field(name='amount_refunded', description='Total amount refunded across all payments', field_type='string', required=True),
+            Field(name='amount_fee', description='Total fee charged for processing the refunds', field_type='string', required=True),
+            Field(name='payments', description='Array of individual refund payments', field_type='array', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Refunds Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Refund Payment Fields
+        section = Section(title='Refund Payment Fields', key='refund_payment_fields')
+        section.fields = [
+            Field(name='id', description='Stellar transaction hash of the refund payment', field_type='string', required=True),
+            Field(name='amount', description='Amount returned in this refund payment', field_type='string', required=True),
+            Field(name='fee', description='Fee charged for processing this refund payment', field_type='string', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Refund Payment Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Fee Details Fields
+        section = Section(title='Fee Details Fields', key='fee_details_fields')
+        section.fields = [
+            Field(name='total', description='Aggregate fee amount charged', field_type='string', required=True),
+            Field(name='asset', description='SEP-38 asset of the fee', field_type='string', required=True),
+            Field(name='details', description='Array of fee line items', field_type='array', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Fee Details Fields': {len(section.fields)} fields{Colors.END}")
+
+        # Fee Details Breakdown Fields
+        section = Section(title='Fee Details Breakdown Fields', key='fee_details_breakdown_fields')
+        section.fields = [
+            Field(name='name', description='Name of the fee line item', field_type='string', required=True),
+            Field(name='amount', description='Amount of this fee line item', field_type='string', required=True),
+            Field(name='description', description='Optional description of the fee line item', field_type='string', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Fee Details Breakdown Fields': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
     def parse_sep_46(self) -> Dict[str, Any]:
         """Parse SEP-46 (Contract Meta) structure - hardcoded definitions"""
         print(f"{Colors.BLUE}Using SEP-46 specific parser (hardcoded){Colors.END}")
@@ -1706,6 +1874,7 @@ class SEPParser:
             '0012': self.parse_sep_12,
             '0024': self.parse_sep_24,
             '0030': self.parse_sep_30,
+            '0031': self.parse_sep_31,
             '0038': self.parse_sep_38,
             '0045': self.parse_sep_45,
             '0046': self.parse_sep_46,
