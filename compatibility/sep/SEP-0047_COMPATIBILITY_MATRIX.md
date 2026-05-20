@@ -1,10 +1,10 @@
 # SEP-0047 (Contract Interface Discovery) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:14
+**Generated:** 2026-05-20 11:38:55
 
 **SEP Version:** 0.1.0  
 **SEP Status:** Draft  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0047.md
 
 ## SEP Summary
@@ -25,44 +25,6 @@ Defines how Soroban contracts advertise which SEPs they implement via a `sep` ke
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/AssembledTransaction.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/ClientOptions.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/ContractClient.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/ContractSpec.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/NativeUnionVal.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/SorobanContractParser.kt`
-
-### Key Classes
-
-- **`AssembledTransaction`** - Methods: simulate, sign, signAndSubmit, needsNonInvokerSigningBy, result, isReadCall, submit, getSimulationData, toEnvelopeXdrBase64, restoreFootprint, submitInternal
-- **`SimulateHostFunctionResult`**
-- **`ClientOptions`**
-- **`ContractClient`** - Methods: getContractSpec, getMethodNames, funcArgsToXdrSCValues, nativeToXdrSCVal, funcResToNative, close, forContract, install, installInternal, deployFromWasmIdInternal, deployContractInternal, hexStringToByteArray
-- **`ContractSpec`** - Methods: funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events, getFunc, findEntry, funcArgsToXdrSCValues, funcResToNative, scValToNative, scValUdtToNative, enumToNative, structToNative, unionToNative, nativeToXdrSCVal, handleValueType, parseInteger, handleU128Type, handleI128Type, handleU256Type, handleI256Type, handleBytesType, handleAddressType, handleErrorType, handleValType, handleOptionType, handleResultType, handleVecType, handleMapType, handleTupleType, handleBytesNType, handleUDTType, handleStructType, handleUnionType, handleEnumType, isNumericString, hexToBytes
-- **`NativeUnionVal`**
-- **`VoidCase`**
-- **`TupleCase`**
-- **`SorobanContractParser`** - Methods: parseContractByteCode, parseEnvironmentMeta, parseContractSpec, parseMeta, extractBytesBetween, extractBytesToEnd, indexOfBytes
-- **`SorobanContractParserException`**
-- **`SorobanContractInfo`**
-
-### Test Coverage
-
-**Tests:** 286 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/AssembledTransactionComprehensiveTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/ClientOptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/ContractClientAndHelpersTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/ContractSpecExceptionTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/ContractSpecTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/ExponentialBackoffTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/NativeUnionValTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract/SorobanContractParserTest.kt`
 
 ## Coverage by Section
 

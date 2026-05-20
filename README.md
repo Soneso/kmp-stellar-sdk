@@ -1,6 +1,6 @@
 # Stellar SDK for Kotlin Multiplatform
 
-[![Version](https://img.shields.io/badge/version-1.5.1-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/Soneso/kmp-stellar-sdk/releases)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-blueviolet?logo=kotlin)](https://kotlinlang.org/docs/multiplatform.html)
 [![Maven Central](https://img.shields.io/maven-central/v/com.soneso.stellar/stellar-sdk)](https://search.maven.org/artifact/com.soneso.stellar/stellar-sdk)
 [![codecov](https://codecov.io/gh/Soneso/kmp-stellar-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/Soneso/kmp-stellar-sdk)
@@ -69,7 +69,7 @@ The SDK provides comprehensive Stellar functionality:
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
 - **Smart Accounts** - [OpenZeppelin smart account](https://github.com/OpenZeppelin/stellar-contracts) support with WebAuthn passkeys, multi-signer authorization, context rules, and policies (threshold, weighted threshold, spending limit)
-- **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
+- **SEP Support** - SEP-1 (stellar.toml), SEP-2 (Federation), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contracts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
 
 ## Installation
 
@@ -78,7 +78,7 @@ Add the SDK as a Maven dependency (recommended for most projects):
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.5.1")
+    implementation("com.soneso.stellar:stellar-sdk:1.6.0")
 }
 ```
 

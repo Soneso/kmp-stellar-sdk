@@ -1,10 +1,10 @@
 # SEP-0008 (Regulated Assets) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:10
+**Generated:** 2026-05-20 11:38:48
 
 **SEP Version:** 1.7.4  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md
 
 ## SEP Summary
@@ -13,73 +13,34 @@ Defines how assets that require per-transaction issuer approval are identified, 
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (32/32 fields)
+**Total Coverage:** 65.62% (21/32 fields)
 
-- ✅ **Implemented:** 32/32
-- ❌ **Not Implemented:** 0/32
+- ✅ **Implemented:** 21/32
+- ❌ **Not Implemented:** 11/32
 
-**Required Fields:** 100.0% (27/27)
+**Required Fields:** 74.07% (20/27)
 
-**Optional Fields:** 100.0% (5/5)
+**Optional Fields:** 20.0% (1/5)
 
 ## Implementation Status
 
 ✅ **Fully Implemented**
 
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/RegulatedAsset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostActionResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08PostTransactionResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/Sep08Service.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08IncompleteInitDataException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidActionResponseException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep08/exceptions/Sep08InvalidTransactionResponseException.kt`
-
-### Key Classes
-
-- **`RegulatedAsset`** - Methods: toXdr, toAsset, toString, compareTo, equals, hashCode
-- **`Sep08PostActionResponse`** - Methods: fromJson, parseNextUrl
-- **`Done`** - Methods: fromJson, parseNextUrl
-- **`NextUrl`** - Methods: fromJson, parseNextUrl
-- **`Sep08PostTransactionResponse`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`Success`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`Revised`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`Pending`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`ActionRequired`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`Rejected`** - Methods: fromJson, parseSuccess, parseRevised, parsePending, parseActionRequired, parseRejected
-- **`Sep08Service`** - Methods: fromDomain, authorizationRequired, postTransaction, postAction, buildHeaders
-- **`Sep08IncompleteInitDataException`** - Methods: toString
-- **`Sep08InvalidActionResponseException`** - Methods: toString
-- **`Sep08InvalidTransactionResponseException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 108 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep08/Sep08IntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ResponseParsingTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep08/Sep08ServiceTest.kt`
-
 ## Coverage by Section
 
 | Section | Coverage | Required | Implemented | Total |
 |---------|----------|----------|-------------|-------|
-| Action Required Response Fields | 100.0% | 3/3 | 5 | 5 |
+| Action Required Response Fields | 20.0% | 1/3 | 1 | 5 |
 | Action URL Handling | 100.0% | 4/4 | 4 | 4 |
 | Approval Endpoint | 100.0% | 1/1 | 1 | 1 |
 | Authorization Flags | 100.0% | 2/2 | 2 | 2 |
-| Pending Response Fields | 100.0% | 2/2 | 3 | 3 |
-| Rejected Response Fields | 100.0% | 2/2 | 2 | 2 |
+| Pending Response Fields | 33.33% | 1/2 | 1 | 3 |
+| Rejected Response Fields | 50.0% | 1/2 | 1 | 2 |
 | Request Parameters | 100.0% | 1/1 | 1 | 1 |
 | Response Statuses | 100.0% | 5/5 | 5 | 5 |
-| Revised Response Fields | 100.0% | 3/3 | 3 | 3 |
+| Revised Response Fields | 33.33% | 1/3 | 1 | 3 |
 | Stellar TOML Fields | 100.0% | 2/2 | 3 | 3 |
-| Success Response Fields | 100.0% | 2/2 | 3 | 3 |
+| Success Response Fields | 33.33% | 1/2 | 1 | 3 |
 
 ## Detailed Field Comparison
 
@@ -88,10 +49,10 @@ Defines how assets that require per-transaction issuer approval are identified, 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `status` | ✓ | ✅ | `(implicit)` | Status value "action_required" |
-| `message` | ✓ | ✅ | `message` | A human readable string containing information regarding the action required |
-| `action_url` | ✓ | ✅ | `actionUrl` | A URL that allows the user to complete the actions required to have the transaction approved |
-| `action_method` |  | ✅ | `actionMethod` | GET or POST, indicating the type of request that should be made to the action_url. If not provide... |
-| `action_fields` |  | ✅ | `actionFields` | An array of additional fields defined by SEP-9 Standard KYC / AML fields that the client may opti... |
+| `message` | ✓ | ❌ | - | A human readable string containing information regarding the action required |
+| `action_url` | ✓ | ❌ | - | A URL that allows the user to complete the actions required to have the transaction approved |
+| `action_method` |  | ❌ | - | GET or POST, indicating the type of request that should be made to the action_url. If not provide... |
+| `action_fields` |  | ❌ | - | An array of additional fields defined by SEP-9 Standard KYC / AML fields that the client may opti... |
 
 ### Action URL Handling
 
@@ -120,15 +81,15 @@ Defines how assets that require per-transaction issuer approval are identified, 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `status` | ✓ | ✅ | `(implicit)` | Status value "pending" |
-| `timeout` | ✓ | ✅ | `timeout` | Number of milliseconds to wait before submitting the same transaction again. Use 0 if the wait ti... |
-| `message` |  | ✅ | `message` | A human readable string containing information to pass on to the user |
+| `timeout` | ✓ | ❌ | - | Number of milliseconds to wait before submitting the same transaction again. Use 0 if the wait ti... |
+| `message` |  | ❌ | - | A human readable string containing information to pass on to the user |
 
 ### Rejected Response Fields
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `status` | ✓ | ✅ | `(implicit)` | Status value "rejected" |
-| `error` | ✓ | ✅ | `error` | A human readable string explaining why the transaction is not compliant and could not be made com... |
+| `error` | ✓ | ❌ | - | A human readable string explaining why the transaction is not compliant and could not be made com... |
 
 ### Request Parameters
 
@@ -151,8 +112,8 @@ Defines how assets that require per-transaction issuer approval are identified, 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `status` | ✓ | ✅ | `(implicit)` | Status value "revised" |
-| `tx` | ✓ | ✅ | `tx` | Transaction envelope XDR, base64 encoded. This transaction is a revised compliant version of the ... |
-| `message` | ✓ | ✅ | `message` | A human readable string explaining the modifications made to the transaction to make it compliant |
+| `tx` | ✓ | ❌ | - | Transaction envelope XDR, base64 encoded. This transaction is a revised compliant version of the ... |
+| `message` | ✓ | ❌ | - | A human readable string explaining the modifications made to the transaction to make it compliant |
 
 ### Stellar TOML Fields
 
@@ -167,16 +128,54 @@ Defines how assets that require per-transaction issuer approval are identified, 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `status` | ✓ | ✅ | `(implicit)` | Status value "success" |
-| `tx` | ✓ | ✅ | `tx` | Transaction envelope XDR, base64 encoded. This transaction will have both the original signature(... |
-| `message` |  | ✅ | `message` | A human readable string containing information to pass on to the user |
+| `tx` | ✓ | ❌ | - | Transaction envelope XDR, base64 encoded. This transaction will have both the original signature(... |
+| `message` |  | ❌ | - | A human readable string containing information to pass on to the user |
 
 ## Implementation Gaps
 
-No gaps found! All fields are implemented.
+### 🟠 High Priority (7 gaps)
+
+- **`tx`** (Required)
+  - Section: Success Response Fields
+  - Transaction envelope XDR, base64 encoded. This transaction will have both the original signature(s) from the request as well as one or multiple additional signatures from the issuer.
+- **`tx`** (Required)
+  - Section: Revised Response Fields
+  - Transaction envelope XDR, base64 encoded. This transaction is a revised compliant version of the original request transaction, signed by the issuer.
+- **`message`** (Required)
+  - Section: Revised Response Fields
+  - A human readable string explaining the modifications made to the transaction to make it compliant
+- **`timeout`** (Required)
+  - Section: Pending Response Fields
+  - Number of milliseconds to wait before submitting the same transaction again. Use 0 if the wait time cannot be determined.
+- **`message`** (Required)
+  - Section: Action Required Response Fields
+  - A human readable string containing information regarding the action required
+- **`action_url`** (Required)
+  - Section: Action Required Response Fields
+  - A URL that allows the user to complete the actions required to have the transaction approved
+- **`error`** (Required)
+  - Section: Rejected Response Fields
+  - A human readable string explaining why the transaction is not compliant and could not be made compliant
+
+### 🟢 Low Priority (4 gaps)
+
+- **`message`** (Optional)
+  - Section: Success Response Fields
+  - A human readable string containing information to pass on to the user
+- **`message`** (Optional)
+  - Section: Pending Response Fields
+  - A human readable string containing information to pass on to the user
+- **`action_method`** (Optional)
+  - Section: Action Required Response Fields
+  - GET or POST, indicating the type of request that should be made to the action_url. If not provided, GET is assumed.
+- **`action_fields`** (Optional)
+  - Section: Action Required Response Fields
+  - An array of additional fields defined by SEP-9 Standard KYC / AML fields that the client may optionally provide to the approval service when sending the request to the action_url
 
 ## Recommendations
 
-The SDK has full compatibility with SEP-0008!
+2. **High Priority**: Implement 7 high-priority field(s)
+3. **Required Fields**: Complete implementation of 7 required field(s)
 
 ## Legend
 

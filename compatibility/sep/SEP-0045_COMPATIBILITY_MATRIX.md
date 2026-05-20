@@ -1,10 +1,10 @@
 # SEP-0045 (Stellar Web Authentication for Contract Accounts) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:13
+**Generated:** 2026-05-20 11:38:54
 
 **SEP Version:** 0.1.1  
 **SEP Status:** Draft  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0045.md
 
 ## SEP Summary
@@ -25,77 +25,6 @@ Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to s
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/Sep45AuthToken.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/Sep45ChallengeResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/Sep45ClientDomainSigningDelegate.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/Sep45TokenResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/WebAuthForContracts.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45ChallengeRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45ChallengeValidationException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidAccountException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidArgsException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidContractAddressException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidFunctionNameException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidHomeDomainException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidNetworkPassphraseException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidNonceException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidServerSignatureException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45InvalidWebAuthDomainException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45MissingClientDomainException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45MissingClientEntryException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45MissingServerEntryException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45NoContractIdException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45NoEndpointException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45NoSigningKeyException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45SubInvocationsFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45TimeoutException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45TokenSubmissionException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep45/exceptions/Sep45UnknownResponseException.kt`
-
-### Key Classes
-
-- **`Sep45AuthToken`** - Methods: isExpired, toString, parse
-- **`Sep45ChallengeResponse`** - Methods: fromJson
-- **`Sep45TokenResponse`**
-- **`WebAuthForContracts`** - Methods: fromDomain, getChallenge, validateChallenge, signAuthorizationEntries, sendSignedChallenge, decodeAuthorizationEntries, encodeAuthorizationEntries, extractArgsFromEntry, verifyServerSignature, scAddressToString, entryToBase64, base64ToEntry
-- **`Sep45ChallengeRequestException`**
-- **`Sep45ChallengeValidationException`**
-- **`Sep45InvalidAccountException`**
-- **`Sep45InvalidArgsException`**
-- **`Sep45InvalidContractAddressException`**
-- **`Sep45InvalidFunctionNameException`**
-- **`Sep45InvalidHomeDomainException`**
-- **`Sep45InvalidNetworkPassphraseException`**
-- **`Sep45InvalidNonceException`**
-- **`Sep45InvalidServerSignatureException`**
-- **`Sep45InvalidWebAuthDomainException`**
-- **`Sep45MissingClientDomainException`**
-- **`Sep45MissingClientEntryException`**
-- **`Sep45MissingServerEntryException`**
-- **`Sep45NoContractIdException`**
-- **`Sep45NoEndpointException`**
-- **`Sep45NoSigningKeyException`**
-- **`Sep45SubInvocationsFoundException`**
-- **`Sep45TimeoutException`**
-- **`Sep45TokenSubmissionException`**
-- **`Sep45UnknownResponseException`**
-
-### Test Coverage
-
-**Tests:** 162 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep45/Sep45IntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep45/Sep45AuthTokenTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep45/Sep45ChallengeValidationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep45/Sep45ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep45/Sep45ResponseParsingTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep45/WebAuthForContractsTest.kt`
 
 ## Coverage by Section
 

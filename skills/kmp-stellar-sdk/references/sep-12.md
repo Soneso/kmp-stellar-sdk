@@ -191,8 +191,8 @@ val personFields = NaturalPersonKYCFields(
     taxId = "123-45-6789",
     taxIdName = "SSN",
 
-    // Employment — occupation is String in KMP SDK (ISCO-08 code, e.g., "2512")
-    occupation = "2512",
+    // Employment — occupation is the 3-char ISCO-08 code (e.g., "111" for legislators)
+    occupation = "111",
     employerName = "Acme Corp",
     employerAddress = "456 Business Ave",
 
@@ -369,13 +369,13 @@ val response = kycService.putCustomerInfo(request)
 
 ### File uploads (binary fields)
 
-Binary fields (photos, documents) are stored as `ByteArray` and sent via `multipart/form-data` automatically.
+Binary fields (photos, documents) are stored as `ByteArray` and sent via `multipart/form-data` automatically. The `java.io.File` reading shown below is JVM/Android-only; on iOS/macOS/JS targets use the platform's file-reading API to produce the same `ByteArray`.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
 import kotlinx.datetime.LocalDate
-import java.io.File // JVM/Android only — use platform-specific file reading on other targets
+import java.io.File
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -437,7 +437,7 @@ For anchor-specific fields not covered by SEP-9, use `customFields` (text) and `
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
-import java.io.File // JVM/Android only
+import java.io.File
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -538,28 +538,69 @@ The anchor POSTs to your callback URL with the same JSON body as `GET /customer`
 
 ### Verifying callback signatures
 
-Use `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` to validate incoming callbacks. The class is shared between SEP-12 and SEP-31.
+When the anchor delivers customer-status updates to your registered callback URL, each `POST` carries a `Signature` (or legacy `X-Stellar-Signature`) header signed with the anchor's `SIGNING_KEY` from its stellar.toml. Use `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` to validate them. The class is shared between SEP-12 and SEP-31.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
+import com.soneso.stellar.sdk.sep.sep01.StellarToml
 
-// Construct once per registered callback URL and reuse for every inbound callback.
+// Resolve the anchor's SIGNING_KEY once, then cache the verifier per registered URL.
+val toml = StellarToml.fromDomain("testanchor.stellar.org")
+val signingKey = toml.generalInformation.signingKey
+    ?: error("Anchor stellar.toml missing SIGNING_KEY")
+
 val verifier = CallbackSignatureVerifier(
-    signingKey = anchorPublicKey,                                  // anchor's SIGNING_KEY (G... address)
-    registeredCallbackUrl = "https://myapp.com/webhooks/kyc-status", // URL you registered with the anchor
-    freshnessSeconds = 120,                                        // default; do not raise above 120 in production
+    signingKey = signingKey,
+    registeredCallbackUrl = "https://myapp.com/webhooks/kyc-status",
+    // freshnessSeconds defaults to 120 to match the spec recommendation.
+    // Do not raise above 120 in production (max allowed is 600, intended only
+    // for test-environment clock skew).
 )
 
-// In your webhook handler
+// In your webhook handler:
 val result = verifier.verify(
-    signatureHeader = signatureHeader,             // "Signature" header value, may be null
-    xStellarSignatureHeader = xStellarSignature,    // legacy "X-Stellar-Signature" value, may be null
-    body = requestBody,                            // raw inbound JSON body
+    signatureHeader = request.header("Signature"),
+    xStellarSignatureHeader = request.header("X-Stellar-Signature"),
+    body = request.bodyAsText(),
 )
 
-if (result == CallbackSignatureVerifier.Result.Valid) {
-    // Process callback safely
+when (result) {
+    CallbackSignatureVerifier.Result.Valid -> {
+        // Authentic; process the customer status update.
+    }
+    CallbackSignatureVerifier.Result.MissingHeader -> {
+        // Neither header was present.
+    }
+    CallbackSignatureVerifier.Result.MalformedHeader -> {
+        // One of: header did not match the expected `t=<digits>, s=<base64>` shape,
+        // the base64 payload failed to decode, or the signature bytes were rejected
+        // by the Ed25519 layer (e.g., wrong byte length).
+    }
+    is CallbackSignatureVerifier.Result.Stale -> {
+        // Timestamp outside freshness window.
+        // result.ageSeconds is signed: positive = past, negative = future-dated.
+        // Both are rejected; the sign exists for logging only.
+    }
+    CallbackSignatureVerifier.Result.SignatureMismatch -> {
+        // Header was well-formed but cryptographic verification failed.
+    }
 }
+```
+
+The verifier:
+- Pins the canonical host from the registered callback URL (port stripped) so a forwarded `Host` header cannot redirect signature scope.
+- Enforces HTTPS for the registered URL, with HTTP allowed only for loopback authorities (development).
+- Applies a two-sided freshness window (`|now - signedTimestamp| <= freshnessSeconds`) to defend against future-dated forgery and replay equally.
+
+Once verification passes, decode the body — the anchor posts the same JSON shape as `GET /customer` responses:
+
+```kotlin
+import com.soneso.stellar.sdk.sep.sep12.GetCustomerInfoResponse
+import kotlinx.serialization.json.Json
+
+val json = Json { ignoreUnknownKeys = true }
+val update = json.decodeFromString<GetCustomerInfoResponse>(requestBody)
+println("Customer ${update.id} status: ${update.status}")
 ```
 
 The deprecated `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` object remains available as a thin shim for backwards compatibility and is scheduled for removal; see the project `CHANGELOG.md`.
@@ -572,11 +613,13 @@ Upload a file and receive a `fileId` to reference in subsequent `PUT /customer` 
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
-import java.io.File // JVM/Android only
+import java.io.File
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
-// Upload the file — takes ByteArray and jwt String
+// Upload the file — takes ByteArray and jwt String.
+// File-reading is JVM/Android-only; on other platforms produce the ByteArray
+// with the platform's file API.
 val fileBytes = File("passport_front.jpg").readBytes()
 val fileResponse = kycService.postCustomerFile(fileBytes, jwtToken)
 
@@ -696,7 +739,7 @@ suspend fun deleteCustomer(
 
 ## Error handling
 
-All methods throw typed exceptions from `com.soneso.stellar.sdk.sep.sep12.exceptions` on HTTP errors (400, 401, 404, 409, 413). `putCustomerCallback()` and `deleteCustomer()` return `HttpResponse` on success (status 200) but still throw exceptions for error status codes.
+All methods throw typed exceptions from `com.soneso.stellar.sdk.sep.sep12.exceptions` on HTTP errors (400, 401, 404, 409, 413). `putCustomerCallback()` and `deleteCustomer()` return `HttpResponse` on success (status 200 or 202; 202 indicates the anchor accepted the request for asynchronous processing) but still throw exceptions for error status codes.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
@@ -791,7 +834,7 @@ Same properties as `GetCustomerInfoField`, plus:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `status` | `FieldStatus?` | Enum: `ACCEPTED`, `PROCESSING`, `REJECTED`, or `VERIFICATION_REQUIRED` |
+| `status` | `FieldStatus?` | Enum: `ACCEPTED`, `PROCESSING`, `REJECTED`, or `VERIFICATION_REQUIRED`. When `VERIFICATION_REQUIRED`, submit the code received out-of-band (SMS / email) by passing it in `PutCustomerInfoRequest.verificationFields` with the field name suffixed by `_verification` (e.g., `"email_address_verification" to "ABC123"`). |
 | `error` | `String?` | Rejection reason when status is `REJECTED` |
 
 ### PutCustomerInfoResponse
@@ -895,49 +938,24 @@ val org = OrganizationKYCFields(
 // (Unlike NaturalPersonKYCFields.birthDate which IS a LocalDate)
 ```
 
-**WRONG: using setter methods instead of constructor parameters**
+**WRONG: using setter / getter methods on SEP-12 data classes**
+
+All SEP-12 request and response classes are Kotlin data classes with `val` properties. There are no setters, no `getX()` methods, and no empty constructors — required fields must be supplied at construction time.
 
 ```kotlin
-// WRONG: KMP SDK uses data classes with constructor parameters, not setters
+// WRONG: empty constructor + property assignment — required fields have no default,
+// and val properties have no setter
 val request = GetCustomerInfoRequest()
-request.jwt = jwtToken           // compile error — no setter, val property
-request.id = customerId          // compile error
+request.jwt = jwtToken            // compile error
+val id = fileResponse.getFileId() // compile error — no such method
 
-// CORRECT: pass all values in the constructor
+// CORRECT: pass all values in the constructor, access val properties directly
 val request = GetCustomerInfoRequest(
     jwt = jwtToken,
-    id = customerId
-)
-```
-
-**WRONG: using copy() to build PutCustomerInfoRequest incrementally**
-
-```kotlin
-// WRONG: creating empty request and copying values in — jwt is required
-val request = PutCustomerInfoRequest()  // compile error — jwt has no default
-
-// CORRECT: provide all values in the constructor call
-val request = PutCustomerInfoRequest(
-    jwt = jwtToken,
     id = customerId,
-    kycFields = kycFields,
-    type = "sep31-sender"
 )
-```
-
-**WRONG: accessing CustomerFileResponse via getter methods -- it has val properties**
-
-```kotlin
-// WRONG: there are no getter methods on CustomerFileResponse
-val id = fileResponse.getFileId()          // compile error
-val ct = fileResponse.getContentType()     // compile error
-
-// CORRECT: access val properties directly
 val id = fileResponse.fileId
-val ct = fileResponse.contentType
-val sz = fileResponse.size           // Long, not Int
-val ex = fileResponse.expiresAt
-val cu = fileResponse.customerId
+val sz = fileResponse.size  // Long, not Int
 ```
 
 **WRONG: CustomerFileResponse.size is Int**
@@ -1019,22 +1037,3 @@ val request = PutCustomerInfoRequest(
 
 ---
 
-## Customer statuses
-
-| Status | Meaning |
-|--------|---------|
-| `CustomerStatus.ACCEPTED` | All required info verified. Customer may proceed. |
-| `CustomerStatus.PROCESSING` | Info under review. Check back later. |
-| `CustomerStatus.NEEDS_INFO` | Additional fields required. See `fields`. |
-| `CustomerStatus.REJECTED` | Permanently rejected. See `message` for reason. |
-
-## Field statuses
-
-| Status | Meaning |
-|--------|---------|
-| `FieldStatus.ACCEPTED` | Field validated. |
-| `FieldStatus.PROCESSING` | Field under review. |
-| `FieldStatus.REJECTED` | Field rejected. See `error` for reason. |
-| `FieldStatus.VERIFICATION_REQUIRED` | Code sent to customer (SMS/email); submit code with `_verification` suffix via `verificationFields`. |
-
----

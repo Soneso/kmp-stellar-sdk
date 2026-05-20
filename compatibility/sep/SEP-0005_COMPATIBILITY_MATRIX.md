@@ -1,10 +1,10 @@
 # SEP-0005 (Key Derivation Methods for Stellar Keys) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:09
+**Generated:** 2026-05-20 11:38:47
 
 **SEP Version:** N/A  
 **SEP Status:** Final  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0005.md
 
 ## SEP Summary
@@ -25,37 +25,6 @@ Defines methods for deriving Stellar keypairs from mnemonic phrases, making it e
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/HexCodec.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/Mnemonic.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/MnemonicConstants.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/MnemonicLanguage.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/MnemonicStrength.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/MnemonicUtils.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/WordList.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/InvalidChecksumException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/InvalidEntropyException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/InvalidMnemonicException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/InvalidPathException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/InvalidWordException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep05/exceptions/Sep05Exception.kt`
-
-### Key Classes
-
-- **`HexCodec`** - Methods: encode, decode, hexCharToInt
-- **`Mnemonic`** - Methods: generate12WordsMnemonic, generate15WordsMnemonic, generate18WordsMnemonic, generate21WordsMnemonic, generate24WordsMnemonic, validate, detectLanguage, from, fromEntropy, fromBip39HexSeed, fromBip39Seed, getKeyPair, getAccountId, getPrivateKey, getPublicKey, getBip39Seed, getBip39SeedHex, close, derivePath, deriveChild
-- **`MnemonicConstants`**
-- **`MnemonicLanguage`**
-- **`MnemonicStrength`** - Methods: fromWordCount, fromEntropyBits
-- **`MnemonicUtils`** - Methods: generateMnemonic, entropyToMnemonic, mnemonicToEntropy, validateMnemonic, detectLanguage, mnemonicToSeed, mnemonicToSeedHex, getMnemonicStrength, normalizeWords, validateEntropy, deriveChecksumBits, bytesToBinaryString
-- **`WordList`** - Methods: getWordList, getWordIndex, loadWordList
-- **`InvalidChecksumException`** - Methods: toString
-- **`InvalidEntropyException`** - Methods: toString
-- **`InvalidMnemonicException`** - Methods: toString
-- **`InvalidPathException`** - Methods: toString
-- **`InvalidWordException`** - Methods: toString
 
 ## Coverage by Section
 

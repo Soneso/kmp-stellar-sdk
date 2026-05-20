@@ -48,23 +48,44 @@ python3 tools/matrix-generator/run_analysis.py
 
 For detailed documentation, see `tools/matrix-generator/README.md`.
 
+### skill-generator - Agent Skill API Reference Generator
+
+**Location:** `tools/skill-generator/`
+
+**Description:** Python-based tool that regenerates the agent skill's compact API reference file from the SDK's Kotlin source. The output (`skills/kmp-stellar-sdk/references/api_reference.md`) lists every public class, method, and property signature, so AI coding agents consuming the skill can look up the SDK surface without reading raw source.
+
+**Prerequisites:**
+- Python 3.8+ (standard library only, no external dependencies)
+
+**Usage:**
+```bash
+python3 tools/skill-generator/generate_api_reference.py
+```
+
+**Output:** Writes to `skills/kmp-stellar-sdk/references/api_reference.md`. After regenerating, rebuild the skill zip so the bundled archive matches.
+
+For detailed documentation, see `tools/skill-generator/README.md`.
+
 ## Directory Structure
 
 ```
 tools/
-├── README.md              # This file
-├── xdrgen-kt/             # XDR code generation tool
-│   ├── generate.rb        # Main generator script
-│   ├── Gemfile            # Ruby dependencies
-│   └── lib/               # Custom Kotlin generator
-└── matrix-generator/      # Compatibility matrix generator
-    ├── run_analysis.py    # Master orchestrator (all pipelines)
-    ├── common.py          # Shared utilities
-    ├── github_fetcher.py  # GitHub API client
-    ├── sdk_analyzer.py    # Kotlin source analyzer
-    ├── horizon/           # Horizon API pipeline
-    ├── rpc/               # Soroban RPC pipeline
-    └── sep/               # SEP pipeline
+├── README.md                  # This file
+├── xdrgen-kt/                 # XDR code generation tool
+│   ├── generate.rb            # Main generator script
+│   ├── Gemfile                # Ruby dependencies
+│   └── lib/                   # Custom Kotlin generator
+├── matrix-generator/          # Compatibility matrix generator
+│   ├── run_analysis.py        # Master orchestrator (all pipelines)
+│   ├── common.py              # Shared utilities
+│   ├── github_fetcher.py      # GitHub API client
+│   ├── sdk_analyzer.py        # Kotlin source analyzer
+│   ├── horizon/               # Horizon API pipeline
+│   ├── rpc/                   # Soroban RPC pipeline
+│   └── sep/                   # SEP pipeline
+└── skill-generator/           # Agent skill API reference generator
+    ├── README.md              # Tool documentation
+    └── generate_api_reference.py
 ```
 
 ## Contributing

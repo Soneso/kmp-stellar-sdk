@@ -1,10 +1,10 @@
 # SEP-0001 (Stellar Info File) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:08
+**Generated:** 2026-05-20 11:38:46
 
 **SEP Version:** 2.7.0  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0001.md
 
 ## SEP Summary
@@ -25,35 +25,6 @@ The `stellar.toml` file publishes information about an organization's Stellar in
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Currency.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Documentation.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/GeneralInformation.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/PointOfContact.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/StellarToml.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/TomlParser.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep01/Validator.kt`
-
-### Key Classes
-
-- **`Currency`**
-- **`Documentation`**
-- **`GeneralInformation`**
-- **`PointOfContact`**
-- **`StellarToml`** - Methods: fromDomain, currencyFromUrl, parse, safeguardTomlContent, parseTomlTree, parseGeneralInformation, parseDocumentation, parsePointsOfContact, parseCurrencies, parseCurrency, parseCurrencyFromMap, parseValidators
-- **`TomlParser`** - Methods: parse, parseValue, parseArray
-- **`Validator`**
-
-### Test Coverage
-
-**Tests:** 33 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep01/StellarTomlIntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep01/StellarTomlTest.kt`
 
 ## Coverage by Section
 

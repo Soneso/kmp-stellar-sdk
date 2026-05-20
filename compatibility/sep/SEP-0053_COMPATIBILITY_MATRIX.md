@@ -1,10 +1,10 @@
 # SEP-0053 (Sign and Verify Messages) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:15
+**Generated:** 2026-05-20 11:38:56
 
 **SEP Version:** 0.0.1  
-**SEP Status:** Draft  
-**SDK Version:** 1.5.1  
+**SEP Status:** Final Comment Period (Final)  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0053.md
 
 ## SEP Summary
@@ -25,22 +25,6 @@ Standardizes signing and verification of arbitrary messages using Stellar Ed2551
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/KeyPair.kt`
-
-### Key Classes
-
-- **`KeyPair`** - Methods: calculateMessageHash, getCryptoLibraryName, fromSecretSeed, fromAccountId, fromPublicKey, random, canSign, getAccountId, getSecretSeed, getPublicKey, getXdrAccountId, sign, signDecorated, verify, signMessage, verifyMessage, equals, hashCode
-
-### Test Coverage
-
-**Tests:** 29 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep53/Sep53Test.kt`
 
 ## Coverage by Section
 

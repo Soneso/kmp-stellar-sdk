@@ -1,10 +1,10 @@
 # SEP-0012 (KYC API) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:12
+**Generated:** 2026-05-20 11:38:51
 
 **SEP Version:** 1.15.0  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md
 
 ## SEP Summary
@@ -25,68 +25,6 @@ A standard API for wallets to upload KYC data to anchors. Customers enter their 
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CallbackSignatureVerifier.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerFileResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/CustomerStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/FieldStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerFilesResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoField.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoProvidedField.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/GetCustomerInfoResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/KYCService.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerCallbackRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerInfoRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerInfoResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/PutCustomerVerificationRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/CustomerAlreadyExistsException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/CustomerNotFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/FileTooLargeException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/InvalidFieldException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/KYCException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep12/exceptions/UnauthorizedException.kt`
-
-### Key Classes
-
-- **`CallbackSignatureVerifier`** - Methods: verify, parseSignatureHeader
-- **`CustomerFileResponse`**
-- **`CustomerStatus`** - Methods: fromString
-- **`FieldStatus`** - Methods: fromString
-- **`GetCustomerFilesResponse`**
-- **`GetCustomerInfoField`**
-- **`GetCustomerInfoProvidedField`**
-- **`GetCustomerInfoRequest`**
-- **`GetCustomerInfoResponse`**
-- **`KYCService`** - Methods: fromDomain, getCustomerInfo, putCustomerInfo, putCustomerVerification, deleteCustomer, putCustomerCallback, postCustomerFile, getCustomerFiles, extractFieldName, extractAccountId, extractCustomerId, extractFileSize
-- **`PutCustomerCallbackRequest`**
-- **`PutCustomerInfoRequest`**
-- **`PutCustomerInfoResponse`**
-- **`PutCustomerVerificationRequest`**
-- **`CustomerAlreadyExistsException`**
-- **`CustomerNotFoundException`**
-- **`FileTooLargeException`**
-- **`InvalidFieldException`**
-- **`UnauthorizedException`**
-
-### Test Coverage
-
-**Tests:** 151 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep12/KYCServiceIntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CallbackSignatureVerifierTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CustomerFileResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/CustomerStatusTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/FieldStatusTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/GetCustomerInfoResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/KYCServiceTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/MuxedAccountParsingTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/PutCustomerInfoRequestTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep12/Sep12ExceptionsTest.kt`
 
 ## Coverage by Section
 

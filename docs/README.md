@@ -69,6 +69,7 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-12 (KYC API) - Customer information management
 - SEP-24 (Hosted Deposit/Withdrawal) - Interactive anchor transfers
 - SEP-30 (Account Recovery) - Multi-party account recovery
+- SEP-31 (Cross-Border Payments) - Sending Anchor side of cross-border payments
 - SEP-38 (Anchor RFQ API) - Quote service for asset exchanges
 - SEP-45 (Web Authentication for Contract Accounts) - Contract account authentication
 - SEP-46 (Contract Meta) - Parse contract metadata from Wasm bytecode

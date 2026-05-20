@@ -5,9 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.0] - Unreleased
+## [1.6.0] - 2026-05-20
 
 ### Added
+- **SEP-31 (Cross-Border Payments)**: Sending Anchor side. `Sep31Service`
+  exposes service discovery via `stellar.toml`, payment initiation,
+  lifecycle tracking, and signed status callback registration. Wraps the
+  five HTTP endpoints (`GET /info`, `POST /transactions`,
+  `GET /transactions/:id`, `PUT /transactions/:id/callback`,
+  `PATCH /transactions/:id`) with typed request/response classes
+  (`Sep31InfoResponse`, `Sep31ReceiveAssetInfo`, `Sep31Sep12TypesInfo`,
+  `Sep31PostTransactionsRequest`, `Sep31PostTransactionsResponse`,
+  `Sep31TransactionResponse`, `Sep31TransactionStatus`, `Sep31FeeDetails`,
+  `Sep31FeeDetailsDetails`, `Sep31Refunds`, `Sep31RefundPayment`) and a
+  typed exception hierarchy rooted at `Sep31Exception`. Integrates with
+  SEP-10 (JWT auth), SEP-12 (KYC), and optional SEP-38 (firm quotes).
+  User-facing guide at `docs/sep/sep-31.md`; agent skill reference at
+  `skills/kmp-stellar-sdk/references/sep-31.md`.
 - `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` — shared
   callback signature verifier covering SEP-12 and SEP-31. Construct one
   instance per registered callback URL. Returns a sealed `Result`
@@ -16,8 +30,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logs. Enforces HTTPS (loopback-only HTTP exception), pins host from the
   registered URL with port stripped, and applies a two-sided freshness
   check (defends against future-dated forgery as well as replay).
-- SEP-31 documentation now references the shared verifier instead of a
-  hand-rolled verification snippet.
+- SEP-31 documentation references the shared verifier directly instead of
+  inline verification snippets.
+
+### Changed
+- **SEP-1 `StellarToml.fromDomain`**: the HTTPS-only invariant is relaxed
+  to allow HTTP for loopback authorities (`localhost`, `127.0.0.1`, `[::1]`).
+  All other hosts still require HTTPS. This enables local-development
+  workflows against an Anchor Platform instance without a TLS cert.
+- **SEP-10 integration test**: migrated the client-domain signer used by
+  the integration test from `server-signer.replit.app` to
+  `testsigner.stellargate.com` (source: `Soneso/go-server-signer`). No
+  production code changes; the two local-signing variants
+  (`testClientDomainAuthentication`, `testLocalClientDomainSigningDelegate`)
+  were dropped in favour of the remote-delegate test that already covers
+  the full client-domain path.
 
 ### Deprecated
 - `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` is

@@ -82,7 +82,17 @@ skill files and bump the skill version (patch increment for version-only changes
 2. `skills/.claude-plugin/plugin.json` — Bump `version` to match
 3. `.claude-plugin/marketplace.json` — Bump `version` to match
 
-After updating, rebuild the skill zip (must contain only the `skills/kmp-stellar-sdk/` content):
+**Skill API reference** (regenerate when SDK public API surface changed):
+
+If this release adds, removes, or changes any public class / method / property (anything outside the `xdr/` and `crypto/` packages), regenerate the agent skill's compact API reference from source:
+
+```bash
+python3 tools/skill-generator/generate_api_reference.py
+```
+
+Output goes to `skills/kmp-stellar-sdk/references/api_reference.md`. Skip this step for pure version-bump or doc-only releases.
+
+After updating skill metadata and (if regenerated) the API reference, rebuild the skill zip (must contain only the `skills/kmp-stellar-sdk/` content):
 
 ```bash
 cd skills
@@ -171,18 +181,20 @@ Expected output: `BUILD SUCCESSFUL`
 
 #### Step 7: Run Tests (Optional but Recommended)
 
+Always pass `-PexcludeIntegrationTests` during release verification. Integration tests hit live testnet (Friendbot, anchors, Horizon, RPC), take much longer than unit tests, and can fail on intermittent network flakiness — none of that belongs in the release-readiness signal. CI applies the same flag for the same reason.
+
 ```bash
-# Run JVM tests
-./gradlew :stellar-sdk:jvmTest
+# Run JVM unit tests (integration tests excluded)
+./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests
 
-# Run specific test classes on JS
-./gradlew :stellar-sdk:jsNodeTest --tests "KeyPairTest"
+# Run JS Node unit tests
+./gradlew :stellar-sdk:jsNodeTest -PexcludeIntegrationTests
 
-# Run macOS tests (if on macOS)
-./gradlew :stellar-sdk:macosArm64Test
+# Run macOS native unit tests (if on macOS)
+./gradlew :stellar-sdk:macosArm64Test -PexcludeIntegrationTests
 ```
 
-**Note**: Some integration tests may fail if testnet is down. This is acceptable for release if unit tests pass.
+**Note**: integration tests should still pass when run separately against a healthy testnet, but they are not part of the release gate.
 
 ### Phase 3: Local Maven Verification
 

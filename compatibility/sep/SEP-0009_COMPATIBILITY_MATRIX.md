@@ -1,10 +1,10 @@
 # SEP-0009 (Standard KYC Fields) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:11
+**Generated:** 2026-05-20 11:38:48
 
 **SEP Version:** 1.17.0  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0009.md
 
 ## SEP Summary
@@ -25,34 +25,6 @@ A standard list of KYC and financial account fields (names, addresses, ID docume
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/CardKYCFields.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/FinancialAccountKYCFields.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/NaturalPersonKYCFields.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/OrganizationKYCFields.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep09/StandardKYCFields.kt`
-
-### Key Classes
-
-- **`CardKYCFields`** - Methods: fields
-- **`FinancialAccountKYCFields`** - Methods: fields
-- **`NaturalPersonKYCFields`** - Methods: fields, files, equals, hashCode
-- **`OrganizationKYCFields`** - Methods: fields, files, equals, hashCode
-- **`StandardKYCFields`** - Methods: fields, files
-
-### Test Coverage
-
-**Tests:** 128 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/CardKYCFieldsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/FinancialAccountKYCFieldsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/NaturalPersonKYCFieldsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/OrganizationKYCFieldsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep09/StandardKYCFieldsTest.kt`
 
 ## Coverage by Section
 

@@ -1,10 +1,10 @@
 # SEP-0010 (Stellar Web Authentication) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:11
+**Generated:** 2026-05-20 11:38:49
 
 **SEP Version:** 3.4.1  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md
 
 ## SEP Summary
@@ -25,75 +25,6 @@ Lets wallets and exchanges create authenticated web sessions by proving Stellar 
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/AuthToken.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/ChallengeResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/TokenSubmissionResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/WebAuth.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/ChallengeValidationException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/GenericChallengeValidationException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidClientDomainSourceException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidHomeDomainException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoTypeException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidMemoValueException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidOperationTypeException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSequenceNumberException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureCountException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSignatureException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidSourceAccountException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidTimeBoundsException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/InvalidWebAuthDomainException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/MemoWithMuxedAccountException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/NoMemoForMuxedAccountsException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/TokenSubmissionException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep10/exceptions/WebAuthException.kt`
-
-### Key Classes
-
-- **`AuthToken`** - Methods: isExpired, toString, parse
-- **`ChallengeResponse`**
-- **`TokenSubmissionRequest`**
-- **`TokenSubmissionResponse`**
-- **`WebAuth`** - Methods: fromDomain, jwtToken, getChallenge, validateChallengeRequest, buildChallengeUrl, validateChallenge, validateOperations, validateTimeBounds, validateServerSignature, signTransaction, sendSignedChallenge
-- **`ChallengeRequestException`**
-- **`ChallengeValidationException`**
-- **`GenericChallengeValidationException`**
-- **`InvalidClientDomainSourceException`**
-- **`InvalidHomeDomainException`**
-- **`InvalidMemoTypeException`**
-- **`InvalidMemoValueException`**
-- **`InvalidOperationTypeException`**
-- **`InvalidSequenceNumberException`**
-- **`InvalidSignatureCountException`**
-- **`InvalidSignatureException`**
-- **`InvalidSourceAccountException`**
-- **`InvalidTimeBoundsException`**
-- **`InvalidWebAuthDomainException`**
-- **`MemoWithMuxedAccountException`**
-- **`NoMemoForMuxedAccountsException`**
-- **`TokenSubmissionException`**
-- **`WebAuthException`**
-
-### Test Coverage
-
-**Tests:** 165 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep10/WebAuthIntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenEnhancedTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/AuthTokenTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/Sep10ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthChallengeTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthClientDomainSigningDelegateTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthJwtTokenTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthSigningTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthTokenSubmissionTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep10/WebAuthValidationTest.kt`
 
 ## Coverage by Section
 

@@ -1,10 +1,10 @@
 # SEP-0002 (Federation protocol) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:08
+**Generated:** 2026-05-20 11:38:46
 
 **SEP Version:** 1.1.0  
 **SEP Status:** Final  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0002.md
 
 ## SEP Summary
@@ -25,32 +25,6 @@ The federation protocol resolves human-readable addresses like `name*yourdomain.
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/FederationResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/FederationService.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/exceptions/Sep02Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/exceptions/Sep02FederationNotFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/exceptions/Sep02InvalidAddressException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep02/exceptions/Sep02InvalidResponseException.kt`
-
-### Key Classes
-
-- **`FederationResponse`** - Methods: fromJson
-- **`FederationService`** - Methods: fromDomain, resolveStellarAddress, parseAddress, resolveAccountId, resolveTransactionId, resolveForward, buildHeaders, executeQuery
-- **`Sep02FederationNotFoundException`** - Methods: toString
-- **`Sep02InvalidAddressException`** - Methods: toString
-- **`Sep02InvalidResponseException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 37 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep02/FederationServiceIntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep02/FederationServiceTest.kt`
 
 ## Coverage by Section
 

@@ -1,10 +1,10 @@
 # SEP-0030 (Account Recovery: multi-party recovery of Stellar accounts) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:12
+**Generated:** 2026-05-20 11:38:52
 
 **SEP Version:** 0.8.1  
 **SEP Status:** Draft  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0030.md
 
 ## SEP Summary
@@ -25,53 +25,6 @@ Account Recovery: multi-party recovery of Stellar accounts using alternative aut
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30AccountResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30AccountsResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30AuthMethod.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30Request.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30RequestIdentity.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30ResponseIdentity.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30ResponseSigner.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30Service.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/Sep30SignatureResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30BadRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30ConflictException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30InvalidResponseException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30NotFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30UnauthorizedException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep30/exceptions/Sep30UnknownResponseException.kt`
-
-### Key Classes
-
-- **`Sep30AccountResponse`** - Methods: fromJson
-- **`Sep30AccountsResponse`** - Methods: fromJson
-- **`Sep30AuthMethod`** - Methods: toJson
-- **`Sep30Request`** - Methods: toJson
-- **`Sep30RequestIdentity`** - Methods: toJson
-- **`Sep30ResponseIdentity`** - Methods: fromJson
-- **`Sep30ResponseSigner`** - Methods: fromJson
-- **`Sep30Service`** - Methods: registerAccount, updateIdentitiesForAccount, signTransaction, accountDetails, deleteAccount, accounts, mapToJsonString, anyToJsonElement, mapToJsonElement, handleAccountResponse, handleSignatureResponse, handleAccountsResponse, extractErrorMessage
-- **`Sep30SignatureResponse`** - Methods: fromJson
-- **`Sep30BadRequestException`** - Methods: toString
-- **`Sep30ConflictException`** - Methods: toString
-- **`Sep30InvalidResponseException`** - Methods: toString
-- **`Sep30NotFoundException`** - Methods: toString
-- **`Sep30UnauthorizedException`** - Methods: toString
-- **`Sep30UnknownResponseException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 83 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep30/Sep30ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep30/Sep30ResponseParsingTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep30/Sep30ServiceTest.kt`
 
 ## Coverage by Section
 

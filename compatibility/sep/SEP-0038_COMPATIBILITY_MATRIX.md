@@ -1,10 +1,10 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:13
+**Generated:** 2026-05-20 11:38:54
 
 **SEP Version:** 2.5.0  
 **SEP Status:** Draft  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md
 
 ## SEP Summary
@@ -25,62 +25,6 @@ Lets anchors provide quotes for exchanging on-chain assets for off-chain assets 
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/QuoteService.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38Asset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38BuyAsset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38DeliveryMethod.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38Fee.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38FeeDetail.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38InfoResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PriceResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38PricesResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteRequest.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38QuoteResponse.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/Sep38SellAsset.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38BadRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38NotFoundException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38PermissionDeniedException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep38/exceptions/Sep38UnknownResponseException.kt`
-
-### Key Classes
-
-- **`QuoteService`** - Methods: fromDomain, info, prices, price, postQuote, getQuote, extractErrorMessage
-- **`Sep38Asset`**
-- **`Sep38BuyAsset`**
-- **`Sep38DeliveryMethod`**
-- **`Sep38Fee`**
-- **`Sep38FeeDetail`**
-- **`Sep38InfoResponse`**
-- **`Sep38PriceResponse`**
-- **`Sep38PricesResponse`**
-- **`Sep38QuoteRequest`**
-- **`Sep38QuoteResponse`**
-- **`Sep38SellAsset`**
-- **`Sep38BadRequestException`** - Methods: toString
-- **`Sep38NotFoundException`** - Methods: toString
-- **`Sep38PermissionDeniedException`** - Methods: toString
-- **`Sep38UnknownResponseException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 93 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep38/QuoteServiceIntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/QuoteServiceTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38AssetTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38DeliveryMethodTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38InfoResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PriceResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38PricesResponseTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteRequestTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep38/Sep38QuoteResponseTest.kt`
 
 ## Coverage by Section
 

@@ -1,10 +1,10 @@
 # SEP-0006 (Deposit and Withdrawal API) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:10
+**Generated:** 2026-05-20 11:38:47
 
 **SEP Version:** 4.3.0  
 **SEP Status:** Active (Interactive components are deprecated in favor of SEP-24)  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md
 
 ## SEP Summary
@@ -25,77 +25,6 @@ A programmatic API for anchors and wallets to handle deposits and withdrawals wi
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Requests.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Responses.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06Service.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06TransactionKind.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/Sep06TransactionStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06AuthenticationRequiredException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06CustomerInformationNeededException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06CustomerInformationStatusException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06InvalidRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06ServerErrorException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep06/exceptions/Sep06TransactionNotFoundException.kt`
-
-### Key Classes
-
-- **`Sep06DepositRequest`**
-- **`Sep06DepositExchangeRequest`**
-- **`Sep06WithdrawRequest`**
-- **`Sep06WithdrawExchangeRequest`**
-- **`Sep06TransactionsRequest`**
-- **`Sep06TransactionRequest`**
-- **`Sep06FeeRequest`**
-- **`Sep06PatchTransactionRequest`**
-- **`Sep06InfoResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06DepositAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06DepositExchangeAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06WithdrawAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06WithdrawType`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06WithdrawExchangeAsset`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06Field`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06FeeEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06TransactionEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06TransactionsEndpointInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06FeatureFlags`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06DepositResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06DepositInstruction`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06ExtraInfo`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06WithdrawResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06TransactionsResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06TransactionResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06FeeResponse`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06Transaction`** - Methods: getStatusEnum, getKindEnum, isTerminal
-- **`Sep06FeeDetails`**
-- **`Sep06FeeDetail`**
-- **`Sep06Refunds`**
-- **`Sep06RefundPayment`**
-- **`Sep06Service`** - Methods: fromDomain, fromUrl, info, deposit, depositExchange, withdraw, withdrawExchange, fee, transactions, transaction, patchTransaction, buildHeaders, httpPatch, handleForbiddenResponse, parseErrorMessage
-- **`Sep06TransactionKind`** - Methods: isDeposit, isWithdrawal, isExchange, fromValue
-- **`Sep06TransactionStatus`** - Methods: isTerminal, isError, isPending, fromValue
-- **`Sep06AuthenticationRequiredException`** - Methods: toString
-- **`Sep06CustomerInformationNeededException`** - Methods: toString
-- **`Sep06CustomerInformationStatusException`** - Methods: toString
-- **`Sep06InvalidRequestException`** - Methods: toString
-- **`Sep06ServerErrorException`** - Methods: toString
-- **`Sep06TransactionNotFoundException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 137 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep06/Sep06IntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ResponseParsingTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06ServiceTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06TransactionKindTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep06/Sep06TransactionStatusTest.kt`
 
 ## Coverage by Section
 

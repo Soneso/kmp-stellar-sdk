@@ -1,6 +1,6 @@
 # SEP Implementations
 
-The KMP SDK implements 13 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
+The KMP SDK implements 14 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
 
 ## SEP Reference Table
 
@@ -16,6 +16,7 @@ The KMP SDK implements 13 Stellar Ecosystem Proposals (SEPs) that cover authenti
 | SEP-12 | KYC API | Submit and manage customer information | [Details](sep-12.md) |
 | SEP-24 | Interactive Deposit/Withdrawal | Interactive web flows for fiat on/off ramps | [Details](sep-24.md) |
 | SEP-30 | Account Recovery | Recover access to accounts via identity verification | [Details](sep-30.md) |
+| SEP-31 | Cross-Border Payments | Sending Anchor side of the SEP-31 payment flow | [Details](sep-31.md) |
 | SEP-38 | Anchor RFQ API | Get exchange quotes for asset conversions | [Details](sep-38.md) |
 | SEP-45 | Web Auth for Contracts | Authenticate Soroban contract accounts | [Details](sep-45.md) |
 | SEP-53 | Sign/Verify Messages | Sign and verify arbitrary messages with Ed25519 keypairs | [Details](sep-53.md) |
@@ -60,7 +61,8 @@ The following SEPs depend on other SEPs:
 - **SEP-12 (KYC API)** -> Requires SEP-10 for authentication
 - **SEP-24 (Interactive Deposit/Withdrawal)** -> Requires SEP-10 for authentication; often paired with SEP-12 and SEP-38
 - **SEP-30 (Account Recovery)** -> Requires SEP-10 for authentication
-- **SEP-38 (Anchor RFQ API)** -> Requires SEP-10 for authentication; used with SEP-06 or SEP-24
+- **SEP-31 (Cross-Border Payments)** -> Requires SEP-10 for authentication; KYC via SEP-12; optional firm quotes via SEP-38
+- **SEP-38 (Anchor RFQ API)** -> Requires SEP-10 for authentication; used with SEP-06, SEP-24, or SEP-31
 - **SEP-45 (Web Auth for Contracts)** -> Requires SEP-01 to discover web auth endpoint for contract accounts
 
 No dependencies: SEP-02, SEP-05, SEP-08, SEP-09

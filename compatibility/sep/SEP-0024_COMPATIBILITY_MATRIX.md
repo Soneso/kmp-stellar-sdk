@@ -1,10 +1,10 @@
 # SEP-0024 (Hosted Deposit and Withdrawal) Compatibility Matrix
 
-**Generated:** 2026-04-28 02:38:12
+**Generated:** 2026-05-20 11:38:52
 
 **SEP Version:** 3.8.0  
 **SEP Status:** Active  
-**SDK Version:** 1.5.1  
+**SDK Version:** 1.6.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0024.md
 
 ## SEP Summary
@@ -25,55 +25,6 @@ An interactive deposit and withdrawal flow where the anchor controls the UI via 
 ## Implementation Status
 
 ✅ **Fully Implemented**
-
-### Implementation Files
-
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/Sep24Requests.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/Sep24Responses.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/Sep24Service.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/Sep24TransactionStatus.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/exceptions/Sep24AuthenticationRequiredException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/exceptions/Sep24Exception.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/exceptions/Sep24InvalidRequestException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/exceptions/Sep24ServerErrorException.kt`
-- `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep/sep24/exceptions/Sep24TransactionNotFoundException.kt`
-
-### Key Classes
-
-- **`Sep24DepositRequest`**
-- **`Sep24WithdrawRequest`**
-- **`Sep24FeeRequest`**
-- **`Sep24TransactionsRequest`**
-- **`Sep24TransactionRequest`**
-- **`Sep24InfoResponse`** - Methods: getStatusEnum, isTerminal
-- **`Sep24AssetInfo`** - Methods: getStatusEnum, isTerminal
-- **`Sep24FeeEndpointInfo`** - Methods: getStatusEnum, isTerminal
-- **`Sep24Features`** - Methods: getStatusEnum, isTerminal
-- **`Sep24InteractiveResponse`** - Methods: getStatusEnum, isTerminal
-- **`Sep24FeeResponse`** - Methods: getStatusEnum, isTerminal
-- **`Sep24TransactionResponse`** - Methods: getStatusEnum, isTerminal
-- **`Sep24TransactionsResponse`** - Methods: getStatusEnum, isTerminal
-- **`Sep24Transaction`** - Methods: getStatusEnum, isTerminal
-- **`Sep24FeeDetails`**
-- **`Sep24FeeDetail`**
-- **`Sep24Refunds`**
-- **`Sep24RefundPayment`**
-- **`Sep24Service`** - Methods: fromDomain, info, fee, deposit, withdraw, transactions, transaction, buildHeaders, parseErrorMessage, parseErrorType
-- **`Sep24TransactionStatus`** - Methods: fromValue, isTerminal
-- **`Sep24AuthenticationRequiredException`** - Methods: toString
-- **`Sep24InvalidRequestException`** - Methods: toString
-- **`Sep24ServerErrorException`** - Methods: toString
-- **`Sep24TransactionNotFoundException`** - Methods: toString
-
-### Test Coverage
-
-**Tests:** 74 test cases
-
-**Test Files:**
-
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep/sep24/Sep24IntegrationTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep24/Sep24ExceptionsTest.kt`
-- `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep24/Sep24ServiceTest.kt`
 
 ## Coverage by Section
 
