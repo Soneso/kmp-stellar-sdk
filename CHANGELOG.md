@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - Unreleased
+
+### Added
+- `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` — shared
+  callback signature verifier covering SEP-12 and SEP-31. Construct one
+  instance per registered callback URL. Returns a sealed `Result`
+  (`Valid` / `Stale(ageSeconds)` / `SignatureMismatch` / `MalformedHeader`
+  / `MissingHeader`) so callers can distinguish replay from forgery in
+  logs. Enforces HTTPS (loopback-only HTTP exception), pins host from the
+  registered URL with port stripped, and applies a two-sided freshness
+  check (defends against future-dated forgery as well as replay).
+- SEP-31 documentation now references the shared verifier instead of a
+  hand-rolled verification snippet.
+
+### Deprecated
+- `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` is
+  deprecated. Use `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier`
+  instead. The shim is functionally equivalent (bit-for-bit observable
+  behaviour preserved via internal compatibility flags) and is scheduled
+  for removal in version 1.8.0, or no earlier than 90 days after the
+  1.6.0 release date, whichever is later.
+
 ## [1.5.1] - 2026-04-28
 
 ### Changed

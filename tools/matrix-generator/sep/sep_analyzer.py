@@ -146,14 +146,100 @@ class SEPAnalyzer:
         classes = []
         content = file_path.read_text(encoding='utf-8')
 
-        # Find class definitions (class, data class, sealed class, object, enum class)
-        # Must match at start of line (^) or after whitespace, and not be in a comment
-        class_pattern = r'(?:^|\n)\s*(?:public\s+|private\s+|internal\s+|protected\s+)?(?:data\s+)?(?:sealed\s+)?(?:enum\s+)?(class|object)\s+(\w+)'
+        # Find class definitions (class, data class, sealed class, object, enum class).
+        # Captures the visibility modifier so the matrix can omit non-public types from
+        # the user-facing "Key Classes" section. Internal/private SDK types (e.g., sealed
+        # discriminators on top-level functions wrappers) are SDK implementation detail
+        # and should not appear as advertised API surface.
+        class_pattern = (
+            r'(?:^|\n)\s*'
+            r'(public\s+|private\s+|internal\s+|protected\s+)?'
+            r'(?:data\s+)?(?:sealed\s+)?(?:enum\s+)?'
+            r'(class|object)\s+(\w+)'
+        )
         matches = re.finditer(class_pattern, content, re.MULTILINE)
 
         for match in matches:
-            class_type = match.group(1)
-            class_name = match.group(2)
+            visibility_raw = (match.group(1) or '').strip()
+            class_type = match.group(2)
+            class_name = match.group(3)
+
+            # Skip non-public types. Default visibility in Kotlin is public, so an empty
+            # modifier means public at the top level.
+            if visibility_raw in ('private', 'internal'):
+                continue
+
+            # Skip nested declarations (sealed-class variants, named companion objects,
+            # nested types). Nested types inherit visibility from their enclosing class
+            # in the eyes of an end user — and the regex cannot determine that visibility
+            # cheaply. The conservative rule is: only top-level (column-0) declarations
+            # form the user-facing API surface. SEP code in this SDK consistently puts
+            # every public type at column 0; companion objects (which are always indented)
+            # still have their methods picked up because extract_methods scans the parent
+            # class body inclusive of the companion.
+            class_kw_start = match.start(2)
+            prev_newline = content.rfind('\n', 0, class_kw_start)
+            line_start = prev_newline + 1 if prev_newline >= 0 else 0
+            prefix_text = content[line_start:class_kw_start]
+            # Strip the captured visibility modifier (if any) plus the optional
+            # data/sealed/enum keywords (which the outer regex consumes as non-
+            # capturing groups). Whatever remains must be pure indentation for
+            # the declaration to count as top-level.
+            stripped = prefix_text
+            visibility_prefix_text = (match.group(1) or '')
+            if visibility_prefix_text and stripped.startswith(visibility_prefix_text):
+                stripped = stripped[len(visibility_prefix_text):]
+            for kw in ('data ', 'sealed ', 'enum '):
+                while stripped.lstrip(' \t').startswith(kw):
+                    leading_ws_len = len(stripped) - len(stripped.lstrip(' \t'))
+                    stripped = stripped[:leading_ws_len] + stripped[leading_ws_len + len(kw):]
+            if any(ch not in (' ', '\t') for ch in stripped):
+                # Defensive: prefix contains something other than whitespace — unusual; skip.
+                continue
+            if len(stripped) > 0:
+                # Indented declaration → nested → skip.
+                continue
+
+            # Skip body-less sealed-class variants like `object ServiceUrl : ErrorTarget()`
+            # or `class DirectPaymentServerForDomain(val domain: String) : ErrorTarget()`
+            # whose only purpose is to act as a discriminator label.
+            #
+            # Heuristic:
+            # - `object` types CANNOT have a primary constructor, so the only evidence
+            #   they're "real" is a `{` body. A `(` that follows is always a supertype
+            #   invocation and does not count.
+            # - `class` types can have a primary constructor, which IS evidence of "real"
+            #   user-facing API (data classes hold their properties there). But a `(`
+            #   that appears AFTER the `:` inheritance separator is a supertype call, not
+            #   a primary constructor, and does not count.
+            # - Either form: `{` body is unconditional evidence the type is "real".
+            decl_end = match.end()
+            has_evidence = False
+            scan_limit = min(len(content), decl_end + 4096)
+            i = decl_end
+            seen_colon = False
+            angle_depth = 0
+            while i < scan_limit:
+                ch = content[i]
+                if ch == '{' and angle_depth == 0:
+                    has_evidence = True
+                    break
+                if ch == '(' and angle_depth == 0 and not seen_colon and class_type == 'class':
+                    has_evidence = True
+                    break
+                if ch == ':' and angle_depth == 0:
+                    seen_colon = True
+                elif ch == '<':
+                    angle_depth += 1
+                elif ch == '>':
+                    angle_depth = max(0, angle_depth - 1)
+                elif angle_depth == 0 and ch not in (
+                    ' ', '\t', '\n', '\r', ':', ',', '?', '.', '*', '(', ')',
+                ) and not (ch.isalnum() or ch == '_'):
+                    break
+                i += 1
+            if not has_evidence:
+                continue
 
             # SEP-53: Filter out spurious "uses" match from "This class uses" in comments
             if self.sep_number == '0053' and class_name == 'uses':
@@ -197,19 +283,34 @@ class SEPAnalyzer:
 
         class_body = class_match.group(1)
 
-        # Pattern for Kotlin method declarations
-        # Matches: [modifiers] [suspend] fun methodName([params])[: ReturnType]
-        method_pattern = r'(?:^|\n)\s*(?:(?:public|private|protected|internal|override|suspend|inline|operator|infix)\s+)*(suspend\s+)?fun\s+(\w+)\s*\(([^)]*)\)(?:\s*:\s*([^\{=]+?))?(?:\s*[{=])'
+        # Pattern for Kotlin method declarations.
+        # Captures the full modifier list so non-public methods can be filtered out of
+        # the user-facing "Key Classes" section. The method body itself is still useful
+        # to the analyzer's field-mapping logic (which looks for fromJson / toJson by
+        # name) but unsupported helpers should not appear as advertised API surface.
+        method_pattern = (
+            r'(?:^|\n)\s*'
+            r'((?:(?:public|private|protected|internal|override|suspend|inline|operator|infix)\s+)*)'
+            r'(suspend\s+)?fun\s+(\w+)\s*\(([^)]*)\)'
+            r'(?:\s*:\s*([^\{=]+?))?'
+            r'(?:\s*[{=])'
+        )
 
         method_matches = re.finditer(method_pattern, class_body, re.MULTILINE)
 
         seen_methods = set()
 
         for match in method_matches:
-            is_suspend = match.group(1) is not None
-            method_name = match.group(2)
-            params_str = match.group(3).strip() if match.group(3) else ""
-            return_type = match.group(4).strip() if match.group(4) else "Unit"
+            modifiers = (match.group(1) or '').split()
+            is_suspend = match.group(2) is not None
+            method_name = match.group(3)
+            params_str = match.group(4).strip() if match.group(4) else ""
+            return_type = match.group(5).strip() if match.group(5) else "Unit"
+
+            # Skip non-public methods. Default visibility in Kotlin is public, so an
+            # empty modifier set means public.
+            if 'private' in modifiers or 'internal' in modifiers or 'protected' in modifiers:
+                continue
 
             # Skip constructors
             if method_name == class_name:
@@ -405,6 +506,7 @@ class SEPAnalyzer:
             '0012': self.map_sep_12_fields,
             '0024': self.map_sep_24_fields,
             '0030': self.map_sep_30_fields,
+            '0031': self.map_sep_31_fields,
             '0038': self.map_sep_38_fields,
             '0045': self.map_sep_45_fields,
             '0046': self.map_sep_46_fields,
@@ -1493,6 +1595,155 @@ class SEPAnalyzer:
                 for field in sep_fields:
                     section_mappings[field.get('name', '')] = None
 
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
+
+    def map_sep_31_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-31 (Cross-Border Payments) fields.
+
+        SEP-31 implementation uses:
+        - Sep31Service exposing info, postTransactions, getTransaction,
+          patchTransaction, putTransactionCallback (plus fromDomain factory)
+        - Sep31InfoResponse with receiveAssets map keyed by asset code
+        - Sep31ReceiveAssetInfo for per-asset configuration
+        - Sep31Sep12TypesInfo for SEP-12 sender/receiver customer types
+        - Sep31PostTransactionsRequest / Sep31PostTransactionsResponse
+        - Sep31TransactionResponse with embedded Sep31Refunds, Sep31RefundPayment,
+          Sep31FeeDetails, Sep31FeeDetailsDetails
+
+        Each spec field is explicitly mapped to the actual Kotlin property name
+        on the appropriate class. Endpoints are mapped to the Sep31Service
+        suspend method that implements the request.
+        """
+        endpoint_map: Dict[str, Optional[str]] = {
+            'GET /info': 'Sep31Service.info',
+            'POST /transactions': 'Sep31Service.postTransactions',
+            'GET /transactions/:id': 'Sep31Service.getTransaction',
+            'PATCH /transactions/:id': 'Sep31Service.patchTransaction',
+            'PUT /transactions/:id/callback': 'Sep31Service.putTransactionCallback',
+        }
+
+        info_response_map: Dict[str, Optional[str]] = {
+            'receive': 'Sep31InfoResponse.receiveAssets',
+        }
+
+        receive_asset_info_map: Dict[str, Optional[str]] = {
+            'sep12': 'Sep31ReceiveAssetInfo.sep12Info',
+            'min_amount': 'Sep31ReceiveAssetInfo.minAmount',
+            'max_amount': 'Sep31ReceiveAssetInfo.maxAmount',
+            'fee_fixed': 'Sep31ReceiveAssetInfo.feeFixed',
+            'fee_percent': 'Sep31ReceiveAssetInfo.feePercent',
+            'sender_sep12_type': 'Sep31ReceiveAssetInfo.senderSep12Type',
+            'receiver_sep12_type': 'Sep31ReceiveAssetInfo.receiverSep12Type',
+            'fields': 'Sep31ReceiveAssetInfo.fields',
+            'quotes_supported': 'Sep31ReceiveAssetInfo.quotesSupported',
+            'quotes_required': 'Sep31ReceiveAssetInfo.quotesRequired',
+            'funding_methods': 'Sep31ReceiveAssetInfo.fundingMethods',
+        }
+
+        sep12_types_info_map: Dict[str, Optional[str]] = {
+            'sender': 'Sep31Sep12TypesInfo.senderTypes',
+            'receiver': 'Sep31Sep12TypesInfo.receiverTypes',
+        }
+
+        post_transactions_request_map: Dict[str, Optional[str]] = {
+            'amount': 'Sep31PostTransactionsRequest.amount',
+            'asset_code': 'Sep31PostTransactionsRequest.assetCode',
+            'asset_issuer': 'Sep31PostTransactionsRequest.assetIssuer',
+            'destination_asset': 'Sep31PostTransactionsRequest.destinationAsset',
+            'quote_id': 'Sep31PostTransactionsRequest.quoteId',
+            'sender_id': 'Sep31PostTransactionsRequest.senderId',
+            'receiver_id': 'Sep31PostTransactionsRequest.receiverId',
+            'fields': 'Sep31PostTransactionsRequest.fields',
+            'lang': 'Sep31PostTransactionsRequest.lang',
+            'refund_memo': 'Sep31PostTransactionsRequest.refundMemo',
+            'refund_memo_type': 'Sep31PostTransactionsRequest.refundMemoType',
+            'funding_method': 'Sep31PostTransactionsRequest.fundingMethod',
+        }
+
+        post_transactions_response_map: Dict[str, Optional[str]] = {
+            'id': 'Sep31PostTransactionsResponse.id',
+            'stellar_account_id': 'Sep31PostTransactionsResponse.stellarAccountId',
+            'stellar_memo_type': 'Sep31PostTransactionsResponse.stellarMemoType',
+            'stellar_memo': 'Sep31PostTransactionsResponse.stellarMemo',
+        }
+
+        transaction_response_map: Dict[str, Optional[str]] = {
+            'id': 'Sep31TransactionResponse.id',
+            'status': 'Sep31TransactionResponse.status',
+            'status_eta': 'Sep31TransactionResponse.statusEta',
+            'status_message': 'Sep31TransactionResponse.statusMessage',
+            'amount_in': 'Sep31TransactionResponse.amountIn',
+            'amount_in_asset': 'Sep31TransactionResponse.amountInAsset',
+            'amount_out': 'Sep31TransactionResponse.amountOut',
+            'amount_out_asset': 'Sep31TransactionResponse.amountOutAsset',
+            'amount_fee': 'Sep31TransactionResponse.amountFee',
+            'amount_fee_asset': 'Sep31TransactionResponse.amountFeeAsset',
+            'fee_details': 'Sep31TransactionResponse.feeDetails',
+            'quote_id': 'Sep31TransactionResponse.quoteId',
+            'stellar_account_id': 'Sep31TransactionResponse.stellarAccountId',
+            'stellar_memo_type': 'Sep31TransactionResponse.stellarMemoType',
+            'stellar_memo': 'Sep31TransactionResponse.stellarMemo',
+            'started_at': 'Sep31TransactionResponse.startedAt',
+            'updated_at': 'Sep31TransactionResponse.updatedAt',
+            'completed_at': 'Sep31TransactionResponse.completedAt',
+            'stellar_transaction_id': 'Sep31TransactionResponse.stellarTransactionId',
+            'external_transaction_id': 'Sep31TransactionResponse.externalTransactionId',
+            'refunded': 'Sep31TransactionResponse.refunded',
+            'refunds': 'Sep31TransactionResponse.refunds',
+            'required_info_message': 'Sep31TransactionResponse.requiredInfoMessage',
+            'required_info_updates': 'Sep31TransactionResponse.requiredInfoUpdates',
+        }
+
+        refunds_map: Dict[str, Optional[str]] = {
+            'amount_refunded': 'Sep31Refunds.amountRefunded',
+            'amount_fee': 'Sep31Refunds.amountFee',
+            'payments': 'Sep31Refunds.payments',
+        }
+
+        refund_payment_map: Dict[str, Optional[str]] = {
+            'id': 'Sep31RefundPayment.id',
+            'amount': 'Sep31RefundPayment.amount',
+            'fee': 'Sep31RefundPayment.fee',
+        }
+
+        fee_details_map: Dict[str, Optional[str]] = {
+            'total': 'Sep31FeeDetails.total',
+            'asset': 'Sep31FeeDetails.asset',
+            'details': 'Sep31FeeDetails.details',
+        }
+
+        fee_details_breakdown_map: Dict[str, Optional[str]] = {
+            'name': 'Sep31FeeDetailsDetails.name',
+            'amount': 'Sep31FeeDetailsDetails.amount',
+            'description': 'Sep31FeeDetailsDetails.description',
+        }
+
+        section_maps: Dict[str, Dict[str, Optional[str]]] = {
+            'service_endpoints': endpoint_map,
+            'info_response_fields': info_response_map,
+            'receive_asset_info_fields': receive_asset_info_map,
+            'sep12_types_info_fields': sep12_types_info_map,
+            'post_transactions_request_fields': post_transactions_request_map,
+            'post_transactions_response_fields': post_transactions_response_map,
+            'transaction_response_fields': transaction_response_map,
+            'refunds_fields': refunds_map,
+            'refund_payment_fields': refund_payment_map,
+            'fee_details_fields': fee_details_map,
+            'fee_details_breakdown_fields': fee_details_breakdown_map,
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            section_map = section_maps.get(section_key, {})
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in section.get('fields', []):
+                field_name = field.get('name', '')
+                section_mappings[field_name] = section_map.get(field_name)
             field_mappings[section_key] = section_mappings
 
         return field_mappings

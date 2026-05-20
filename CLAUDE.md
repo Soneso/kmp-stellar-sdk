@@ -30,7 +30,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
 
 ### Smart Accounts (OpenZeppelin)
 - **Contracts**: [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) v0.7.0
@@ -234,6 +234,39 @@ com.soneso.stellar.sdk.sep.sep30/
     ├── Sep30ConflictException.kt              # HTTP 409
     ├── Sep30UnknownResponseException.kt       # Other HTTP errors
     └── Sep30InvalidResponseException.kt       # Malformed 200 responses
+```
+
+### SEP-31 Cross-Border Payments
+
+The SDK implements SEP-31 (Cross-Border Payments) from the Sending Anchor side. The service client talks to a Receiving Anchor's `DIRECT_PAYMENT_SERVER` to discover supported assets, initiate cross-border payments, register status callbacks, and track transaction lifecycle. Authentication uses SEP-10; KYC uses SEP-12; optional firm quotes use SEP-38.
+
+#### Package Structure
+```
+com.soneso.stellar.sdk.sep.sep31/
+├── Sep31Service.kt                       # Service client (info, postTransactions, getTransaction, putTransactionCallback, patchTransaction)
+├── Sep31InfoResponse.kt                  # Parsed GET /info response (receiveAssets map)
+├── Sep31ReceiveAssetInfo.kt              # Per-asset configuration (limits, fee model, funding methods)
+├── Sep31Sep12TypesInfo.kt                # SEP-12 sender/receiver customer types for one asset
+├── Sep31PostTransactionsRequest.kt       # POST /transactions request body
+├── Sep31PostTransactionsResponse.kt      # POST /transactions response (id, stellarAccountId, stellarMemo)
+├── Sep31TransactionResponse.kt           # Full transaction state (GET/PATCH /transactions/:id)
+├── Sep31TransactionStatus.kt             # Lifecycle status enum (10 values, fromString)
+├── Sep31FeeDetails.kt                    # Fee breakdown (total, asset, details)
+├── Sep31FeeDetailsDetails.kt             # Single fee line item
+├── Sep31Refunds.kt                       # Refund aggregate (amountRefunded, amountFee, payments)
+├── Sep31RefundPayment.kt                 # Single on-chain refund payment
+└── exceptions/
+    ├── Sep31Exception.kt                              # Base exception
+    ├── Sep31BadRequestException.kt                    # HTTP 400
+    ├── Sep31CustomerInfoNeededException.kt            # HTTP 400 with error=customer_info_needed
+    ├── Sep31TransactionInfoNeededException.kt         # HTTP 400 with error=transaction_info_needed (deprecated)
+    ├── Sep31UnauthorizedException.kt                  # HTTP 401
+    ├── Sep31ForbiddenException.kt                     # HTTP 403
+    ├── Sep31TransactionNotFoundException.kt           # HTTP 404 on GET/PATCH /transactions/:id
+    ├── Sep31TransactionCallbackNotSupportedException.kt # HTTP 404 on PUT /transactions/:id/callback
+    ├── Sep31InvalidResponseException.kt               # Malformed 2xx body
+    ├── Sep31UnknownResponseException.kt               # Unmapped HTTP status
+    └── Sep31ConfigurationException.kt                 # fromDomain configuration failure
 ```
 
 ## Documentation Standards

@@ -14,7 +14,7 @@ package com.soneso.stellar.sdk.sep.sep12
  * Callback payload format:
  * - The anchor will POST JSON with customer status updates
  * - Callbacks include Signature and X-Stellar-Signature headers for verification
- * - Verify signatures using CallbackSignatureVerifier
+ * - Verify signatures using [com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier]
  *
  * Customer identification:
  * - Use [id] if you have a customer ID from previous registration
@@ -50,38 +50,33 @@ package com.soneso.stellar.sdk.sep.sep12
  * // Your webhook endpoint
  * post("/webhooks/kyc-status") {
  *     val signatureHeader = call.request.header("Signature")
- *         ?: call.request.header("X-Stellar-Signature")
+ *     val xStellarSignatureHeader = call.request.header("X-Stellar-Signature")
  *     val requestBody = call.receiveText()
  *
- *     // Verify signature
- *     if (signatureHeader != null) {
- *         val isValid = CallbackSignatureVerifier.verify(
- *             signatureHeader = signatureHeader,
- *             requestBody = requestBody,
- *             expectedHost = "myapp.com",
- *             anchorSigningKey = anchorPublicKey
- *         )
+ *     val verifier = com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier(
+ *         signingKey = anchorPublicKey,
+ *         registeredCallbackUrl = "https://myapp.com/webhooks/kyc-status",
+ *     )
  *
- *         if (isValid) {
- *             // Parse and process status update
- *             val update = Json.decodeFromString<GetCustomerInfoResponse>(requestBody)
- *             handleStatusUpdate(update)
- *             call.respond(HttpStatusCode.OK)
- *         } else {
- *             call.respond(HttpStatusCode.Unauthorized, "Invalid signature")
- *         }
+ *     val result = verifier.verify(signatureHeader, xStellarSignatureHeader, requestBody)
+ *     if (result is com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier.Result.Valid) {
+ *         val update = Json.decodeFromString<GetCustomerInfoResponse>(requestBody)
+ *         handleStatusUpdate(update)
+ *         call.respond(HttpStatusCode.OK)
+ *     } else {
+ *         call.respond(HttpStatusCode.Unauthorized, "Invalid signature")
  *     }
  * }
  * ```
  *
  * Security considerations:
- * - Always verify callback signatures using CallbackSignatureVerifier
+ * - Always verify callback signatures using [com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier]
  * - Use HTTPS for callback URLs to protect customer data in transit
  * - Implement request authentication on your webhook endpoint
  * - Consider rate limiting to prevent abuse
  *
  * See also:
- * - [CallbackSignatureVerifier] for verifying callback authenticity
+ * - [com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier] for verifying callback authenticity
  * - [GetCustomerInfoResponse] for callback payload format
  * - [SEP-0012 Specification](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md#customer-callback-put)
  *

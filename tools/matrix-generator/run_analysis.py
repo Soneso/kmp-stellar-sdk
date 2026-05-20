@@ -35,6 +35,7 @@ KNOWN_SEPS: Dict[str, str] = {
     '0012': 'KYC API',
     '0024': 'Hosted Deposit/Withdrawal',
     '0030': 'Account Recovery',
+    '0031': 'Cross-Border Payments',
     '0038': 'Anchor RFQ API',
     '0045': 'Web Auth for Contract Accounts',
     '0046': 'Contract Meta',

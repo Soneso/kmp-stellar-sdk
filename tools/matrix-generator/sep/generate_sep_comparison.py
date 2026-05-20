@@ -70,6 +70,7 @@ class SEPCompatibilityGenerator:
         "0012": "A standard API for wallets to upload KYC data to anchors. Customers enter their information once and reuse it across multiple services.",
         "0024": "An interactive deposit and withdrawal flow where the anchor controls the UI via a popup within the wallet. Based on SEP-06 but limited to the interactive path.",
         "0030": "Account Recovery: multi-party recovery of Stellar accounts using alternative authentication methods",
+        "0031": "Cross-Border Payments: a programmatic API for Sending Anchors to deliver on-chain payments to Receiving Anchors, who then settle the off-chain leg with the Receiving Client. Covers asset discovery, SEP-12 KYC linkage, optional SEP-38 quotes, status polling, and refunds.",
         "0038": "Lets anchors provide quotes for exchanging on-chain assets for off-chain assets and vice versa.",
         "0045": "Web authentication for contract accounts (`C...` addresses). Extends SEP-10 to smart contract wallets; services supporting both account types should implement both SEPs.",
         "0046": "Defines a standard Wasm custom section (`contractmetav0`) for embedding arbitrary key-value metadata into deployed Soroban contracts, using XDR-encoded SCMetaEntry pairs.",
@@ -585,33 +586,6 @@ class SEPCompatibilityGenerator:
                 f.write("✅ **Fully Implemented**\n\n")
             else:
                 f.write("❌ **Not Implemented**\n\n")
-
-            # Implementation Files
-            f.write("### Implementation Files\n\n")
-            for file in self.sdk_data.get('files', []):
-                f.write(f"- `{file}`\n")
-            f.write("\n")
-
-            # Key Classes
-            f.write("### Key Classes\n\n")
-            for cls in self.sdk_data.get('classes', []):
-                f.write(f"- **`{cls['name']}`**")
-                if cls.get('methods'):
-                    method_names = [m['name'] for m in cls['methods']]
-                    f.write(f" - Methods: {', '.join(method_names)}")
-                f.write("\n")
-            f.write("\n")
-
-            # Test Coverage
-            test_count = self.sdk_data.get('test_count', 0)
-            test_files = self.sdk_data.get('test_files', [])
-            if test_count > 0:
-                f.write("### Test Coverage\n\n")
-                f.write(f"**Tests:** {test_count} test cases\n\n")
-                f.write("**Test Files:**\n\n")
-                for test_file in test_files:
-                    f.write(f"- `{test_file}`\n")
-                f.write("\n")
 
             # Coverage by Section (improved table with required coverage)
             f.write("## Coverage by Section\n\n")

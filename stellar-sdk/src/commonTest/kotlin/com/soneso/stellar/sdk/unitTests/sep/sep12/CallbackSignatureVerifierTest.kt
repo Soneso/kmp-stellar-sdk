@@ -274,4 +274,145 @@ class CallbackSignatureVerifierTest {
 
         assertFalse(isValid)
     }
+
+    // ==================== Shim regression coverage (32-36) ====================
+    //
+    // These cases lock in the bit-for-bit compatibility promise of the v0.6.0
+    // CallbackSignatureVerifier object. They exercise behaviours that the new
+    // shared class deliberately changes (port-included host, empty host,
+    // one-sided freshness, swallowed construction errors) and must continue to
+    // hold through the deprecation shim.
+
+    @Test
+    fun testShim_portIncludedHost_preserved() = runTest {
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        val hostWithPort = "myapp.com:8443"
+        val payload = "$timestamp.$hostWithPort.$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$timestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = hostWithPort,
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            maxAgeSeconds = 300
+        )
+
+        assertTrue(isValid)
+    }
+
+    @Test
+    fun testShim_loopbackWithPort_preserved() = runTest {
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        val loopbackHost = "localhost:8080"
+        val payload = "$timestamp.$loopbackHost.$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$timestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = loopbackHost,
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            maxAgeSeconds = 300
+        )
+
+        assertTrue(isValid)
+    }
+
+    @Test
+    fun testShim_emptyHost_preserved() = runTest {
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        // v0.6.0 allowed `expectedHost = ""`, producing payload `"$t..$body"`. The
+        // shim must continue to accept that degenerate-but-valid configuration.
+        val payload = "$timestamp..$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$timestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = "",
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            maxAgeSeconds = 300
+        )
+
+        assertTrue(isValid)
+    }
+
+    @Test
+    fun testShim_futureDatedTimestamp_preserved() = runTest {
+        val currentTime = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        // 200 seconds in the future. The v0.6.0 verifier's one-sided check
+        // (`currentTime - timestamp > maxAgeSeconds`) accepts future-dated
+        // timestamps because `currentTime - futureTimestamp` is negative.
+        val futureTimestamp = currentTime + 200
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        val payload = "$futureTimestamp.$testHost.$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$futureTimestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = testHost,
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            maxAgeSeconds = 300
+        )
+
+        assertTrue(isValid)
+    }
+
+    @Test
+    fun testShim_malformedSigningKey_swallowedAsFalse() = runTest {
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signatureHeader = "t=$timestamp, s=${Base64.encode(ByteArray(64))}"
+
+        // v0.6.0 wrapped its entire `verify` body in `try/catch(Exception) { false }`,
+        // so a malformed `anchorSigningKey` (which makes `KeyPair.fromAccountId` throw)
+        // collapsed to `false`. The shim must preserve that contract — the shared
+        // class's `init {}` throws on malformed `signingKey` and the shim's wrapping
+        // try/catch is what keeps the return value at `false`.
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = testHost,
+            anchorSigningKey = "not-a-G-key",
+            maxAgeSeconds = 300
+        )
+
+        assertFalse(isValid)
+    }
+
+    @Test
+    fun testDefaultMaxAgeSeconds_omittedParameter_invokesWithFiveMinuteDefault() = runTest {
+        // Calling the shim without the `maxAgeSeconds` argument exercises the
+        // default-parameter binding (= 300 seconds, 5 minutes). The signature payload
+        // is constructed with a current timestamp, so a 300-second freshness window
+        // is comfortably wide and the verification must succeed.
+        val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val signerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+        val payload = "$timestamp.$testHost.$testBody"
+        val signatureBytes = signerKeyPair.sign(payload.encodeToByteArray())
+        val signatureBase64 = Base64.encode(signatureBytes)
+        val signatureHeader = "t=$timestamp, s=$signatureBase64"
+
+        val isValid = CallbackSignatureVerifier.verify(
+            signatureHeader = signatureHeader,
+            requestBody = testBody,
+            expectedHost = testHost,
+            anchorSigningKey = signerKeyPair.getAccountId(),
+            // maxAgeSeconds intentionally omitted — exercises default 300-second value.
+        )
+
+        assertTrue(isValid)
+    }
 }

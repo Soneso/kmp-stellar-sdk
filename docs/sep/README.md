@@ -20,6 +20,7 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-12 | KYC API | [sep-12.md](sep-12.md) |
 | SEP-24 | Interactive Deposit and Withdrawal | [sep-24.md](sep-24.md) |
 | SEP-30 | Account Recovery | [sep-30.md](sep-30.md) |
+| SEP-31 | Cross-Border Payments | [sep-31.md](sep-31.md) |
 | SEP-38 | Anchor RFQ API | [sep-38.md](sep-38.md) |
 | SEP-45 | Web Authentication for Contract Accounts | [sep-45.md](sep-45.md) |
 | SEP-46 | Contract Meta | [Contract Parser](../advanced.md#contract-parser) |

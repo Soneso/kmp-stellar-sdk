@@ -538,24 +538,31 @@ The anchor POSTs to your callback URL with the same JSON body as `GET /customer`
 
 ### Verifying callback signatures
 
-Use `CallbackSignatureVerifier` to validate incoming callbacks:
+Use `com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier` to validate incoming callbacks. The class is shared between SEP-12 and SEP-31.
 
 ```kotlin
-import com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier
+import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
 
-// In your webhook handler
-val isValid = CallbackSignatureVerifier.verify(
-    signatureHeader = signatureHeader,       // "t=<timestamp>, s=<base64_signature>"
-    requestBody = requestBody,               // raw JSON body
-    expectedHost = "myapp.com",              // your callback host
-    anchorSigningKey = anchorPublicKey,       // anchor's SIGNING_KEY (G... address)
-    maxAgeSeconds = 300                      // optional, default 5 minutes
+// Construct once per registered callback URL and reuse for every inbound callback.
+val verifier = CallbackSignatureVerifier(
+    signingKey = anchorPublicKey,                                  // anchor's SIGNING_KEY (G... address)
+    registeredCallbackUrl = "https://myapp.com/webhooks/kyc-status", // URL you registered with the anchor
+    freshnessSeconds = 120,                                        // default; do not raise above 120 in production
 )
 
-if (isValid) {
+// In your webhook handler
+val result = verifier.verify(
+    signatureHeader = signatureHeader,             // "Signature" header value, may be null
+    xStellarSignatureHeader = xStellarSignature,    // legacy "X-Stellar-Signature" value, may be null
+    body = requestBody,                            // raw inbound JSON body
+)
+
+if (result == CallbackSignatureVerifier.Result.Valid) {
     // Process callback safely
 }
 ```
+
+The deprecated `com.soneso.stellar.sdk.sep.sep12.CallbackSignatureVerifier` object remains available as a thin shim for backwards compatibility and is scheduled for removal; see the project `CHANGELOG.md`.
 
 ---
 

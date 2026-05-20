@@ -103,16 +103,21 @@ class StellarToml(
         /**
          * Fetches and parses stellar.toml from a domain's well-known location.
          *
-         * Automatically constructs the standard stellar.toml URL for the given domain
-         * and fetches the content via HTTPS. The standard location is always:
-         * `https://DOMAIN/.well-known/stellar.toml`
+         * The standard SEP-1 location is `https://DOMAIN/.well-known/stellar.toml`.
+         * As a development convenience, this method also accepts the three IETF
+         * loopback authorities — `localhost`, `127.0.0.1`, and `[::1]`, each
+         * optionally with a `:port` — and fetches over `http://` against those
+         * hosts so callers can integrate against a local Anchor Platform
+         * instance without standing up a TLS-terminating proxy. Every non-loopback
+         * domain is fetched over HTTPS unconditionally.
          *
          * This is the primary method for discovering a domain's Stellar integration
          * information. Organizations publish their stellar.toml file at this standardized
          * location to allow wallets, anchors, and other services to discover their
          * capabilities and configuration.
          *
-         * @param domain The domain name (without protocol). E.g., "example.com"
+         * @param domain The domain name (without protocol). E.g., "example.com",
+         *   "localhost:8080", "127.0.0.1", or "[::1]:8080".
          * @param httpClient Optional custom HTTP client for testing or proxy configuration
          * @param httpRequestHeaders Optional custom HTTP headers to include in the request
          * @return StellarToml containing the parsed stellar.toml data
@@ -146,6 +151,12 @@ class StellarToml(
          *     httpRequestHeaders = mapOf("User-Agent" to "MyWallet/1.0")
          * )
          * ```
+         *
+         * Local development example:
+         * ```kotlin
+         * // Anchor Platform running on http://localhost:8080
+         * val stellarToml = StellarToml.fromDomain("localhost:8080")
+         * ```
          */
         suspend fun fromDomain(
             domain: String,
@@ -153,7 +164,8 @@ class StellarToml(
             httpRequestHeaders: Map<String, String>? = null
         ): StellarToml {
             val client = httpClient ?: HttpClient()
-            val url = "https://$domain/.well-known/stellar.toml"
+            val scheme = if (isLoopbackDomain(domain)) "http" else "https"
+            val url = "$scheme://$domain/.well-known/stellar.toml"
 
             try {
                 val response: HttpResponse = client.get(url) {
@@ -176,6 +188,19 @@ class StellarToml(
                 }
             }
         }
+
+        /**
+         * Returns `true` if [domain] is one of the three IETF loopback authorities
+         * (`localhost`, `127.0.0.1`, `[::1]`, each optionally followed by `:port`).
+         * Comparison is case-insensitive. Used by [fromDomain] to switch the fetch
+         * scheme from `https` to `http` for local development.
+         *
+         * Delegates to [com.soneso.stellar.sdk.sep.common.isLoopbackHost] so the
+         * loopback recognition rules are shared with the SEP-31 and callback-signature
+         * verifier layers.
+         */
+        internal fun isLoopbackDomain(domain: String): Boolean =
+            com.soneso.stellar.sdk.sep.common.isLoopbackHost(domain)
 
         /**
          * Loads detailed currency information from an external TOML file.

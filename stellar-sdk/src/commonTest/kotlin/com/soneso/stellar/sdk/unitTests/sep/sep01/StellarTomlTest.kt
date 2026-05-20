@@ -5,6 +5,13 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep01
 
 import com.soneso.stellar.sdk.sep.sep01.*
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLProtocol
+import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -645,5 +652,85 @@ class StellarTomlTest {
         val stellarToml = StellarToml.parse(toml)
         assertEquals("2.0.0", stellarToml.generalInformation.version)
         assertEquals("GBBHQ7H4V6RRORKYLHTCAWP6MOHNORRFJSDPXDFYDGJB2LPZUFPXUEW3", stellarToml.generalInformation.signingKey)
+    }
+
+    // ==================== fromDomain (loopback carve-out) ====================
+
+    private val minimalToml = "VERSION=\"2.0.0\"\n"
+
+    /** Captures the protocol+host+port of the request the mock receives, so tests can
+     *  assert which scheme [StellarToml.fromDomain] actually selected. */
+    private fun captureTomlFetchUrl(): Pair<HttpClient, () -> URLProtocol?> {
+        var captured: URLProtocol? = null
+        val engine = MockEngine { request ->
+            captured = request.url.protocol
+            respond(
+                content = minimalToml,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain"),
+            )
+        }
+        return HttpClient(engine) to { captured }
+    }
+
+    @Test
+    fun fromDomain_productionDomain_usesHttps() = runTest {
+        val (client, captured) = captureTomlFetchUrl()
+        val toml = StellarToml.fromDomain("anchor.example.org", client)
+        assertEquals("2.0.0", toml.generalInformation.version)
+        assertEquals(URLProtocol.HTTPS, captured())
+    }
+
+    @Test
+    fun fromDomain_loopbackLocalhost_usesHttp() = runTest {
+        val (client, captured) = captureTomlFetchUrl()
+        val toml = StellarToml.fromDomain("localhost:8080", client)
+        assertEquals("2.0.0", toml.generalInformation.version)
+        assertEquals(URLProtocol.HTTP, captured())
+    }
+
+    @Test
+    fun fromDomain_loopbackIpv4_usesHttp() = runTest {
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("127.0.0.1:8080", client)
+        assertEquals(URLProtocol.HTTP, captured())
+    }
+
+    @Test
+    fun fromDomain_loopbackIpv6_usesHttp() = runTest {
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("[::1]:8080", client)
+        assertEquals(URLProtocol.HTTP, captured())
+    }
+
+    @Test
+    fun fromDomain_localhostNoPort_usesHttp() = runTest {
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("localhost", client)
+        assertEquals(URLProtocol.HTTP, captured())
+    }
+
+    @Test
+    fun fromDomain_uppercaseLocalhost_usesHttp() = runTest {
+        // Host comparison must be case-insensitive.
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("LOCALHOST:8080", client)
+        assertEquals(URLProtocol.HTTP, captured())
+    }
+
+    @Test
+    fun fromDomain_localhostLookalike_usesHttps() = runTest {
+        // "localhost.evil.com" must NOT match the carve-out — falls through to https.
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("localhost.evil.com", client)
+        assertEquals(URLProtocol.HTTPS, captured())
+    }
+
+    @Test
+    fun fromDomain_loopbackIpv4Lookalike_usesHttps() = runTest {
+        // "127.0.0.1.evil.com" must NOT match — falls through to https.
+        val (client, captured) = captureTomlFetchUrl()
+        StellarToml.fromDomain("127.0.0.1.evil.com", client)
+        assertEquals(URLProtocol.HTTPS, captured())
     }
 }
