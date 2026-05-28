@@ -112,9 +112,9 @@ struct ContextRuleBuilderScreen: View {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, _ in
                     viewModel.showSignerPicker = false
-                    let descriptors = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
                     Task {
                         await viewModel.submitEditWithSigners(
                             bridge: bridgeWrapper.bridge,
@@ -126,14 +126,16 @@ struct ContextRuleBuilderScreen: View {
                 },
                 onDismiss: {
                     viewModel.showSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
         .sheet(isPresented: $viewModel.showCreateSignerPicker) {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, _ in
                     viewModel.showCreateSignerPicker = false
                     Task {
                         await viewModel.submitCreateWithSigners(
@@ -146,7 +148,8 @@ struct ContextRuleBuilderScreen: View {
                 },
                 onDismiss: {
                     viewModel.showCreateSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
     }

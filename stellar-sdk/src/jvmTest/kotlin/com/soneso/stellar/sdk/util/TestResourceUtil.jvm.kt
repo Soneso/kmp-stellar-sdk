@@ -37,4 +37,22 @@ actual object TestResourceUtil {
             throw IllegalArgumentException("WASM file not found: '$filename'", e)
         }
     }
+
+    actual fun readFixtureBytes(filename: String): ByteArray {
+        return try {
+            // Try reading from classpath using ClassLoader
+            val resourceStream = TestResourceUtil::class.java.classLoader.getResourceAsStream("fixtures/$filename")
+            if (resourceStream != null) {
+                return resourceStream.readBytes()
+            }
+
+            // Fallback: Try reading from filesystem (useful during development)
+            val filePath = "src/commonTest/resources/fixtures/$filename"
+            Files.readAllBytes(Paths.get(filePath))
+        } catch (e: IOException) {
+            throw IllegalArgumentException("Failed to read fixture file '$filename': ${e.message}", e)
+        } catch (e: NullPointerException) {
+            throw IllegalArgumentException("Fixture file not found: '$filename'", e)
+        }
+    }
 }

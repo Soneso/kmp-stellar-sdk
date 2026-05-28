@@ -49,7 +49,9 @@ final class MacOSBridgeWrapper: ObservableObject {
     /// - `createWallet(username:onProgress:)` — passkey registration + contract deployment.
     /// - `quickConnect()` / `manualConnect()` / `connectWithAddress(_:)` — session restore and connection.
     /// - `transfer(tokenContract:recipient:amount:)` — single-signer token transfer.
-    /// - `multiSignerTransfer(tokenContract:recipient:amount:signerDescriptors:delegatedSecretKeys:)` — multi-signer token transfer.
+    /// - `multiSignerTransfer(tokenContract:recipient:amount:signerDescriptors:delegatedSecretKeys:ed25519SecretKeys:)` — multi-signer token transfer.
+    /// - `multiSignerApproveAllowance(tokenContract:spenderAddress:amount:expirationLedgerOffset:signerDescriptors:delegatedSecretKeys:ed25519SecretKeys:)` — multi-signer allowance approval.
+    /// - `validateEd25519Key(secretHex:expectedPublicKeyHex:)` — validate an Ed25519 seed hex against a known public key.
     /// - `loadContextRules()` / `addContextRule(...)` / `removeContextRule(_:)` — context rule management.
     /// - `loadAccountSigners()` — enumerate all signers registered on the account.
     /// - `getActivityLogEntries()` — fetch the current activity log snapshot.

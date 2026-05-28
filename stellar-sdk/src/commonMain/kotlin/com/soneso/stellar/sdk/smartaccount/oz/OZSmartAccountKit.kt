@@ -412,5 +412,48 @@ class OZSmartAccountKit private constructor(
                 sorobanServer = SorobanServer(config.rpcUrl)
             )
         }
+
+        /**
+         * Creates a kit with a pre-built [SorobanServer], used in tests to inject a
+         * mock HTTP engine. Not intended for production use.
+         */
+        internal fun createWithServer(
+            config: OZSmartAccountConfig,
+            sorobanServer: SorobanServer
+        ): OZSmartAccountKit = OZSmartAccountKit(
+            config = config,
+            storage = config.storage,
+            relayerClient = null,
+            indexerClient = null,
+            externalWallet = config.externalWallet,
+            sorobanServer = sorobanServer
+        )
     }
 }
+
+// ============================================================================
+// Kit Extension Properties
+// ============================================================================
+
+/**
+ * The [OZExternalSignerManager] configured for this kit, or null if none was provided.
+ *
+ * Use this property to register Ed25519 keypairs or set an [OZExternalEd25519SignerAdapter]
+ * before submitting multi-signer operations that include [SelectedSigner.Ed25519] selectors.
+ *
+ * Example:
+ * ```kotlin
+ * val manager = OZExternalSignerManager(networkPassphrase = config.networkPassphrase)
+ * manager.addEd25519FromRawKey(secretKeyBytes, verifierAddress)
+ *
+ * val config = OZSmartAccountConfig.builder(...)
+ *     .externalSignerManager(manager)
+ *     .build()
+ * val kit = OZSmartAccountKit.create(config)
+ *
+ * // kit.externalSignerManager is the same instance as manager
+ * kit.externalSignerManager?.addEd25519FromRawKey(anotherSecretKey, anotherVerifier)
+ * ```
+ */
+val OZSmartAccountKit.externalSignerManager: OZExternalSignerManager?
+    get() = config.externalSignerManager

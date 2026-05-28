@@ -4,7 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
+import com.soneso.smartdemo.wallet.DemoEd25519Adapter
 import com.soneso.smartdemo.wallet.WalletConnector
+import com.soneso.stellar.sdk.smartaccount.oz.OZExternalSignerManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -23,6 +25,24 @@ object DemoState {
      * Set during kit initialization so TransferScreen can register secret keys.
      */
     var externalSignerManager: ExternalSignerManagerAdapter? = null
+        private set
+
+    /**
+     * The Ed25519 external signer manager, created once during kit initialization and
+     * shared across all flows that include [SelectedSigner.Ed25519] signers.
+     *
+     * The Transfer flow uses the in-process keypair path (no adapter assigned).
+     * The Approve flow sets [OZExternalSignerManager.ed25519Adapter] to a [DemoEd25519Adapter]
+     * before submitting and clears it afterwards.
+     */
+    var ed25519SignerManager: OZExternalSignerManager? = null
+        private set
+
+    /**
+     * Shared [DemoEd25519Adapter] instance used by the Approve flow adapter callback path.
+     * Created once at kit initialization time and reused across approve operations.
+     */
+    var demoEd25519Adapter: DemoEd25519Adapter? = null
         private set
 
     /** Platform-specific WebAuthn provider, set by platform entry points (MainActivity, AppDelegate, etc.). */
@@ -74,6 +94,14 @@ object DemoState {
         externalSignerManager = manager
     }
 
+    fun setEd25519SignerManager(manager: OZExternalSignerManager?) {
+        ed25519SignerManager = manager
+    }
+
+    fun setDemoEd25519Adapter(adapter: DemoEd25519Adapter?) {
+        demoEd25519Adapter = adapter
+    }
+
     fun setWebAuthnProvider(provider: WebAuthnProvider?) {
         webauthnProvider = provider
     }
@@ -115,6 +143,8 @@ object DemoState {
     fun reset() {
         kit = null
         externalSignerManager = null
+        ed25519SignerManager = null
+        demoEd25519Adapter = null
         webauthnProvider = null
         storage = null
         // walletConnector is NOT reset — it is a platform-level singleton

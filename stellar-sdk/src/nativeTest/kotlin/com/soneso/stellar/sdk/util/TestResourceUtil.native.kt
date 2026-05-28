@@ -40,12 +40,34 @@ actual object TestResourceUtil {
             "stellar-sdk/src/commonTest/resources/wasm/$filename"
         ))
 
+        return readFileFromPaths(filename, paths, "WASM")
+    }
+
+    actual fun readFixtureBytes(filename: String): ByteArray {
+        val projectDir = getenv("PROJECT_DIR")?.toKString()
+
+        val paths = mutableListOf<String>()
+
+        if (projectDir != null) {
+            paths.add("$projectDir/src/commonTest/resources/fixtures/$filename")
+        }
+
+        paths.addAll(listOf(
+            "src/commonTest/resources/fixtures/$filename",
+            "stellar-sdk/src/commonTest/resources/fixtures/$filename"
+        ))
+
+        return readFileFromPaths(filename, paths, "fixture")
+    }
+
+    private fun readFileFromPaths(filename: String, paths: List<String>, kind: String): ByteArray {
+        val projectDir = getenv("PROJECT_DIR")?.toKString()
+
         for (path in paths) {
             try {
                 val file = fopen(path, "rb") ?: continue
 
                 try {
-                    // Get file size
                     fseek(file, 0, SEEK_END)
                     val size = ftell(file).toInt()
                     fseek(file, 0, SEEK_SET)
@@ -54,29 +76,28 @@ actual object TestResourceUtil {
                         continue
                     }
 
-                    // Read file contents
                     return memScoped {
                         val buffer = allocArray<ByteVar>(size)
                         val bytesRead = fread(buffer, 1u, size.toULong(), file).toInt()
 
                         if (bytesRead != size) {
-                            throw IllegalArgumentException("Failed to read complete file: expected $size bytes, got $bytesRead")
+                            throw IllegalArgumentException(
+                                "Failed to read complete file: expected $size bytes, got $bytesRead"
+                            )
                         }
 
-                        // Convert to ByteArray
                         ByteArray(size) { i -> buffer[i] }
                     }
                 } finally {
                     fclose(file)
                 }
             } catch (e: Exception) {
-                // Try next path
                 continue
             }
         }
 
         throw IllegalArgumentException(
-            "WASM file not found in any expected location: '$filename'. " +
+            "$kind file not found in any expected location: '$filename'. " +
             "PROJECT_DIR: $projectDir. Searched paths: ${paths.joinToString(", ")}"
         )
     }

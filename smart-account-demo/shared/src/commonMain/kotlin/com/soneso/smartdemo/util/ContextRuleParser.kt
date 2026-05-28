@@ -9,6 +9,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ExternalWalletAdapter
+import com.soneso.stellar.sdk.smartaccount.oz.OZExternalSignerManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 
@@ -56,8 +57,10 @@ suspend fun fetchAllContextRules(): List<ParsedContextRule> {
  * Extracts unique signers from a list of parsed context rules and determines
  * whether each signer can currently sign transactions.
  *
- * For [ExternalSigner] with WebAuthn key data (keyData > 65 bytes): canSign is true
+ * For [ExternalSigner] with WebAuthn key data (keyData > 32 bytes): canSign is true
  * when the signer's credential ID matches [connectedCredentialId].
+ * For [ExternalSigner] with exactly 32 bytes of key data (Ed25519): canSign is true
+ * when [ed25519SignerManager]?.canSignEd25519For(verifierAddress, publicKey) returns true.
  * For [DelegatedSigner]: canSign is true when [externalWallet]?.canSignFor(address) returns true.
  *
  * Signers are deduplicated across rules using [SmartAccountBuilders.collectUniqueSigners].
@@ -65,12 +68,14 @@ suspend fun fetchAllContextRules(): List<ParsedContextRule> {
  * @param rules Parsed context rules to extract signers from.
  * @param connectedCredentialId Base64URL-encoded credential ID of the connected passkey.
  * @param externalWallet Optional external wallet adapter for delegated signer check.
+ * @param ed25519SignerManager Optional Ed25519 manager for Ed25519 signer capability check.
  * @return List of [SignerInfo] with canSign status for each unique signer.
  */
 fun extractSignersFromRules(
     rules: List<ParsedContextRule>,
     connectedCredentialId: String?,
-    externalWallet: ExternalWalletAdapter?
+    externalWallet: ExternalWalletAdapter?,
+    ed25519SignerManager: OZExternalSignerManager? = null
 ): List<SignerInfo> {
     val allSigners = rules.flatMap { it.signers }
     val unique = SmartAccountBuilders.collectUniqueSigners(allSigners)
@@ -79,16 +84,22 @@ fun extractSignersFromRules(
         val canSign = when (signer) {
             is ExternalSigner -> {
                 val keyData = signer.keyData
-                if (keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
-                    // WebAuthn signer: compare credential ID suffix against connected credential
-                    val credIdBytes = keyData.copyOfRange(
-                        SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
-                        keyData.size
-                    )
-                    val credIdEncoded = Util.base64urlEncode(credIdBytes)
-                    credIdEncoded == connectedCredentialId
-                } else {
-                    false
+                when {
+                    keyData.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE -> {
+                        // WebAuthn signer: compare credential ID suffix against connected credential
+                        val credIdBytes = keyData.copyOfRange(
+                            SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE,
+                            keyData.size
+                        )
+                        val credIdEncoded = Util.base64urlEncode(credIdBytes)
+                        credIdEncoded == connectedCredentialId
+                    }
+                    keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE -> {
+                        // Ed25519 signer: check if the manager has a signing source registered
+                        ed25519SignerManager?.canSignEd25519For(signer.verifierAddress, keyData)
+                            ?: false
+                    }
+                    else -> false
                 }
             }
             is DelegatedSigner -> {

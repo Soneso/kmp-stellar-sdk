@@ -212,7 +212,7 @@ class ContextRulesScreen : Screen {
                 title = "Select Signers",
                 description = "Choose which signers co-authorize removing this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
                     showRemoveSignerPicker = false
                     val rule = ruleToRemoveWithSigners!!
                     ruleToRemoveWithSigners = null

@@ -82,7 +82,7 @@ kit.signerManager.addPasskey(
 
 On-chain representation: `Vec([Symbol("External"), Address(verifier), Bytes(publicKey)])`
 
-SDK method:
+**Adding an Ed25519 signer**:
 ```kotlin
 kit.signerManager.addEd25519(
     contextRuleId = 0u,
@@ -90,6 +90,63 @@ kit.signerManager.addEd25519(
     publicKey = ed25519PublicKey // 32 bytes
 )
 ```
+
+**Signing with an Ed25519 signer**:
+
+When a context rule contains an Ed25519 signer, multi-signer operations include it as a `SelectedSigner.Ed25519`. This type carries no signing material — it is a pure identifier. The actual signing source is registered separately on `OZExternalSignerManager`, which must be passed to the kit via `OZSmartAccountConfig.externalSignerManager`.
+
+The on-chain Ed25519 verifier contract expects a raw 64-byte signature over the auth digest. The auth digest is computed as `SHA-256(SHA-256(sorobanAuthPreimageXDR) || contextRuleIds.toXDR())`. The SDK computes this internally; you only supply the signing source.
+
+Two ways to provide a signing source:
+
+**Option 1 — In-process raw seed.** Provide the 32-byte Ed25519 seed directly. The SDK derives the keypair in memory, signs the auth digest, and verifies the result locally before including it in the transaction.
+
+```kotlin
+// onChainPublicKey: ByteArray  // 32-byte Ed25519 public key from the on-chain signer slot
+// (obtain from the ExternalSigner.keyData field of the registered Ed25519 signer)
+
+// Decode the 32-byte seed from a hex string (e.g., from user input)
+val seedHex = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+val seedBytes = seedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()  // 32 bytes
+
+// Derive the public key and verify it matches the on-chain signer slot
+val derivedPublicKey = manager.addEd25519FromRawKey(
+    secretKeyBytes = seedBytes,
+    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+)
+
+// Assert the derived key matches the stored on-chain publicKey before proceeding.
+// If they differ, the seed does not belong to this signer slot.
+check(derivedPublicKey.contentEquals(onChainPublicKey)) {
+    "Derived public key does not match the on-chain signer. Wrong seed."
+}
+```
+
+**Option 2 — Adapter (hardware wallets, HSMs, remote signers).** Implement `OZExternalEd25519SignerAdapter` and assign it to the manager. The adapter's `signAuthDigest` is called by the pipeline; the raw seed never enters process memory.
+
+```kotlin
+manager.ed25519Adapter = MyHardwareAdapter()
+```
+
+See [OZExternalEd25519SignerAdapter](api-reference.md#ozexternaled25519signeradapter) for a complete adapter implementation example.
+
+After registering the signing source, construct `SelectedSigner.Ed25519` with the verifier address and public key obtained from the on-chain signer data, and pass it to the multi-signer operation:
+
+```kotlin
+val result = kit.multiSignerManager.multiSignerTransfer(
+    tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    recipient = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+    amount = "10",
+    selectedSigners = listOf(
+        SelectedSigner.Ed25519(
+            verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            publicKey = onChainPublicKey  // 32 bytes, from context rule discovery
+        )
+    )
+)
+```
+
+**Adapter-first precedence**: when both an adapter and an in-memory keypair are registered for the same `(verifierAddress, publicKey)` pair, the adapter takes priority. This allows a hardware-wallet adapter to override an in-memory keypair without requiring the in-memory registration to be removed first.
 
 ---
 

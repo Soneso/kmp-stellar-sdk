@@ -16,6 +16,8 @@ import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
 import com.soneso.stellar.sdk.xdr.SCMapXdr
 import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.XdrReader
+import com.soneso.stellar.sdk.xdr.XdrWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -274,86 +276,89 @@ class SmartAccountSignaturesTest {
     // ========================================================================
 
     @Test
-    fun testEd25519ToScVal_returnsMapType() {
+    fun testEd25519ToScVal_returnsBytesType() {
         val sig = ed25519()
         val scVal = sig.toScVal()
-        assertIs<SCValXdr.Map>(scVal, "Ed25519Signature.toScVal() must return SCValXdr.Map")
-        assertEquals(SCValTypeXdr.SCV_MAP, scVal.discriminant)
+        assertIs<SCValXdr.Bytes>(scVal, "Ed25519Signature.toScVal() must return SCValXdr.Bytes")
+        assertEquals(SCValTypeXdr.SCV_BYTES, scVal.discriminant)
     }
 
     @Test
-    fun testEd25519ToScVal_hasExactlyTwoEntries() {
-        val entries = mapEntries(ed25519().toScVal())
-        assertEquals(2, entries.size, "Ed25519 ScVal map must have exactly 2 entries")
-    }
-
-    @Test
-    fun testEd25519ToScVal_keysInAlphabeticalOrder() {
-        val entries = mapEntries(ed25519().toScVal())
-        val keys = entries.map { symbolValue(it.first) }
-        assertEquals(
-            listOf("public_key", "signature"),
-            keys,
-            "Keys must be in alphabetical order: public_key, signature"
-        )
-    }
-
-    @Test
-    fun testEd25519ToScVal_publicKeyEntry() {
-        val pk = pubKey32()
-        val sig = ed25519(publicKey = pk)
-        val entries = mapEntries(sig.toScVal())
-
-        assertEquals("public_key", symbolValue(entries[0].first))
-        assertTrue(
-            pk.contentEquals(bytesValue(entries[0].second)),
-            "public_key value must match input bytes"
-        )
-    }
-
-    @Test
-    fun testEd25519ToScVal_signatureEntry() {
+    fun testEd25519ToScVal_containsRawSignatureBytes() {
         val s = ed25519Sig64()
         val sig = ed25519(signature = s)
-        val entries = mapEntries(sig.toScVal())
-
-        assertEquals("signature", symbolValue(entries[1].first))
         assertTrue(
-            s.contentEquals(bytesValue(entries[1].second)),
-            "signature value must match input bytes"
+            s.contentEquals(bytesValue(sig.toScVal())),
+            "toScVal() must return the raw signature bytes"
         )
     }
 
     @Test
-    fun testEd25519ToScVal_allZeroBytes() {
+    fun testEd25519ToScVal_doesNotContainPublicKey() {
+        val pk = pubKey32()
+        val s = ed25519Sig64()
+        val sig = ed25519(publicKey = pk, signature = s)
+        val rawBytes = bytesValue(sig.toScVal())
+        // The bytes must equal the signature field only, not 96 bytes containing the key
+        assertEquals(64, rawBytes.size, "toScVal() bytes must be exactly 64 (signature only)")
+    }
+
+    @Test
+    fun testEd25519ToScVal_allZeroSignatureBytes() {
         val sig = Ed25519Signature(
             publicKey = ByteArray(32),
             signature = ByteArray(64)
         )
-        val entries = mapEntries(sig.toScVal())
-        assertTrue(ByteArray(32).contentEquals(bytesValue(entries[0].second)))
-        assertTrue(ByteArray(64).contentEquals(bytesValue(entries[1].second)))
+        val rawBytes = bytesValue(sig.toScVal())
+        assertTrue(ByteArray(64).contentEquals(rawBytes), "All-zero signature must round-trip")
     }
 
     @Test
-    fun testEd25519ToScVal_allOnesBytes() {
+    fun testEd25519ToScVal_allOnesSignatureBytes() {
         val sig = Ed25519Signature(
             publicKey = ByteArray(32) { 0xFF.toByte() },
             signature = ByteArray(64) { 0xFF.toByte() }
         )
-        val entries = mapEntries(sig.toScVal())
+        val rawBytes = bytesValue(sig.toScVal())
         assertTrue(
-            ByteArray(32) { 0xFF.toByte() }.contentEquals(bytesValue(entries[0].second)),
-            "public_key must preserve 0xFF bytes"
+            ByteArray(64) { 0xFF.toByte() }.contentEquals(rawBytes),
+            "All-0xFF signature must round-trip"
         )
     }
 
     @Test
-    fun testEd25519ToScVal_calledTwiceReturnsSameStructure() {
+    fun testEd25519ToScVal_calledTwiceReturnsSameBytes() {
         val sig = ed25519()
-        val keys1 = mapEntries(sig.toScVal()).map { symbolValue(it.first) }
-        val keys2 = mapEntries(sig.toScVal()).map { symbolValue(it.first) }
-        assertEquals(keys1, keys2)
+        val bytes1 = bytesValue(sig.toScVal())
+        val bytes2 = bytesValue(sig.toScVal())
+        assertTrue(bytes1.contentEquals(bytes2), "Repeated calls must produce identical bytes")
+    }
+
+    // ========================================================================
+    // Ed25519Signature.toAuthPayloadBytes()
+    // ========================================================================
+
+    @Test
+    fun testEd25519ToAuthPayloadBytes_returnsRawSignatureBytes() {
+        val s = ed25519Sig64()
+        val sig = ed25519(signature = s)
+        val payloadBytes = sig.toAuthPayloadBytes()
+        assertTrue(s.contentEquals(payloadBytes), "toAuthPayloadBytes() must return raw signature bytes")
+    }
+
+    @Test
+    fun testEd25519ToAuthPayloadBytes_is64Bytes() {
+        val payloadBytes = ed25519().toAuthPayloadBytes()
+        assertEquals(64, payloadBytes.size, "Ed25519 auth payload bytes must be exactly 64")
+    }
+
+    @Test
+    fun testEd25519ToAuthPayloadBytes_doesNotXdrWrap() {
+        val s = ed25519Sig64()
+        val sig = ed25519(signature = s)
+        val payloadBytes = sig.toAuthPayloadBytes()
+        // Raw 64 bytes — not an XDR-encoded ScVal (which would be longer due to the type tag)
+        assertTrue(payloadBytes.contentEquals(s), "No XDR wrapper must be applied")
     }
 
     // ========================================================================
@@ -456,6 +461,77 @@ class SmartAccountSignaturesTest {
     fun testPolicySignature_isSmartAccountSignature() {
         val sig: SmartAccountSignature = PolicySignature
         assertIs<PolicySignature>(sig)
+    }
+
+    // ========================================================================
+    // WebAuthnSignature.toAuthPayloadBytes()
+    // ========================================================================
+
+    @Test
+    fun testWebAuthnToAuthPayloadBytes_isNonEmpty() {
+        val bytes = webAuthn().toAuthPayloadBytes()
+        assertTrue(bytes.isNotEmpty(), "WebAuthn toAuthPayloadBytes() must return non-empty bytes")
+    }
+
+    @Test
+    fun testWebAuthnToAuthPayloadBytes_isXdrEncodedMapScVal() {
+        val sig = webAuthn()
+        val payloadBytes = sig.toAuthPayloadBytes()
+        // Decoding the bytes as an XdrSCVal must yield a Map
+        val decoded = SCValXdr.decode(XdrReader(payloadBytes))
+        assertIs<SCValXdr.Map>(decoded, "WebAuthn payload bytes must decode to a Map ScVal")
+    }
+
+    @Test
+    fun testWebAuthnToAuthPayloadBytes_equalsXdrEncodedToScVal() {
+        val sig = webAuthn()
+        val payloadBytes = sig.toAuthPayloadBytes()
+        val writer = XdrWriter()
+        sig.toScVal().encode(writer)
+        val expectedBytes = writer.toByteArray()
+        assertTrue(expectedBytes.contentEquals(payloadBytes), "toAuthPayloadBytes() must equal XDR-encoded toScVal()")
+    }
+
+    @Test
+    fun testWebAuthnToAuthPayloadBytes_calledTwiceReturnsSameBytes() {
+        val sig = webAuthn()
+        val bytes1 = sig.toAuthPayloadBytes()
+        val bytes2 = sig.toAuthPayloadBytes()
+        assertTrue(bytes1.contentEquals(bytes2), "Repeated calls must produce identical bytes")
+    }
+
+    // ========================================================================
+    // PolicySignature.toAuthPayloadBytes()
+    // ========================================================================
+
+    @Test
+    fun testPolicyToAuthPayloadBytes_isNonEmpty() {
+        val bytes = PolicySignature.toAuthPayloadBytes()
+        assertTrue(bytes.isNotEmpty(), "Policy toAuthPayloadBytes() must return non-empty bytes")
+    }
+
+    @Test
+    fun testPolicyToAuthPayloadBytes_isXdrEncodedEmptyMapScVal() {
+        val payloadBytes = PolicySignature.toAuthPayloadBytes()
+        val decoded = SCValXdr.decode(XdrReader(payloadBytes))
+        assertIs<SCValXdr.Map>(decoded, "Policy payload bytes must decode to a Map ScVal")
+        assertEquals(0, (decoded as SCValXdr.Map).value!!.value.size, "Policy map must be empty")
+    }
+
+    @Test
+    fun testPolicyToAuthPayloadBytes_equalsXdrEncodedToScVal() {
+        val payloadBytes = PolicySignature.toAuthPayloadBytes()
+        val writer = XdrWriter()
+        PolicySignature.toScVal().encode(writer)
+        val expectedBytes = writer.toByteArray()
+        assertTrue(expectedBytes.contentEquals(payloadBytes), "toAuthPayloadBytes() must equal XDR-encoded toScVal()")
+    }
+
+    @Test
+    fun testPolicyToAuthPayloadBytes_calledTwiceReturnsSameBytes() {
+        val bytes1 = PolicySignature.toAuthPayloadBytes()
+        val bytes2 = PolicySignature.toAuthPayloadBytes()
+        assertTrue(bytes1.contentEquals(bytes2), "Repeated calls must produce identical bytes")
     }
 
     // ========================================================================
@@ -633,32 +709,17 @@ class SmartAccountSignaturesTest {
 
     @Test
     fun testEd25519ToScVal_matchesManualScvConstruction() {
-        val pk = pubKey32()
         val s = ed25519Sig64()
-        val sig = Ed25519Signature(pk, s)
+        val sig = Ed25519Signature(pubKey32(), s)
 
-        val expected = Scv.toMap(linkedMapOf(
-            Scv.toSymbol("public_key") to Scv.toBytes(pk),
-            Scv.toSymbol("signature") to Scv.toBytes(s)
-        ))
-
+        val expected = Scv.toBytes(s)
         val actual = sig.toScVal()
 
-        val expectedEntries = (expected as SCValXdr.Map).value!!.value
-        val actualEntries = (actual as SCValXdr.Map).value!!.value
-
-        assertEquals(expectedEntries.size, actualEntries.size)
-        for (i in expectedEntries.indices) {
-            assertEquals(
-                symbolValue(expectedEntries[i].key),
-                symbolValue(actualEntries[i].key)
-            )
-            assertTrue(
-                bytesValue(expectedEntries[i].`val`).contentEquals(
-                    bytesValue(actualEntries[i].`val`)
-                )
-            )
-        }
+        assertIs<SCValXdr.Bytes>(actual, "Ed25519 toScVal() must return SCValXdr.Bytes")
+        assertTrue(
+            bytesValue(expected).contentEquals(bytesValue(actual)),
+            "toScVal() bytes must match Scv.toBytes(signature)"
+        )
     }
 
     @Test
@@ -751,15 +812,14 @@ class SmartAccountSignaturesTest {
         val ed = ed25519()
         val wa = webAuthn()
 
-        val edEntries = mapEntries(ed.toScVal())
-        val waEntries = mapEntries(wa.toScVal())
+        val edScVal = ed.toScVal()
+        val waScVal = wa.toScVal()
 
-        // Ed25519 has 2 entries, WebAuthn has 3
-        assertNotEquals(edEntries.size, waEntries.size)
-
-        // Ed25519 has "public_key", WebAuthn has "authenticator_data"
-        assertEquals("public_key", symbolValue(edEntries[0].first))
-        assertEquals("authenticator_data", symbolValue(waEntries[0].first))
+        // Ed25519 returns Bytes; WebAuthn returns Map — the discriminants must differ
+        assertIs<SCValXdr.Bytes>(edScVal, "Ed25519 toScVal() must return SCValXdr.Bytes")
+        assertIs<SCValXdr.Map>(waScVal, "WebAuthn toScVal() must return SCValXdr.Map")
+        assertNotEquals(edScVal.discriminant, waScVal.discriminant,
+            "Ed25519 and WebAuthn discriminants must differ")
     }
 
     // ========================================================================
@@ -783,18 +843,18 @@ class SmartAccountSignaturesTest {
     }
 
     @Test
-    fun testEd25519ToScVal_allKeysAreSymbols() {
-        val entries = mapEntries(ed25519().toScVal())
-        for ((key, _) in entries) {
-            assertIs<SCValXdr.Sym>(key, "All keys must be SCValXdr.Sym")
-        }
+    fun testEd25519ToScVal_isNotAMap() {
+        val scVal = ed25519().toScVal()
+        assertFalse(scVal is SCValXdr.Map, "Ed25519 toScVal() must not return a Map")
+        assertIs<SCValXdr.Bytes>(scVal, "Ed25519 toScVal() must return SCValXdr.Bytes")
     }
 
     @Test
-    fun testEd25519ToScVal_allValuesAreBytes() {
-        val entries = mapEntries(ed25519().toScVal())
-        for ((_, value) in entries) {
-            assertIs<SCValXdr.Bytes>(value, "All values must be SCValXdr.Bytes")
-        }
+    fun testEd25519ToScVal_bytesAreRaw64ByteSignature() {
+        val s = ed25519Sig64()
+        val scVal = ed25519(signature = s).toScVal()
+        assertIs<SCValXdr.Bytes>(scVal)
+        assertEquals(64, bytesValue(scVal).size, "SCValXdr.Bytes content must be 64 bytes")
+        assertTrue(s.contentEquals(bytesValue(scVal)), "Bytes must equal the raw signature")
     }
 }

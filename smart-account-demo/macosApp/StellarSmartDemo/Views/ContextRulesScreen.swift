@@ -126,7 +126,8 @@ struct ContextRulesScreen: View {
                 SignerPickerSheet(
                     signers: availableSigners,
                     activeCredentialId: appState.credentialId,
-                    onConfirm: { selected, secretKeys in
+                    ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                    onConfirm: { selected, secretKeys, _ in
                         showRemoveSignerPicker = false
                         let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
                         let capturedRule = rule
@@ -142,7 +143,8 @@ struct ContextRulesScreen: View {
                     onDismiss: {
                         showRemoveSignerPicker = false
                         ruleToRemoveWithSigners = nil
-                    }
+                    },
+                    bridge: bridgeWrapper.bridge
                 )
             }
         }

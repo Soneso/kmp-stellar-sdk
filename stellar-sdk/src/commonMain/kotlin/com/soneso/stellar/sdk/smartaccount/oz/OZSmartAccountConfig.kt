@@ -61,6 +61,7 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | webauthnProvider | No | null |
  * | storage | No | InMemoryStorageAdapter |
  * | externalWallet | No | null |
+ * | externalSignerManager | No | null |
  * | maxContextRuleScanId | No | 50 |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
@@ -196,6 +197,19 @@ data class OZSmartAccountConfig(
      * using WebAuthn credentials.
      */
     val externalWallet: ExternalWalletAdapter? = null,
+
+    /**
+     * Manager for Ed25519 external signers.
+     *
+     * Required when any [SelectedSigner.Ed25519] selector appears in a multi-signer
+     * operation. The manager holds either in-memory keypairs registered via
+     * [OZExternalSignerManager.addEd25519FromRawKey] or an [OZExternalEd25519SignerAdapter]
+     * that delegates signing to a hardware wallet or remote service.
+     *
+     * When null, any [SelectedSigner.Ed25519] signer in a multi-signer call throws
+     * [ValidationException.InvalidInput] at validation time.
+     */
+    val externalSignerManager: OZExternalSignerManager? = null,
 
     /**
      * Maximum rule ID to scan when iterating context rules.
@@ -344,6 +358,7 @@ data class OZSmartAccountConfig(
         private var webauthnProvider: WebAuthnProvider? = null
         private var storage: StorageAdapter = InMemoryStorageAdapter()
         private var externalWallet: ExternalWalletAdapter? = null
+        private var externalSignerManager: OZExternalSignerManager? = null
         private var maxContextRuleScanId: UInt = 50u
 
         /**
@@ -459,6 +474,21 @@ data class OZSmartAccountConfig(
         fun externalWallet(externalWallet: ExternalWalletAdapter?) = apply { this.externalWallet = externalWallet }
 
         /**
+         * Sets the external signer manager for Ed25519 multi-signer operations.
+         *
+         * Required when any [SelectedSigner.Ed25519] selector will be used. The manager
+         * must contain in-memory keypairs registered via
+         * [OZExternalSignerManager.addEd25519FromRawKey] or have an
+         * [OZExternalEd25519SignerAdapter] set on its [OZExternalSignerManager.ed25519Adapter]
+         * property before any multi-signer call that includes [SelectedSigner.Ed25519].
+         *
+         * @param externalSignerManager The manager instance, or null to clear it.
+         * @return This builder for chaining.
+         */
+        fun externalSignerManager(externalSignerManager: OZExternalSignerManager?) =
+            apply { this.externalSignerManager = externalSignerManager }
+
+        /**
          * Sets the maximum context rule ID to scan when iterating rules.
          *
          * @param value The maximum scan ID (default 50)
@@ -492,6 +522,7 @@ data class OZSmartAccountConfig(
                 webauthnProvider = webauthnProvider,
                 storage = storage,
                 externalWallet = externalWallet,
+                externalSignerManager = externalSignerManager,
                 maxContextRuleScanId = maxContextRuleScanId
             )
         }

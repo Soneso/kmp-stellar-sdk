@@ -15,4 +15,13 @@ expect object TestResourceUtil {
      * @throws IllegalArgumentException if the file cannot be found or read
      */
     fun readWasmFile(filename: String): ByteArray
+
+    /**
+     * Reads a fixture file from the test resources fixtures directory.
+     *
+     * @param filename The name of the fixture file (e.g., "ed25519_cross_sdk_fixture.json")
+     * @return The file contents as a ByteArray
+     * @throws IllegalArgumentException if the file cannot be found or read
+     */
+    fun readFixtureBytes(filename: String): ByteArray
 }

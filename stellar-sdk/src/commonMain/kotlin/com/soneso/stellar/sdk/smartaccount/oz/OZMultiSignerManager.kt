@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
@@ -97,6 +98,44 @@ sealed class SelectedSigner {
      * @property address The Stellar G-address of the delegated signer.
      */
     data class Wallet(val address: String) : SelectedSigner()
+
+    /**
+     * An Ed25519 external signer identified by the verifier contract address and
+     * 32-byte public key.
+     *
+     * The `(verifierAddress, publicKey)` pair identifies the on-chain
+     * `External(verifierAddress, publicKey)` signer slot. Signing capability for this
+     * signer must be registered separately via
+     * [OZExternalSignerManager.addEd25519FromRawKey] (or by setting an
+     * [OZExternalEd25519SignerAdapter]) before including this selector in a
+     * multi-signer operation.
+     *
+     * Unlike passkey selectors, this type carries no signing material — it is a pure
+     * identifier.
+     *
+     * @property verifierAddress C-strkey of the Ed25519 verifier contract registered as
+     *   part of the on-chain `External(verifierAddress, publicKey)` signer entry.
+     * @property publicKey 32-byte Ed25519 public key identifying the signer slot on the
+     *   smart account.
+     */
+    data class Ed25519(
+        val verifierAddress: String,
+        val publicKey: ByteArray,
+    ) : SelectedSigner() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+            other as Ed25519
+            if (verifierAddress != other.verifierAddress) return false
+            return publicKey.contentEquals(other.publicKey)
+        }
+
+        override fun hashCode(): Int {
+            var result = verifierAddress.hashCode()
+            result = 31 * result + publicKey.contentHashCode()
+            return result
+        }
+    }
 }
 
 // MARK: - Multi-Signer Manager
@@ -386,32 +425,9 @@ class OZMultiSignerManager internal constructor(
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
-        // Validate: wallet signers require an external wallet adapter
         val walletSigners = selectedSigners.filterIsInstance<SelectedSigner.Wallet>()
-        if (walletSigners.isNotEmpty() && kit.externalWallet == null) {
-            throw ValidationException.invalidInput(
-                "selectedSigners",
-                "Wallet signers require an external wallet adapter to be configured"
-            )
-        }
+        validateSelectedSigners(selectedSigners, walletSigners)
 
-        // Validate: each wallet signer must be reachable via the external wallet
-        for (walletSigner in walletSigners) {
-            val canSign = try {
-                kit.externalWallet!!.canSignFor(walletSigner.address)
-            } catch (e: Exception) {
-                false
-            }
-            if (!canSign) {
-                throw ValidationException.invalidInput(
-                    "selectedSigners",
-                    "No signer available for address: ${walletSigner.address}. " +
-                        "Use externalWallet.addFromSecret() or externalWallet.addFromWallet() to add a signer."
-                )
-            }
-        }
-
-        // Step 1: Simulate to get auth entries
         val deployer = kit.getDeployer()
         val deployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
 
@@ -424,51 +440,21 @@ class OZMultiSignerManager internal constructor(
             .build()
 
         val simulation = kit.sorobanServer.simulateTransaction(transaction)
-
         if (simulation.error != null) {
             throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
         }
-
         val authEntries = simulation.results?.firstOrNull()?.parseAuth()
             ?: throw TransactionException.simulationFailed("No auth entries returned from simulation")
 
-        // Step 2: Get current ledger sequence
         val latestLedger = kit.sorobanServer.getLatestLedger()
-
-        // Step 3: Calculate expiration
         val expirationLedger = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
 
-        // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
         val contextRules = kit.contextRuleManager.listContextRules()
+        val smartAccountSigners = mapToSmartAccountSigners(selectedSigners)
 
-        // Build the list of SmartAccountSigner objects from selectedSigners for rule resolution.
-        // Hoisted outside the auth entry loop since selectedSigners is invariant across entries.
-        val smartAccountSigners = selectedSigners.map { selectedSigner ->
-            when (selectedSigner) {
-                is SelectedSigner.Passkey -> {
-                    val keyData = selectedSigner.keyData
-                        ?: throw ValidationException.invalidInput(
-                            "selectedSigners",
-                            "keyData is required for passkey signers for rule resolution"
-                        )
-                    ExternalSigner(
-                        verifierAddress = kit.config.webauthnVerifierAddress,
-                        keyData = keyData
-                    )
-                }
-                is SelectedSigner.Wallet -> {
-                    DelegatedSigner(address = selectedSigner.address)
-                }
-            }
-        }
-
-        // Step 4: Sign auth entries.
-        // Uses the same SmartAccountAuth.signAuthEntry() as the single-signer flow.
-        // signAuthEntry is called once per passkey and the entry accumulates signatures across calls.
         val signedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
         for ((entryIndex, entry) in authEntries.withIndex()) {
-            // Check if this entry's credentials match our contract
             val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
             if (credentials == null) {
                 signedAuthEntries.add(entry)
@@ -477,17 +463,9 @@ class OZMultiSignerManager internal constructor(
 
             val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
             if (entryAddress != contractId) {
-                // The entry address doesn't match the smart account contract.
-                // Check whether it matches any SelectedSigner.Wallet address — if so, sign it
-                // directly using the external wallet adapter.
                 val matchingWalletSigner = walletSigners.firstOrNull { it.address == entryAddress }
                 if (matchingWalletSigner != null) {
-                    val signedWalletEntry = signWalletAddressAuthEntry(
-                        entry = entry,
-                        walletSigner = matchingWalletSigner,
-                        expirationLedger = expirationLedger
-                    )
-                    signedAuthEntries.add(signedWalletEntry)
+                    signedAuthEntries.add(signWalletAddressAuthEntry(entry, matchingWalletSigner, expirationLedger))
                 } else {
                     throw TransactionException.signingFailed(
                         "Unsupported auth entry for $entryAddress. " +
@@ -497,186 +475,48 @@ class OZMultiSignerManager internal constructor(
                 continue
             }
 
-            // Clone the entry and set the expiration ledger before signing
             var signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
 
-            // Use caller-provided callback or resolve automatically.
             val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
                 resolveContextRuleIds(signedEntry, entryIndex)
             } else {
-                kit.contextRuleManager.resolveContextRuleIdsForEntry(
-                    signedEntry, smartAccountSigners, contextRules
-                )
+                kit.contextRuleManager.resolveContextRuleIdsForEntry(signedEntry, smartAccountSigners, contextRules)
             }
 
-            // Compute the payload hash once for this entry (used by both passkey and delegated paths).
             val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
                 entry = signedEntry,
                 expirationLedger = expirationLedger,
                 networkPassphrase = kit.config.networkPassphrase
             )
-
-            // Compute the auth digest binding the rule IDs. This is what all signers actually sign,
-            // preventing rule-selection downgrade attacks.
             val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
 
-            // Step 4a: Sign with each passkey signer using SmartAccountAuth.signAuthEntry().
-            // Each call triggers one WebAuthn prompt and appends to the signature map.
             for ((signerIndex, selectedSigner) in selectedSigners.withIndex()) {
                 when (selectedSigner) {
                     is SelectedSigner.Passkey -> {
-                        val webauthnProvider = kit.config.webauthnProvider
-                            ?: throw ValidationException.invalidInput(
-                                "webauthnProvider",
-                                "WebAuthn provider is required for passkey signers but is not configured"
-                            )
-
-                        // Trigger WebAuthn authentication (one OS prompt per passkey signer).
-                        // Pass credentialIdBytes with transport hints as allowCredentials so the
-                        // browser routes to the correct passkey when multiple exist for this RP.
-                        // null transports is the correct fallback for cross-device credentials
-                        // not yet stored locally.
-                        val allowCredentials = selectedSigner.credentialIdBytes?.let { idBytes ->
-                            listOf(AllowCredential(id = idBytes, transports = selectedSigner.transports))
-                        }
-
-                        val authResult = try {
-                            webauthnProvider.authenticate(authDigest, allowCredentials)
-                        } catch (e: Exception) {
-                            throw WebAuthnException.authenticationFailed(
-                                "WebAuthn authentication failed for passkey signer " +
-                                    "${signerIndex + 1}/${selectedSigners.size}: ${e.message}",
-                                e
-                            )
-                        }
-
-                        // Normalize DER signature to compact format with low-S
-                        val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
-
-                        val webAuthnSig = WebAuthnSignature(
-                            authenticatorData = authResult.authenticatorData,
-                            clientData = authResult.clientDataJSON,
-                            signature = compactSig
-                        )
-
-                        // keyData is guaranteed non-null here — validated during
-                        // smartAccountSigners construction above.
-                        val passkeySigner = ExternalSigner(
-                            verifierAddress = kit.config.webauthnVerifierAddress,
-                            keyData = selectedSigner.keyData!!
-                        )
-
-                        // Attach the signature to the entry.
-                        // This appends to the existing signature map if one exists.
-                        signedEntry = SmartAccountAuth.signAuthEntry(
-                            entry = signedEntry,
-                            signer = passkeySigner,
-                            signature = webAuthnSig,
-                            expirationLedger = expirationLedger,
-                            contextRuleIds = resolvedContextRuleIds
+                        signedEntry = appendPasskeySignature(
+                            signedEntry, selectedSigner, signerIndex, selectedSigners.size,
+                            authDigest, expirationLedger, resolvedContextRuleIds
                         )
                     }
-
-                    is SelectedSigner.Wallet -> {
-                        // Delegated wallet signers are handled after all passkey signatures
+                    is SelectedSigner.Wallet -> { /* handled in delegated loop below */ }
+                    is SelectedSigner.Ed25519 -> {
+                        signedEntry = appendEd25519Signature(
+                            signedEntry, selectedSigner, authDigest, expirationLedger, resolvedContextRuleIds
+                        )
                     }
                 }
             }
 
-            // Step 4b: Add delegated signer auth entries and placeholders.
-            // Each delegated signer gets:
-            // - Its own signed auth entry (built and signed via Auth.authorizeInvocation)
-            // - An empty-bytes placeholder in the smart account's signature map
-            for (selectedSigner in selectedSigners) {
-                if (selectedSigner !is SelectedSigner.Wallet) continue
-
-                // externalWallet is guaranteed non-null — validated at method entry.
-                val externalWallet = kit.externalWallet!!
-
-                // Build the invocation targeting the smart account's __check_auth.
-                // The auth digest (payloadHash bound to contextRuleIds) is passed as argument,
-                // matching what the verifier contract expects.
-                val checkAuthInvocation = SorobanAuthorizedInvocationXdr(
-                    function = SorobanAuthorizedFunctionXdr.ContractFn(
-                        InvokeContractArgsXdr(
-                            contractAddress = Address(contractId).toSCAddress(),
-                            functionName = SCSymbolXdr("__check_auth"),
-                            args = listOf(Scv.toBytes(authDigest))
-                        )
-                    ),
-                    subInvocations = emptyList()
-                )
-
-                // Create an Auth.Signer that delegates signing to the ExternalWalletAdapter.
-                // The adapter receives the base64-encoded HashIDPreimage XDR and returns
-                // the raw Ed25519 signature bytes (base64-encoded).
-                @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-                val authSigner = Auth.Signer { preimage ->
-                    val writer = XdrWriter()
-                    preimage.encode(writer)
-                    val preimageXdr = kotlin.io.encoding.Base64.encode(writer.toByteArray())
-                    val result = try {
-                        externalWallet.signAuthEntry(
-                            preimageXdr,
-                            SignAuthEntryOptions(
-                                networkPassphrase = kit.config.networkPassphrase,
-                                address = selectedSigner.address
-                            )
-                        )
-                    } catch (e: Exception) {
-                        throw TransactionException.signingFailed(
-                            "External wallet signing failed for ${selectedSigner.address}: ${e.message}", e
-                        )
-                    }
-
-                    val signatureBytes = kotlin.io.encoding.Base64.decode(result.signedAuthEntry)
-                    Auth.Signature(
-                        publicKey = result.signerAddress ?: selectedSigner.address,
-                        signature = signatureBytes
-                    )
-                }
-
-                // Build and sign the delegated auth entry using Auth.authorizeInvocation.
-                // This handles nonce generation, preimage construction, signing, and
-                // building the {public_key, signature} format.
-                val signedDelegatedEntry = Auth.authorizeInvocation(
-                    signer = authSigner,
-                    publicKey = selectedSigner.address,
-                    validUntilLedgerSeq = expirationLedger.toLong(),
-                    invocation = checkAuthInvocation,
-                    network = Network(kit.config.networkPassphrase)
-                )
-                signedAuthEntries.add(signedDelegatedEntry)
-
-                // Add empty-bytes placeholder to the smart account's signature map.
-                val delegatedSigner = DelegatedSigner(address = selectedSigner.address)
-                signedEntry = SmartAccountAuth.addRawSignatureMapEntry(
-                    entry = signedEntry,
-                    signerKey = delegatedSigner.toScVal(),
-                    signatureValue = Scv.toBytes(byteArrayOf()),
-                    contextRuleIds = resolvedContextRuleIds
-                )
-            }
-
-            signedAuthEntries.add(signedEntry)
+            val (updatedEntry, delegatedEntries) = appendDelegatedSignerEntries(
+                signedEntry, contractId, selectedSigners, expirationLedger, authDigest, resolvedContextRuleIds
+            )
+            signedAuthEntries.addAll(delegatedEntries)
+            signedAuthEntries.add(updatedEntry)
         }
 
-        // Update lastUsedAt for each passkey signer that participated (once per transaction)
-        for (signer in selectedSigners) {
-            if (signer is SelectedSigner.Passkey) {
-                val credId = signer.credentialId ?: continue
-                try {
-                    kit.credentialManager.updateLastUsed(credId)
-                } catch (_: Exception) {
-                    // Non-critical — credential tracking is best-effort
-                }
-            }
-        }
+        updatePasskeyLastUsed(selectedSigners)
 
-        // Step 5: Re-simulate with signed auth entries.
-        // Use a fresh deployer account to avoid sequence number double-increment.
         val refetchedDeployerAccount = kit.sorobanServer.getAccount(deployer.getAccountId())
-
         val signedOperation = InvokeHostFunctionOperation(hostFunction, signedAuthEntries)
         val signedTransaction = TransactionBuilder(
             refetchedDeployerAccount,
@@ -689,15 +529,10 @@ class OZMultiSignerManager internal constructor(
             .build()
 
         val resignedSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
-
         if (resignedSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${resignedSimulation.error}")
         }
 
-        // Step 6: Assemble and submit via the same Mode 1 / Mode 2 routing as single-signer.
-        // Mode 1 (default): relayer receives hostFunction + authEntries and builds the envelope.
-        // Mode 2 (fallback): used only when source_account auth entries are present.
-        // prepareTransaction applies resource fees, footprint, and soroban data from simulation.
         return kit.transactionOperations.submitMultiSignerTransaction(
             hostFunction = hostFunction,
             signedAuthEntries = signedAuthEntries,
@@ -728,6 +563,298 @@ class OZMultiSignerManager internal constructor(
                 "selectedSigners",
                 "At least one signer must be provided"
             )
+        }
+    }
+
+    /**
+     * Validates all selected signers: wallet adapter presence, per-wallet reachability, and Ed25519
+     * key size, verifier address format, manager presence, and signing source registration.
+     */
+    private fun validateSelectedSigners(
+        selectedSigners: List<SelectedSigner>,
+        walletSigners: List<SelectedSigner.Wallet>
+    ) {
+        if (walletSigners.isNotEmpty() && kit.externalWallet == null) {
+            throw ValidationException.invalidInput(
+                "selectedSigners",
+                "Wallet signers require an external wallet adapter to be configured"
+            )
+        }
+
+        for (walletSigner in walletSigners) {
+            val canSign = try {
+                kit.externalWallet!!.canSignFor(walletSigner.address)
+            } catch (e: Exception) {
+                false
+            }
+            if (!canSign) {
+                throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "No signer available for address: ${walletSigner.address}. " +
+                        "Use externalWallet.addFromSecret() or externalWallet.addFromWallet() to add a signer."
+                )
+            }
+        }
+
+        for (ed25519Signer in selectedSigners.filterIsInstance<SelectedSigner.Ed25519>()) {
+            if (ed25519Signer.publicKey.size != SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
+                throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "Ed25519 signer publicKey must be exactly ${SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE} bytes, " +
+                        "got ${ed25519Signer.publicKey.size}"
+                )
+            }
+            if (!StrKey.isValidContract(ed25519Signer.verifierAddress)) {
+                throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "Ed25519 signer verifierAddress must be a valid contract address (C...), " +
+                        "got: ${ed25519Signer.verifierAddress}"
+                )
+            }
+            val externalSignerManager = kit.config.externalSignerManager
+                ?: throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "Ed25519 signers require an OZExternalSignerManager to be configured in OZSmartAccountConfig"
+                )
+            if (!externalSignerManager.canSignEd25519For(ed25519Signer.verifierAddress, ed25519Signer.publicKey)) {
+                throw ValidationException.invalidInput(
+                    "selectedSigners",
+                    "No signing source available for Ed25519 signer (verifier=${ed25519Signer.verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)}...). " +
+                        "Register via OZExternalSignerManager.addEd25519FromRawKey(...) or set ed25519Adapter before signing."
+                )
+            }
+        }
+    }
+
+    /**
+     * Converts a list of [SelectedSigner] values to the corresponding [SmartAccountSigner] objects
+     * used for context rule resolution.
+     */
+    private fun mapToSmartAccountSigners(selectedSigners: List<SelectedSigner>): List<SmartAccountSigner> {
+        return selectedSigners.map { selectedSigner ->
+            when (selectedSigner) {
+                is SelectedSigner.Passkey -> {
+                    val keyData = selectedSigner.keyData
+                        ?: throw ValidationException.invalidInput(
+                            "selectedSigners",
+                            "keyData is required for passkey signers for rule resolution"
+                        )
+                    ExternalSigner(
+                        verifierAddress = kit.config.webauthnVerifierAddress,
+                        keyData = keyData
+                    )
+                }
+                is SelectedSigner.Wallet -> DelegatedSigner(address = selectedSigner.address)
+                is SelectedSigner.Ed25519 -> ExternalSigner.ed25519(
+                    verifierAddress = selectedSigner.verifierAddress,
+                    publicKey = selectedSigner.publicKey
+                )
+            }
+        }
+    }
+
+    /**
+     * Appends a passkey (WebAuthn) signature to the auth entry and returns the updated entry.
+     */
+    private suspend fun appendPasskeySignature(
+        entry: SorobanAuthorizationEntryXdr,
+        signer: SelectedSigner.Passkey,
+        signerIndex: Int,
+        totalSigners: Int,
+        authDigest: ByteArray,
+        expirationLedger: UInt,
+        contextRuleIds: List<UInt>
+    ): SorobanAuthorizationEntryXdr {
+        val webauthnProvider = kit.config.webauthnProvider
+            ?: throw ValidationException.invalidInput(
+                "webauthnProvider",
+                "WebAuthn provider is required for passkey signers but is not configured"
+            )
+
+        val allowCredentials = signer.credentialIdBytes?.let { idBytes ->
+            listOf(AllowCredential(id = idBytes, transports = signer.transports))
+        }
+
+        val authResult = try {
+            webauthnProvider.authenticate(authDigest, allowCredentials)
+        } catch (e: Exception) {
+            throw WebAuthnException.authenticationFailed(
+                "WebAuthn authentication failed for passkey signer " +
+                    "${signerIndex + 1}/$totalSigners: ${e.message}",
+                e
+            )
+        }
+
+        val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
+        val webAuthnSig = WebAuthnSignature(
+            authenticatorData = authResult.authenticatorData,
+            clientData = authResult.clientDataJSON,
+            signature = compactSig
+        )
+
+        // keyData is guaranteed non-null — validated during mapToSmartAccountSigners.
+        val passkeySigner = ExternalSigner(
+            verifierAddress = kit.config.webauthnVerifierAddress,
+            keyData = signer.keyData!!
+        )
+
+        return SmartAccountAuth.signAuthEntry(
+            entry = entry,
+            signer = passkeySigner,
+            signature = webAuthnSig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+    }
+
+    /**
+     * Appends an Ed25519 signature to the auth entry after local verification and returns the
+     * updated entry.
+     */
+    private suspend fun appendEd25519Signature(
+        entry: SorobanAuthorizationEntryXdr,
+        signer: SelectedSigner.Ed25519,
+        authDigest: ByteArray,
+        expirationLedger: UInt,
+        contextRuleIds: List<UInt>
+    ): SorobanAuthorizationEntryXdr {
+        // externalSignerManager is guaranteed non-null — validated in validateSelectedSigners.
+        val externalSignerManager = kit.config.externalSignerManager!!
+
+        val rawSignature = externalSignerManager.signEd25519AuthDigest(
+            verifierAddress = signer.verifierAddress,
+            publicKey = signer.publicKey,
+            authDigest = authDigest
+        )
+
+        val isValid = try {
+            KeyPair.fromPublicKey(signer.publicKey).verify(authDigest, rawSignature)
+        } catch (e: Exception) {
+            throw TransactionException.signingFailed(
+                "Ed25519 local signature verification failed for verifier " +
+                    "${signer.verifierAddress}: ${e.message}",
+                e
+            )
+        }
+
+        if (!isValid) {
+            throw TransactionException.signingFailed(
+                "Ed25519 signature produced by signing source does not verify for " +
+                    "verifier ${signer.verifierAddress} — signing source returned an invalid signature"
+            )
+        }
+
+        val ed25519Sig = Ed25519Signature(publicKey = signer.publicKey, signature = rawSignature)
+        val ed25519ExternalSigner = ExternalSigner.ed25519(
+            verifierAddress = signer.verifierAddress,
+            publicKey = signer.publicKey
+        )
+
+        return SmartAccountAuth.signAuthEntry(
+            entry = entry,
+            signer = ed25519ExternalSigner,
+            signature = ed25519Sig,
+            expirationLedger = expirationLedger,
+            contextRuleIds = contextRuleIds
+        )
+    }
+
+    /**
+     * Processes each [SelectedSigner.Wallet] in [selectedSigners]: builds a signed delegated auth
+     * entry via [Auth.authorizeInvocation] and adds an empty-bytes placeholder to the smart
+     * account's signature map on [entry].
+     *
+     * Returns the updated entry (with all wallet placeholders applied) and the list of signed
+     * delegated auth entries that must be appended before the smart account entry.
+     */
+    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    private suspend fun appendDelegatedSignerEntries(
+        entry: SorobanAuthorizationEntryXdr,
+        contractId: String,
+        selectedSigners: List<SelectedSigner>,
+        expirationLedger: UInt,
+        authDigest: ByteArray,
+        contextRuleIds: List<UInt>
+    ): Pair<SorobanAuthorizationEntryXdr, List<SorobanAuthorizationEntryXdr>> {
+        var signedEntry = entry
+        val delegatedEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
+
+        for (selectedSigner in selectedSigners) {
+            if (selectedSigner !is SelectedSigner.Wallet) continue
+
+            // externalWallet is guaranteed non-null — validated in validateSelectedSigners.
+            val externalWallet = kit.externalWallet!!
+
+            val checkAuthInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.ContractFn(
+                    InvokeContractArgsXdr(
+                        contractAddress = Address(contractId).toSCAddress(),
+                        functionName = SCSymbolXdr("__check_auth"),
+                        args = listOf(Scv.toBytes(authDigest))
+                    )
+                ),
+                subInvocations = emptyList()
+            )
+
+            val authSigner = Auth.Signer { preimage ->
+                val writer = XdrWriter()
+                preimage.encode(writer)
+                val preimageXdr = kotlin.io.encoding.Base64.encode(writer.toByteArray())
+                val result = try {
+                    externalWallet.signAuthEntry(
+                        preimageXdr,
+                        SignAuthEntryOptions(
+                            networkPassphrase = kit.config.networkPassphrase,
+                            address = selectedSigner.address
+                        )
+                    )
+                } catch (e: Exception) {
+                    throw TransactionException.signingFailed(
+                        "External wallet signing failed for ${selectedSigner.address}: ${e.message}", e
+                    )
+                }
+                val signatureBytes = kotlin.io.encoding.Base64.decode(result.signedAuthEntry)
+                Auth.Signature(
+                    publicKey = result.signerAddress ?: selectedSigner.address,
+                    signature = signatureBytes
+                )
+            }
+
+            val signedDelegatedEntry = Auth.authorizeInvocation(
+                signer = authSigner,
+                publicKey = selectedSigner.address,
+                validUntilLedgerSeq = expirationLedger.toLong(),
+                invocation = checkAuthInvocation,
+                network = Network(kit.config.networkPassphrase)
+            )
+            delegatedEntries.add(signedDelegatedEntry)
+
+            val delegatedSigner = DelegatedSigner(address = selectedSigner.address)
+            signedEntry = SmartAccountAuth.addRawSignatureMapEntry(
+                entry = signedEntry,
+                signerKey = delegatedSigner.toScVal(),
+                signatureValue = Scv.toBytes(byteArrayOf()),
+                contextRuleIds = contextRuleIds
+            )
+        }
+
+        return Pair(signedEntry, delegatedEntries)
+    }
+
+    /**
+     * Updates the last-used timestamp for each passkey signer that participated in the transaction.
+     * Best-effort: failures are silently ignored.
+     */
+    private suspend fun updatePasskeyLastUsed(selectedSigners: List<SelectedSigner>) {
+        for (signer in selectedSigners) {
+            if (signer is SelectedSigner.Passkey) {
+                val credId = signer.credentialId ?: continue
+                try {
+                    kit.credentialManager.updateLastUsed(credId)
+                } catch (_: Exception) {
+                    // Non-critical — credential tracking is best-effort
+                }
+            }
         }
     }
 

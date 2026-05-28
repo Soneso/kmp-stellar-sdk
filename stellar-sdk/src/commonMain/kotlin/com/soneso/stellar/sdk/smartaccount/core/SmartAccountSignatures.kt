@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.core
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.XdrWriter
 
 /**
  * Base sealed class for smart account signature types.
@@ -20,7 +21,8 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  * - [PolicySignature]: Policy-based authorization (empty map)
  *
  * Each signature type can be converted to a Soroban SCVal representation that
- * the smart account contract can verify.
+ * the smart account contract can verify, and to a [ByteArray] that is embedded
+ * directly in the on-wire auth-payload signers map via [toAuthPayloadBytes].
  *
  * Example usage:
  * ```kotlin
@@ -30,19 +32,64 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  *     signature = signatureBytes
  * )
  * val scVal = signature.toScVal()
+ * val payloadBytes = signature.toAuthPayloadBytes()
  * ```
  */
 sealed class SmartAccountSignature {
     /**
      * Converts this signature to its ScVal representation.
      *
-     * The keys in the resulting map MUST be alphabetically sorted for
-     * contract compatibility.
+     * The exact shape is variant-dependent: [WebAuthnSignature] and [PolicySignature]
+     * return an SCValXdr.Map; [Ed25519Signature] returns SCValXdr.Bytes holding the raw
+     * 64-byte signature.
      *
-     * @return The signature encoded as an SCValXdr.Map
+     * @return The signature encoded as an [SCValXdr].
      */
     abstract fun toScVal(): SCValXdr
 
+    /**
+     * Returns the raw bytes to embed in the on-wire signers map of the auth payload.
+     *
+     * The content is verifier-dependent:
+     *
+     * | Signature type       | Content                                       |
+     * |----------------------|-----------------------------------------------|
+     * | [WebAuthnSignature]  | XDR-encoded SCValXdr (Map with 3 fields)      |
+     * | [Ed25519Signature]   | Raw 64-byte signature (no XDR wrapper)        |
+     * | [PolicySignature]    | XDR-encoded SCValXdr (empty Map)              |
+     *
+     * For [Ed25519Signature] the Ed25519 verifier contract expects `BytesN<64>` —
+     * exactly 64 raw bytes. XDR-wrapping inflates the payload beyond 64 bytes and
+     * causes the verifier to reject it.
+     *
+     * @return The bytes for the auth-payload signers map value.
+     * @throws TransactionException.SigningFailed when XDR encoding fails
+     *   (WebAuthn and Policy variants only; Ed25519 never throws).
+     */
+    abstract fun toAuthPayloadBytes(): ByteArray
+
+    companion object {
+        /**
+         * XDR-encodes [scVal] and returns the resulting bytes.
+         *
+         * Used by [WebAuthnSignature] and [PolicySignature]; not used by
+         * [Ed25519Signature] (which returns raw bytes without XDR wrapping).
+         *
+         * @throws TransactionException.SigningFailed when XDR encoding fails.
+         */
+        internal fun encodeScValToBytes(scVal: SCValXdr, contextLabel: String): ByteArray {
+            return try {
+                val writer = XdrWriter()
+                scVal.encode(writer)
+                writer.toByteArray()
+            } catch (e: Exception) {
+                throw TransactionException.signingFailed(
+                    "Failed to XDR encode $contextLabel signature ScVal",
+                    e
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -51,13 +98,6 @@ sealed class SmartAccountSignature {
  * WebAuthn signatures contain the complete attestation data required to verify
  * biometric or security key authentication. The signature must be in compact format
  * (64 bytes) with normalized S value to prevent signature malleability.
- *
- * Field ordering in the SCVal map is CRITICAL and must be alphabetical:
- * 1. authenticator_data
- * 2. client_data
- * 3. signature
- *
- * Note: The field name is "client_data", NOT "client_data_json".
  *
  * Example:
  * ```kotlin
@@ -86,10 +126,10 @@ data class WebAuthnSignature(
 ) : SmartAccountSignature() {
 
     init {
-        if (signature.size != 64) {
+        if (signature.size != SmartAccountConstants.ED25519_SIGNATURE_SIZE) {
             throw ValidationException.invalidInput(
                 "signature",
-                "WebAuthn signature must be exactly 64 bytes, got ${signature.size}"
+                "WebAuthn signature must be exactly ${SmartAccountConstants.ED25519_SIGNATURE_SIZE} bytes, got ${signature.size}"
             )
         }
     }
@@ -117,9 +157,10 @@ data class WebAuthnSignature(
         ))
     }
 
-    /**
-     * Constant-time equals to prevent timing side-channel attacks on signature data.
-     */
+    /** XDR-encoded ScVal Map with `authenticator_data`, `client_data`, `signature` byte fields. */
+    override fun toAuthPayloadBytes(): ByteArray =
+        encodeScValToBytes(toScVal(), "WebAuthn")
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -132,14 +173,6 @@ data class WebAuthnSignature(
         return a and b and c
     }
 
-    /**
-     * Custom hashCode implementation that properly handles ByteArray fields.
-     *
-     * Standard data class hashCode would not correctly hash ByteArray fields
-     * by content, so this override ensures proper content-based hashing.
-     *
-     * @return Hash code for this WebAuthn signature
-     */
     override fun hashCode(): Int {
         var result = authenticatorData.contentHashCode()
         result = 31 * result + clientData.contentHashCode()
@@ -151,12 +184,16 @@ data class WebAuthnSignature(
 /**
  * Ed25519 signature from a traditional keypair.
  *
- * Ed25519 signatures are 64 bytes and provide strong security guarantees with
- * deterministic signing and built-in resistance to side-channel attacks.
+ * Ed25519 signatures are 64 bytes and provide deterministic signing with strong
+ * side-channel resistance.
  *
- * Field ordering in the SCVal map is CRITICAL and must be alphabetical:
- * 1. public_key
- * 2. signature
+ * [toScVal] returns the raw 64-byte signature as `SCValXdr.Bytes`. The Ed25519
+ * verifier contract expects `BytesN<64>` directly as `sig_data`. The corresponding
+ * public key is supplied separately from the smart account's on-chain
+ * `External(verifier, key_data)` storage and is NOT transmitted in the auth payload.
+ *
+ * The [publicKey] field is retained on the data class for local Ed25519 signature
+ * verification before submission and for content-based equality.
  *
  * Example:
  * ```kotlin
@@ -164,12 +201,12 @@ data class WebAuthnSignature(
  *     publicKey = byteArrayOf(...),   // 32-byte Ed25519 public key
  *     signature = byteArrayOf(...)    // 64-byte Ed25519 signature
  * )
- * val scVal = ed25519Sig.toScVal()
+ * val scVal = ed25519Sig.toScVal()    // SCValXdr.Bytes holding the raw 64 bytes
  * ```
  *
- * @property publicKey Ed25519 public key (32 bytes).
+ * @property publicKey Ed25519 public key (32 bytes). Used for local signature
+ *   verification before submission; not transmitted on-chain.
  * @property signature Ed25519 signature (64 bytes).
- *   Generated by signing a message hash with an Ed25519 private key.
  */
 data class Ed25519Signature(
     val publicKey: ByteArray,
@@ -183,38 +220,30 @@ data class Ed25519Signature(
                 "Ed25519 public key must be exactly ${SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE} bytes, got ${publicKey.size}"
             )
         }
-        if (signature.size != 64) {
+        if (signature.size != SmartAccountConstants.ED25519_SIGNATURE_SIZE) {
             throw ValidationException.invalidInput(
                 "signature",
-                "Ed25519 signature must be exactly 64 bytes, got ${signature.size}"
+                "Ed25519 signature must be exactly ${SmartAccountConstants.ED25519_SIGNATURE_SIZE} bytes, got ${signature.size}"
             )
         }
     }
 
     /**
-     * Converts the Ed25519 signature to a Soroban SCVal map.
+     * Returns the raw 64-byte Ed25519 signature as `SCValXdr.Bytes`.
      *
-     * The resulting map has keys in alphabetical order:
-     * ```
-     * ScVal::Map([
-     *   { Symbol("public_key"), Bytes(publicKey) },
-     *   { Symbol("signature"), Bytes(signature) },
-     * ])
-     * ```
+     * The Ed25519 verifier contract expects `BytesN<64>` directly as `sig_data`.
+     * The public key is supplied separately from the smart account's on-chain
+     * `External(verifier, key_data)` storage and is NOT transmitted here.
      *
-     * @return SCValXdr.Map with public key and signature bytes
+     * @return SCValXdr.Bytes holding the raw 64-byte signature.
      */
     override fun toScVal(): SCValXdr {
-        // Keys must be in alphabetical order for contract compatibility
-        return Scv.toMap(linkedMapOf(
-            Scv.toSymbol("public_key") to Scv.toBytes(publicKey),
-            Scv.toSymbol("signature") to Scv.toBytes(signature)
-        ))
+        return Scv.toBytes(signature)
     }
 
-    /**
-     * Constant-time equals to prevent timing side-channel attacks on signature data.
-     */
+    /** Raw 64-byte Ed25519 signature; the public key is supplied by the on-chain `External(verifier, key_data)` signer slot. */
+    override fun toAuthPayloadBytes(): ByteArray = signature.copyOf()
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -226,14 +255,6 @@ data class Ed25519Signature(
         return a and b
     }
 
-    /**
-     * Custom hashCode implementation that properly handles ByteArray fields.
-     *
-     * Standard data class hashCode would not correctly hash ByteArray fields
-     * by content, so this override ensures proper content-based hashing.
-     *
-     * @return Hash code for this Ed25519 signature
-     */
     override fun hashCode(): Int {
         var result = publicKey.contentHashCode()
         result = 31 * result + signature.contentHashCode()
@@ -273,4 +294,8 @@ object PolicySignature : SmartAccountSignature() {
     override fun toScVal(): SCValXdr {
         return Scv.toMap(linkedMapOf())
     }
+
+    /** XDR-encoded empty ScVal Map signaling policy-based authorization. */
+    override fun toAuthPayloadBytes(): ByteArray =
+        encodeScValToBytes(toScVal(), "Policy")
 }

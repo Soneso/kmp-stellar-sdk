@@ -524,27 +524,18 @@ class SmartAccountTest {
     }
 
     @Test
-    fun testEd25519Signature_toScVal_alphabeticalOrder() {
+    fun testEd25519Signature_toScVal_returnsBytesWithRawSignature() {
         val publicKey = ByteArray(32) { 0x44 }
         val signature = ByteArray(64) { 0x55 }
 
         val sig = Ed25519Signature(publicKey, signature)
         val scVal = sig.toScVal()
 
-        // Verify it's a map
-        assertTrue(scVal is com.soneso.stellar.sdk.xdr.SCValXdr.Map)
-        val map = (scVal as com.soneso.stellar.sdk.xdr.SCValXdr.Map).value
-        assertEquals(2, map?.value?.size)
-
-        // Verify keys are in alphabetical order
-        val key1 = (map?.value?.get(0)?.key as com.soneso.stellar.sdk.xdr.SCValXdr.Sym).value?.value
-        val key2 = (map?.value?.get(1)?.key as com.soneso.stellar.sdk.xdr.SCValXdr.Sym).value?.value
-
-        assertEquals("public_key", key1)
-        assertEquals("signature", key2)
-
-        // Verify alphabetical order
-        assertTrue(key1!! < key2!!)
+        // toScVal() must return SCValXdr.Bytes holding the raw 64-byte signature
+        assertTrue(scVal is com.soneso.stellar.sdk.xdr.SCValXdr.Bytes)
+        val rawBytes = (scVal as com.soneso.stellar.sdk.xdr.SCValXdr.Bytes).value.value
+        assertEquals(64, rawBytes.size)
+        assertTrue(signature.contentEquals(rawBytes))
     }
 
     @Test

@@ -56,10 +56,16 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.flows.Ed25519SignerIdentity
+import com.soneso.smartdemo.flows.VerificationResult
+import com.soneso.smartdemo.flows.verifyDelegatedSecret
+import com.soneso.smartdemo.flows.verifyEd25519Seed
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.formatSignerForDisplay
+import com.soneso.smartdemo.util.toHexString
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.smartdemo.wallet.WalletConnector
 import com.soneso.smartdemo.wallet.WalletConnection
@@ -92,7 +98,9 @@ private sealed class DelegatedSignerAuth {
  * Displays categorized lists of available signers (passkey, delegated, Ed25519)
  * and allows the user to select which ones to use for authorization. For delegated
  * signers, the user can enter a Stellar secret key or connect an external wallet
- * (where available) to enable signing.
+ * (where available) to enable signing. For Ed25519 signers, the user enters the
+ * 64-character hex representation of the 32-byte secret seed, which is verified
+ * by deriving the keypair and checking that the public key matches.
  *
  * @param isOpen Whether the dialog is visible
  * @param onDismiss Called when the dialog is dismissed without confirming
@@ -100,9 +108,10 @@ private sealed class DelegatedSignerAuth {
  * @param activeCredentialId The Base64URL credential ID of the currently connected passkey, or null
  * @param title Dialog title text
  * @param description Explanatory text shown below the title
- * @param onConfirm Called with the list of selected signers when the user confirms.
- *        The second parameter is a map of delegated signer addresses to their KeyPairs
- *        for signers where a secret key was entered.
+ * @param onConfirm Called with the selected signers when the user confirms. The second parameter
+ *        is a map of delegated signer addresses to their KeyPairs for signers where a secret
+ *        key was entered. The third parameter is a map of Ed25519 signer identities to their
+ *        raw 32-byte seeds, collected from the local verification cache.
  */
 @Composable
 fun SignerPickerDialog(
@@ -112,7 +121,11 @@ fun SignerPickerDialog(
     activeCredentialId: String?,
     title: String = "Select Signers",
     description: String = "Choose which signers to use for this transaction.",
-    onConfirm: (selectedSigners: List<SmartAccountSigner>, delegatedKeyPairs: Map<String, KeyPair>) -> Unit
+    onConfirm: (
+        selectedSigners: List<SmartAccountSigner>,
+        delegatedKeyPairs: Map<String, KeyPair>,
+        ed25519Secrets: Map<Ed25519SignerIdentity, ByteArray>
+    ) -> Unit
 ) {
     if (!isOpen) return
 
@@ -125,12 +138,24 @@ fun SignerPickerDialog(
     // Delegated signer auth state — covers both secret-key and wallet-connected signers
     val delegatedSignerAuth = remember { mutableStateMapOf<String, DelegatedSignerAuth>() }
 
-    // Secret key input state
+    // Ed25519 signer local cache — verified seeds stored here until Confirm is called.
+    // Seeds are NEVER registered with any adapter here; that happens in the flow's
+    // submission path after onConfirm is called.
+    val ed25519VerifiedSeeds = remember { mutableStateMapOf<Ed25519SignerIdentity, ByteArray>() }
+
+    // Secret key input state (shared between delegated and Ed25519 signer rows)
     var secretKeyInputAddress by remember { mutableStateOf<String?>(null) }
     var secretKeyValue by remember { mutableStateOf("") }
     var secretKeyError by remember { mutableStateOf<String?>(null) }
     var isValidatingKey by remember { mutableStateOf(false) }
     var secretKeyVisible by remember { mutableStateOf(false) }
+
+    // Ed25519 hex-secret input state — tracks which verifier address is currently open
+    var ed25519InputVerifierAddress by remember { mutableStateOf<String?>(null) }
+    var ed25519HexValue by remember { mutableStateOf("") }
+    var ed25519HexError by remember { mutableStateOf<String?>(null) }
+    var isValidatingEd25519 by remember { mutableStateOf(false) }
+    var ed25519SecretVisible by remember { mutableStateOf(false) }
 
     // Wallet connection state — address of the signer currently being connected (loading state)
     var walletConnectingAddress by remember { mutableStateOf<String?>(null) }
@@ -159,7 +184,8 @@ fun SignerPickerDialog(
     val ed25519Signers = remember(availableSigners) {
         availableSigners.filter { signer ->
             signer is ExternalSigner &&
-                SmartAccountBuilders.getCredentialIdFromSigner(signer) == null
+                SmartAccountBuilders.getCredentialIdFromSigner(signer) == null &&
+                (signer as ExternalSigner).keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE
         }
     }
 
@@ -189,14 +215,20 @@ fun SignerPickerDialog(
     // Clean up state when the dialog closes. DisposableEffect fires onDispose when
     // isOpen changes in either direction. When opening (false->true), delegatedSignerAuth
     // is empty so the disconnect is a no-op. When closing (true->false), any active
-    // wallet session is disconnected. Backgrounding does not trigger disposal.
+    // wallet session is disconnected, and all local caches are cleared.
     DisposableEffect(isOpen) {
         onDispose {
             secretKeyValue = ""
             secretKeyError = null
             secretKeyInputAddress = null
             secretKeyVisible = false
+            ed25519HexValue = ""
+            ed25519HexError = null
+            ed25519InputVerifierAddress = null
+            ed25519SecretVisible = false
             walletErrors.clear()
+            // Drop Ed25519 seeds from the local cache — nothing was registered anywhere.
+            ed25519VerifiedSeeds.clear()
 
             val addressToDisconnect = delegatedSignerAuth.entries
                 .firstOrNull { it.value is DelegatedSignerAuth.Wallet }
@@ -406,29 +438,22 @@ fun SignerPickerDialog(
                                             isValidatingKey = true
                                             secretKeyError = null
                                             try {
-                                                val trimmed = secretKeyValue.trim()
-                                                if (!trimmed.startsWith("S") || trimmed.length != 56) {
-                                                    secretKeyError = "Invalid secret key. Must start with S and be 56 characters."
-                                                    return@launch
+                                                when (val result = verifyDelegatedSecret(
+                                                    secret = secretKeyValue,
+                                                    expectedAccountId = signer.address
+                                                )) {
+                                                    is VerificationResult.Failure -> {
+                                                        secretKeyError = result.errorMessage
+                                                    }
+                                                    is VerificationResult.Success -> {
+                                                        delegatedSignerAuth[signer.address] =
+                                                            DelegatedSignerAuth.SecretKey(result.keypair)
+                                                        selectedSignerKeys[signer.uniqueKey] = true
+                                                        secretKeyInputAddress = null
+                                                        secretKeyValue = ""
+                                                        secretKeyVisible = false
+                                                    }
                                                 }
-
-                                                val keyPair = KeyPair.fromSecretSeed(trimmed)
-                                                val derivedAddress = keyPair.getAccountId()
-
-                                                if (derivedAddress != signer.address) {
-                                                    secretKeyError = "Secret key does not match this address."
-                                                    return@launch
-                                                }
-
-                                                // Store the auth and auto-select the signer
-                                                delegatedSignerAuth[signer.address] =
-                                                    DelegatedSignerAuth.SecretKey(keyPair)
-                                                selectedSignerKeys[signer.uniqueKey] = true
-                                                secretKeyInputAddress = null
-                                                secretKeyValue = ""
-                                                secretKeyVisible = false
-                                            } catch (e: Throwable) {
-                                                secretKeyError = "Invalid secret key: ${e.message}"
                                             } finally {
                                                 isValidatingKey = false
                                             }
@@ -445,18 +470,83 @@ fun SignerPickerDialog(
                         SignerSectionHeader(label = "Ed25519 Signers")
                         ed25519Signers.forEach { signer ->
                             val external = signer as ExternalSigner
+                            val identity = Ed25519SignerIdentity(
+                                verifierAddress = external.verifierAddress,
+                                publicKey = external.keyData
+                            )
+                            val isVerified = ed25519VerifiedSeeds.containsKey(identity)
                             val isSelected = selectedSignerKeys[signer.uniqueKey] == true
+                            val isEnteringHex = ed25519InputVerifierAddress == external.verifierAddress
                             val displayInfo = formatSignerForDisplay(signer)
 
                             Ed25519SignerRow(
                                 verifierAddress = external.verifierAddress,
                                 displayInfo = displayInfo.display,
+                                isVerified = isVerified,
                                 isSelected = isSelected,
                                 onToggle = {
-                                    selectedSignerKeys[signer.uniqueKey] =
-                                        !(selectedSignerKeys[signer.uniqueKey] ?: false)
+                                    if (isVerified) {
+                                        selectedSignerKeys[signer.uniqueKey] =
+                                            !(selectedSignerKeys[signer.uniqueKey] ?: false)
+                                    }
+                                },
+                                isEnteringHex = isEnteringHex,
+                                onEnterKeyClick = {
+                                    ed25519InputVerifierAddress = external.verifierAddress
+                                    ed25519HexValue = ""
+                                    ed25519HexError = null
+                                    ed25519SecretVisible = false
                                 }
                             )
+
+                            // Hex-secret input form — shared SecretKeyInputForm parameterised for Ed25519
+                            if (isEnteringHex) {
+                                Ed25519HexInputForm(
+                                    publicKey = external.keyData,
+                                    hexValue = ed25519HexValue,
+                                    onHexChange = { value ->
+                                        ed25519HexValue = value
+                                        ed25519HexError = null
+                                    },
+                                    hexError = ed25519HexError,
+                                    isValidating = isValidatingEd25519,
+                                    secretVisible = ed25519SecretVisible,
+                                    onToggleVisibility = { ed25519SecretVisible = !ed25519SecretVisible },
+                                    onCancel = {
+                                        ed25519InputVerifierAddress = null
+                                        ed25519HexValue = ""
+                                        ed25519HexError = null
+                                        ed25519SecretVisible = false
+                                    },
+                                    onSubmit = {
+                                        scope.launch {
+                                            isValidatingEd25519 = true
+                                            ed25519HexError = null
+                                            try {
+                                                when (val result = verifyEd25519Seed(
+                                                    hex = ed25519HexValue,
+                                                    expectedPublicKey = external.keyData
+                                                )) {
+                                                    is VerificationResult.Failure -> {
+                                                        ed25519HexError = result.errorMessage
+                                                    }
+                                                    is VerificationResult.Success -> {
+                                                        val seedBytes = result.seedBytes
+                                                            ?: return@launch
+                                                        ed25519VerifiedSeeds[identity] = seedBytes
+                                                        selectedSignerKeys[signer.uniqueKey] = true
+                                                        ed25519InputVerifierAddress = null
+                                                        ed25519HexValue = ""
+                                                        ed25519SecretVisible = false
+                                                    }
+                                                }
+                                            } finally {
+                                                isValidatingEd25519 = false
+                                            }
+                                        }
+                                    }
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -487,7 +577,10 @@ fun SignerPickerDialog(
                         val keyPairs = delegatedSignerAuth
                             .filterValues { it is DelegatedSignerAuth.SecretKey }
                             .mapValues { (_, auth) -> (auth as DelegatedSignerAuth.SecretKey).keyPair }
-                        onConfirm(selected, keyPairs)
+                        // Pass the Ed25519 verified seeds snapshot. The picker does NOT register
+                        // these with any adapter — that is the flow's responsibility after onConfirm.
+                        val ed25519Snapshot = ed25519VerifiedSeeds.toMap()
+                        onConfirm(selected, keyPairs, ed25519Snapshot)
                     }
                 )
             }
@@ -650,6 +743,96 @@ private fun PasskeySignerRow(
 }
 
 /**
+ * Shared card frame for a signer row.
+ *
+ * Renders the toggle/checkbox/identifier/status/badge layout and delegates the
+ * action-button area (below the main row) to [actionContent]. Both delegated and
+ * Ed25519 signer rows are thin wrappers that supply their type-specific inputs here.
+ *
+ * @param isEnabled Whether the checkbox and card tap are enabled.
+ * @param isSelected Whether the checkbox is checked.
+ * @param isEnteringKey Whether the row is currently in key-entry mode (affects bottom padding).
+ * @param onToggle Called when the user taps the row or the checkbox.
+ * @param primaryText Main identifier text shown in monospace (e.g. truncated address or display info).
+ * @param secondaryText Optional secondary label below [primaryText].
+ * @param statusText Status line shown below the secondary text; null hides it.
+ * @param statusColor Color for [statusText].
+ * @param badgeContent Optional composable for the badge shown on the trailing edge.
+ * @param actionContent Optional composable for action buttons shown below the main row.
+ */
+@Composable
+private fun SignerRow(
+    isEnabled: Boolean,
+    isSelected: Boolean,
+    isEnteringKey: Boolean,
+    onToggle: () -> Unit,
+    primaryText: String,
+    secondaryText: String? = null,
+    statusText: String,
+    statusColor: androidx.compose.ui.graphics.Color,
+    badgeContent: (@Composable () -> Unit)? = null,
+    actionContent: (@Composable () -> Unit)? = null,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = if (isEnteringKey) 0.dp else 8.dp)
+            .clickable(enabled = isEnabled, onClick = onToggle),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected && isEnabled) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggle() },
+                    enabled = isEnabled
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = primaryText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (secondaryText != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = secondaryText,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = statusColor
+                    )
+                }
+                badgeContent?.invoke()
+            }
+            actionContent?.invoke()
+        }
+    }
+}
+
+/**
  * Row for a delegated (Stellar account) signer.
  *
  * Supports two authorization modes: entering a secret key directly, or connecting
@@ -673,93 +856,49 @@ private fun DelegatedSignerRow(
     onDisconnectWalletClick: () -> Unit
 ) {
     val isAuthorized = hasKeyPair || isWalletConnected
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = if (isEnteringKey) 0.dp else 8.dp)
-            .clickable(enabled = isAuthorized, onClick = onToggle),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected && isAuthorized) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            }
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggle() },
-                    enabled = isAuthorized
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
+    val statusText = when {
+        hasKeyPair -> "Ready to sign"
+        isWalletConnected -> "Freighter - Ready to sign"
+        else -> "Enter secret key or connect wallet to enable signing"
+    }
+    val statusColor = if (isAuthorized) Color(0xFF4CAF50)
+    else MaterialTheme.colorScheme.onSurfaceVariant
+
+    SignerRow(
+        isEnabled = isAuthorized,
+        isSelected = isSelected,
+        isEnteringKey = isEnteringKey,
+        onToggle = onToggle,
+        primaryText = truncateAddress(signer.address, 6),
+        statusText = statusText,
+        statusColor = statusColor,
+        badgeContent = {
+            when {
+                hasKeyPair -> Surface(
+                    color = Color(0xFF4CAF50),
+                    shape = MaterialTheme.shapes.small
+                ) {
                     Text(
-                        text = truncateAddress(signer.address, 6),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = "Verified",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    when {
-                        hasKeyPair -> Text(
-                            text = "Ready to sign",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF4CAF50)
-                        )
-                        isWalletConnected -> Text(
-                            text = "Freighter - Ready to sign",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF4CAF50)
-                        )
-                        else -> Text(
-                            text = "Enter secret key or connect wallet to enable signing",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
-
-                // Badge on the right
-                when {
-                    hasKeyPair -> {
-                        Surface(
-                            color = Color(0xFF4CAF50),
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                text = "Verified",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
-                        }
-                    }
-                    isWalletConnected -> {
-                        Surface(
-                            color = Color(0xFF1565C0),
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                text = "Freighter",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
-                        }
-                    }
+                isWalletConnected -> Surface(
+                    color = Color(0xFF1565C0),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Freighter",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
                 }
             }
-
+        },
+        actionContent = {
             // Action buttons row — shown when no auth is present and not in key-entry mode
             if (!isAuthorized && !isEnteringKey && !walletConnecting) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -868,20 +1007,42 @@ private fun DelegatedSignerRow(
                 )
             }
         }
-    }
+    )
 }
 
+/**
+ * Shared card composable for collecting and verifying a signer secret.
+ *
+ * Renders a Card containing a header row with a title and close button, a password-style
+ * OutlinedTextField with a show/hide toggle, an action-button row (Cancel / Verify), and a
+ * warning footer. The caller supplies all text strings and callbacks; this composable owns
+ * no state.
+ *
+ * @param headerText Text shown in the header row, typically including the truncated address.
+ * @param placeholder Placeholder shown inside the empty text field.
+ * @param inputValue Current text field content.
+ * @param onInputChange Called on every keystroke with the new raw value.
+ * @param isVisible Whether the field content is shown in plain text.
+ * @param onToggleVisibility Called when the user taps the eye icon.
+ * @param validationError Non-null error message displayed below the field; null hides it.
+ * @param isValidating When true the Verify button shows a spinner and is disabled.
+ * @param warningText Text shown in the amber warning footer card.
+ * @param onVerify Called when the user taps Verify (submission CTA).
+ * @param onCancel Called when the user taps Cancel or the close icon.
+ */
 @Composable
-private fun SecretKeyInputForm(
-    address: String,
-    secretKeyValue: String,
-    onSecretKeyChange: (String) -> Unit,
-    secretKeyError: String?,
-    isValidating: Boolean,
-    secretKeyVisible: Boolean,
+private fun SignerSecretInputCard(
+    headerText: String,
+    placeholder: String,
+    inputValue: String,
+    onInputChange: (String) -> Unit,
+    isVisible: Boolean,
     onToggleVisibility: () -> Unit,
-    onCancel: () -> Unit,
-    onSubmit: () -> Unit
+    validationError: String?,
+    isValidating: Boolean,
+    warningText: String,
+    onVerify: () -> Unit,
+    onCancel: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -905,7 +1066,7 @@ private fun SecretKeyInputForm(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Secret key for ${truncateAddress(address, 6)}",
+                    text = headerText,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
@@ -923,14 +1084,14 @@ private fun SecretKeyInputForm(
                 }
             }
 
-            // Secret key input field
+            // Secret input field
             OutlinedTextField(
-                value = secretKeyValue,
-                onValueChange = onSecretKeyChange,
+                value = inputValue,
+                onValueChange = onInputChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("S...") },
+                placeholder = { Text(placeholder) },
                 singleLine = true,
-                visualTransformation = if (secretKeyVisible) {
+                visualTransformation = if (isVisible) {
                     VisualTransformation.None
                 } else {
                     PasswordVisualTransformation()
@@ -938,19 +1099,19 @@ private fun SecretKeyInputForm(
                 trailingIcon = {
                     IconButton(onClick = onToggleVisibility) {
                         Icon(
-                            imageVector = if (secretKeyVisible) {
+                            imageVector = if (isVisible) {
                                 Icons.Default.VisibilityOff
                             } else {
                                 Icons.Default.Visibility
                             },
-                            contentDescription = if (secretKeyVisible) "Hide" else "Show",
+                            contentDescription = if (isVisible) "Hide" else "Show",
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 },
-                isError = secretKeyError != null,
-                supportingText = if (secretKeyError != null) {
-                    { Text(secretKeyError) }
+                isError = validationError != null,
+                supportingText = if (validationError != null) {
+                    { Text(validationError) }
                 } else null,
                 textStyle = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace
@@ -968,8 +1129,8 @@ private fun SecretKeyInputForm(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = onSubmit,
-                    enabled = !isValidating && secretKeyValue.trim().isNotEmpty()
+                    onClick = onVerify,
+                    enabled = !isValidating && inputValue.trim().isNotEmpty()
                 ) {
                     if (isValidating) {
                         CircularProgressIndicator(
@@ -986,7 +1147,7 @@ private fun SecretKeyInputForm(
                 }
             }
 
-            // Warning text
+            // Warning footer
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -994,7 +1155,7 @@ private fun SecretKeyInputForm(
                 )
             ) {
                 Text(
-                    text = "Your secret key is stored in memory only and cleared when this dialog closes.",
+                    text = warningText,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(8.dp)
@@ -1005,63 +1166,135 @@ private fun SecretKeyInputForm(
 }
 
 @Composable
+private fun SecretKeyInputForm(
+    address: String,
+    secretKeyValue: String,
+    onSecretKeyChange: (String) -> Unit,
+    secretKeyError: String?,
+    isValidating: Boolean,
+    secretKeyVisible: Boolean,
+    onToggleVisibility: () -> Unit,
+    onCancel: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    SignerSecretInputCard(
+        headerText = "Secret key for ${truncateAddress(address, 6)}",
+        placeholder = "S...",
+        inputValue = secretKeyValue,
+        onInputChange = onSecretKeyChange,
+        isVisible = secretKeyVisible,
+        onToggleVisibility = onToggleVisibility,
+        validationError = secretKeyError,
+        isValidating = isValidating,
+        warningText = "Your secret key is stored in memory only and cleared when this dialog closes.",
+        onVerify = onSubmit,
+        onCancel = onCancel
+    )
+}
+
+@Composable
+private fun Ed25519HexInputForm(
+    publicKey: ByteArray,
+    hexValue: String,
+    onHexChange: (String) -> Unit,
+    hexError: String?,
+    isValidating: Boolean,
+    secretVisible: Boolean,
+    onToggleVisibility: () -> Unit,
+    onCancel: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    SignerSecretInputCard(
+        headerText = "Ed25519 secret for ${publicKey.toHexString().take(8)}...",
+        placeholder = "64-character hex (32-byte seed)",
+        inputValue = hexValue,
+        onInputChange = onHexChange,
+        isVisible = secretVisible,
+        onToggleVisibility = onToggleVisibility,
+        validationError = hexError,
+        isValidating = isValidating,
+        warningText = "Your secret seed is stored in memory only and cleared after signing.",
+        onVerify = onSubmit,
+        onCancel = onCancel
+    )
+}
+
+/**
+ * Row for an Ed25519 external signer.
+ *
+ * The user enters a 64-character hex seed to enable signing. Wraps [SignerRow]
+ * with Ed25519-specific labels and the "Enter Secret" action button.
+ */
+@Composable
 private fun Ed25519SignerRow(
     verifierAddress: String,
     displayInfo: String,
+    isVerified: Boolean,
     isSelected: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    isEnteringHex: Boolean,
+    onEnterKeyClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .clickable(onClick = onToggle),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+    val statusText = if (isVerified) "Ready to sign" else "Enter secret seed to enable signing"
+    val statusColor = if (isVerified) Color(0xFF4CAF50)
+    else MaterialTheme.colorScheme.onSurfaceVariant
+
+    SignerRow(
+        isEnabled = isVerified,
+        isSelected = isSelected,
+        isEnteringKey = isEnteringHex,
+        onToggle = onToggle,
+        primaryText = displayInfo,
+        secondaryText = "Verifier: ${truncateAddress(verifierAddress, 6)}",
+        statusText = statusText,
+        statusColor = statusColor,
+        badgeContent = {
+            if (isVerified) {
+                Surface(
+                    color = Color(0xFF4CAF50),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Verified",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
+                }
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                Surface(
+                    color = MaterialTheme.colorScheme.secondary,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Ed25519",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondary
+                    )
+                }
             }
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggle() }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = displayInfo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Verifier: ${truncateAddress(verifierAddress, 6)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        },
+        actionContent = if (!isVerified && !isEnteringHex) {
+            {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onEnterKeyClick,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Key,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Enter Secret",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
-            Surface(
-                color = MaterialTheme.colorScheme.secondary,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Text(
-                    text = "Ed25519",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondary
-                )
-            }
-        }
-    }
+        } else null
+    )
 }

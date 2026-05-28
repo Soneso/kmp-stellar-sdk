@@ -122,13 +122,19 @@ struct ApproveScreen: View {
             SignerPickerSheet(
                 signers: availableSigners,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     showSignerPicker = false
-                    performMultiSignerApprove(selected: selected, secretKeys: secretKeys)
+                    performMultiSignerApprove(
+                        selected: selected,
+                        secretKeys: secretKeys,
+                        ed25519Secrets: ed25519Secrets
+                    )
                 },
                 onDismiss: {
                     showSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
     }
@@ -465,7 +471,8 @@ struct ApproveScreen: View {
     /// chosen) or the multi-signer path.
     private func performMultiSignerApprove(
         selected: [SignerInfoBridge],
-        secretKeys: [String: String]
+        secretKeys: [String: String],
+        ed25519Secrets: [String: String] = [:]
     ) {
         let tokenContract = resolveTokenContract()
         let capturedSpender = spender
@@ -508,7 +515,8 @@ struct ApproveScreen: View {
                         amount: capturedAmount,
                         expirationLedgerOffset: capturedOffset,
                         signerDescriptors: descriptors,
-                        delegatedSecretKeys: secretKeys
+                        delegatedSecretKeys: secretKeys,
+                        ed25519SecretKeys: ed25519Secrets
                     )
                 }
 

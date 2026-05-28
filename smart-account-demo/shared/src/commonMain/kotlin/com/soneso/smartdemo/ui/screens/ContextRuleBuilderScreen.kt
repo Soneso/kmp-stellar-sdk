@@ -1203,7 +1203,7 @@ class ContextRuleBuilderScreen(
                 title = "Select Signers",
                 description = "Choose which signers co-authorize creating this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
                     showCreateSignerPicker = false
 
                     scope.launch {
@@ -1282,7 +1282,7 @@ class ContextRuleBuilderScreen(
                 title = "Select Signers",
                 description = "Choose which signers co-authorize editing this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
                     showEditSignerPicker = false
                     isSubmitting = true
                     editProgressCompletedSteps = 0

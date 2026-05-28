@@ -47,9 +47,12 @@ import com.soneso.smartdemo.flows.ContextRuleEditDiff
 import com.soneso.smartdemo.flows.EditSignerEntry
 import com.soneso.smartdemo.flows.EditPolicyEntry
 import com.soneso.smartdemo.flows.PolicyParams
+import com.soneso.smartdemo.flows.Ed25519SignerIdentity
+import com.soneso.smartdemo.flows.clearDelegatedKeypairs
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.readPolicyParams
 import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.smartdemo.flows.registerEd25519Keypairs
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
@@ -420,7 +423,10 @@ class MacOSBridge {
      * Each [SignerDescriptor] in [signerDescriptors] is mapped to a [SelectedSigner]:
      * - "passkey": resolved from context rules by credential ID to obtain full key data.
      * - "delegated": constructed as [SelectedSigner.Wallet] by G-address.
-     * - "ed25519": not supported in multi-signer transfer (ed25519 signers are passkey/external).
+     * - "ed25519": constructed from the hex-encoded public key in [desc.value]. The
+     *   corresponding raw seed must be provided in [ed25519SecretKeys] keyed as
+     *   `"<verifierAddress>:<publicKeyHex>"`. Secrets are registered in-process via
+     *   [OZExternalSignerManager.addEd25519FromRawKey] and cleared after submission.
      *
      * Delegated signer keypairs must be provided in [delegatedSecretKeys] (G-address → secret key)
      * so the bridge can register them with the [ExternalSignerManagerAdapter] before the call.
@@ -430,6 +436,8 @@ class MacOSBridge {
      * @param amount Transfer amount as a decimal string.
      * @param signerDescriptors Ordered list of signers that must participate.
      * @param delegatedSecretKeys Map of G-address to Stellar secret key (S...) for delegated signers.
+     * @param ed25519SecretKeys Map of `"<verifierAddress>:<publicKeyHex>"` to hex-encoded 32-byte
+     *   seed for Ed25519 signers. Registered in-process; cleared on completion.
      * @return [TransferResult] with success flag, transaction hash, and optional error.
      * @throws Exception if the kit is not initialized, any secret key is invalid, or signing fails.
      */
@@ -439,57 +447,20 @@ class MacOSBridge {
         recipient: String,
         amount: String,
         signerDescriptors: List<SignerDescriptor>,
-        delegatedSecretKeys: Map<String, String>
+        delegatedSecretKeys: Map<String, String>,
+        ed25519SecretKeys: Map<String, String> = emptyMap()
     ): TransferResult {
-        // Register delegated keypairs so the ExternalSignerManagerAdapter can sign auth entries.
-        val externalManager = DemoState.externalSignerManager
-            ?: throw IllegalStateException("External signer manager not initialized")
-        externalManager.removeAll()
-        for ((_, secret) in delegatedSecretKeys) {
-            if (secret.isNotBlank()) {
-                externalManager.addFromSecret(secret)
-            }
+        val ctx = setupMultiSignerContext(
+            signerDescriptors = signerDescriptors,
+            delegatedSecretKeys = delegatedSecretKeys,
+            ed25519SecretKeys = ed25519SecretKeys,
+            useAdapter = false
+        )
+        return try {
+            multiSignerTransfer(tokenContract, recipient, amount, ctx.selectedSigners)
+        } finally {
+            ctx.teardown()
         }
-
-        // Resolve signers. Passkey signers require a full ExternalSigner instance including
-        // keyData, so we look them up from context rules by credential ID.
-        val rules = try {
-            loadContextRules()
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val allPasskeySigners = rules.flatMap { it.signers }
-            .filterIsInstance<ExternalSigner>()
-            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-
-        val smartAccountSigners = mutableListOf<SmartAccountSigner>()
-        for (desc in signerDescriptors) {
-            when (desc.type.lowercase()) {
-                "passkey" -> {
-                    // Look up the ExternalSigner by credential ID suffix in keyData.
-                    val found = allPasskeySigners.firstOrNull { signer ->
-                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
-                    }
-                    if (found != null) {
-                        smartAccountSigners.add(found)
-                    } else {
-                        ActivityLogState.error(
-                            "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
-                        )
-                    }
-                }
-                "delegated" -> {
-                    smartAccountSigners.add(buildDelegatedSigner(desc.value))
-                }
-                else -> {
-                    ActivityLogState.error("Unsupported signer type in multi-signer transfer: ${desc.type}")
-                }
-            }
-        }
-
-        val selectedSigners = buildSelectedSigners(smartAccountSigners)
-        return multiSignerTransfer(tokenContract, recipient, amount, selectedSigners)
     }
 
     // =========================================================================
@@ -522,12 +493,19 @@ class MacOSBridge {
     /**
      * Approves a token allowance with multi-signer authorization.
      *
+     * Ed25519 signers use the adapter callback path: secrets are registered on a
+     * [com.soneso.smartdemo.wallet.DemoEd25519Adapter] which is assigned to the
+     * [com.soneso.stellar.sdk.smartaccount.oz.OZExternalSignerManager.ed25519Adapter] field
+     * before submission and cleared afterwards.
+     *
      * @param tokenContract C-address of the token contract.
      * @param spenderAddress G-address or C-address being granted the allowance.
      * @param amount Decimal amount string.
      * @param expirationLedgerOffset Ledger offset from now as Int (converted to UInt internally).
      * @param signerDescriptors Ordered list of signers that must participate.
      * @param delegatedSecretKeys Map of G-address to Stellar secret key (S...) for delegated signers.
+     * @param ed25519SecretKeys Map of `"<verifierAddress>:<publicKeyHex>"` to hex-encoded 32-byte
+     *   seed for Ed25519 signers. Registered via adapter; cleared on completion.
      * @return [ApproveResult] with success flag, transaction hash, and optional error.
      */
     @Throws(Exception::class)
@@ -537,62 +515,26 @@ class MacOSBridge {
         amount: String,
         expirationLedgerOffset: Int,
         signerDescriptors: List<SignerDescriptor>,
-        delegatedSecretKeys: Map<String, String>
+        delegatedSecretKeys: Map<String, String>,
+        ed25519SecretKeys: Map<String, String> = emptyMap()
     ): ApproveResult {
-        // Register delegated keypairs so the ExternalSignerManagerAdapter can sign auth entries.
-        val externalManager = DemoState.externalSignerManager
-            ?: throw IllegalStateException("External signer manager not initialized")
-        externalManager.removeAll()
-        for ((_, secret) in delegatedSecretKeys) {
-            if (secret.isNotBlank()) {
-                externalManager.addFromSecret(secret)
-            }
-        }
-
-        // Resolve signers. Passkey signers require a full ExternalSigner instance including
-        // keyData, so we look them up from context rules by credential ID.
-        val rules = try {
-            loadContextRules()
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val allPasskeySigners = rules.flatMap { it.signers }
-            .filterIsInstance<ExternalSigner>()
-            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-
-        val smartAccountSigners = mutableListOf<SmartAccountSigner>()
-        for (desc in signerDescriptors) {
-            when (desc.type.lowercase()) {
-                "passkey" -> {
-                    val found = allPasskeySigners.firstOrNull { signer ->
-                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
-                    }
-                    if (found != null) {
-                        smartAccountSigners.add(found)
-                    } else {
-                        ActivityLogState.error(
-                            "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
-                        )
-                    }
-                }
-                "delegated" -> {
-                    smartAccountSigners.add(buildDelegatedSigner(desc.value))
-                }
-                else -> {
-                    ActivityLogState.error("Unsupported signer type in multi-signer approve: ${desc.type}")
-                }
-            }
-        }
-
-        val selectedSigners = buildSelectedSigners(smartAccountSigners)
-        return com.soneso.smartdemo.flows.multiSignerApproveAllowance(
-            tokenContract = tokenContract,
-            spenderAddress = spenderAddress,
-            amount = amount,
-            expirationLedgerOffset = expirationLedgerOffset.toUInt(),
-            selectedSigners = selectedSigners
+        val ctx = setupMultiSignerContext(
+            signerDescriptors = signerDescriptors,
+            delegatedSecretKeys = delegatedSecretKeys,
+            ed25519SecretKeys = ed25519SecretKeys,
+            useAdapter = true
         )
+        return try {
+            com.soneso.smartdemo.flows.multiSignerApproveAllowance(
+                tokenContract = tokenContract,
+                spenderAddress = spenderAddress,
+                amount = amount,
+                expirationLedgerOffset = expirationLedgerOffset.toUInt(),
+                selectedSigners = ctx.selectedSigners
+            )
+        } finally {
+            ctx.teardown()
+        }
     }
 
     /**
@@ -653,37 +595,8 @@ class MacOSBridge {
         signerDescriptors: List<SignerDescriptor> = emptyList(),
         delegatedSecretKeys: Map<String, String> = emptyMap()
     ): ContextRuleResult {
-        // Register delegated keypairs for multi-signer operations.
-        if (delegatedSecretKeys.isNotEmpty()) {
-            val externalManager = DemoState.externalSignerManager
-                ?: throw IllegalStateException("External signer manager not initialized")
-            externalManager.removeAll()
-            for ((_, secret) in delegatedSecretKeys) {
-                if (secret.isNotBlank()) {
-                    externalManager.addFromSecret(secret)
-                }
-            }
-        }
-
-        // Resolve selected signers for multi-signer mode.
-        val selectedSigners: List<SelectedSigner> = if (signerDescriptors.isNotEmpty()) {
-            val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
-            val allPasskeySigners = rules.flatMap { it.signers }
-                .filterIsInstance<ExternalSigner>()
-                .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-
-            val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
-                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
-            }
-            if (isSinglePasskeyTransfer(smartAccountSigners)) {
-                emptyList()
-            } else {
-                buildSelectedSigners(smartAccountSigners)
-            }
-        } else {
-            emptyList()
-        }
+        registerDelegatedSecrets(delegatedSecretKeys)
+        val selectedSigners = resolveSelectedSigners(signerDescriptors, loadOnChainPasskeySigners())
 
         return com.soneso.smartdemo.flows.removeContextRule(ruleId.toUInt(), selectedSigners)
     }
@@ -767,29 +680,11 @@ class MacOSBridge {
             null
         }
 
-        // Register delegated keypairs for multi-signer auth operations.
-        if (delegatedSecretKeysForAuth.isNotEmpty()) {
-            val externalManager = DemoState.externalSignerManager
-                ?: throw IllegalStateException("External signer manager not initialized")
-            externalManager.removeAll()
-            for ((_, secret) in delegatedSecretKeysForAuth) {
-                if (secret.isNotBlank()) {
-                    externalManager.addFromSecret(secret)
-                }
-            }
-        }
+        registerDelegatedSecrets(delegatedSecretKeysForAuth)
 
         // Resolve signers. Passkey signers are looked up from on-chain context rules by credential
         // ID so the bridge can obtain their full key data (verifier address + keyData bytes).
-        val rules = try {
-            loadContextRules()
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val allPasskeySigners = rules.flatMap { it.signers }
-            .filterIsInstance<ExternalSigner>()
-            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+        val allPasskeySigners = loadOnChainPasskeySigners()
         val signers = buildSignerList(signerDescriptors, allPasskeySigners)
 
         // Build FlowPolicyEntry list. For each PolicyDescriptor the bridge constructs the correct
@@ -798,18 +693,7 @@ class MacOSBridge {
         val policies = buildPolicyEntries(policyDescriptors, signers)
 
         // Resolve selected signers for multi-signer mode.
-        val selectedSigners: List<SelectedSigner> = if (signerDescriptorsForAuth.isNotEmpty()) {
-            val smartAccountSigners = signerDescriptorsForAuth.mapNotNull { desc ->
-                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
-            }
-            if (isSinglePasskeyTransfer(smartAccountSigners)) {
-                emptyList()
-            } else {
-                buildSelectedSigners(smartAccountSigners)
-            }
-        } else {
-            emptyList()
-        }
+        val selectedSigners = resolveSelectedSigners(signerDescriptorsForAuth, allPasskeySigners)
 
         return com.soneso.smartdemo.flows.addContextRule(
             contextType = contextType,
@@ -1100,6 +984,29 @@ class MacOSBridge {
         }
     }
 
+    /**
+     * Validates that a hex-encoded 32-byte Ed25519 seed derives the expected public key.
+     *
+     * Decodes [secretHex] to 32 bytes, derives the corresponding [KeyPair], and compares
+     * the derived 32-byte public key to [expectedPublicKeyHex].
+     *
+     * @param secretHex Lowercase hex string encoding the 32-byte raw Ed25519 seed.
+     * @param expectedPublicKeyHex Lowercase hex string encoding the expected 32-byte public key.
+     * @return `true` when the derived public key matches [expectedPublicKeyHex] byte-for-byte.
+     *   `false` on any decoding failure, wrong-length input, or key mismatch.
+     */
+    @Throws(Exception::class)
+    suspend fun validateEd25519Key(secretHex: String, expectedPublicKeyHex: String): Boolean {
+        return try {
+            val seedBytes = hexToByteArray(secretHex)
+            if (seedBytes.size != SmartAccountConstants.ED25519_SECRET_KEY_SIZE) return false
+            val keypair = KeyPair.fromSecretSeed(seedBytes)
+            keypair.getPublicKey().toHexString() == expectedPublicKeyHex
+        } catch (_: Exception) {
+            false
+        }
+    }
+
 
     // =========================================================================
     // MARK: - Context Rule Edit
@@ -1125,28 +1032,11 @@ class MacOSBridge {
         delegatedSecretKeys: Map<String, String>,
         onProgress: (String) -> Unit
     ): ContextRuleEditResultBridge {
-        // Register delegated keypairs for multi-signer operations.
-        if (delegatedSecretKeys.isNotEmpty()) {
-            val externalManager = DemoState.externalSignerManager
-                ?: throw IllegalStateException("External signer manager not initialized")
-            externalManager.removeAll()
-            for ((_, secret) in delegatedSecretKeys) {
-                if (secret.isNotBlank()) {
-                    externalManager.addFromSecret(secret)
-                }
-            }
-        }
+        registerDelegatedSecrets(delegatedSecretKeys)
 
-        // Resolve signers from descriptors to full SmartAccountSigner instances.
-        val rules = try {
-            loadContextRules()
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val allPasskeySigners = rules.flatMap { it.signers }
-            .filterIsInstance<ExternalSigner>()
-            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+        // Load rules once; derive passkey signers from the same snapshot to avoid a second RPC call.
+        val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
+        val allPasskeySigners = extractPasskeySigners(rules)
 
         // Build new signer entries from descriptors.
         val newSignerEntries = editDiff.newSignerDescriptors.map { desc ->
@@ -1242,20 +1132,7 @@ class MacOSBridge {
         )
 
         // Resolve selected signers for multi-signer mode.
-        // If the user only selected the connected passkey, use empty list to route through
-        // the simpler single-signer pipeline (matches Compose's isSinglePasskeyTransfer check).
-        val selectedSigners: List<SelectedSigner> = if (signerDescriptors.isNotEmpty()) {
-            val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
-                resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
-            }
-            if (isSinglePasskeyTransfer(smartAccountSigners)) {
-                emptyList()
-            } else {
-                buildSelectedSigners(smartAccountSigners)
-            }
-        } else {
-            emptyList()
-        }
+        val selectedSigners = resolveSelectedSigners(signerDescriptors, allPasskeySigners)
 
         // Call the flow orchestrator.
         val result = com.soneso.smartdemo.flows.submitContextRuleEdits(
@@ -1315,6 +1192,194 @@ class MacOSBridge {
     // =========================================================================
     // MARK: - Private Helpers
     // =========================================================================
+
+    /**
+     * Registers delegated G-address secret seeds on the external signer manager.
+     * Clears any previously registered seeds before registering the new ones.
+     */
+    private suspend fun registerDelegatedSecrets(delegatedSecretKeys: Map<String, String>) {
+        if (delegatedSecretKeys.isEmpty()) return
+        val externalManager = DemoState.externalSignerManager
+            ?: throw IllegalStateException("External signer manager not initialized")
+        externalManager.removeAll()
+        for ((_, secret) in delegatedSecretKeys) {
+            if (secret.isNotBlank()) {
+                externalManager.addFromSecret(secret)
+            }
+        }
+    }
+
+    /**
+     * Extracts all unique passkey signers from an already-loaded list of context rules.
+     *
+     * Call this when the caller already holds the rules list to avoid redundant RPC fetches.
+     */
+    private fun extractPasskeySigners(rules: List<ParsedContextRule>): List<ExternalSigner> {
+        return rules.flatMap { it.signers }
+            .filterIsInstance<ExternalSigner>()
+            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+    }
+
+    /**
+     * Loads all unique passkey signers currently registered on-chain across all context rules.
+     * Returns an empty list if rule loading fails.
+     */
+    private suspend fun loadOnChainPasskeySigners(): List<ExternalSigner> {
+        val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
+        return extractPasskeySigners(rules)
+    }
+
+    /**
+     * Resolves Swift signer descriptors to a list of [SelectedSigner] instances for multi-signer
+     * auth. Returns an empty list when the input is empty or when the resolution collapses to
+     * a single-passkey case (which uses the implicit signing path).
+     */
+    private suspend fun resolveSelectedSigners(
+        signerDescriptors: List<SignerDescriptor>,
+        allPasskeySigners: List<ExternalSigner>,
+    ): List<SelectedSigner> {
+        if (signerDescriptors.isEmpty()) return emptyList()
+        val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
+            resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
+        }
+        return if (isSinglePasskeyTransfer(smartAccountSigners)) {
+            emptyList()
+        } else {
+            buildSelectedSigners(smartAccountSigners)
+        }
+    }
+
+    /**
+     * Holds the resolved [SelectedSigner] list and a cleanup closure for a multi-signer operation.
+     *
+     * Call [teardown] in a finally block to clear all in-memory signing material after submission.
+     */
+    private data class MultiSignerContext(
+        val selectedSigners: List<SelectedSigner>,
+        val teardown: suspend () -> Unit,
+    )
+
+    /**
+     * Resolves Swift signer descriptors and verified secret maps into a [MultiSignerContext]
+     * ready for a multi-signer flow call.
+     *
+     * Registers delegated keypairs on [DemoState.externalSignerManager]. For Ed25519:
+     * - [useAdapter] = false: registers raw seeds in-process via addEd25519FromRawKey.
+     * - [useAdapter] = true: assigns [DemoState.demoEd25519Adapter] and registers seeds into it.
+     *
+     * The returned [MultiSignerContext.teardown] clears all registered material regardless of
+     * outcome; call it in a finally block.
+     *
+     * @param signerDescriptors Ordered list of Swift signer descriptors.
+     * @param delegatedSecretKeys Map of G-address to Stellar secret key (S...) for delegated signers.
+     * @param ed25519SecretKeys Map of `"<verifierAddress>:<publicKeyHex>"` to hex-encoded 32-byte seed.
+     * @param useAdapter When true, Ed25519 secrets are registered via the adapter callback path.
+     */
+    private suspend fun setupMultiSignerContext(
+        signerDescriptors: List<SignerDescriptor>,
+        delegatedSecretKeys: Map<String, String>,
+        ed25519SecretKeys: Map<String, String>,
+        useAdapter: Boolean,
+    ): MultiSignerContext {
+        val externalManager = DemoState.externalSignerManager
+            ?: throw IllegalStateException("External signer manager not initialized")
+        externalManager.removeAll()
+        for ((_, secret) in delegatedSecretKeys) {
+            if (secret.isNotBlank()) {
+                externalManager.addFromSecret(secret)
+            }
+        }
+
+        val ed25519Manager = DemoState.ed25519SignerManager
+        val ed25519Adapter = DemoState.demoEd25519Adapter
+
+        if (useAdapter) {
+            if (ed25519SecretKeys.isNotEmpty() && ed25519Adapter != null && ed25519Manager != null) {
+                val identityMap = ed25519SecretKeys.mapNotNull { (identityKey, seedHex) ->
+                    if (seedHex.isBlank()) return@mapNotNull null
+                    val (verifierAddress, pubKeyHex) = splitEd25519IdentityKey(identityKey)
+                    val identity = Ed25519SignerIdentity(
+                        verifierAddress = verifierAddress,
+                        publicKey = hexToByteArray(pubKeyHex)
+                    )
+                    identity to hexToByteArray(seedHex)
+                }.toMap()
+                ed25519Manager.ed25519Adapter = ed25519Adapter
+                registerEd25519Keypairs(ed25519Adapter, identityMap)
+            }
+        } else {
+            for ((identityKey, seedHex) in ed25519SecretKeys) {
+                if (seedHex.isNotBlank() && ed25519Manager != null) {
+                    val (verifierAddress, _) = splitEd25519IdentityKey(identityKey)
+                    val seedBytes = hexToByteArray(seedHex)
+                    ed25519Manager.addEd25519FromRawKey(seedBytes, verifierAddress)
+                }
+            }
+        }
+
+        val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
+        val allPasskeySigners = rules.flatMap { it.signers }
+            .filterIsInstance<ExternalSigner>()
+            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+
+        val smartAccountSigners = mutableListOf<SmartAccountSigner>()
+        for (desc in signerDescriptors) {
+            when (desc.type.lowercase()) {
+                "passkey" -> {
+                    val found = allPasskeySigners.firstOrNull { signer ->
+                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
+                    }
+                    if (found != null) {
+                        smartAccountSigners.add(found)
+                    } else {
+                        ActivityLogState.error(
+                            "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
+                        )
+                    }
+                }
+                "delegated" -> smartAccountSigners.add(buildDelegatedSigner(desc.value))
+                "ed25519" -> {
+                    val pubKeyBytes = hexToByteArray(desc.value)
+                    smartAccountSigners.add(buildEd25519Signer(pubKeyBytes))
+                }
+                else -> ActivityLogState.error("Unsupported signer type: ${desc.type}")
+            }
+        }
+
+        val selectedSigners = buildSelectedSigners(smartAccountSigners)
+        val adapterForClear = if (useAdapter && ed25519SecretKeys.isNotEmpty()) ed25519Adapter else null
+        return MultiSignerContext(
+            selectedSigners = selectedSigners,
+            teardown = {
+                clearDelegatedKeypairs(
+                    ed25519SignerManager = ed25519Manager,
+                    ed25519Adapter = adapterForClear
+                )
+            }
+        )
+    }
+
+    /**
+     * Splits an Ed25519 identity key of the form `"<verifierAddress>:<publicKeyHex>"` into
+     * its two components.
+     *
+     * The verifier address is a C-strkey (56 characters). The colon separator appears at
+     * index 56. Everything after the colon is the hex-encoded public key.
+     *
+     * @throws IllegalArgumentException if the key does not contain the expected separator.
+     */
+    private fun splitEd25519IdentityKey(identityKey: String): Pair<String, String> {
+        val separatorIndex = identityKey.indexOf(':')
+        require(separatorIndex > 0) {
+            "Ed25519 identity key must be in the form '<verifierAddress>:<publicKeyHex>'"
+        }
+        return Pair(
+            identityKey.substring(0, separatorIndex),
+            identityKey.substring(separatorIndex + 1)
+        )
+    }
 
     /**
      * Constructs a [ContextRuleType] from a type name string and an optional parameter.

@@ -33,7 +33,7 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * - Building Soroban authorization payload hashes for WebAuthn challenges
  * - Signing authorization entries with Smart Account signers
  * - Managing signature expiration and map entry ordering
- * - Double XDR encoding of signature values
+ * - Variant-specific encoding of signature values per [SmartAccountSignature.toAuthPayloadBytes]
  *
  * Example usage:
  * ```kotlin
@@ -196,69 +196,24 @@ object SmartAccountAuth {
     // ========================================================================
 
     /**
-     * Attaches a pre-computed signature to an authorization entry.
+     * Signs a single Soroban authorization entry with the provided signature.
      *
-     * This method does NOT perform cryptographic signing. The caller is responsible
-     * for computing the signature over the correct payload hash. Use
-     * [buildAuthPayloadHash] with the same [expirationLedger] value to obtain
-     * the hash before calling this method.
+     * Encoding of the signature bytes is delegated to [SmartAccountSignature.toAuthPayloadBytes];
+     * see that contract for variant-specific wire shape.
      *
-     * Attaching the signature involves the following steps:
-     * 1. Clones the entry via XDR round-trip (encode then decode)
-     * 2. Sets the signature expiration ledger on the credentials
-     * 3. Builds the signer key ScVal from the signer
-     * 4. Double XDR-encodes the signature value (CRITICAL)
-     * 5. Creates a map entry with key=signer, value=double-encoded-signature
-     * 6. Merges with any existing signatures (multi-signer accumulation)
-     * 7. Sorts map entries by XDR-encoded key bytes (lowercase hex, lexicographic)
-     * 8. Returns the entry with the updated signature map
+     * The input entry is never mutated; a deep clone is produced via XDR round-trip before any
+     * modification. Multiple calls on the same entry accumulate signatures in the credentials map,
+     * enabling multi-signer flows.
      *
-     * CRITICAL DETAILS:
-     * - The input entry is never mutated; a deep clone is returned
-     * - Signature value uses DOUBLE XDR encoding: encode the ScVal to bytes,
-     *   then wrap those bytes in a new ScVal::Bytes
-     * - Map entries MUST be sorted by their XDR-encoded key bytes as lowercase hex
-     * - Credentials must be of type `.Address`
-     *
-     * The signature map format is:
-     * ```
-     * ScVal::Vec([
-     *   ScVal::Map([
-     *     { key: signer.toScVal(), value: ScVal::Bytes(XDR_encode(signatureScVal)) },
-     *     ...
-     *   ])
-     * ])
-     * ```
-     *
-     * @param entry The authorization entry to attach the signature to
-     * @param signer The Smart Account signer (delegated or external)
-     * @param signature The pre-computed signature object (WebAuthn, Ed25519, or Policy)
-     * @param expirationLedger The ledger number at which the signature expires.
-     *        Must match the value passed to [buildAuthPayloadHash] when producing the signature.
-     * @return A new authorization entry with the signature attached
-     * @throws TransactionException.SigningFailed if credentials is not `.Address`
-     *         type, if XDR encoding/decoding fails, or if map construction fails
-     *
-     * Example:
-     * ```kotlin
-     * val expirationLedger = currentLedger + 100u
-     * val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
-     *     entry = unsignedEntry,
-     *     expirationLedger = expirationLedger,
-     *     networkPassphrase = Network.TESTNET.networkPassphrase
-     * )
-     * val webAuthnSig = WebAuthnSignature(
-     *     authenticatorData = authData,
-     *     clientData = clientData,
-     *     signature = signOverPayloadHash(payloadHash)
-     * )
-     * val signedEntry = SmartAccountAuth.signAuthEntry(
-     *     entry = unsignedEntry,
-     *     signer = externalSigner,
-     *     signature = webAuthnSig,
-     *     expirationLedger = expirationLedger
-     * )
-     * ```
+     * @param entry The authorization entry to sign.
+     * @param signer The Smart Account signer whose slot receives the signature (delegated or external).
+     * @param signature The [SmartAccountSignature] to attach (variant determines wire encoding).
+     * @param expirationLedger The ledger at which this signature expires. Must match the value
+     *   passed to [buildAuthPayloadHash] when the signature was computed.
+     * @param contextRuleIds The context rule IDs the signature satisfies. Defaults to empty.
+     * @return The signed authorization entry with the signature inserted into the signer slot.
+     * @throws TransactionException.SigningFailed on XDR encoding/decoding failure or when
+     *   credentials are not of type Address.
      */
     suspend fun signAuthEntry(
         entry: SorobanAuthorizationEntryXdr,
@@ -267,7 +222,7 @@ object SmartAccountAuth {
         expirationLedger: UInt,
         contextRuleIds: List<UInt> = emptyList()
     ): SorobanAuthorizationEntryXdr {
-        // STEP 1: Clone entry via XDR round-trip to avoid mutating input
+        // Clone entry via XDR round-trip to avoid mutating input
         val entryBytes: ByteArray = try {
             val writer = XdrWriter()
             entry.encode(writer)
@@ -289,7 +244,6 @@ object SmartAccountAuth {
             )
         }
 
-        // STEP 2: Set expiration (BEFORE building payload - though payload is built externally)
         var credentials = (entryCopy.credentials as? SorobanCredentialsXdr.Address)?.value
             ?: throw TransactionException.signingFailed(
                 "Credentials must be of type address to sign auth entry"
@@ -302,7 +256,6 @@ object SmartAccountAuth {
             signature = credentials.signature
         )
 
-        // STEP 3: Build signature map entry
         // KEY: Signer identity as ScVal
         val signerKey = try {
             signer.toScVal()
@@ -313,23 +266,18 @@ object SmartAccountAuth {
             )
         }
 
-        // VALUE: Double XDR-encoded signature
-        // Step A: signature.toScVal() is already a ScVal
-        val signatureScVal = signature.toScVal()
-
-        // Step B: XDR-encode that ScVal into raw bytes
+        // VALUE: Verifier-appropriate bytes for the on-wire signers map.
+        // The exact content is verifier-dependent: WebAuthn/Policy XDR-encode their ScVal;
+        // Ed25519 passes the raw 64-byte signature directly. See
+        // SmartAccountSignature.toAuthPayloadBytes for the per-type contract.
         val sigXdrBytes: ByteArray = try {
-            val writer = XdrWriter()
-            signatureScVal.encode(writer)
-            writer.toByteArray()
+            signature.toAuthPayloadBytes()
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
-                "Failed to XDR encode signature ScVal",
+                "Failed to encode signature bytes for auth payload",
                 e
             )
         }
-
-        // STEP 4-6: Update AuthPayload and return updated entry
 
         // Read existing payload from credentials (Void -> empty payload)
         val existingPayload = SmartAccountAuthPayloadCodec.read(credentials.signature)
