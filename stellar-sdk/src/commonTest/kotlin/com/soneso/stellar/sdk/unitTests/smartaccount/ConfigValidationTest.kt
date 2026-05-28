@@ -17,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -476,5 +477,80 @@ class ConfigValidationTest {
     @Test
     fun testOZConstants_defaultTimeoutSeconds() {
         assertEquals(30, OZConstants.DEFAULT_TIMEOUT_SECONDS)
+    }
+
+    // MARK: - Builder.externalSignerManager
+
+    @Test
+    fun testBuilder_externalSignerManager_storesInstance() {
+        val manager = OZExternalSignerManager(
+            networkPassphrase = Network.TESTNET.networkPassphrase
+        )
+
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalSignerManager(manager)
+            .build()
+
+        assertNotNull(config.externalSignerManager, "externalSignerManager must not be null after builder.externalSignerManager()")
+        assertSame(manager, config.externalSignerManager, "externalSignerManager must be the exact instance passed to the builder")
+    }
+
+    @Test
+    fun testBuilder_externalSignerManager_null_leavesFieldNull() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalSignerManager(null)
+            .build()
+
+        assertNull(config.externalSignerManager, "externalSignerManager must be null when null is passed to the builder")
+    }
+
+    @Test
+    fun testBuilder_externalSignerManager_overridesPreviousValue() {
+        val manager1 = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+        val manager2 = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalSignerManager(manager1)
+            .externalSignerManager(manager2)
+            .build()
+
+        assertSame(manager2, config.externalSignerManager, "Last externalSignerManager call must win")
+    }
+
+    // MARK: - createDefaultDeployer determinism
+
+    @Test
+    fun testCreateDefaultDeployer_returnsValidKeypair() = runTest {
+        val deployer = OZSmartAccountConfig.createDefaultDeployer()
+        assertNotNull(deployer, "createDefaultDeployer() must return a non-null keypair")
+        assertTrue(deployer.canSign(), "createDefaultDeployer() must return a signing keypair")
+        assertTrue(deployer.getAccountId().startsWith("G"), "Deployer account ID must start with G")
+    }
+
+    @Test
+    fun testCreateDefaultDeployer_isDeterministicAcrossMultipleCalls() = runTest {
+        val deployer1 = OZSmartAccountConfig.createDefaultDeployer()
+        val deployer2 = OZSmartAccountConfig.createDefaultDeployer()
+
+        assertEquals(
+            deployer1.getAccountId(),
+            deployer2.getAccountId(),
+            "createDefaultDeployer() must produce the same G-address on every call"
+        )
     }
 }

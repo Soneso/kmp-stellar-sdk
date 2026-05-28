@@ -19,6 +19,13 @@ import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 import com.soneso.stellar.sdk.smartaccount.oz.externalSignerManager
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
+import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
+import com.soneso.stellar.sdk.xdr.SCSymbolXdr
+import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
+import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import kotlinx.coroutines.test.runTest
@@ -46,6 +53,23 @@ private class ZeroBytesAdapter(private val targetPublicKey: ByteArray) : OZExter
 
     override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
         ByteArray(64) // all zeros — fails Ed25519 verification
+}
+
+// ---------------------------------------------------------------------------
+// Adapter that returns a wrong-length signature — causes KeyPair.verify to throw
+// ---------------------------------------------------------------------------
+
+/**
+ * Adapter that claims it can sign for a specific public key but returns a signature of
+ * wrong length (63 bytes). This causes [KeyPair.verify] to throw an exception rather
+ * than return false, exercising the catch-block path in appendEd25519Signature.
+ */
+private class WrongLengthSignatureAdapter(private val targetPublicKey: ByteArray) : OZExternalEd25519SignerAdapter {
+    override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean =
+        publicKey.contentEquals(targetPublicKey)
+
+    override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+        ByteArray(63) // wrong length — causes verify() to throw, not return false
 }
 
 // ---------------------------------------------------------------------------
@@ -636,6 +660,250 @@ class OZMultiSignerManagerEd25519Test {
         val c = SelectedSigner.Ed25519(verifierAddress = VERIFIER_B, publicKey = pk)
         // Different verifier address should produce a different hash code.
         assertFalse(a.hashCode() == c.hashCode(), "Different verifier address must produce different hash code")
+    }
+
+    // ========================================================================
+    // validateSelectedSigners — Ed25519 signer without externalSignerManager in config
+    // ========================================================================
+
+    @Test
+    fun test_validateSelectedSigners_ed25519WithoutExternalSignerManager_throwsInvalidInput() = runTest {
+        // Config has no externalSignerManager — any Ed25519 selector must throw immediately.
+        val kit = OZSmartAccountKit.create(buildConfig(externalSignerManager = null))
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val validPublicKey = ByteArray(32) { it.toByte() }
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            kit.multiSignerManager.submitWithMultipleSigners(
+                hostFunction = stubHostFunction(VERIFIER_B),
+                selectedSigners = listOf(
+                    SelectedSigner.Ed25519(
+                        verifierAddress = VERIFIER_A,
+                        publicKey = validPublicKey
+                    )
+                )
+            )
+        }
+        assertTrue(
+            ex.message.contains("selectedSigners", ignoreCase = true),
+            "Exception must reference selectedSigners; got: ${ex.message}"
+        )
+        assertTrue(
+            ex.message.contains("OZExternalSignerManager", ignoreCase = false) ||
+                ex.message.contains("externalSignerManager", ignoreCase = true),
+            "Exception must mention externalSignerManager requirement; got: ${ex.message}"
+        )
+    }
+
+    // ========================================================================
+    // appendEd25519Signature — verify() throws due to wrong-length signature →
+    // caught and re-thrown as TransactionException.SigningFailed
+    // ========================================================================
+
+    @Test
+    fun test_submitWithMultipleSigners_ed25519_verifyThrowsException_wrappedInSigningFailed() = runTest {
+        // WrongLengthSignatureAdapter returns a 63-byte signature. Ed25519 verify
+        // must receive exactly 64 bytes; a wrong-length input causes the underlying
+        // crypto library to throw an exception rather than return false. The production
+        // catch block in appendEd25519Signature must wrap this as TransactionException.SigningFailed.
+        val deployer = KeyPair.random()
+        val extManager = OZExternalSignerManager(
+            networkPassphrase = Network.TESTNET.networkPassphrase
+        )
+
+        val rawSeed = ByteArray(32) { (it + 43).toByte() }
+        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+
+        extManager.ed25519Adapter = WrongLengthSignatureAdapter(publicKey)
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val authEntry = buildAuthEntry(VERIFIER_B)
+        val authEntryXdr = authEntry.toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+
+        val mockServer = buildSequentialMockServer(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = authEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(
+            config = buildConfig(extManager, deployer),
+            sorobanServer = mockServer
+        )
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        assertFailsWith<TransactionException.SigningFailed> {
+            kit.multiSignerManager.submitWithMultipleSigners(
+                hostFunction = stubHostFunction(VERIFIER_B),
+                selectedSigners = listOf(
+                    SelectedSigner.Ed25519(
+                        verifierAddress = VERIFIER_A,
+                        publicKey = publicKey
+                    )
+                ),
+                resolveContextRuleIds = { _, _ -> emptyList() }
+            )
+        }
+    }
+
+    // ========================================================================
+    // cloneEntryWithExpiration — entry with Void credentials (non-Address branch)
+    //
+    // When the credentials discriminant is SOROBAN_CREDENTIALS_SOURCE_ACCOUNT (Void),
+    // cloneEntryWithExpiration returns the XDR round-trip clone unchanged (no expiration
+    // field to update). The entry is passed through to signedAuthEntries and the call
+    // completes successfully. This test drives that early-return branch.
+    // ========================================================================
+
+    @Test
+    fun test_submitWithMultipleSigners_authEntryWithVoidCredentials_passedThroughSuccessfully() = runTest {
+        // Build a simulation response that contains an auth entry whose credentials are
+        // SorobanCredentialsXdr.Void (source-account credentials). The signing pipeline
+        // must pass these entries through unmodified: cloneEntryWithExpiration detects
+        // non-Address credentials and returns the clone immediately without setting expiration.
+        // The entry lands in signedAuthEntries and the full round-trip succeeds.
+        val deployer = KeyPair.random()
+        val extManager = OZExternalSignerManager(
+            networkPassphrase = Network.TESTNET.networkPassphrase
+        )
+        val rawSeed = ByteArray(32) { (it + 88).toByte() }
+        extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+
+        // Build an auth entry with Void (source-account) credentials.
+        val voidAuthEntry = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Void,
+            rootInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.ContractFn(
+                    InvokeContractArgsXdr(
+                        contractAddress = Address(VERIFIER_B).toSCAddress(),
+                        functionName = SCSymbolXdr("noop"),
+                        args = emptyList()
+                    )
+                ),
+                subInvocations = emptyList()
+            )
+        )
+        val voidAuthEntryXdr = voidAuthEntry.toXdrBase64()
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+        val txHash = "f5832b6ea5dca8c7e0f6c9a4b8e4e9d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1"
+
+        val mockServer = buildSequentialMockServerWithSubmission(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = voidAuthEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr,
+            txHash = txHash
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(
+            config = buildConfig(extManager, deployer),
+            sorobanServer = mockServer
+        )
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        // Void-credentials entries have no address to match against contractId, so the
+        // pipeline's early-continue branch fires and adds them to signedAuthEntries unchanged.
+        // With an empty selectedSigners list, no signing loop runs and the call completes.
+        val result = kit.multiSignerManager.submitWithMultipleSigners(
+            hostFunction = stubHostFunction(VERIFIER_B),
+            selectedSigners = emptyList(),
+            resolveContextRuleIds = { _, _ -> emptyList() }
+        )
+
+        assertTrue(result.success, "Void-credentials auth entry must be passed through; result=${result.error}")
+        assertEquals(txHash, result.hash, "Transaction hash must match the mock response")
+    }
+
+    // ========================================================================
+    // multiSignerContractCall — validation path exercises method entry
+    // ========================================================================
+
+    @Test
+    fun test_multiSignerContractCall_blankTargetFn_throwsInvalidInput() = runTest {
+        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val manager = kit.multiSignerManager
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            manager.multiSignerContractCall(
+                target = VERIFIER_A,
+                targetFn = "",
+                selectedSigners = listOf(
+                    SelectedSigner.Ed25519(verifierAddress = VERIFIER_A, publicKey = ByteArray(32))
+                )
+            )
+        }
+    }
+
+    @Test
+    fun test_multiSignerContractCall_emptySelectedSigners_throwsInvalidInput() = runTest {
+        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val manager = kit.multiSignerManager
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            manager.multiSignerContractCall(
+                target = VERIFIER_A,
+                targetFn = "transfer",
+                selectedSigners = emptyList()
+            )
+        }
+    }
+
+    // ========================================================================
+    // multiSignerExecuteAndSubmit — validation path exercises method entry
+    // ========================================================================
+
+    @Test
+    fun test_multiSignerExecuteAndSubmit_invalidTargetAddress_throwsException() = runTest {
+        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val manager = kit.multiSignerManager
+
+        val ex = assertFailsWith<Exception> {
+            manager.multiSignerExecuteAndSubmit(
+                target = "not-a-contract-address",
+                targetFn = "vote",
+                selectedSigners = listOf(
+                    SelectedSigner.Ed25519(verifierAddress = VERIFIER_A, publicKey = ByteArray(32))
+                )
+            )
+        }
+        assertTrue(
+            ex.message?.contains("target", ignoreCase = true) == true ||
+                ex.message?.contains("contract address", ignoreCase = true) == true,
+            "Exception must reference the invalid target address; got: ${ex.message}"
+        )
+    }
+
+    @Test
+    fun test_multiSignerExecuteAndSubmit_emptySelectedSigners_throwsInvalidInput() = runTest {
+        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val manager = kit.multiSignerManager
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            manager.multiSignerExecuteAndSubmit(
+                target = VERIFIER_A,
+                targetFn = "vote",
+                selectedSigners = emptyList()
+            )
+        }
     }
 }
 
