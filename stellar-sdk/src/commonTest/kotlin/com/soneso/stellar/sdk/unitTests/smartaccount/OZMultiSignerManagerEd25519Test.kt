@@ -83,6 +83,31 @@ private class ZeroBytesAdapter(private val targetPublicKey: ByteArray) : OZExter
 }
 
 // ---------------------------------------------------------------------------
+// Adapter that delegates to a real keypair — produces valid Ed25519 signatures
+// ---------------------------------------------------------------------------
+
+/**
+ * Adapter that signs auth digests with a real [KeyPair], producing signatures that pass
+ * local Ed25519 verification. The [callCount] property records how many times
+ * [signAuthDigest] was invoked.
+ */
+private class ValidSigningAdapter(
+    private val keypair: KeyPair,
+    private val targetPublicKey: ByteArray
+) : OZExternalEd25519SignerAdapter {
+    var callCount = 0
+        private set
+
+    override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean =
+        publicKey.contentEquals(targetPublicKey)
+
+    override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray {
+        callCount++
+        return keypair.sign(authDigest)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -253,6 +278,44 @@ private fun simulateCountResponseJson(countXdrBase64: String, sorobanDataBase64:
 """.trimIndent()
 
 /**
+ * Returns a sendTransaction JSON-RPC response body with PENDING status and the given [hash].
+ */
+private fun sendTransactionPendingResponseJson(hash: String): String = """
+{
+  "jsonrpc": "2.0",
+  "id": "test-id",
+  "result": {
+    "status": "PENDING",
+    "hash": "$hash",
+    "latestLedger": 1001,
+    "latestLedgerCloseTime": 1700000000
+  }
+}
+""".trimIndent()
+
+/**
+ * Returns a getTransaction JSON-RPC response body with SUCCESS status and the given [hash].
+ */
+private fun getTransactionSuccessResponseJson(hash: String): String = """
+{
+  "jsonrpc": "2.0",
+  "id": "test-id",
+  "result": {
+    "status": "SUCCESS",
+    "latestLedger": 1002,
+    "latestLedgerCloseTime": 1700000010,
+    "oldestLedger": 900,
+    "oldestLedgerCloseTime": 1699990000,
+    "ledger": 1001,
+    "createdAt": 1700000000,
+    "envelopeXdr": null,
+    "resultXdr": null,
+    "resultMetaXdr": null
+  }
+}
+""".trimIndent()
+
+/**
  * Creates a [SorobanServer] backed by a [MockEngine] that handles the fixed RPC
  * call sequence that occurs during [OZMultiSignerManager.submitWithMultipleSigners]:
  *
@@ -281,6 +344,61 @@ private fun buildSequentialMockServer(
             3 -> ledgerEntriesResponseJson(accountXdrBase64)
             4 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
             else -> error("Unexpected RPC request at index ${requestIndex - 1}")
+        }
+        respond(
+            content = ByteReadChannel(responseBody),
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType, "application/json")
+        )
+    }
+    val client = HttpClient(mockEngine) {
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = false
+            })
+        }
+    }
+    return SorobanServer("https://soroban-testnet.stellar.org", client)
+}
+
+/**
+ * Creates a [SorobanServer] backed by a [MockEngine] that handles the full RPC call
+ * sequence for a successful [OZMultiSignerManager.submitWithMultipleSigners] submission:
+ *
+ * 1. getLedgerEntries — deployer account lookup (first simulation)
+ * 2. simulateTransaction — main invocation simulation, returns [authEntryBase64]
+ * 3. getLatestLedger — current ledger sequence for signature expiry
+ * 4. getLedgerEntries — deployer account lookup (context-rule-count simulation)
+ * 5. simulateTransaction — get_context_rules_count query, returns U32(0)
+ * 6. getLedgerEntries — deployer account lookup (re-fetch for second simulation setup)
+ * 7. simulateTransaction — re-simulation with signed auth entries
+ * 8. sendTransaction — submission, returns PENDING with [txHash]
+ * 9. getTransaction — polling call, returns SUCCESS
+ *
+ * Any additional requests beyond index 8 also return SUCCESS to handle platforms
+ * or configurations that may issue getTransaction more than once.
+ */
+private fun buildSequentialMockServerWithSubmission(
+    accountXdrBase64: String,
+    authEntryBase64: String,
+    sorobanDataBase64: String,
+    countXdrBase64: String,
+    txHash: String
+): SorobanServer {
+    var requestIndex = 0
+    val mockEngine = MockEngine { _ ->
+        val responseBody = when (requestIndex++) {
+            0 -> ledgerEntriesResponseJson(accountXdrBase64)
+            1 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
+            2 -> latestLedgerResponseJson()
+            3 -> ledgerEntriesResponseJson(accountXdrBase64)
+            4 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
+            5 -> ledgerEntriesResponseJson(accountXdrBase64)
+            6 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
+            7 -> sendTransactionPendingResponseJson(txHash)
+            else -> getTransactionSuccessResponseJson(txHash)
         }
         respond(
             content = ByteReadChannel(responseBody),
@@ -647,6 +765,115 @@ class OZMultiSignerManagerEd25519Test {
             ex.message.contains(VERIFIER_A, ignoreCase = false),
             "SigningFailed message must contain the verifier address (VERIFIER_A); got: ${ex.message}"
         )
+    }
+
+    @Test
+    fun test_submitWithMultipleSigners_ed25519Only_inProcessKeypair_succeeds() = runTest {
+        // Drive appendEd25519Signature all the way through the success path using an
+        // in-process keypair registered via addEd25519FromRawKey. No adapter is set.
+        // The signing pipeline must: sign the auth digest, verify the signature locally
+        // (KeyPair.verify returns true), wrap it in Ed25519Signature, and return a
+        // TransactionResult with success = true.
+        val deployer = KeyPair.random()
+        val extManager = OZExternalSignerManager(
+            networkPassphrase = Network.TESTNET.networkPassphrase
+        )
+
+        val rawSeed = ByteArray(32) { (it + 77).toByte() }
+        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        // No adapter — the in-process keypair path must handle signing entirely.
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val authEntry = buildAuthEntry(VERIFIER_B)
+        val authEntryXdr = authEntry.toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+        val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+        val mockServer = buildSequentialMockServerWithSubmission(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = authEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr,
+            txHash = txHash
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(
+            config = buildConfig(extManager, deployer),
+            sorobanServer = mockServer
+        )
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val result = kit.multiSignerManager.submitWithMultipleSigners(
+            hostFunction = stubHostFunction(VERIFIER_B),
+            selectedSigners = listOf(
+                SelectedSigner.Ed25519(
+                    verifierAddress = VERIFIER_A,
+                    publicKey = publicKey
+                )
+            ),
+            resolveContextRuleIds = { _, _ -> emptyList() }
+        )
+
+        assertTrue(result.success, "TransactionResult must be successful; error=${result.error}")
+        assertNotNull(result.hash, "TransactionResult must carry the transaction hash")
+        assertEquals(txHash, result.hash, "Transaction hash must match the value returned by sendTransaction")
+    }
+
+    @Test
+    fun test_submitWithMultipleSigners_ed25519Only_viaAdapter_succeeds() = runTest {
+        // Drive appendEd25519Signature through the success path using an adapter that
+        // wraps a real keypair. The adapter is registered alongside the same in-process
+        // keypair so canSignEd25519For passes. At signing time, adapter-first precedence
+        // routes through the adapter, and callCount == 1 confirms the adapter path ran.
+        val deployer = KeyPair.random()
+        val extManager = OZExternalSignerManager(
+            networkPassphrase = Network.TESTNET.networkPassphrase
+        )
+
+        val rawSeed = ByteArray(32) { (it + 77).toByte() }
+        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+
+        val signingKeypair = KeyPair.fromSecretSeed(rawSeed)
+        val adapter = ValidSigningAdapter(signingKeypair, publicKey)
+        extManager.ed25519Adapter = adapter
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val authEntry = buildAuthEntry(VERIFIER_B)
+        val authEntryXdr = authEntry.toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+        val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+        val mockServer = buildSequentialMockServerWithSubmission(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = authEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr,
+            txHash = txHash
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(
+            config = buildConfig(extManager, deployer),
+            sorobanServer = mockServer
+        )
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val result = kit.multiSignerManager.submitWithMultipleSigners(
+            hostFunction = stubHostFunction(VERIFIER_B),
+            selectedSigners = listOf(
+                SelectedSigner.Ed25519(
+                    verifierAddress = VERIFIER_A,
+                    publicKey = publicKey
+                )
+            ),
+            resolveContextRuleIds = { _, _ -> emptyList() }
+        )
+
+        assertTrue(result.success, "TransactionResult must be successful; error=${result.error}")
+        assertNotNull(result.hash, "TransactionResult must carry the transaction hash")
+        assertEquals(txHash, result.hash, "Transaction hash must match the value returned by sendTransaction")
+        assertEquals(1, adapter.callCount, "Adapter signAuthDigest must have been called exactly once")
     }
 
     @Test
