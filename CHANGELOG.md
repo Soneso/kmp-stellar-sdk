@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-05-29
+
+### Added
+- **Ed25519 external signers for OZ smart accounts**: `SelectedSigner.Ed25519`
+  adds a third multi-signer kind alongside passkey and wallet (G-address)
+  signers. An Ed25519 signer can sign two ways: an in-memory raw seed
+  registered at runtime via `kit.externalSigners.addEd25519FromRawKey(...)`,
+  or a pluggable `OZExternalEd25519SignerAdapter` (hardware wallet, HSM, or
+  remote signing service) supplied at kit construction via
+  `config.externalEd25519Adapter`. Usable wherever `selectedSigners` is
+  accepted — `multiSignerTransfer`, `multiSignerContractCall`,
+  `multiSignerExecuteAndSubmit`, and context-rule operations
+  (`addContextRule` / `removeContextRule` / `updateName` / `updateValidUntil`).
+- `OZSmartAccountKit.externalSigners` — the kit-owned `OZExternalSignerManager`
+  fronting all external (non-passkey) signers. Exposes `addFromSecret` /
+  `addEd25519FromRawKey` to register in-memory keys at runtime and `canSignFor` /
+  `canSignEd25519For` to check signing capability before a multi-signer ceremony.
+- `OZSmartAccountConfig.externalEd25519Adapter` — the Ed25519 adapter input,
+  the symmetric sibling of `externalWallet`.
+
+### Changed
+- External (non-passkey) signing is unified behind the kit-owned
+  `OZExternalSignerManager` (`kit.externalSigners`): the multi-signer pipeline
+  resolves and signs both wallet (G-address) and Ed25519 signers through it.
+  Each kind offers two custody models — a config-injected adapter
+  (`config.externalWallet` / `config.externalEd25519Adapter`) or an in-memory
+  key registered at runtime. Wallet signing behaviour is unchanged and
+  `config.externalWallet` continues to work exactly as before; this release is
+  additive and backwards compatible with 1.6.0.
+
 ## [1.6.0] - 2026-05-20
 
 ### Added

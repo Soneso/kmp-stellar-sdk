@@ -1,10 +1,10 @@
 # SEP-0031 (Cross-Border Payments API) Compatibility Matrix
 
-**Generated:** 2026-05-20 11:38:53
+**Generated:** 2026-05-29 19:51:51
 
 **SEP Version:** 3.1.0  
 **SEP Status:** Active  
-**SDK Version:** 1.6.0  
+**SDK Version:** 1.6.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md
 
 ## SEP Summary

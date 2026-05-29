@@ -1,10 +1,10 @@
 # SEP-0002 (Federation protocol) Compatibility Matrix
 
-**Generated:** 2026-05-20 11:38:46
+**Generated:** 2026-05-29 19:51:46
 
 **SEP Version:** 1.1.0  
 **SEP Status:** Final  
-**SDK Version:** 1.6.0  
+**SDK Version:** 1.6.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0002.md
 
 ## SEP Summary

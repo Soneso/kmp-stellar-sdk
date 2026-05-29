@@ -33,7 +33,7 @@ Supported signer types:
 - **Delegated** Stellar account (G-address) or contract (C-address) using native `require_auth`
 - **Ed25519** external signer via a verifier contract
 
-Architecture. `OZSmartAccountKit.create(config)` is the single entry point. The kit exposes seven sub-managers as lazy properties: `walletOperations`, `transactionOperations`, `signerManager`, `contextRuleManager`, `policyManager`, `multiSignerManager`, `credentialManager` (plus `events`). The config takes three platform adapters — `WebAuthnProvider`, `StorageAdapter`, and an optional `ExternalWalletAdapter`. Internally the kit owns a `SorobanServer` (RPC), `OZRelayerClient` (fee-bump, optional), and `OZIndexerClient` (credential lookup, optional).
+Architecture. `OZSmartAccountKit.create(config)` is the single entry point. The kit exposes seven sub-managers as lazy properties: `walletOperations`, `transactionOperations`, `signerManager`, `contextRuleManager`, `policyManager`, `multiSignerManager`, `credentialManager` (plus `events`). The config takes two platform adapters — `WebAuthnProvider` and `StorageAdapter` — plus two optional external-signer adapters: `ExternalWalletAdapter` (`externalWallet`) and `OZExternalEd25519SignerAdapter` (`externalEd25519Adapter`). Internally the kit owns a `SorobanServer` (RPC), `OZRelayerClient` (fee-bump, optional), and `OZIndexerClient` (credential lookup, optional).
 
 `OZExternalSignerManager` is owned by the kit and exposed as the non-null read-only property `kit.externalSigners` — the single front door for all external (non-passkey) signers. The multi-signer pipeline routes every `SelectedSigner.Wallet` and `SelectedSigner.Ed25519` signing through it.
 
@@ -51,7 +51,7 @@ Smart accounts are in the same artifact as the rest of the KMP SDK:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.6.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.6.1")
 }
 ```
 
@@ -1032,7 +1032,7 @@ val ed25519PublicKey = kit.externalSigners.addEd25519FromRawKey(
 )
 ```
 
-Relationship to `ExternalWalletAdapter`: the adapter is the *interface* a wallet provider implements (connect / signAuthEntry / canSignFor). The kit-owned manager composes the adapter supplied via `config.externalWallet`; it does not implement the interface. For a concrete implementation, see the example implementation in the smart account demo. The adapter discussion under [Multi-Signer Operations in smart_accounts_policies.md](./smart_accounts_policies.md#multi-signer-operations) covers the interface itself.
+Relationship to `ExternalWalletAdapter`: the adapter is the *interface* a wallet provider implements (connect / signAuthEntry / canSignFor). The kit-owned manager composes the adapter supplied via `config.externalWallet`; it does not implement the interface. The adapter discussion under [Multi-Signer Operations in smart_accounts_policies.md](./smart_accounts_policies.md#multi-signer-operations) covers the interface itself.
 
 ### Standalone construction (advanced)
 

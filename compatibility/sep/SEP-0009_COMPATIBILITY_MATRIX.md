@@ -1,10 +1,10 @@
 # SEP-0009 (Standard KYC Fields) Compatibility Matrix
 
-**Generated:** 2026-05-20 11:38:48
+**Generated:** 2026-05-29 19:51:48
 
 **SEP Version:** 1.17.0  
 **SEP Status:** Active  
-**SDK Version:** 1.6.0  
+**SDK Version:** 1.6.1  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0009.md
 
 ## SEP Summary

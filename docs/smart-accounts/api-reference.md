@@ -19,7 +19,7 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 7. [Context Rules](#context-rules)
 8. [Builders](#builders)
 9. [Multi-Signer Operations](#multi-signer-operations)
-10. [External Signers](#external-signers) — OZExternalSignerManager, OZExternalEd25519SignerAdapter
+10. [External Signers](#external-signers)
 11. [Indexer Client](#indexer-client)
 12. [Relayer Client](#relayer-client)
 13. [Events](#events)

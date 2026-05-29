@@ -203,7 +203,7 @@ val storage = InMemoryStorageAdapter()  // default in OZSmartAccountConfig
 ```kotlin
 // app-level build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.6.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.6.1")
 
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")

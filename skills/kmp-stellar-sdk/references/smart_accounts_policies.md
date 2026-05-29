@@ -767,7 +767,7 @@ sealed class SelectedSigner {
         val transports: List<String>? = null         // e.g. listOf("internal", "hybrid")
     ) : SelectedSigner()
 
-    data class Wallet(val address: String) : SelectedSigner()    // G-address
+    data class Wallet(val address: String) : SelectedSigner()    // G-address or C-address
 
     data class Ed25519(                                          // External Ed25519 signer
         val verifierAddress: String,                             // C-address of the Ed25519 verifier
@@ -811,8 +811,24 @@ val rule = kit.contextRuleManager.listContextRules().first { it.id == contextRul
 // Base64URL credentialId from keyData and check whether it is stored locally.
 val available = rule.signers.mapNotNull { signer ->
     when {
+        // ExternalSigner has three keyData shapes (see SmartAccountBuilders.describeSignerType):
+        //   size == ED25519_PUBLIC_KEY_SIZE (32)    -> Ed25519
+        //   size  > SECP256R1_PUBLIC_KEY_SIZE (65)  -> WebAuthn passkey (65-byte pubkey || credentialId)
+        //   any other size                          -> generic external verifier (no local signer; skipped)
+        signer is ExternalSigner && signer.keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE -> {
+            // Ed25519 external signer: signable if the kit-owned manager (adapter or
+            // in-memory key) can sign for this verifier + public-key slot.
+            if (kit.externalSigners.canSignEd25519For(signer.verifierAddress, signer.keyData)) {
+                SelectedSigner.Ed25519(
+                    verifierAddress = signer.verifierAddress,
+                    publicKey       = signer.keyData
+                )
+            } else null
+        }
         signer is ExternalSigner -> {
-            // WebAuthn signers have keyData = 65-byte pubkey || credentialId
+            // WebAuthn passkey (keyData = 65-byte pubkey || credentialId). A generic external
+            // verifier has no credentialId suffix, so getCredentialIdFromSigner returns null
+            // and it is skipped.
             val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer) ?: return@mapNotNull null
             val credIdStr   = SmartAccountBuilders.getCredentialIdStringFromSigner(signer) ?: return@mapNotNull null
             val stored      = kit.credentialManager.getCredential(credIdStr)
