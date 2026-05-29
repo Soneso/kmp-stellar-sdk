@@ -19,6 +19,7 @@ import com.soneso.smartdemo.state.DemoState
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -165,9 +166,11 @@ data class ContextRuleEditResult(
  * Converts a list of selected [SmartAccountSigner] objects from the signer picker into
  * the [SelectedSigner] list required by multi-signer operations.
  *
- * - [ExternalSigner] with a credential ID -> [SelectedSigner.Passkey] with full keyData.
+ * - [ExternalSigner] with a WebAuthn credential ID -> [SelectedSigner.Passkey] with full keyData.
+ * - [ExternalSigner] with a 32-byte public key (Ed25519) -> [SelectedSigner.Ed25519] carrying
+ *   the verifier address and public key. Signing source must already be registered on the
+ *   [OZExternalSignerManager] before the multi-signer call.
  * - [DelegatedSigner] -> [SelectedSigner.Wallet] identified by G-address.
- * - [ExternalSigner] without a credential ID -> skipped (not supported in multi-signer flow).
  *
  * @param signers Selected signers from the signer picker dialog.
  * @return Mapped list of [SelectedSigner] ready for multi-signer operations.
@@ -180,20 +183,35 @@ suspend fun buildSelectedSigners(signers: List<SmartAccountSigner>): List<Select
             is ExternalSigner -> {
                 val credIdStr = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
                 val credIdBytes = SmartAccountBuilders.getCredentialIdFromSigner(signer)
-                if (credIdStr != null) {
-                    // Look up stored credential for transport hints (enables cross-device auth).
-                    // Null transports is the correct fallback for credentials not in local storage.
-                    val transports = try {
-                        storage?.get(credIdStr)?.transports
-                    } catch (_: Exception) { null }
-                    result.add(
-                        SelectedSigner.Passkey(
-                            credentialId = credIdStr,
-                            credentialIdBytes = credIdBytes,
-                            keyData = signer.keyData,
-                            transports = transports
+                when {
+                    credIdStr != null -> {
+                        // WebAuthn passkey signer — look up stored credential for transport hints
+                        // (enables cross-device auth). Null transports is the correct fallback
+                        // for credentials not in local storage.
+                        val transports = try {
+                            storage?.get(credIdStr)?.transports
+                        } catch (_: Exception) { null }
+                        result.add(
+                            SelectedSigner.Passkey(
+                                credentialId = credIdStr,
+                                credentialIdBytes = credIdBytes,
+                                keyData = signer.keyData,
+                                transports = transports
+                            )
                         )
-                    )
+                    }
+                    signer.keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE -> {
+                        // Ed25519 signer — the public key is stored directly as keyData.
+                        // Signing source must be registered on the OZExternalSignerManager
+                        // (either in-memory keypair or adapter) before the multi-signer call.
+                        result.add(
+                            SelectedSigner.Ed25519(
+                                verifierAddress = signer.verifierAddress,
+                                publicKey = signer.keyData
+                            )
+                        )
+                    }
+                    // Other external signer types without a recognisable credential are skipped.
                 }
             }
             is DelegatedSigner -> {

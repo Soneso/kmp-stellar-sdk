@@ -137,13 +137,19 @@ struct TransferScreen: View {
             SignerPickerSheet(
                 signers: availableSigners,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     showSignerPicker = false
-                    performMultiSignerTransfer(selected: selected, secretKeys: secretKeys)
+                    performMultiSignerTransfer(
+                        selected: selected,
+                        secretKeys: secretKeys,
+                        ed25519Secrets: ed25519Secrets
+                    )
                 },
                 onDismiss: {
                     showSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
     }
@@ -463,7 +469,8 @@ struct TransferScreen: View {
     /// chosen) or the multi-signer path.
     private func performMultiSignerTransfer(
         selected: [SignerInfoBridge],
-        secretKeys: [String: String]
+        secretKeys: [String: String],
+        ed25519Secrets: [String: String] = [:]
     ) {
         let tokenContract = resolveTokenContract()
         let capturedRecipient = recipient
@@ -505,7 +512,8 @@ struct TransferScreen: View {
                         recipient: capturedRecipient,
                         amount: capturedAmount,
                         signerDescriptors: descriptors,
-                        delegatedSecretKeys: secretKeys
+                        delegatedSecretKeys: secretKeys,
+                        ed25519SecretKeys: ed25519Secrets
                     )
                 }
 

@@ -18,12 +18,14 @@ package com.soneso.smartdemo.flows
 
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
 import com.soneso.smartdemo.util.SignerInfo
 import com.soneso.smartdemo.util.extractSignersFromRules
 import com.soneso.smartdemo.util.fetchAllContextRules
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Result of a token transfer.
@@ -37,6 +39,18 @@ data class TransferResult(
     val hash: String?,
     val error: String?
 )
+
+/**
+ * Guards [registeredDelegatedAddresses] against concurrent registration and cleanup.
+ */
+private val delegatedRegistrationMutex = Mutex()
+
+/**
+ * G-addresses the demo has registered as in-memory delegated keypairs on the kit-owned
+ * manager. Tracked so cleanup removes exactly these entries without disturbing wallet
+ * connections or Ed25519 registrations.
+ */
+private val registeredDelegatedAddresses = mutableSetOf<String>()
 
 /**
  * Transfers tokens from the connected smart account to a recipient address.
@@ -102,12 +116,12 @@ suspend fun transfer(
  *    recipient, amount, and the explicit signer list. The SDK:
  *    a. Simulates the transaction to compute Soroban auth entries.
  *    b. For each [SelectedSigner.Passkey]: triggers one OS WebAuthn authentication prompt.
- *    c. For each [SelectedSigner.Wallet]: signs via the configured ExternalWalletAdapter.
+ *    c. For each [SelectedSigner.Wallet]: signs via [kit.externalSigners].
  *    d. Submits the transaction to the network (via the relayer if configured).
  * 3. On success, refresh XLM and DEMO balances in [DemoState].
  *
- * The caller is responsible for registering any delegated signer keypairs in
- * [DemoState.externalSignerManager] before calling this function.
+ * The caller is responsible for registering any delegated signer keypairs via
+ * [registerDelegatedKeypairs] before calling this function.
  *
  * @param tokenContract The contract address (C-address) of the token to transfer.
  * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
@@ -126,7 +140,7 @@ suspend fun multiSignerTransfer(
 
     // multiSignerTransfer collects signatures from all listed signers in order,
     // then submits the transaction. Passkey signers trigger WebAuthn prompts;
-    // wallet signers sign via the ExternalWalletAdapter registered in the kit config.
+    // wallet signers sign via kit.externalSigners (in-memory keypair or wallet adapter).
     val result = kit.multiSignerManager.multiSignerTransfer(
         tokenContract = tokenContract,
         recipient = recipient,
@@ -162,7 +176,7 @@ suspend fun loadAvailableSigners(): List<SignerInfo> {
         extractSignersFromRules(
             rules = rules,
             connectedCredentialId = DemoState.credentialId,
-            externalWallet = DemoState.externalSignerManager
+            externalSigners = kit.externalSigners
         )
     } catch (_: Exception) {
         emptyList()
@@ -170,25 +184,184 @@ suspend fun loadAvailableSigners(): List<SignerInfo> {
 }
 
 /**
- * Registers delegated signer keypairs in [DemoState.externalSignerManager] so that
+ * Registers delegated signer keypairs as in-memory keypairs on [kit.externalSigners] so that
  * [multiSignerTransfer] can sign authorization entries for [SelectedSigner.Wallet] signers.
  *
- * The SDK's multiSignerTransfer calls [ExternalWalletAdapter.canSignFor] and
- * [ExternalWalletAdapter.signAuthEntry] for each wallet signer — these rely on the
- * keypairs being registered in the adapter before the call.
- *
- * Any previously registered keypairs are cleared before adding the new set to prevent
- * stale keys from accumulating across transfers.
+ * Each keypair is added via OZExternalSignerManager.addFromSecret so the manager resolves it
+ * through its in-memory keypair custody model. Any demo delegated keypairs registered by an
+ * earlier operation are removed first to prevent stale keys from accumulating across operations.
+ * The addresses are tracked so [clearDelegatedKeypairs] removes exactly these entries.
  *
  * @param delegatedKeyPairs Map of G-address to [com.soneso.stellar.sdk.KeyPair].
  */
 suspend fun registerDelegatedKeypairs(
     delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>
 ) {
-    val externalManager = DemoState.externalSignerManager as? ExternalSignerManagerAdapter ?: return
-    externalManager.removeAll()
-    for ((_, keyPair) in delegatedKeyPairs) {
-        val secretSeed = keyPair.getSecretSeed() ?: continue
-        externalManager.addFromSecret(secretSeed.concatToString())
+    val kit = DemoState.kit ?: return
+    delegatedRegistrationMutex.withLock {
+        for (address in registeredDelegatedAddresses) {
+            kit.externalSigners.remove(address)
+        }
+        registeredDelegatedAddresses.clear()
+        for ((_, keyPair) in delegatedKeyPairs) {
+            val secretSeed = keyPair.getSecretSeed() ?: continue
+            val address = kit.externalSigners.addFromSecret(secretSeed.concatToString())
+            registeredDelegatedAddresses.add(address)
+        }
+    }
+}
+
+/**
+ * Runs [block] with in-process multi-signer material registered on the kit-owned manager.
+ *
+ * Registers each Ed25519 seed via OZExternalSignerManager.addEd25519FromRawKey and each delegated
+ * G-address keypair via [registerDelegatedKeypairs], runs [block], then clears all registered
+ * material in a finally so nothing leaks on success, failure, or cancellation. Registration runs
+ * inside the try so partial registration interrupted by an exception or cancellation is still
+ * cleaned up.
+ *
+ * Use this for the in-process custody path: the demo's adapter ([DemoState.demoEd25519Adapter])
+ * holds no seed for these keys, so the manager resolves them through its in-memory registry rather
+ * than the adapter.
+ *
+ * @param delegatedKeyPairs Map of G-address to [com.soneso.stellar.sdk.KeyPair] for delegated signers.
+ * @param ed25519Secrets Map of signer identity to 32-byte raw seed from the picker's local cache.
+ * @param block The operation to run while the signing material is registered.
+ * @return The value returned by [block].
+ */
+suspend fun <T> withInProcessMultiSigner(
+    delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>,
+    ed25519Secrets: Map<Ed25519SignerIdentity, ByteArray>,
+    block: suspend () -> T
+): T {
+    val kit = DemoState.kit
+    return try {
+        if (kit != null) {
+            for ((identity, seed) in ed25519Secrets) {
+                kit.externalSigners.addEd25519FromRawKey(
+                    secretKeyBytes = seed,
+                    verifierAddress = identity.verifierAddress
+                )
+            }
+        }
+        registerDelegatedKeypairs(delegatedKeyPairs)
+        block()
+    } finally {
+        clearInProcessEd25519Keys(ed25519Secrets.keys)
+        clearDelegatedKeypairs()
+    }
+}
+
+/**
+ * Transfers tokens using an explicit list of signers, demonstrating the in-process Ed25519
+ * custody path.
+ *
+ * Wraps the transfer in [withInProcessMultiSigner], which registers each Ed25519 seed directly on
+ * [kit.externalSigners] via addEd25519FromRawKey and each delegated keypair, then clears all
+ * in-memory signing material in a finally regardless of outcome. Because the demo's adapter
+ * ([DemoState.demoEd25519Adapter]) holds no seed for these keys, the manager resolves them through
+ * its in-memory registry rather than the adapter.
+ *
+ * @param tokenContract The contract address (C-address) of the token to transfer.
+ * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
+ * @param amount The amount to transfer as a decimal string.
+ * @param selectedSigners All signers that must participate, in signing order.
+ * @param delegatedKeyPairs Map of G-address to [com.soneso.stellar.sdk.KeyPair] for delegated signers.
+ * @param ed25519Secrets Map of signer identity to 32-byte raw seed from the picker's local cache.
+ * @return [TransferResult] with success/failure status, transaction hash, and optional error.
+ */
+suspend fun multiSignerTransferWithEd25519(
+    tokenContract: String,
+    recipient: String,
+    amount: String,
+    selectedSigners: List<SelectedSigner>,
+    delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>,
+    ed25519Secrets: Map<Ed25519SignerIdentity, ByteArray>
+): TransferResult = withInProcessMultiSigner(delegatedKeyPairs, ed25519Secrets) {
+    multiSignerTransfer(
+        tokenContract = tokenContract,
+        recipient = recipient,
+        amount = amount,
+        selectedSigners = selectedSigners
+    )
+}
+
+/**
+ * Approves a token allowance using an explicit list of signers, demonstrating the Ed25519
+ * adapter custody path.
+ *
+ * Registers all seeds on [DemoState.demoEd25519Adapter] before submitting. The adapter is injected
+ * into the kit via OZSmartAccountConfig.externalEd25519Adapter and consulted by [kit.externalSigners]
+ * ahead of its in-memory registry, so these keys resolve through the adapter. Clears all in-memory
+ * signing material in a finally block regardless of outcome, so partial registration interrupted by
+ * an exception or cancellation is still cleaned up.
+ *
+ * @param tokenContract The contract address (C-address) of the token.
+ * @param spenderAddress The spender's Stellar address (G-address or C-address).
+ * @param amount The allowance amount as a decimal string.
+ * @param expirationLedgerOffset Number of ledgers from now until the allowance expires.
+ * @param selectedSigners All signers that must participate, in signing order.
+ * @param delegatedKeyPairs Map of G-address to [com.soneso.stellar.sdk.KeyPair] for delegated signers.
+ * @param ed25519Secrets Map of signer identity to 32-byte raw seed from the picker's local cache.
+ * @return [ApproveResult] with success/failure status, transaction hash, and optional error.
+ */
+suspend fun multiSignerApproveAllowanceWithEd25519(
+    tokenContract: String,
+    spenderAddress: String,
+    amount: String,
+    expirationLedgerOffset: UInt,
+    selectedSigners: List<SelectedSigner>,
+    delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>,
+    ed25519Secrets: Map<Ed25519SignerIdentity, ByteArray>
+): ApproveResult {
+    val adapter = DemoState.demoEd25519Adapter
+    return try {
+        if (ed25519Secrets.isNotEmpty() && adapter != null) {
+            for ((identity, seed) in ed25519Secrets) {
+                adapter.add(identity, seed)
+            }
+        }
+        registerDelegatedKeypairs(delegatedKeyPairs)
+        multiSignerApproveAllowance(
+            tokenContract = tokenContract,
+            spenderAddress = spenderAddress,
+            amount = amount,
+            expirationLedgerOffset = expirationLedgerOffset,
+            selectedSigners = selectedSigners
+        )
+    } finally {
+        adapter?.clearAll()
+        clearDelegatedKeypairs()
+    }
+}
+
+/**
+ * Removes all in-memory delegated keypairs the demo registered on [kit.externalSigners].
+ *
+ * Removes exactly the G-addresses tracked by [registerDelegatedKeypairs], leaving wallet
+ * connections and Ed25519 registrations untouched. Must be called in a `finally` block around
+ * the submission so it executes on both success and failure. A no-op when no kit is initialized
+ * or no delegated keypairs are tracked.
+ */
+suspend fun clearDelegatedKeypairs() {
+    val kit = DemoState.kit ?: return
+    delegatedRegistrationMutex.withLock {
+        for (address in registeredDelegatedAddresses) {
+            kit.externalSigners.remove(address)
+        }
+        registeredDelegatedAddresses.clear()
+    }
+}
+
+/**
+ * Removes the in-process Ed25519 keys registered for the current operation from
+ * [kit.externalSigners].
+ *
+ * @param identities The signer identities whose in-memory keys should be removed.
+ */
+private suspend fun clearInProcessEd25519Keys(identities: Set<Ed25519SignerIdentity>) {
+    val kit = DemoState.kit ?: return
+    for (identity in identities) {
+        kit.externalSigners.removeEd25519(identity.verifierAddress, identity.publicKey)
     }
 }

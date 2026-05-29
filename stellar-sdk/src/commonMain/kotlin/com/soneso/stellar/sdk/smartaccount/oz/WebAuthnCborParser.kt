@@ -10,9 +10,9 @@ package com.soneso.stellar.sdk.smartaccount.oz
 /**
  * Pure Kotlin CBOR parsing utilities for WebAuthn attestation and authenticator data.
  *
- * This object consolidates CBOR parsing logic that was previously duplicated across the
- * Android, JavaScript, and Apple WebAuthn provider implementations. It has no platform
- * dependencies and can be called from any source set.
+ * This object holds the shared CBOR parsing logic used by the Android, JavaScript, and Apple
+ * WebAuthn provider implementations. It has no platform dependencies and can be called from any
+ * source set.
  *
  * All methods are designed to be resilient to malformed or truncated input. They return
  * null instead of throwing when data cannot be parsed, allowing callers to implement

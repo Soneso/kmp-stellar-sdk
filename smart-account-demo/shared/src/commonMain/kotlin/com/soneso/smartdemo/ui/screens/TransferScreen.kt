@@ -61,11 +61,11 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.smartdemo.flows.Ed25519SignerIdentity
 import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.loadAvailableSigners
-import com.soneso.smartdemo.flows.multiSignerTransfer
-import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.smartdemo.flows.multiSignerTransferWithEd25519
 import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
@@ -568,7 +568,7 @@ class TransferScreen : Screen {
                 title = "Select Signers",
                 description = "Choose which signers co-authorize this transfer. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, ed25519Secrets ->
                     showSignerPicker = false
 
                     scope.launch {
@@ -577,7 +577,6 @@ class TransferScreen : Screen {
 
                         try {
                             if (isSinglePasskeyTransfer(selectedSigners)) {
-                                // Single connected passkey selected — use the standard transfer path
                                 ActivityLogState.info(
                                     "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
                                 )
@@ -594,12 +593,6 @@ class TransferScreen : Screen {
                                     throw Exception(result.error ?: "Transfer failed")
                                 }
                             } else {
-                                // Multiple signers or delegated signers — use multi-signer path
-
-                                // Register delegated signer keypairs before calling
-                                // multiSignerTransfer so the ExternalWalletAdapter can sign.
-                                registerDelegatedKeypairs(delegatedKeyPairs)
-
                                 val selected = buildSelectedSigners(selectedSigners)
 
                                 ActivityLogState.info(
@@ -607,11 +600,13 @@ class TransferScreen : Screen {
                                         "(${selected.size} signer(s))"
                                 )
 
-                                val result = multiSignerTransfer(
+                                val result = multiSignerTransferWithEd25519(
                                     tokenContract = tokenContract,
                                     recipient = recipient,
                                     amount = amount,
-                                    selectedSigners = selected
+                                    selectedSigners = selected,
+                                    delegatedKeyPairs = delegatedKeyPairs,
+                                    ed25519Secrets = ed25519Secrets
                                 )
 
                                 if (result.success) {

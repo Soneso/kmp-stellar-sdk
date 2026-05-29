@@ -809,6 +809,12 @@ object SmartAccountConstants {
     const val ED25519_PUBLIC_KEY_SIZE = 32
 
     /**
+     * Size in bytes of an Ed25519 secret key seed (RFC 8032). Equal to [ED25519_PUBLIC_KEY_SIZE]
+     * for Ed25519 — kept as a distinct constant so validations remain semantically accurate.
+     */
+    const val ED25519_SECRET_KEY_SIZE = 32
+
+    /**
      * Size in bytes of an uncompressed secp256r1 public key (1 prefix byte + 32 x-coordinate + 32 y-coordinate).
      */
     const val SECP256R1_PUBLIC_KEY_SIZE = 65
@@ -817,6 +823,21 @@ object SmartAccountConstants {
      * Uncompressed point prefix byte (0x04) as defined in SEC 1 for secp256r1 public keys.
      */
     const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04
+
+    /**
+     * Ed25519 signature length in bytes (RFC 8032).
+     */
+    const val ED25519_SIGNATURE_SIZE = 64
+
+    /**
+     * Length of a Stellar S-strkey secret seed (Base32 encoding of version + 32-byte seed + 2-byte checksum).
+     */
+    const val ED25519_SECRET_KEY_STRKEY_LENGTH = 56
+
+    /**
+     * Number of characters of an address used in error-message excerpts.
+     */
+    const val ADDRESS_PREFIX_LENGTH = 8
 }
 
 // ============================================================================

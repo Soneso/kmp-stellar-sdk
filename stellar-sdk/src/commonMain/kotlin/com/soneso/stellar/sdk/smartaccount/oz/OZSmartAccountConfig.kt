@@ -61,6 +61,7 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | webauthnProvider | No | null |
  * | storage | No | InMemoryStorageAdapter |
  * | externalWallet | No | null |
+ * | externalEd25519Adapter | No | null |
  * | maxContextRuleScanId | No | 50 |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
@@ -196,6 +197,19 @@ data class OZSmartAccountConfig(
      * using WebAuthn credentials.
      */
     val externalWallet: ExternalWalletAdapter? = null,
+
+    /**
+     * Ed25519 external-signer adapter for out-of-process Ed25519 signing.
+     *
+     * The kit injects this adapter into the manager exposed as [OZSmartAccountKit.externalSigners],
+     * backing the adapter custody model for [SelectedSigner.Ed25519] signers (hardware wallet,
+     * HSM, or remote signing service). It is the symmetric sibling of [externalWallet] for the
+     * Ed25519 signer kind.
+     *
+     * When null, [SelectedSigner.Ed25519] signers resolve only against in-memory keypairs
+     * registered at runtime via [OZExternalSignerManager.addEd25519FromRawKey].
+     */
+    val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
 
     /**
      * Maximum rule ID to scan when iterating context rules.
@@ -344,6 +358,7 @@ data class OZSmartAccountConfig(
         private var webauthnProvider: WebAuthnProvider? = null
         private var storage: StorageAdapter = InMemoryStorageAdapter()
         private var externalWallet: ExternalWalletAdapter? = null
+        private var externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null
         private var maxContextRuleScanId: UInt = 50u
 
         /**
@@ -459,6 +474,18 @@ data class OZSmartAccountConfig(
         fun externalWallet(externalWallet: ExternalWalletAdapter?) = apply { this.externalWallet = externalWallet }
 
         /**
+         * Sets the Ed25519 external-signer adapter used by [OZSmartAccountKit.externalSigners]
+         * for the out-of-process Ed25519 signing path.
+         *
+         * @param value The Ed25519 external-signer adapter, or null to disable the adapter path.
+         * @return This builder for chaining.
+         */
+        fun externalEd25519Adapter(value: OZExternalEd25519SignerAdapter?): Builder {
+            externalEd25519Adapter = value
+            return this
+        }
+
+        /**
          * Sets the maximum context rule ID to scan when iterating rules.
          *
          * @param value The maximum scan ID (default 50)
@@ -492,6 +519,7 @@ data class OZSmartAccountConfig(
                 webauthnProvider = webauthnProvider,
                 storage = storage,
                 externalWallet = externalWallet,
+                externalEd25519Adapter = externalEd25519Adapter,
                 maxContextRuleScanId = maxContextRuleScanId
             )
         }

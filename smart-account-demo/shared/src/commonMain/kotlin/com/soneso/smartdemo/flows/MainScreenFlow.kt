@@ -18,6 +18,7 @@ import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.token.DemoTokenService
 import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
 import com.soneso.smartdemo.util.refreshAllBalances
+import com.soneso.smartdemo.wallet.DemoEd25519Adapter
 import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
@@ -47,16 +48,20 @@ suspend fun initializeKit(
     webauthnProvider: WebAuthnProvider?,
     storage: StorageAdapter?
 ) {
-    // Create the external signer adapter for keypair-based delegated signers.
-    // This bridges the ExternalWalletAdapter interface to in-memory Ed25519 keypairs,
-    // enabling multi-signer transfers where a delegated Stellar account co-signs.
-    val externalSignerManagerAdapter = ExternalSignerManagerAdapter()
-    externalSignerManagerAdapter.walletConnector = DemoState.walletConnector
+    // Wallet (Freighter) custody adapter for SelectedSigner.Wallet signers that sign through a
+    // connected external wallet. Supplied as the kit's wallet adapter via config.externalWallet;
+    // the kit-owned manager (kit.externalSigners) routes wallet signing through it.
+    val walletSignerAdapter = ExternalSignerManagerAdapter()
+    walletSignerAdapter.walletConnector = DemoState.walletConnector
+
+    // Ed25519 adapter custody backend for SelectedSigner.Ed25519 signers that route through the
+    // adapter path. Injected via config.externalEd25519Adapter and consulted by kit.externalSigners
+    // ahead of its in-memory keypair registry. The Approve flow registers verified seeds on it; the
+    // Transfer flow uses the in-process path (kit.externalSigners.addEd25519FromRawKey) instead.
+    val demoEd25519Adapter = DemoEd25519Adapter()
 
     // Build the SDK configuration from DemoConfig constants.
     // takeIf { isNotBlank() } ensures blank strings are treated as absent (no relayer/indexer).
-    // externalWallet bridges OZExternalSignerManager to the ExternalWalletAdapter interface
-    // required by multiSignerTransfer() for delegated signer support.
     val config = OZSmartAccountConfig(
         rpcUrl = DemoConfig.RPC_URL,
         networkPassphrase = DemoConfig.NETWORK_PASSPHRASE,
@@ -66,14 +71,18 @@ suspend fun initializeKit(
         indexerUrl = DemoConfig.DEFAULT_INDEXER_URL.takeIf { it.isNotBlank() },
         webauthnProvider = webauthnProvider,
         storage = storage ?: InMemoryStorageAdapter(),
-        externalWallet = externalSignerManagerAdapter,
+        externalWallet = walletSignerAdapter,
+        externalEd25519Adapter = demoEd25519Adapter,
         maxContextRuleScanId = DemoConfig.MAX_CONTEXT_RULE_SCAN_ID.toUInt()
     )
 
     // Create the kit instance. This is the main entry point to all SDK operations.
+    // The kit constructs its OZExternalSignerManager from the two config adapters and exposes it
+    // as kit.externalSigners.
     val kit = OZSmartAccountKit.create(config)
     DemoState.setKitInstance(kit)
-    DemoState.setExternalSignerManager(externalSignerManagerAdapter)
+    DemoState.setWalletSignerAdapter(walletSignerAdapter)
+    DemoState.setDemoEd25519Adapter(demoEd25519Adapter)
 
     ActivityLogState.success("SDK initialized")
 

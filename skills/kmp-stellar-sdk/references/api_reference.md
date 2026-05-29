@@ -1180,7 +1180,8 @@ suspend fun updateNickname(credentialId: String, nickname: String?)
 suspend fun clearAll()
 
 ## OZExternalSignerManager
-constructor(private val networkPassphrase: String, private val walletAdapter: ExternalWalletAdapter? = null, private val walletConnectionStorage: WalletConnectionStorage? = null)
+Kit-owned, accessed as the non-null property kit.externalSigners. Standalone construction is an advanced path.
+constructor(private val networkPassphrase: String, private val walletAdapter: ExternalWalletAdapter? = null, private val walletConnectionStorage: WalletConnectionStorage? = null, private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null)
 suspend fun addFromSecret(secretKey: String): String
 suspend fun addFromWallet(): ConnectedWallet?
 suspend fun canSignFor(address: String): Boolean
@@ -1189,6 +1190,14 @@ suspend fun signAuthEntry(address: String, authEntry: String): SignAuthEntryResu
 suspend fun remove(address: String)
 suspend fun removeAll()
 suspend fun restoreConnections(): List<ConnectedWallet>
+suspend fun addEd25519FromRawKey(secretKeyBytes: ByteArray, verifierAddress: String): ByteArray
+fun canSignEd25519For(verifierAddress: String, publicKey: ByteArray): Boolean
+suspend fun signEd25519AuthDigest(verifierAddress: String, publicKey: ByteArray, authDigest: ByteArray): ByteArray
+suspend fun removeEd25519(verifierAddress: String, publicKey: ByteArray)
+
+## interface OZExternalEd25519SignerAdapter
+fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean
+suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray
 
 ## OZIndexerClient : AutoCloseable
 constructor(indexerUrl: String, timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS, private val injectedClient: HttpClient? = null)
@@ -1234,7 +1243,7 @@ suspend fun removeSigner(contextRuleId: UInt, signerId: UInt, selectedSigners: L
 suspend fun removeSigner(contextRuleId: UInt, signer: SmartAccountSigner, selectedSigners: List<SelectedSigner> = emptyList(), forceMethod: SubmissionMethod? = null): TransactionResult
 
 ## data OZSmartAccountConfig
-constructor(val rpcUrl: String, val networkPassphrase: String, val accountWasmHash: String, val webauthnVerifierAddress: String, val deployerKeypair: KeyPair? = null, val rpId: String? = null, val rpName: String = "Smart Account", val sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS, val signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR, val timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS, val relayerUrl: String? = null, val indexerUrl: String? = null, val webauthnProvider: WebAuthnProvider? = null, val storage: StorageAdapter = InMemoryStorageAdapter(), val externalWallet: ExternalWalletAdapter? = null, val maxContextRuleScanId: UInt = 50u)
+constructor(val rpcUrl: String, val networkPassphrase: String, val accountWasmHash: String, val webauthnVerifierAddress: String, val deployerKeypair: KeyPair? = null, val rpId: String? = null, val rpName: String = "Smart Account", val sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS, val signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR, val timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS, val relayerUrl: String? = null, val indexerUrl: String? = null, val webauthnProvider: WebAuthnProvider? = null, val storage: StorageAdapter = InMemoryStorageAdapter(), val externalWallet: ExternalWalletAdapter? = null, val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null, val maxContextRuleScanId: UInt = 50u)
 Companion:
 suspend fun createDefaultDeployer(): KeyPair
 fun builder(rpcUrl: String, networkPassphrase: String, accountWasmHash: String, webauthnVerifierAddress: String): Builder
@@ -1253,6 +1262,7 @@ val indexerUrl: String?
 val webauthnProvider: WebAuthnProvider?
 val storage: StorageAdapter
 val externalWallet: ExternalWalletAdapter?
+val externalEd25519Adapter: OZExternalEd25519SignerAdapter?
 val maxContextRuleScanId: UInt
 suspend fun effectiveDeployer(): KeyPair
 fun effectiveIndexerUrl(): String?
@@ -1270,6 +1280,7 @@ fun indexerUrl(value: String?): Builder
 fun webauthnProvider(webauthnProvider: WebAuthnProvider?)
 fun storage(storage: StorageAdapter)
 fun externalWallet(externalWallet: ExternalWalletAdapter?)
+fun externalEd25519Adapter(value: OZExternalEd25519SignerAdapter?): Builder
 fun maxContextRuleScanId(value: UInt): Builder
 fun build(): OZSmartAccountConfig
 
@@ -1287,6 +1298,7 @@ val contextRuleManager: OZContextRuleManager by lazy
 val policyManager: OZPolicyManager by lazy
 val multiSignerManager: OZMultiSignerManager by lazy
 val credentialManager: OZCredentialManager by lazy
+val externalSigners: OZExternalSignerManager
 val isConnected: Boolean
 val credentialId: String?
 val contractId: String?
@@ -1373,6 +1385,11 @@ val transports: List<String>?
 ## data SelectedSigner.Wallet : SelectedSigner
 constructor(val address: String)
 val address: String
+
+## data SelectedSigner.Ed25519 : SelectedSigner
+constructor(val verifierAddress: String, val publicKey: ByteArray)
+val verifierAddress: String
+val publicKey: ByteArray
 
 ## sealed SessionException : SmartAccountException
 constructor(code: SmartAccountErrorCode, message: String, cause: Throwable? = null)

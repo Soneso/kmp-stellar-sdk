@@ -103,9 +103,29 @@ class OZSmartAccountKit private constructor(
     val indexerClient: OZIndexerClient?,
 
     /**
-     * Optional external wallet adapter for multi-signer support.
+     * The kit-owned [OZExternalSignerManager] — the single front door for all external
+     * (non-passkey) signers.
+     *
+     * The manager is constructed by the factories from [config], injecting the wallet adapter
+     * ([OZSmartAccountConfig.externalWallet]) and the Ed25519 adapter
+     * ([OZSmartAccountConfig.externalEd25519Adapter]). Use it to register in-memory keypairs and to
+     * query signing capability before submitting multi-signer operations.
+     *
+     * Example:
+     * ```kotlin
+     * val config = OZSmartAccountConfig.builder(...)
+     *     .externalEd25519Adapter(myHardwareAdapter)
+     *     .build()
+     * val kit = OZSmartAccountKit.create(config)
+     *
+     * // Register an in-memory Ed25519 signer at runtime
+     * kit.externalSigners.addEd25519FromRawKey(secretKeyBytes, verifierAddress)
+     *
+     * // Register an in-memory wallet (G-address) signer at runtime
+     * kit.externalSigners.addFromSecret("S...")
+     * ```
      */
-    internal val externalWallet: ExternalWalletAdapter?,
+    val externalSigners: OZExternalSignerManager,
 
     /**
      * Soroban RPC server shared by all operation managers. Closed by [close].
@@ -408,9 +428,35 @@ class OZSmartAccountKit private constructor(
                 storage = config.storage,
                 relayerClient = relayerClient,
                 indexerClient = indexerClient,
-                externalWallet = config.externalWallet,
+                externalSigners = OZExternalSignerManager(
+                    networkPassphrase = config.networkPassphrase,
+                    walletAdapter = config.externalWallet,
+                    walletConnectionStorage = null,
+                    ed25519Adapter = config.externalEd25519Adapter,
+                ),
                 sorobanServer = SorobanServer(config.rpcUrl)
             )
         }
+
+        /**
+         * Creates a kit with a pre-built [SorobanServer], used in tests to inject a
+         * mock HTTP engine. Not intended for production use.
+         */
+        internal fun createWithServer(
+            config: OZSmartAccountConfig,
+            sorobanServer: SorobanServer
+        ): OZSmartAccountKit = OZSmartAccountKit(
+            config = config,
+            storage = config.storage,
+            relayerClient = null,
+            indexerClient = null,
+            externalSigners = OZExternalSignerManager(
+                networkPassphrase = config.networkPassphrase,
+                walletAdapter = config.externalWallet,
+                walletConnectionStorage = null,
+                ed25519Adapter = config.externalEd25519Adapter,
+            ),
+            sorobanServer = sorobanServer
+        )
     }
 }

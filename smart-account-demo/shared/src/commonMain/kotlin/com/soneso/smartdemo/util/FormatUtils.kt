@@ -61,7 +61,7 @@ fun formatSignerForDisplay(signer: SmartAccountSigner): SignerDisplayInfo {
                 )
                 signer.keyData.size == 32 -> SignerDisplayInfo(
                     type = "Ed25519",
-                    display = "key:${signer.keyData.toHexString().take(8)}..."
+                    display = "${signer.keyData.toHexString().take(8)}..."
                 )
                 else -> SignerDisplayInfo(
                     type = "External",

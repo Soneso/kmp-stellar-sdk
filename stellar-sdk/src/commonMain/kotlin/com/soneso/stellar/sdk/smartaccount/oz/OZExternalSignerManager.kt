@@ -10,6 +10,7 @@ package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import kotlinx.coroutines.sync.Mutex
@@ -17,6 +18,78 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+
+// MARK: - Ed25519 Adapter Interface
+
+/**
+ * Adapter for out-of-process Ed25519 signing sources.
+ *
+ * Implement this interface to plug in a hardware wallet, remote signing service, or any
+ * other signing backend into the multi-signer pipeline. The manager consults the adapter
+ * before falling back to its in-memory keypair registry (adapter-first precedence rule).
+ *
+ * Example:
+ * ```kotlin
+ * class MyHardwareAdapter : OZExternalEd25519SignerAdapter {
+ *     override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean =
+ *         hardwareWallet.hasSigner(publicKey)
+ *
+ *     override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+ *         hardwareWallet.sign(authDigest, publicKey)
+ * }
+ *
+ * val manager = OZExternalSignerManager(
+ *     networkPassphrase = "...",
+ *     ed25519Adapter = MyHardwareAdapter()
+ * )
+ * ```
+ */
+interface OZExternalEd25519SignerAdapter {
+    /**
+     * Returns whether this adapter can produce an Ed25519 signature for the given
+     * verifier-contract address and public-key pair.
+     *
+     * Called before the in-memory keypair registry is consulted. When this method returns
+     * `true`, the adapter must be able to fulfil a subsequent [signAuthDigest] call for
+     * the same key without error.
+     *
+     * @param verifierAddress The C-strkey of the Ed25519 verifier contract identifying
+     *   the on-chain signer slot.
+     * @param publicKey The 32-byte Ed25519 public key identifying the signer slot.
+     * @return `true` when the adapter can sign for this `(verifierAddress, publicKey)` pair.
+     */
+    fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean
+
+    /**
+     * Produces a 64-byte Ed25519 signature over [authDigest].
+     *
+     * Called by the multi-signer pipeline when [canSignFor] returned `true` for the same
+     * key pair. The pipeline locally verifies the returned signature before incorporating
+     * it into the authorization payload.
+     *
+     * @param authDigest The 32-byte digest to sign, computed as
+     *   `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
+     * @param publicKey The 32-byte Ed25519 public key that identifies which key to sign with.
+     * @return The 64-byte raw Ed25519 signature over [authDigest].
+     */
+    suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray
+}
+
+// MARK: - Ed25519 Storage Key
+
+/**
+ * Composite key for the Ed25519 signer registry.
+ *
+ * Stores the public key as a hex string so that standard [Map] equality (string equality)
+ * gives content-based semantics without a custom equals/hashCode per lookup. Two entries
+ * with the same public key but different verifier addresses are distinct on-chain signers
+ * and must be stored as separate entries, mirroring the on-chain
+ * `External(verifierAddress, publicKey)` signer identity.
+ */
+private data class Ed25519SignerKey(
+    val verifierAddress: String,
+    val publicKeyHex: String,
+)
 
 // MARK: - External Signer Type
 
@@ -47,7 +120,7 @@ enum class ExternalSignerType {
  *
  * Example:
  * ```kotlin
- * val signers = externalSignerManager.getAll()
+ * val signers = manager.getAll()
  * for (signer in signers) {
  *     println("${signer.address} (${signer.type})")
  *     if (signer.type == ExternalSignerType.WALLET) {
@@ -189,11 +262,24 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
  * // List all signers
  * val signers = manager.getAll()
  * ```
+ *
+ * @param networkPassphrase The Stellar network passphrase used when delegating to wallet adapters.
+ * @param walletAdapter Optional wallet adapter backing the wallet (G-address) custody model.
+ *   The SDK never sees the wallet's private key — signing is delegated out of process.
+ * @param walletConnectionStorage Optional persistent store for external-wallet connection
+ *   metadata. Defaults to an in-memory store that does not survive application restarts.
+ * @param ed25519Adapter Optional adapter backing the Ed25519 adapter custody model. When set,
+ *   it is consulted via [OZExternalEd25519SignerAdapter.canSignFor] before the in-memory
+ *   Ed25519 keypair registry (adapter-first precedence rule). Set a concrete
+ *   [OZExternalEd25519SignerAdapter] to route Ed25519 signing through a hardware wallet, HSM,
+ *   or remote signing service; leave `null` to use only in-memory keypairs registered via
+ *   [addEd25519FromRawKey].
  */
 class OZExternalSignerManager(
     private val networkPassphrase: String,
     private val walletAdapter: ExternalWalletAdapter? = null,
-    private val walletConnectionStorage: WalletConnectionStorage? = null
+    private val walletConnectionStorage: WalletConnectionStorage? = null,
+    private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null,
 ) {
     // MARK: - Internal State
 
@@ -202,6 +288,12 @@ class OZExternalSignerManager(
      * Memory-only, never persisted.
      */
     private val keypairSigners = mutableMapOf<String, KeyPair>()
+
+    /**
+     * Ed25519 keypairs keyed by `(verifierAddress, publicKeyHex)`. Memory-only, never persisted.
+     * The composite key mirrors the on-chain `External(verifierAddress, publicKey)` signer identity.
+     */
+    private val ed25519Signers = mutableMapOf<Ed25519SignerKey, KeyPair>()
 
     /**
      * Whether [restoreConnections] has been called.
@@ -555,8 +647,8 @@ class OZExternalSignerManager(
     /**
      * Removes all signers.
      *
-     * Clears all keypair signers from memory, disconnects all external wallets,
-     * and removes all persisted wallet connections from storage.
+     * Clears all keypair signers and all Ed25519 registrations from memory, disconnects
+     * all external wallets, and removes all persisted wallet connections from storage.
      *
      * Example:
      * ```kotlin
@@ -567,6 +659,7 @@ class OZExternalSignerManager(
     suspend fun removeAll() {
         mutex.withLock {
             keypairSigners.clear()
+            ed25519Signers.clear()
         }
 
         // Disconnect all wallets
@@ -574,6 +667,170 @@ class OZExternalSignerManager(
 
         // Clear storage
         walletConnectionStorage?.removeItem(WALLET_STORAGE_KEY)
+    }
+
+    // MARK: - Ed25519 Methods
+
+    /**
+     * Registers an Ed25519 signing keypair derived from raw 32-byte secret key material
+     * and stores it in memory under the composite `(verifierAddress, publicKey)` key.
+     * The keypair is never persisted to storage and is lost when the application terminates.
+     *
+     * If a keypair is already registered for the same `(verifierAddress, publicKey)` pair
+     * it is silently overwritten.
+     *
+     * [secretKeyBytes] must be exactly 32 bytes — the raw Ed25519 seed. This is not a
+     * Stellar S-strkey; it is the raw seed material. For hardware wallets, HSMs, or remote
+     * signing services, supply an [OZExternalEd25519SignerAdapter] at construction instead —
+     * the raw secret never enters process memory.
+     *
+     * [verifierAddress] is the C-strkey of the Ed25519 verifier contract under which the
+     * signer is registered on-chain.
+     *
+     * @param secretKeyBytes The 32-byte raw Ed25519 seed.
+     * @param verifierAddress The C-strkey of the Ed25519 verifier contract.
+     * @return The derived 32-byte Ed25519 public key.
+     * @throws ValidationException.InvalidInput when [secretKeyBytes] is not exactly 32 bytes.
+     * @throws SignerException.Invalid when keypair construction fails.
+     */
+    suspend fun addEd25519FromRawKey(secretKeyBytes: ByteArray, verifierAddress: String): ByteArray {
+        if (secretKeyBytes.size != SmartAccountConstants.ED25519_SECRET_KEY_SIZE) {
+            throw ValidationException.invalidInput(
+                "secretKeyBytes",
+                "Ed25519 secret key seed must be exactly ${SmartAccountConstants.ED25519_SECRET_KEY_SIZE} bytes, " +
+                    "got ${secretKeyBytes.size}"
+            )
+        }
+
+        val keypair: KeyPair = try {
+            KeyPair.fromSecretSeed(secretKeyBytes)
+        } catch (e: Exception) {
+            throw SignerException.invalid(
+                "Failed to construct Ed25519 keypair from provided secret key bytes: ${e.message}",
+                e
+            )
+        }
+
+        val publicKey = keypair.getPublicKey()
+        val storeKey = Ed25519SignerKey(
+            verifierAddress = verifierAddress,
+            publicKeyHex = Util.bytesToHex(publicKey)
+        )
+
+        mutex.withLock {
+            ed25519Signers[storeKey] = keypair
+        }
+
+        return publicKey
+    }
+
+    /**
+     * Returns whether a signing source is available for the given Ed25519 signer.
+     *
+     * Checks the adapter first (adapter-first precedence rule). When the adapter returns
+     * `true` for [OZExternalEd25519SignerAdapter.canSignFor], this method returns `true`
+     * without consulting the in-memory registry. Falls back to checking whether an
+     * in-memory keypair is registered for `(verifierAddress, publicKey)`.
+     *
+     * @param verifierAddress The C-strkey of the Ed25519 verifier contract.
+     * @param publicKey The 32-byte Ed25519 public key identifying the signer slot.
+     * @return `true` when a signing source is available for this signer.
+     */
+    fun canSignEd25519For(verifierAddress: String, publicKey: ByteArray): Boolean {
+        val adapter = ed25519Adapter
+        if (adapter != null && adapter.canSignFor(verifierAddress, publicKey)) {
+            return true
+        }
+        val storeKey = Ed25519SignerKey(
+            verifierAddress = verifierAddress,
+            publicKeyHex = Util.bytesToHex(publicKey)
+        )
+        return ed25519Signers.containsKey(storeKey)
+    }
+
+    /**
+     * Produces a 64-byte Ed25519 signature over [authDigest].
+     *
+     * Resolves the signing source using the adapter-first precedence rule: the adapter is
+     * consulted first via [OZExternalEd25519SignerAdapter.canSignFor]. If the adapter claims
+     * it can sign, it is invoked via [OZExternalEd25519SignerAdapter.signAuthDigest]. Otherwise
+     * the in-memory keypair registry is used. Throws when neither source is available.
+     *
+     * The registry mutex is released before the adapter's
+     * [OZExternalEd25519SignerAdapter.signAuthDigest] is awaited, preventing deadlock with
+     * adapters that may call back into the manager.
+     *
+     * @param verifierAddress The C-strkey of the Ed25519 verifier contract.
+     * @param publicKey The 32-byte Ed25519 public key identifying the signer slot.
+     * @param authDigest The 32-byte auth digest to sign.
+     * @return The 64-byte raw Ed25519 signature over [authDigest].
+     * @throws ValidationException.InvalidInput when no signing source is registered.
+     * @throws TransactionException.SigningFailed when the adapter or in-memory keypair fails.
+     */
+    suspend fun signEd25519AuthDigest(
+        verifierAddress: String,
+        publicKey: ByteArray,
+        authDigest: ByteArray,
+    ): ByteArray {
+        val adapter = ed25519Adapter
+
+        if (adapter != null && adapter.canSignFor(verifierAddress, publicKey)) {
+            // The mutex is NOT held during the adapter await — the adapter may take several
+            // seconds (e.g. user confirmation on a hardware device) and may itself call back
+            // into this manager. Holding the mutex across the suspend point would deadlock.
+            val rawSignature: ByteArray = try {
+                adapter.signAuthDigest(authDigest, publicKey)
+            } catch (e: Exception) {
+                throw TransactionException.signingFailed(
+                    "Ed25519 adapter signing failed for verifier $verifierAddress: ${e.message}",
+                    e
+                )
+            }
+            return rawSignature
+        }
+
+        val storeKey = Ed25519SignerKey(
+            verifierAddress = verifierAddress,
+            publicKeyHex = Util.bytesToHex(publicKey)
+        )
+        val keypair = mutex.withLock { ed25519Signers[storeKey] }
+
+        if (keypair == null) {
+            val prefix = verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)
+            throw ValidationException.invalidInput(
+                "selectedSigners",
+                "Ed25519 signer (verifier=${prefix}...) has no registered keypair or adapter. " +
+                    "Register an in-memory key via kit.externalSigners.addEd25519FromRawKey(...), " +
+                    "or supply config.externalEd25519Adapter when constructing the kit."
+            )
+        }
+
+        if (!keypair.canSign()) {
+            throw TransactionException.signingFailed(
+                "Ed25519 keypair for verifier $verifierAddress is public-only and cannot sign"
+            )
+        }
+
+        return keypair.sign(authDigest)
+    }
+
+    /**
+     * Removes a registered Ed25519 signer from the in-memory registry.
+     *
+     * Clears the keypair stored under `(verifierAddress, publicKey)`. No-op when no keypair
+     * is registered for that pair. The adapter is not affected by this call.
+     *
+     * @param verifierAddress The C-strkey of the Ed25519 verifier contract.
+     * @param publicKey The 32-byte Ed25519 public key identifying the signer slot to remove.
+     */
+    suspend fun removeEd25519(verifierAddress: String, publicKey: ByteArray) {
+        val storeKey = Ed25519SignerKey(
+            verifierAddress = verifierAddress,
+            publicKeyHex = Util.bytesToHex(publicKey)
+        )
+        mutex.withLock {
+            ed25519Signers.remove(storeKey)
+        }
     }
 
     // MARK: - Wallet Connection Persistence

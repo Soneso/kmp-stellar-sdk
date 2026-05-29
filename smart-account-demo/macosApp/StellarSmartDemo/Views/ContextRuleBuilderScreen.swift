@@ -112,41 +112,46 @@ struct ContextRuleBuilderScreen: View {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showSignerPicker = false
-                    let descriptors = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
                     Task {
                         await viewModel.submitEditWithSigners(
                             bridge: bridgeWrapper.bridge,
                             selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys
+                            delegatedSecretKeys: secretKeys,
+                            ed25519SecretKeys: ed25519Secrets
                         )
                         appState.sync(from: bridgeWrapper.bridge)
                     }
                 },
                 onDismiss: {
                     viewModel.showSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
         .sheet(isPresented: $viewModel.showCreateSignerPicker) {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                onConfirm: { selected, secretKeys in
+                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showCreateSignerPicker = false
                     Task {
                         await viewModel.submitCreateWithSigners(
                             bridge: bridgeWrapper.bridge,
                             selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys
+                            delegatedSecretKeys: secretKeys,
+                            ed25519SecretKeys: ed25519Secrets
                         )
                         appState.sync(from: bridgeWrapper.bridge)
                     }
                 },
                 onDismiss: {
                     viewModel.showCreateSignerPicker = false
-                }
+                },
+                bridge: bridgeWrapper.bridge
             )
         }
     }

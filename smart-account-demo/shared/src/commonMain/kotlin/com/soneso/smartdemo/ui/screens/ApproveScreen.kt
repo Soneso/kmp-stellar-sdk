@@ -66,8 +66,7 @@ import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.fetchAllowance
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.loadAvailableSigners
-import com.soneso.smartdemo.flows.multiSignerApproveAllowance
-import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.smartdemo.flows.multiSignerApproveAllowanceWithEd25519
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
@@ -588,19 +587,18 @@ class ApproveScreen : Screen {
                 title = "Select Signers",
                 description = "Choose which signers co-authorize this approval. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, ed25519Secrets ->
                     showSignerPicker = false
 
                     scope.launch {
                         isLoading = true
                         errorMessage = null
 
-                        try {
-                            val capturedSpender = spender
-                            val capturedAmount = amount
+                        val capturedSpender = spender
+                        val capturedAmount = amount
 
+                        try {
                             if (isSinglePasskeyTransfer(selectedSigners)) {
-                                // Single connected passkey selected — use the standard approve path
                                 ActivityLogState.info(
                                     "Approving $capturedAmount DEMO for ${capturedSpender.take(8)}..."
                                 )
@@ -624,12 +622,6 @@ class ApproveScreen : Screen {
                                     throw Exception(result.error ?: "Approve failed")
                                 }
                             } else {
-                                // Multiple signers or delegated signers — use multi-signer path
-
-                                // Register delegated signer keypairs before calling
-                                // multiSignerApproveAllowance so the ExternalWalletAdapter can sign.
-                                registerDelegatedKeypairs(delegatedKeyPairs)
-
                                 val selected = buildSelectedSigners(selectedSigners)
 
                                 ActivityLogState.info(
@@ -637,12 +629,14 @@ class ApproveScreen : Screen {
                                         "(${selected.size} signer(s))"
                                 )
 
-                                val result = multiSignerApproveAllowance(
+                                val result = multiSignerApproveAllowanceWithEd25519(
                                     tokenContract = tokenContract,
                                     spenderAddress = capturedSpender,
                                     amount = capturedAmount,
                                     expirationLedgerOffset = EXPIRATION_OFFSETS[selectedExpirationIndex],
-                                    selectedSigners = selected
+                                    selectedSigners = selected,
+                                    delegatedKeyPairs = delegatedKeyPairs,
+                                    ed25519Secrets = ed25519Secrets
                                 )
 
                                 if (result.success) {

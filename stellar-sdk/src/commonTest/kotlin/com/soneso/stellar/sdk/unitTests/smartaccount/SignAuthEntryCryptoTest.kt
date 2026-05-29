@@ -16,16 +16,13 @@ import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
-import com.soneso.stellar.sdk.xdr.SCBytesXdr
-import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
-import com.soneso.stellar.sdk.xdr.SCMapXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
-import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
+import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -43,9 +40,9 @@ import kotlin.test.assertTrue
  * can be extracted from the signed entry and verified against the payload hash
  * computed by [SmartAccountAuth.buildAuthPayloadHash] using [KeyPair.verify].
  *
- * The contract format for Ed25519 external signers stores the signature inside a double
- * XDR-encoded [SCValXdr.Bytes] value inside a [SCValXdr.Map]. This test unpacks that
- * structure and verifies the raw Ed25519 bytes.
+ * The Ed25519 verifier contract expects `BytesN<64>` — raw 64-byte signature only.
+ * The signer slot in the signers map therefore stores the raw bytes directly wrapped
+ * in a [SCValXdr.Bytes] value, without an additional XDR envelope.
  */
 class SignAuthEntryCryptoTest {
 
@@ -124,25 +121,11 @@ class SignAuthEntryCryptoTest {
         assertNotNull(mapEntry)
         assertEquals(1, mapEntry.value.size)
 
-        // The value is double-XDR-encoded: SCValXdr.Bytes(XDR_bytes_of_inner_ScVal)
-        val outerBytesVal = mapEntry.value[0].`val`
-        assertTrue(outerBytesVal is SCValXdr.Bytes, "Signature value must be SCValXdr.Bytes")
-        val xdrBytes = (outerBytesVal as SCValXdr.Bytes).value.value
-
-        // The xdrBytes contains XDR of the Ed25519Signature SCVal map. Decode it and
-        // extract the raw 64-byte signature under key "signature".
-        val innerScVal = SCValXdr.decode(com.soneso.stellar.sdk.xdr.XdrReader(xdrBytes))
-        assertTrue(innerScVal is SCValXdr.Map, "Inner ScVal must be a Map")
-        val innerMap = (innerScVal as SCValXdr.Map).value
-        assertNotNull(innerMap)
-
-        // Find the "signature" entry (alphabetically: public_key first, then signature)
-        val sigEntry = innerMap.value.firstOrNull { entry ->
-            (entry.key as? SCValXdr.Sym)?.value?.value == "signature"
-        }
-        assertNotNull(sigEntry, "Must have a 'signature' entry in the Ed25519 map")
-
-        val sigBytes = ((sigEntry.`val` as SCValXdr.Bytes).value).value
+        // The Ed25519 signer slot stores the raw 64-byte signature directly in
+        // SCValXdr.Bytes — no additional XDR envelope is applied.
+        val sigBytesVal = mapEntry.value[0].`val`
+        assertTrue(sigBytesVal is SCValXdr.Bytes, "Signature value must be SCValXdr.Bytes")
+        val sigBytes = (sigBytesVal as SCValXdr.Bytes).value.value
         assertEquals(64, sigBytes.size, "Ed25519 signature must be 64 bytes")
 
         // Verify the extracted signature against the payload hash using the public key
@@ -180,15 +163,12 @@ class SignAuthEntryCryptoTest {
             expirationLedger = expirationLedger
         )
 
-        // Unpack signature bytes
+        // Unpack signature bytes — Ed25519 stores raw 64-byte signature directly
         val credentials = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
         val outerMap = (credentials.signature as SCValXdr.Map).value!!
         val signersEntry = outerMap.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
         val mapEntry = (signersEntry.`val` as SCValXdr.Map).value!!
-        val xdrBytes = ((mapEntry.value[0].`val`) as SCValXdr.Bytes).value.value
-        val innerMap = (SCValXdr.decode(com.soneso.stellar.sdk.xdr.XdrReader(xdrBytes)) as SCValXdr.Map).value!!
-        val sigEntry = innerMap.value.first { (it.key as? SCValXdr.Sym)?.value?.value == "signature" }
-        val sigBytes = (sigEntry.`val` as SCValXdr.Bytes).value.value
+        val sigBytes = ((mapEntry.value[0].`val`) as SCValXdr.Bytes).value.value
 
         // Verify against the signing keypair: should be valid
         assertTrue(signingKeypair.verify(payloadHash, sigBytes))

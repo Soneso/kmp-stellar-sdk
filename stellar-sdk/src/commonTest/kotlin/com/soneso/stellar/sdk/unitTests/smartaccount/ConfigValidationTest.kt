@@ -17,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -477,4 +478,118 @@ class ConfigValidationTest {
     fun testOZConstants_defaultTimeoutSeconds() {
         assertEquals(30, OZConstants.DEFAULT_TIMEOUT_SECONDS)
     }
+
+    // MARK: - Builder.externalEd25519Adapter
+
+    @Test
+    fun testBuilder_externalEd25519Adapter_storesInstance() {
+        val adapter = StubEd25519Adapter()
+
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalEd25519Adapter(adapter)
+            .build()
+
+        assertNotNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must not be null after builder.externalEd25519Adapter()"
+        )
+        assertSame(
+            adapter,
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must be the exact instance passed to the builder"
+        )
+    }
+
+    @Test
+    fun testBuilder_externalEd25519Adapter_defaultIsNull() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        ).build()
+
+        assertNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must default to null when never set on the builder"
+        )
+    }
+
+    @Test
+    fun testBuilder_externalEd25519Adapter_null_leavesFieldNull() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalEd25519Adapter(null)
+            .build()
+
+        assertNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must be null when null is passed to the builder"
+        )
+    }
+
+    @Test
+    fun testBuilder_externalEd25519Adapter_overridesPreviousValue() {
+        val adapter1 = StubEd25519Adapter()
+        val adapter2 = StubEd25519Adapter()
+
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalEd25519Adapter(adapter1)
+            .externalEd25519Adapter(adapter2)
+            .build()
+
+        assertSame(
+            adapter2,
+            config.externalEd25519Adapter,
+            "Last externalEd25519Adapter call must win"
+        )
+    }
+
+    // MARK: - createDefaultDeployer determinism
+
+    @Test
+    fun testCreateDefaultDeployer_returnsValidKeypair() = runTest {
+        val deployer = OZSmartAccountConfig.createDefaultDeployer()
+        assertNotNull(deployer, "createDefaultDeployer() must return a non-null keypair")
+        assertTrue(deployer.canSign(), "createDefaultDeployer() must return a signing keypair")
+        assertTrue(deployer.getAccountId().startsWith("G"), "Deployer account ID must start with G")
+    }
+
+    @Test
+    fun testCreateDefaultDeployer_isDeterministicAcrossMultipleCalls() = runTest {
+        val deployer1 = OZSmartAccountConfig.createDefaultDeployer()
+        val deployer2 = OZSmartAccountConfig.createDefaultDeployer()
+
+        assertEquals(
+            deployer1.getAccountId(),
+            deployer2.getAccountId(),
+            "createDefaultDeployer() must produce the same G-address on every call"
+        )
+    }
+}
+
+
+/**
+ * Minimal [OZExternalEd25519SignerAdapter] used to assert builder field round-trips.
+ * Never invoked for signing in these tests.
+ */
+private class StubEd25519Adapter : OZExternalEd25519SignerAdapter {
+    override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean = false
+
+    override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+        throw UnsupportedOperationException("StubEd25519Adapter.signAuthDigest must not be called")
 }

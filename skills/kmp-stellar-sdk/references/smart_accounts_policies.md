@@ -768,10 +768,15 @@ sealed class SelectedSigner {
     ) : SelectedSigner()
 
     data class Wallet(val address: String) : SelectedSigner()    // G-address
+
+    data class Ed25519(                                          // External Ed25519 signer
+        val verifierAddress: String,                             // C-address of the Ed25519 verifier
+        val publicKey: ByteArray                                 // 32-byte Ed25519 public key
+    ) : SelectedSigner()
 }
 ```
 
-Each `Passkey` triggers one OS biometric prompt. Each `Wallet` delegates to `ExternalWalletAdapter.signAuthEntry()` (which may show its own UI).
+Each `Passkey` triggers one OS biometric prompt. Each `Wallet` and `Ed25519` entry is signed through the kit-owned `kit.externalSigners` manager (a wallet adapter may show its own UI).
 
 ```kotlin
 // WRONG: SelectedSigner.Passkey(credentialId = "abc...")
@@ -797,10 +802,9 @@ val passkeySigner = SelectedSigner.Passkey(
 Discover which signers are available on a rule by reading `ParsedContextRule.signers` and matching against local credentials/wallets:
 
 ```kotlin
-// `externalWallet` is the same ExternalWalletAdapter instance you passed to
-// OZSmartAccountConfig(externalWallet = ...). Keep a reference in your app;
-// the kit's own `externalWallet` property is internal.
-val externalWallet: ExternalWalletAdapter? = myWalletAdapter
+// Resolve wallet signing capability through the kit-owned manager. It returns true
+// for either an in-memory keypair (kit.externalSigners.addFromSecret) or a wallet
+// adapter supplied via config.externalWallet.
 val rule = kit.contextRuleManager.listContextRules().first { it.id == contextRuleId }
 
 // Build the list the UI will present. For a passkey signer, look up the
@@ -820,7 +824,7 @@ val available = rule.signers.mapNotNull { signer ->
             )
         }
         signer is DelegatedSigner -> {
-            if (externalWallet != null && externalWallet.canSignFor(signer.address)) {
+            if (kit.externalSigners.canSignFor(signer.address)) {
                 SelectedSigner.Wallet(signer.address)
             } else null
         }
@@ -954,7 +958,7 @@ If the automatic resolver cannot find a unique rule, it throws `ValidationExcept
 
 ### External wallet requirements
 
-Wallet signers require `OZSmartAccountConfig.externalWallet` to be set to an `ExternalWalletAdapter` implementation. Minimal interface:
+A `SelectedSigner.Wallet` (G-address) signer resolves through the kit-owned `kit.externalSigners` manager. Register a signing source by either custody model: register an in-memory keypair at runtime with `kit.externalSigners.addFromSecret("S...")`, or supply an `ExternalWalletAdapter` via `OZSmartAccountConfig.externalWallet` at kit construction. Resolution tries the in-memory keypair first, then the adapter. The adapter interface (minimal):
 
 ```kotlin
 interface ExternalWalletAdapter {
@@ -982,7 +986,7 @@ The adapter receives the Base64-encoded `HashIDPreimage::SorobanAuthorization` X
 Signatures are collected in the order `selectedSigners` is supplied. For each auth entry whose credentials match the smart account contract:
 
 1. Every `SelectedSigner.Passkey` triggers one WebAuthn prompt (the SDK passes its `credentialIdBytes` + `transports` as `allowCredentials` so the browser/OS routes to the correct passkey).
-2. Every `SelectedSigner.Wallet` produces a separate delegated auth entry (signed via `ExternalWalletAdapter.signAuthEntry`) and a placeholder entry in the smart account's internal signature map.
+2. Every `SelectedSigner.Wallet` produces a separate delegated auth entry (signed through `kit.externalSigners`) and a placeholder entry in the smart account's internal signature map.
 
 If a passkey signer cancels the biometric prompt, the call fails fast with `WebAuthnException.AuthenticationFailed` — remaining signers are not prompted.
 
@@ -1072,7 +1076,7 @@ if (oldIdx >= 0) {
 //        add_signer call — there is no stored credential for the lost passkey
 //        to answer the biometric prompt.
 // CORRECT: pass selectedSigners = listOf(backup) so the multi-signer pipeline
-//          routes auth to the backup signer via ExternalWalletAdapter.
+//          routes auth to the backup signer through kit.externalSigners.
 ```
 
 ### Signer rotation (add new, then remove old)

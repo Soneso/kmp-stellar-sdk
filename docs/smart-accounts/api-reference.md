@@ -19,7 +19,7 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 7. [Context Rules](#context-rules)
 8. [Builders](#builders)
 9. [Multi-Signer Operations](#multi-signer-operations)
-10. [External Signers](#external-signers)
+10. [External Signers](#external-signers) — OZExternalSignerManager, OZExternalEd25519SignerAdapter
 11. [Indexer Client](#indexer-client)
 12. [Relayer Client](#relayer-client)
 13. [Events](#events)
@@ -186,6 +186,28 @@ val multiSignerManager: OZMultiSignerManager
 
 Access multi-signature operations and available signer queries.
 
+#### externalSigners
+```kotlin
+val externalSigners: OZExternalSignerManager
+```
+
+Read-only property exposing the kit-owned [OZExternalSignerManager] — the single front door for all external (non-passkey) signers. Always non-null: the kit constructs the manager from its configuration, injecting the wallet adapter (`OZSmartAccountConfig.externalWallet`) and the Ed25519 adapter (`OZSmartAccountConfig.externalEd25519Adapter`). The multi-signer pipeline routes all wallet (G-address) and Ed25519 signing through this manager.
+
+Use this property to register in-memory keypairs at runtime and to query signing capability before a multi-signer operation that includes `SelectedSigner.Wallet` or `SelectedSigner.Ed25519` selectors.
+
+```kotlin
+val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
+    .externalEd25519Adapter(myHardwareAdapter)
+    .build()
+val kit = OZSmartAccountKit.create(config)
+
+// Register an in-memory Ed25519 signer at runtime
+kit.externalSigners.addEd25519FromRawKey(secretKeyBytes, verifierAddress)
+
+// Register an in-memory wallet (G-address) signer at runtime
+kit.externalSigners.addFromSecret("S...")
+```
+
 ---
 
 ### Client Properties
@@ -264,6 +286,7 @@ data class OZSmartAccountConfig(
     val webauthnProvider: WebAuthnProvider? = null,
     val storage: StorageAdapter = InMemoryStorageAdapter(),
     val externalWallet: ExternalWalletAdapter? = null,
+    val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
     val maxContextRuleScanId: UInt = 50u
 )
 ```
@@ -285,7 +308,8 @@ data class OZSmartAccountConfig(
 - `indexerUrl`: Optional indexer endpoint for credential-to-contract mapping
 - `webauthnProvider`: Platform-specific WebAuthn provider
 - `storage`: Storage adapter for credential persistence (defaults to `InMemoryStorageAdapter()`)
-- `externalWallet`: Optional external wallet adapter for multi-signer support
+- `externalWallet`: Optional wallet adapter ([ExternalWalletAdapter]) backing the adapter custody model for `SelectedSigner.Wallet` (G-address) signers. The kit injects it into [OZSmartAccountKit.externalSigners].
+- `externalEd25519Adapter`: Optional Ed25519 adapter ([OZExternalEd25519SignerAdapter]) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into [OZSmartAccountKit.externalSigners]. See [External Signers](#external-signers).
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
 
 ### Platform-Specific Providers
@@ -323,7 +347,7 @@ Interface for delegated (G-address) signers in multi-signer operations. Implemen
 - `disconnectByAddress(address: String)` — disconnect a specific wallet by address (default no-op)
 - `getConnectedWallets(): List<ConnectedWallet>` — list connected wallets
 
-The SDK includes `OZExternalSignerManager` which implements this interface and manages keypair-based signers. See [External Signers](#external-signers) for details.
+The kit-owned `OZExternalSignerManager` ([OZSmartAccountKit.externalSigners]) composes an `ExternalWalletAdapter` supplied via `OZSmartAccountConfig.externalWallet` and routes `SelectedSigner.Wallet` signing through it. See [External Signers](#external-signers) for details.
 
 **Factory Methods**:
 
@@ -2154,6 +2178,8 @@ Collects unique signers from all context rules, removing duplicates across rules
 
 Manages multi-signature operations including token transfers and arbitrary contract calls. The caller is responsible for discovering signers from context rules and passing complete signer data via `SelectedSigner`.
 
+All three signer kinds — `SelectedSigner.Passkey`, `SelectedSigner.Wallet`, and `SelectedSigner.Ed25519` — may appear in the same `selectedSigners` list. The pipeline collects signatures for each signer in order: passkey entries trigger WebAuthn prompts, while wallet and Ed25519 entries are signed through the kit-owned [OZSmartAccountKit.externalSigners] manager.
+
 Note: The `selectedSigners` parameter is also available on individual manager methods (`signerManager`, `policyManager`, `contextRuleManager`). Use those methods directly instead of `multiSignerExecuteAndSubmit` when performing standard signer, policy, or rule operations with multi-signer authorization. The SDK handles argument encoding and routing internally.
 
 ```kotlin
@@ -2177,7 +2203,7 @@ suspend fun multiSignerTransfer(
 
 Executes a multi-signature token transfer. The amount is a decimal string (e.g., "100" or "10.5").
 
-The caller explicitly lists every signer. There is no implicit connected passkey -- include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` entry requests a delegated auth entry from the external wallet.
+The caller explicitly lists every signer. There is no implicit connected passkey — include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` and `Ed25519` entry signs through the kit-owned [OZSmartAccountKit.externalSigners] manager.
 
 **Parameters**:
 - `tokenContract`: Token contract address (C-address)
@@ -2192,7 +2218,8 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 **Example**:
 
 ```kotlin
-// Signers are obtained from context rule discovery (client-side)
+// Signers are obtained from context rule discovery (client-side).
+// All three signer kinds may appear in the same list.
 val result = kit.multiSignerManager.multiSignerTransfer(
     tokenContract = "CBCD...",
     recipient = "GBXYZ...",
@@ -2203,7 +2230,11 @@ val result = kit.multiSignerManager.multiSignerTransfer(
             credentialIdBytes = credIdBytes,
             keyData = signer.keyData
         ),
-        SelectedSigner.Wallet("GA7Q...")
+        SelectedSigner.Wallet("GA7Q..."),
+        SelectedSigner.Ed25519(
+            verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            publicKey = ed25519PublicKeyBytes   // 32 bytes
+        )
     )
 )
 ```
@@ -2328,7 +2359,7 @@ suspend fun submitWithMultipleSigners(
 ): TransactionResult
 ```
 
-Low-level multi-signer submission pipeline. Accepts a pre-built `HostFunctionXdr` and handles the full lifecycle: simulation, auth entry extraction, multi-signer signing (WebAuthn + delegated), re-simulation, and submission.
+Low-level multi-signer submission pipeline. Accepts a pre-built `HostFunctionXdr` and handles the full lifecycle: simulation, auth entry extraction, multi-signer signing (passkey, wallet, and Ed25519), re-simulation, and submission.
 
 This is the building block used internally by `multiSignerTransfer`, `multiSignerContractCall`, and `multiSignerExecuteAndSubmit`. Use it directly when you need full control over the host function construction.
 
@@ -2340,20 +2371,61 @@ This is the building block used internally by `multiSignerTransfer`, `multiSigne
 
 **Returns**: `TransactionResult`
 
-**Throws**: `ValidationException` if wallet signers are present but no external wallet adapter is configured, or if the adapter cannot sign for a wallet signer's address. `SmartAccountException` if signing or submission fails.
+**Throws**: `ValidationException` if [OZSmartAccountKit.externalSigners] has no signing source for a given wallet or Ed25519 signer (no in-memory key registered and no configured adapter that can sign for it). `SmartAccountException` if signing or submission fails.
 
 ---
 ## External Signers
 
 ### OZExternalSignerManager
 
-Manages external (non-passkey) signers: Ed25519 keypairs and external wallet connections.
+The kit-owned manager for external (non-passkey) signers, accessed as [OZSmartAccountKit.externalSigners]. It is the single front door through which the multi-signer pipeline resolves and signs `SelectedSigner.Wallet` (G-address) and `SelectedSigner.Ed25519` entries.
+
+The manager handles two signer kinds, each with two custody models:
+
+1. **Wallet (G-address) signers** — sign auth entries for `SelectedSigner.Wallet` entries.
+   - In-memory: register a secret seed at runtime via `kit.externalSigners.addFromSecret("S...")`. The SDK holds the key in memory.
+   - Adapter: supply an `ExternalWalletAdapter` via `OZSmartAccountConfig.externalWallet` at kit construction (Freighter, hardware, remote). The SDK never sees the key.
+   - Resolution precedence: for a wallet address the manager tries the in-memory keypair first, then the adapter.
+2. **Ed25519 external signers** — sign auth digests for `SelectedSigner.Ed25519` entries. The registry key is the tuple `(verifierAddress, publicKey)`, matching the on-chain `External(verifier, keyData)` signer slot.
+   - In-memory: register a raw 32-byte seed at runtime via `kit.externalSigners.addEd25519FromRawKey(rawBytes, verifierAddress)`. The SDK holds the key in memory.
+   - Adapter: supply an `OZExternalEd25519SignerAdapter` via `OZSmartAccountConfig.externalEd25519Adapter` at kit construction (hardware wallet, HSM, remote signing service). The SDK never sees the key.
+   - Resolution precedence: for an Ed25519 slot the manager tries the adapter first, then the in-memory key.
+
+A developer who registers a single slot under both custody models should keep this asymmetry in mind: a wallet slot resolves to the in-memory keypair first, an Ed25519 slot resolves to the adapter first.
+
+The four registration paths:
 
 ```kotlin
-val externalMgr = OZExternalSignerManager(
+val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
+    // Wallet adapter custody model (model 1)
+    .externalWallet(myWalletAdapter)
+    // Ed25519 adapter custody model (model 1)
+    .externalEd25519Adapter(myHardwareAdapter)
+    .build()
+val kit = OZSmartAccountKit.create(config)
+
+// Wallet in-memory custody model (model 2): register a secret seed at runtime
+val walletAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+
+// Ed25519 in-memory custody model (model 2): register a raw 32-byte seed at runtime
+val ed25519PublicKey = kit.externalSigners.addEd25519FromRawKey(
+    secretKeyBytes = rawSeedBytes,   // exactly 32 bytes
+    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+)
+```
+
+For a concrete `ExternalWalletAdapter` implementation, see the example implementation in the smart account demo. See also [SelectedSigner.Ed25519](#selectedsigner).
+
+#### Standalone construction (advanced)
+
+The multi-signer pipeline always uses the kit-owned `kit.externalSigners`. Constructing a manager directly is an advanced, optional path for using the signer registry outside a kit (for example, to supply a custom `WalletConnectionStorage` for cross-launch wallet-connection persistence).
+
+```kotlin
+val manager = OZExternalSignerManager(
     networkPassphrase = "Test SDF Network ; September 2015",
     walletAdapter = myWalletAdapter,
-    walletConnectionStorage = myStorage
+    walletConnectionStorage = myStorage,
+    ed25519Adapter = myHardwareAdapter
 )
 ```
 
@@ -2361,6 +2433,7 @@ val externalMgr = OZExternalSignerManager(
 - `networkPassphrase`: Stellar network passphrase (e.g., `"Test SDF Network ; September 2015"`)
 - `walletAdapter`: Optional `ExternalWalletAdapter` for external wallet connections (e.g., Freighter, LOBSTR). Required for `addFromWallet` and `restoreConnections`.
 - `walletConnectionStorage`: Optional `WalletConnectionStorage` for persisting wallet connections across app launches. When null, wallet connections are not persisted.
+- `ed25519Adapter`: Optional `OZExternalEd25519SignerAdapter` backing the Ed25519 adapter custody model. Consulted before the in-memory Ed25519 registry (adapter-first precedence).
 
 ---
 
@@ -2492,7 +2565,143 @@ Removes a signer by address.
 suspend fun removeAll()
 ```
 
-Removes all managed signers and disconnects external wallets.
+Removes all managed signers and disconnects external wallets. Also clears all Ed25519 registrations from the in-memory registry. The configured Ed25519 adapter is not affected.
+
+---
+
+#### addEd25519FromRawKey
+
+```kotlin
+suspend fun addEd25519FromRawKey(secretKeyBytes: ByteArray, verifierAddress: String): ByteArray
+```
+
+Registers an Ed25519 signing keypair derived from a raw 32-byte secret key seed. The keypair is held in memory only and is never persisted to storage. Registration is keyed by the tuple `(verifierAddress, publicKey)`, so the same 32-byte seed registered under two different verifier addresses is stored as two independent entries.
+
+**Parameters**:
+- `secretKeyBytes`: Raw 32-byte Ed25519 seed (not an S-strkey). For sources that emit raw bytes (hardware tokens, HSMs), pass the bytes directly without encoding.
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract under which the signer is registered on-chain.
+
+**Returns**: The derived 32-byte Ed25519 public key.
+
+**Throws**:
+- `ValidationException.InvalidInput` when `secretKeyBytes` is not exactly 32 bytes.
+- `SignerException.Invalid` when keypair construction fails.
+
+```kotlin
+// Decode a hex-encoded 32-byte seed and register it
+val seedHex = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+val seedBytes = seedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+val derivedPublicKey = kit.externalSigners.addEd25519FromRawKey(
+    secretKeyBytes = seedBytes,
+    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+)
+// derivedPublicKey is 32 bytes — verify it matches the on-chain signer's publicKey
+```
+
+---
+
+#### canSignEd25519For
+
+```kotlin
+fun canSignEd25519For(verifierAddress: String, publicKey: ByteArray): Boolean
+```
+
+Returns whether a signing source is available for the given `(verifierAddress, publicKey)` pair. Checks the adapter first (adapter-first precedence), then the in-memory keypair registry. This is a pure getter — no suspension, no I/O.
+
+**Parameters**:
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract.
+- `publicKey`: 32-byte Ed25519 public key identifying the signer slot.
+
+**Returns**: `true` when a signing source is available.
+
+```kotlin
+val canSign = kit.externalSigners.canSignEd25519For(verifierAddress, publicKey)
+if (canSign) {
+    println("Ready to sign for this signer slot")
+}
+```
+
+---
+
+#### signEd25519AuthDigest
+
+```kotlin
+suspend fun signEd25519AuthDigest(
+    verifierAddress: String,
+    publicKey: ByteArray,
+    authDigest: ByteArray
+): ByteArray
+```
+
+Produces a 64-byte Ed25519 signature over `authDigest`. Resolves the signing source using adapter-first precedence: the adapter is checked first; if it declines, the in-memory registry is used. Throws when neither source is available.
+
+The registry mutex is released before awaiting the adapter's `signAuthDigest` call. This allows hardware-wallet adapters that may take several seconds (e.g., user confirmation on a device) or that may need to call back into the manager without causing deadlock.
+
+**Parameters**:
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract.
+- `publicKey`: 32-byte Ed25519 public key identifying the signer slot.
+- `authDigest`: 32-byte auth digest to sign.
+
+**Returns**: 64-byte raw Ed25519 signature.
+
+**Throws**:
+- `ValidationException.InvalidInput` when no signing source is registered for the given tuple.
+- `TransactionException.SigningFailed` when the adapter or keypair signing call fails.
+
+---
+
+#### removeEd25519
+
+```kotlin
+suspend fun removeEd25519(verifierAddress: String, publicKey: ByteArray)
+```
+
+Removes a registered Ed25519 signer from the in-memory registry. No-op when no keypair is registered for `(verifierAddress, publicKey)`. The configured Ed25519 adapter is not affected.
+
+**Parameters**:
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract.
+- `publicKey`: 32-byte Ed25519 public key identifying the signer slot to remove.
+
+```kotlin
+kit.externalSigners.removeEd25519(verifierAddress, publicKey)
+```
+
+---
+
+### OZExternalEd25519SignerAdapter
+
+Adapter interface for out-of-process Ed25519 signing sources. Implement this interface to route Ed25519 signing through a hardware wallet, HSM, or remote signing service, and supply it via `OZSmartAccountConfig.externalEd25519Adapter` at kit construction.
+
+```kotlin
+interface OZExternalEd25519SignerAdapter {
+    fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean
+    suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray
+}
+```
+
+**`canSignFor`**: Called before the in-memory registry is consulted. When this returns `true`, the adapter must be able to fulfill a subsequent `signAuthDigest` call for the same key without error.
+
+**`signAuthDigest`**: Produces a 64-byte Ed25519 signature over `authDigest`. The pipeline locally verifies the returned signature before incorporating it into the authorization payload.
+
+**Parameters**:
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract identifying the on-chain signer slot.
+- `publicKey`: 32-byte Ed25519 public key identifying the signer slot.
+- `authDigest`: 32-byte digest to sign, computed as `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
+
+```kotlin
+class MyHardwareAdapter : OZExternalEd25519SignerAdapter {
+    override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean =
+        hardwareDevice.hasSigner(publicKey)
+
+    override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+        hardwareDevice.sign(authDigest, publicKey)  // blocks until user confirms on device
+}
+
+val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
+    .externalEd25519Adapter(MyHardwareAdapter())
+    .build()
+val kit = OZSmartAccountKit.create(config)
+```
 
 ---
 
@@ -3339,7 +3548,7 @@ sealed class IndexerException : SmartAccountException {
 
 ### SelectedSigner
 
-Sealed class that specifies which signers should participate in a multi-signature operation. The caller lists every signer explicitly — there is no implicit connected passkey.
+Sealed class that specifies which signers should participate in a multi-signature operation. The caller lists every signer explicitly — there is no implicit connected passkey. Three signer kinds are supported and may be mixed in a single list.
 
 ```kotlin
 sealed class SelectedSigner {
@@ -3347,17 +3556,43 @@ sealed class SelectedSigner {
     data class Passkey(
         val credentialId: String? = null,
         val credentialIdBytes: ByteArray? = null,
-        val keyData: ByteArray? = null
+        val keyData: ByteArray? = null,
+        val transports: List<String>? = null
     ) : SelectedSigner()
 
     /** Delegated wallet signer identified by its Stellar G-address. */
     data class Wallet(val address: String) : SelectedSigner()
+
+    /**
+     * Ed25519 external signer identified by the verifier contract address and 32-byte public key.
+     *
+     * This case is a pure identifier — it carries no signing material. A signing source
+     * must be registered on [OZSmartAccountKit.externalSigners] before including this
+     * selector in a multi-signer operation: register an in-memory key at runtime via
+     * [OZExternalSignerManager.addEd25519FromRawKey], or supply an
+     * [OZExternalEd25519SignerAdapter] via [OZSmartAccountConfig.externalEd25519Adapter]
+     * at kit construction.
+     */
+    data class Ed25519(
+        val verifierAddress: String,
+        val publicKey: ByteArray
+    ) : SelectedSigner()
 }
 ```
 
+**`Passkey` fields**:
 - `credentialId`: Base64URL-encoded credential ID for display/logging.
 - `credentialIdBytes`: Raw credential ID bytes for the WebAuthn allowCredentials constraint.
 - `keyData`: Full key data (secp256r1 public key + credentialId bytes). Required for multi-signer transfers. Populated from the signer data obtained during context rule discovery.
+- `transports`: Optional transport hints (e.g., `"internal"`, `"hybrid"`). Enables cross-device authentication flows.
+
+**`Ed25519` fields**:
+- `verifierAddress`: C-strkey of the Ed25519 verifier contract that is stored as part of the on-chain `External(verifierAddress, publicKey)` signer entry.
+- `publicKey`: 32-byte Ed25519 public key identifying the signer slot on the smart account.
+
+**Equality**: `SelectedSigner.Ed25519` overrides `equals` and `hashCode` using content-based comparison for the `publicKey` byte array. Two instances with identical `verifierAddress` and `publicKey` bytes are equal regardless of object identity.
+
+See also: [OZExternalSignerManager](#ozexternalsignermanager) for registering Ed25519 signing sources.
 
 ---
 
@@ -3515,6 +3750,21 @@ data class SignAuthEntryOptions(
 
 ---
 
+### SmartAccountSignature
+
+Sealed base class for all signature variants attached to a smart-account auth payload. Concrete subtypes: [WebAuthnSignature](#webauthnsignature), [Ed25519Signature](#ed25519signature), [PolicySignature](#policysignature).
+
+```kotlin
+sealed class SmartAccountSignature {
+    abstract fun toScVal(): SCValXdr
+    abstract fun toAuthPayloadBytes(): ByteArray
+}
+```
+
+`toScVal()` returns the variant-specific Soroban value as it appears in the on-wire signature slot. `toAuthPayloadBytes()` returns the byte sequence that is inserted into the signer-payload Map under the signer's key — Map-shaped variants XDR-encode their `toScVal()`; the `Ed25519Signature` variant returns the raw 64-byte signature directly because the Ed25519 verifier contract expects `BytesN<64>` without an XDR envelope.
+
+---
+
 ### WebAuthnSignature
 
 ```kotlin
@@ -3522,10 +3772,40 @@ data class WebAuthnSignature(
     val authenticatorData: ByteArray,
     val clientData: ByteArray,
     val signature: ByteArray
-)
+) : SmartAccountSignature()
 ```
 
-Represents a WebAuthn signature with authenticator and client data.
+Represents a WebAuthn signature with authenticator and client data. `toScVal()` returns an `SCValXdr.Map` with three keys in alphabetical order: `authenticator_data`, `client_data`, `signature`. The 64-byte `signature` field is the compact ECDSA signature with normalized S value.
+
+---
+
+### Ed25519Signature
+
+```kotlin
+data class Ed25519Signature(
+    val publicKey: ByteArray,
+    val signature: ByteArray
+) : SmartAccountSignature()
+```
+
+Represents an Ed25519 signature produced by an Ed25519 external signer (see [SelectedSigner.Ed25519](#selectedsigner) and [OZExternalEd25519SignerAdapter](#ozexternaled25519signeradapter)).
+
+- `publicKey` (32 bytes) is used for local verification before submission and for content-equality. It is NOT transmitted on the wire — the Ed25519 verifier contract reads the public key from the smart account's `External(verifier, key_data)` storage.
+- `signature` (64 bytes) is the raw Ed25519 signature.
+- `toScVal()` returns `SCValXdr.Bytes` containing the raw 64-byte signature. Not a Map.
+- `toAuthPayloadBytes()` returns the raw 64-byte signature directly with no XDR envelope.
+
+---
+
+### PolicySignature
+
+```kotlin
+object PolicySignature : SmartAccountSignature()
+```
+
+Singleton signaling policy-based authorization. Used when a context rule is satisfied by policy evaluation (e.g. threshold, weighted threshold, spending limit) rather than by an explicit signer signature. `toScVal()` returns an empty `SCValXdr.Map`.
+
+Obtain the canonical instance via `PolicySignature` (no constructor).
 
 ---
 
@@ -3721,9 +4001,13 @@ Defined in `smartaccount/core/SmartAccountErrors.kt`. Contains crypto constants 
 
 ```kotlin
 object SmartAccountConstants {
-    const val ED25519_PUBLIC_KEY_SIZE = 32         // Size in bytes of an Ed25519 public key (RFC 8032)
-    const val SECP256R1_PUBLIC_KEY_SIZE = 65       // Size in bytes of an uncompressed secp256r1 public key
-    const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04  // Uncompressed point prefix byte as defined in SEC 1
+    const val ED25519_PUBLIC_KEY_SIZE = 32              // Size in bytes of an Ed25519 public key (RFC 8032)
+    const val ED25519_SECRET_KEY_SIZE = 32              // Size in bytes of an Ed25519 secret key seed (RFC 8032)
+    const val SECP256R1_PUBLIC_KEY_SIZE = 65            // Size in bytes of an uncompressed secp256r1 public key
+    const val UNCOMPRESSED_PUBKEY_PREFIX: Byte = 0x04   // Uncompressed point prefix byte as defined in SEC 1
+    const val ED25519_SIGNATURE_SIZE = 64               // Ed25519 signature length in bytes (RFC 8032)
+    const val ED25519_SECRET_KEY_STRKEY_LENGTH = 56     // Length of a Stellar S-strkey secret seed
+    const val ADDRESS_PREFIX_LENGTH = 8                 // Number of characters of an address used in error-message excerpts
 }
 ```
 
