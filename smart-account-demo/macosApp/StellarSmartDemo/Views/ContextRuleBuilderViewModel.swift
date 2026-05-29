@@ -894,7 +894,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     func submitEditWithSigners(
         bridge: MacOSBridge,
         selectedSigners: [SignerInfoBridge],
-        delegatedSecretKeys: [String: String]
+        delegatedSecretKeys: [String: String],
+        ed25519SecretKeys: [String: String]
     ) async {
         guard let diff = computeEditDiff() else { return }
         guard !diff.isEmpty else { return }
@@ -949,6 +950,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                 editDiff: bridgeDiff,
                 signerDescriptors: signerDescs,
                 delegatedSecretKeys: delegatedSecretKeys,
+                ed25519SecretKeys: ed25519SecretKeys,
                 onProgress: { [weak self] msg in
                     Task { @MainActor in
                         stepCount += 1
@@ -1043,7 +1045,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         await submitEditWithSigners(
             bridge: bridge,
             selectedSigners: [],
-            delegatedSecretKeys: [:]
+            delegatedSecretKeys: [:],
+            ed25519SecretKeys: [:]
         )
     }
 
@@ -1070,14 +1073,15 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         }
 
         // Single-signer path: submit directly
-        try await performCreateSubmission(bridge: bridge, signerDescs: [], secretKeys: [:])
+        try await performCreateSubmission(bridge: bridge, signerDescs: [], secretKeys: [:], ed25519Secrets: [:])
     }
 
     /// Called from the create-mode signer picker after user confirms signer selection.
     func submitCreateWithSigners(
         bridge: MacOSBridge,
         selectedSigners: [SignerInfoBridge],
-        delegatedSecretKeys: [String: String]
+        delegatedSecretKeys: [String: String],
+        ed25519SecretKeys: [String: String]
     ) async {
         isSubmitting = true
         errorMessage = nil
@@ -1089,7 +1093,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             try await performCreateSubmission(
                 bridge: bridge,
                 signerDescs: signerDescs,
-                secretKeys: delegatedSecretKeys
+                secretKeys: delegatedSecretKeys,
+                ed25519Secrets: ed25519SecretKeys
             )
         } catch let submissionErr as SubmissionError {
             submissionSuccess = false
@@ -1118,7 +1123,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     private func performCreateSubmission(
         bridge: MacOSBridge,
         signerDescs: [SignerDescriptor],
-        secretKeys: [String: String]
+        secretKeys: [String: String],
+        ed25519Secrets: [String: String]
     ) async throws {
         let contextTypeName: String
         let contextTypeParam: String?
@@ -1158,7 +1164,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             signerDescriptors: signerDescriptors,
             policyDescriptors: policyDescriptors,
             signerDescriptorsForAuth: signerDescs,
-            delegatedSecretKeysForAuth: secretKeys
+            delegatedSecretKeysForAuth: secretKeys,
+            ed25519SecretKeys: ed25519Secrets
         )
 
         submissionSuccess = result.success

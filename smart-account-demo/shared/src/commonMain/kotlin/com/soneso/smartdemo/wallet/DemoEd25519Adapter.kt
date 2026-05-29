@@ -14,9 +14,15 @@ import kotlinx.coroutines.sync.withLock
  * callback path — real production adapters delegate to hardware wallets, HSMs, or remote
  * signing services and never handle raw seed material.
  *
+ * The adapter is injected at kit construction via OZSmartAccountConfig.externalEd25519Adapter
+ * and consulted by kit.externalSigners ahead of its in-memory keypair registry. [canSignFor]
+ * returns `true` only for seeds registered via [add]; keys registered in-process through
+ * kit.externalSigners.addEd25519FromRawKey are deliberately absent here so they route through
+ * the in-memory path rather than this adapter.
+ *
  * Usage pattern:
  * 1. After the user verifies secrets in the signer picker, call [add] for each secret.
- * 2. Set this adapter on [OZExternalSignerManager.ed25519Adapter] before submitting.
+ * 2. Submit the multi-signer operation; the manager invokes [signAuthDigest] for covered keys.
  * 3. After submission (success or failure), call [clearAll] to drop all seed material.
  */
 class DemoEd25519Adapter : OZExternalEd25519SignerAdapter {

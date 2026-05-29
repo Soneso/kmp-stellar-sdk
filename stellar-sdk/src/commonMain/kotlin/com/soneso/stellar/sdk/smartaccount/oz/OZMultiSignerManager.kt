@@ -106,9 +106,9 @@ sealed class SelectedSigner {
      * The `(verifierAddress, publicKey)` pair identifies the on-chain
      * `External(verifierAddress, publicKey)` signer slot. Signing capability for this
      * signer must be registered separately via
-     * [OZExternalSignerManager.addEd25519FromRawKey] (or by setting an
-     * [OZExternalEd25519SignerAdapter]) before including this selector in a
-     * multi-signer operation.
+     * [OZExternalSignerManager.addEd25519FromRawKey] (or by supplying an
+     * [OZExternalEd25519SignerAdapter] through [OZSmartAccountConfig.externalEd25519Adapter]
+     * when constructing the kit) before including this selector in a multi-signer operation.
      *
      * Unlike passkey selectors, this type carries no signing material — it is a pure
      * identifier.
@@ -567,23 +567,17 @@ class OZMultiSignerManager internal constructor(
     }
 
     /**
-     * Validates all selected signers: wallet adapter presence, per-wallet reachability, and Ed25519
-     * key size, verifier address format, manager presence, and signing source registration.
+     * Validates all selected signers: per-wallet signing-source reachability via
+     * [OZExternalSignerManager.canSignFor], and Ed25519 key size, verifier address format, and
+     * signing-source availability via [OZExternalSignerManager.canSignEd25519For].
      */
-    private fun validateSelectedSigners(
+    private suspend fun validateSelectedSigners(
         selectedSigners: List<SelectedSigner>,
         walletSigners: List<SelectedSigner.Wallet>
     ) {
-        if (walletSigners.isNotEmpty() && kit.externalWallet == null) {
-            throw ValidationException.invalidInput(
-                "selectedSigners",
-                "Wallet signers require an external wallet adapter to be configured"
-            )
-        }
-
         for (walletSigner in walletSigners) {
             val canSign = try {
-                kit.externalWallet!!.canSignFor(walletSigner.address)
+                kit.externalSigners.canSignFor(walletSigner.address)
             } catch (e: Exception) {
                 false
             }
@@ -591,7 +585,9 @@ class OZMultiSignerManager internal constructor(
                 throw ValidationException.invalidInput(
                     "selectedSigners",
                     "No signer available for address: ${walletSigner.address}. " +
-                        "Use externalWallet.addFromSecret() or externalWallet.addFromWallet() to add a signer."
+                        "Register an in-memory keypair via kit.externalSigners.addFromSecret(<S-strkey>), " +
+                        "or supply a wallet adapter that can sign for this address via config.externalWallet " +
+                        "when constructing the kit."
                 )
             }
         }
@@ -611,16 +607,13 @@ class OZMultiSignerManager internal constructor(
                         "got: ${ed25519Signer.verifierAddress}"
                 )
             }
-            val externalSignerManager = kit.config.externalSignerManager
-                ?: throw ValidationException.invalidInput(
-                    "selectedSigners",
-                    "Ed25519 signers require an OZExternalSignerManager to be configured in OZSmartAccountConfig"
-                )
-            if (!externalSignerManager.canSignEd25519For(ed25519Signer.verifierAddress, ed25519Signer.publicKey)) {
+            if (!kit.externalSigners.canSignEd25519For(ed25519Signer.verifierAddress, ed25519Signer.publicKey)) {
                 throw ValidationException.invalidInput(
                     "selectedSigners",
-                    "No signing source available for Ed25519 signer (verifier=${ed25519Signer.verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)}...). " +
-                        "Register via OZExternalSignerManager.addEd25519FromRawKey(...) or set ed25519Adapter before signing."
+                    "No signing source available for Ed25519 signer " +
+                        "(verifier=${ed25519Signer.verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)}...). " +
+                        "Register an in-memory key via kit.externalSigners.addEd25519FromRawKey(...), " +
+                        "or supply config.externalEd25519Adapter when constructing the kit."
                 )
             }
         }
@@ -718,10 +711,7 @@ class OZMultiSignerManager internal constructor(
         expirationLedger: UInt,
         contextRuleIds: List<UInt>
     ): SorobanAuthorizationEntryXdr {
-        // externalSignerManager is guaranteed non-null — validated in validateSelectedSigners.
-        val externalSignerManager = kit.config.externalSignerManager!!
-
-        val rawSignature = externalSignerManager.signEd25519AuthDigest(
+        val rawSignature = kit.externalSigners.signEd25519AuthDigest(
             verifierAddress = signer.verifierAddress,
             publicKey = signer.publicKey,
             authDigest = authDigest
@@ -782,9 +772,6 @@ class OZMultiSignerManager internal constructor(
         for (selectedSigner in selectedSigners) {
             if (selectedSigner !is SelectedSigner.Wallet) continue
 
-            // externalWallet is guaranteed non-null — validated in validateSelectedSigners.
-            val externalWallet = kit.externalWallet!!
-
             val checkAuthInvocation = SorobanAuthorizedInvocationXdr(
                 function = SorobanAuthorizedFunctionXdr.ContractFn(
                     InvokeContractArgsXdr(
@@ -800,19 +787,7 @@ class OZMultiSignerManager internal constructor(
                 val writer = XdrWriter()
                 preimage.encode(writer)
                 val preimageXdr = kotlin.io.encoding.Base64.encode(writer.toByteArray())
-                val result = try {
-                    externalWallet.signAuthEntry(
-                        preimageXdr,
-                        SignAuthEntryOptions(
-                            networkPassphrase = kit.config.networkPassphrase,
-                            address = selectedSigner.address
-                        )
-                    )
-                } catch (e: Exception) {
-                    throw TransactionException.signingFailed(
-                        "External wallet signing failed for ${selectedSigner.address}: ${e.message}", e
-                    )
-                }
+                val result = kit.externalSigners.signAuthEntry(selectedSigner.address, preimageXdr)
                 val signatureBytes = kotlin.io.encoding.Base64.decode(result.signedAuthEntry)
                 Auth.Signature(
                     publicKey = result.signerAddress ?: selectedSigner.address,
@@ -880,9 +855,6 @@ class OZMultiSignerManager internal constructor(
         walletSigner: SelectedSigner.Wallet,
         expirationLedger: UInt
     ): SorobanAuthorizationEntryXdr {
-        // externalWallet is guaranteed non-null — validated in submitWithMultipleSigners.
-        val externalWallet = kit.externalWallet!!
-
         // Clone and set the expiration ledger
         val signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
 
@@ -905,20 +877,8 @@ class OZMultiSignerManager internal constructor(
         preimage.encode(writer)
         val preimageXdr = kotlin.io.encoding.Base64.encode(writer.toByteArray())
 
-        // Request signature from the external wallet
-        val signResult = try {
-            externalWallet.signAuthEntry(
-                preimageXdr,
-                SignAuthEntryOptions(
-                    networkPassphrase = kit.config.networkPassphrase,
-                    address = walletSigner.address
-                )
-            )
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "External wallet signing failed for ${walletSigner.address}: ${e.message}", e
-            )
-        }
+        // Request signature from the external signer
+        val signResult = kit.externalSigners.signAuthEntry(walletSigner.address, preimageXdr)
 
         val signatureBytes = kotlin.io.encoding.Base64.decode(signResult.signedAuthEntry)
 

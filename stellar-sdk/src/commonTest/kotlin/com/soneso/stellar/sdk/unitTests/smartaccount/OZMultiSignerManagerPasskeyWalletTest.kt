@@ -28,6 +28,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -479,14 +480,14 @@ class OZMultiSignerManagerPasskeyWalletTest {
     }
 
     // ========================================================================
-    // Wallet signer — no adapter configured
+    // Wallet signer — no signing source at all (no keypair, no adapter)
     // ========================================================================
 
     @Test
-    fun test_submitWithMultipleSigners_wallet_noAdapter_throwsValidationInvalidInput() = runTest {
+    fun test_submitWithMultipleSigners_wallet_noSigningSource_throwsValidationInvalidInput() = runTest {
         val deployer = KeyPair.random()
 
-        // Config with no externalWallet adapter
+        // Config with no externalWallet adapter and no in-memory keypair registered.
         val config = OZSmartAccountConfig(
             rpcUrl = "https://soroban-testnet.stellar.org",
             networkPassphrase = Network.TESTNET.networkPassphrase,
@@ -498,15 +499,62 @@ class OZMultiSignerManagerPasskeyWalletTest {
         val kit = OZSmartAccountKit.create(config)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
+        val unregisteredAddress = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
         val ex = assertFailsWith<ValidationException.InvalidInput> {
             kit.multiSignerManager.submitWithMultipleSigners(
                 hostFunction = stubHostFunction(VERIFIER_B),
-                selectedSigners = listOf(SelectedSigner.Wallet("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"))
+                selectedSigners = listOf(SelectedSigner.Wallet(unregisteredAddress))
             )
         }
+        // The wallet not-found message must name both runtime remedies.
         assertTrue(
-            ex.message.contains("selectedSigners", ignoreCase = true),
-            "Exception must reference selectedSigners; got: ${ex.message}"
+            ex.message.contains(unregisteredAddress, ignoreCase = false),
+            "Exception must identify the address with no signing source; got: ${ex.message}"
+        )
+        assertTrue(
+            ex.message.contains("kit.externalSigners.addFromSecret", ignoreCase = false),
+            "Exception must name kit.externalSigners.addFromSecret; got: ${ex.message}"
+        )
+        assertTrue(
+            ex.message.contains("config.externalWallet", ignoreCase = false),
+            "Exception must name config.externalWallet; got: ${ex.message}"
+        )
+    }
+
+    // ========================================================================
+    // Wallet signer — in-memory keypair registered, no adapter → validation passes
+    // ========================================================================
+
+    @Test
+    fun test_submitWithMultipleSigners_wallet_inMemoryKeypairNoAdapter_passesValidation() = runTest {
+        val deployer = KeyPair.random()
+        val walletKeypair = KeyPair.random()
+
+        // No externalWallet adapter — the in-memory keypair custody model is the only source.
+        val config = OZSmartAccountConfig(
+            rpcUrl = "https://soroban-testnet.stellar.org",
+            networkPassphrase = Network.TESTNET.networkPassphrase,
+            accountWasmHash = "a" + "0".repeat(63),
+            webauthnVerifierAddress = VERIFIER_A,
+            deployerKeypair = deployer
+        )
+
+        val kit = OZSmartAccountKit.create(config)
+        val walletAddress = kit.externalSigners.addFromSecret(walletKeypair.getSecretSeed()!!.concatToString())
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        // With an in-memory keypair registered, the per-address validation passes and the
+        // call proceeds past validation to the simulation step. A network-related failure
+        // (not InvalidInput) confirms validation did not reject the wallet signer.
+        val ex = assertFailsWith<Exception> {
+            kit.multiSignerManager.submitWithMultipleSigners(
+                hostFunction = stubHostFunction(VERIFIER_B),
+                selectedSigners = listOf(SelectedSigner.Wallet(walletAddress))
+            )
+        }
+        assertFalse(
+            ex is ValidationException.InvalidInput,
+            "Wallet validation must pass with an in-memory keypair and no adapter; got: ${ex::class.simpleName}: ${ex.message}"
         )
     }
 
@@ -610,6 +658,138 @@ class OZMultiSignerManagerPasskeyWalletTest {
         assertEquals(txHash, result.hash, "Hash must match sendTransaction response")
         // Passkey was included — authenticate must have been called once
         assertEquals(1, mockProvider.authenticateCallCount, "Passkey authenticate must be called once")
+    }
+
+    // ========================================================================
+    // Wallet signer — in-memory keypair custody model (full submit round-trip)
+    // ========================================================================
+
+    @Test
+    fun test_submitWithMultipleSigners_walletInMemoryKeypair_succeeds() = runTest {
+        val deployer = KeyPair.random()
+        val walletKeypair = KeyPair.random()
+
+        // No externalWallet adapter is configured. The wallet signer is backed solely by an
+        // in-memory keypair registered through kit.externalSigners.addFromSecret(...).
+        val config = OZSmartAccountConfig(
+            rpcUrl = "https://soroban-testnet.stellar.org",
+            networkPassphrase = Network.TESTNET.networkPassphrase,
+            accountWasmHash = "a" + "0".repeat(63),
+            webauthnVerifierAddress = VERIFIER_A,
+            deployerKeypair = deployer
+        )
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val authEntry = buildAuthEntry(VERIFIER_B)
+        val authEntryXdr = authEntry.toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+        val txHash = "f6052a5d94acb9d6f9f5b8a3a7d3d8c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0"
+
+        val mockServer = buildSequentialMockServerWithSubmission(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = authEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr,
+            txHash = txHash
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(config = config, sorobanServer = mockServer)
+        val walletAddress = kit.externalSigners.addFromSecret(walletKeypair.getSecretSeed()!!.concatToString())
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val result = kit.multiSignerManager.submitWithMultipleSigners(
+            hostFunction = stubHostFunction(VERIFIER_B),
+            selectedSigners = listOf(SelectedSigner.Wallet(walletAddress)),
+            resolveContextRuleIds = { _, _ -> emptyList() }
+        )
+
+        assertTrue(result.success, "Result must be successful; error=${result.error}")
+        assertNotNull(result.hash, "Result must carry a transaction hash")
+        assertEquals(txHash, result.hash, "Hash must match sendTransaction response")
+    }
+
+    // ========================================================================
+    // signAuthEntry precedence — in-memory keypair wins over the wallet adapter
+    // ========================================================================
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun test_signAuthEntry_keypairAndAdapterForSameAddress_keypairWins() = runTest {
+        // Register an address as BOTH an in-memory keypair AND a wallet adapter able to sign
+        // for it. The manager must resolve the in-memory keypair first: the returned signature
+        // verifies under the keypair public key, and the adapter is never invoked.
+        val walletKeypair = KeyPair.random()
+        val walletAddress = walletKeypair.getAccountId()
+
+        val countingAdapter = object : ExternalWalletAdapter {
+            var signCallCount = 0
+                private set
+
+            override suspend fun connect(): ConnectedWallet = ConnectedWallet(
+                address = walletAddress,
+                walletId = "test-wallet",
+                walletName = "Test Wallet"
+            )
+
+            override suspend fun disconnect() { /* no-op */ }
+
+            override fun canSignFor(address: String): Boolean = address == walletAddress
+
+            override fun getConnectedWallets(): List<ConnectedWallet> = listOf(
+                ConnectedWallet(address = walletAddress, walletId = "test-wallet", walletName = "Test Wallet")
+            )
+
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                if (address == walletAddress) {
+                    ConnectedWallet(address = walletAddress, walletId = "test-wallet", walletName = "Test Wallet")
+                } else null
+
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult {
+                signCallCount++
+                // Return a deliberately distinct (invalid) signature so a keypair-vs-adapter
+                // mix-up would be detectable; this path must not be reached.
+                return SignAuthEntryResult(
+                    signedAuthEntry = Base64.encode(ByteArray(64)),
+                    signerAddress = walletAddress
+                )
+            }
+        }
+
+        val config = OZSmartAccountConfig(
+            rpcUrl = "https://soroban-testnet.stellar.org",
+            networkPassphrase = Network.TESTNET.networkPassphrase,
+            accountWasmHash = "a" + "0".repeat(63),
+            webauthnVerifierAddress = VERIFIER_A,
+            externalWallet = countingAdapter
+        )
+
+        val kit = OZSmartAccountKit.create(config)
+        // Register the same address as an in-memory keypair on the kit-owned manager.
+        kit.externalSigners.addFromSecret(walletKeypair.getSecretSeed()!!.concatToString())
+
+        // Build a base64 preimage and sign it through the manager.
+        val preimageBytes = ByteArray(48) { (it + 7).toByte() }
+        val preimageBase64 = Base64.encode(preimageBytes)
+
+        val result = kit.externalSigners.signAuthEntry(walletAddress, preimageBase64)
+
+        // The keypair path hashes the preimage (SHA-256) and signs the hash. Recompute and verify.
+        val expectedDigest = getSha256Crypto().hash(preimageBytes)
+        val signatureBytes = Base64.decode(result.signedAuthEntry)
+        assertTrue(
+            walletKeypair.verify(expectedDigest, signatureBytes),
+            "Signature must verify under the in-memory keypair public key (keypair-first precedence)"
+        )
+        assertEquals(
+            0,
+            countingAdapter.signCallCount,
+            "The wallet adapter must NOT be invoked when an in-memory keypair is registered for the address"
+        )
+        assertEquals(walletAddress, result.signerAddress, "signerAddress must be the keypair G-address")
     }
 
     // ========================================================================

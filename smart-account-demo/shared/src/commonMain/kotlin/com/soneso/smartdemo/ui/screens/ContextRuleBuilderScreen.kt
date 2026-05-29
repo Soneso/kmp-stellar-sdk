@@ -89,7 +89,7 @@ import com.soneso.smartdemo.flows.loadAvailableSigners
 import com.soneso.smartdemo.flows.loadContextRules
 import com.soneso.smartdemo.flows.loadParsedContextRule
 import com.soneso.smartdemo.flows.readPolicyParamsWithServer
-import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.smartdemo.flows.withInProcessMultiSigner
 import com.soneso.smartdemo.flows.resolveAbsoluteLedger
 import com.soneso.smartdemo.flows.submitContextRuleEdits
 import com.soneso.smartdemo.platform.getClipboard
@@ -1203,7 +1203,7 @@ class ContextRuleBuilderScreen(
                 title = "Select Signers",
                 description = "Choose which signers co-authorize creating this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, ed25519Secrets ->
                     showCreateSignerPicker = false
 
                     scope.launch {
@@ -1219,25 +1219,19 @@ class ContextRuleBuilderScreen(
                                 FlowPolicyEntry(address = policy.address, scVal = policy.scVal)
                             }
 
-                            if (isSinglePasskeyTransfer(selectedSigners)) {
-                                val result = addContextRule(
-                                    contextType = selectedContextType,
-                                    name = ruleName.trim(),
-                                    validUntil = validUntilVal,
-                                    signers = signers,
-                                    policies = flowPolicies
-                                )
-                                submissionResult = result
+                            val selected = if (isSinglePasskeyTransfer(selectedSigners)) {
+                                emptyList()
                             } else {
-                                registerDelegatedKeypairs(delegatedKeyPairs)
-                                val selected = buildSelectedSigners(selectedSigners)
+                                buildSelectedSigners(selectedSigners)
+                            }
 
-                                ActivityLogState.info(
-                                    "Creating context rule with multi-signer authorization " +
-                                        "(${selected.size} signer(s))"
-                                )
+                            ActivityLogState.info(
+                                "Creating context rule with multi-signer authorization " +
+                                    "(${if (selected.isEmpty()) "single-signer" else "${selected.size} signer(s)"})"
+                            )
 
-                                val result = addContextRule(
+                            val result = withInProcessMultiSigner(delegatedKeyPairs, ed25519Secrets) {
+                                addContextRule(
                                     contextType = selectedContextType,
                                     name = ruleName.trim(),
                                     validUntil = validUntilVal,
@@ -1245,8 +1239,8 @@ class ContextRuleBuilderScreen(
                                     policies = flowPolicies,
                                     selectedSigners = selected
                                 )
-                                submissionResult = result
                             }
+                            submissionResult = result
                         } catch (e: Throwable) {
                             val msg = e.message ?: "Unknown error"
                             if (isUserCancellation(msg)) {
@@ -1282,7 +1276,7 @@ class ContextRuleBuilderScreen(
                 title = "Select Signers",
                 description = "Choose which signers co-authorize editing this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, ed25519Secrets ->
                     showEditSignerPicker = false
                     isSubmitting = true
                     editProgressCompletedSteps = 0
@@ -1290,7 +1284,6 @@ class ContextRuleBuilderScreen(
 
                     scope.launch {
                         try {
-                            registerDelegatedKeypairs(delegatedKeyPairs)
                             val selected: List<SelectedSigner> =
                                 if (isSinglePasskeyTransfer(selectedSigners)) {
                                     emptyList()
@@ -1300,13 +1293,18 @@ class ContextRuleBuilderScreen(
 
                             val resolvedDiff = resolveEditDiffExpiry(editDiff)
                             var stepCount = 0
-                            val result = submitContextRuleEdits(
-                                diff = resolvedDiff,
-                                selectedSigners = selected
-                            ) { msg ->
-                                editProgressMessage = msg
-                                stepCount++
-                                editProgressCompletedSteps = stepCount - 1
+                            // Keep the in-process signing material registered for the entire edit
+                            // sequence — submitContextRuleEdits runs each change as a separate
+                            // transaction and clears once when the whole sequence completes.
+                            val result = withInProcessMultiSigner(delegatedKeyPairs, ed25519Secrets) {
+                                submitContextRuleEdits(
+                                    diff = resolvedDiff,
+                                    selectedSigners = selected
+                                ) { msg ->
+                                    editProgressMessage = msg
+                                    stepCount++
+                                    editProgressCompletedSteps = stepCount - 1
+                                }
                             }
                             handleEditResult(
                                 result = result,

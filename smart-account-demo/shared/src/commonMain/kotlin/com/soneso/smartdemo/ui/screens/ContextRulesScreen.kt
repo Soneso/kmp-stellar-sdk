@@ -64,7 +64,7 @@ import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.loadAvailableSigners
 import com.soneso.smartdemo.flows.loadContextRules
-import com.soneso.smartdemo.flows.registerDelegatedKeypairs
+import com.soneso.smartdemo.flows.withInProcessMultiSigner
 import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
@@ -212,7 +212,7 @@ class ContextRulesScreen : Screen {
                 title = "Select Signers",
                 description = "Choose which signers co-authorize removing this context rule. " +
                     "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm = { selectedSigners, delegatedKeyPairs, _ ->
+                onConfirm = { selectedSigners, delegatedKeyPairs, ed25519Secrets ->
                     showRemoveSignerPicker = false
                     val rule = ruleToRemoveWithSigners!!
                     ruleToRemoveWithSigners = null
@@ -223,7 +223,6 @@ class ContextRulesScreen : Screen {
                             val selected = if (isSinglePasskeyTransfer(selectedSigners)) {
                                 emptyList()
                             } else {
-                                registerDelegatedKeypairs(delegatedKeyPairs)
                                 buildSelectedSigners(selectedSigners)
                             }
 
@@ -232,7 +231,9 @@ class ContextRulesScreen : Screen {
                                     "(${if (selected.isEmpty()) "single-signer" else "${selected.size} signer(s)"})"
                             )
 
-                            val result = removeContextRule(rule.id, selected)
+                            val result = withInProcessMultiSigner(delegatedKeyPairs, ed25519Secrets) {
+                                removeContextRule(rule.id, selected)
+                            }
                             if (result.success) {
                                 isLoading = true
                                 errorMessage = null

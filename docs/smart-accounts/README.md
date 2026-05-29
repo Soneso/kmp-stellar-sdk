@@ -305,7 +305,7 @@ val result = kit.policyManager.addPolicy(
 
 When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers with multiple signers. `multiSignerExecuteAndSubmit()` handles arbitrary contract calls (e.g., governance votes, multisig swaps) with multiple signers — it routes the call through the smart account's `execute` entry point.
 
-All three signer kinds — passkey (`SelectedSigner.Passkey`), delegated wallet (`SelectedSigner.Wallet`), and Ed25519 external (`SelectedSigner.Ed25519`) — may be mixed in the same `selectedSigners` list. Ed25519 signers require an `OZExternalSignerManager` configured on `OZSmartAccountConfig.externalSignerManager`.
+All three signer kinds — passkey (`SelectedSigner.Passkey`), delegated wallet (`SelectedSigner.Wallet`), and Ed25519 external (`SelectedSigner.Ed25519`) — may be mixed in the same `selectedSigners` list. Wallet and Ed25519 signers resolve through the kit-owned `kit.externalSigners` manager: register an in-memory key at runtime (`kit.externalSigners.addFromSecret(...)` / `kit.externalSigners.addEd25519FromRawKey(...)`) or supply an adapter at kit construction (`externalWallet` / `externalEd25519Adapter`).
 
 ### Error Handling
 
@@ -359,8 +359,8 @@ try {
 | `indexerUrl` | `String?` | `null` | Indexer endpoint for credential-to-contract discovery. Enables `connectWallet()` to find contracts by credential ID. |
 | `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform-specific WebAuthn implementation. Required for `createWallet()`, `connectWallet()`, and `transfer()`. |
 | `storage` | `StorageAdapter` | `InMemoryStorageAdapter()` | Credential and session persistence. Use a platform-specific adapter (Keychain, SharedPreferences, localStorage) in production. |
-| `externalWallet` | `ExternalWalletAdapter?` | `null` | Adapter for external wallet signing (e.g., Freighter, Lobstr). When set, enables delegated signing workflows. |
-| `externalSignerManager` | `OZExternalSignerManager?` | `null` | Manager for Ed25519 external signers. Required when any `SelectedSigner.Ed25519` appears in a multi-signer operation. |
+| `externalWallet` | `ExternalWalletAdapter?` | `null` | Wallet adapter (e.g., Freighter, Lobstr) backing the adapter custody model for `SelectedSigner.Wallet` signers. The kit injects it into `kit.externalSigners`. |
+| `externalEd25519Adapter` | `OZExternalEd25519SignerAdapter?` | `null` | Ed25519 adapter (hardware wallet, HSM, remote signing service) backing the adapter custody model for `SelectedSigner.Ed25519` signers. The kit injects it into `kit.externalSigners`. |
 
 ### Builder Pattern
 

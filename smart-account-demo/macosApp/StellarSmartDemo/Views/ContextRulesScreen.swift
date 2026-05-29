@@ -127,7 +127,7 @@ struct ContextRulesScreen: View {
                     signers: availableSigners,
                     activeCredentialId: appState.credentialId,
                     ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
-                    onConfirm: { selected, secretKeys, _ in
+                    onConfirm: { selected, secretKeys, ed25519Secrets in
                         showRemoveSignerPicker = false
                         let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
                         let capturedRule = rule
@@ -136,7 +136,8 @@ struct ContextRulesScreen: View {
                             await performRemoveWithSigners(
                                 rule: capturedRule,
                                 signerDescs: signerDescs,
-                                secretKeys: secretKeys
+                                secretKeys: secretKeys,
+                                ed25519Secrets: ed25519Secrets
                             )
                         }
                     },
@@ -659,14 +660,15 @@ struct ContextRulesScreen: View {
         }
 
         // Single-signer path
-        await performRemoveWithSigners(rule: rule, signerDescs: [], secretKeys: [:])
+        await performRemoveWithSigners(rule: rule, signerDescs: [], secretKeys: [:], ed25519Secrets: [:])
     }
 
     /// Performs rule removal with optional multi-signer authorization.
     private func performRemoveWithSigners(
         rule: ParsedContextRule,
         signerDescs: [SignerDescriptor],
-        secretKeys: [String: String]
+        secretKeys: [String: String],
+        ed25519Secrets: [String: String]
     ) async {
         let bridge = bridgeWrapper.bridge
         let ruleIdForBridge = Int32(bitPattern: rule.id)
@@ -677,7 +679,8 @@ struct ContextRulesScreen: View {
             let result = try await bridge.removeContextRule(
                 ruleId: ruleIdForBridge,
                 signerDescriptors: signerDescs,
-                delegatedSecretKeys: secretKeys
+                delegatedSecretKeys: secretKeys,
+                ed25519SecretKeys: ed25519Secrets
             )
             if result.success {
                 await MainActor.run {

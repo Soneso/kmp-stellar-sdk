@@ -38,8 +38,10 @@ import kotlinx.serialization.json.Json
  *         hardwareWallet.sign(authDigest, publicKey)
  * }
  *
- * val manager = OZExternalSignerManager(networkPassphrase = "...")
- * manager.ed25519Adapter = MyHardwareAdapter()
+ * val manager = OZExternalSignerManager(
+ *     networkPassphrase = "...",
+ *     ed25519Adapter = MyHardwareAdapter()
+ * )
  * ```
  */
 interface OZExternalEd25519SignerAdapter {
@@ -118,7 +120,7 @@ enum class ExternalSignerType {
  *
  * Example:
  * ```kotlin
- * val signers = externalSignerManager.getAll()
+ * val signers = manager.getAll()
  * for (signer in signers) {
  *     println("${signer.address} (${signer.type})")
  *     if (signer.type == ExternalSignerType.WALLET) {
@@ -260,11 +262,24 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
  * // List all signers
  * val signers = manager.getAll()
  * ```
+ *
+ * @param networkPassphrase The Stellar network passphrase used when delegating to wallet adapters.
+ * @param walletAdapter Optional wallet adapter backing the wallet (G-address) custody model.
+ *   The SDK never sees the wallet's private key — signing is delegated out of process.
+ * @param walletConnectionStorage Optional persistent store for external-wallet connection
+ *   metadata. Defaults to an in-memory store that does not survive application restarts.
+ * @param ed25519Adapter Optional adapter backing the Ed25519 adapter custody model. When set,
+ *   it is consulted via [OZExternalEd25519SignerAdapter.canSignFor] before the in-memory
+ *   Ed25519 keypair registry (adapter-first precedence rule). Set a concrete
+ *   [OZExternalEd25519SignerAdapter] to route Ed25519 signing through a hardware wallet, HSM,
+ *   or remote signing service; leave `null` to use only in-memory keypairs registered via
+ *   [addEd25519FromRawKey].
  */
 class OZExternalSignerManager(
     private val networkPassphrase: String,
     private val walletAdapter: ExternalWalletAdapter? = null,
-    private val walletConnectionStorage: WalletConnectionStorage? = null
+    private val walletConnectionStorage: WalletConnectionStorage? = null,
+    private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null,
 ) {
     // MARK: - Internal State
 
@@ -279,18 +294,6 @@ class OZExternalSignerManager(
      * The composite key mirrors the on-chain `External(verifierAddress, publicKey)` signer identity.
      */
     private val ed25519Signers = mutableMapOf<Ed25519SignerKey, KeyPair>()
-
-    /**
-     * Optional adapter for out-of-process Ed25519 signing. When set, the adapter is
-     * consulted via [OZExternalEd25519SignerAdapter.canSignFor] before the in-memory
-     * keypair registry (adapter-first precedence rule).
-     *
-     * Set to a concrete [OZExternalEd25519SignerAdapter] implementation to route Ed25519
-     * signing through a hardware wallet, HSM, or remote signing service. Set to `null`
-     * to clear the adapter and fall back exclusively to in-memory keypairs registered
-     * via [addEd25519FromRawKey].
-     */
-    var ed25519Adapter: OZExternalEd25519SignerAdapter? = null
 
     /**
      * Whether [restoreConnections] has been called.
@@ -678,8 +681,8 @@ class OZExternalSignerManager(
      *
      * [secretKeyBytes] must be exactly 32 bytes — the raw Ed25519 seed. This is not a
      * Stellar S-strkey; it is the raw seed material. For hardware wallets, HSMs, or remote
-     * signing services, use [ed25519Adapter] instead — the raw secret never enters process
-     * memory.
+     * signing services, supply an [OZExternalEd25519SignerAdapter] at construction instead —
+     * the raw secret never enters process memory.
      *
      * [verifierAddress] is the C-strkey of the Ed25519 verifier contract under which the
      * signer is registered on-chain.
@@ -753,10 +756,9 @@ class OZExternalSignerManager(
      * it can sign, it is invoked via [OZExternalEd25519SignerAdapter.signAuthDigest]. Otherwise
      * the in-memory keypair registry is used. Throws when neither source is available.
      *
-     * The adapter reference is snapshotted before any suspension point so that the
-     * adapter-first check is consistent for the lifetime of the call. Any registry mutex
-     * is released before the adapter's [OZExternalEd25519SignerAdapter.signAuthDigest] is
-     * awaited, preventing deadlock with adapters that may call back into the manager.
+     * The registry mutex is released before the adapter's
+     * [OZExternalEd25519SignerAdapter.signAuthDigest] is awaited, preventing deadlock with
+     * adapters that may call back into the manager.
      *
      * @param verifierAddress The C-strkey of the Ed25519 verifier contract.
      * @param publicKey The 32-byte Ed25519 public key identifying the signer slot.
@@ -770,16 +772,14 @@ class OZExternalSignerManager(
         publicKey: ByteArray,
         authDigest: ByteArray,
     ): ByteArray {
-        // Snapshot the adapter reference before any suspension point so the adapter-first
-        // check is consistent for the lifetime of this call.
-        val adapterSnapshot = ed25519Adapter
+        val adapter = ed25519Adapter
 
-        if (adapterSnapshot != null && adapterSnapshot.canSignFor(verifierAddress, publicKey)) {
+        if (adapter != null && adapter.canSignFor(verifierAddress, publicKey)) {
             // The mutex is NOT held during the adapter await — the adapter may take several
             // seconds (e.g. user confirmation on a hardware device) and may itself call back
             // into this manager. Holding the mutex across the suspend point would deadlock.
             val rawSignature: ByteArray = try {
-                adapterSnapshot.signAuthDigest(authDigest, publicKey)
+                adapter.signAuthDigest(authDigest, publicKey)
             } catch (e: Exception) {
                 throw TransactionException.signingFailed(
                     "Ed25519 adapter signing failed for verifier $verifierAddress: ${e.message}",
@@ -799,8 +799,9 @@ class OZExternalSignerManager(
             val prefix = verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)
             throw ValidationException.invalidInput(
                 "selectedSigners",
-                "Ed25519 signer (verifier=${prefix}...) has no registered keypair or adapter — " +
-                    "register via OZExternalSignerManager.addEd25519FromRawKey(...) before signing"
+                "Ed25519 signer (verifier=${prefix}...) has no registered keypair or adapter. " +
+                    "Register an in-memory key via kit.externalSigners.addEd25519FromRawKey(...), " +
+                    "or supply config.externalEd25519Adapter when constructing the kit."
             )
         }
 

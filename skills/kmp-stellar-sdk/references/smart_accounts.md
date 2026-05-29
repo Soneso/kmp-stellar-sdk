@@ -35,7 +35,7 @@ Supported signer types:
 
 Architecture. `OZSmartAccountKit.create(config)` is the single entry point. The kit exposes seven sub-managers as lazy properties: `walletOperations`, `transactionOperations`, `signerManager`, `contextRuleManager`, `policyManager`, `multiSignerManager`, `credentialManager` (plus `events`). The config takes three platform adapters — `WebAuthnProvider`, `StorageAdapter`, and an optional `ExternalWalletAdapter`. Internally the kit owns a `SorobanServer` (RPC), `OZRelayerClient` (fee-bump, optional), and `OZIndexerClient` (credential lookup, optional).
 
-`OZExternalSignerManager` is **not** owned by the kit — construct it directly, and call `restoreConnections()` at app launch so wallet signers added in a prior session are visible to the multi-signer pipeline.
+`OZExternalSignerManager` is owned by the kit and exposed as the non-null read-only property `kit.externalSigners` — the single front door for all external (non-passkey) signers. The multi-signer pipeline routes every `SelectedSigner.Wallet` and `SelectedSigner.Ed25519` signing through it.
 
 ```kotlin
 // WRONG: kit.walletOperations() — it is a property, not a function
@@ -106,7 +106,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 | `indexerUrl` | `String?` | `null` | Enables credential-to-contract discovery |
 | `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform passkey implementation |
 | `storage` | `StorageAdapter` | `InMemoryStorageAdapter()` | Credential/session persistence. **DANGER: the default `InMemoryStorageAdapter` is tests-only.** Omit `storage = ...` in production and credentials are lost when the process exits — the on-chain smart account becomes unreachable. Always pass a platform adapter (Android Keystore / iOS Keychain / IndexedDB). See [smart_accounts_webauthn.md](./smart_accounts_webauthn.md) |
-| `externalWallet` | `ExternalWalletAdapter?` | `null` | Freighter/Lobstr-style signer |
+| `externalWallet` | `ExternalWalletAdapter?` | `null` | Wallet adapter (Freighter/Lobstr-style) backing the adapter custody model for `SelectedSigner.Wallet` signers. Injected into `kit.externalSigners`. |
+| `externalEd25519Adapter` | `OZExternalEd25519SignerAdapter?` | `null` | Ed25519 adapter (hardware wallet, HSM, remote signer) backing the adapter custody model for `SelectedSigner.Ed25519` signers. Injected into `kit.externalSigners`. |
 | `maxContextRuleScanId` | `UInt` | `50u` | Highest context rule ID to scan when listing |
 
 ```kotlin
@@ -997,33 +998,59 @@ data class SyncResult(val deployed: Int, val pending: Int, val failed: Int)
 
 ## External Signer Manager
 
-`OZExternalSignerManager` tracks delegated (non-passkey) signers — raw Ed25519 secret keys and connected external wallets (Freighter, LOBSTR, etc.). It is the runtime holder for signers supplied as `SelectedSigner.Wallet` in multi-signer operations.
+`OZExternalSignerManager` is the kit-owned front door for all external (non-passkey) signers, accessed as `kit.externalSigners` (always non-null). The multi-signer pipeline routes every `SelectedSigner.Wallet` (G-address) and `SelectedSigner.Ed25519` signing through it. It handles two signer kinds, each with two custody models:
+
+| Signer kind | In-memory custody (SDK holds the key) | Adapter custody (SDK never sees the key) |
+|---|---|---|
+| Wallet / G-address | `kit.externalSigners.addFromSecret("S...")` at runtime | `config.externalWallet` (`ExternalWalletAdapter`) at kit construction |
+| Ed25519 external | `kit.externalSigners.addEd25519FromRawKey(rawBytes, verifierAddress)` at runtime | `config.externalEd25519Adapter` (`OZExternalEd25519SignerAdapter`) at kit construction |
+
+Resolution precedence differs by kind: a wallet (G-address) slot resolves to the in-memory keypair first, then the adapter; an Ed25519 slot resolves to the adapter first, then the in-memory key. A slot registered under both models follows this per-kind order.
 
 ```kotlin
-// WRONG: kit.externalSignerManager  — it is NOT a property of OZSmartAccountKit
-// CORRECT: construct the manager directly; it is an independent class
-val externalMgr = OZExternalSignerManager(
-    networkPassphrase = "Test SDF Network ; September 2015",
-    walletAdapter = myWalletAdapter,                  // optional
-    walletConnectionStorage = myConnectionStorage     // optional; platform KV store
+// WRONG: kit.externalSignerManager  — no such property
+// CORRECT: kit.externalSigners  — non-null, kit-owned
+val mgr = kit.externalSigners
+```
+
+The four registration paths:
+
+```kotlin
+val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
+    .externalWallet(myWalletAdapter)           // wallet adapter custody (model 1)
+    .externalEd25519Adapter(myHardwareAdapter) // Ed25519 adapter custody (model 1)
+    .build()
+val kit = OZSmartAccountKit.create(config)
+
+// Wallet in-memory custody (model 2): register a secret seed at runtime
+val gAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+
+// Ed25519 in-memory custody (model 2): register a raw 32-byte seed at runtime
+val ed25519PublicKey = kit.externalSigners.addEd25519FromRawKey(
+    secretKeyBytes = rawSeedBytes,   // exactly 32 bytes
+    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 )
 ```
 
-Relationship to `ExternalWalletAdapter`: the adapter is the *interface* a wallet provider implements (connect / signAuthEntry / canSignFor), passed to both `OZSmartAccountConfig.externalWallet` and `OZExternalSignerManager`. The adapter discussion under [Multi-Signer Operations in smart_accounts_policies.md](./smart_accounts_policies.md#multi-signer-operations) covers the interface itself; this section covers the manager that owns adapter lifecycle and persists wallet connections.
+Relationship to `ExternalWalletAdapter`: the adapter is the *interface* a wallet provider implements (connect / signAuthEntry / canSignFor). The kit-owned manager composes the adapter supplied via `config.externalWallet`; it does not implement the interface. For a concrete implementation, see the example implementation in the smart account demo. The adapter discussion under [Multi-Signer Operations in smart_accounts_policies.md](./smart_accounts_policies.md#multi-signer-operations) covers the interface itself.
 
-### Constructor
+### Standalone construction (advanced)
+
+The multi-signer pipeline always uses `kit.externalSigners`. Construct a manager directly only for advanced use outside a kit — for example, to supply a custom `WalletConnectionStorage` for cross-launch wallet-connection persistence.
 
 ```kotlin
 class OZExternalSignerManager(
     private val networkPassphrase: String,
     private val walletAdapter: ExternalWalletAdapter? = null,
-    private val walletConnectionStorage: WalletConnectionStorage? = null
+    private val walletConnectionStorage: WalletConnectionStorage? = null,
+    private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null
 )
 ```
 
 - `networkPassphrase` — forwarded to the adapter's `signAuthEntry` via `SignAuthEntryOptions.networkPassphrase`.
 - `walletAdapter` — required for `addFromWallet` and `restoreConnections`. When null, only keypair signers are supported.
 - `walletConnectionStorage` — required for `restoreConnections` to reconnect across app launches. When null, wallet connections are in-memory only.
+- `ed25519Adapter` — backs the Ed25519 adapter custody model; consulted before the in-memory Ed25519 registry (adapter-first precedence).
 
 ### WalletConnectionStorage
 
@@ -1061,7 +1088,7 @@ suspend fun addFromSecret(secretKey: String): String    // returns derived G-add
 ```
 
 ```kotlin
-val address = externalMgr.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+val address = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
 ```
 
 ```kotlin
@@ -1080,7 +1107,7 @@ suspend fun addFromWallet(): ConnectedWallet?           // null if the user canc
 ```
 
 ```kotlin
-val wallet = externalMgr.addFromWallet()
+val wallet = kit.externalSigners.addFromWallet()
 if (wallet != null) {
     println("Connected ${wallet.walletName} (${wallet.address})")
 }
@@ -1098,8 +1125,8 @@ suspend fun getAll(): List<ExternalSignerInfo>
 ```
 
 ```kotlin
-if (externalMgr.canSignFor("GA7Q...")) {
-    val info = externalMgr.getAll().first { it.address == "GA7Q..." }
+if (kit.externalSigners.canSignFor("GA7Q...")) {
+    val info = kit.externalSigners.getAll().first { it.address == "GA7Q..." }
     println("Type: ${info.type}, wallet: ${info.walletName ?: "n/a"}")
 }
 ```
@@ -1129,6 +1156,40 @@ data class SignAuthEntryResult(
 
 Throws `SignerException.NotFound` if no signer matches the address, or `TransactionException.SigningFailed` on a signing error.
 
+### Ed25519 methods
+
+Ed25519 external signers are keyed by the tuple `(verifierAddress, publicKey)`, matching the on-chain `External(verifier, keyData)` signer slot. Resolution is adapter-first: the configured `config.externalEd25519Adapter` is consulted before the in-memory registry.
+
+```kotlin
+// Register an in-memory key (raw 32-byte seed, NOT an S-strkey). Returns the derived public key.
+suspend fun addEd25519FromRawKey(secretKeyBytes: ByteArray, verifierAddress: String): ByteArray
+
+// Pure getter: true when the adapter OR the in-memory registry can sign for the slot.
+fun canSignEd25519For(verifierAddress: String, publicKey: ByteArray): Boolean
+
+// Produces a 64-byte raw Ed25519 signature over the 32-byte authDigest (adapter-first).
+suspend fun signEd25519AuthDigest(verifierAddress: String, publicKey: ByteArray, authDigest: ByteArray): ByteArray
+
+// Removes the in-memory key for the slot. No-op if absent. Does not affect the adapter.
+suspend fun removeEd25519(verifierAddress: String, publicKey: ByteArray)
+```
+
+```kotlin
+// WRONG: addEd25519FromRawKey("S...".toByteArray(), verifier)  — must be the raw 32-byte seed
+// CORRECT: pass the raw 32-byte Ed25519 seed bytes directly
+val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeedBytes, verifierAddress)
+// Assert publicKey matches the on-chain signer slot before building SelectedSigner.Ed25519
+```
+
+`addEd25519FromRawKey` throws `ValidationException.InvalidInput` when `secretKeyBytes` is not exactly 32 bytes. For hardware wallets, HSMs, or remote signers, supply `config.externalEd25519Adapter` instead so the raw seed never enters process memory. `OZExternalEd25519SignerAdapter` has two methods:
+
+```kotlin
+interface OZExternalEd25519SignerAdapter {
+    fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean
+    suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray
+}
+```
+
 ### remove / removeAll
 
 ```kotlin
@@ -1150,27 +1211,27 @@ Idempotent — subsequent calls return `walletAdapter.getConnectedWallets()` wit
 
 ```kotlin
 // Typical app launch sequence
+val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
+    .externalWallet(myWalletAdapter)
+    .build()
 val kit = OZSmartAccountKit.create(config)
-val externalMgr = OZExternalSignerManager(
-    networkPassphrase = config.networkPassphrase,
-    walletAdapter = myWalletAdapter,
-    walletConnectionStorage = myConnectionStorage
-)
 
 // Restore previously connected wallets BEFORE the user triggers a multi-signer action.
-// Without this call, adapter.canSignFor() returns false for wallets the user connected
-// in a previous session, and multi-signer operations will fail.
-externalMgr.restoreConnections()
+// Without this call, the adapter's canSignFor returns false for wallets the user
+// connected in a previous session, and multi-signer operations will fail.
+kit.externalSigners.restoreConnections()
 
 // Now safe to build SelectedSigner lists with Wallet entries
 val rule = kit.contextRuleManager.listContextRules().first { it.id == ruleId }
 val selectedSigners = rule.signers.mapNotNull { /* as in smart_accounts_policies.md */ }
 ```
 
+The kit-owned manager uses an in-memory wallet-connection store. To persist external-wallet connections across app launches, construct a standalone manager with a platform `WalletConnectionStorage` (see [Standalone construction](#standalone-construction-advanced)).
+
 ```kotlin
 // WRONG: call restoreConnections() lazily, on first multi-signer op
-// CORRECT: call it once at app launch after constructing the manager — wallet
-//          signers are invisible to canSignFor until restore has run.
+// CORRECT: call it once at app launch — wallet signers are invisible to the
+//          adapter's canSignFor until restore has run.
 ```
 
 ---

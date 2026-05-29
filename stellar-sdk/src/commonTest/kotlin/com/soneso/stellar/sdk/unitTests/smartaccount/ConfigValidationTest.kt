@@ -479,13 +479,11 @@ class ConfigValidationTest {
         assertEquals(30, OZConstants.DEFAULT_TIMEOUT_SECONDS)
     }
 
-    // MARK: - Builder.externalSignerManager
+    // MARK: - Builder.externalEd25519Adapter
 
     @Test
-    fun testBuilder_externalSignerManager_storesInstance() {
-        val manager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+    fun testBuilder_externalEd25519Adapter_storesInstance() {
+        val adapter = StubEd25519Adapter()
 
         val config = OZSmartAccountConfig.builder(
             rpcUrl = validRpcUrl,
@@ -493,31 +491,56 @@ class ConfigValidationTest {
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
         )
-            .externalSignerManager(manager)
+            .externalEd25519Adapter(adapter)
             .build()
 
-        assertNotNull(config.externalSignerManager, "externalSignerManager must not be null after builder.externalSignerManager()")
-        assertSame(manager, config.externalSignerManager, "externalSignerManager must be the exact instance passed to the builder")
+        assertNotNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must not be null after builder.externalEd25519Adapter()"
+        )
+        assertSame(
+            adapter,
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must be the exact instance passed to the builder"
+        )
     }
 
     @Test
-    fun testBuilder_externalSignerManager_null_leavesFieldNull() {
+    fun testBuilder_externalEd25519Adapter_defaultIsNull() {
         val config = OZSmartAccountConfig.builder(
             rpcUrl = validRpcUrl,
             networkPassphrase = validPassphrase,
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
-        )
-            .externalSignerManager(null)
-            .build()
+        ).build()
 
-        assertNull(config.externalSignerManager, "externalSignerManager must be null when null is passed to the builder")
+        assertNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must default to null when never set on the builder"
+        )
     }
 
     @Test
-    fun testBuilder_externalSignerManager_overridesPreviousValue() {
-        val manager1 = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
-        val manager2 = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
+    fun testBuilder_externalEd25519Adapter_null_leavesFieldNull() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .externalEd25519Adapter(null)
+            .build()
+
+        assertNull(
+            config.externalEd25519Adapter,
+            "externalEd25519Adapter must be null when null is passed to the builder"
+        )
+    }
+
+    @Test
+    fun testBuilder_externalEd25519Adapter_overridesPreviousValue() {
+        val adapter1 = StubEd25519Adapter()
+        val adapter2 = StubEd25519Adapter()
 
         val config = OZSmartAccountConfig.builder(
             rpcUrl = validRpcUrl,
@@ -525,11 +548,15 @@ class ConfigValidationTest {
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
         )
-            .externalSignerManager(manager1)
-            .externalSignerManager(manager2)
+            .externalEd25519Adapter(adapter1)
+            .externalEd25519Adapter(adapter2)
             .build()
 
-        assertSame(manager2, config.externalSignerManager, "Last externalSignerManager call must win")
+        assertSame(
+            adapter2,
+            config.externalEd25519Adapter,
+            "Last externalEd25519Adapter call must win"
+        )
     }
 
     // MARK: - createDefaultDeployer determinism
@@ -553,4 +580,16 @@ class ConfigValidationTest {
             "createDefaultDeployer() must produce the same G-address on every call"
         )
     }
+}
+
+
+/**
+ * Minimal [OZExternalEd25519SignerAdapter] used to assert builder field round-trips.
+ * Never invoked for signing in these tests.
+ */
+private class StubEd25519Adapter : OZExternalEd25519SignerAdapter {
+    override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean = false
+
+    override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+        throw UnsupportedOperationException("StubEd25519Adapter.signAuthDigest must not be called")
 }

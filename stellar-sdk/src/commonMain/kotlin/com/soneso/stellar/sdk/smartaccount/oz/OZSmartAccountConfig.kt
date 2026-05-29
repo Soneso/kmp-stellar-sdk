@@ -61,7 +61,7 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | webauthnProvider | No | null |
  * | storage | No | InMemoryStorageAdapter |
  * | externalWallet | No | null |
- * | externalSignerManager | No | null |
+ * | externalEd25519Adapter | No | null |
  * | maxContextRuleScanId | No | 50 |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
@@ -199,17 +199,17 @@ data class OZSmartAccountConfig(
     val externalWallet: ExternalWalletAdapter? = null,
 
     /**
-     * Manager for Ed25519 external signers.
+     * Ed25519 external-signer adapter for out-of-process Ed25519 signing.
      *
-     * Required when any [SelectedSigner.Ed25519] selector appears in a multi-signer
-     * operation. The manager holds either in-memory keypairs registered via
-     * [OZExternalSignerManager.addEd25519FromRawKey] or an [OZExternalEd25519SignerAdapter]
-     * that delegates signing to a hardware wallet or remote service.
+     * The kit injects this adapter into the manager exposed as [OZSmartAccountKit.externalSigners],
+     * backing the adapter custody model for [SelectedSigner.Ed25519] signers (hardware wallet,
+     * HSM, or remote signing service). It is the symmetric sibling of [externalWallet] for the
+     * Ed25519 signer kind.
      *
-     * When null, any [SelectedSigner.Ed25519] signer in a multi-signer call throws
-     * [ValidationException.InvalidInput] at validation time.
+     * When null, [SelectedSigner.Ed25519] signers resolve only against in-memory keypairs
+     * registered at runtime via [OZExternalSignerManager.addEd25519FromRawKey].
      */
-    val externalSignerManager: OZExternalSignerManager? = null,
+    val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
 
     /**
      * Maximum rule ID to scan when iterating context rules.
@@ -358,7 +358,7 @@ data class OZSmartAccountConfig(
         private var webauthnProvider: WebAuthnProvider? = null
         private var storage: StorageAdapter = InMemoryStorageAdapter()
         private var externalWallet: ExternalWalletAdapter? = null
-        private var externalSignerManager: OZExternalSignerManager? = null
+        private var externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null
         private var maxContextRuleScanId: UInt = 50u
 
         /**
@@ -474,19 +474,16 @@ data class OZSmartAccountConfig(
         fun externalWallet(externalWallet: ExternalWalletAdapter?) = apply { this.externalWallet = externalWallet }
 
         /**
-         * Sets the external signer manager for Ed25519 multi-signer operations.
+         * Sets the Ed25519 external-signer adapter used by [OZSmartAccountKit.externalSigners]
+         * for the out-of-process Ed25519 signing path.
          *
-         * Required when any [SelectedSigner.Ed25519] selector will be used. The manager
-         * must contain in-memory keypairs registered via
-         * [OZExternalSignerManager.addEd25519FromRawKey] or have an
-         * [OZExternalEd25519SignerAdapter] set on its [OZExternalSignerManager.ed25519Adapter]
-         * property before any multi-signer call that includes [SelectedSigner.Ed25519].
-         *
-         * @param externalSignerManager The manager instance, or null to clear it.
+         * @param value The Ed25519 external-signer adapter, or null to disable the adapter path.
          * @return This builder for chaining.
          */
-        fun externalSignerManager(externalSignerManager: OZExternalSignerManager?) =
-            apply { this.externalSignerManager = externalSignerManager }
+        fun externalEd25519Adapter(value: OZExternalEd25519SignerAdapter?): Builder {
+            externalEd25519Adapter = value
+            return this
+        }
 
         /**
          * Sets the maximum context rule ID to scan when iterating rules.
@@ -522,7 +519,7 @@ data class OZSmartAccountConfig(
                 webauthnProvider = webauthnProvider,
                 storage = storage,
                 externalWallet = externalWallet,
-                externalSignerManager = externalSignerManager,
+                externalEd25519Adapter = externalEd25519Adapter,
                 maxContextRuleScanId = maxContextRuleScanId
             )
         }

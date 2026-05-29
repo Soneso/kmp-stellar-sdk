@@ -113,13 +113,14 @@ struct ContextRuleBuilderScreen: View {
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
                 ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
-                onConfirm: { selected, secretKeys, _ in
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showSignerPicker = false
                     Task {
                         await viewModel.submitEditWithSigners(
                             bridge: bridgeWrapper.bridge,
                             selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys
+                            delegatedSecretKeys: secretKeys,
+                            ed25519SecretKeys: ed25519Secrets
                         )
                         appState.sync(from: bridgeWrapper.bridge)
                     }
@@ -135,13 +136,14 @@ struct ContextRuleBuilderScreen: View {
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
                 ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
-                onConfirm: { selected, secretKeys, _ in
+                onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showCreateSignerPicker = false
                     Task {
                         await viewModel.submitCreateWithSigners(
                             bridge: bridgeWrapper.bridge,
                             selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys
+                            delegatedSecretKeys: secretKeys,
+                            ed25519SecretKeys: ed25519Secrets
                         )
                         appState.sync(from: bridgeWrapper.bridge)
                     }

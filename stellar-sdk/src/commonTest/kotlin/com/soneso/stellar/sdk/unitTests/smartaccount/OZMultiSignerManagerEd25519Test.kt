@@ -17,7 +17,6 @@ import com.soneso.stellar.sdk.smartaccount.oz.OZExternalSignerManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
-import com.soneso.stellar.sdk.smartaccount.oz.externalSignerManager
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
@@ -36,7 +35,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // ---------------------------------------------------------------------------
@@ -101,15 +99,21 @@ private class ValidSigningAdapter(
 // Config helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Builds a kit config. The Ed25519 adapter custody model is supplied via
+ * [OZSmartAccountConfig.externalEd25519Adapter]; the kit injects it into the manager it
+ * exposes as [OZSmartAccountKit.externalSigners]. In-memory Ed25519 keys are registered at
+ * runtime on `kit.externalSigners` after the kit is built.
+ */
 private fun buildConfig(
-    externalSignerManager: OZExternalSignerManager? = null,
+    externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
     deployer: KeyPair? = null
 ): OZSmartAccountConfig = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = Network.TESTNET.networkPassphrase,
     accountWasmHash = "a" + "0".repeat(63),
     webauthnVerifierAddress = VERIFIER_A,
-    externalSignerManager = externalSignerManager,
+    externalEd25519Adapter = externalEd25519Adapter,
     deployerKeypair = deployer
 )
 
@@ -123,28 +127,25 @@ private fun passkeyStub() = SelectedSigner.Passkey(
  * Unit tests for the Ed25519 signer path through [OZMultiSignerManager] validation.
  *
  * Tests cover:
- * - validateSignerSet Ed25519 validation (public key length, verifier address format,
+ * - validateSelectedSigners Ed25519 validation (public key length, verifier address format,
  *   signing source registration, same-pubkey different-verifier tuple resolution)
  * - SelectedSigner.Ed25519 construction, equality, and hashCode semantics
  * - Ed25519Signature wire shape (raw BytesN<64>, not a Map)
- * - Kit accessor for externalSignerManager
+ * - The kit-owned [OZSmartAccountKit.externalSigners] front door
  * - The local verification branch in the signing pipeline
  */
 class OZMultiSignerManagerEd25519Test {
 
     // ========================================================================
-    // validateSignerSet — Ed25519 validation
+    // validateSelectedSigners — Ed25519 validation
     // ========================================================================
 
     @Test
-    fun test_validateSignerSet_ed25519WithRegisteredSigner_passes() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+    fun test_validateSelectedSigners_ed25519WithRegisteredSigner_passes() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
         val rawSeed = ByteArray(32) { it.toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
 
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -167,13 +168,9 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     @Test
-    fun test_validateSignerSet_ed25519WithoutRegisteredSigner_throwsInvalidInputSelectedSigners() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-        // No signer registered for VERIFIER_A.
-
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+    fun test_validateSelectedSigners_ed25519WithoutRegisteredSigner_throwsInvalidInputSelectedSigners() = runTest {
+        // No signer registered for VERIFIER_A on kit.externalSigners.
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -197,11 +194,8 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     @Test
-    fun test_validateSignerSet_ed25519InvalidPublicKeyLength_throws() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+    fun test_validateSelectedSigners_ed25519InvalidPublicKeyLength_throws() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -220,14 +214,10 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     @Test
-    fun test_validateSignerSet_ed25519InvalidVerifierAddress_throws() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+    fun test_validateSelectedSigners_ed25519InvalidVerifierAddress_throws() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
         val rawSeed = ByteArray(32) { (it + 1).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -246,40 +236,37 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     @Test
-    fun test_validateSignerSet_ed25519SamePubkeyDifferentVerifiers_resolvedByTuple() = runTest {
-        val extManager = OZExternalSignerManager(
+    fun test_validateSelectedSigners_ed25519SamePubkeyDifferentVerifiers_resolvedByTuple() = runTest {
+        val manager = OZExternalSignerManager(
             networkPassphrase = Network.TESTNET.networkPassphrase
         )
         val rawSeed = ByteArray(32) { (it + 2).toByte() }
 
         // Same raw seed, two different verifier addresses — two distinct registry entries.
-        val pk1 = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-        extManager.addEd25519FromRawKey(rawSeed, VERIFIER_B)
+        val pk1 = manager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        manager.addEd25519FromRawKey(rawSeed, VERIFIER_B)
 
         // Both entries are reachable via their respective tuple keys.
         assertTrue(
-            extManager.canSignEd25519For(VERIFIER_A, pk1),
+            manager.canSignEd25519For(VERIFIER_A, pk1),
             "canSignEd25519For must return true for VERIFIER_A"
         )
         assertTrue(
-            extManager.canSignEd25519For(VERIFIER_B, pk1),
+            manager.canSignEd25519For(VERIFIER_B, pk1),
             "canSignEd25519For must return true for VERIFIER_B using the same public key"
         )
     }
 
     @Test
-    fun test_validateSignerSet_ed25519DuplicateTupleEntries_dedupedOrRejected() = runTest {
+    fun test_validateSelectedSigners_ed25519DuplicateTupleEntries_dedupedOrRejected() = runTest {
         // The production implementation does NOT deduplicate selectedSigners — duplicate
         // entries pass validation and the signing loop processes each entry individually.
         // This test pins that behavior: two identical Ed25519 selectors with a registered
-        // signer pass the validateSignerSet loop without throwing InvalidInput.
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+        // signer pass the validateSelectedSigners loop without throwing InvalidInput.
+        val kit = OZSmartAccountKit.create(buildConfig())
         val rawSeed = ByteArray(32) { (it + 3).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
 
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -303,16 +290,16 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     @Test
-    fun test_validateSignerSet_ed25519PubkeyMatchesWalletGAddressBytes_noFalseMatch() = runTest {
-        val extManager = OZExternalSignerManager(
+    fun test_validateSelectedSigners_ed25519PubkeyMatchesWalletGAddressBytes_noFalseMatch() = runTest {
+        val manager = OZExternalSignerManager(
             networkPassphrase = Network.TESTNET.networkPassphrase
         )
         val ed25519Seed = ByteArray(32) { (it + 3).toByte() }
-        val ed25519PublicKey = extManager.addEd25519FromRawKey(ed25519Seed, VERIFIER_A)
+        val ed25519PublicKey = manager.addEd25519FromRawKey(ed25519Seed, VERIFIER_A)
 
         // canSignEd25519For checks the (verifierAddress, publicKey) tuple.
         assertTrue(
-            extManager.canSignEd25519For(VERIFIER_A, ed25519PublicKey),
+            manager.canSignEd25519For(VERIFIER_A, ed25519PublicKey),
             "canSignEd25519For must return true for the registered Ed25519 entry"
         )
 
@@ -320,7 +307,7 @@ class OZMultiSignerManagerEd25519Test {
         // return false because no wallet signer was added.
         val derivedAccountId = KeyPair.fromPublicKey(ed25519PublicKey).getAccountId()
         assertFalse(
-            extManager.canSignFor(derivedAccountId),
+            manager.canSignFor(derivedAccountId),
             "Ed25519 registry must not bleed into the wallet canSignFor lookup path"
         )
     }
@@ -353,11 +340,9 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_submitWithMultipleSigners_mixedPasskeyEd25519Wallet_allSlotsFilled() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+        val kit = OZSmartAccountKit.create(buildConfig())
         val rawSeed = ByteArray(32) { (it + 21).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
 
         // Construct three SelectedSigner values of each supported type.
         val passkeySigner = passkeyStub()
@@ -379,11 +364,9 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_submitWithMultipleSigners_mixedRuleEd25519AndPasskeyAtSameIndex_routesCorrectly() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
+        val kit = OZSmartAccountKit.create(buildConfig())
         val rawSeed = ByteArray(32) { (it + 22).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
 
         val ed25519Signer = SelectedSigner.Ed25519(verifierAddress = VERIFIER_A, publicKey = publicKey)
         val passkeySigner = passkeyStub()
@@ -410,18 +393,6 @@ class OZMultiSignerManagerEd25519Test {
         // real public key. The production code detects this and throws
         // TransactionException.SigningFailed immediately, before any submission RPC call.
         val deployer = KeyPair.random()
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-
-        // Register a real keypair against VERIFIER_A so validation passes.
-        val rawSeed = ByteArray(32) { (it + 42).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        // Replace the in-process signer with an adapter that returns a zero-byte signature.
-        // ZeroBytesAdapter.canSignFor returns true for publicKey, so the signing branch
-        // routes through it instead of the in-process raw-key path.
-        extManager.ed25519Adapter = ZeroBytesAdapter(publicKey)
 
         // Build the pre-computed XDR values used by the mock RPC server.
         val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
@@ -437,10 +408,19 @@ class OZMultiSignerManagerEd25519Test {
             countXdrBase64 = countZeroXdr
         )
 
+        // Register a real keypair against VERIFIER_A so validation passes; the adapter is
+        // injected via config and takes precedence at signing time, returning zero bytes.
+        val rawSeed = ByteArray(32) { (it + 42).toByte() }
+        val signingKeypair = KeyPair.fromSecretSeed(rawSeed)
+        val publicKey = signingKeypair.getPublicKey()
+
+        // ZeroBytesAdapter.canSignFor returns true for publicKey, so the signing branch
+        // routes through it instead of the in-process raw-key path.
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildConfig(extManager, deployer),
+            config = buildConfig(externalEd25519Adapter = ZeroBytesAdapter(publicKey), deployer = deployer),
             sorobanServer = mockServer
         )
+        kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -471,18 +451,11 @@ class OZMultiSignerManagerEd25519Test {
     @Test
     fun test_submitWithMultipleSigners_ed25519Only_inProcessKeypair_succeeds() = runTest {
         // Drive appendEd25519Signature all the way through the success path using an
-        // in-process keypair registered via addEd25519FromRawKey. No adapter is set.
-        // The signing pipeline must: sign the auth digest, verify the signature locally
-        // (KeyPair.verify returns true), wrap it in Ed25519Signature, and return a
-        // TransactionResult with success = true.
+        // in-process keypair registered via kit.externalSigners.addEd25519FromRawKey. No
+        // adapter is configured. The signing pipeline must: sign the auth digest, verify the
+        // signature locally (KeyPair.verify returns true), wrap it in Ed25519Signature, and
+        // return a TransactionResult with success = true.
         val deployer = KeyPair.random()
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-
-        val rawSeed = ByteArray(32) { (it + 77).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-        // No adapter — the in-process keypair path must handle signing entirely.
 
         val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
         val authEntry = buildAuthEntry(VERIFIER_B)
@@ -500,9 +473,12 @@ class OZMultiSignerManagerEd25519Test {
         )
 
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildConfig(extManager, deployer),
+            config = buildConfig(deployer = deployer),
             sorobanServer = mockServer
         )
+        // No adapter — the in-process keypair path must handle signing entirely.
+        val rawSeed = ByteArray(32) { (it + 77).toByte() }
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val result = kit.multiSignerManager.submitWithMultipleSigners(
@@ -523,21 +499,16 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_submitWithMultipleSigners_ed25519Only_viaAdapter_succeeds() = runTest {
-        // Drive appendEd25519Signature through the success path using an adapter that
-        // wraps a real keypair. The adapter is registered alongside the same in-process
-        // keypair so canSignEd25519For passes. At signing time, adapter-first precedence
-        // routes through the adapter, and callCount == 1 confirms the adapter path ran.
+        // Drive appendEd25519Signature through the success path using a config-injected
+        // adapter that wraps a real keypair. The adapter is registered alongside the same
+        // in-process keypair so canSignEd25519For passes. At signing time, adapter-first
+        // precedence routes through the adapter, and callCount == 1 confirms the adapter ran.
         val deployer = KeyPair.random()
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
 
         val rawSeed = ByteArray(32) { (it + 77).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
         val signingKeypair = KeyPair.fromSecretSeed(rawSeed)
+        val publicKey = signingKeypair.getPublicKey()
         val adapter = ValidSigningAdapter(signingKeypair, publicKey)
-        extManager.ed25519Adapter = adapter
 
         val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
         val authEntry = buildAuthEntry(VERIFIER_B)
@@ -555,9 +526,10 @@ class OZMultiSignerManagerEd25519Test {
         )
 
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildConfig(extManager, deployer),
+            config = buildConfig(externalEd25519Adapter = adapter, deployer = deployer),
             sorobanServer = mockServer
         )
+        kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val result = kit.multiSignerManager.submitWithMultipleSigners(
@@ -582,10 +554,7 @@ class OZMultiSignerManagerEd25519Test {
         // When selectedSigners is empty, no Ed25519 validation fires (the Ed25519 loop has
         // nothing to iterate over). The call proceeds past validation to the simulation step
         // where a network-related exception surfaces.
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -606,26 +575,35 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     // ========================================================================
-    // Kit accessor
+    // Kit-owned external signer front door
     // ========================================================================
 
     @Test
-    fun test_kit_externalSignerManager_returnsInstanceFromConfig() = runTest {
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
-
-        // The kit's externalSignerManager accessor must return the exact instance from config.
-        val retrieved = kit.externalSignerManager
-        assertNotNull(retrieved, "externalSignerManager must not be null when set in config")
-        assertTrue(retrieved === extManager, "externalSignerManager must be the same instance passed via config")
+    fun test_kit_externalSigners_nonNullWithNoExternalConfig() = runTest {
+        // The manager is always present, even when no external signer config is supplied.
+        val kit = OZSmartAccountKit.create(buildConfig())
+        assertNotNull(kit.externalSigners, "kit.externalSigners must be non-null on a kit with no external config")
     }
 
     @Test
-    fun test_kit_externalSignerManager_nullWhenNotInConfig() = runTest {
-        val kit = OZSmartAccountKit.create(buildConfig(externalSignerManager = null))
-        assertNull(kit.externalSignerManager, "externalSignerManager must be null when not set in config")
+    fun test_kit_externalSigners_returnsSameInstanceAcrossCalls() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
+        val first = kit.externalSigners
+        val second = kit.externalSigners
+        assertTrue(first === second, "kit.externalSigners must return the same kit-owned manager on every access")
+    }
+
+    @Test
+    fun test_kit_externalSigners_registersInMemoryEd25519Key() = runTest {
+        // A key registered through the kit-owned manager is reachable for signing.
+        val kit = OZSmartAccountKit.create(buildConfig())
+        val rawSeed = ByteArray(32) { (it + 4).toByte() }
+        val publicKey = kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+
+        assertTrue(
+            kit.externalSigners.canSignEd25519For(VERIFIER_A, publicKey),
+            "kit.externalSigners must report it can sign for a key registered through it"
+        )
     }
 
     // ========================================================================
@@ -663,13 +641,14 @@ class OZMultiSignerManagerEd25519Test {
     }
 
     // ========================================================================
-    // validateSelectedSigners — Ed25519 signer without externalSignerManager in config
+    // validateSelectedSigners — Ed25519 signer with no signing source
     // ========================================================================
 
     @Test
-    fun test_validateSelectedSigners_ed25519WithoutExternalSignerManager_throwsInvalidInput() = runTest {
-        // Config has no externalSignerManager — any Ed25519 selector must throw immediately.
-        val kit = OZSmartAccountKit.create(buildConfig(externalSignerManager = null))
+    fun test_validateSelectedSigners_ed25519NoSigningSource_throwsInvalidInputNamingRemedies() = runTest {
+        // No adapter and no in-memory key registered — any Ed25519 selector must throw,
+        // and the pipeline message must name both runtime remedies.
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val validPublicKey = ByteArray(32) { it.toByte() }
@@ -690,9 +669,12 @@ class OZMultiSignerManagerEd25519Test {
             "Exception must reference selectedSigners; got: ${ex.message}"
         )
         assertTrue(
-            ex.message.contains("OZExternalSignerManager", ignoreCase = false) ||
-                ex.message.contains("externalSignerManager", ignoreCase = true),
-            "Exception must mention externalSignerManager requirement; got: ${ex.message}"
+            ex.message.contains("kit.externalSigners.addEd25519FromRawKey", ignoreCase = false),
+            "Exception must name kit.externalSigners.addEd25519FromRawKey; got: ${ex.message}"
+        )
+        assertTrue(
+            ex.message.contains("config.externalEd25519Adapter", ignoreCase = false),
+            "Exception must name config.externalEd25519Adapter; got: ${ex.message}"
         )
     }
 
@@ -708,14 +690,10 @@ class OZMultiSignerManagerEd25519Test {
         // crypto library to throw an exception rather than return false. The production
         // catch block in appendEd25519Signature must wrap this as TransactionException.SigningFailed.
         val deployer = KeyPair.random()
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
 
         val rawSeed = ByteArray(32) { (it + 43).toByte() }
-        val publicKey = extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        extManager.ed25519Adapter = WrongLengthSignatureAdapter(publicKey)
+        val signingKeypair = KeyPair.fromSecretSeed(rawSeed)
+        val publicKey = signingKeypair.getPublicKey()
 
         val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
         val authEntry = buildAuthEntry(VERIFIER_B)
@@ -731,9 +709,10 @@ class OZMultiSignerManagerEd25519Test {
         )
 
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildConfig(extManager, deployer),
+            config = buildConfig(externalEd25519Adapter = WrongLengthSignatureAdapter(publicKey), deployer = deployer),
             sorobanServer = mockServer
         )
+        kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         assertFailsWith<TransactionException.SigningFailed> {
@@ -767,11 +746,6 @@ class OZMultiSignerManagerEd25519Test {
         // non-Address credentials and returns the clone immediately without setting expiration.
         // The entry lands in signedAuthEntries and the full round-trip succeeds.
         val deployer = KeyPair.random()
-        val extManager = OZExternalSignerManager(
-            networkPassphrase = Network.TESTNET.networkPassphrase
-        )
-        val rawSeed = ByteArray(32) { (it + 88).toByte() }
-        extManager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
 
         // Build an auth entry with Void (source-account) credentials.
         val voidAuthEntry = SorobanAuthorizationEntryXdr(
@@ -803,9 +777,11 @@ class OZMultiSignerManagerEd25519Test {
         )
 
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildConfig(extManager, deployer),
+            config = buildConfig(deployer = deployer),
             sorobanServer = mockServer
         )
+        val rawSeed = ByteArray(32) { (it + 88).toByte() }
+        kit.externalSigners.addEd25519FromRawKey(rawSeed, VERIFIER_A)
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         // Void-credentials entries have no address to match against contractId, so the
@@ -827,8 +803,7 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_multiSignerContractCall_blankTargetFn_throwsInvalidInput() = runTest {
-        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -846,8 +821,7 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_multiSignerContractCall_emptySelectedSigners_throwsInvalidInput() = runTest {
-        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -867,8 +841,7 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_multiSignerExecuteAndSubmit_invalidTargetAddress_throwsException() = runTest {
-        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -891,8 +864,7 @@ class OZMultiSignerManagerEd25519Test {
 
     @Test
     fun test_multiSignerExecuteAndSubmit_emptySelectedSigners_throwsInvalidInput() = runTest {
-        val extManager = OZExternalSignerManager(networkPassphrase = Network.TESTNET.networkPassphrase)
-        val kit = OZSmartAccountKit.create(buildConfig(extManager))
+        val kit = OZSmartAccountKit.create(buildConfig())
         kit.setConnectedState("test-credential-id", VERIFIER_B)
 
         val manager = kit.multiSignerManager
@@ -906,5 +878,3 @@ class OZMultiSignerManagerEd25519Test {
         }
     }
 }
-
-

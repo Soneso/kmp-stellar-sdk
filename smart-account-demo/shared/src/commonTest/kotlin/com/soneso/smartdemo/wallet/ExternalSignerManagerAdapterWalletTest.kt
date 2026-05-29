@@ -15,18 +15,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
  * Unit tests for the wallet connector integration in [ExternalSignerManagerAdapter].
  *
  * Covers:
- * - canSignFor routing for wallet-connected addresses and keypair addresses
+ * - canSignFor routing for wallet-connected addresses
  * - signAuthEntry delegation to WalletConnector for wallet-connected addresses
- * - signAuthEntry keypair path when wallet connector is present but not for that address
  * - Error propagation from WalletConnector
  * - disconnect lifecycle
+ * - connect/reconnect returning null
  */
 class ExternalSignerManagerAdapterWalletTest {
 
@@ -92,15 +91,6 @@ class ExternalSignerManagerAdapterWalletTest {
     }
 
     @Test
-    fun testCanSignFor_keypairAddress() = runTest {
-        val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        val address = adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
-
-        assertTrue(adapter.canSignFor(address))
-    }
-
-    @Test
     fun testCanSignFor_unknownAddress_returnsFalse() = runTest {
         val adapter = createAdapter()
         val unknownAddress = KeyPair.random().getAccountId()
@@ -149,32 +139,6 @@ class ExternalSignerManagerAdapterWalletTest {
         assertEquals(1, mock.signAuthEntryCalls.size)
         assertEquals(testPreimage, mock.signAuthEntryCalls[0].first)
         assertEquals(walletAddress, mock.signAuthEntryCalls[0].second)
-    }
-
-    @Test
-    fun testSignAuthEntry_usesKeypair_notWallet_forKeypairAddress() = runTest {
-        val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        val keypairAddress = adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
-
-        // Wallet is connected but for a different address
-        val mock = MockWalletConnector()
-        mock.connectedAddr = MOCK_WALLET_ADDRESS
-        mock.signResult = "walletSignature"
-        adapter.walletConnector = mock
-
-        val result = adapter.signAuthEntry(
-            preimageXdr = testPreimage,
-            options = SignAuthEntryOptions(address = keypairAddress)
-        )
-
-        // Wallet must not have been called
-        assertEquals(0, mock.signAuthEntryCalls.size)
-
-        // Result must be a valid non-empty base64 signature
-        assertNotNull(result.signedAuthEntry)
-        assertTrue(result.signedAuthEntry.isNotEmpty())
-        assertEquals(keypairAddress, result.signerAddress)
     }
 
     @Test
@@ -265,19 +229,6 @@ class ExternalSignerManagerAdapterWalletTest {
     }
 
     @Test
-    fun testDisconnect_clearsKeypairSigners() = runTest {
-        val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        val address = adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
-
-        assertTrue(adapter.canSignFor(address))
-
-        adapter.disconnect()
-
-        assertFalse(adapter.canSignFor(address))
-    }
-
-    @Test
     fun testDisconnect_doesNotCallWalletWhenNotConnected() = runTest {
         val adapter = createAdapter()
         val mock = MockWalletConnector()
@@ -289,83 +240,13 @@ class ExternalSignerManagerAdapterWalletTest {
         assertEquals(0, mock.disconnectCalls.size)
     }
 
-    // MARK: - Wallet takes precedence over keypair
-
-    @Test
-    fun testSignAuthEntry_walletTakesPrecedence_overKeypair_forSameAddress() = runTest {
-        // Edge case: both wallet and keypair exist for the same address.
-        // The adapter checks wallet first; the wallet path must be taken.
-        val adapter = createAdapter()
-
-        val keypair = KeyPair.random()
-        val address = adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
-
-        val mock = MockWalletConnector()
-        mock.connectedAddr = address
-        mock.signResult = "walletSignatureTakesPrecedence"
-        adapter.walletConnector = mock
-
-        val result = adapter.signAuthEntry(
-            preimageXdr = testPreimage,
-            options = SignAuthEntryOptions(address = address)
-        )
-
-        assertEquals("walletSignatureTakesPrecedence", result.signedAuthEntry)
-        assertEquals(1, mock.signAuthEntryCalls.size)
-    }
-
-    // MARK: - addFromSecret / canSignFor interaction
-
-    @Test
-    fun testAddFromSecret_derivesCorrectAddress() = runTest {
-        val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        val expectedAddress = keypair.getAccountId()
-        val secretSeed = keypair.getSecretSeed()!!.concatToString()
-
-        val returnedAddress = adapter.addFromSecret(secretSeed)
-
-        assertEquals(expectedAddress, returnedAddress)
-        assertTrue(adapter.canSignFor(returnedAddress))
-    }
-
-    @Test
-    fun testRemove_preventsCanSignFor() = runTest {
-        val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        val address = adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
-
-        assertTrue(adapter.canSignFor(address))
-        adapter.remove(address)
-        assertFalse(adapter.canSignFor(address))
-    }
-
-    @Test
-    fun testRemoveAll_preventsCanSignForAllKeypairs() = runTest {
-        val adapter = createAdapter()
-        val kp1 = KeyPair.random()
-        val kp2 = KeyPair.random()
-        val addr1 = adapter.addFromSecret(kp1.getSecretSeed()!!.concatToString())
-        val addr2 = adapter.addFromSecret(kp2.getSecretSeed()!!.concatToString())
-
-        assertTrue(adapter.canSignFor(addr1))
-        assertTrue(adapter.canSignFor(addr2))
-
-        adapter.removeAll()
-
-        assertFalse(adapter.canSignFor(addr1))
-        assertFalse(adapter.canSignFor(addr2))
-    }
-
     // MARK: - getConnectedWallets
 
     @Test
     fun testGetConnectedWallets_returnsEmptyList() = runTest {
         val adapter = createAdapter()
-        val keypair = KeyPair.random()
-        adapter.addFromSecret(keypair.getSecretSeed()!!.concatToString())
 
-        // Keypair signers are not surfaced as ConnectedWallet objects
+        // Wallet connections are surfaced through the connector, not this adapter
         assertTrue(adapter.getConnectedWallets().isEmpty())
     }
 

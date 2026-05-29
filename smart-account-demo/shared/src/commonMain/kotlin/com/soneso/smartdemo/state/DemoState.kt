@@ -6,7 +6,6 @@ import androidx.compose.runtime.setValue
 import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
 import com.soneso.smartdemo.wallet.DemoEd25519Adapter
 import com.soneso.smartdemo.wallet.WalletConnector
-import com.soneso.stellar.sdk.smartaccount.oz.OZExternalSignerManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.StorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -21,26 +20,21 @@ object DemoState {
         private set
 
     /**
-     * The external signer manager adapter used for delegated (keypair) signers.
-     * Set during kit initialization so TransferScreen can register secret keys.
+     * The wallet-connector adapter backing the external-wallet (Freighter) custody model.
+     * Injected as the kit's wallet adapter at initialization; flows query it via
+     * [kit.externalSigners] for SelectedSigner.Wallet signers connected through a wallet.
      */
-    var externalSignerManager: ExternalSignerManagerAdapter? = null
+    var walletSignerAdapter: ExternalSignerManagerAdapter? = null
         private set
 
     /**
-     * The Ed25519 external signer manager, created once during kit initialization and
-     * shared across all flows that include [SelectedSigner.Ed25519] signers.
+     * The demo Ed25519 adapter injected into the kit via
+     * OZSmartAccountConfig.externalEd25519Adapter at construction. Created once and reused.
      *
-     * The Transfer flow uses the in-process keypair path (no adapter assigned).
-     * The Approve flow sets [OZExternalSignerManager.ed25519Adapter] to a [DemoEd25519Adapter]
-     * before submitting and clears it afterwards.
-     */
-    var ed25519SignerManager: OZExternalSignerManager? = null
-        private set
-
-    /**
-     * Shared [DemoEd25519Adapter] instance used by the Approve flow adapter callback path.
-     * Created once at kit initialization time and reused across approve operations.
+     * Flows that exercise the adapter custody path register verified seeds on it via
+     * [DemoEd25519Adapter.add] before submitting and clear them via [DemoEd25519Adapter.clearAll]
+     * afterwards. The in-process custody path registers keys on [kit.externalSigners] instead and
+     * never touches this adapter.
      */
     var demoEd25519Adapter: DemoEd25519Adapter? = null
         private set
@@ -90,12 +84,8 @@ object DemoState {
         kit = newKit
     }
 
-    fun setExternalSignerManager(manager: ExternalSignerManagerAdapter?) {
-        externalSignerManager = manager
-    }
-
-    fun setEd25519SignerManager(manager: OZExternalSignerManager?) {
-        ed25519SignerManager = manager
+    fun setWalletSignerAdapter(adapter: ExternalSignerManagerAdapter?) {
+        walletSignerAdapter = adapter
     }
 
     fun setDemoEd25519Adapter(adapter: DemoEd25519Adapter?) {
@@ -142,8 +132,7 @@ object DemoState {
 
     fun reset() {
         kit = null
-        externalSignerManager = null
-        ed25519SignerManager = null
+        walletSignerAdapter = null
         demoEd25519Adapter = null
         webauthnProvider = null
         storage = null

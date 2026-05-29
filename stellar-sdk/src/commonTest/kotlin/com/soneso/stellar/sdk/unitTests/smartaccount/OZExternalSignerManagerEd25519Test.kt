@@ -77,8 +77,13 @@ private class NeverSignAdapter : OZExternalEd25519SignerAdapter {
 // Helper
 // ---------------------------------------------------------------------------
 
-private fun createManager(): OZExternalSignerManager =
-    OZExternalSignerManager(networkPassphrase = TEST_NETWORK_PASSPHRASE)
+private fun createManager(
+    ed25519Adapter: OZExternalEd25519SignerAdapter? = null
+): OZExternalSignerManager =
+    OZExternalSignerManager(
+        networkPassphrase = TEST_NETWORK_PASSPHRASE,
+        ed25519Adapter = ed25519Adapter
+    )
 
 /**
  * Unit tests for the Ed25519 signer surface on [OZExternalSignerManager].
@@ -220,12 +225,11 @@ class OZExternalSignerManagerEd25519Test {
 
     @Test
     fun test_ed25519Adapter_takesPrecedenceForCanSignForTrue() = runTest {
-        val manager = createManager()
         val keypair = KeyPair.random()
         val publicKey = keypair.getPublicKey()
 
         // Adapter always claims it can sign — no in-memory keypair registered.
-        manager.ed25519Adapter = AlwaysSignAdapter(keypair)
+        val manager = createManager(ed25519Adapter = AlwaysSignAdapter(keypair))
 
         assertTrue(
             manager.canSignEd25519For(VERIFIER_A, publicKey),
@@ -245,12 +249,10 @@ class OZExternalSignerManagerEd25519Test {
 
     @Test
     fun test_ed25519Adapter_falsyAdapterFallsBackToInProcessKeypair() = runTest {
-        val manager = createManager()
+        // Adapter reports it cannot sign for any key.
+        val manager = createManager(ed25519Adapter = NeverSignAdapter())
         val rawSeed = ByteArray(32) { (it + 4).toByte() }
         val publicKey = manager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        // Adapter reports it cannot sign for any key.
-        manager.ed25519Adapter = NeverSignAdapter()
 
         // canSignEd25519For still returns true via the in-memory fallback.
         assertTrue(
@@ -278,16 +280,16 @@ class OZExternalSignerManagerEd25519Test {
 
     @Test
     fun test_signEd25519AuthDigest_adapterThrowsException_wrapsAsSigningFailed() = runTest {
-        val manager = createManager()
+        // An adapter that claims it can sign but throws takes precedence over the in-memory keypair.
+        val manager = createManager(
+            ed25519Adapter = object : OZExternalEd25519SignerAdapter {
+                override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean = true
+                override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
+                    throw RuntimeException("Hardware wallet disconnected")
+            }
+        )
         val rawSeed = ByteArray(32) { (it + 8).toByte() }
         val publicKey = manager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        // Replace the in-memory signer with an adapter that claims it can sign but throws.
-        manager.ed25519Adapter = object : OZExternalEd25519SignerAdapter {
-            override fun canSignFor(verifierAddress: String, publicKey: ByteArray): Boolean = true
-            override suspend fun signAuthDigest(authDigest: ByteArray, publicKey: ByteArray): ByteArray =
-                throw RuntimeException("Hardware wallet disconnected")
-        }
 
         val authDigest = ByteArray(32) { it.toByte() }
 
@@ -302,12 +304,10 @@ class OZExternalSignerManagerEd25519Test {
 
     @Test
     fun test_signEd25519AuthDigest_adapterReturnsFalseForCanSignFor_fallsBackToInMemory() = runTest {
-        val manager = createManager()
+        // NeverSignAdapter reports false → in-memory keypair must be used.
+        val manager = createManager(ed25519Adapter = NeverSignAdapter())
         val rawSeed = ByteArray(32) { (it + 9).toByte() }
         val publicKey = manager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
-
-        // NeverSignAdapter reports false → in-memory keypair must be used.
-        manager.ed25519Adapter = NeverSignAdapter()
 
         val authDigest = ByteArray(32) { ((it + 5) and 0xFF).toByte() }
         val signature = manager.signEd25519AuthDigest(VERIFIER_A, publicKey, authDigest)
@@ -333,6 +333,27 @@ class OZExternalSignerManagerEd25519Test {
         assertFailsWith<ValidationException.InvalidInput> {
             manager.signEd25519AuthDigest(VERIFIER_A, unregisteredKey, authDigest)
         }
+    }
+
+    @Test
+    fun test_signEd25519AuthDigest_neitherRegistered_messageNamesBothRemedies() = runTest {
+        // The in-manager not-found message must name both runtime remedies:
+        // kit.externalSigners.addEd25519FromRawKey(...) and config.externalEd25519Adapter.
+        val manager = createManager()
+        val unregisteredKey = ByteArray(32) { (it + 56).toByte() }
+        val authDigest = ByteArray(32)
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            manager.signEd25519AuthDigest(VERIFIER_A, unregisteredKey, authDigest)
+        }
+        assertTrue(
+            ex.message.contains("kit.externalSigners.addEd25519FromRawKey", ignoreCase = false),
+            "Message must point at kit.externalSigners.addEd25519FromRawKey; got: ${ex.message}"
+        )
+        assertTrue(
+            ex.message.contains("config.externalEd25519Adapter", ignoreCase = false),
+            "Message must point at config.externalEd25519Adapter; got: ${ex.message}"
+        )
     }
 
     // ========================================================================
