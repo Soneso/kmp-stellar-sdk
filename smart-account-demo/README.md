@@ -8,32 +8,35 @@ Supported platforms: Android, iOS, macOS, and Web. Android, iOS, and Web use Com
 
 ## Features
 
-The demo includes 7 screens:
+The demo includes 8 screens:
 
 ### 1. Main Dashboard
 Wallet status display with XLM and DEMO token balances, navigation to all other screens, activity log showing SDK operations in real time, balance refresh, and wallet disconnect.
 
 ### 2. Wallet Creation
-Collects a username, registers a passkey via the platform's WebAuthn provider, deploys a smart account contract to testnet, funds the wallet with XLM via the relayer, and mints 10,000 DEMO tokens. Displays the credential ID, contract address, transaction hash, and initial balances on completion.
+Collects a username, registers a passkey via the platform's WebAuthn provider, deploys a smart account contract to testnet, funds the wallet with XLM via Friendbot, and mints 10,000 DEMO tokens. Displays the credential ID, contract address, transaction hash, and initial balances on completion.
 
 ### 3. Wallet Connection
 Four connection strategies:
-- **Auto Connect** -- restores a saved session or triggers passkey authentication, then resolves the contract address via the indexer.
+- **Auto Connect** -- restores a saved session if one exists, otherwise authenticates with a passkey and tries to resolve the contract address automatically.
 - **Connect via Indexer** -- authenticates with a passkey first, then looks up the associated contract address through the indexer service.
 - **Connect with Address** -- recovery flow where the user provides a known contract address and authenticates with any registered passkey.
 - **Retry Pending Deployment** -- retries contract deployment for credentials where the passkey was registered but the on-chain deployment did not complete.
 
 ### 4. Transfer
-Send XLM or DEMO tokens from the connected smart account to any Stellar address. When the account has multiple signers (from context rules), a signer picker allows selecting which signers co-authorize the transaction. Supports both single-passkey and multi-signer transfer paths. Each transfer triggers a WebAuthn authentication ceremony to sign the Soroban authorization entry.
+Send XLM or DEMO tokens from the connected smart account to any Stellar address. When the account has multiple signers (from context rules), a signer picker allows selecting which signers co-authorize the transaction. Supports both single-passkey and multi-signer transfer paths. Signing with a passkey signer triggers a WebAuthn authentication ceremony to sign the Soroban authorization entry.
 
 ### 5. Context Rules
 Lists all on-chain authorization rules for the connected account. Each rule card shows its ID, name, context type (Default, CallContract, CreateContract), signers, policies, and expiry. Supports expanding rules for detail view, removing rules (with a safety check preventing removal of the last rule), and navigating to the rule builder for creating or editing rules.
 
 ### 6. Context Rule Builder
-Form for creating or editing a context rule. Configure the context type, rule name, optional expiry (as a ledger offset converted to an absolute ledger number), signers (passkey, Ed25519, or delegated), and policy contracts (threshold, spending limit, weighted threshold) with their parameters. In edit mode, updates the rule name and expiry via separate on-chain transactions.
+Form for creating or editing a context rule. Configure the context type, rule name, optional expiry (as a ledger offset converted to an absolute ledger number), signers (passkey, delegated G-address, raw Ed25519), and policy contracts (threshold, spending limit, weighted threshold) with their parameters. In edit mode, you can rename the rule, change its expiry, add or remove signers, and add, remove, or modify policies; each change is applied as a separate on-chain transaction.
 
 ### 7. Account Signers
-Displays all unique signers registered across all context rules. Each signer entry shows its type (passkey, Ed25519, delegated), identifier, and the list of context rules it belongs to. Signers are deduplicated across rules using stable signer keys.
+Displays all unique signers registered across all context rules. Each signer entry shows its type (passkey, delegated G-address, raw Ed25519), identifier, and the list of context rules it belongs to. Signers are deduplicated across rules using stable signer keys.
+
+### 8. Approve
+Grants a SEP-41 token spending allowance that delegates spending authority over the smart account's tokens to another address. This screen demonstrates an arbitrary contract call: unlike Transfer (which uses the dedicated transfer helper), Approve invokes the token's `approve` function through the generic contract-call path, with both single-signer and multi-signer support.
 
 ## Architecture
 
@@ -44,11 +47,11 @@ smart-account-demo/
 │       ├── commonMain/kotlin/.../
 │       │   ├── App.kt                   # Compose app entry point
 │       │   ├── config/                  # DemoConfig, PolicyInfo, KNOWN_POLICIES
-│       │   ├── flows/                   # Business logic (6 flow files)
+│       │   ├── flows/                   # Business logic
 │       │   ├── state/                   # DemoState, ActivityLogState
 │       │   ├── token/                   # DemoTokenService
 │       │   ├── util/                    # Helpers, context rule parsing, policy builders
-│       │   ├── ui/screens/              # 7 Compose screens
+│       │   ├── ui/screens/              # Compose screens
 │       │   └── platform/               # Expect/actual (clipboard)
 │       ├── androidMain/                 # Android clipboard, platform init
 │       ├── iosMain/                     # iOS UIViewController, platform init
@@ -58,15 +61,15 @@ smart-account-demo/
 ├── iosApp/                              # iOS entry point (SwiftUI wrapping Compose)
 ├── macosApp/                            # macOS native SwiftUI app
 │   └── StellarSmartDemo/
-│       ├── Views/                       # 7 screens, 3 sections, 1 view model
-│       ├── Components/                  # 8 reusable UI components
-│       └── Utilities/                   # 7 helper files
+│       ├── Views/                       # Screens, sections, view model
+│       ├── Components/                  # Reusable UI components
+│       └── Utilities/                   # Helper files
 └── webApp/                              # Web entry point (Compose via Kotlin/JS)
 ```
 
-**Shared module**: All business logic lives in `flows/` (wallet creation, connection, transfer, context rules, account signers, main screen initialization). State management uses `DemoState` (wallet connection, balances, kit instance) and `ActivityLogState` (operation log). Platform-specific code is limited to clipboard access, WebAuthn providers, and storage adapters.
+**Shared module**: All business logic lives in `flows/`. State management uses `DemoState` (wallet connection, balances, kit instance) and `ActivityLogState` (operation log). Platform-specific code is limited to clipboard access, WebAuthn providers, and storage adapters.
 
-**macOS app**: Uses native SwiftUI instead of Compose. The Kotlin `MacOSBridge.kt` in `macosMain` exposes all shared flow functions to Swift. The SwiftUI layer handles UI rendering while all SDK interaction goes through the bridge.
+**macOS app**: Uses native SwiftUI instead of Compose. A Kotlin bridge in `macosMain` exposes the shared flow functions to Swift; the SwiftUI layer handles UI rendering while all SDK interaction goes through the bridge.
 
 ## Prerequisites
 
@@ -127,9 +130,9 @@ In Xcode:
 
 **Switching between simulator and physical device:**
 
-The framework dependency in `project.yml` (line 55) must match the target platform. After changing it, run `xcodegen generate` to regenerate the Xcode project, then set your signing team again.
+The framework dependency in `project.yml` must match the target platform. After changing it, run `xcodegen generate` to regenerate the Xcode project, then set your signing team again.
 
-| Target | Framework path in project.yml line 55 |
+| Target | Framework path in `project.yml` |
 |--------|---------------------------------------|
 | Simulator | `../shared/build/bin/iosSimulatorArm64/debugFramework/shared.framework` |
 | Physical device | `../shared/build/bin/iosArm64/debugFramework/shared.framework` |
@@ -201,7 +204,7 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 
 | Setting | Description |
 |---------|-------------|
-| `RPC_URL` | Soroban RPC endpoint (`soroban-testnet.stellar.org`) |
+| `RPC_URL` | Soroban RPC endpoint |
 | `NETWORK_PASSPHRASE` | Stellar testnet passphrase |
 | `ACCOUNT_WASM_HASH` | Smart account contract WASM hash (OZ stellar-contracts v0.7.0) |
 | `WEBAUTHN_VERIFIER_ADDRESS` | On-chain WebAuthn (secp256r1) signature verifier contract |
@@ -211,13 +214,14 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 | `DEFAULT_INDEXER_URL` | Credential-to-contract address lookup service |
 | `DEFAULT_RP_ID` | WebAuthn Relying Party ID (`soneso.com`) |
 | `RP_NAME` | Display name for passkey prompts |
-| `REOWN_PROJECT_ID` | Reown (WalletConnect) project ID for external wallet connection |
+| `REOWN_PROJECT_ID` | Reown (WalletConnect) project ID for external-wallet connect. Empty by default; register a free project ID at [cloud.reown.com](https://cloud.reown.com) and set it. External-wallet connect is disabled (and its UI hidden) when unset. |
+| `MAX_CONTEXT_RULE_SCAN_ID` | Upper bound on rule-ID iteration when scanning the chain (default `25`) |
 
 DEMO token settings (`DEMO_TOKEN_*`) control the deterministic deployment and minting of a custom Soroban token used for testing transfers.
 
 Known policy contracts (threshold, spending limit, weighted threshold) are defined in `KNOWN_POLICIES`.
 
-## External Wallet Connection (Freighter)
+## External Wallet Connection
 
 The demo supports connecting an external Stellar wallet (Freighter) as a delegated signer, as an alternative to entering a secret key manually.
 
@@ -234,7 +238,7 @@ Wallet connection buttons are hidden on simulators and emulators since WalletCon
 
 Android and iOS use the [Reown](https://cloud.reown.com/) (WalletConnect v2) SDK. A project ID is required. Set `REOWN_PROJECT_ID` in `DemoConfig.kt`. Register for a free project ID at [cloud.reown.com](https://cloud.reown.com/).
 
-### iOS App Group (required for device builds)
+### iOS App Group
 
 The Reown SDK requires an App Group for relay session storage. The entitlement `group.com.soneso.stellar.smartdemo` is configured in `iosApp/StellarSmartDemo/StellarSmartDemo.entitlements`.
 
@@ -263,4 +267,6 @@ This is not needed for simulator builds (wallet connection is disabled on simula
 
 ## License
 
-Copyright (c) 2026 Soneso. All rights reserved.
+Copyright 2026 Soneso
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](../LICENSE).

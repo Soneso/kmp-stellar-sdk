@@ -7,7 +7,7 @@ package com.soneso.smartdemo.flows
  * 1. Ensure the deployer account is funded (needed after testnet resets).
  * 2. Register a passkey via the platform's WebAuthn provider.
  * 3. Deploy the smart account contract to the Stellar network.
- * 4. Fund the wallet with XLM via the relayer.
+ * 4. Fund the wallet with XLM via Friendbot.
  * 5. Deploy the DEMO token (if not already deployed) and mint 10,000 DEMO.
  *
  * Uses [OZSmartAccountKit.walletOperations.createWallet] as the main SDK entry point.
@@ -103,8 +103,8 @@ suspend fun createWallet(
     // Step 2: createWallet triggers the WebAuthn ceremony on the device (passkey registration),
     // then deploys the smart account contract using the deployer and native token contract.
     // - autoSubmit: controls whether the SDK submits the transaction automatically.
-    // - autoFund: if true, the relayer funds the new wallet with XLM after deployment.
-    // - nativeTokenContract: the XLM SAC address, used to top up the wallet via the relayer.
+    // - autoFund: if true, the new wallet is funded with XLM via Friendbot after deployment.
+    // - nativeTokenContract: the XLM SAC address, used to top up the wallet via Friendbot.
     val result = kit.walletOperations.createWallet(
         userName = username,
         autoSubmit = autoSubmit,
@@ -140,7 +140,7 @@ suspend fun createWallet(
 
     if (autoSubmit) {
         // Step 4: Fetch the initial XLM balance via the Stellar Asset Contract (SAC).
-        // The relayer funded the wallet with XLM; fetching it confirms the funding succeeded.
+        // The wallet was funded with XLM via Friendbot; fetching it confirms the funding succeeded.
         try {
             xlmBalance = fetchXlmBalance(result.contractId)
             DemoState.updateBalance(xlmBalance)

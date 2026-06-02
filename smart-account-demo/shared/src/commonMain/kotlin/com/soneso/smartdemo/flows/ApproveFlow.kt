@@ -3,10 +3,10 @@ package com.soneso.smartdemo.flows
 /**
  * Business logic for token allowance approval from a smart account.
  *
- * Calls the token contract's approve() function directly (not through the smart
- * account's execute() entry point). This allows contract-specific context rules
- * (CallContract) to authorize the operation, enabling multi-signer scenarios
- * without requiring the Default rule's signer.
+ * Calls the token contract's approve() function through the generic contractCall /
+ * multiSignerContractCall API, demonstrating that the smart account can authorize an
+ * arbitrary contract function (not just transfers, which use the dedicated transfer
+ * helper).
  *
  * Provides single-signer and multi-signer paths for the SEP-41 approve() function,
  * plus a read-only allowance query. All functions operate on the connected smart
