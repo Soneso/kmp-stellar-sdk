@@ -1468,13 +1468,11 @@ class SmartAccountKitTest {
             accountWasmHash = "a" + "0".repeat(63),
             webauthnVerifierAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
         )
-            .rpName("Test Wallet")
             .sessionExpiryMs(86400000L)
             .relayerUrl("https://relayer.example.com")
             .indexerUrl("https://indexer.example.com")
             .build()
 
-        assertEquals("Test Wallet", config.rpName)
         assertEquals(86400000L, config.sessionExpiryMs)
         assertEquals("https://relayer.example.com", config.relayerUrl)
         assertEquals("https://indexer.example.com", config.indexerUrl)

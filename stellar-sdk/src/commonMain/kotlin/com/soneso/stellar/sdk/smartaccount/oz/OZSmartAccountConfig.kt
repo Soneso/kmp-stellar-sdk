@@ -36,7 +36,6 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  *     accountWasmHash = "abc123...",
  *     webauthnVerifierAddress = "CBCD1234..."
  * )
- *     .rpName("My Custom Wallet")
  *     .sessionExpiryMs(86400000L) // 1 day
  *     .relayerUrl("https://relayer.example.com")
  *     .storage(myPersistentStorage)
@@ -51,8 +50,6 @@ import com.soneso.stellar.sdk.crypto.getSha256Crypto
  * | accountWasmHash | Yes | - |
  * | webauthnVerifierAddress | Yes | - |
  * | deployerKeypair | No | Deterministic deployer |
- * | rpId | No | Browser default |
- * | rpName | No | "Smart Account" |
  * | sessionExpiryMs | No | 604800000 (7 days) |
  * | signatureExpirationLedgers | No | 720 (~1 hour) |
  * | timeoutInSeconds | No | 30 |
@@ -113,23 +110,6 @@ data class OZSmartAccountConfig(
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
      */
     val deployerKeypair: KeyPair? = null,
-
-    /**
-     * The WebAuthn Relying Party ID (rpId).
-     *
-     * This should match the domain where WebAuthn credentials are created.
-     * If null, the browser will use the current domain.
-     *
-     * Example: "example.com"
-     */
-    val rpId: String? = null,
-
-    /**
-     * The WebAuthn Relying Party name displayed to users during authentication.
-     *
-     * Default: "Smart Account"
-     */
-    val rpName: String = "Smart Account",
 
     /**
      * Session expiry time in milliseconds.
@@ -274,7 +254,6 @@ data class OZSmartAccountConfig(
          *     accountWasmHash = "abc123...",
          *     webauthnVerifierAddress = "CBCD1234..."
          * )
-         *     .rpName("My Wallet")
          *     .sessionExpiryMs(86400000L)
          *     .relayerUrl("https://relayer.example.com")
          *     .storage(myPersistentStorage)
@@ -333,7 +312,6 @@ data class OZSmartAccountConfig(
      *     accountWasmHash = "abc123...",
      *     webauthnVerifierAddress = "CBCD1234..."
      * )
-     *     .rpName("My Wallet")
      *     .sessionExpiryMs(86400000L)
      *     .relayerUrl("https://relayer.example.com")
      *     .storage(myPersistentStorage)
@@ -348,8 +326,6 @@ data class OZSmartAccountConfig(
         private val webauthnVerifierAddress: String
     ) {
         private var deployerKeypair: KeyPair? = null
-        private var rpId: String? = null
-        private var rpName: String = "Smart Account"
         private var sessionExpiryMs: Long = OZConstants.DEFAULT_SESSION_EXPIRY_MS
         private var signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR
         private var timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS
@@ -369,28 +345,6 @@ data class OZSmartAccountConfig(
          */
         fun deployerKeypair(value: KeyPair?): Builder {
             deployerKeypair = value
-            return this
-        }
-
-        /**
-         * Sets the WebAuthn Relying Party ID.
-         *
-         * @param value The rpId (null to use browser default)
-         * @return This builder for chaining
-         */
-        fun rpId(value: String?): Builder {
-            rpId = value
-            return this
-        }
-
-        /**
-         * Sets the WebAuthn Relying Party name.
-         *
-         * @param value The rpName
-         * @return This builder for chaining
-         */
-        fun rpName(value: String): Builder {
-            rpName = value
             return this
         }
 
@@ -509,8 +463,6 @@ data class OZSmartAccountConfig(
                 accountWasmHash = accountWasmHash,
                 webauthnVerifierAddress = webauthnVerifierAddress,
                 deployerKeypair = deployerKeypair,
-                rpId = rpId,
-                rpName = rpName,
                 sessionExpiryMs = sessionExpiryMs,
                 signatureExpirationLedgers = signatureExpirationLedgers,
                 timeoutInSeconds = timeoutInSeconds,

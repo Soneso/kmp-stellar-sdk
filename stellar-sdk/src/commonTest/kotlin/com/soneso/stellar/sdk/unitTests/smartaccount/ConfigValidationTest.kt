@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
  * - Default deployer creation
  *
  * These tests cover:
- * - Builder pattern: all optional fields (rpName, rpId, signatureExpirationLedgers, timeoutInSeconds)
+ * - Builder pattern: all optional fields (signatureExpirationLedgers, timeoutInSeconds)
  * - Config defaults for optional fields
  * - webauthnVerifierAddress additional edge cases
  * - Config data class properties and equality
@@ -67,8 +67,6 @@ class ConfigValidationTest {
         val config = validConfig()
 
         assertNull(config.deployerKeypair)
-        assertNull(config.rpId)
-        assertEquals("Smart Account", config.rpName)
         assertEquals(OZConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
         assertEquals(Util.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
         assertEquals(OZConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
@@ -213,8 +211,6 @@ class ConfigValidationTest {
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
         )
-            .rpName("My Custom Wallet")
-            .rpId("example.com")
             .sessionExpiryMs(86400000L)
             .signatureExpirationLedgers(1440)
             .timeoutInSeconds(60)
@@ -222,8 +218,6 @@ class ConfigValidationTest {
             .indexerUrl("https://indexer.example.com")
             .build()
 
-        assertEquals("My Custom Wallet", config.rpName)
-        assertEquals("example.com", config.rpId)
         assertEquals(86400000L, config.sessionExpiryMs)
         assertEquals(1440, config.signatureExpirationLedgers)
         assertEquals(60, config.timeoutInSeconds)
@@ -240,8 +234,6 @@ class ConfigValidationTest {
             webauthnVerifierAddress = validVerifier
         ).build()
 
-        assertEquals("Smart Account", config.rpName)
-        assertNull(config.rpId)
         assertEquals(OZConstants.DEFAULT_SESSION_EXPIRY_MS, config.sessionExpiryMs)
         assertEquals(Util.LEDGERS_PER_HOUR, config.signatureExpirationLedgers)
         assertEquals(OZConstants.DEFAULT_TIMEOUT_SECONDS, config.timeoutInSeconds)
@@ -257,7 +249,6 @@ class ConfigValidationTest {
             networkPassphrase = validPassphrase,
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier,
-            rpName = "Test",
             sessionExpiryMs = 100000L,
             relayerUrl = "https://relayer.test"
         )
@@ -268,7 +259,6 @@ class ConfigValidationTest {
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
         )
-            .rpName("Test")
             .sessionExpiryMs(100000L)
             .relayerUrl("https://relayer.test")
             .build()
@@ -284,13 +274,11 @@ class ConfigValidationTest {
             accountWasmHash = validWasmHash,
             webauthnVerifierAddress = validVerifier
         )
-            .rpId(null)
             .relayerUrl(null)
             .indexerUrl(null)
             .deployerKeypair(null)
             .build()
 
-        assertNull(config.rpId)
         assertNull(config.relayerUrl)
         assertNull(config.indexerUrl)
         assertNull(config.deployerKeypair)
@@ -307,8 +295,6 @@ class ConfigValidationTest {
         )
 
         val result = builder
-            .rpName("A")
-            .rpId("b.com")
             .sessionExpiryMs(1000L)
             .signatureExpirationLedgers(100)
             .timeoutInSeconds(10)
@@ -318,8 +304,8 @@ class ConfigValidationTest {
 
         // All calls return the same builder, so we can build from the result
         val config = result.build()
-        assertEquals("A", config.rpName)
-        assertEquals("b.com", config.rpId)
+        assertEquals(1000L, config.sessionExpiryMs)
+        assertEquals("https://r.com", config.relayerUrl)
     }
 
     // MARK: - Config Data Class Properties
@@ -356,9 +342,9 @@ class ConfigValidationTest {
     @Test
     fun testConfigCopy_withModifiedFields() {
         val original = validConfig()
-        val modified = original.copy(rpName = "Modified Wallet")
+        val modified = original.copy(sessionExpiryMs = 99999L)
 
-        assertEquals("Modified Wallet", modified.rpName)
+        assertEquals(99999L, modified.sessionExpiryMs)
         assertEquals(original.rpcUrl, modified.rpcUrl)
         assertEquals(original.networkPassphrase, modified.networkPassphrase)
     }
