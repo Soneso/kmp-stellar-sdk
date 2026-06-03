@@ -21,16 +21,19 @@ WebAuthn passkeys require a trust relationship between the app and a domain. The
 
 On the web, the RP ID defaults to the current page's hostname if not explicitly set. For example, if the demo runs at `http://localhost:8081`, the RP ID is `localhost`.
 
-When constructing `OZSmartAccountConfig`, the `rpId` parameter can be omitted for web apps. The browser's WebAuthn API will use the current origin's effective domain.
+The RP ID is set on `JsWebAuthnProvider`, not on `OZSmartAccountConfig`. For web apps, the `rpId` parameter of `JsWebAuthnProvider` can be omitted — the browser's WebAuthn API uses the current origin's effective domain.
 
 ```kotlin
+val webauthnProvider = JsWebAuthnProvider(
+    rpId = "your-domain.com", // or omit for localhost development
+    rpName = "My Stellar App"
+)
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
-    rpName = "My Stellar App",
-    // rpId omitted - browser uses current hostname
+    webauthnProvider = webauthnProvider
 )
 ```
 
@@ -63,16 +66,20 @@ Android uses the Credential Manager API (API level 28+) for passkey operations. 
 
 ### Step 1: Set the RP ID
 
-Pass the RP ID explicitly in the SDK configuration:
+Pass the RP ID explicitly on `AndroidWebAuthnProvider`:
 
 ```kotlin
+val webauthnProvider = AndroidWebAuthnProvider(
+    context = applicationContext,
+    rpId = "example.com",
+    rpName = "My Stellar App"
+)
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
-    rpId = "example.com",
-    rpName = "My Stellar App",
+    webauthnProvider = webauthnProvider
 )
 ```
 
@@ -142,16 +149,19 @@ iOS uses the AuthenticationServices framework (`ASAuthorizationPlatformPublicKey
 
 ### Step 1: Set the RP ID
 
-Pass the RP ID explicitly in the SDK configuration:
+Pass the RP ID explicitly on `AppleWebAuthnProvider`:
 
 ```kotlin
+val webauthnProvider = AppleWebAuthnProvider(
+    rpId = "example.com",
+    rpName = "My Stellar App"
+)
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "...",
     webauthnVerifierAddress = "C...",
-    rpId = "example.com",
-    rpName = "My Stellar App",
+    webauthnProvider = webauthnProvider
 )
 ```
 
@@ -246,7 +256,7 @@ The web demo runs on `localhost` during development (e.g., `http://localhost:808
 - Browsers treat `localhost` as a secure context.
 - The browser automatically uses `localhost` as the RP ID when none is specified.
 
-The TypeScript reference demo uses the same approach: it does not set `rpId` in its `SmartAccountKit` configuration and relies on `localhost` for development.
+The TypeScript reference demo uses the same approach: it passes no explicit `rpId` to its WebAuthn provider and relies on `localhost` for development.
 
 ### Android Demo
 
@@ -276,8 +286,8 @@ When deploying to production, replace `localhost` or test domains with your prod
 
 | Item | Web | Android | iOS/macOS |
 |------|-----|---------|-----------|
-| `rpId` in SDK config | Set to your domain | Set to your domain | Set to your domain |
-| `rpName` in SDK config | Set display name | Set display name | Set display name |
+| `rpId` on WebAuthn provider | Set to your domain | Set to your domain | Set to your domain |
+| `rpName` on WebAuthn provider | Set display name | Set display name | Set display name |
 | Domain file | `.well-known/webauthn` (only if cross-origin) | `.well-known/assetlinks.json` | `.well-known/apple-app-site-association` |
 | App config | None | Package name + signing fingerprint in `assetlinks.json` | Team ID + bundle ID in association file |
 | Entitlement | None | None | `webcredentials:<domain>` |
@@ -289,13 +299,14 @@ When deploying to production, replace `localhost` or test domains with your prod
 
 2. **Obtain a TLS certificate** (e.g., via Let's Encrypt) for the domain.
 
-3. **Set the RP ID** in your `OZSmartAccountConfig`:
+3. **Set the RP ID** on your platform `WebAuthnProvider` (not on `OZSmartAccountConfig`):
    ```kotlin
-   val config = OZSmartAccountConfig(
-       // ...
-       rpId = "myapp.example.com",
-       rpName = "My Stellar Wallet",
-   )
+   // Web
+   val webauthnProvider = JsWebAuthnProvider(rpId = "myapp.example.com", rpName = "My Stellar Wallet")
+   // Android
+   val webauthnProvider = AndroidWebAuthnProvider(context, rpId = "myapp.example.com", rpName = "My Stellar Wallet")
+   // iOS / macOS
+   val webauthnProvider = AppleWebAuthnProvider(rpId = "myapp.example.com", rpName = "My Stellar Wallet")
    ```
 
 4. **Host the domain association files** as described in each platform section above. All files must be served over HTTPS.

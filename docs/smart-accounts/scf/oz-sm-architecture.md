@@ -125,9 +125,9 @@ Both WebAuthnProvider and StorageAdapter are defined as interfaces, so developer
 
 ### 6. Deployer and address derivation
 
-Contract addresses are deterministic. The KMP SDK derives a C-address from `SHA256(credentialId)` as salt, combined with the deployer public key and network passphrase, via `HashIDPreimage::ContractID`. Given the same inputs, the KMP SDK produces addresses identical to the TypeScript Smart Account Kit.
+Contract addresses are deterministic. The KMP SDK derives a C-address from `SHA-256(credentialId)` as salt, combined with the deployer public key and network passphrase, via `HashIDPreimage::ContractID`. Given the same inputs, the KMP SDK produces addresses identical to the TypeScript Smart Account Kit.
 
-The KMP SDK accepts a configurable deployer keypair. Production applications will typically use a custom deployer for attribution and traceability, since the deployer signs the deployment transaction and is visible on-chain. For testing and simple use cases, the SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")` as the Ed25519 seed, shared with the TypeScript Smart Account Kit.
+The KMP SDK accepts a configurable deployer keypair. Production applications will typically use a custom deployer for attribution and traceability, since the deployer signs the deployment transaction and is visible on-chain. For testing and simple use cases, the SDK provides a default deployer derived from `SHA-256("openzeppelin-smart-account-kit")` as the Ed25519 seed, shared with the TypeScript Smart Account Kit.
 
 Signer encoding follows the standard Soroban enum serialization for the on-chain `Signer` type (`Delegated(Address)` or `External(Address, Bytes)`). For passkey signers, the key data is the 65-byte uncompressed secp256r1 public key concatenated with the credential ID.
 
@@ -141,7 +141,7 @@ Signer encoding follows the standard Soroban enum serialization for the on-chain
 
 **Signature normalization**: WebAuthn produces DER-encoded secp256r1 signatures. The KMP SDK converts these to compact 64-byte format with low-S enforcement, as required by the on-chain verifier.
 
-**Auth entry signing**: The KMP SDK computes `SHA256(XDR(HashIDPreimage::SorobanAuthorization))` as the payload hash. Signature values use double XDR encoding (encode SCVal to bytes, wrap in SCVal::Bytes). SCVal map keys are sorted by XDR-encoded byte representation for deterministic ordering.
+**Auth entry signing**: The KMP SDK computes `SHA-256(XDR(HashIDPreimage::SorobanAuthorization))` as the payload hash. Signature values use double XDR encoding (encode SCVal to bytes, wrap in SCVal::Bytes). SCVal map keys are sorted by XDR-encoded byte representation for deterministic ordering.
 
 **Storage security**: Android uses AES-256-GCM encryption backed by the Android Keystore. Apple platforms use the system Keychain. Web uses IndexedDB. Stored data contains only public keys and session metadata, never secret keys.
 

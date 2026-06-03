@@ -13,11 +13,14 @@ A smart account is a Soroban contract that replaces traditional Stellar key mana
 - **Context rules**: Define different authorization requirements for different operation types
 - **Policies**: Enforce authorization constraints such as spending limits and multi-signature thresholds, or add custom policy contracts
 - **Fee sponsoring**: Submit transactions through a relayer so users never pay gas fees
+- **Credential discovery**: Optional indexer lookup that maps a passkey credential to one or more deployed smart-account contracts
 - **Session management**: Silent reconnection without re-authentication for 7 days (configurable)
 
 The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The on-chain contract stores signers and policies; the SDK handles WebAuthn ceremonies, transaction assembly, authorization entry signing, and submission.
 
 ## Architecture
+
+The kit is split into two layers: a protocol-agnostic `core/` layer (signer types, signature wrappers, the `WebAuthnProvider` interface, and crypto helpers usable by any Soroban `CustomAccountInterface` contract) and an OpenZeppelin-specific `oz/` layer (the kit, managers, relayer/indexer clients, and storage adapters).
 
 ```
 +-----------------------------------------------------------------------+
@@ -28,7 +31,7 @@ The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The 
 +-----------------------------------------------------------------------+
 |                       OZSmartAccountKit                               |
 |  Entry point. Created via OZSmartAccountKit.create(config).           |
-|  Provides sub-managers as lazy properties:                            |
+|  Provides sub-managers as properties:                                 |
 |                                                                       |
 |  +-----------------------+  +----------------------------+            |
 |  | walletOperations      |  | transactionOperations      |            |
@@ -53,15 +56,8 @@ The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The 
 | WebAuthnProvider |  | StorageAdapter   |  | ExternalWalletAdapter |
 | (platform impl)  |  | (platform impl)  |  | (optional)            |
 +------------------+  +------------------+  +-----------------------+
-        |                    |
-        v                    v
-+----------------+  +------------------+
-| Platform       |  | Credential &     |
-| Biometric UI   |  | Session Store    |
-| (OS-level)     |  | (Keychain, etc.) |
-+----------------+  +------------------+
 
-        OZSmartAccountKit also connects to:
+        OZSmartAccountKit also uses:
 
 +----------------+  +------------------+  +---------------------+
 | SorobanServer  |  | OZRelayerClient  |  | OZIndexerClient     |
@@ -69,11 +65,13 @@ The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The 
 +----------------+  +------------------+  +---------------------+
 ```
 
-**OZSmartAccountKit** is the single entry point. It holds configuration, connection state (`isConnected`, `credentialId`, `contractId`), and exposes all operations through sub-managers. Each sub-manager receives a reference to the kit and uses its Soroban server, relayer, and storage internally.
+**OZSmartAccountKit** is the single entry point. It holds configuration, connection state (`isConnected`, `credentialId`, `contractId`), and exposes all operations through sub-managers. Each sub-manager receives a reference to the kit and uses its Soroban server, relayer, indexer, and storage internally.
 
-**WebAuthnProvider** is a platform-specific interface you implement (or use the provided implementations for Android, iOS, and browser). It triggers the OS-level biometric prompt and returns raw WebAuthn attestation/assertion data.
+**WebAuthnProvider** is a platform-specific interface you implement, or use the provided implementation. It triggers the OS-level biometric prompt and returns raw WebAuthn attestation/assertion data.
 
-**StorageAdapter** persists credentials and sessions. The SDK includes `InMemoryStorageAdapter` for testing. Production apps implement this interface using platform storage (Keychain, SharedPreferences, localStorage).
+**StorageAdapter** persists credentials and sessions. The SDK includes an in-memory adapter for testing and platform-storage adapters for production (see the Configuration Reference).
+
+**External signing** flows through one kit-owned `OZExternalSignerManager`, exposed as `kit.externalSigners` — the single front door for all external (non-passkey) signers. Supply adapters for external wallet signers (e.g. Freighter or WalletConnect) and for raw Ed25519 signers (e.g. an HSM or remote signing service) via configuration, or register in-memory keypairs at runtime. See the [demo app](../../smart-account-demo) for examples.
 
 ## Quick Start
 
@@ -88,16 +86,16 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 // Required fields come from the OpenZeppelin deployment:
 // - rpcUrl: Soroban RPC endpoint
 // - networkPassphrase: Stellar network identifier
-// - accountWasmHash: SHA-256 hash of the smart account WASM (hex string)
-// - webauthnVerifierAddress: Deployed WebAuthn verifier contract (C-address)
+// - accountWasmHash: SHA-256 hash of the smart account WASM (64-char hex)
+// - webauthnVerifierAddress: deployed WebAuthn verifier contract (C-address)
 //
-// Optional fields configure platform adapters and services:
+// Optional fields configure platform adapters and services.
 
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "a1b2c3d4e5f6...",  // hex string from contract deployment
-    webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "<64-char hex WASM hash>",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     relayerUrl = "https://relayer.example.com",    // optional: enables fee sponsoring
     indexerUrl = "https://indexer.example.com",     // optional: enables credential lookup
     webauthnProvider = MyWebAuthnProvider(),         // optional: platform-specific passkey implementation
@@ -111,31 +109,31 @@ val kit = OZSmartAccountKit.create(config)
 
 // Step 3: Create a new wallet
 //
-// This triggers a WebAuthn registration ceremony (biometric prompt).
-// The SDK generates a passkey, derives a deterministic contract address,
-// deploys the smart account contract, and funds it via Friendbot (testnet).
+// Triggers a WebAuthn registration ceremony (biometric prompt), derives a
+// deterministic contract address, deploys the smart account contract, and
+// funds it via Friendbot (testnet).
 
 val wallet = kit.walletOperations.createWallet(
     userName = "Alice",
     autoSubmit = true,
     autoFund = true,
-    nativeTokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+    nativeTokenContract = "<C-address of native XLM SAC>"
 )
 
-// wallet.credentialId      -- Base64URL-encoded credential ID
-// wallet.contractId        -- Stellar C-address of the deployed contract
-// wallet.signedTransactionXdr -- signed deploy transaction envelope (always present)
-// wallet.transactionHash   -- deployment transaction hash (present when autoSubmit = true)
+// wallet.credentialId         -- Base64URL-encoded credential ID
+// wallet.contractId           -- Stellar C-address of the deployed contract
+// wallet.publicKey            -- 65-byte uncompressed secp256r1 public key
+// wallet.signedTransactionXdr -- signed deploy envelope (always populated)
+// wallet.transactionHash      -- deployment tx hash (set when autoSubmit = true)
 
 // Step 4: Transfer tokens
 //
-// This triggers a WebAuthn authentication ceremony (biometric prompt)
-// to sign the authorization entry. If a relayer is configured,
-// the transaction is fee-sponsored.
+// Triggers a WebAuthn authentication ceremony (biometric prompt) to sign the
+// authorization entry. If a relayer is configured, the transaction is fee-sponsored.
 
 val result = kit.transactionOperations.transfer(
-    tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-    recipient = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+    tokenContract = "<C-address of token contract>",
+    recipient = "<recipient G-address>",
     amount = "10"  // decimal amount (automatically converted to stroops)
 )
 
@@ -160,9 +158,9 @@ On app relaunch, use a two-phase connect pattern. Phase 1 silently restores the 
 ```kotlin
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "a1b2c3d4e5f6...",
-    webauthnVerifierAddress = "CBCD1234...",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "<64-char hex WASM hash>",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     storage = myStorageAdapter  // platform-specific adapter for credential persistence
 )
 val kit = OZSmartAccountKit.create(config)
@@ -241,7 +239,7 @@ Add additional signers to a context rule so multiple parties can authorize trans
 // Add a delegated Stellar account as a signer on the Default context rule (ID 0)
 val addResult = kit.signerManager.addDelegated(
     contextRuleId = 0u,
-    address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+    address = "<delegated G-address>"
 )
 
 // Add a new passkey signer (handles WebAuthn registration, credential storage,
@@ -250,8 +248,8 @@ val passkeyResult = kit.signerManager.addNewPasskeySigner(
     contextRuleId = 0u,
     userName = "Alice backup device"
 )
-// passkeyResult.credentialId  -- Base64URL-encoded credential ID
-// passkeyResult.publicKey     -- 65-byte secp256r1 uncompressed public key
+// passkeyResult.credentialId  -- Base64URL-encoded credential ID (no padding)
+// passkeyResult.publicKey     -- 65-byte uncompressed secp256r1 public key
 // passkeyResult.transactionResult -- on-chain submission result
 
 // Low-level alternative: add a passkey signer with pre-extracted cryptographic materials
@@ -270,31 +268,31 @@ val removeResult = kit.signerManager.removeSigner(
 
 ### Adding Policies
 
-Policies enforce constraints on context rules. Each context rule supports up to 5 policies.
+Policies enforce constraints on context rules. Each context rule supports up to 5 policies. Built-in helpers cover the three OpenZeppelin policy contracts: `addSimpleThreshold`, `addWeightedThreshold`, and `addSpendingLimit`.
 
 ```kotlin
 // Require 2-of-3 signers to authorize
 val thresholdResult = kit.policyManager.addSimpleThreshold(
     contextRuleId = 0u,
-    policyAddress = "CPOLICY1234...",
+    policyAddress = "<C-address of the simple-threshold policy>",
     threshold = 2u
 )
 
 // Limit spending to 1000 XLM per day
 val limitResult = kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
-    policyAddress = "CPOLICY5678...",
+    policyAddress = "<C-address of the spending-limit policy>",
     spendingLimit = "1000",
     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
 )
 ```
 
-For custom policy contracts beyond the built-in types, use `addPolicy()` with policy-specific installation parameters:
+For custom policy contracts beyond the built-in types, use `addPolicy()` with policy-specific install parameters:
 
 ```kotlin
 val result = kit.policyManager.addPolicy(
     contextRuleId = 0u,
-    policyAddress = "CCUSTOMPOLICY...",
+    policyAddress = "<C-address of the custom policy>",
     installParams = Scv.toMap(linkedMapOf(
         Scv.toSymbol("my_param") to Scv.toUint32(42u)
     ))
@@ -303,9 +301,11 @@ val result = kit.policyManager.addPolicy(
 
 ### Multi-Signer Operations
 
-When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers with multiple signers. `multiSignerExecuteAndSubmit()` handles arbitrary contract calls (e.g., governance votes, multisig swaps) with multiple signers — it routes the call through the smart account's `execute` entry point.
+When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers; `multiSignerContractCall()` handles arbitrary external contract calls (e.g., governance votes, multisig swaps), authorized through the matching call-contract context rule; and `multiSignerExecuteAndSubmit()` routes a call through the smart account's `execute` entry point.
 
 All three signer kinds — passkey (`SelectedSigner.Passkey`), delegated wallet (`SelectedSigner.Wallet`), and Ed25519 external (`SelectedSigner.Ed25519`) — may be mixed in the same `selectedSigners` list. Wallet and Ed25519 signers resolve through the kit-owned `kit.externalSigners` manager: register an in-memory key at runtime (`kit.externalSigners.addFromSecret(...)` / `kit.externalSigners.addEd25519FromRawKey(...)`) or supply an adapter at kit construction (`externalWallet` / `externalEd25519Adapter`).
+
+See the [API Reference](api-reference.md#multi-signer-operations) for `SelectedSigner` types, custody models, and registration examples.
 
 ### Error Handling
 
@@ -317,7 +317,7 @@ try {
 } catch (e: SmartAccountException) {
     when (e) {
         is WebAuthnException.Cancelled ->
-            println("User cancelled biometric prompt")
+            println("User cancelled the biometric prompt")
         is WebAuthnException.NotSupported ->
             println("WebAuthn not configured: ${e.message}")
         is TransactionException.SimulationFailed ->
@@ -334,33 +334,32 @@ try {
 
 ## Configuration Reference
 
-`OZSmartAccountConfig` holds all parameters. Four fields are required; the rest have defaults.
+`OZSmartAccountConfig` holds all parameters. Four fields are required; the rest have defaults. The constructor validates inputs and throws `ConfigurationException` on invalid values.
 
 ### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `rpcUrl` | `String` | Soroban RPC endpoint URL (e.g., `"https://soroban-testnet.stellar.org"`) |
-| `networkPassphrase` | `String` | Stellar network passphrase. Use `"Test SDF Network ; September 2015"` for testnet or `"Public Global Stellar Network ; September 2015"` for mainnet. |
-| `accountWasmHash` | `String` | SHA-256 hash (hex) of the smart account contract WASM binary. Obtained after uploading the contract to the network. |
-| `webauthnVerifierAddress` | `String` | Contract address (C-address, 56 chars) of the deployed WebAuthn signature verifier. Must start with `C`. |
+| `rpcUrl` | `String` | Soroban RPC endpoint URL (for example `https://soroban-testnet.stellar.org`). |
+| `networkPassphrase` | `String` | Stellar network passphrase. Use `Network.TESTNET.networkPassphrase` for testnet or `Network.PUBLIC.networkPassphrase` for mainnet. |
+| `accountWasmHash` | `String` | SHA-256 hash (64 hex characters) of the smart account contract WASM binary. Obtained after uploading the contract to the network. |
+| `webauthnVerifierAddress` | `String` | Contract address (C-address, 56 characters) of the deployed WebAuthn signature verifier. Must start with `C`. |
 
 ### Optional Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `deployerKeypair` | `KeyPair?` | `null` (uses default) | Keypair used for contract deployment. If null, derived from `SHA256("openzeppelin-smart-account-kit")`. See [How Wallet Deployment Works](#how-wallet-deployment-works). |
-| `rpId` | `String?` | `null` | WebAuthn Relying Party ID. Should match your domain (e.g., `"example.com"`). If null, the browser uses the current origin. |
-| `rpName` | `String` | `"Smart Account"` | Display name shown to users during WebAuthn ceremonies. |
+| `deployerKeypair` | `KeyPair?` | `null` (uses default) | Keypair used for contract deployment. If `null`, derived from `SHA-256("openzeppelin-smart-account-kit")`. See [How Wallet Deployment Works](#how-wallet-deployment-works). |
 | `sessionExpiryMs` | `Long` | `604800000` (7 days) | Session duration in milliseconds. Sessions enable reconnection without re-authentication. |
 | `signatureExpirationLedgers` | `Int` | `720` (~1 hour) | Auth entry expiration in ledgers (~5 seconds per ledger). Prevents replay attacks. |
-| `timeoutInSeconds` | `Int` | `30` | Default timeout for network operations. |
+| `timeoutInSeconds` | `Int` | `30` | Sets each transaction's TimeBounds (`max_time = now + timeoutInSeconds`; `0` = no expiry), bounding how long a signed transaction stays valid for submission. Must be `>= 0`. |
 | `relayerUrl` | `String?` | `null` | Relayer endpoint for fee-sponsored transactions. When set, users do not pay gas fees. |
-| `indexerUrl` | `String?` | `null` | Indexer endpoint for credential-to-contract discovery. Enables `connectWallet()` to find contracts by credential ID. |
-| `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform-specific WebAuthn implementation. Required for `createWallet()`, `connectWallet()`, and `transfer()`. |
+| `indexerUrl` | `String?` | `null` | Indexer endpoint for credential-to-contract discovery. When `null`, falls back to the built-in per-network default (testnet/mainnet). |
+| `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform-specific WebAuthn implementation. Required for `createWallet`, `connectWallet(prompt = true)`, `authenticatePasskey`, and any passkey-signing flow. |
 | `storage` | `StorageAdapter` | `InMemoryStorageAdapter()` | Credential and session persistence. Use a platform-specific adapter (Keychain, SharedPreferences, localStorage) in production. |
 | `externalWallet` | `ExternalWalletAdapter?` | `null` | Wallet adapter (e.g., Freighter, Lobstr) backing the adapter custody model for `SelectedSigner.Wallet` signers. The kit injects it into `kit.externalSigners`. |
 | `externalEd25519Adapter` | `OZExternalEd25519SignerAdapter?` | `null` | Ed25519 adapter (hardware wallet, HSM, remote signing service) backing the adapter custody model for `SelectedSigner.Ed25519` signers. The kit injects it into `kit.externalSigners`. |
+| `maxContextRuleScanId` | `UInt` | `50` | Upper bound on the context-rule IDs scanned when listing rules without an explicit scan limit. |
 
 ### Builder Pattern
 
@@ -369,11 +368,10 @@ For configuration with many optional fields, use the builder:
 ```kotlin
 val config = OZSmartAccountConfig.builder(
     rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "a1b2c3d4e5f6...",
-    webauthnVerifierAddress = "CBCD1234..."
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "<64-char hex WASM hash>",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>"
 )
-    .rpName("My Wallet App")
     .sessionExpiryMs(86_400_000L)  // 1 day
     .relayerUrl("https://relayer.example.com")
     .indexerUrl("https://indexer.example.com")
@@ -429,7 +427,7 @@ Contract address derivation is deterministic: given the same deployer keypair, c
 
 ### Default Deployer
 
-The SDK provides a default deployer derived from `SHA256("openzeppelin-smart-account-kit")`. This default is suitable for testing and simple deployments. Other OpenZeppelin Smart Account SDK implementations use the same derivation, so all SDKs produce identical results from the same inputs.
+The SDK provides a default deployer derived from `SHA-256("openzeppelin-smart-account-kit")`. This default is suitable for testing and simple deployments. Other OpenZeppelin Smart Account SDK implementations use the same derivation, so all SDKs produce identical results from the same inputs.
 
 ```kotlin
 val deployer = OZSmartAccountConfig.createDefaultDeployer()

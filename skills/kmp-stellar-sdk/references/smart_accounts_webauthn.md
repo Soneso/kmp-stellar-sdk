@@ -358,8 +358,6 @@ class MainActivity : ComponentActivity() {
             networkPassphrase = "Test SDF Network ; September 2015",
             accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
             webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
-            rpId = "your-domain.com",                 // also used by the SDK for Android path
-            rpName = "My Stellar Wallet",
             webauthnProvider = webauthn,
             storage = storage
         )
@@ -557,14 +555,13 @@ let webauthn = AppleWebAuthnProvider(
 let storage = KeychainStorageAdapter(serviceName: "com.yourapp.stellar")
 
 // Use OZSmartAccountConfig.Companion.builder(...) from Swift for a cleaner call
-// site than the 16-parameter Kotlin data-class constructor.
+// site than the long Kotlin data-class constructor.
 let config = OZSmartAccountConfig.Companion().builder(
     rpcUrl: "https://soroban-testnet.stellar.org",
     networkPassphrase: "Test SDF Network ; September 2015",
     accountWasmHash: "a1b2c3...",
     webauthnVerifierAddress: "CBCD..."
 )
-    .rpName("My Stellar Wallet")
     .webauthnProvider(webauthn)
     .storage(storage)
     .build()

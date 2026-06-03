@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.6.1. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
 metadata:
   author: soneso
-  version: "1.1.3"
+  version: "1.1.4"
   sdk_repo: https://github.com/Soneso/kmp-stellar-sdk
 ---
 

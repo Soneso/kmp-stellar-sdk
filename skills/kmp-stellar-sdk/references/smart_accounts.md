@@ -97,8 +97,6 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `deployerKeypair` | `KeyPair?` | `null` | Null means use the default deterministic deployer |
-| `rpId` | `String?` | `null` | WebAuthn Relying Party ID (domain). Browser uses origin when null |
-| `rpName` | `String` | `"Smart Account"` | Display name shown to users during WebAuthn prompts |
 | `sessionExpiryMs` | `Long` | `604_800_000` (7 days) | Session duration for silent reconnect |
 | `signatureExpirationLedgers` | `Int` | `720` (`Util.LEDGERS_PER_HOUR`, ~1 hour) | Auth entry expiration, in ledgers (not seconds). **Replay-protection window**: if an attacker intercepts a signed envelope (via a compromised relayer, MITM, or logged XDR) they can resubmit it until this ledger passes. Default ~1 h is long for interactive flows — consider 60–180 (5–15 min) for high-value transfers |
 | `timeoutInSeconds` | `Int` | `30` | Network timeout for transaction ops |
@@ -143,7 +141,6 @@ val config = OZSmartAccountConfig.builder(
     accountWasmHash = "a1b2c3d4...",
     webauthnVerifierAddress = "CBCD1234..."
 )
-    .rpName("My Wallet")
     .sessionExpiryMs(86_400_000L)               // 1 day
     .signatureExpirationLedgers(1440)           // ~2 hours
     .relayerUrl("https://relayer.example.com")

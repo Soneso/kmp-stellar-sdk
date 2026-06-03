@@ -276,8 +276,6 @@ data class OZSmartAccountConfig(
 
     // Optional
     val deployerKeypair: KeyPair? = null,
-    val rpId: String? = null,
-    val rpName: String = "Smart Account",
     val sessionExpiryMs: Long = 604800000L,  // 7 days
     val signatureExpirationLedgers: Int = 720,  // ~1 hour
     val timeoutInSeconds: Int = 30,
@@ -299,8 +297,6 @@ data class OZSmartAccountConfig(
 
 **Optional Fields**:
 - `deployerKeypair`: Keypair for contract deployment (uses deterministic default if null)
-- `rpId`: WebAuthn Relying Party ID (domain name)
-- `rpName`: WebAuthn Relying Party name displayed to users
 - `sessionExpiryMs`: Session validity duration in milliseconds
 - `signatureExpirationLedgers`: Auth entry signature expiration in ledgers
 - `timeoutInSeconds`: Operation timeout in seconds
@@ -372,7 +368,6 @@ val config = OZSmartAccountConfig.builder(
     accountWasmHash = "abc123...",
     webauthnVerifierAddress = "CBCD1234..."
 )
-    .rpName("My Wallet")
     .sessionExpiryMs(86400000L)  // 1 day
     .relayerUrl("https://relayer.example.com")
     .storage(myStorageAdapter)
@@ -389,7 +384,7 @@ val config = OZSmartAccountConfig.builder(
 suspend fun effectiveDeployer(): KeyPair
 ```
 
-Returns the deployer keypair that will be used for contract deployment and transaction submission. If `deployerKeypair` is explicitly set in the config, that value is returned. Otherwise, a deterministic keypair is derived from `SHA256("openzeppelin-smart-account-kit")`. The derivation is deterministic and reproducible, always producing the same deployer address. The deployer only pays fees; it does not control user wallets.
+Returns the deployer keypair that will be used for contract deployment and transaction submission. If `deployerKeypair` is explicitly set in the config, that value is returned. Otherwise, a deterministic keypair is derived from `SHA-256("openzeppelin-smart-account-kit")`. The derivation is deterministic and reproducible, always producing the same deployer address. The deployer only pays fees; it does not control user wallets.
 
 **Returns**: The configured deployer or the default deterministic deployer
 
