@@ -12,66 +12,33 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 
 1. [Quick Start](#quick-start)
 2. [OZSmartAccountKit](#ozsmartaccountkit-main-entry-point)
-3. [Wallet Operations](#wallet-operations)
-4. [Transaction Operations](#transaction-operations)
-5. [Credential Management](#credential-management)
-6. [Signers and Policies](#signers-and-policies)
-7. [Context Rules](#context-rules)
-8. [Builders](#builders)
-9. [Multi-Signer Operations](#multi-signer-operations)
-10. [External Signers](#external-signers)
-11. [Indexer Client](#indexer-client)
-12. [Relayer Client](#relayer-client)
-13. [Events](#events)
-14. [Exceptions](#exceptions)
-15. [Types](#types)
+3. [OZSmartAccountConfig](#ozsmartaccountconfig)
+4. [Wallet Operations](#wallet-operations)
+5. [Transaction Operations](#transaction-operations)
+6. [Credential Management](#credential-management)
+7. [Signer Management](#signer-management)
+8. [Policy Management](#policy-management)
+9. [Context Rule Management](#context-rule-management)
+10. [Builder Helpers](#builder-helpers)
+11. [Utilities](#utilities)
+12. [Multi-Signer Operations](#multi-signer-operations)
+13. [External Signer Management](#external-signer-management)
+14. [Indexer Client](#indexer-client)
+15. [Relayer Client](#relayer-client)
+16. [Auth Helpers](#auth-helpers)
+17. [Events](#events)
+18. [Errors](#errors)
+19. [Types](#types)
+20. [Constants](#constants)
+21. [Platform-Specific Implementations](#platform-specific-implementations)
+22. [Error Handling Example](#error-handling-example)
+23. [License](#license)
 
 ---
 
 ## Quick Start
 
-```kotlin
-// Initialize the kit
-val config = OZSmartAccountConfig(
-    rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "YOUR_ACCOUNT_WASM_HASH",
-    webauthnVerifierAddress = "CWEBAUTHN_VERIFIER_ADDRESS",
-    webauthnProvider = webauthnProvider,  // required for passkey auth (AndroidWebAuthnProvider / AppleWebAuthnProvider / JsWebAuthnProvider)
-    storage = storageAdapter              // defaults to InMemoryStorageAdapter (AndroidStorageAdapter / UserDefaultsStorageAdapter / IndexedDBStorageAdapter)
-)
-val kit = OZSmartAccountKit.create(config)
-
-// On app start: silently restore from stored session
-val session = kit.walletOperations.connectWallet()
-if (session != null) {
-    println("Restored wallet: ${session.contractId}")
-}
-
-// User creates a new wallet (registers a passkey, deploys the contract)
-val wallet = kit.walletOperations.createWallet(
-    userName = "Alice",
-    autoSubmit = true,
-    autoFund = true,
-    nativeTokenContract = "CDLZFC3..."
-)
-println("Created wallet: ${wallet.contractId}")
-
-// User connects to an existing wallet (prompts for passkey selection)
-val connected = kit.walletOperations.connectWallet(
-    OZWalletOperations.ConnectWalletOptions(prompt = true)
-)
-
-// Transfer tokens
-val result = kit.transactionOperations.transfer(
-    tokenContract = "CDLZFC3...",
-    recipient = "GA7QYNF7...",
-    amount = "10"
-)
-
-// Disconnect
-kit.disconnect()
-```
+See the [Quick Start in the README](README.md#quick-start) for an end-to-end example covering kit configuration, wallet creation, token transfer, and the reconnection patterns. The sections below document each public symbol in detail.
 
 ---
 
@@ -92,7 +59,7 @@ Creates a new OZSmartAccountKit instance. Storage and external wallet adapters a
 
 **Returns**: Initialized OZSmartAccountKit instance
 
-**Throws**: `ConfigurationException.InvalidConfig` if configuration is invalid
+**Throws**: None. The factory performs no validation — configuration is validated by the `OZSmartAccountConfig` constructor (or `OZSmartAccountConfig.builder(...).build()`), which throws `ConfigurationException` before the config reaches `create`.
 
 ---
 
@@ -245,7 +212,7 @@ suspend fun disconnect()
 
 Disconnects the currently connected wallet, clearing the in-memory connection state and removing the stored session. Stored credentials remain and can be reconnected later.
 
-**Throws**: None (safe to call when not connected)
+**Throws**: Propagates any exception thrown by the storage adapter's `clearSession()`. Safe to call when not connected; the default `InMemoryStorageAdapter` does not throw.
 
 ---
 
@@ -299,13 +266,13 @@ data class OZSmartAccountConfig(
 - `deployerKeypair`: Keypair for contract deployment (uses deterministic default if null)
 - `sessionExpiryMs`: Session validity duration in milliseconds
 - `signatureExpirationLedgers`: Auth entry signature expiration in ledgers
-- `timeoutInSeconds`: Operation timeout in seconds
+- `timeoutInSeconds`: Sets each transaction's TimeBounds (`max_time = now + timeoutInSeconds`; `0` = no expiry)
 - `relayerUrl`: Optional relayer endpoint for fee sponsoring
 - `indexerUrl`: Optional indexer endpoint for credential-to-contract mapping
 - `webauthnProvider`: Platform-specific WebAuthn provider
 - `storage`: Storage adapter for credential persistence (defaults to `InMemoryStorageAdapter()`)
 - `externalWallet`: Optional wallet adapter ([ExternalWalletAdapter]) backing the adapter custody model for `SelectedSigner.Wallet` (G-address) signers. The kit injects it into [OZSmartAccountKit.externalSigners].
-- `externalEd25519Adapter`: Optional Ed25519 adapter ([OZExternalEd25519SignerAdapter]) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into [OZSmartAccountKit.externalSigners]. See [External Signers](#external-signers).
+- `externalEd25519Adapter`: Optional Ed25519 adapter ([OZExternalEd25519SignerAdapter]) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into [OZSmartAccountKit.externalSigners]. See [External Signer Management](#external-signer-management).
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
 
 ### Platform-Specific Providers
@@ -316,9 +283,9 @@ The SDK provides ready-to-use WebAuthn providers for each platform:
 
 | Platform | Class | Constructor |
 |----------|-------|-------------|
-| Android | `AndroidWebAuthnProvider` | `AndroidWebAuthnProvider(activity)` |
-| iOS/macOS | `AppleWebAuthnProvider` | `AppleWebAuthnProvider(window)` |
-| JS/Web | `JsWebAuthnProvider` | `JsWebAuthnProvider(rpId)` |
+| Android | `AndroidWebAuthnProvider` | `AndroidWebAuthnProvider(context, rpId, rpName)` |
+| iOS/macOS | `AppleWebAuthnProvider` | `AppleWebAuthnProvider(rpId, rpName)` |
+| JS/Web | `JsWebAuthnProvider` | `JsWebAuthnProvider(rpId, rpName)` |
 
 #### StorageAdapter implementations
 
@@ -343,7 +310,7 @@ Interface for delegated (G-address) signers in multi-signer operations. Implemen
 - `disconnectByAddress(address: String)` — disconnect a specific wallet by address (default no-op)
 - `getConnectedWallets(): List<ConnectedWallet>` — list connected wallets
 
-The kit-owned `OZExternalSignerManager` ([OZSmartAccountKit.externalSigners]) composes an `ExternalWalletAdapter` supplied via `OZSmartAccountConfig.externalWallet` and routes `SelectedSigner.Wallet` signing through it. See [External Signers](#external-signers) for details.
+The kit-owned `OZExternalSignerManager` ([OZSmartAccountKit.externalSigners]) composes an `ExternalWalletAdapter` supplied via `OZSmartAccountConfig.externalWallet` and routes `SelectedSigner.Wallet` signing through it. See [External Signer Management](#external-signer-management) for details.
 
 **Factory Methods**:
 
@@ -726,21 +693,7 @@ data class AuthenticatePasskeyResult(
 **Fields**:
 - `credentialId`: Base64URL-encoded credential ID of the authenticated passkey
 - `signature`: Normalized WebAuthn signature (compact format, low-S)
-- `publicKey`: Uncompressed secp256r1 public key (65 bytes)
-
-#### AddPasskeySignerResult
-```kotlin
-data class AddPasskeySignerResult(
-    val credentialId: String,
-    val publicKey: ByteArray,
-    val transactionResult: TransactionResult
-)
-```
-
-**Fields**:
-- `credentialId`: Base64URL-encoded credential ID of the newly registered passkey
-- `publicKey`: 65-byte uncompressed secp256r1 public key (starts with 0x04)
-- `transactionResult`: Result of the on-chain signer addition transaction
+- `publicKey`: Uncompressed secp256r1 public key (65 bytes) when the credential is in local storage; an empty `ByteArray` otherwise
 
 ---
 
@@ -991,6 +944,9 @@ println("Funded: $fundedAmount XLM")
 ### Result Types
 
 #### TransactionResult
+
+Returned by all state-changing operations (transfer, contractCall, addContextRule, addSigner, addPolicy, etc.).
+
 ```kotlin
 data class TransactionResult(
     val success: Boolean,
@@ -1232,34 +1188,7 @@ Deletes a pending credential from storage (syncs before deleting to ensure not d
 
 ---
 
-### StoredCredential Type
-
-```kotlin
-data class StoredCredential(
-    val credentialId: String,
-    val publicKey: ByteArray,
-    val contractId: String? = null,
-    val deploymentStatus: CredentialDeploymentStatus = CredentialDeploymentStatus.PENDING,
-    val deploymentError: String? = null,
-    val createdAt: Long = currentTimeMillis(),
-    val lastUsedAt: Long? = null,
-    val nickname: String? = null,
-    val isPrimary: Boolean = false,
-    val transports: List<String>? = null,
-    val deviceType: String? = null,
-    val backedUp: Boolean? = null
-)
-
-enum class CredentialDeploymentStatus {
-    PENDING,
-    FAILED
-}
-```
-
----
-
-
-## Signers and Policies
+## Signer Management
 
 ### OZSignerManager
 
@@ -1527,6 +1456,26 @@ val result = kit.signerManager.removeSigner(
 ```
 
 ---
+
+### Result Types
+
+#### AddPasskeySignerResult
+```kotlin
+data class AddPasskeySignerResult(
+    val credentialId: String,
+    val publicKey: ByteArray,
+    val transactionResult: TransactionResult
+)
+```
+
+**Fields**:
+- `credentialId`: Base64URL-encoded credential ID of the newly registered passkey
+- `publicKey`: 65-byte uncompressed secp256r1 public key (starts with 0x04)
+- `transactionResult`: Result of the on-chain signer addition transaction
+
+---
+
+## Policy Management
 
 ### OZPolicyManager
 
@@ -1808,29 +1757,7 @@ val result = kit.policyManager.removePolicy(
 
 ---
 
-### Policy Types
-
-#### PolicyInstallParams
-```kotlin
-sealed class PolicyInstallParams {
-    data class SimpleThreshold(val threshold: UInt) : PolicyInstallParams()
-    data class WeightedThreshold(
-        val signerWeights: Map<SmartAccountSigner, UInt>,
-        val threshold: UInt
-    ) : PolicyInstallParams()
-    data class SpendingLimit(
-        val spendingLimit: BigInteger,  // in stroops (1 XLM = 10,000,000 stroops)
-        val periodLedgers: UInt
-    ) : PolicyInstallParams()
-}
-// Note: The addSpendingLimit() convenience method accepts amount as a String
-// (e.g., "100" or "10.5") and converts to stroops internally. When using
-// PolicyInstallParams.SpendingLimit directly with addPolicy(), provide stroops as BigInteger.
-```
-
----
-
-## Context Rules
+## Context Rule Management
 
 ### OZContextRuleManager
 
@@ -2099,7 +2026,7 @@ ContextRuleType.CreateContract(wasmHashBytes)
 
 ---
 
-## Builders
+## Builder Helpers
 
 ### OZBuilders
 
@@ -2128,7 +2055,7 @@ Creates a CallContract context rule type for a specific contract.
 **Parameters**:
 - `contractAddress`: The contract address (C-address, validated)
 
-**Throws**: `ValidationException` if the address is not a valid C-address
+**Throws**: `ValidationException.InvalidAddress` if the address is not a valid C-address
 
 **Example**:
 
@@ -2155,7 +2082,7 @@ Creates a CreateContract context rule type for a specific WASM hash.
 - `wasmHashHex`: 64-character hex string (with optional "0x" prefix), or
 - `wasmHash`: 32-byte array
 
-**Throws**: `ValidationException` if the hash length is incorrect
+**Throws**: `ValidationException.InvalidInput` if the hash length is incorrect
 
 #### collectUniqueSignersFromRules
 
@@ -2164,6 +2091,160 @@ fun collectUniqueSignersFromRules(rules: List<ParsedContextRule>): List<SmartAcc
 ```
 
 Collects unique signers from all context rules, removing duplicates across rules.
+
+---
+
+### SmartAccountBuilders
+
+Protocol-agnostic type-safe constructors for signers and policy parameters, plus signer inspection, matching, and deduplication helpers. Use these instead of constructing signer or policy-parameter types directly to get input validation.
+
+```kotlin
+val builders = SmartAccountBuilders
+```
+
+#### Signer constructors
+
+```kotlin
+fun createDelegatedSigner(publicKey: String): DelegatedSigner
+fun createExternalSigner(verifierAddress: String, keyData: ByteArray): ExternalSigner
+fun createWebAuthnSigner(webauthnVerifierAddress: String, publicKey: ByteArray, credentialId: ByteArray): ExternalSigner
+fun createEd25519Signer(ed25519VerifierAddress: String, publicKey: ByteArray): ExternalSigner
+```
+
+- `createDelegatedSigner`: creates a delegated signer (native Stellar account or contract address) that uses Soroban `require_auth()`; no verifier contract needed. Throws `ValidationException.InvalidAddress` for an invalid address.
+- `createExternalSigner`: creates an external signer backed by a verifier contract. `keyData` format depends on the verifier type. Throws `ValidationException.InvalidAddress` or `ValidationException.InvalidInput`.
+- `createWebAuthnSigner`: convenience wrapper around `createExternalSigner` that builds the WebAuthn `keyData` (65-byte secp256r1 uncompressed public key + credential ID). Throws on an invalid verifier address, public key, or empty credential ID.
+- `createEd25519Signer`: external signer for a 32-byte Ed25519 public key verified by a verifier contract. Throws if the public key is not 32 bytes.
+
+#### Policy parameter builders
+
+```kotlin
+fun createThresholdParams(threshold: Int): SimpleThresholdParams
+fun createWeightedThresholdParams(threshold: Int, signerWeights: Map<SmartAccountSigner, Int>): WeightedThresholdParams
+fun createSpendingLimitParams(spendingLimit: String, periodLedgers: Int): SpendingLimitParams
+```
+
+- `createThresholdParams`: M-of-N simple threshold; `threshold` is the minimum number of signers required (>= 1).
+- `createWeightedThresholdParams`: weighted threshold where authorization succeeds when the sum of authenticated signer weights meets or exceeds `threshold`. Validates that all weights are >= 1 and the total weight is >= `threshold`.
+- `createSpendingLimitParams`: spending-limit policy restricting transfers within a ledger window. `spendingLimit` is a decimal XLM string (converted to stroops internally); `periodLedgers` must be >= 1.
+
+The returned `SimpleThresholdParams`, `WeightedThresholdParams`, and `SpendingLimitParams` data classes are documented in the [Types](#types) section.
+
+#### Signer inspection
+
+```kotlin
+fun getCredentialIdFromSigner(signer: SmartAccountSigner): ByteArray?
+fun getCredentialIdStringFromSigner(signer: SmartAccountSigner): String?
+fun isDelegatedSigner(signer: SmartAccountSigner): Boolean
+fun isExternalSigner(signer: SmartAccountSigner): Boolean
+fun describeSignerType(signer: SmartAccountSigner): String
+```
+
+- `getCredentialIdFromSigner`: extracts the WebAuthn credential ID from a signer's key data, or `null` if it is not a WebAuthn signer.
+- `getCredentialIdStringFromSigner`: same as above, Base64URL-encoded, or `null`.
+- `isDelegatedSigner` / `isExternalSigner`: type checks for `DelegatedSigner` / `ExternalSigner`.
+- `describeSignerType`: human-readable label such as `"Stellar Account"`, `"Passkey (WebAuthn)"`, `"Ed25519"`, or `"External Verifier"`.
+
+#### Signer matching
+
+```kotlin
+fun signerMatchesCredential(signer: SmartAccountSigner, credentialId: ByteArray): Boolean
+fun signerMatchesCredentialId(signer: SmartAccountSigner, credentialId: String): Boolean
+fun signerMatchesAddress(signer: SmartAccountSigner, address: String): Boolean
+```
+
+- `signerMatchesCredential`: true if the signer is a WebAuthn signer whose credential ID matches the given raw bytes.
+- `signerMatchesCredentialId`: same match against a Base64URL-encoded credential ID string.
+- `signerMatchesAddress`: true if the signer is a `DelegatedSigner` with the given G-address or C-address.
+
+#### Comparison and deduplication
+
+```kotlin
+fun signersEqual(a: SmartAccountSigner, b: SmartAccountSigner): Boolean
+fun getSignerKey(signer: SmartAccountSigner): String
+fun collectUniqueSigners(signers: List<SmartAccountSigner>): List<SmartAccountSigner>
+```
+
+- `signersEqual`: compares two signers by type and field values (delegated by address; external by verifier address and key data).
+- `getSignerKey`: unique string key for a signer suitable for `Map`/`Set` keys (`"delegated:<address>"` or `"external:<verifierAddress>:<keyDataHex>"`); equivalent to `SmartAccountSigner.uniqueKey`.
+- `collectUniqueSigners`: removes duplicates from a list using `getSignerKey`, keeping the first occurrence and preserving order.
+
+---
+
+## Utilities
+
+### SmartAccountUtils
+
+Protocol-agnostic cryptographic utilities for WebAuthn signature processing, public key extraction, and deterministic contract address derivation.
+
+```kotlin
+val utils = SmartAccountUtils
+```
+
+#### normalizeSignature
+
+```kotlin
+fun normalizeSignature(derSignature: ByteArray): ByteArray
+```
+
+Converts a DER-encoded ECDSA (secp256r1) signature to the compact 64-byte form (32-byte R || 32-byte S) with low-S normalization, as required by the on-chain verifier.
+
+**Parameters**:
+- `derSignature`: DER-encoded signature bytes
+
+**Returns**: Compact 64-byte signature
+
+**Throws**: `ValidationException.InvalidInput` if the DER structure is malformed or the R/S values violate secp256r1 constraints
+
+#### extractPublicKeyFromRegistration
+
+```kotlin
+fun extractPublicKeyFromRegistration(
+    publicKey: ByteArray? = null,
+    authenticatorData: ByteArray? = null,
+    attestationObject: ByteArray? = null
+): ByteArray
+```
+
+Extracts the canonical uncompressed 65-byte secp256r1 public key (0x04 prefix + X + Y) from a WebAuthn registration response. Tries `publicKey` (SPKI) first, then `authenticatorData` (CBOR attested credential data), then `attestationObject` (full CBOR attestation). At least one parameter must be non-null. Compressed keys (0x02/0x03 prefix) are not supported.
+
+**Returns**: Uncompressed secp256r1 public key (65 bytes)
+
+**Throws**: `ValidationException.InvalidInput` if a compressed key prefix is detected, or if the public key cannot be extracted from any provided source
+
+#### getContractSalt
+
+```kotlin
+suspend fun getContractSalt(credentialId: ByteArray): ByteArray
+```
+
+Returns the SHA-256 of the credential identifier, matching the salt used during deployment.
+
+**Parameters**:
+- `credentialId`: WebAuthn credential ID
+
+**Returns**: SHA-256 hash of the credential ID (32 bytes)
+
+#### deriveContractAddress
+
+```kotlin
+suspend fun deriveContractAddress(
+    credentialId: ByteArray,
+    deployerPublicKey: String,
+    networkPassphrase: String
+): String
+```
+
+Derives the deterministic smart-account contract address from the credential ID, the deployer's G-address, and the network passphrase. Used by wallet creation to compute the address without an RPC round trip.
+
+**Parameters**:
+- `credentialId`: WebAuthn credential ID used to generate the salt
+- `deployerPublicKey`: Stellar account ID (G-address) of the deployer
+- `networkPassphrase`: Network passphrase (e.g., `"Test SDF Network ; September 2015"`)
+
+**Returns**: Contract address as a C-address (StrKey encoded)
+
+**Throws**: `ValidationException.InvalidAddress` if the deployer public key is invalid; `ValidationException.InvalidInput` if contract ID encoding fails; `TransactionException.SigningFailed` if hash computation fails
 
 ---
 
@@ -2369,7 +2450,7 @@ This is the building block used internally by `multiSignerTransfer`, `multiSigne
 **Throws**: `ValidationException` if [OZSmartAccountKit.externalSigners] has no signing source for a given wallet or Ed25519 signer (no in-memory key registered and no configured adapter that can sign for it). `SmartAccountException` if signing or submission fails.
 
 ---
-## External Signers
+## External Signer Management
 
 ### OZExternalSignerManager
 
@@ -2702,19 +2783,6 @@ val kit = OZSmartAccountKit.create(config)
 
 ### Types
 
-#### ConnectedWallet
-```kotlin
-data class ConnectedWallet(
-    val address: String,
-    val walletId: String,
-    val walletName: String
-)
-```
-
-Information about a connected external wallet.
-
----
-
 #### WalletConnectionStorage
 
 ```kotlin
@@ -2778,7 +2846,8 @@ val indexer = OZIndexerClient(
 ```kotlin
 class OZIndexerClient(
     indexerUrl: String,
-    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS
+    timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS,
+    injectedClient: HttpClient? = null
 )
 ```
 
@@ -2786,6 +2855,9 @@ class OZIndexerClient(
 |-----------|------|-------------|
 | `indexerUrl` | `String` | Indexer service URL (must use HTTPS, or http://localhost for development) |
 | `timeoutMs` | `Long` | Request timeout in milliseconds (default: `OZConstants.DEFAULT_INDEXER_TIMEOUT_MS`) |
+| `injectedClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null). When supplied, it is not closed by `close()`. |
+
+**Throws**: `ConfigurationException.InvalidConfig` if `indexerUrl` is blank or not HTTPS (http://localhost permitted).
 
 ### Factory Methods
 
@@ -2986,6 +3058,18 @@ data class EventTypeCount(
 
 ---
 
+#### HealthCheckResponse
+
+Raw response from the indexer health endpoint. `isHealthy()` wraps this and returns a `Boolean`.
+
+```kotlin
+data class HealthCheckResponse(
+    val status: String
+)
+```
+
+---
+
 ## Relayer Client
 
 The SDK includes a relayer client for fee-sponsored transaction submission. When configured, the SDK automatically routes transactions through the relayer so users don't need XLM to pay fees.
@@ -3020,7 +3104,7 @@ kit.relayerClient?.sendXdr(transactionEnvelope)
 class OZRelayerClient(
     relayerUrl: String,
     timeoutMs: Long = OZConstants.DEFAULT_RELAYER_TIMEOUT_MS,
-    httpClient: HttpClient? = null
+    injectedClient: HttpClient? = null
 )
 ```
 
@@ -3028,19 +3112,9 @@ class OZRelayerClient(
 |-----------|------|-------------|
 | `relayerUrl` | `String` | Relayer endpoint URL (must use HTTPS, or http://localhost for development) |
 | `timeoutMs` | `Long` | Default request timeout in milliseconds (default: 6 minutes for testnet retries) |
-| `httpClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null, creates per-request clients) |
+| `injectedClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null, creates per-request clients). When supplied, it is not closed by `close()`. |
 
 **Throws**: `ConfigurationException.InvalidConfig` if `relayerUrl` is blank or not HTTPS.
-
-### Properties
-
-#### isConfigured
-
-```kotlin
-val isConfigured: Boolean
-```
-
-Whether the client is properly configured with a valid URL.
 
 ### Methods
 
@@ -3088,6 +3162,16 @@ This method does not throw. All error conditions are returned in the `RelayerRes
 
 ---
 
+#### close
+
+```kotlin
+override fun close()
+```
+
+Closes the owned HTTP client and releases its resources. When an injected client was supplied (testing), it is not closed — the caller retains ownership. The client must not be used after `close()`.
+
+---
+
 ### Response and Error Types
 
 #### RelayerResponse
@@ -3129,6 +3213,90 @@ object RelayerErrorCodes {
     const val TIMEOUT = "TIMEOUT"
 }
 ```
+
+---
+
+## Auth Helpers
+
+These helpers are the lower-level building blocks the kit uses internally to construct OpenZeppelin authorization payloads. They are exposed publicly as escape hatches for callers that need to build, sign, or attach authorization entries by hand.
+
+### SmartAccountAuth
+
+```kotlin
+object SmartAccountAuth {
+    suspend fun buildAuthDigest(
+        signaturePayload: ByteArray,
+        contextRuleIds: List<UInt>
+    ): ByteArray
+
+    suspend fun buildAuthPayloadHash(
+        entry: SorobanAuthorizationEntryXdr,
+        expirationLedger: UInt,
+        networkPassphrase: String
+    ): ByteArray
+
+    suspend fun buildSourceAccountAuthPayloadHash(
+        entry: SorobanAuthorizationEntryXdr,
+        nonce: Int64Xdr,
+        expirationLedger: UInt,
+        networkPassphrase: String
+    ): ByteArray
+
+    suspend fun signAuthEntry(
+        entry: SorobanAuthorizationEntryXdr,
+        signer: SmartAccountSigner,
+        signature: SmartAccountSignature,
+        expirationLedger: UInt,
+        contextRuleIds: List<UInt> = emptyList()
+    ): SorobanAuthorizationEntryXdr
+
+    fun addRawSignatureMapEntry(
+        entry: SorobanAuthorizationEntryXdr,
+        signerKey: SCValXdr,
+        signatureValue: SCValXdr,
+        contextRuleIds: List<UInt> = emptyList()
+    ): SorobanAuthorizationEntryXdr
+}
+```
+
+- `buildAuthDigest(signaturePayload, contextRuleIds)` — computes `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
+- `buildAuthPayloadHash(entry, expirationLedger, networkPassphrase)` — computes the `HashIdPreimage::SorobanAuthorization` hash that must be signed to authorize an entry with address credentials.
+- `buildSourceAccountAuthPayloadHash(entry, nonce, expirationLedger, networkPassphrase)` — variant for source-account credentials, typically used when converting them to address credentials for relayer fee sponsoring.
+- `signAuthEntry(entry, signer, signature, expirationLedger, contextRuleIds)` — attaches a pre-computed signature to an authorization entry. Does NOT perform cryptographic signing. Returns a fresh entry; when `contextRuleIds` is non-empty it overrides any existing identifiers in the payload.
+- `addRawSignatureMapEntry(entry, signerKey, signatureValue, contextRuleIds)` — adds a raw key/value entry to the auth entry's signature map. Used for delegated-signer placeholders where the value is `Bytes` rather than a signature.
+
+### SmartAccountAuthPayload
+
+```kotlin
+data class SmartAccountAuthPayload(
+    val signers: MutableMap<SmartAccountSigner, ByteArray>,
+    val contextRuleIds: List<UInt>
+)
+```
+
+In-memory representation of the AuthPayload accepted by the OpenZeppelin smart-account contract: a `Map` with two fields, `context_rule_ids` and `signers`. The `signers` map is mutable so callers and the codec can add or replace entries in place before encoding back to an `SCValXdr`.
+
+### SmartAccountAuthPayloadCodec
+
+```kotlin
+object SmartAccountAuthPayloadCodec {
+    fun read(signatureScVal: SCValXdr): SmartAccountAuthPayload
+    fun write(payload: SmartAccountAuthPayload): SCValXdr
+    fun upsertSigner(
+        payload: SmartAccountAuthPayload,
+        signer: SmartAccountSigner,
+        signatureBytes: ByteArray
+    )
+    fun signerFromScVal(scVal: SCValXdr): SmartAccountSigner
+}
+```
+
+Codec for reading and writing `SmartAccountAuthPayload` to and from `SCValXdr`. Inner signer entries are sorted by lowercase-hex of their XDR-encoded keys for deterministic encoding. Signature bytes are verifier-dependent: WebAuthn and Policy entries are XDR-encoded `SCValXdr`; Ed25519 entries carry the raw 64-byte signature (no XDR wrapper).
+
+- `read(signatureScVal)` — accepts `SCValXdr.Void` (returns an empty payload) or `SCValXdr.Map` (the full payload).
+- `write(payload)` — builds the outer map (`context_rule_ids` then `signers`) and sorts the inner signer entries deterministically.
+- `upsertSigner(payload, signer, signatureBytes)` — inserts or replaces a signer's entry in the payload.
+- `signerFromScVal(scVal)` — decodes a signer-key ScVal back into the matching `SmartAccountSigner`.
 
 ---
 
@@ -3320,7 +3488,7 @@ Functional interface for event listeners. Used by `addListener` for cross-langua
 
 ---
 
-## Exceptions
+## Errors
 
 All Smart Account exceptions extend `SmartAccountException` and include an error code and message.
 
@@ -3539,6 +3707,24 @@ sealed class IndexerException : SmartAccountException {
 
 ---
 
+### ContractErrorCodes
+
+Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract that the SDK interprets directly when decoding failed transaction results. Error code range: 3xxx.
+
+This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
+
+```kotlin
+object ContractErrorCodes {
+    const val MATH_OVERFLOW = 3012                   // Integer arithmetic overflow occurred in the contract
+    const val KEY_DATA_TOO_LARGE = 3013              // The key_data field on a signer exceeds the maximum allowed size
+    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014  // The number of context rule IDs does not match the expected count
+    const val NAME_TOO_LONG = 3015                   // A name field (e.g. context rule name) exceeds the maximum allowed length
+    const val UNAUTHORIZED_SIGNER = 3016             // The signer is not authorized to sign the given context rule
+}
+```
+
+---
+
 ## Types
 
 ### SelectedSigner
@@ -3731,7 +3917,7 @@ interface ExternalWalletAdapter {
     fun getWalletForAddress(address: String): ConnectedWallet?
     fun getConnectedWallets(): List<ConnectedWallet>
     suspend fun signAuthEntry(
-        authEntryXdr: String,
+        preimageXdr: String,
         options: SignAuthEntryOptions? = null
     ): SignAuthEntryResult
     suspend fun reconnect(walletId: String): ConnectedWallet?
@@ -3804,28 +3990,6 @@ Obtain the canonical instance via `PolicySignature` (no constructor).
 
 ---
 
-### TransactionResult
-
-Returned by all state-changing operations (transfer, contractCall, addContextRule, etc.).
-
-```kotlin
-data class TransactionResult(
-    val success: Boolean,
-    val hash: String? = null,
-    val ledger: UInt? = null,
-    val error: String? = null
-)
-```
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `success` | `Boolean` | Whether the transaction was confirmed on-chain |
-| `hash` | `String?` | Transaction hash (present on success) |
-| `ledger` | `UInt?` | Ledger number where the transaction was included |
-| `error` | `String?` | Error message if the transaction failed |
-
----
-
 ### PolicyInstallParams
 
 Sealed class for policy installation parameters passed to `addContextRule` and `addPolicy`.
@@ -3853,6 +4017,46 @@ sealed class PolicyInstallParams {
 | `SimpleThreshold` | Requires at least M-of-N signers. All signers have equal weight. `threshold` must be > 0. |
 | `WeightedThreshold` | Each signer has a configurable weight. Sum of approving weights must meet the threshold. |
 | `SpendingLimit` | Limits spending per ledger period. `spendingLimit` is in stroops (as `BigInteger`), `periodLedgers` is the number of ledgers in the period. |
+
+The `addSpendingLimit(...)` convenience method accepts the amount as a decimal XLM `String` and converts it to stroops internally; when constructing `PolicyInstallParams.SpendingLimit` directly for `addPolicy(...)`, provide stroops as a `BigInteger`.
+
+---
+
+### SimpleThresholdParams
+
+Typed policy parameters returned by `SmartAccountBuilders.createThresholdParams(...)`.
+
+```kotlin
+data class SimpleThresholdParams(
+    val threshold: Int
+)
+```
+
+---
+
+### WeightedThresholdParams
+
+Typed policy parameters returned by `SmartAccountBuilders.createWeightedThresholdParams(...)`.
+
+```kotlin
+data class WeightedThresholdParams(
+    val threshold: Int,
+    val signerWeights: Map<SmartAccountSigner, Int>
+)
+```
+
+---
+
+### SpendingLimitParams
+
+Typed policy parameters returned by `SmartAccountBuilders.createSpendingLimitParams(...)`. The constructor is internal; build instances via the builder, which accepts a decimal XLM `String` and converts to stroops.
+
+```kotlin
+data class SpendingLimitParams(
+    val spendingLimit: BigInteger,  // stroops
+    val periodLedgers: Int
+)
+```
 
 ---
 
@@ -3909,6 +4113,51 @@ enum class CredentialDeploymentStatus {
 | `FAILED` | Deployment transaction failed |
 
 Note: There is no `SUCCESS` status. On successful deployment the credential is removed from storage and the wallet connects using on-chain data.
+
+---
+
+### StoredSession
+
+Persisted session record linking a credential to its deployed contract. Written on connect and cleared by `disconnect()`.
+
+```kotlin
+data class StoredSession(
+    val credentialId: String,
+    val contractId: String,
+    val connectedAt: Long,
+    val expiresAt: Long
+) {
+    val isExpired: Boolean
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `credentialId` | `String` | Base64URL-encoded credential ID of the connected wallet |
+| `contractId` | `String` | Smart account contract address (C-address) |
+| `connectedAt` | `Long` | Connection timestamp (milliseconds) |
+| `expiresAt` | `Long` | Expiry timestamp (milliseconds) |
+| `isExpired` | `Boolean` | Computed; true once the current time has passed `expiresAt` |
+
+---
+
+### StoredCredentialUpdate
+
+Partial-update descriptor for an existing `StoredCredential`. Every field is nullable; a null field means "leave unchanged".
+
+```kotlin
+data class StoredCredentialUpdate(
+    val deploymentStatus: CredentialDeploymentStatus? = null,
+    val deploymentError: String? = null,
+    val contractId: String? = null,
+    val lastUsedAt: Long? = null,
+    val nickname: String? = null,
+    val isPrimary: Boolean? = null,
+    val transports: List<String>? = null,
+    val deviceType: String? = null,
+    val backedUp: Boolean? = null
+)
+```
 
 ---
 
@@ -4006,22 +4255,6 @@ object SmartAccountConstants {
 }
 ```
 
-### ContractErrorCodes
-
-Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract that the SDK interprets directly when decoding failed transaction results. Error code range: 3xxx.
-
-This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
-
-```kotlin
-object ContractErrorCodes {
-    const val MATH_OVERFLOW = 3012                   // Integer arithmetic overflow occurred in the contract
-    const val KEY_DATA_TOO_LARGE = 3013              // The key_data field on a signer exceeds the maximum allowed size
-    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014  // The number of context rule IDs does not match the expected count
-    const val NAME_TOO_LONG = 3015                   // A name field (e.g. context rule name) exceeds the maximum allowed length
-    const val UNAUTHORIZED_SIGNER = 3016             // The signer is not authorized to sign the given context rule
-}
-```
-
 ### OZConstants
 
 Defined in `smartaccount/oz/OZConstants.kt`. Contains OZ-specific configuration defaults and contract limits.
@@ -4036,18 +4269,6 @@ object OZConstants {
     const val DEFAULT_TIMEOUT_SECONDS = 30
     const val MAX_SIGNERS = 15
     const val MAX_POLICIES = 5
-}
-```
-
-### Util
-
-Defined in `Util.kt`. Contains general-purpose Stellar network constants available SDK-wide.
-
-```kotlin
-object Util {
-    const val STROOPS_PER_XLM = 10_000_000L  // Number of stroops in one XLM
-    const val LEDGERS_PER_HOUR = 720          // Average ledgers per hour (~5s per ledger)
-    const val LEDGERS_PER_DAY = 17_280        // Average ledgers per day (~5s per ledger)
 }
 ```
 
