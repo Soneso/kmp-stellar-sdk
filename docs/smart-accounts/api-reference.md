@@ -3549,7 +3549,7 @@ sealed class SmartAccountException(
 > | 3002 | `CREDENTIAL_ALREADY_EXISTS` | `UnvalidatedContext` |
 > | 3003 | `CREDENTIAL_INVALID` | `ExternalVerificationFailed` |
 >
-> When inspecting an error code, first check the exception type to determine which namespace it belongs to. SDK-defined contract codes that the SDK interprets directly are declared in [`ContractErrorCodes`](#contracterrorcodes); the full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
+> When inspecting an error code, first check the exception type to determine which namespace it belongs to. The SDK does not parse or map contract error codes — it surfaces the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer extracts and interprets the code. [`ContractErrorCodes`](#contracterrorcodes) is a consumer-side reference catalog for that interpretation; the full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
 
 ```kotlin
 enum class SmartAccountErrorCode(val code: Int) {
@@ -3745,7 +3745,7 @@ sealed class IndexerException : SmartAccountException {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract that the SDK interprets directly when decoding failed transaction results. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract, provided as a reference catalog for consumers. The SDK does not parse or map these codes — failed transactions surface the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer matches the extracted code against these constants. Error code range: 3xxx.
 
 This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 

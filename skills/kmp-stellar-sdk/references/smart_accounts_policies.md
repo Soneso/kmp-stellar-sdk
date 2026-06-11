@@ -1196,7 +1196,7 @@ try {
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK — only `ContractErrorCodes` constants for the five codes the SDK interprets directly (`MATH_OVERFLOW = 3012`, `KEY_DATA_TOO_LARGE = 3013`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014`, `NAME_TOO_LONG = 3015`, `UNAUTHORIZED_SIGNER = 3016`). For every other code in the 3000-/3100-/3200-ranges you parse the message yourself and map to action. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK, and the SDK does not parse or map contract error codes — `ContractErrorCodes` is a consumer-side reference catalog declaring five constants (`MATH_OVERFLOW = 3012`, `KEY_DATA_TOO_LARGE = 3013`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014`, `NAME_TOO_LONG = 3015`, `UNAUTHORIZED_SIGNER = 3016`). For every code in the 3000-/3100-/3200-ranges you parse the message yourself and map to action. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
 // WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class
