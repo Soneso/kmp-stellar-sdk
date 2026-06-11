@@ -7,7 +7,7 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
-import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
+import com.soneso.stellar.sdk.smartaccount.core.WebAuthnCborParser
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -910,6 +910,41 @@ class WebAuthnCborParserTest {
         val result = WebAuthnCborParser.extractPublicKeyFromCoseKey(fullData)
         assertNotNull(result)
         assertEquals(65, result.size)
+    }
+
+    @Test
+    fun extractPublicKeyFromCoseKey_patternFallbackValidSeparator() = runTest {
+        // Force the pattern-fallback path: a leading non-map byte (major type 0) makes
+        // the entry method skip map iteration entirely. The embedded structure carries
+        // a valid [0x22, 0x58, 0x20] Y-coordinate separator, so extraction succeeds.
+        val prefix = byteArrayOf(
+            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(),
+            0x20.toByte(), 0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        val yHeader = byteArrayOf(0x22, 0x58, 0x20)
+        val data = byteArrayOf(0x00) + prefix + testX + yHeader + testY
+
+        val result = WebAuthnCborParser.extractPublicKeyFromCoseKey(data)
+        assertNotNull(result)
+        assertEquals(65, result.size)
+        assertEquals(0x04.toByte(), result[0])
+        assertContentEquals(testX, result.copyOfRange(1, 33))
+        assertContentEquals(testY, result.copyOfRange(33, 65))
+    }
+
+    @Test
+    fun extractPublicKeyFromCoseKey_patternFallbackCorruptedSeparator_returnsNull() = runTest {
+        // Force the pattern-fallback path with a leading non-map byte, then corrupt the
+        // 3-byte Y-coordinate separator. The strict separator validation must reject the
+        // structure and return null instead of extracting a misaligned Y coordinate.
+        val prefix = byteArrayOf(
+            0xa5.toByte(), 0x01, 0x02, 0x03, 0x26.toByte(),
+            0x20.toByte(), 0x01, 0x21, 0x58, 0x20.toByte()
+        )
+        val corruptedYHeader = byteArrayOf(0xFF.toByte(), 0x58, 0x20)
+        val data = byteArrayOf(0x00) + prefix + testX + corruptedYHeader + testY
+
+        assertNull(WebAuthnCborParser.extractPublicKeyFromCoseKey(data))
     }
 
     // =========================================================================

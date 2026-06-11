@@ -5,7 +5,7 @@
 //  Copyright (c) 2026 Soneso. All rights reserved.
 //
 
-package com.soneso.stellar.sdk.smartaccount.oz
+package com.soneso.stellar.sdk.smartaccount.core
 
 /**
  * Pure Kotlin CBOR parsing utilities for WebAuthn attestation and authenticator data.
@@ -304,19 +304,37 @@ internal object WebAuthnCborParser {
      * - Y is the 32 bytes starting 3 bytes after X (the 3 bytes are the CBOR-encoded
      *   map key -3 followed by a 32-byte bstr header: `0x22 0x58 0x20`).
      *
+     * The 3-byte Y-coordinate separator is validated at its fixed offset before Y is
+     * extracted. A mismatch means the prefix match is coincidental or the key data is
+     * structurally malformed, and null is returned.
+     *
      * @param data Byte array to search within.
-     * @return Uncompressed 65-byte public key, or null if the prefix is not found or
-     *   there is insufficient data following it.
+     * @return Uncompressed 65-byte public key, or null if the prefix is not found,
+     *   there is insufficient data following it, or the Y-coordinate separator does
+     *   not match `0x22 0x58 0x20`.
      */
     private fun extractPublicKeyByPattern(data: ByteArray): ByteArray? {
         val prefixIndex = findSubarray(data, COSE_ES256_KEY_PREFIX)
         if (prefixIndex < 0) return null
 
         val xStart = prefixIndex + COSE_ES256_KEY_PREFIX.size
-        val yStart = xStart + 32 + 3 // 3 bytes: CBOR key -3 (0x22) + bstr header (0x58 0x20)
+        val separatorStart = xStart + 32
+        // 3 bytes: CBOR key -3 (0x22) + bstr header (0x58 0x20)
+        val yStart = separatorStart + 3
         val requiredLength = yStart + 32
 
         if (data.size < requiredLength) return null
+
+        // Validate the 3-byte Y-coordinate separator [0x22, 0x58, 0x20] at the fixed
+        // offset. This confirms the X coordinate occupies exactly the 32 bytes preceding
+        // it and that the surrounding structure is a valid ES256 COSE key, not a
+        // coincidental prefix match elsewhere in the data.
+        if (data[separatorStart] != 0x22.toByte() ||
+            data[separatorStart + 1] != 0x58.toByte() ||
+            data[separatorStart + 2] != 0x20.toByte()
+        ) {
+            return null
+        }
 
         val x = data.copyOfRange(xStart, xStart + 32)
         val y = data.copyOfRange(yStart, yStart + 32)

@@ -8,7 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount
 
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
-import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
+import com.soneso.stellar.sdk.smartaccount.core.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
