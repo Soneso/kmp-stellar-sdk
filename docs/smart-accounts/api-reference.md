@@ -221,7 +221,7 @@ Disconnects the currently connected wallet, clearing the in-memory connection st
 fun close()
 ```
 
-Closes the kit, releases all held HTTP client resources, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter and persisted wallet connections are left intact.
+Closes the kit, releases all held HTTP client resources, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter is left intact.
 
 The kit must not be used after calling this method. To log out without releasing resources, call `disconnect()` instead.
 
@@ -2562,21 +2562,19 @@ For a concrete `ExternalWalletAdapter` implementation, see the example implement
 
 #### Standalone construction (advanced)
 
-The multi-signer pipeline always uses the kit-owned `kit.externalSigners`. Constructing a manager directly is an advanced, optional path for using the signer registry outside a kit (for example, to supply a custom `WalletConnectionStorage` for cross-launch wallet-connection persistence).
+The multi-signer pipeline always uses the kit-owned `kit.externalSigners`. Constructing a manager directly is an advanced, optional path for using the signer registry outside a kit.
 
 ```kotlin
 val manager = OZExternalSignerManager(
     networkPassphrase = "Test SDF Network ; September 2015",
     walletAdapter = myWalletAdapter,
-    walletConnectionStorage = myStorage,
     ed25519Adapter = myHardwareAdapter
 )
 ```
 
 **Constructor Parameters**:
 - `networkPassphrase`: Stellar network passphrase (e.g., `"Test SDF Network ; September 2015"`)
-- `walletAdapter`: Optional `ExternalWalletAdapter` for external wallet connections (e.g., Freighter, LOBSTR). Required for `addFromWallet` and `restoreConnections`.
-- `walletConnectionStorage`: Optional `WalletConnectionStorage` for persisting wallet connections across app launches. When null, wallet connections are not persisted.
+- `walletAdapter`: Optional `ExternalWalletAdapter` for external wallet connections (e.g., Freighter, LOBSTR).
 - `ed25519Adapter`: Optional `OZExternalEd25519SignerAdapter` backing the Ed25519 adapter custody model. Consulted before the in-memory Ed25519 registry (adapter-first precedence).
 
 ---
@@ -2587,7 +2585,7 @@ val manager = OZExternalSignerManager(
 val hasWalletAdapter: Boolean
 ```
 
-Whether an external wallet adapter is configured. Returns true if the manager was initialized with a non-null `ExternalWalletAdapter`. Wallet-related operations (`addFromWallet`, `restoreConnections`) require this to be true.
+Whether an external wallet adapter is configured. Returns true if the manager was initialized with a non-null `ExternalWalletAdapter`.
 
 ---
 
@@ -2604,22 +2602,6 @@ Adds an Ed25519 keypair from a secret key (memory-only, not persisted).
 **Returns**: Derived G-address
 
 **Throws**: `SignerException.Invalid` if key is invalid
-
----
-
-#### addFromWallet
-
-```kotlin
-suspend fun addFromWallet(): ConnectedWallet?
-```
-
-Connects an external wallet (e.g., Freighter, LOBSTR).
-
-Connection metadata is persisted if storage is configured.
-
-**Returns**: Connected wallet info, or null if user cancelled
-
-**Throws**: `ConfigurationException.MissingConfig` if no adapter configured. `SmartAccountException` if the wallet connection fails.
 
 ---
 
@@ -2710,20 +2692,6 @@ Signs an authorization entry preimage with the appropriate signer.
 **Returns**: Signed entry and signer address
 
 **Throws**: `SignerException.NotFound`, `TransactionException.SigningFailed`
-
----
-
-#### restoreConnections
-
-```kotlin
-suspend fun restoreConnections(): List<ConnectedWallet>
-```
-
-Restores previously connected external wallets from storage.
-
-Idempotent: subsequent calls return currently connected wallets.
-
-**Returns**: List of restored wallet connections
 
 ---
 
@@ -2886,28 +2854,6 @@ val kit = OZSmartAccountKit.create(config)
 ---
 
 ### Types
-
-#### WalletConnectionStorage
-
-```kotlin
-interface WalletConnectionStorage {
-    suspend fun getItem(key: String): String?
-    suspend fun setItem(key: String, value: String)
-    suspend fun removeItem(key: String)
-}
-```
-
-Key-value storage interface for persisting external wallet connections across app launches. Implementations must be thread-safe.
-
-Platform-specific implementations should use SharedPreferences (Android), UserDefaults (iOS/macOS), localStorage (Web), or any other persistent key-value store.
-
-| Method | Description |
-|--------|-------------|
-| `getItem(key)` | Retrieves a value by key, or null if not found |
-| `setItem(key, value)` | Stores a value for a key (overwrites existing) |
-| `removeItem(key)` | Removes a value by key (no-op if absent) |
-
----
 
 ## Indexer Client
 
@@ -4024,7 +3970,6 @@ interface ExternalWalletAdapter {
         preimageXdr: String,
         options: SignAuthEntryOptions? = null
     ): SignAuthEntryResult
-    suspend fun reconnect(walletId: String): ConnectedWallet?
 }
 
 data class SignAuthEntryOptions(
@@ -4271,7 +4216,7 @@ data class StoredCredentialUpdate(
 
 ### ConnectedWallet
 
-Returned by `ExternalWalletAdapter.connect()` and `restoreConnections()`.
+Returned by `ExternalWalletAdapter.connect()` and `getConnectedWallets()`.
 
 ```kotlin
 data class ConnectedWallet(
@@ -4284,7 +4229,7 @@ data class ConnectedWallet(
 | Property | Type | Description |
 |----------|------|-------------|
 | `address` | `String` | Stellar G-address of the connected wallet |
-| `walletId` | `String` | Wallet identifier for reconnection (e.g., "freighter", "lobstr") |
+| `walletId` | `String` | Wallet identifier (e.g., "freighter", "lobstr") |
 | `walletName` | `String` | Human-readable display name (e.g., "Freighter", "LOBSTR") |
 
 ---

@@ -203,7 +203,7 @@ kit.disconnect()
 
 ### Close
 
-Releases HTTP resources owned by the kit (Soroban RPC client, indexer client) and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`); persisted wallet connections are retained. Does **not** clear session state. Call `disconnect()` first if you want both.
+Releases HTTP resources owned by the kit (Soroban RPC client, indexer client) and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`). Does **not** clear session state. Call `disconnect()` first if you want both.
 
 ```kotlin
 try {
@@ -1035,35 +1035,19 @@ Relationship to `ExternalWalletAdapter`: the adapter is the *interface* a wallet
 
 ### Standalone construction (advanced)
 
-The multi-signer pipeline always uses `kit.externalSigners`. Construct a manager directly only for advanced use outside a kit — for example, to supply a custom `WalletConnectionStorage` for cross-launch wallet-connection persistence.
+The multi-signer pipeline always uses `kit.externalSigners`. Construct a manager directly only for advanced use outside a kit.
 
 ```kotlin
 class OZExternalSignerManager(
     private val networkPassphrase: String,
     private val walletAdapter: ExternalWalletAdapter? = null,
-    private val walletConnectionStorage: WalletConnectionStorage? = null,
     private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null
 )
 ```
 
 - `networkPassphrase` — forwarded to the adapter's `signAuthEntry` via `SignAuthEntryOptions.networkPassphrase`.
-- `walletAdapter` — required for `addFromWallet` and `restoreConnections`. When null, only keypair signers are supported.
-- `walletConnectionStorage` — required for `restoreConnections` to reconnect across app launches. When null, wallet connections are in-memory only.
+- `walletAdapter` — backs the wallet (G-address) custody model. When null, only keypair signers are supported.
 - `ed25519Adapter` — backs the Ed25519 adapter custody model; consulted before the in-memory Ed25519 registry (adapter-first precedence).
-
-### WalletConnectionStorage
-
-A minimal key-value interface for persisting wallet connection metadata (address + walletId + walletName). Separate from `StorageAdapter` — it holds only wallet connections, not credentials or sessions.
-
-```kotlin
-interface WalletConnectionStorage {
-    suspend fun getItem(key: String): String?
-    suspend fun setItem(key: String, value: String)
-    suspend fun removeItem(key: String)
-}
-```
-
-Implement this with SharedPreferences (Android), Keychain/UserDefaults (iOS), or `localStorage` (Web). The default if you pass `null` is an in-memory implementation that loses data on process exit — safe for development only.
 
 ### ExternalSignerInfo and ExternalSignerType
 
@@ -1095,24 +1079,7 @@ val address = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJ
 // CORRECT: addFromSecret("S...")  — Stellar secret seed
 ```
 
-Keypair signers take precedence over wallet signers with the same G-address; any persisted wallet entry for that address is removed from `WalletConnectionStorage`. Throws `SignerException.Invalid` on an invalid seed.
-
-### addFromWallet
-
-Prompts the user through the configured `ExternalWalletAdapter`. On success, the connection is persisted to `WalletConnectionStorage` (if configured) so `restoreConnections` can reconnect later.
-
-```kotlin
-suspend fun addFromWallet(): ConnectedWallet?           // null if the user cancelled
-```
-
-```kotlin
-val wallet = kit.externalSigners.addFromWallet()
-if (wallet != null) {
-    println("Connected ${wallet.walletName} (${wallet.address})")
-}
-```
-
-Throws `ConfigurationException.MissingConfig` if `walletAdapter` is null.
+Keypair signers take precedence over wallet signers with the same G-address. Throws `SignerException.Invalid` on an invalid seed.
 
 ### canSignFor / get / getAll
 
@@ -1192,46 +1159,11 @@ interface OZExternalEd25519SignerAdapter {
 ### remove / removeAll
 
 ```kotlin
-suspend fun remove(address: String)      // clears keypair + disconnects wallet + removes from storage
-suspend fun removeAll()                  // clears every signer, disconnects all wallets, wipes storage
+suspend fun remove(address: String)      // clears keypair + disconnects wallet
+suspend fun removeAll()                  // clears every signer, disconnects all wallets
 ```
 
-`remove` is safe to call for an unknown address — it is a no-op. `removeAll` calls `walletAdapter.disconnect()` and deletes the manager's storage key.
-
-### restoreConnections
-
-Critical on app restart. Reads persisted wallet-connection metadata from `WalletConnectionStorage` and calls `walletAdapter.reconnect(walletId)` for each entry. Failed reconnects are silently removed from storage (the wallet may have been revoked).
-
-```kotlin
-suspend fun restoreConnections(): List<ConnectedWallet>
-```
-
-Idempotent — subsequent calls return `walletAdapter.getConnectedWallets()` without re-reading storage. Returns an empty list if either `walletAdapter` or `walletConnectionStorage` is null.
-
-```kotlin
-// Typical app launch sequence
-val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, verifier)
-    .externalWallet(myWalletAdapter)
-    .build()
-val kit = OZSmartAccountKit.create(config)
-
-// Restore previously connected wallets BEFORE the user triggers a multi-signer action.
-// Without this call, the adapter's canSignFor returns false for wallets the user
-// connected in a previous session, and multi-signer operations will fail.
-kit.externalSigners.restoreConnections()
-
-// Now safe to build SelectedSigner lists with Wallet entries
-val rule = kit.contextRuleManager.listContextRules().first { it.id == ruleId }
-val selectedSigners = rule.signers.mapNotNull { /* as in smart_accounts_policies.md */ }
-```
-
-The kit-owned manager uses an in-memory wallet-connection store. To persist external-wallet connections across app launches, construct a standalone manager with a platform `WalletConnectionStorage` (see [Standalone construction](#standalone-construction-advanced)).
-
-```kotlin
-// WRONG: call restoreConnections() lazily, on first multi-signer op
-// CORRECT: call it once at app launch — wallet signers are invisible to the
-//          adapter's canSignFor until restore has run.
-```
+`remove` is safe to call for an unknown address — it is a no-op. `removeAll` clears the keypair and Ed25519 registries and calls `walletAdapter.disconnect()`.
 
 ---
 

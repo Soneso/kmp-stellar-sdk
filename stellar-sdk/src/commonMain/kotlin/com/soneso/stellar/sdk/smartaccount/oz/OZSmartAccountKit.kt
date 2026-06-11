@@ -300,8 +300,7 @@ class OZSmartAccountKit private constructor(
      * cleanup. In-memory external signers (keypairs registered via
      * [OZExternalSignerManager.addFromSecret] and Ed25519 keys registered via
      * [OZExternalSignerManager.addEd25519FromRawKey]) are cleared so that raw key material
-     * does not outlive the kit; the external wallet adapter and persisted wallet
-     * connections are left intact.
+     * does not outlive the kit; the external wallet adapter is left intact.
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
@@ -321,8 +320,8 @@ class OZSmartAccountKit private constructor(
         sorobanServer.close()
         indexerClient?.close()
 
-        // Drop in-memory signing secrets (registered keypairs / Ed25519 keys). Persisted
-        // wallet connections and the external-wallet adapter are intentionally left intact.
+        // Drop in-memory signing secrets (registered keypairs / Ed25519 keys). The
+        // external-wallet adapter is intentionally left intact.
         externalSigners.clearInMemorySigners()
     }
 
@@ -443,7 +442,6 @@ class OZSmartAccountKit private constructor(
                 externalSigners = OZExternalSignerManager(
                     networkPassphrase = config.networkPassphrase,
                     walletAdapter = config.externalWallet,
-                    walletConnectionStorage = null,
                     ed25519Adapter = config.externalEd25519Adapter,
                 ),
                 sorobanServer = SorobanServer(config.rpcUrl)
@@ -465,7 +463,6 @@ class OZSmartAccountKit private constructor(
             externalSigners = OZExternalSignerManager(
                 networkPassphrase = config.networkPassphrase,
                 walletAdapter = config.externalWallet,
-                walletConnectionStorage = null,
                 ed25519Adapter = config.externalEd25519Adapter,
             ),
             sorobanServer = sorobanServer

@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * - signAuthEntry delegation to WalletConnector for wallet-connected addresses
  * - Error propagation from WalletConnector
  * - disconnect lifecycle
- * - connect/reconnect returning null
+ * - connect returning null
  */
 class ExternalSignerManagerAdapterWalletTest {
 
@@ -250,7 +250,7 @@ class ExternalSignerManagerAdapterWalletTest {
         assertTrue(adapter.getConnectedWallets().isEmpty())
     }
 
-    // MARK: - connect / reconnect
+    // MARK: - connect
 
     @Test
     fun testConnect_returnsNull() = runTest {
@@ -260,11 +260,4 @@ class ExternalSignerManagerAdapterWalletTest {
         assertEquals(null, result)
     }
 
-    @Test
-    fun testReconnect_returnsNull() = runTest {
-        val adapter = createAdapter()
-        // reconnect() is not supported — must return null without throwing
-        val result = adapter.reconnect("freighter")
-        assertEquals(null, result)
-    }
 }

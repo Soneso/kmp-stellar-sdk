@@ -552,8 +552,6 @@ data class ConnectedWallet(
 
     /**
      * Unique wallet identifier (e.g., "freighter", "lobstr").
-     *
-     * Used for reconnection via [ExternalWalletAdapter.reconnect].
      */
     val walletId: String,
 
@@ -613,8 +611,8 @@ data class SignAuthEntryResult(
  * Protocol for integrating external wallet adapters for multi-signer support.
  *
  * External wallet adapters enable signing with external wallets like Freighter or Albedo
- * for multi-signature smart accounts. They handle wallet connection, signature collection,
- * and wallet reconnection.
+ * for multi-signature smart accounts. They handle wallet connection and signature
+ * collection, and own the connection lifecycle (e.g., WalletConnect sessions).
  *
  * Example implementation:
  * ```kotlin
@@ -718,19 +716,6 @@ interface ExternalWalletAdapter {
      * @return The connected wallet info, or null if not found
      */
     fun getWalletForAddress(address: String): ConnectedWallet? {
-        return null
-    }
-
-    /**
-     * Reconnects to a previously connected wallet by its wallet ID.
-     *
-     * Used for restoring wallet connections after page reloads or app restarts.
-     * Default implementation returns null (reconnection not supported).
-     *
-     * @param walletId The wallet identifier (e.g., "freighter", "lobstr")
-     * @return The reconnected wallet info, or null if reconnection failed
-     */
-    suspend fun reconnect(walletId: String): ConnectedWallet? {
         return null
     }
 }

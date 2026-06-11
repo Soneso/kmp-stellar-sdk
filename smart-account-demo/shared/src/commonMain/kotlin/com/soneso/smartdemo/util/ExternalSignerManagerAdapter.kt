@@ -82,7 +82,4 @@ class ExternalSignerManagerAdapter : ExternalWalletAdapter {
     override fun canSignFor(address: String): Boolean {
         return walletConnector?.isConnected(address) == true
     }
-
-    /** Not supported — returns null. */
-    override suspend fun reconnect(walletId: String): ConnectedWallet? = null
 }
