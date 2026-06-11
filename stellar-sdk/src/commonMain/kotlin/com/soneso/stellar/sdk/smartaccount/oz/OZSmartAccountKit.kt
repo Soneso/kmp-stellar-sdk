@@ -304,7 +304,8 @@ class OZSmartAccountKit private constructor(
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
-     * calling this method.
+     * calling this method: the manager properties remain accessible, but any operation on
+     * them fails because the underlying HTTP clients are closed.
      *
      * Example:
      * ```kotlin

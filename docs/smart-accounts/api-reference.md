@@ -223,7 +223,7 @@ fun close()
 
 Closes the kit, releases all held HTTP client resources, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter is left intact.
 
-The kit must not be used after calling this method. To log out without releasing resources, call `disconnect()` instead.
+The kit must not be used after calling this method: the manager properties remain accessible, but any operation on them fails because the underlying HTTP clients are closed. To log out without releasing resources, call `disconnect()` instead.
 
 **Throws**: None
 
