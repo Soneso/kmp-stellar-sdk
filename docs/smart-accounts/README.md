@@ -134,7 +134,7 @@ val wallet = kit.walletOperations.createWallet(
 val result = kit.transactionOperations.transfer(
     tokenContract = "<C-address of token contract>",
     recipient = "<recipient G-address>",
-    amount = "10"  // decimal amount (automatically converted to stroops)
+    amount = "10"  // decimal amount (converted to the token's base units)
 )
 
 if (result.success) {

@@ -1371,14 +1371,14 @@ class MacOSBridge {
             "call_contract" -> {
                 val addr = contextTypeParam
                     ?: throw IllegalArgumentException("call_contract requires a contract address")
-                OZBuilders.createCallContractContext(addr)
+                OZBuilders.createCallContractContextType(addr)
             }
             "create_contract" -> {
                 val hex = contextTypeParam
                     ?: throw IllegalArgumentException("create_contract requires a WASM hash hex string")
-                OZBuilders.createCreateContractContext(hex)
+                OZBuilders.createCreateContractContextType(hex)
             }
-            else -> OZBuilders.createDefaultContext()
+            else -> OZBuilders.createDefaultContextType()
         }
     }
 
@@ -1392,7 +1392,7 @@ class MacOSBridge {
         return try {
             buildContextRuleType(contextTypeName, contextTypeParam)
         } catch (_: Exception) {
-            OZBuilders.createDefaultContext()
+            OZBuilders.createDefaultContextType()
         }
     }
 

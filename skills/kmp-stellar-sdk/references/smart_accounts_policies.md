@@ -306,17 +306,17 @@ CreateContract  ->  Vec([Symbol("CreateContract"), Bytes(wasmHash)])
 
 // WRONG: ContextRuleType.CreateContract("abcd...")     — parameter is ByteArray, not hex string
 // CORRECT: ContextRuleType.CreateContract(wasmHashBytes)  — raw 32-byte ByteArray
-//   Use OZBuilders.createCreateContractContext("abcd...") to convert hex ->
+//   Use OZBuilders.createCreateContractContextType("abcd...") to convert hex ->
 //   ContextRuleType.CreateContract automatically.
 ```
 
 The `OZBuilders` helpers wrap construction with validation:
 
 ```kotlin
-val defaultCtx = OZBuilders.createDefaultContext()                      // Default
-val callCtx    = OZBuilders.createCallContractContext("CBCD...")        // validates C-address
-val createCtx1 = OZBuilders.createCreateContractContext("abc123...")    // hex String, 64 chars (0x-prefix ok)
-val createCtx2 = OZBuilders.createCreateContractContext(wasmHash32Bytes) // ByteArray, 32 bytes
+val defaultCtx = OZBuilders.createDefaultContextType()                  // Default
+val callCtx    = OZBuilders.createCallContractContextType("CBCD...")    // validates C-address
+val createCtx1 = OZBuilders.createCreateContractContextType("abc123...") // hex String, 64 chars (0x-prefix ok)
+val createCtx2 = OZBuilders.createCreateContractContextType(wasmHash32Bytes) // ByteArray, 32 bytes
 ```
 
 ### addContextRule
@@ -668,14 +668,13 @@ kit.policyManager.addPolicy(
 
 Map keys must be symbols in **lexicographic (alphabetical) order** by XDR bytes — the SDK sorts the top-level policies map internally, but the install-params map inside each entry is your responsibility.
 
-### PolicyInstallParams (SDK-internal — do NOT use directly)
+### PolicyInstallParams (typed install parameters)
 
-This sealed class is internal to the SDK. Its `toScVal()` method is declared `internal` and is not callable from user code — `addPolicy(installParams: SCValXdr)` takes a raw `SCValXdr`, not a `PolicyInstallParams`. The three variants are listed here **for reference only**, so you can recognize them when reading kit internals or logs:
+The sealed class models the three built-in policy types. Its `toScVal()` method is public and encodes the variant as the SCVal map the policy contract's install entry point expects. `addPolicy` accepts either a `PolicyInstallParams` (typed overload, encodes internally) or a raw `SCValXdr` (for custom policy contracts):
 
 ```kotlin
-// INTERNAL SDK TYPE — shown for reference. Do not construct these to pass
-// into addPolicy; they cannot be converted to SCValXdr from outside the SDK.
 sealed class PolicyInstallParams {
+    abstract fun toScVal(): SCValXdr
     data class SimpleThreshold(val threshold: UInt) : PolicyInstallParams()
     data class WeightedThreshold(
         val signerWeights: Map<SmartAccountSigner, UInt>,
@@ -688,14 +687,15 @@ sealed class PolicyInstallParams {
 }
 ```
 
-**Always use one of:** `addSimpleThreshold` / `addWeightedThreshold` / `addSpendingLimit` on `OZPolicyManager` (they encode the params correctly), or the generic `addPolicy(installParams: SCValXdr)` with an `SCValXdr` you build yourself via `Scv.toMap(...)` for custom policy contracts.
+**Use one of:** `addSimpleThreshold` / `addWeightedThreshold` / `addSpendingLimit` on `OZPolicyManager` (they encode the params correctly), the typed `addPolicy(installParams: PolicyInstallParams)` overload, or the generic `addPolicy(installParams: SCValXdr)` with an `SCValXdr` you build yourself via `Scv.toMap(...)` for custom policy contracts.
 
 `SmartAccountBuilders` exposes a separate set of **inspection-only** factories (`createThresholdParams(Int)`, `createWeightedThresholdParams(Int, Map<SmartAccountSigner, Int>)`, `createSpendingLimitParams(String, Int)`) that produce `SimpleThresholdParams` / `WeightedThresholdParams` / `SpendingLimitParams` data classes. These are also not wired into `addPolicy` — they exist to let you diff / compare policy params locally without touching XDR.
 
 ```kotlin
-// WRONG: kit.policyManager.addPolicy(installParams = PolicyInstallParams.SimpleThreshold(2u))
-//   — toScVal() is internal; this does not compile from user code.
-// CORRECT: kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "...", threshold = 2u)
+// Both are valid; the convenience method is the shortest path:
+// kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "...", threshold = 2u)
+// kit.policyManager.addPolicy(contextRuleId = 0u, policyAddress = "...",
+//     installParams = PolicyInstallParams.SimpleThreshold(threshold = 2u))
 ```
 
 ### removePolicy — by ID

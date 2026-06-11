@@ -1546,9 +1546,19 @@ suspend fun addPolicy(
     selectedSigners: List<SelectedSigner> = emptyList(),
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
+
+suspend fun addPolicy(
+    contextRuleId: UInt,
+    policyAddress: String,
+    installParams: PolicyInstallParams,
+    selectedSigners: List<SelectedSigner> = emptyList(),
+    forceMethod: SubmissionMethod? = null
+): TransactionResult
 ```
 
 Generic method for adding any policy contract to a context rule. The convenience methods (`addSimpleThreshold`, `addWeightedThreshold`, `addSpendingLimit`) delegate to this method.
+
+The typed overload accepts a `PolicyInstallParams` variant and encodes it via `PolicyInstallParams.toScVal()`. Use the `SCValXdr` overload for custom policy contracts not modelled by a built-in variant.
 
 **Parameters**:
 
@@ -2086,18 +2096,18 @@ Type-safe constructors for context rule types and signer utilities. Use these in
 val builders = OZBuilders
 ```
 
-#### createDefaultContext
+#### createDefaultContextType
 
 ```kotlin
-fun createDefaultContext(): ContextRuleType
+fun createDefaultContextType(): ContextRuleType
 ```
 
 Creates a Default context rule type that matches any operation.
 
-#### createCallContractContext
+#### createCallContractContextType
 
 ```kotlin
-fun createCallContractContext(contractAddress: String): ContextRuleType
+fun createCallContractContextType(contractAddress: String): ContextRuleType
 ```
 
 Creates a CallContract context rule type for a specific contract.
@@ -2110,7 +2120,7 @@ Creates a CallContract context rule type for a specific contract.
 **Example**:
 
 ```kotlin
-val contextType = OZBuilders.createCallContractContext("CTOKEN...")
+val contextType = OZBuilders.createCallContractContextType("CTOKEN...")
 val result = kit.contextRuleManager.addContextRule(
     contextType = contextType,
     name = "Token operations",
@@ -2119,11 +2129,11 @@ val result = kit.contextRuleManager.addContextRule(
 )
 ```
 
-#### createCreateContractContext
+#### createCreateContractContextType
 
 ```kotlin
-fun createCreateContractContext(wasmHashHex: String): ContextRuleType
-fun createCreateContractContext(wasmHash: ByteArray): ContextRuleType
+fun createCreateContractContextType(wasmHashHex: String): ContextRuleType
+fun createCreateContractContextType(wasmHash: ByteArray): ContextRuleType
 ```
 
 Creates a CreateContract context rule type for a specific WASM hash.
@@ -2133,6 +2143,10 @@ Creates a CreateContract context rule type for a specific WASM hash.
 - `wasmHash`: 32-byte array
 
 **Throws**: `ValidationException.InvalidInput` if the hash length is incorrect
+
+#### Deprecated context-type builder names
+
+`createDefaultContext`, `createCallContractContext`, and `createCreateContractContext` (both overloads) are deprecated aliases of the `create*ContextType` builders above and delegate to them. They are scheduled for removal in the next major release.
 
 #### collectUniqueSignersFromRules
 
@@ -4086,6 +4100,8 @@ Sealed class for policy installation parameters passed to `addContextRule` and `
 
 ```kotlin
 sealed class PolicyInstallParams {
+    abstract fun toScVal(): SCValXdr
+
     data class SimpleThreshold(
         val threshold: UInt
     ) : PolicyInstallParams()
@@ -4101,6 +4117,8 @@ sealed class PolicyInstallParams {
     ) : PolicyInstallParams()
 }
 ```
+
+`toScVal()` encodes the variant as the SCVal map expected by the policy contract's install entry point — usable directly as the `installParams` of the `SCValXdr`-based `addPolicy` or as a value in `addContextRule`'s policies map. The typed `addPolicy(installParams: PolicyInstallParams)` overload calls it internally.
 
 | Variant | Description |
 |---------|-------------|

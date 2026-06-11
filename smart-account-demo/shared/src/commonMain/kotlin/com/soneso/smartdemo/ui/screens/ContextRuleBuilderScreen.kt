@@ -1522,11 +1522,11 @@ class ContextRuleBuilderScreen(
         wasmHashHex: String
     ): ContextRuleType {
         return when (option) {
-            ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContext()
+            ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContextType()
             ContextTypeOption.CALL_CONTRACT ->
-                OZBuilders.createCallContractContext(contractAddress.trim())
+                OZBuilders.createCallContractContextType(contractAddress.trim())
             ContextTypeOption.CREATE_CONTRACT ->
-                OZBuilders.createCreateContractContext(wasmHashHex.trim().lowercase())
+                OZBuilders.createCreateContractContextType(wasmHashHex.trim().lowercase())
         }
     }
 

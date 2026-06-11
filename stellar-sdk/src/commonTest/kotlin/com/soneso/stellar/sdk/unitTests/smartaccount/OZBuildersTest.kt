@@ -18,7 +18,7 @@ class OZBuildersTest {
 
     @Test
     fun createDefaultContext_returnsDefault() {
-        val result = OZBuilders.createDefaultContext()
+        val result = OZBuilders.createDefaultContextType()
         assertIs<ContextRuleType.Default>(result)
     }
 
@@ -27,7 +27,7 @@ class OZBuildersTest {
     @Test
     fun createCallContractContext_validAddress() {
         val address = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
-        val result = OZBuilders.createCallContractContext(address)
+        val result = OZBuilders.createCallContractContextType(address)
         assertIs<ContextRuleType.CallContract>(result)
         assertEquals(address, result.contractAddress)
     }
@@ -35,14 +35,14 @@ class OZBuildersTest {
     @Test
     fun createCallContractContext_invalidAddress_throws() {
         assertFailsWith<ValidationException> {
-            OZBuilders.createCallContractContext("GABC...")
+            OZBuilders.createCallContractContextType("GABC...")
         }
     }
 
     @Test
     fun createCallContractContext_emptyAddress_throws() {
         assertFailsWith<ValidationException> {
-            OZBuilders.createCallContractContext("")
+            OZBuilders.createCallContractContextType("")
         }
     }
 
@@ -51,7 +51,7 @@ class OZBuildersTest {
     @Test
     fun createCreateContractContext_validHex() {
         val hex = "a".repeat(64)
-        val result = OZBuilders.createCreateContractContext(hex)
+        val result = OZBuilders.createCreateContractContextType(hex)
         assertIs<ContextRuleType.CreateContract>(result)
         assertEquals(32, result.wasmHash.size)
     }
@@ -59,7 +59,7 @@ class OZBuildersTest {
     @Test
     fun createCreateContractContext_validHexWith0xPrefix() {
         val hex = "0x" + "b".repeat(64)
-        val result = OZBuilders.createCreateContractContext(hex)
+        val result = OZBuilders.createCreateContractContextType(hex)
         assertIs<ContextRuleType.CreateContract>(result)
         assertEquals(32, result.wasmHash.size)
     }
@@ -67,14 +67,14 @@ class OZBuildersTest {
     @Test
     fun createCreateContractContext_shortHex_throws() {
         assertFailsWith<ValidationException> {
-            OZBuilders.createCreateContractContext("abc123")
+            OZBuilders.createCreateContractContextType("abc123")
         }
     }
 
     @Test
     fun createCreateContractContext_longHex_throws() {
         assertFailsWith<ValidationException> {
-            OZBuilders.createCreateContractContext("a".repeat(66))
+            OZBuilders.createCreateContractContextType("a".repeat(66))
         }
     }
 
@@ -83,7 +83,7 @@ class OZBuildersTest {
     @Test
     fun createCreateContractContext_validBytes() {
         val bytes = ByteArray(32) { it.toByte() }
-        val result = OZBuilders.createCreateContractContext(bytes)
+        val result = OZBuilders.createCreateContractContextType(bytes)
         assertIs<ContextRuleType.CreateContract>(result)
         assertTrue(bytes.contentEquals(result.wasmHash))
     }
@@ -91,7 +91,7 @@ class OZBuildersTest {
     @Test
     fun createCreateContractContext_wrongSizeBytes_throws() {
         assertFailsWith<ValidationException> {
-            OZBuilders.createCreateContractContext(ByteArray(16))
+            OZBuilders.createCreateContractContextType(ByteArray(16))
         }
     }
 
@@ -101,5 +101,33 @@ class OZBuildersTest {
     fun collectUniqueSignersFromRules_emptyRules() {
         val result = OZBuilders.collectUniqueSignersFromRules(emptyList())
         assertTrue(result.isEmpty())
+    }
+
+    // MARK: - Deprecated context-type builder aliases
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun deprecatedContextBuilders_delegateToRenamedBuilders() {
+        assertEquals(OZBuilders.createDefaultContextType(), OZBuilders.createDefaultContext())
+
+        val address = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+        assertEquals(
+            OZBuilders.createCallContractContextType(address),
+            OZBuilders.createCallContractContext(address)
+        )
+
+        val hex = "a".repeat(64)
+        val fromHexNew = OZBuilders.createCreateContractContextType(hex)
+        val fromHexOld = OZBuilders.createCreateContractContext(hex)
+        assertIs<ContextRuleType.CreateContract>(fromHexNew)
+        assertIs<ContextRuleType.CreateContract>(fromHexOld)
+        assertTrue(fromHexNew.wasmHash.contentEquals(fromHexOld.wasmHash))
+
+        val bytes = ByteArray(32) { it.toByte() }
+        val fromBytesNew = OZBuilders.createCreateContractContextType(bytes)
+        val fromBytesOld = OZBuilders.createCreateContractContext(bytes)
+        assertIs<ContextRuleType.CreateContract>(fromBytesNew)
+        assertIs<ContextRuleType.CreateContract>(fromBytesOld)
+        assertTrue(fromBytesNew.wasmHash.contentEquals(fromBytesOld.wasmHash))
     }
 }

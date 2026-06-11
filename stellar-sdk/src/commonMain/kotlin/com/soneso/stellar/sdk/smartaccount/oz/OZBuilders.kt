@@ -35,10 +35,10 @@ object OZBuilders {
      *
      * Example:
      * ```kotlin
-     * val contextType = OZBuilders.createDefaultContext()
+     * val contextType = OZBuilders.createDefaultContextType()
      * ```
      */
-    fun createDefaultContext(): ContextRuleType {
+    fun createDefaultContextType(): ContextRuleType {
         return ContextRuleType.Default
     }
 
@@ -54,10 +54,10 @@ object OZBuilders {
      *
      * Example:
      * ```kotlin
-     * val contextType = OZBuilders.createCallContractContext("CBCD1234...")
+     * val contextType = OZBuilders.createCallContractContextType("CBCD1234...")
      * ```
      */
-    fun createCallContractContext(contractAddress: String): ContextRuleType {
+    fun createCallContractContextType(contractAddress: String): ContextRuleType {
         requireContractAddress(contractAddress, "contractAddress")
         return ContextRuleType.CallContract(contractAddress)
     }
@@ -73,10 +73,10 @@ object OZBuilders {
      *
      * Example:
      * ```kotlin
-     * val contextType = OZBuilders.createCreateContractContext("abc123...")
+     * val contextType = OZBuilders.createCreateContractContextType("abc123...")
      * ```
      */
-    fun createCreateContractContext(wasmHashHex: String): ContextRuleType {
+    fun createCreateContractContextType(wasmHashHex: String): ContextRuleType {
         val cleanHash = if (wasmHashHex.startsWith("0x")) wasmHashHex.substring(2) else wasmHashHex
         if (cleanHash.length != 64) {
             throw ValidationException.invalidInput(
@@ -99,10 +99,10 @@ object OZBuilders {
      *
      * Example:
      * ```kotlin
-     * val contextType = OZBuilders.createCreateContractContext(wasmHashBytes)
+     * val contextType = OZBuilders.createCreateContractContextType(wasmHashBytes)
      * ```
      */
-    fun createCreateContractContext(wasmHash: ByteArray): ContextRuleType {
+    fun createCreateContractContextType(wasmHash: ByteArray): ContextRuleType {
         if (wasmHash.size != 32) {
             throw ValidationException.invalidInput(
                 "wasmHash",
@@ -111,6 +111,63 @@ object OZBuilders {
         }
         return ContextRuleType.CreateContract(wasmHash)
     }
+
+    // ========================================================================
+    // Deprecated Context Rule Type Builders
+    // ========================================================================
+
+    /**
+     * Creates a Default context rule type.
+     *
+     * @return A [ContextRuleType.Default] for default authorization
+     */
+    @Deprecated(
+        message = "Renamed so the builder name matches the ContextRuleType it returns.",
+        replaceWith = ReplaceWith("createDefaultContextType()")
+    )
+    fun createDefaultContext(): ContextRuleType = createDefaultContextType()
+
+    /**
+     * Creates a CallContract context rule type.
+     *
+     * @param contractAddress The contract address this rule applies to (C-address)
+     * @return A [ContextRuleType.CallContract] for contract-specific authorization
+     * @throws ValidationException.InvalidAddress if the contract address format is invalid
+     */
+    @Deprecated(
+        message = "Renamed so the builder name matches the ContextRuleType it returns.",
+        replaceWith = ReplaceWith("createCallContractContextType(contractAddress)")
+    )
+    fun createCallContractContext(contractAddress: String): ContextRuleType =
+        createCallContractContextType(contractAddress)
+
+    /**
+     * Creates a CreateContract context rule type from a hex-encoded WASM hash.
+     *
+     * @param wasmHashHex The WASM hash as a hex string (64 characters, optionally prefixed with "0x")
+     * @return A [ContextRuleType.CreateContract] for contract creation authorization
+     * @throws ValidationException.InvalidInput if the hex string (after removing optional "0x" prefix) is not 64 characters
+     */
+    @Deprecated(
+        message = "Renamed so the builder name matches the ContextRuleType it returns.",
+        replaceWith = ReplaceWith("createCreateContractContextType(wasmHashHex)")
+    )
+    fun createCreateContractContext(wasmHashHex: String): ContextRuleType =
+        createCreateContractContextType(wasmHashHex)
+
+    /**
+     * Creates a CreateContract context rule type from raw WASM hash bytes.
+     *
+     * @param wasmHash The WASM hash (32 bytes)
+     * @return A [ContextRuleType.CreateContract] for contract creation authorization
+     * @throws ValidationException.InvalidInput if the byte array is not 32 bytes
+     */
+    @Deprecated(
+        message = "Renamed so the builder name matches the ContextRuleType it returns.",
+        replaceWith = ReplaceWith("createCreateContractContextType(wasmHash)")
+    )
+    fun createCreateContractContext(wasmHash: ByteArray): ContextRuleType =
+        createCreateContractContextType(wasmHash)
 
     // ========================================================================
     // Signer Inspection Utilities
