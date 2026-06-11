@@ -88,14 +88,25 @@ fun formatContextType(contextType: ContextRuleType): String {
 }
 
 /**
- * Returns a human-readable description of the signer type.
+ * Returns the demo's display label for a signer type.
  *
- * Delegates to [SmartAccountBuilders.describeSignerType] so screens do not import
- * SDK internals directly. Possible values: "Stellar Account", "Passkey (WebAuthn)",
+ * Label mapping is app-owned (the SDK provides type checks and key-data accessors,
+ * not UI strings). Possible values: "Stellar Account", "Passkey (WebAuthn)",
  * "Ed25519", "External Verifier".
  */
-fun describeSignerType(signer: SmartAccountSigner): String =
-    SmartAccountBuilders.describeSignerType(signer)
+private const val ED25519_KEY_SIZE = 32
+
+fun describeSignerType(signer: SmartAccountSigner): String {
+    if (signer is DelegatedSigner) return "Stellar Account"
+    val external = signer as ExternalSigner
+    return when {
+        // WebAuthn signers carry a 65-byte public key followed by the credential ID
+        SmartAccountBuilders.getPublicKeyFromSigner(external) != null -> "Passkey (WebAuthn)"
+        // Ed25519 signers carry a 32-byte public key
+        external.keyData.size == ED25519_KEY_SIZE -> "Ed25519"
+        else -> "External Verifier"
+    }
+}
 
 // ============================================================================
 // Numeric Formatting

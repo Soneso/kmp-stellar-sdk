@@ -615,29 +615,6 @@ class PolicyManagerTest {
         assertEquals(BigInteger.fromLong(1L), stroops)
     }
 
-    // MARK: - createSpendingLimitParams Tests
-
-    @Test
-    fun testCreateSpendingLimitParams_valid() {
-        val params = SmartAccountBuilders.createSpendingLimitParams("100", 720)
-        assertEquals(BigInteger.fromLong(1_000_000_000L), params.spendingLimit)
-        assertEquals(720, params.periodLedgers)
-    }
-
-    @Test
-    fun testCreateSpendingLimitParams_invalidAmount() {
-        assertFailsWith<IllegalArgumentException> {
-            SmartAccountBuilders.createSpendingLimitParams("", 720)
-        }
-    }
-
-    @Test
-    fun testCreateSpendingLimitParams_zeroPeriod() {
-        assertFailsWith<ValidationException.InvalidInput> {
-            SmartAccountBuilders.createSpendingLimitParams("100", 0)
-        }
-    }
-
     // MARK: - stroopsToI128ScVal Tests
 
     @Test

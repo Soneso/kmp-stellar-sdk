@@ -7,7 +7,6 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Util
 
 /**
@@ -132,135 +131,6 @@ object SmartAccountBuilders {
     }
 
     // ========================================================================
-    // Policy Parameter Builders
-    // ========================================================================
-
-    /**
-     * Creates simple threshold policy parameters.
-     *
-     * Simple threshold requires M-of-N signers where M = threshold
-     * and N = total number of signers on the context rule.
-     *
-     * @param threshold Minimum number of signers required (must be >= 1)
-     * @return Policy parameters for simple threshold
-     * @throws ValidationException.InvalidInput if threshold is less than 1
-     *
-     * Example:
-     * ```kotlin
-     * // 2-of-3 multisig
-     * val params = SmartAccountBuilders.createThresholdParams(2)
-     * ```
-     */
-    fun createThresholdParams(threshold: Int): SimpleThresholdParams {
-        if (threshold < 1) {
-            throw ValidationException.invalidInput(
-                "threshold",
-                "Threshold must be at least 1, got: $threshold"
-            )
-        }
-        return SimpleThresholdParams(threshold = threshold)
-    }
-
-    /**
-     * Creates weighted threshold policy parameters.
-     *
-     * Weighted threshold assigns different weights to different signers.
-     * Authorization succeeds when the sum of weights of authenticated
-     * signers meets or exceeds the threshold.
-     *
-     * @param threshold Total weight required for authorization (must be >= 1)
-     * @param signerWeights Map of signers to their weights (all weights must be >= 1)
-     * @return Policy parameters for weighted threshold
-     * @throws ValidationException.InvalidInput if threshold is less than 1, signer weights
-     *         is empty, any weight is less than 1, or total weight is less than threshold
-     *
-     * Example:
-     * ```kotlin
-     * val weights = mapOf(adminSigner to 100, userSigner to 50)
-     * val params = SmartAccountBuilders.createWeightedThresholdParams(100, weights)
-     * ```
-     */
-    fun createWeightedThresholdParams(
-        threshold: Int,
-        signerWeights: Map<SmartAccountSigner, Int>
-    ): WeightedThresholdParams {
-        if (threshold < 1) {
-            throw ValidationException.invalidInput(
-                "threshold",
-                "Threshold must be at least 1, got: $threshold"
-            )
-        }
-        if (signerWeights.isEmpty()) {
-            throw ValidationException.invalidInput(
-                "signerWeights",
-                "At least one signer weight must be provided"
-            )
-        }
-
-        var totalWeight = 0
-        for ((_, weight) in signerWeights) {
-            if (weight < 1) {
-                throw ValidationException.invalidInput(
-                    "signerWeights",
-                    "All weights must be positive integers, got: $weight"
-                )
-            }
-            totalWeight += weight
-        }
-
-        if (totalWeight < threshold) {
-            throw ValidationException.invalidInput(
-                "signerWeights",
-                "Sum of weights ($totalWeight) must be >= threshold ($threshold)"
-            )
-        }
-
-        return WeightedThresholdParams(
-            threshold = threshold,
-            signerWeights = signerWeights
-        )
-    }
-
-    /**
-     * Creates spending limit policy parameters.
-     *
-     * Spending limit restricts how much can be transferred within a given time period.
-     * Useful for rate limiting or daily limits.
-     *
-     * @param spendingLimit Maximum amount allowed in the period as a decimal XLM string
-     *   (e.g. "100" or "10.5"). Converted to stroops internally.
-     * @param periodLedgers Number of ledgers in the period (must be >= 1).
-     *        Use [Util.LEDGERS_PER_HOUR] or [Util.LEDGERS_PER_DAY]
-     *        for common periods.
-     * @return Policy parameters for spending limit
-     * @throws IllegalArgumentException if spending limit is not a valid positive decimal number
-     * @throws ValidationException.InvalidInput if period is less than 1
-     *
-     * Example:
-     * ```kotlin
-     * // 100 XLM per day (~17280 ledgers at 5 seconds per ledger)
-     * val params = SmartAccountBuilders.createSpendingLimitParams(
-     *     spendingLimit = "100",
-     *     periodLedgers = Util.LEDGERS_PER_DAY
-     * )
-     * ```
-     */
-    fun createSpendingLimitParams(spendingLimit: String, periodLedgers: Int): SpendingLimitParams {
-        // Delegate to amountToStroops which validates non-empty and positive
-        val stroops = Util.amountToStroops(spendingLimit)
-        if (periodLedgers < 1) {
-            throw ValidationException.invalidInput(
-                "periodLedgers",
-                "Period must be at least 1 ledger, got: $periodLedgers"
-            )
-        }
-        return SpendingLimitParams(
-            spendingLimit = stroops,
-            periodLedgers = periodLedgers
-        )
-    }
-
-    // ========================================================================
     // Signer Inspection Utilities
     // ========================================================================
 
@@ -367,6 +237,12 @@ object SmartAccountBuilders {
      * // "Passkey (WebAuthn)"
      * ```
      */
+    @Deprecated(
+        message = "UI label strings belong in the application layer where they can be " +
+            "localized. Map signer types to display labels in your app, using the type " +
+            "checks (isDelegatedSigner / isExternalSigner) and key-data accessors " +
+            "(getPublicKeyFromSigner / getCredentialIdFromSigner) to distinguish them."
+    )
     fun describeSignerType(signer: SmartAccountSigner): String {
         if (signer is DelegatedSigner) {
             return "Stellar Account"
@@ -536,51 +412,4 @@ object SmartAccountBuilders {
         return signerMap.values.toList()
     }
 }
-
-// ============================================================================
-// Policy Parameter Data Classes
-// ============================================================================
-
-/**
- * Parameters for simple threshold policy.
- *
- * Requires that at least [threshold] of the signers on the context rule
- * provide valid signatures for authorization to succeed.
- *
- * @property threshold Minimum number of signers required (>= 1)
- */
-data class SimpleThresholdParams(
-    val threshold: Int
-)
-
-/**
- * Parameters for weighted threshold policy.
- *
- * Each signer has a weight, and authorization succeeds when the sum of
- * weights of authenticated signers meets or exceeds the threshold.
- *
- * @property threshold Total weight required for authorization (>= 1)
- * @property signerWeights Map of signers to their weights (all >= 1)
- */
-data class WeightedThresholdParams(
-    val threshold: Int,
-    val signerWeights: Map<SmartAccountSigner, Int>
-)
-
-/**
- * Parameters for spending limit policy.
- *
- * Restricts how much can be transferred within a given time period.
- *
- * Construct instances using [SmartAccountBuilders.createSpendingLimitParams], which validates
- * inputs and converts the spending limit from a decimal XLM string to stroops.
- *
- * @property spendingLimit Maximum amount allowed in the period (in stroops as BigInteger, >= 1)
- * @property periodLedgers Number of ledgers in the period (>= 1).
- *           Approximately 5 seconds per ledger on the Stellar network.
- */
-data class SpendingLimitParams internal constructor(
-    val spendingLimit: BigInteger,
-    val periodLedgers: Int
-)
 

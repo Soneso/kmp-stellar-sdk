@@ -689,8 +689,6 @@ sealed class PolicyInstallParams {
 
 **Use one of:** `addSimpleThreshold` / `addWeightedThreshold` / `addSpendingLimit` on `OZPolicyManager` (they encode the params correctly), the typed `addPolicy(installParams: PolicyInstallParams)` overload, or the generic `addPolicy(installParams: SCValXdr)` with an `SCValXdr` you build yourself via `Scv.toMap(...)` for custom policy contracts.
 
-`SmartAccountBuilders` exposes a separate set of **inspection-only** factories (`createThresholdParams(Int)`, `createWeightedThresholdParams(Int, Map<SmartAccountSigner, Int>)`, `createSpendingLimitParams(String, Int)`) that produce `SimpleThresholdParams` / `WeightedThresholdParams` / `SpendingLimitParams` data classes. These are also not wired into `addPolicy` — they exist to let you diff / compare policy params locally without touching XDR.
-
 ```kotlin
 // Both are valid; the convenience method is the shortest path:
 // kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "...", threshold = 2u)
@@ -812,7 +810,7 @@ val rule = kit.contextRuleManager.listContextRules().first { it.id == contextRul
 // Base64URL credentialId from keyData and check whether it is stored locally.
 val available = rule.signers.mapNotNull { signer ->
     when {
-        // ExternalSigner has three keyData shapes (see SmartAccountBuilders.describeSignerType):
+        // ExternalSigner has three keyData shapes (WebAuthn: 65-byte pubkey + credential ID; Ed25519: 32-byte key; other: verifier-specific):
         //   size == ED25519_PUBLIC_KEY_SIZE (32)    -> Ed25519
         //   size  > SECP256R1_PUBLIC_KEY_SIZE (65)  -> WebAuthn passkey (65-byte pubkey || credentialId)
         //   any other size                          -> generic external verifier (no local signer; skipped)

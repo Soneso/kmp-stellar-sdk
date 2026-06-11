@@ -2180,20 +2180,6 @@ fun createEd25519Signer(ed25519VerifierAddress: String, publicKey: ByteArray): E
 - `createWebAuthnSigner`: convenience wrapper around `createExternalSigner` that builds the WebAuthn `keyData` (65-byte secp256r1 uncompressed public key + credential ID). Throws on an invalid verifier address, public key, or empty credential ID.
 - `createEd25519Signer`: external signer for a 32-byte Ed25519 public key verified by a verifier contract. Throws if the public key is not 32 bytes.
 
-#### Policy parameter builders
-
-```kotlin
-fun createThresholdParams(threshold: Int): SimpleThresholdParams
-fun createWeightedThresholdParams(threshold: Int, signerWeights: Map<SmartAccountSigner, Int>): WeightedThresholdParams
-fun createSpendingLimitParams(spendingLimit: String, periodLedgers: Int): SpendingLimitParams
-```
-
-- `createThresholdParams`: M-of-N simple threshold; `threshold` is the minimum number of signers required (>= 1).
-- `createWeightedThresholdParams`: weighted threshold where authorization succeeds when the sum of authenticated signer weights meets or exceeds `threshold`. Validates that all weights are >= 1 and the total weight is >= `threshold`.
-- `createSpendingLimitParams`: spending-limit policy restricting transfers within a ledger window. `spendingLimit` is a decimal XLM string (converted to stroops internally); `periodLedgers` must be >= 1.
-
-The returned `SimpleThresholdParams`, `WeightedThresholdParams`, and `SpendingLimitParams` data classes are documented in the [Types](#types) section.
-
 #### Signer inspection
 
 ```kotlin
@@ -2209,7 +2195,7 @@ fun describeSignerType(signer: SmartAccountSigner): String
 - `getCredentialIdStringFromSigner`: same as above, Base64URL-encoded, or `null`.
 - `getPublicKeyFromSigner`: extracts the 65-byte uncompressed secp256r1 public key from a WebAuthn signer's key data, or `null` if it is not a WebAuthn signer.
 - `isDelegatedSigner` / `isExternalSigner`: type checks for `DelegatedSigner` / `ExternalSigner`.
-- `describeSignerType`: human-readable label such as `"Stellar Account"`, `"Passkey (WebAuthn)"`, `"Ed25519"`, or `"External Verifier"`.
+- `describeSignerType` (deprecated): human-readable label such as `"Stellar Account"`, `"Passkey (WebAuthn)"`, `"Ed25519"`, or `"External Verifier"`. UI label strings belong in the application layer where they can be localized; map signer types to display labels in your app. Scheduled for removal in the next major release.
 
 #### Signer matching
 
@@ -4072,44 +4058,6 @@ sealed class PolicyInstallParams {
 | `SpendingLimit` | Limits spending per ledger period. `spendingLimit` is in the token's base units (as `BigInteger`), `periodLedgers` is the number of ledgers in the period. |
 
 The `addSpendingLimit(...)` convenience method accepts the amount as a decimal `String` and converts it to base units internally using its `decimals` parameter (default 7); when constructing `PolicyInstallParams.SpendingLimit` directly for `addPolicy(...)`, provide base units as a `BigInteger` (see `OZTransactionOperations.amountToBaseUnits`).
-
----
-
-### SimpleThresholdParams
-
-Typed policy parameters returned by `SmartAccountBuilders.createThresholdParams(...)`.
-
-```kotlin
-data class SimpleThresholdParams(
-    val threshold: Int
-)
-```
-
----
-
-### WeightedThresholdParams
-
-Typed policy parameters returned by `SmartAccountBuilders.createWeightedThresholdParams(...)`.
-
-```kotlin
-data class WeightedThresholdParams(
-    val threshold: Int,
-    val signerWeights: Map<SmartAccountSigner, Int>
-)
-```
-
----
-
-### SpendingLimitParams
-
-Typed policy parameters returned by `SmartAccountBuilders.createSpendingLimitParams(...)`. The constructor is internal; build instances via the builder, which accepts a decimal XLM `String` and converts to stroops.
-
-```kotlin
-data class SpendingLimitParams(
-    val spendingLimit: BigInteger,  // stroops
-    val periodLedgers: Int
-)
-```
 
 ---
 

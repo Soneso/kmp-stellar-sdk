@@ -681,7 +681,7 @@ val ed25519Signer = SmartAccountBuilders.createEd25519Signer("CDEF...", publicKe
 val isPasskey: Boolean = SmartAccountBuilders.isExternalSigner(passkey)
 val credId: ByteArray? = SmartAccountBuilders.getCredentialIdFromSigner(passkey)
 val credIdStr: String? = SmartAccountBuilders.getCredentialIdStringFromSigner(passkey) // Base64URL
-val typeLabel: String  = SmartAccountBuilders.describeSignerType(passkey)              // "Passkey (WebAuthn)"
+// describeSignerType is deprecated: map signer types to display labels in your app
 
 // Matching
 val matches = SmartAccountBuilders.signerMatchesCredentialId(passkey, "base64url-id")
