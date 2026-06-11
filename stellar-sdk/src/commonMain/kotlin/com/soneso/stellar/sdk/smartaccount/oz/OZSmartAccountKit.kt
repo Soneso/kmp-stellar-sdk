@@ -371,11 +371,13 @@ class OZSmartAccountKit private constructor(
      * SHA256("openzeppelin-smart-account-kit") for deterministic address derivation.
      *
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
+     * Use this accessor to obtain the deployer's G-address when funding it externally on
+     * networks without Friendbot.
      *
      * @return The configured or default deployer keypair
      * @throws ConfigurationException if default deployer creation fails
      */
-    internal suspend fun getDeployer(): KeyPair {
+    suspend fun getDeployer(): KeyPair {
         return cachedDeployer ?: config.effectiveDeployer().also { cachedDeployer = it }
     }
 

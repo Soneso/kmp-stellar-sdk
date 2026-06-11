@@ -327,7 +327,7 @@ class OZExternalSignerManager(
      * Wallet-related operations ([addFromWallet], [restoreConnections]) require this
      * to be true.
      */
-    internal val hasWalletAdapter: Boolean
+    val hasWalletAdapter: Boolean
         get() = walletAdapter != null
 
     // MARK: - Add Signers
@@ -465,7 +465,7 @@ class OZExternalSignerManager(
      * }
      * ```
      */
-    internal suspend fun get(address: String): ExternalSignerInfo? {
+    suspend fun get(address: String): ExternalSignerInfo? {
         // Check keypair signers
         val hasKeypair = platformSynchronized(registryLock) {
             keypairSigners.containsKey(address)
@@ -550,7 +550,7 @@ class OZExternalSignerManager(
      *
      * @return True if at least one signer is managed
      */
-    internal suspend fun hasSigners(): Boolean {
+    suspend fun hasSigners(): Boolean {
         val hasKeypairs = platformSynchronized(registryLock) {
             keypairSigners.isNotEmpty()
         }

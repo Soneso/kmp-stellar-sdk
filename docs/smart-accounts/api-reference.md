@@ -229,6 +229,22 @@ The kit must not be used after calling this method. To log out without releasing
 
 ---
 
+#### getDeployer
+
+```kotlin
+suspend fun getDeployer(): KeyPair
+```
+
+Returns the deployer keypair, resolving to the default if not explicitly configured. The result is cached after the first call. If no deployer was provided in the configuration, a deterministic deployer is derived from SHA256("openzeppelin-smart-account-kit").
+
+The deployer only pays for deployment transactions; it does not control user wallets. Use this accessor to obtain the deployer's G-address when funding it externally on networks without Friendbot.
+
+**Returns**: The configured or default deployer keypair
+
+**Throws**: `ConfigurationException` if default deployer creation fails
+
+---
+
 ## OZSmartAccountConfig
 
 Configuration data class for smart account operations.
@@ -2169,6 +2185,7 @@ The returned `SimpleThresholdParams`, `WeightedThresholdParams`, and `SpendingLi
 ```kotlin
 fun getCredentialIdFromSigner(signer: SmartAccountSigner): ByteArray?
 fun getCredentialIdStringFromSigner(signer: SmartAccountSigner): String?
+fun getPublicKeyFromSigner(signer: SmartAccountSigner): ByteArray?
 fun isDelegatedSigner(signer: SmartAccountSigner): Boolean
 fun isExternalSigner(signer: SmartAccountSigner): Boolean
 fun describeSignerType(signer: SmartAccountSigner): String
@@ -2176,6 +2193,7 @@ fun describeSignerType(signer: SmartAccountSigner): String
 
 - `getCredentialIdFromSigner`: extracts the WebAuthn credential ID from a signer's key data, or `null` if it is not a WebAuthn signer.
 - `getCredentialIdStringFromSigner`: same as above, Base64URL-encoded, or `null`.
+- `getPublicKeyFromSigner`: extracts the 65-byte uncompressed secp256r1 public key from a WebAuthn signer's key data, or `null` if it is not a WebAuthn signer.
 - `isDelegatedSigner` / `isExternalSigner`: type checks for `DelegatedSigner` / `ExternalSigner`.
 - `describeSignerType`: human-readable label such as `"Stellar Account"`, `"Passkey (WebAuthn)"`, `"Ed25519"`, or `"External Verifier"`.
 
@@ -2549,6 +2567,16 @@ val manager = OZExternalSignerManager(
 
 ---
 
+#### hasWalletAdapter
+
+```kotlin
+val hasWalletAdapter: Boolean
+```
+
+Whether an external wallet adapter is configured. Returns true if the manager was initialized with a non-null `ExternalWalletAdapter`. Wallet-related operations (`addFromWallet`, `restoreConnections`) require this to be true.
+
+---
+
 #### addFromSecret
 
 ```kotlin
@@ -2595,6 +2623,20 @@ Checks if any managed signer can sign for the given address.
 
 ---
 
+#### get
+
+```kotlin
+suspend fun get(address: String): ExternalSignerInfo?
+```
+
+Returns the signer info for the given address. Checks keypair signers first (takes precedence), then wallet signers.
+
+**Parameters**: `address` - G-address to look up
+
+**Returns**: The signer info, or null if no signer exists for this address
+
+---
+
 #### getAll
 
 ```kotlin
@@ -2616,6 +2658,18 @@ enum class ExternalSignerType {
 Lists all managed external signers (keypair and wallet).
 
 **Returns**: List of signer information
+
+---
+
+#### hasSigners
+
+```kotlin
+suspend fun hasSigners(): Boolean
+```
+
+Checks if any external signers are registered (keypair or wallet).
+
+**Returns**: True if at least one signer is managed
 
 ---
 

@@ -290,6 +290,34 @@ object SmartAccountBuilders {
     }
 
     /**
+     * Extracts the secp256r1 public key from a WebAuthn signer's key data.
+     *
+     * WebAuthn signers store key data as: publicKey (65 bytes) + credentialId (variable).
+     * This function extracts the 65-byte uncompressed public key portion from an
+     * [ExternalSigner].
+     *
+     * @param signer The signer to extract the public key from
+     * @return The 65-byte uncompressed secp256r1 public key, or null if the signer is
+     *   not a WebAuthn signer (delegated signers, or external signers whose key data
+     *   is not longer than 65 bytes)
+     *
+     * Example:
+     * ```kotlin
+     * val publicKey = SmartAccountBuilders.getPublicKeyFromSigner(signer)
+     * ```
+     */
+    fun getPublicKeyFromSigner(signer: SmartAccountSigner): ByteArray? {
+        if (signer !is ExternalSigner) return null
+        if (signer.keyData.size <= SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {
+            return null // Not a WebAuthn signer (no public-key prefix + credential ID)
+        }
+        return signer.keyData.copyOfRange(
+            0,
+            SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE
+        )
+    }
+
+    /**
      * Extracts the credential ID from a WebAuthn signer's key data as a Base64URL-encoded string.
      *
      * @param signer The signer to extract the credential ID from
