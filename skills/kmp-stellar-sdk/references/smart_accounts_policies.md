@@ -342,7 +342,7 @@ val signerB = DelegatedSigner("GC3C4MCEADMY26BVBPJIIUOKD5WZEZW5XI2LSU5F4QDZARBVA
 // Build the install params for the spending-limit policy inline (symbol keys alphabetical)
 val spendingLimitParams = Scv.toMap(linkedMapOf(
     Scv.toSymbol("period_ledgers") to Scv.toUint32(Util.LEDGERS_PER_DAY.toUInt()),
-    Scv.toSymbol("spending_limit") to Util.stroopsToI128ScVal(Util.amountToStroops("1000"))
+    Scv.toSymbol("spending_limit") to Scv.toInt128(OZTransactionOperations.amountToBaseUnits("1000", decimals = 7))
 ))
 
 val result = kit.contextRuleManager.addContextRule(
@@ -580,8 +580,9 @@ Caps the total amount transferred by the rule's context within a rolling window 
 suspend fun addSpendingLimit(
     contextRuleId: UInt,
     policyAddress: String,
-    spendingLimit: String,                 // decimal XLM-style string, e.g. "1000" or "10.5"
+    spendingLimit: String,                 // positive decimal string, e.g. "1000" or "10.5"
     periodLedgers: UInt,                   // window in ledgers (~5 s each)
+    decimals: Int = 7,                     // token scale for the conversion (no on-chain fetch here)
     selectedSigners: List<SelectedSigner> = emptyList(),
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
@@ -620,7 +621,7 @@ kit.policyManager.addSpendingLimit(
 
 ```kotlin
 // WRONG: spendingLimit = "10000000000"     — interpreted as 10 billion XLM (decimal string!)
-// CORRECT: spendingLimit = "1000"          — SDK converts to stroops internally
+// CORRECT: spendingLimit = "1000"          — SDK converts to base units (decimals param, default 7)
 // WRONG: spendingLimit = 1000.0            — parameter is a String, not Double
 // CORRECT: spendingLimit = "1000"
 // WRONG: periodLedgers = 86400u            — 86,400 ledgers is ~5 days at 5 s/ledger
@@ -681,7 +682,7 @@ sealed class PolicyInstallParams {
         val threshold: UInt
     ) : PolicyInstallParams()
     data class SpendingLimit(
-        val spendingLimit: BigInteger,    // stroops, NOT a decimal string
+        val spendingLimit: BigInteger,    // token base units, NOT a decimal string
         val periodLedgers: UInt
     ) : PolicyInstallParams()
 }
@@ -855,7 +856,8 @@ val available = rule.signers.mapNotNull { signer ->
 suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
-    amount: String,                       // decimal string, NOT stroops
+    amount: String,                       // decimal string, NOT base units
+    decimals: Int? = null,                // token scale; null fetches decimals() on-chain
     selectedSigners: List<SelectedSigner>,
     forceMethod: SubmissionMethod? = null,
     resolveContextRuleIds: ResolveContextRuleIds? = null
@@ -901,7 +903,7 @@ suspend fun multiSignerContractCall(
 val args = listOf(
     Scv.toAddress(Address(kit.contractId!!).toSCAddress()),
     Scv.toAddress(Address("CDEX1234...").toSCAddress()),
-    Util.stroopsToI128ScVal(Util.amountToStroops("100")),
+    Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),
     Scv.toUint32(Util.LEDGERS_PER_HOUR.toUInt())
 )
 kit.multiSignerManager.multiSignerContractCall(

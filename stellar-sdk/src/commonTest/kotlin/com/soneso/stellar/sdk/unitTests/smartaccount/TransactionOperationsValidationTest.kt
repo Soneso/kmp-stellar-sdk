@@ -186,12 +186,14 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        // Util.amountToStroops rejects zero with IllegalArgumentException
-        assertFailsWith<IllegalArgumentException> {
+        // decimals is passed explicitly so the amount conversion runs without the
+        // on-chain decimals() fetch (these tests are offline).
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = "0"
+                amount = "0",
+                decimals = 7
             )
         }
     }
@@ -201,11 +203,12 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = "-5"
+                amount = "-5",
+                decimals = 7
             )
         }
     }
@@ -215,11 +218,12 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = "abc"
+                amount = "abc",
+                decimals = 7
             )
         }
     }
@@ -229,11 +233,12 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = ""
+                amount = "",
+                decimals = 7
             )
         }
     }
@@ -243,11 +248,12 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = "1e5"
+                amount = "1e5",
+                decimals = 7
             )
         }
     }
@@ -257,12 +263,13 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        // Below 1 stroop (0.0000001)
-        assertFailsWith<IllegalArgumentException> {
+        // 8 fractional digits exceed the 7-decimal token scale
+        assertFailsWith<ValidationException.InvalidAmount> {
             txOps.transfer(
                 tokenContract = validContractAddress,
                 recipient = validAccountAddress,
-                amount = "0.00000001"
+                amount = "0.00000001",
+                decimals = 7
             )
         }
     }
@@ -276,15 +283,32 @@ class TransactionOperationsValidationTest {
         val kit = createConnectedKit()
         val txOps = kit.transactionOperations
 
-        // tokenContract validation happens inside contractCall after recipient validation.
-        // The transfer method validates recipient first, then calls contractCall which
-        // validates the target (tokenContract). So we need a valid recipient to reach
-        // the token contract validation.
+        // With decimals unset, the token contract is validated by fetchTokenDecimals
+        // (before any RPC call), tagged with the "tokenContract" field name.
         val ex = assertFailsWith<ValidationException.InvalidAddress> {
             txOps.transfer(
                 tokenContract = "not-a-contract",
                 recipient = validAccountAddress,
                 amount = "10"
+            )
+        }
+        assertNotNull(ex.message)
+        assertTrue(ex.message!!.contains("tokenContract"))
+    }
+
+    @Test
+    fun transfer_invalidTokenContract_explicitDecimals_throws() = runTest {
+        val kit = createConnectedKit()
+        val txOps = kit.transactionOperations
+
+        // With decimals supplied, the decimals fetch is skipped and the token contract
+        // is validated inside contractCall as the "target".
+        val ex = assertFailsWith<ValidationException.InvalidAddress> {
+            txOps.transfer(
+                tokenContract = "not-a-contract",
+                recipient = validAccountAddress,
+                amount = "10",
+                decimals = 7
             )
         }
         assertNotNull(ex.message)

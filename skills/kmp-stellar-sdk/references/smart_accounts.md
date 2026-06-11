@@ -722,7 +722,8 @@ SEP-41 compatible token transfer (XLM via SAC, any Soroban token).
 suspend fun transfer(
     tokenContract: String,       // C-address of the token contract
     recipient: String,           // G-address or C-address
-    amount: String,              // decimal string — converted to stroops internally
+    amount: String,              // decimal string — converted to the token's base units
+    decimals: Int? = null,       // token scale; null fetches the token's decimals() on-chain
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
@@ -743,14 +744,15 @@ if (result.success) {
 
 ```kotlin
 // WRONG: amount = 10  — must be a String
-// CORRECT: amount = "10"  — decimal string with up to 7 places
+// CORRECT: amount = "10"  — decimal string with up to `decimals` fractional places
 // WRONG: amount = "10500000"  — that would be 10.5 million XLM, not 10.5 XLM
-// CORRECT: amount = "10.5"  — SDK converts to stroops automatically
+// CORRECT: amount = "10.5"  — SDK converts to the token's base units automatically
+// TIP: pass decimals = 7 for XLM/SAC to skip the on-chain decimals() lookup
 // WRONG: transfer to self  — throws ValidationException
 // CORRECT: recipient must differ from the smart account's contractId
 ```
 
-`transfer` throws `WalletException.NotConnected` when no wallet is connected. `ValidationException.InvalidAddress` for bad recipient, `IllegalArgumentException` for invalid amount, `TransactionException.*` for simulation/submission failures, `WebAuthnException.*` for biometric cancellation.
+`transfer` throws `WalletException.NotConnected` when no wallet is connected. `ValidationException.InvalidAddress` for bad recipient or token contract, `ValidationException.InvalidAmount` for invalid amount, `TransactionException.*` for simulation/submission failures, `WebAuthnException.*` for biometric cancellation.
 
 ### contractCall
 
@@ -774,7 +776,7 @@ import com.soneso.stellar.sdk.Address
 val args = listOf(
     Scv.toAddress(Address(smartAccountId).toSCAddress()),    // from
     Scv.toAddress(Address(spenderContract).toSCAddress()),   // spender
-    Util.stroopsToI128ScVal(Util.amountToStroops("100")),    // amount as i128
+    Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),  // amount as i128
     Scv.toUint32(720u)                                       // expiration ledger
 )
 

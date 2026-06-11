@@ -716,23 +716,25 @@ suspend fun transfer(
     tokenContract: String,
     recipient: String,
     amount: String,
+    decimals: Int? = null,
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
-Transfers tokens from the smart account to a recipient. The amount is a decimal string (e.g., "100" or "10.5") converted to stroops internally using BigInteger arithmetic. Works with any SEP-41 compatible token (XLM SAC, custom Soroban tokens).
+Transfers tokens from the smart account to a recipient. The amount is a decimal string (e.g., "100" or "10.5") converted to the token's base units: `decimals` is used when supplied, otherwise the token's on-chain `decimals()` is fetched via `fetchTokenDecimals`. Works with any SEP-41 compatible token (XLM SAC, custom Soroban tokens).
 
 **Parameters**:
 - `tokenContract`: Token contract address (C-address). Use the SAC address for XLM or the token's contract address for custom tokens.
 - `recipient`: Recipient address (G-address for accounts, C-address for contracts)
-- `amount`: Decimal amount string (e.g., "10", "100.5"). Converted to stroops automatically.
+- `amount`: Decimal amount string (e.g., "10", "100.5"). Converted to the token's base units using the resolved decimals.
+- `decimals`: Token decimal scale used to convert `amount`. When null (default), the token's on-chain `decimals()` is fetched automatically. Supply it to skip the extra simulation round-trip (XLM and SAC-wrapped classic assets use 7).
 - `forceMethod`: Optional override to force RELAYER or RPC submission
 
 **Returns**: `TransactionResult` with success status, hash, ledger, and optional error
 
 **Throws**:
 - `WalletException.NotConnected`: Wallet is not connected
-- `ValidationException`: Invalid addresses or amount
+- `ValidationException`: Invalid addresses, invalid amount, or more fractional digits than the token's decimals allow
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
 - `CredentialException`: Credential lookup failed during signing
@@ -753,6 +755,37 @@ if (result.success) {
     println("Error: ${result.error}")
 }
 ```
+
+---
+
+#### fetchTokenDecimals
+
+```kotlin
+suspend fun fetchTokenDecimals(tokenContract: String): Int
+```
+
+Reads the `decimals()` value from a SEP-41 token contract. Simulates the token contract's `decimals` function and returns the reported `u32` scale. The simulation is read-only; nothing is submitted on-chain.
+
+**Parameters**:
+- `tokenContract`: SEP-41 token contract address (C-address)
+
+**Returns**: The token's decimal scale
+
+**Throws**:
+- `ValidationException.InvalidAddress`: `tokenContract` is not a valid contract address
+- `TransactionException.SimulationFailed`: Simulation failed or the contract did not return a valid u32 value
+
+---
+
+#### amountToBaseUnits
+
+```kotlin
+fun amountToBaseUnits(amount: String, decimals: Int): BigInteger
+```
+
+Companion-object helper that converts a positive decimal `amount` string to its base-units value scaled by `decimals` decimal places. Rejects scientific notation, empty or non-numeric strings, values less than or equal to zero, and values carrying more fractional digits than `decimals` allows. `decimals` must be in `0..MAX_TOKEN_DECIMALS` (38).
+
+**Throws**: `ValidationException.InvalidAmount` when `amount` is invalid or `decimals` is out of range
 
 ---
 
@@ -803,7 +836,7 @@ val result = kit.transactionOperations.contractCall(
     targetArgs = listOf(
         Scv.toAddress(Address(smartAccountAddress).toSCAddress()),
         Scv.toAddress(Address(spenderAddress).toSCAddress()),
-        Util.stroopsToI128ScVal(Util.amountToStroops("100")),
+        Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),
         Scv.toUint32(expirationLedger)
     )
 )
@@ -1639,18 +1672,20 @@ suspend fun addSpendingLimit(
     policyAddress: String,
     spendingLimit: String,
     periodLedgers: UInt,
+    decimals: Int = 7,
     selectedSigners: List<SelectedSigner> = emptyList(),
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
 ```
 
-Adds a spending limit policy.
+Adds a spending limit policy. The amount is supplied as a positive decimal string and converted to the token's base units using `decimals`. This method has no token-contract parameter and therefore does not fetch the scale automatically.
 
 **Parameters**:
 - `contextRuleId`: Context rule ID
 - `policyAddress`: Policy contract address
-- `spendingLimit`: Maximum amount per period as a decimal string (e.g., "1000")
+- `spendingLimit`: Maximum amount per period as a positive decimal string (e.g., "1000") with up to `decimals` fractional digits
 - `periodLedgers`: Period duration in ledgers (17,280 ≈ 1 day)
+- `decimals`: Token decimal scale used to convert `spendingLimit` to base units. Defaults to 7 (XLM and SAC-wrapped classic assets). Pass the token's `decimals()` value for tokens with a different scale (see `OZTransactionOperations.fetchTokenDecimals`).
 - `selectedSigners`: Optional list of `SelectedSigner` for multi-signer authorization. When empty (default), uses single-signer auth with the connected passkey.
 - `forceMethod`: Optional submission method override. When null (default), uses the configured submission method (relayer if available, RPC otherwise).
 
@@ -1658,8 +1693,7 @@ Adds a spending limit policy.
 
 **Throws**:
 - `WalletException.NotConnected`: Wallet is not connected
-- `ValidationException`: Invalid policy address
-- `IllegalArgumentException`: Invalid spending limit amount
+- `ValidationException`: Invalid policy address or invalid spending limit amount
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
 
@@ -2271,20 +2305,22 @@ suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
     amount: String,
+    decimals: Int? = null,
     selectedSigners: List<SelectedSigner>,
     forceMethod: SubmissionMethod? = null,
     resolveContextRuleIds: ResolveContextRuleIds? = null
 ): TransactionResult
 ```
 
-Executes a multi-signature token transfer. The amount is a decimal string (e.g., "100" or "10.5").
+Executes a multi-signature token transfer. The amount is a decimal string (e.g., "100" or "10.5") converted to the token's base units: `decimals` is used when supplied, otherwise the token's on-chain `decimals()` is fetched via `OZTransactionOperations.fetchTokenDecimals`.
 
 The caller explicitly lists every signer. There is no implicit connected passkey — include `SelectedSigner.Passkey()` if the connected passkey should sign. Signatures are collected in list order: each `Passkey` entry triggers one OS WebAuthn prompt; each `Wallet` and `Ed25519` entry signs through the kit-owned [OZSmartAccountKit.externalSigners] manager.
 
 **Parameters**:
 - `tokenContract`: Token contract address (C-address)
 - `recipient`: Recipient address (G-address or C-address)
-- `amount`: Decimal amount to transfer (e.g., "100" or "10.5")
+- `amount`: Decimal amount to transfer (e.g., "100" or "10.5"). Converted to the token's base units using the resolved decimals.
+- `decimals`: Token decimal scale used to convert `amount`. When null (default), the token's on-chain `decimals()` is fetched automatically. Supply it to skip the extra simulation round-trip (XLM and SAC-wrapped classic assets use 7).
 - `selectedSigners`: All signers that must sign, in collection order
 - `forceMethod`: Optional override for the submission method. When null (default), the SDK auto-detects whether to use the relayer or direct submission.
 - `resolveContextRuleIds`: Optional callback that returns context rule IDs for each authorization entry. See [ResolveContextRuleIds](#resolvecontextruleids).
@@ -2356,7 +2392,7 @@ val result = kit.multiSignerManager.multiSignerContractCall(
     targetArgs = listOf(
         Scv.toAddress(Address(smartAccountAddress).toSCAddress()),
         Scv.toAddress(Address(spenderAddress).toSCAddress()),
-        Util.stroopsToI128ScVal(Util.amountToStroops("100")),
+        Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),
         Scv.toUint32(expirationLedger)
     ),
     selectedSigners = listOf(
@@ -4016,9 +4052,9 @@ sealed class PolicyInstallParams {
 |---------|-------------|
 | `SimpleThreshold` | Requires at least M-of-N signers. All signers have equal weight. `threshold` must be > 0. |
 | `WeightedThreshold` | Each signer has a configurable weight. Sum of approving weights must meet the threshold. |
-| `SpendingLimit` | Limits spending per ledger period. `spendingLimit` is in stroops (as `BigInteger`), `periodLedgers` is the number of ledgers in the period. |
+| `SpendingLimit` | Limits spending per ledger period. `spendingLimit` is in the token's base units (as `BigInteger`), `periodLedgers` is the number of ledgers in the period. |
 
-The `addSpendingLimit(...)` convenience method accepts the amount as a decimal XLM `String` and converts it to stroops internally; when constructing `PolicyInstallParams.SpendingLimit` directly for `addPolicy(...)`, provide stroops as a `BigInteger`.
+The `addSpendingLimit(...)` convenience method accepts the amount as a decimal `String` and converts it to base units internally using its `decimals` parameter (default 7); when constructing `PolicyInstallParams.SpendingLimit` directly for `addPolicy(...)`, provide base units as a `BigInteger` (see `OZTransactionOperations.amountToBaseUnits`).
 
 ---
 

@@ -105,7 +105,7 @@ typealias ResolveContextRuleIds = suspend (
  * Provides high-level transaction building, signing, and submission capabilities
  * for smart account operations. Handles:
  *
- * - Token transfers with automatic stroops conversion
+ * - Token transfers with automatic base-units conversion (configurable token decimals)
  * - Transaction simulation and fee estimation
  * - Authorization entry signing with WebAuthn
  * - Relayer submission for fee sponsoring
@@ -159,11 +159,13 @@ class OZTransactionOperations internal constructor(
      * Transfers tokens from the smart account to a recipient.
      *
      * Works with any SEP-41 compatible token (XLM via SAC, custom Soroban tokens).
-     * The amount is a decimal string converted to stroops (7 decimal places) internally.
+     * The amount is a decimal string converted to the token's base units before
+     * submission: [decimals] is used when supplied, otherwise the token's on-chain
+     * `decimals()` is fetched via [fetchTokenDecimals].
      *
      * Flow:
      * 1. Validates recipient address and prevents self-transfer
-     * 2. Converts amount to stroops using BigInteger arithmetic
+     * 2. Resolves the token decimals and converts amount to base units
      * 3. Delegates to [contractCall] which builds the host function, simulates,
      *    signs auth entries via WebAuthn, re-simulates, and submits
      *
@@ -173,12 +175,19 @@ class OZTransactionOperations internal constructor(
      * @param tokenContract The token contract address (C-address). Use the SAC address
      *   for XLM or the token's contract address for custom tokens.
      * @param recipient The recipient address (G-address for accounts, C-address for contracts)
-     * @param amount Decimal amount string (e.g., "10", "100.5"). Converted to stroops automatically.
+     * @param amount Decimal amount string (e.g., "10", "100.5"). Converted to the token's
+     *   base units using the resolved decimals.
+     * @param decimals The token's decimal scale used to convert [amount] to base units.
+     *   When null (default), the token's on-chain `decimals()` is fetched via
+     *   [fetchTokenDecimals]. Supply it to skip the extra simulation round-trip
+     *   (XLM and SAC-wrapped classic assets use 7).
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
      * @return TransactionResult indicating success or failure
      * @throws WalletException.NotConnected if no wallet is connected
-     * @throws ValidationException if recipient address is invalid or same as smart account
-     * @throws IllegalArgumentException if amount is not a valid positive decimal
+     * @throws ValidationException.InvalidAddress if recipient address is invalid
+     * @throws ValidationException.InvalidInput if the recipient is the smart account itself
+     * @throws ValidationException.InvalidAmount if the amount is not a valid positive decimal,
+     *   has more fractional digits than the token's decimals allow, or is outside the i128 range
      * @throws TransactionException if simulation, signing, or submission fails
      * @throws WebAuthnException if biometric authentication fails
      *
@@ -201,6 +210,7 @@ class OZTransactionOperations internal constructor(
         tokenContract: String,
         recipient: String,
         amount: String,
+        decimals: Int? = null,
         forceMethod: SubmissionMethod? = null
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
@@ -214,12 +224,13 @@ class OZTransactionOperations internal constructor(
             )
         }
 
-        val stroops = Util.amountToStroops(amount)
+        val resolvedDecimals = decimals ?: fetchTokenDecimals(tokenContract)
+        val baseUnits = amountToBaseUnits(amount, resolvedDecimals)
 
         val targetArgs = listOf(
             Scv.toAddress(Address(contractId).toSCAddress()),
             Scv.toAddress(Address(recipient).toSCAddress()),
-            Util.stroopsToI128ScVal(stroops)
+            baseUnitsToI128ScVal(baseUnits, amount)
         )
 
         return contractCall(
@@ -228,6 +239,35 @@ class OZTransactionOperations internal constructor(
             targetArgs = targetArgs,
             forceMethod = forceMethod
         )
+    }
+
+    /**
+     * Reads the `decimals()` value from a SEP-41 token contract.
+     *
+     * Simulates the token contract's `decimals` function and returns the reported
+     * `u32` scale. The simulation is read-only; nothing is submitted on-chain.
+     *
+     * @param tokenContract The SEP-41 token contract address (C-address)
+     * @return The token's decimal scale
+     * @throws ValidationException.InvalidAddress if [tokenContract] is not a valid contract address
+     * @throws TransactionException.SimulationFailed if the simulation fails or the contract
+     *   does not return a valid u32 value
+     */
+    suspend fun fetchTokenDecimals(tokenContract: String): Int {
+        requireContractAddress(tokenContract, "tokenContract")
+
+        val invokeArgs = InvokeContractArgsXdr(
+            contractAddress = Address(tokenContract).toSCAddress(),
+            functionName = SCSymbolXdr("decimals"),
+            args = emptyList()
+        )
+        val result = simulateAndExtractResult(HostFunctionXdr.InvokeContract(invokeArgs))
+
+        val decimals = scValToUInt32(result)
+            ?: throw TransactionException.simulationFailed(
+                "Token contract $tokenContract did not return a valid u32 decimals value"
+            )
+        return decimals.toInt()
     }
 
     // MARK: - Direct Contract Call
@@ -1264,5 +1304,115 @@ class OZTransactionOperations internal constructor(
             nonce = (nonce shl 8) or (randomBytes[i].toLong() and 0xFF)
         }
         return nonce
+    }
+
+    companion object {
+
+        /**
+         * Maximum number of decimal places accepted by [amountToBaseUnits].
+         *
+         * `10^38` already exceeds the i128 range used for token amounts, so a larger
+         * scale could never produce a representable base-units value.
+         */
+        const val MAX_TOKEN_DECIMALS: Int = 38
+
+        /**
+         * Converts a positive decimal [amount] string to its base-units value scaled
+         * by [decimals] decimal places.
+         *
+         * Rejects scientific notation, empty or non-numeric strings, values less than
+         * or equal to zero, and values carrying more fractional digits than [decimals]
+         * allows. Accepted shape: `^[0-9]+(\.[0-9]+)?$` with at most [decimals]
+         * fractional digits and a result greater than zero.
+         *
+         * @param amount Positive decimal amount string (e.g., "10", "100.5")
+         * @param decimals The token's decimal scale; must be in `0..MAX_TOKEN_DECIMALS`.
+         *   A value of `0` accepts only integer amounts.
+         * @return The base-units value as a [BigInteger]
+         * @throws ValidationException.InvalidAmount if [amount] is invalid or [decimals]
+         *   is out of range
+         */
+        fun amountToBaseUnits(amount: String, decimals: Int): BigInteger {
+            if (decimals < 0) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Token decimals must not be negative"
+                )
+            }
+            if (decimals > MAX_TOKEN_DECIMALS) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Token decimals must not exceed $MAX_TOKEN_DECIMALS"
+                )
+            }
+
+            val trimmed = amount.trim()
+            if (trimmed.isEmpty()) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Amount must not be empty"
+                )
+            }
+
+            if (!AMOUNT_REGEX.matches(trimmed)) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Amount must be a positive decimal number"
+                )
+            }
+
+            val parts = trimmed.split('.')
+            val wholePart = parts[0]
+            val fractionPart = if (parts.size > 1) parts[1] else ""
+
+            if (fractionPart.length > decimals) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Amount has more than $decimals fractional digits"
+                )
+            }
+
+            val paddedFraction = fractionPart.padEnd(decimals, '0')
+            val baseUnits = BigInteger.parseString(wholePart + paddedFraction)
+
+            if (baseUnits <= BigInteger.ZERO) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Amount must be greater than zero"
+                )
+            }
+            return baseUnits
+        }
+
+        /**
+         * Encodes a [baseUnits] value as an i128 [SCValXdr], surfacing an out-of-range
+         * value as a tagged validation error.
+         *
+         * @param baseUnits The base-units value to encode
+         * @param amount The original caller-supplied amount, used for the error message
+         * @throws ValidationException.InvalidAmount if [baseUnits] is outside the i128 range
+         */
+        internal fun baseUnitsToI128ScVal(baseUnits: BigInteger, amount: String): SCValXdr {
+            return try {
+                Scv.toInt128(baseUnits)
+            } catch (e: Exception) {
+                throw ValidationException.invalidAmount(
+                    amount,
+                    "Amount is outside the supported i128 range",
+                    e
+                )
+            }
+        }
+
+        /**
+         * Extracts a `u32` from [value], used to parse a token contract's `decimals()`
+         * return value. Returns null when [value] is not a `u32`.
+         */
+        private fun scValToUInt32(value: SCValXdr): UInt? {
+            return (value as? SCValXdr.U32)?.value?.value
+        }
+
+        /** Accepted decimal-amount shape: digits with an optional fractional part. */
+        private val AMOUNT_REGEX = Regex("^[0-9]+(\\.[0-9]+)?$")
     }
 }

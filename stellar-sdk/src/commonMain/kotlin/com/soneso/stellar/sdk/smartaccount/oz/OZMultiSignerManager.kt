@@ -204,7 +204,12 @@ class OZMultiSignerManager internal constructor(
      *
      * @param tokenContract The token contract address (C-address)
      * @param recipient The recipient address (G-address or C-address)
-     * @param amount Decimal amount to transfer (e.g., "100" or "10.5")
+     * @param amount Decimal amount to transfer (e.g., "100" or "10.5"). Converted to the
+     *   token's base units using the resolved decimals.
+     * @param decimals The token's decimal scale used to convert [amount] to base units.
+     *   When null (default), the token's on-chain `decimals()` is fetched via
+     *   [OZTransactionOperations.fetchTokenDecimals]. Supply it to skip the extra
+     *   simulation round-trip (XLM and SAC-wrapped classic assets use 7).
      * @param selectedSigners All signers that must sign, in collection order.
      *   The list must not be empty.
      * @param forceMethod Optional override for the submission method. When null (default),
@@ -237,6 +242,7 @@ class OZMultiSignerManager internal constructor(
         tokenContract: String,
         recipient: String,
         amount: String,
+        decimals: Int? = null,
         selectedSigners: List<SelectedSigner>,
         forceMethod: SubmissionMethod? = null,
         resolveContextRuleIds: ResolveContextRuleIds? = null
@@ -252,12 +258,14 @@ class OZMultiSignerManager internal constructor(
             )
         }
 
-        val stroops = Util.amountToStroops(amount)
+        val resolvedDecimals = decimals
+            ?: kit.transactionOperations.fetchTokenDecimals(tokenContract)
+        val baseUnits = OZTransactionOperations.amountToBaseUnits(amount, resolvedDecimals)
 
         val targetArgs = listOf(
             Scv.toAddress(Address(contractId).toSCAddress()),
             Scv.toAddress(Address(recipient).toSCAddress()),
-            Util.stroopsToI128ScVal(stroops)
+            OZTransactionOperations.baseUnitsToI128ScVal(baseUnits, amount)
         )
 
         return multiSignerContractCall(
