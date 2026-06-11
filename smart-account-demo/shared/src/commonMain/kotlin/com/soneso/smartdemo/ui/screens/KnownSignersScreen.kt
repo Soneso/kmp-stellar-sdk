@@ -45,10 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -57,10 +54,8 @@ import com.soneso.smartdemo.flows.SignerEntry
 import com.soneso.smartdemo.flows.loadAccountSigners
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.describeSignerType
+import com.soneso.smartdemo.ui.components.SignerIdentityChip
 import com.soneso.smartdemo.util.formatContextType
-import com.soneso.smartdemo.util.formatSignerForDisplay
-import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import kotlinx.coroutines.launch
@@ -295,38 +290,12 @@ class KnownSignersScreen : Screen {
 
     @Composable
     private fun SignerEntryItem(signer: SmartAccountSigner, rules: List<ParsedContextRule>) {
-        val typeDescription = describeSignerType(signer)
-        val displayInfo = formatSignerForDisplay(signer)
-
-        val chipColor = signerTypeColor(typeDescription)
-
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Signer type badge and identifier
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    color = chipColor,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = displayInfo.type,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-
-                Text(
-                    text = displayInfo.display,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            SignerIdentityChip(
+                signer = signer,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             // Context rule memberships
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

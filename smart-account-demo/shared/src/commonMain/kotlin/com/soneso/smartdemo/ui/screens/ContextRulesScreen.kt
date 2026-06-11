@@ -64,16 +64,15 @@ import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
 import com.soneso.smartdemo.flows.loadAvailableSigners
 import com.soneso.smartdemo.flows.loadContextRules
-import com.soneso.smartdemo.flows.withInProcessMultiSigner
 import com.soneso.smartdemo.flows.removeContextRule
+import com.soneso.smartdemo.flows.withInProcessMultiSigner
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
+import com.soneso.smartdemo.ui.components.SignerIdentityChip
 import com.soneso.smartdemo.ui.components.SignerPickerDialog
-import com.soneso.smartdemo.util.describeSignerType
+import com.soneso.smartdemo.ui.components.signerChipColor
 import com.soneso.smartdemo.util.formatContextType
-import com.soneso.smartdemo.util.formatSignerForDisplay
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
@@ -698,46 +697,18 @@ class ContextRulesScreen : Screen {
 
     @Composable
     private fun SignerChip(signer: SmartAccountSigner) {
-        val typeDescription = describeSignerType(signer)
-        val displayInfo = formatSignerForDisplay(signer)
-
-        val chipColor = signerTypeColor(typeDescription)
-
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = chipColor.copy(alpha = 0.08f)
+                containerColor = signerChipColor(signer).copy(alpha = 0.08f)
             )
         ) {
-            Row(
+            SignerIdentityChip(
+                signer = signer,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Type badge
-                Surface(
-                    color = chipColor,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = displayInfo.type,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-
-                // Identifier
-                Text(
-                    text = displayInfo.display,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+                    .padding(12.dp)
+            )
         }
     }
 

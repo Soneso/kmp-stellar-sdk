@@ -53,6 +53,7 @@ import com.soneso.smartdemo.config.KNOWN_POLICIES
 import com.soneso.smartdemo.config.PolicyInfo
 import com.soneso.smartdemo.flows.EditPolicyEntry
 import com.soneso.smartdemo.state.ActivityLogState
+import com.soneso.smartdemo.ui.components.SignerIdentityChip
 import com.soneso.smartdemo.util.buildSimpleThresholdScVal
 import com.soneso.smartdemo.util.buildSpendingLimitScVal
 import com.soneso.smartdemo.util.buildWeightedThresholdScVal
@@ -492,20 +493,15 @@ fun PolicyManagementSection(
                             )
                             signers.forEach { signer ->
                                 val key = SmartAccountBuilders.getSignerKey(signer)
-                                val displayInfo = formatSignerForDisplay(signer)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "${displayInfo.type}: ${displayInfo.display}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                                    SignerIdentityChip(
+                                        signer = signer,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                     OutlinedTextField(
                                         value = signerWeights[key] ?: "",
                                         onValueChange = { value ->
@@ -800,28 +796,17 @@ internal fun EditPolicyParamsForm(
                         }
                         signers.forEach { signer ->
                             val key = SmartAccountBuilders.getSignerKey(signer)
-                            val displayInfo = formatSignerForDisplay(signer)
                             val origWeight = params.signerWeights?.get(key)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "${displayInfo.type}: ${displayInfo.display}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (origWeight != null) {
-                                        Text(
-                                            text = "On-chain: $origWeight",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                                SignerIdentityChip(
+                                    signer = signer,
+                                    modifier = Modifier.weight(1f),
+                                    subline = origWeight?.let { "On-chain: $it" }
+                                )
                                 OutlinedTextField(
                                     value = signerWeights[key] ?: "",
                                     onValueChange = { value ->

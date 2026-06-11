@@ -48,9 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.flows.EditSignerEntry
@@ -60,11 +58,11 @@ import com.soneso.smartdemo.flows.loadAvailablePasskeySigners
 import com.soneso.smartdemo.flows.registerPasskeySigner
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.describeSignerType
+import com.soneso.smartdemo.ui.components.SignerIdentityChip
+import com.soneso.smartdemo.ui.components.signerChipColor
 import com.soneso.smartdemo.util.formatSignerForDisplay
 import com.soneso.smartdemo.util.hexToByteArray
 import com.soneso.smartdemo.util.isUserCancellation
-import com.soneso.smartdemo.util.signerTypeColor
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
@@ -747,15 +745,10 @@ internal fun SignerCard(
     onRemove: () -> Unit,
     enabled: Boolean = true
 ) {
-    val typeDescription = describeSignerType(signer)
-    val displayInfo = formatSignerForDisplay(signer)
-
-    val chipColor = signerTypeColor(typeDescription)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = chipColor.copy(alpha = 0.08f)
+            containerColor = signerChipColor(signer).copy(alpha = 0.08f)
         )
     ) {
         Row(
@@ -765,33 +758,10 @@ internal fun SignerCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            SignerIdentityChip(
+                signer = signer,
                 modifier = Modifier.weight(1f)
-            ) {
-                // Type badge
-                Surface(
-                    color = chipColor,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = displayInfo.type,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-
-                // Identifier
-                Text(
-                    text = displayInfo.display,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            )
 
             // Remove button
             if (enabled) {
@@ -822,15 +792,10 @@ internal fun EditSignerCard(
     onRemove: () -> Unit,
     enabled: Boolean = true
 ) {
-    val typeDescription = describeSignerType(entry.signer)
-    val displayInfo = formatSignerForDisplay(entry.signer)
-
-    val chipColor = signerTypeColor(typeDescription)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = chipColor.copy(alpha = 0.08f)
+            containerColor = signerChipColor(entry.signer).copy(alpha = 0.08f)
         )
     ) {
         Row(
@@ -840,48 +805,11 @@ internal fun EditSignerCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                // Type badge
-                Surface(
-                    color = chipColor,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = displayInfo.type,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-
-                // On-chain badge
-                if (entry.isOriginal) {
-                    Surface(
-                        color = Color(0xFF4CAF50),
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text(
-                            text = "(on-chain)",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
-                        )
-                    }
-                }
-
-                // Identifier
-                Text(
-                    text = displayInfo.display,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            SignerIdentityChip(
+                signer = entry.signer,
+                modifier = Modifier.weight(1f),
+                showOnChainBadge = entry.isOriginal
+            )
 
             // Remove button (disabled for connected wallet's own signer)
             if (enabled) {
