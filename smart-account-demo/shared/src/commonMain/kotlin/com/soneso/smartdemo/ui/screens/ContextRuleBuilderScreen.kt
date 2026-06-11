@@ -313,14 +313,19 @@ class ContextRuleBuilderScreen(
         // Compute the edit diff for operation summary and submission.
         val editDiff: ContextRuleEditDiff? = if (isEditing && editRuleId != null) {
             val nameChanged = ruleName.trim() != originalName
+            // Only entries that are themselves originals can cancel out an original in the
+            // removal diff. A staged entry that equals a dropped original (same signer
+            // re-added, or a same-type policy whose contract address matches) must NOT
+            // suppress the removal — the removal and the add are both submitted, in that
+            // order, otherwise the contract rejects the add as a duplicate (3007/3009).
             val removedSigners = originalSignerEntries.filter { orig ->
-                signerEntries.none { SmartAccountBuilders.signersEqual(it.signer, orig.signer) }
+                signerEntries.none { it.isOriginal && SmartAccountBuilders.signersEqual(it.signer, orig.signer) }
             }
             val newSigners = signerEntries.filter { entry ->
                 !entry.isOriginal
             }
             val removedPolicies = originalPolicyEntries.filter { orig ->
-                policyEntries.none { it.address == orig.address }
+                policyEntries.none { it.isOriginal && it.address == orig.address }
             }
             val newPolicies = policyEntries.filter { entry ->
                 !entry.isOriginal
