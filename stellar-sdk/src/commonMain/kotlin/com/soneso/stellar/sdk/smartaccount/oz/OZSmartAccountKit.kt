@@ -292,15 +292,15 @@ class OZSmartAccountKit private constructor(
     // MARK: - Resource Management
 
     /**
-     * Closes this kit, releases all held HTTP client resources, and drops in-memory
-     * signing secrets.
+     * Closes this kit, releases all held HTTP client resources, removes all event
+     * listeners, and drops in-memory signing secrets.
      *
-     * Closes the Soroban RPC server connection and the indexer HTTP client if present.
-     * The relayer client manages its own per-request connections and requires no explicit
-     * cleanup. In-memory external signers (keypairs registered via
-     * [OZExternalSignerManager.addFromSecret] and Ed25519 keys registered via
-     * [OZExternalSignerManager.addEd25519FromRawKey]) are cleared so that raw key material
-     * does not outlive the kit; the external wallet adapter is left intact.
+     * Closes the Soroban RPC server connection and the indexer and relayer HTTP clients
+     * if present. All listeners registered on [events] are removed so that subscriber
+     * objects do not stay reachable through the kit. In-memory external signers (keypairs
+     * registered via [OZExternalSignerManager.addFromSecret] and Ed25519 keys registered
+     * via [OZExternalSignerManager.addEd25519FromRawKey]) are cleared so that raw key
+     * material does not outlive the kit; the external wallet adapter is left intact.
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
@@ -320,6 +320,11 @@ class OZSmartAccountKit private constructor(
     fun close() {
         sorobanServer.close()
         indexerClient?.close()
+        relayerClient?.close()
+
+        // Drop subscriber references so listener closures do not keep consumer
+        // objects reachable through the kit.
+        events.removeAllListeners()
 
         // Drop in-memory signing secrets (registered keypairs / Ed25519 keys). The
         // external-wallet adapter is intentionally left intact.

@@ -231,6 +231,32 @@ class SmartAccountKitTest {
     }
 
     @Test
+    fun testClose_withRelayerClient() = runTest {
+        val config = createTestConfig(relayerUrl = "https://relayer.example.com")
+        val kit = OZSmartAccountKit.create(config)
+        assertNotNull(kit.relayerClient)
+
+        // close() shuts down the relayer's owned HTTP client; calling twice must not throw
+        kit.close()
+        kit.close()
+    }
+
+    @Test
+    fun testClose_removesEventListeners() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+
+        var received = false
+        kit.events.addListener { received = true }
+
+        kit.close()
+
+        // Listener references are dropped on close; an emit afterwards reaches nobody
+        kit.events.emit(SmartAccountEvent.WalletDisconnected(contractId = "CONTRACT"))
+        assertFalse(received)
+    }
+
+    @Test
     fun testClose_withoutIndexerClient() = runTest {
         // Use a non-testnet passphrase so effectiveIndexerUrl() returns null
         val config = createTestConfig(networkPassphrase = "Custom Network ; No Default Indexer")

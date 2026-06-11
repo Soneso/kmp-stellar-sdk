@@ -221,7 +221,7 @@ Disconnects the currently connected wallet, clearing the in-memory connection st
 fun close()
 ```
 
-Closes the kit, releases all held HTTP client resources, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter is left intact.
+Closes the kit, releases all held HTTP client resources, removes all event listeners, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer and relayer HTTP clients if present. All listeners registered on `events` are removed. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter is left intact.
 
 The kit must not be used after calling this method: the manager properties remain accessible, but any operation on them fails because the underlying HTTP clients are closed. To log out without releasing resources, call `disconnect()` instead.
 
@@ -3148,7 +3148,7 @@ class OZRelayerClient(
 |-----------|------|-------------|
 | `relayerUrl` | `String` | Relayer endpoint URL (must use HTTPS, or http://localhost for development) |
 | `timeoutMs` | `Long` | Default request timeout in milliseconds (default: 6 minutes for testnet retries) |
-| `injectedClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null, creates per-request clients). When supplied, it is not closed by `close()`. |
+| `injectedClient` | `HttpClient?` | Optional custom HTTP client for testing (default: null, the client creates and owns its own HTTP client). When supplied, it is not closed by `close()`. |
 
 **Throws**: `ConfigurationException.InvalidConfig` if `relayerUrl` is blank or not HTTPS.
 
@@ -3204,7 +3204,7 @@ This method does not throw. All error conditions are returned in the `RelayerRes
 override fun close()
 ```
 
-Closes the owned HTTP client and releases its resources. When an injected client was supplied (testing), it is not closed — the caller retains ownership. The client must not be used after `close()`.
+Closes the owned HTTP client and releases its resources. When an injected client was supplied (testing), it is not closed — the caller retains ownership. The client must not be used after `close()`. When using via `kit.relayerClient`, the kit's `close()` handles this automatically.
 
 ---
 

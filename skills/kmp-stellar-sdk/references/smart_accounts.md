@@ -203,7 +203,7 @@ kit.disconnect()
 
 ### Close
 
-Releases HTTP resources owned by the kit (Soroban RPC client, indexer client) and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`). Does **not** clear session state — call `disconnect()` first if you want both. The kit must not be used afterwards: manager properties remain accessible, but operations on them fail because the underlying clients are closed.
+Releases HTTP resources owned by the kit (Soroban RPC client, indexer client, relayer client), removes all event listeners, and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`). Does **not** clear session state — call `disconnect()` first if you want both. The kit must not be used afterwards: manager properties remain accessible, but operations on them fail because the underlying clients are closed.
 
 ```kotlin
 try {
