@@ -221,7 +221,7 @@ Disconnects the currently connected wallet, clearing the in-memory connection st
 fun close()
 ```
 
-Closes the kit and releases all held HTTP client resources. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup.
+Closes the kit, releases all held HTTP client resources, and drops in-memory signing secrets. Closes the Soroban RPC server connection and the indexer HTTP client if present. The relayer client manages its own per-request connections and requires no explicit cleanup. In-memory external signers (keypairs registered via `addFromSecret` and Ed25519 keys registered via `addEd25519FromRawKey`) are cleared; the external wallet adapter and persisted wallet connections are left intact.
 
 The kit must not be used after calling this method. To log out without releasing resources, call `disconnect()` instead.
 

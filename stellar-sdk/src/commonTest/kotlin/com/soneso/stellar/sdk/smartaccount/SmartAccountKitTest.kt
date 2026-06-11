@@ -216,6 +216,21 @@ class SmartAccountKitTest {
     }
 
     @Test
+    fun testClose_clearsInMemoryExternalSigners() = runTest {
+        val config = createTestConfig()
+        val kit = OZSmartAccountKit.create(config)
+
+        val kp = KeyPair.random()
+        val address = kit.externalSigners.addFromSecret(kp.getSecretSeed()!!.concatToString())
+        assertTrue(kit.externalSigners.canSignFor(address))
+
+        kit.close()
+
+        // In-memory signing secrets must not outlive the kit
+        assertFalse(kit.externalSigners.canSignFor(address))
+    }
+
+    @Test
     fun testClose_withoutIndexerClient() = runTest {
         // Use a non-testnet passphrase so effectiveIndexerUrl() returns null
         val config = createTestConfig(networkPassphrase = "Custom Network ; No Default Indexer")

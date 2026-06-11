@@ -13,6 +13,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
+import com.soneso.stellar.sdk.platformSynchronized
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -232,7 +233,9 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
  *    via [restoreConnections].
  *
  * Thread Safety:
- * All mutable state is protected by a [Mutex]. Public methods can be safely called from
+ * The in-memory signer registries are protected by a non-suspending platform lock so they
+ * can also be cleared from non-suspend teardown paths ([OZSmartAccountKit.close]); the
+ * restoration flag is protected by a [Mutex]. Public methods can be safely called from
  * any coroutine context.
  *
  * Example usage:
@@ -302,7 +305,16 @@ class OZExternalSignerManager(
     private var restored = false
 
     /**
-     * Mutex protecting all mutable state.
+     * Non-suspending lock protecting [keypairSigners] and [ed25519Signers].
+     *
+     * A platform lock (rather than a coroutine [Mutex]) is used so the registries can be
+     * cleared from the non-suspend [OZSmartAccountKit.close] via [clearInMemorySigners].
+     * All critical sections are short, non-suspending map operations.
+     */
+    private val registryLock = Any()
+
+    /**
+     * Mutex protecting the [restored] restoration flag.
      */
     private val mutex = Mutex()
 
@@ -355,7 +367,7 @@ class OZExternalSignerManager(
 
         val address = keypair.getAccountId()
 
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             keypairSigners[address] = keypair
         }
 
@@ -424,7 +436,7 @@ class OZExternalSignerManager(
      */
     suspend fun canSignFor(address: String): Boolean {
         // Check keypair signers first
-        val hasKeypair = mutex.withLock {
+        val hasKeypair = platformSynchronized(registryLock) {
             keypairSigners.containsKey(address)
         }
         if (hasKeypair) return true
@@ -455,7 +467,7 @@ class OZExternalSignerManager(
      */
     internal suspend fun get(address: String): ExternalSignerInfo? {
         // Check keypair signers
-        val hasKeypair = mutex.withLock {
+        val hasKeypair = platformSynchronized(registryLock) {
             keypairSigners.containsKey(address)
         }
         if (hasKeypair) {
@@ -499,19 +511,18 @@ class OZExternalSignerManager(
      */
     suspend fun getAll(): List<ExternalSignerInfo> {
         val signers = mutableListOf<ExternalSignerInfo>()
-        val keypairAddresses: Set<String>
 
-        // Add keypair signers
-        mutex.withLock {
-            keypairAddresses = keypairSigners.keys.toSet()
-            for (address in keypairAddresses) {
-                signers.add(
-                    ExternalSignerInfo(
-                        address = address,
-                        type = ExternalSignerType.KEYPAIR
-                    )
+        // Add keypair signers (snapshot taken under the registry lock)
+        val keypairAddresses: Set<String> = platformSynchronized(registryLock) {
+            keypairSigners.keys.toSet()
+        }
+        for (address in keypairAddresses) {
+            signers.add(
+                ExternalSignerInfo(
+                    address = address,
+                    type = ExternalSignerType.KEYPAIR
                 )
-            }
+            )
         }
 
         // Add wallet signers (skip addresses already present as keypair)
@@ -540,7 +551,7 @@ class OZExternalSignerManager(
      * @return True if at least one signer is managed
      */
     internal suspend fun hasSigners(): Boolean {
-        val hasKeypairs = mutex.withLock {
+        val hasKeypairs = platformSynchronized(registryLock) {
             keypairSigners.isNotEmpty()
         }
         if (hasKeypairs) return true
@@ -582,7 +593,7 @@ class OZExternalSignerManager(
         authEntry: String
     ): SignAuthEntryResult {
         // Try keypair signer first
-        val keypair = mutex.withLock {
+        val keypair = platformSynchronized(registryLock) {
             keypairSigners[address]
         }
 
@@ -635,7 +646,7 @@ class OZExternalSignerManager(
      */
     suspend fun remove(address: String) {
         // Remove from keypair signers
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             keypairSigners.remove(address)
         }
 
@@ -657,16 +668,29 @@ class OZExternalSignerManager(
      * ```
      */
     suspend fun removeAll() {
-        mutex.withLock {
-            keypairSigners.clear()
-            ed25519Signers.clear()
-        }
+        clearInMemorySigners()
 
         // Disconnect all wallets
         walletAdapter?.disconnect()
 
         // Clear storage
         walletConnectionStorage?.removeItem(WALLET_STORAGE_KEY)
+    }
+
+    /**
+     * Removes the in-memory signing secrets: all keypair signers registered via
+     * [addFromSecret] and all Ed25519 keypairs registered via [addEd25519FromRawKey].
+     *
+     * The external wallet adapter and persisted wallet connections are left intact —
+     * unlike [removeAll], this does not disconnect wallets and does not delete stored
+     * wallet connections. Called from [OZSmartAccountKit.close] so that raw key material
+     * does not outlive the kit.
+     */
+    internal fun clearInMemorySigners() {
+        platformSynchronized(registryLock) {
+            keypairSigners.clear()
+            ed25519Signers.clear()
+        }
     }
 
     // MARK: - Ed25519 Methods
@@ -717,7 +741,7 @@ class OZExternalSignerManager(
             publicKeyHex = Util.bytesToHex(publicKey)
         )
 
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             ed25519Signers[storeKey] = keypair
         }
 
@@ -745,7 +769,9 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        return ed25519Signers.containsKey(storeKey)
+        return platformSynchronized(registryLock) {
+            ed25519Signers.containsKey(storeKey)
+        }
     }
 
     /**
@@ -756,7 +782,7 @@ class OZExternalSignerManager(
      * it can sign, it is invoked via [OZExternalEd25519SignerAdapter.signAuthDigest]. Otherwise
      * the in-memory keypair registry is used. Throws when neither source is available.
      *
-     * The registry mutex is released before the adapter's
+     * The registry lock is never held while the adapter's
      * [OZExternalEd25519SignerAdapter.signAuthDigest] is awaited, preventing deadlock with
      * adapters that may call back into the manager.
      *
@@ -775,9 +801,9 @@ class OZExternalSignerManager(
         val adapter = ed25519Adapter
 
         if (adapter != null && adapter.canSignFor(verifierAddress, publicKey)) {
-            // The mutex is NOT held during the adapter await — the adapter may take several
-            // seconds (e.g. user confirmation on a hardware device) and may itself call back
-            // into this manager. Holding the mutex across the suspend point would deadlock.
+            // The registry lock is NOT held during the adapter await — the adapter may take
+            // several seconds (e.g. user confirmation on a hardware device) and may itself call
+            // back into this manager. Holding the lock across the suspend point would deadlock.
             val rawSignature: ByteArray = try {
                 adapter.signAuthDigest(authDigest, publicKey)
             } catch (e: Exception) {
@@ -793,7 +819,7 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        val keypair = mutex.withLock { ed25519Signers[storeKey] }
+        val keypair = platformSynchronized(registryLock) { ed25519Signers[storeKey] }
 
         if (keypair == null) {
             val prefix = verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)
@@ -828,7 +854,7 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             ed25519Signers.remove(storeKey)
         }
     }

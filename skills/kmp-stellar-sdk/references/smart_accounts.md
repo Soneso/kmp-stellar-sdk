@@ -203,7 +203,7 @@ kit.disconnect()
 
 ### Close
 
-Releases HTTP resources owned by the kit (Soroban RPC client, indexer client). Does **not** clear session state. Call `disconnect()` first if you want both.
+Releases HTTP resources owned by the kit (Soroban RPC client, indexer client) and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`); persisted wallet connections are retained. Does **not** clear session state. Call `disconnect()` first if you want both.
 
 ```kotlin
 try {

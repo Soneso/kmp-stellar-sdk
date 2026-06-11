@@ -292,10 +292,16 @@ class OZSmartAccountKit private constructor(
     // MARK: - Resource Management
 
     /**
-     * Closes this kit and releases all held HTTP client resources.
+     * Closes this kit, releases all held HTTP client resources, and drops in-memory
+     * signing secrets.
      *
      * Closes the Soroban RPC server connection and the indexer HTTP client if present.
-     * The relayer client manages its own per-request connections and requires no explicit cleanup.
+     * The relayer client manages its own per-request connections and requires no explicit
+     * cleanup. In-memory external signers (keypairs registered via
+     * [OZExternalSignerManager.addFromSecret] and Ed25519 keys registered via
+     * [OZExternalSignerManager.addEd25519FromRawKey]) are cleared so that raw key material
+     * does not outlive the kit; the external wallet adapter and persisted wallet
+     * connections are left intact.
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
@@ -314,6 +320,10 @@ class OZSmartAccountKit private constructor(
     fun close() {
         sorobanServer.close()
         indexerClient?.close()
+
+        // Drop in-memory signing secrets (registered keypairs / Ed25519 keys). Persisted
+        // wallet connections and the external-wallet adapter are intentionally left intact.
+        externalSigners.clearInMemorySigners()
     }
 
     // MARK: - Internal Helpers

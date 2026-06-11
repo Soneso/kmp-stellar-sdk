@@ -327,6 +327,75 @@ class ExternalSignerManagerTest {
         manager.removeAll()
     }
 
+    // MARK: - clearInMemorySigners Tests
+
+    @Test
+    fun testClearInMemorySigners_clearsKeypairAndEd25519Signers() = runTest {
+        val manager = createManager()
+
+        val kp = KeyPair.random()
+        val address = manager.addFromSecret(kp.getSecretSeed()!!.concatToString())
+        val rawSeed = ByteArray(32) { (it + 1).toByte() }
+        val publicKey = manager.addEd25519FromRawKey(rawSeed, VERIFIER_A)
+
+        assertTrue(manager.canSignFor(address))
+        assertTrue(manager.canSignEd25519For(VERIFIER_A, publicKey))
+
+        manager.clearInMemorySigners()
+
+        assertFalse(manager.canSignFor(address))
+        assertFalse(manager.canSignEd25519For(VERIFIER_A, publicKey))
+        assertTrue(manager.getAll().isEmpty())
+        assertFalse(manager.hasSigners())
+    }
+
+    @Test
+    fun testClearInMemorySigners_keepsWalletConnections() = runTest {
+        val walletAddress = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
+        val wallet = ConnectedWallet(
+            address = walletAddress,
+            walletId = "freighter",
+            walletName = "Freighter"
+        )
+        var disconnected = false
+        val adapter = object : ExternalWalletAdapter {
+            override suspend fun connect(): ConnectedWallet? = null
+            override suspend fun reconnect(walletId: String): ConnectedWallet? = null
+            override suspend fun disconnect() {
+                disconnected = true
+            }
+            override fun canSignFor(address: String): Boolean = address == walletAddress
+            override fun getConnectedWallets(): List<ConnectedWallet> = listOf(wallet)
+            override fun getWalletForAddress(address: String): ConnectedWallet? =
+                if (address == walletAddress) wallet else null
+            override suspend fun signAuthEntry(
+                preimageXdr: String,
+                options: SignAuthEntryOptions?
+            ): SignAuthEntryResult = throw UnsupportedOperationException()
+        }
+        val manager = createManager(walletAdapter = adapter)
+
+        val kp = KeyPair.random()
+        val keypairAddress = manager.addFromSecret(kp.getSecretSeed()!!.concatToString())
+
+        manager.clearInMemorySigners()
+
+        // In-memory keypair is gone; the wallet connection is untouched
+        assertNull(manager.get(keypairAddress))
+        assertFalse(disconnected)
+        assertTrue(manager.canSignFor(walletAddress))
+        assertEquals(1, manager.getAll().size)
+        assertEquals(ExternalSignerType.WALLET, manager.getAll().single().type)
+    }
+
+    @Test
+    fun testClearInMemorySigners_emptyManagerDoesNotThrow() {
+        val manager = createManager()
+
+        // Should not throw, and is callable from non-suspend contexts
+        manager.clearInMemorySigners()
+    }
+
     // MARK: - signAuthEntry Tests
 
     @Test
