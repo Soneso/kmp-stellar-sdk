@@ -1155,7 +1155,7 @@ Saves a credential directly to storage. Unlike [createPendingCredential], this d
 suspend fun clearAll()
 ```
 
-Clears all credentials from storage. This operation is irreversible.
+Clears all credentials and the stored session from storage. This operation is irreversible.
 
 **Throws**: `StorageException.WriteFailed` if clearing fails
 

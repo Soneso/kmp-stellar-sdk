@@ -404,7 +404,8 @@ interface StorageAdapter {
     suspend fun update(credentialId: String, updates: StoredCredentialUpdate)
 
     /**
-     * Clears all credentials from storage.
+     * Clears all credentials and the stored session from storage. Equivalent to a
+     * hard reset of the adapter's contents.
      *
      * @throws StorageException.WriteFailed if clearing fails
      */
@@ -491,6 +492,7 @@ class InMemoryStorageAdapter : StorageAdapter {
 
     override suspend fun clear(): Unit = mutex.withLock {
         credentials.clear()
+        session = null
     }
 
     override suspend fun saveSession(session: StoredSession): Unit = mutex.withLock {

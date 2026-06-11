@@ -493,6 +493,7 @@ class StorageAdapterTest {
         assertNull(adapter.get("cred-1"))
         assertNull(adapter.get("cred-2"))
         assertNull(adapter.get("cred-3"))
+        assertNull(adapter.getSession())
     }
 
     @Test
@@ -631,7 +632,7 @@ class StorageAdapterTest {
     // MARK: - Session and Credentials Independence
 
     @Test
-    fun testClearCredentialsDoesNotAffectSession() = runTest {
+    fun testClearRemovesCredentialsAndSession() = runTest {
         val adapter = newAdapter()
         adapter.save(fullCredential())
         adapter.saveSession(StoredSession(
@@ -641,10 +642,10 @@ class StorageAdapterTest {
             expiresAt = Long.MAX_VALUE
         ))
 
-        adapter.clear() // clears credentials only
+        adapter.clear() // hard reset: credentials AND session
 
         assertTrue(adapter.getAll().isEmpty(), "Credentials should be cleared")
-        assertNotNull(adapter.getSession(), "Session should not be affected by clear()")
+        assertNull(adapter.getSession(), "Session must be cleared by clear()")
     }
 
     @Test

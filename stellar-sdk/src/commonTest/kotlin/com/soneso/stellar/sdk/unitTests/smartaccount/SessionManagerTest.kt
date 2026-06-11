@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  * These tests cover session lifecycle scenarios not covered elsewhere:
  * - StoredSession.isExpired with edge cases
  * - Session save/restore/clear via kit storage
- * - Session independence from credentials
+ * - clearAll hard-reset semantics (credentials and session)
  * - Session overwrite behavior
  * - Session with custom expiry configuration
  * - Kit disconnect clears session
@@ -257,10 +257,10 @@ class SessionManagerTest {
         assertNull(storage.getSession(), "Session should be cleared after disconnect")
     }
 
-    // MARK: - Session Independence from Credentials
+    // MARK: - clearAll Hard Reset
 
     @Test
-    fun testSessionIndependentFromCredentials() = runTest {
+    fun testClearAllRemovesCredentialsAndSession() = runTest {
         val (kit, storage) = createKit()
 
         // Save a credential and a session
@@ -277,13 +277,12 @@ class SessionManagerTest {
             expiresAt = Long.MAX_VALUE
         ))
 
-        // Clear all credentials
+        // clearAll is a hard reset of the storage contents
         kit.credentialManager.clearAll()
 
-        // Session should still exist
-        val session = storage.getSession()
-        assertNotNull(session, "Session should not be affected by clearing credentials")
-        assertEquals("cred-1", session.credentialId)
+        // Both the credentials and the session are gone
+        assertTrue(kit.credentialManager.getAllCredentials().isEmpty())
+        assertNull(storage.getSession(), "Session must be cleared by clearAll()")
     }
 
     @Test
