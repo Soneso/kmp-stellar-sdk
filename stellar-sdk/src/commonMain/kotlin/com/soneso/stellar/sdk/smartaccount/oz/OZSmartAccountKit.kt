@@ -292,20 +292,13 @@ class OZSmartAccountKit private constructor(
     // MARK: - Resource Management
 
     /**
-     * Closes this kit, releases all held HTTP client resources, removes all event
-     * listeners, and drops in-memory signing secrets.
-     *
-     * Closes the Soroban RPC server connection and the indexer and relayer HTTP clients
-     * if present. All listeners registered on [events] are removed so that subscriber
-     * objects do not stay reachable through the kit. In-memory external signers (keypairs
-     * registered via [OZExternalSignerManager.addFromSecret] and Ed25519 keys registered
-     * via [OZExternalSignerManager.addEd25519FromRawKey]) are cleared so that raw key
-     * material does not outlive the kit; the external wallet adapter is left intact.
+     * Closes this kit and releases all held resources: the Soroban RPC, indexer, and
+     * relayer HTTP clients, plus in-memory state (event listeners and registered
+     * signing keys).
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
-     * calling this method: the manager properties remain accessible, but any operation on
-     * them fails because the underlying HTTP clients are closed.
+     * calling this method.
      *
      * Example:
      * ```kotlin
@@ -376,8 +369,7 @@ class OZSmartAccountKit private constructor(
      * SHA256("openzeppelin-smart-account-kit") for deterministic address derivation.
      *
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
-     * Use this accessor to obtain the deployer's G-address when funding it externally on
-     * networks without Friendbot.
+     * The deployer's G-address is needed to fund it externally on networks without Friendbot.
      *
      * @return The configured or default deployer keypair
      * @throws ConfigurationException if default deployer creation fails

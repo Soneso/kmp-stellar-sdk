@@ -6,22 +6,11 @@ Platform-specific guide for configuring WebAuthn passkey authentication in Andro
 
 - Android API 28+ (Android 9.0 Pie) for `AndroidWebAuthnProvider` (passkey authentication)
 - Android API 24+ for `AndroidStorageAdapter` (credential persistence)
-- AndroidX Credential Manager library
 - A domain you control for Digital Asset Links
 
 ## Gradle Dependencies
 
-Add the Credential Manager and encrypted storage dependencies to your app-level `build.gradle.kts`:
-
-```kotlin
-dependencies {
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-}
-```
-
-The `credentials-play-services-auth` module provides the Google Play Services backend for Credential Manager, which is required on devices without a native FIDO2 provider.
+The SDK brings the Credential Manager (`androidx.credentials`, including the Play Services backend used on devices without a native FIDO2 provider) and encrypted-storage (`androidx.security:security-crypto`) dependencies transitively — no additions to your build are required. Add them explicitly only if your own code calls those APIs directly.
 
 ## Digital Asset Links
 
@@ -37,7 +26,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 keytool -list -v -keystore your-release.keystore -alias your-alias
 ```
 
-Copy the SHA-256 fingerprint from the output (e.g., `14:6D:E9:...`). Remove the colons to get the format needed for `assetlinks.json`.
+Copy the SHA-256 fingerprint from the output (e.g., `14:6D:E9:...`) as-is — `assetlinks.json` uses the colon-separated form.
 
 ### 2. Host assetlinks.json
 
@@ -46,7 +35,7 @@ Create a file at `https://your-domain.com/.well-known/assetlinks.json`:
 ```json
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": ["delegate_permission/common.get_login_creds"],
     "target": {
       "namespace": "android_app",
       "package_name": "com.example.yourapp",
@@ -62,7 +51,7 @@ Serve this file with `Content-Type: application/json` over HTTPS.
 
 ### 3. Verify
 
-Open `https://your-domain.com/.well-known/assetlinks.json` in a browser to confirm the file is accessible. Google provides a verification tool at `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-domain.com`.
+Open `https://your-domain.com/.well-known/assetlinks.json` in a browser to confirm the file is accessible. Google provides a verification tool at `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-domain.com&relation=delegate_permission/common.get_login_creds`.
 
 ## WebAuthn Provider
 
@@ -130,9 +119,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "CBCD1234...",
-    rpId = "your-domain.com",
-    rpName = "My Stellar Wallet",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     webauthnProvider = webauthnProvider,
     storage = storage
 )
@@ -144,7 +131,7 @@ val kit = OZSmartAccountKit.create(config)
 
 ### Credential Manager throws "No provider found"
 
-The device lacks a FIDO2 provider. Ensure `credentials-play-services-auth` is in your dependencies and Google Play Services is up to date on the device.
+The device lacks a FIDO2 provider. The Play Services Credential Manager backend ships with the SDK; ensure Google Play Services is up to date on the device.
 
 ### SecurityException or domain mismatch
 
@@ -155,11 +142,12 @@ The `rpId` does not match the domain in your `assetlinks.json`, or the signing c
 
 ### Attestation failure on emulators
 
-Android emulators may not have hardware-backed authenticators. Test with:
-- A physical device with biometric hardware
-- Google's FIDO2 virtual authenticator in Chrome DevTools (for web-based testing)
+Android emulators may not have hardware-backed authenticators. Passkeys on emulators require:
+- A "Google APIs" system image with Google Play Services
+- A Google account signed in on the emulator
+- Network access to reach the RP domain for `assetlinks.json` verification
 
-Emulator behavior varies by image. API 33+ emulators with Google Play Services typically support software-backed passkeys.
+Alternatively, test on a physical device with biometric hardware.
 
 ### WebAuthnException.NotSupported
 

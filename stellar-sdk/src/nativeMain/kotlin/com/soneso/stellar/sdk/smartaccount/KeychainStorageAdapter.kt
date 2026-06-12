@@ -92,7 +92,6 @@ private fun CFStringRef?.asNSString(): NSString? {
  * - Encryption at rest by the OS
  * - Access control via `kSecAttrAccessibleAfterFirstUnlock`
  * - Persistence across app reinstalls (unless explicitly deleted)
- * - iCloud Keychain sync (if the user has it enabled)
  *
  * While [UserDefaultsStorageAdapter] is adequate for public key storage,
  * this adapter is appropriate for use cases requiring stronger data protection.

@@ -423,8 +423,7 @@ class OZPolicyManager internal constructor(
      * 5 seconds per ledger, 720 per hour, 17,280 per day).
      *
      * Converts the amount to the token's base units using [decimals] and delegates
-     * to [addPolicy]. This method has no token-contract parameter and therefore does
-     * not fetch the scale automatically.
+     * to [addPolicy].
      *
      * IMPORTANT: This operation requires the connected wallet to have authorization
      * on the smart account. The user will be prompted for biometric authentication

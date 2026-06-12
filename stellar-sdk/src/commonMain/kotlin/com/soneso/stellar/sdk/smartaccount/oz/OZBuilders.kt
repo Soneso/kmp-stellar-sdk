@@ -117,9 +117,7 @@ object OZBuilders {
     // ========================================================================
 
     /**
-     * Creates a Default context rule type.
-     *
-     * @return A [ContextRuleType.Default] for default authorization
+     * Deprecated alias for [createDefaultContextType].
      */
     @Deprecated(
         message = "Renamed so the builder name matches the ContextRuleType it returns.",
@@ -128,11 +126,7 @@ object OZBuilders {
     fun createDefaultContext(): ContextRuleType = createDefaultContextType()
 
     /**
-     * Creates a CallContract context rule type.
-     *
-     * @param contractAddress The contract address this rule applies to (C-address)
-     * @return A [ContextRuleType.CallContract] for contract-specific authorization
-     * @throws ValidationException.InvalidAddress if the contract address format is invalid
+     * Deprecated alias for [createCallContractContextType].
      */
     @Deprecated(
         message = "Renamed so the builder name matches the ContextRuleType it returns.",
@@ -142,11 +136,7 @@ object OZBuilders {
         createCallContractContextType(contractAddress)
 
     /**
-     * Creates a CreateContract context rule type from a hex-encoded WASM hash.
-     *
-     * @param wasmHashHex The WASM hash as a hex string (64 characters, optionally prefixed with "0x")
-     * @return A [ContextRuleType.CreateContract] for contract creation authorization
-     * @throws ValidationException.InvalidInput if the hex string (after removing optional "0x" prefix) is not 64 characters
+     * Deprecated alias for [createCreateContractContextType].
      */
     @Deprecated(
         message = "Renamed so the builder name matches the ContextRuleType it returns.",
@@ -156,11 +146,7 @@ object OZBuilders {
         createCreateContractContextType(wasmHashHex)
 
     /**
-     * Creates a CreateContract context rule type from raw WASM hash bytes.
-     *
-     * @param wasmHash The WASM hash (32 bytes)
-     * @return A [ContextRuleType.CreateContract] for contract creation authorization
-     * @throws ValidationException.InvalidInput if the byte array is not 32 bytes
+     * Deprecated alias for [createCreateContractContextType].
      */
     @Deprecated(
         message = "Renamed so the builder name matches the ContextRuleType it returns.",

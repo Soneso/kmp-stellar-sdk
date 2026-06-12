@@ -35,7 +35,7 @@ Supported signer types:
 
 Architecture. `OZSmartAccountKit.create(config)` is the single entry point. The kit exposes seven sub-managers as lazy properties: `walletOperations`, `transactionOperations`, `signerManager`, `contextRuleManager`, `policyManager`, `multiSignerManager`, `credentialManager` (plus `events`). The config takes two platform adapters — `WebAuthnProvider` and `StorageAdapter` — plus two optional external-signer adapters: `ExternalWalletAdapter` (`externalWallet`) and `OZExternalEd25519SignerAdapter` (`externalEd25519Adapter`). Internally the kit owns a `SorobanServer` (RPC), `OZRelayerClient` (fee-bump, optional), and `OZIndexerClient` (credential lookup, optional).
 
-`OZExternalSignerManager` is owned by the kit and exposed as the non-null read-only property `kit.externalSigners` — the single front door for all external (non-passkey) signers. The multi-signer pipeline routes every `SelectedSigner.Wallet` and `SelectedSigner.Ed25519` signing through it.
+External (non-passkey) signers: `kit.externalSigners` — see [External Signer Manager](#external-signer-manager).
 
 ```kotlin
 // WRONG: kit.walletOperations() — it is a property, not a function
@@ -203,7 +203,7 @@ kit.disconnect()
 
 ### Close
 
-Releases HTTP resources owned by the kit (Soroban RPC client, indexer client, relayer client), removes all event listeners, and clears in-memory external signers (keypairs added via `addFromSecret` / `addEd25519FromRawKey`). Does **not** clear session state — call `disconnect()` first if you want both. The kit must not be used afterwards: manager properties remain accessible, but operations on them fail because the underlying clients are closed.
+Releases all resources owned by the kit (HTTP clients, listeners, registered signing keys). Does **not** clear session state — call `disconnect()` first if you want both. The kit must not be used afterwards.
 
 ```kotlin
 try {
@@ -266,11 +266,7 @@ These two flags are distinct and frequently confused:
 | `autoSubmit` | Submit the deploy transaction to the network immediately. When `false`, the result contains `signedTransactionXdr` only — submit externally with `deployPendingCredential()` or your own code. |
 | `autoFund` | After deploy, fund the new smart account using Friendbot (**testnet only**). Requires `autoSubmit = true` and a `nativeTokenContract` C-address. |
 
-Flow when `autoFund = true`:
-
-1. Friendbot funds a temporary G-account (testnet HTTP request).
-2. SDK waits ~5 seconds for propagation.
-3. Balance of the temp account minus a 5 XLM reserve is transferred to the smart account contract via the native SAC token contract.
+When `autoFund = true`, the SDK runs [fundWallet](#fundwallet) after the deploy.
 
 ### Basic example
 
@@ -312,10 +308,10 @@ before calling `createWallet`. Skip this step if you configured a relayer
 (which pays deploy fees) or supplied your own funded `deployerKeypair`.
 
 ```kotlin
-// Ensure the default deployer exists on testnet — required when no relayer is
-// configured. The default deployer is deterministic (SHA-256 of a well-known
-// seed), so this preflight is idempotent across processes.
-val deployer = OZSmartAccountConfig.createDefaultDeployer()
+// Ensure the deployer exists on testnet — required when no relayer is
+// configured. kit.getDeployer() returns the configured deployer or the
+// deterministic default (SHA-256 of a well-known seed).
+val deployer = kit.getDeployer()
 try {
     SorobanServer(kit.config.rpcUrl).use { it.getAccount(deployer.getAccountId()) }
 } catch (_: Exception) {
@@ -444,10 +440,7 @@ when (val restored = kit.walletOperations.connectWallet()) {
     is ConnectWalletResult.Connected -> {
         println("Reconnected to ${restored.contractId}")
     }
-    is ConnectWalletResult.Ambiguous -> {
-        // Unreachable for the silent restore path: the saved session
-        // supplies an explicit contractId, which bypasses the cascade.
-    }
+    is ConnectWalletResult.Ambiguous -> { /* unreachable: session supplies contractId */ }
 }
 ```
 
@@ -498,8 +491,7 @@ val direct = kit.walletOperations.connectWallet(
         contractId   = "CABC..."
     )
 )
-// Always returns Connected on success (Ambiguous is by-construction unreachable
-// when contractId is supplied); throws WalletException.NotFound if the
+// Always Connected on success; throws WalletException.NotFound if the
 // contract does not exist on-chain.
 ```
 
@@ -681,6 +673,7 @@ val ed25519Signer = SmartAccountBuilders.createEd25519Signer("CDEF...", publicKe
 val isPasskey: Boolean = SmartAccountBuilders.isExternalSigner(passkey)
 val credId: ByteArray? = SmartAccountBuilders.getCredentialIdFromSigner(passkey)
 val credIdStr: String? = SmartAccountBuilders.getCredentialIdStringFromSigner(passkey) // Base64URL
+val pubKey: ByteArray? = SmartAccountBuilders.getPublicKeyFromSigner(passkey) // 65B webAuthn, 32B ed25519, null delegated
 // describeSignerType is deprecated: map signer types to display labels in your app
 
 // Matching
@@ -752,6 +745,8 @@ if (result.success) {
 // CORRECT: recipient must differ from the smart account's contractId
 ```
 
+To fetch a token's scale once and reuse it: `kit.transactionOperations.fetchTokenDecimals(tokenContract)` (suspend; throws `TransactionException.SimulationFailed` if the contract does not return a valid u32).
+
 `transfer` throws `WalletException.NotConnected` when no wallet is connected. `ValidationException.InvalidAddress` for bad recipient or token contract, `ValidationException.InvalidAmount` for invalid amount, `TransactionException.*` for simulation/submission failures, `WebAuthnException.*` for biometric cancellation.
 
 ### contractCall
@@ -776,6 +771,8 @@ import com.soneso.stellar.sdk.Address
 val args = listOf(
     Scv.toAddress(Address(smartAccountId).toSCAddress()),    // from
     Scv.toAddress(Address(spenderContract).toSCAddress()),   // spender
+    // amountToBaseUnits(amount: String, decimals: Int): BigInteger — rejects negative
+    // amounts and decimals > 38 (ValidationException.InvalidAmount)
     Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),  // amount as i128
     Scv.toUint32(720u)                                       // expiration ledger
 )
@@ -816,16 +813,7 @@ suspend fun submit(
 ): TransactionResult
 ```
 
-The SDK simulates the host function, signs auth entries whose address matches the connected smart account, re-simulates, and submits. Pass an empty `auth` list in most cases — simulation produces the entries. Pre-supplied entries are forwarded unchanged.
-
-```kotlin
-// WRONG: kit.transactionOperations.submit(hostFunction)  — auth is required (pass emptyList())
-// CORRECT:
-val result = kit.transactionOperations.submit(
-    hostFunction = HostFunctionXdr.CreateContract(createContractArgs),
-    auth = emptyList()
-)
-```
+The SDK simulates the host function, signs auth entries whose address matches the connected smart account, re-simulates, and submits. `auth` has no default — pass `emptyList()` in most cases; simulation produces the entries. Pre-supplied entries are forwarded unchanged.
 
 Example — shape of the call for a non-`InvokeContract` host function (CreateContract, UploadWasm):
 
@@ -900,7 +888,7 @@ The SDK handles this automatically — no caller intervention needed.
 
 ### Transaction lifecycle
 
-Each `transfer` / `contractCall` / `executeAndSubmit` call simulates, prompts WebAuthn once per matching auth entry (usually one per transaction), re-simulates, submits, then polls (30 × 3 s for transaction methods; 10 × 2 s for deploy). Relayer vs RPC is auto-selected; override with `forceMethod`.
+Each `transfer` / `contractCall` / `executeAndSubmit` call simulates, prompts WebAuthn once per matching auth entry (usually one per transaction), re-simulates, submits, then polls (30 × 3 s for transaction methods; 10 × 2 s for deploy).
 
 ---
 
@@ -1047,7 +1035,7 @@ class OZExternalSignerManager(
 
 - `networkPassphrase` — forwarded to the adapter's `signAuthEntry` via `SignAuthEntryOptions.networkPassphrase`.
 - `walletAdapter` — backs the wallet (G-address) custody model. When null, only keypair signers are supported.
-- `ed25519Adapter` — backs the Ed25519 adapter custody model; consulted before the in-memory Ed25519 registry (adapter-first precedence).
+- `ed25519Adapter` — backs the Ed25519 adapter custody model.
 
 ### ExternalSignerInfo and ExternalSignerType
 
@@ -1081,13 +1069,16 @@ val address = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJ
 
 Keypair signers take precedence over wallet signers with the same G-address. Throws `SignerException.Invalid` on an invalid seed.
 
-### canSignFor / get / getAll
+### canSignFor / get / getAll / hasSigners
 
 Query methods. `canSignFor` checks keypair signers first (O(1)), then delegates to `walletAdapter.canSignFor`. `getAll` returns keypair signers followed by wallet signers, deduplicated by address (keypair wins).
 
 ```kotlin
 suspend fun canSignFor(address: String): Boolean
+suspend fun get(address: String): ExternalSignerInfo?   // null if no signer for the address
 suspend fun getAll(): List<ExternalSignerInfo>
+suspend fun hasSigners(): Boolean                       // any keypair or connected wallet
+val hasWalletAdapter: Boolean
 ```
 
 ```kotlin
@@ -1124,7 +1115,7 @@ Throws `SignerException.NotFound` if no signer matches the address, or `Transact
 
 ### Ed25519 methods
 
-Ed25519 external signers are keyed by the tuple `(verifierAddress, publicKey)`, matching the on-chain `External(verifier, keyData)` signer slot. Resolution is adapter-first: the configured `config.externalEd25519Adapter` is consulted before the in-memory registry.
+Ed25519 external signers are keyed by the tuple `(verifierAddress, publicKey)`, matching the on-chain `External(verifier, keyData)` signer slot.
 
 ```kotlin
 // Register an in-memory key (raw 32-byte seed, NOT an S-strkey). Returns the derived public key.
@@ -1405,24 +1396,9 @@ data class IndexedPolicy(
     val installParams: JsonElement? = null              // policy-specific JSON
 )
 
-@Serializable
-data class IndexerStatsResponse(val stats: IndexerStats)
-
-@Serializable
-data class IndexerStats(
-    val totalEvents: Long,
-    val uniqueContracts: Long,
-    val uniqueCredentials: Long,
-    val firstLedger: Long,
-    val lastLedger: Long,
-    val eventTypes: List<EventTypeCount>
-)
-
-@Serializable
-data class EventTypeCount(val eventType: String, val count: Long)
-
-@Serializable
-data class HealthCheckResponse(val status: String)      // internal to isHealthy()
+// getStats returns IndexerStatsResponse(stats: IndexerStats(totalEvents,
+// uniqueContracts, uniqueCredentials, firstLedger, lastLedger,
+// eventTypes: List<EventTypeCount(eventType, count)>))
 ```
 
 ```kotlin
@@ -1440,7 +1416,8 @@ data class HealthCheckResponse(val status: String)      // internal to isHealthy
 The contract address for a smart account is deterministic given the same credential ID, deployer, and network passphrase. This property comes directly from how Soroban computes contract IDs.
 
 ```kotlin
-suspend fun SmartAccountUtils.deriveContractAddress(
+// Members of `object SmartAccountUtils`:
+suspend fun deriveContractAddress(
     credentialId: ByteArray,        // raw bytes (NOT Base64URL)
     deployerPublicKey: String,      // G-address of deployer
     networkPassphrase: String
@@ -1481,9 +1458,9 @@ Use this for wallet discovery without an indexer: derive the address, then verif
 ### Also exposed
 
 ```kotlin
-suspend fun SmartAccountUtils.getContractSalt(credentialId: ByteArray): ByteArray
-fun SmartAccountUtils.normalizeSignature(derSignature: ByteArray): ByteArray
-fun SmartAccountUtils.extractPublicKeyFromRegistration(
+suspend fun getContractSalt(credentialId: ByteArray): ByteArray
+fun normalizeSignature(derSignature: ByteArray): ByteArray
+fun extractPublicKeyFromRegistration(
     publicKey: ByteArray? = null,
     authenticatorData: ByteArray? = null,
     attestationObject: ByteArray? = null
@@ -1519,7 +1496,7 @@ Set `deployerKeypair` to a keypair you control for mainnet attribution (wallet-p
 
 ### Custom deployer
 
-Production wallet providers typically use a custom deployer for attribution (their public key appears on-chain on deploys):
+Production wallet providers typically set a custom deployer:
 
 ```kotlin
 val myDeployer = KeyPair.fromSecretSeed(secretSeedCharArray)
@@ -1551,7 +1528,7 @@ Testnet examples throughout this file assume `Network.TESTNET.networkPassphrase`
 - Point `rpcUrl` at a mainnet Soroban RPC (not `https://soroban-testnet.stellar.org`).
 - Stop using FriendBot. `FriendBot.fundTestnetAccount(...)` does NOT throw on mainnet — it hard-codes the testnet friendbot URL and silently sends the request against testnet regardless of your network passphrase, so mainnet accounts never get funded and the call appears to succeed or fail against the wrong network. Fund mainnet accounts out-of-band with real XLM instead.
 - Set `autoFund = false` on `createWallet(...)`. On testnet, `autoFund` transfers XLM from the deployer into the freshly deployed wallet; on mainnet that is a real XLM transfer from whatever mainnet source pays for the call (via the relayer if configured, else the deployer directly). The SDK does not treat `autoFund` specially for relayer routing — whether a relayer sponsors it is a relayer-operator policy question, not an SDK guarantee. Unless you have explicit mainnet funding plumbed through, leave `autoFund = false` and fund wallets out-of-band.
-- Replace the default deployer with a custom `deployerKeypair` for attribution and to avoid the shared-address concerns described above. If you keep the default deployer, fund its G-address with real XLM or configure a relayer.
+- Replace the default deployer with a custom `deployerKeypair` (see Custom deployer above). If you keep the default deployer, fund its G-address with real XLM or configure a relayer.
 - Use a mainnet relayer you operate or contractually trust. Every fee-bump costs real XLM — account for the operational budget.
 - Evaluate the default mainnet indexer. `OZIndexerClient.DEFAULT_INDEXER_URLS` ships with a mainnet entry (an SDF-operated `sdf-ecosystem.workers.dev` endpoint). The default works, but it is a third-party dependency in your data path — for production wallets with privacy or availability requirements, set `indexerUrl` to your own deployment or leave `indexerUrl = null` and rely on deterministic address derivation.
 - Replace any testnet-only contract addresses (WASM hash, WebAuthn verifier, policy contracts) with the corresponding mainnet values. Cross-check against the network passphrase before deploying.
@@ -1596,14 +1573,11 @@ try {
 } catch (e: SmartAccountException) {
     when (e) {
         is WebAuthnException.Cancelled ->
-            // All three platform adapters (Android / Apple / JS) map user
-            // cancellation cleanly to Cancelled — this is the sole branch for
-            // a neutral "user dismissed the prompt" UI state.
+            // The sole branch for "user dismissed the prompt" on all platforms.
             println("User cancelled biometric prompt")
         is WebAuthnException.AuthenticationFailed ->
-            // Non-cancellation WebAuthn failures: no matching credential for
-            // the allow-list, origin / rpId mismatch, user-verification failed,
-            // authenticator timeout, or platform-specific errors.
+            // Non-cancellation failures: no matching credential, rpId mismatch,
+            // user verification failed, timeout.
             println("WebAuthn authentication failed: ${e.message}")
         is WebAuthnException.NotSupported ->
             println("WebAuthn not configured: ${e.message}")
@@ -1640,19 +1614,16 @@ Contract error codes and their meanings live in [smart_accounts_policies.md — 
 
 ---
 
-## Contract Limits
+## Limits and Defaults
 
-OZ smart account contract limits (enforced client-side in `OZConstants` and on-chain):
+Contract limits (enforced client-side in `OZConstants` and on-chain) and the kit
+defaults not stated elsewhere in this page:
 
-| Limit | Value |
-|-------|-------|
+| Constant | Value |
+|----------|-------|
 | `OZConstants.MAX_SIGNERS` (per context rule) | 15 |
 | `OZConstants.MAX_POLICIES` (per context rule) | 5 |
-| `OZConstants.DEFAULT_SESSION_EXPIRY_MS` | 604_800_000 (7 days) |
-| `OZConstants.DEFAULT_TIMEOUT_SECONDS` | 30 |
-| `OZConstants.DEFAULT_RELAYER_TIMEOUT_MS` | 360_000 (6 min) |
-| `OZConstants.DEFAULT_INDEXER_TIMEOUT_MS` | 10_000 |
 | `OZConstants.WEBAUTHN_TIMEOUT_MS` | 60_000 |
-| `OZConstants.FRIENDBOT_RESERVE_XLM` | 5 |
+| `OZConstants.DEFAULT_RELAYER_TIMEOUT_MS` | 360_000 (6 min) |
 
 See [smart_accounts_policies.md](./smart_accounts_policies.md) for adding signers and policies under these limits.

@@ -404,8 +404,7 @@ interface StorageAdapter {
     suspend fun update(credentialId: String, updates: StoredCredentialUpdate)
 
     /**
-     * Clears all credentials and the stored session from storage. Equivalent to a
-     * hard reset of the adapter's contents.
+     * Clears all credentials and the stored session from storage.
      *
      * @throws StorageException.WriteFailed if clearing fails
      */

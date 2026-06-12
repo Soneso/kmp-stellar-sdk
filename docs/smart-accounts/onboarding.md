@@ -71,11 +71,7 @@ SDK methods:
 kit.signerManager.addNewPasskeySigner(contextRuleId = 0u, userName = "Alice")
 
 // Low-level: adds a pre-registered passkey signer with raw cryptographic materials
-kit.signerManager.addPasskey(
-    contextRuleId = 0u,
-    publicKey = secp256r1PublicKey,     // public key from passkey registration
-    credentialId = webAuthnCredentialId // raw credential ID bytes
-)
+kit.signerManager.addPasskey(contextRuleId = 0u, publicKey = secp256r1PublicKey, credentialId = webAuthnCredentialId)
 ```
 
 **Ed25519 (External)**: A 32-byte Ed25519 public key, also verified by a verifier contract. Uses the same on-chain `External` format as passkeys, but `keyData` contains only the 32-byte public key (no credential ID). Traditional Stellar accounts verify Ed25519 natively, but smart accounts are contracts and use Soroban's contract-based authorization, which requires a verifier contract for any signature scheme, including Ed25519.
@@ -84,11 +80,7 @@ On-chain representation: `Vec([Symbol("External"), Address(verifier), Bytes(publ
 
 SDK method:
 ```kotlin
-kit.signerManager.addEd25519(
-    contextRuleId = 0u,
-    verifierAddress = "CVERIFIER...",
-    publicKey = ed25519PublicKey // 32 bytes
-)
+kit.signerManager.addEd25519(contextRuleId = 0u, verifierAddress = "<C-address of the Ed25519 verifier>", publicKey = ed25519PublicKey)
 ```
 
 ---
@@ -105,11 +97,10 @@ Each context rule stores:
 - A name (human-readable string)
 - A list of signers (up to 15)
 - A list of policies (up to 5)
-- An optional expiration ledger number. Rules with an expiration are automatically skipped after that ledger is reached, useful for temporary authorization grants.
+- An optional expiration ledger number. After that ledger is reached, the rule no longer authorizes anything, useful for temporary authorization grants.
 
-Each context rule supports up to 15 signers and 5 policies.
 
-When a transaction requires authorization, the contract collects all non-expired rules that match the operation's context type, plus any Default rules, and evaluates them in order until one satisfies the requirements. Rules for a specific context type (e.g. `CallContract("CBCD1234...")`) are evaluated before Default rules, so Default acts as a fallback when no specific rule is satisfied.
+When a transaction requires authorization, the signature authorizes against one specific context rule, chosen on the client side and bound into the signed payload. A rule is eligible when it matches the operation's context type — either a rule for that specific context (e.g. `CallContract("C...")`) or a Default rule, which matches any operation. The SDK selects an eligible rule automatically based on the operation and the selected signers; the contract then validates exactly that rule. An expired rule fails validation.
 
 SDK methods:
 ```kotlin
@@ -118,12 +109,12 @@ SDK methods:
 // ExternalSigner.webAuthn(...) -- see the Signers section above and
 // the SDK guide for full construction details.
 kit.contextRuleManager.addContextRule(
-    contextType = ContextRuleType.CallContract("CBCD1234..."),
+    contextType = ContextRuleType.CallContract("<C-address of the target contract>"),
     name = "TokenTransfers",
     signers = listOf(delegatedSigner, passkeySigner)
 )
 
-// Get count of active rules
+// Get total count of rules (including expired)
 val count = kit.contextRuleManager.getContextRulesCount()
 
 // Get a specific rule by ID
@@ -134,7 +125,7 @@ val rule = kit.contextRuleManager.getContextRule(0u)
 
 ### Policies
 
-A policy is a constraint enforced when a context rule is used for authorization. Policies are separate Soroban contracts deployed alongside the smart account. Policy contracts (SimpleThreshold, SpendingLimit, WeightedThreshold) are standard contracts provided by OpenZeppelin, typically deployed once per network and shared across all smart accounts. You do not deploy a new policy contract for each account. You need the contract address of each policy type you want to use, similar to the verifier contract. Each context rule can have up to 5 policies.
+A policy is a constraint enforced when a context rule is used for authorization. Policies are separate Soroban contracts. Policy contracts (SimpleThreshold, SpendingLimit, WeightedThreshold) are standard contracts provided by OpenZeppelin, typically deployed once per network and shared across all smart accounts. You do not deploy a new policy contract for each account. You need the contract address of each policy type you want to use, similar to the verifier contract. Each context rule can have up to 5 policies.
 
 OpenZeppelin provides three policy implementations:
 
@@ -144,11 +135,7 @@ On-chain: stores `threshold: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addSimpleThreshold(
-    contextRuleId = 0u,
-    policyAddress = "CPOLICY1234...",
-    threshold = 2u
-)
+kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "<C-address>", threshold = 2u)
 ```
 
 **Spending Limit**: Limits the total token amount spent within a rolling window of ledgers. For example, 1000 tokens per day (approximately 17,280 ledgers at 5 seconds per ledger). The spending limit policy intercepts any contract call where the function name is `transfer` and extracts the amount from the third argument. In practice this is almost always a token contract's `transfer` function. If a non-token contract has a function named `transfer`, the policy will attempt to apply the limit to it as well, so scope spending limit policies to specific token contracts using context rules when this is a concern. Other function names are not subject to spending limits.
@@ -157,12 +144,7 @@ On-chain: stores `spending_limit: i128, period_ledgers: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addSpendingLimit(
-    contextRuleId = 0u,
-    policyAddress = "CPOLICY5678...",
-    spendingLimit = "1000",
-    periodLedgers = Util.LEDGERS_PER_DAY.toUInt() // 17,280
-)
+kit.policyManager.addSpendingLimit(contextRuleId = 0u, policyAddress = "<C-address>", spendingLimit = "1000", periodLedgers = Util.LEDGERS_PER_DAY.toUInt())
 ```
 
 **Weighted Threshold**: Each signer has a weight (vote power). The sum of weights from valid signatures must meet or exceed a threshold. For example, signer A has weight 50, signer B has weight 30, signer C has weight 20, and the threshold is 80. A+B or A+C would pass; B+C would not.
@@ -171,15 +153,10 @@ On-chain: stores `signer_weights: Map<Signer, u32>, threshold: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addWeightedThreshold(
-    contextRuleId = 0u,
-    policyAddress = "CPOLICY9012...",
-    signerWeights = mapOf(signerA to 50u, signerB to 30u, signerC to 20u),
-    threshold = 80u
-)
+kit.policyManager.addWeightedThreshold(contextRuleId = 0u, policyAddress = "<C-address>", signerWeights = mapOf(signerA to 50u, signerB to 30u, signerC to 20u), threshold = 80u)
 ```
 
-The policy interface is generic: any Soroban contract that implements the required `can_enforce()` and `enforce()` functions can be used as a policy. Use `addPolicy` to install one:
+The policy interface is generic: any Soroban contract that implements the required `enforce()`, `install()`, and `uninstall()` functions can be used as a policy. Use `addPolicy` to install one:
 
 ```kotlin
 kit.policyManager.addPolicy(
@@ -208,9 +185,9 @@ After deployment, the deployer has no privileges over the contract. It cannot mo
 
 The SDK provides a default deployer derived from `SHA-256("openzeppelin-smart-account-kit")`, where the hash is used as the Ed25519 seed to generate a deterministic keypair. Because the deployer has no privileges after deployment, its publicly derivable key is not a security concern -- it only matters for address derivation and signing the deployment transaction. This default is suitable for testing and simple deployments. Other OpenZeppelin Smart Account SDK implementations use the same derivation, so all compatible SDKs produce identical results from the same inputs. Production wallet applications will typically use a custom deployer (via `deployerKeypair` in the config) for attribution and traceability, since the deployer's public key is visible on-chain.
 
-When a relayer is configured, the SDK still uses the deployer to derive the contract address and build the deployment transaction, but submits it to the relayer, which wraps it in a fee bump transaction and pays the fees. The deployer account does not need to pay fees in this case, but it must still exist on the network with the minimum XLM reserve. On testnet, the default deployer is automatically funded via Friendbot.
+When a relayer is configured, the SDK still uses the deployer to derive the contract address and build the deployment transaction, but submits it to the relayer, which wraps it in a fee bump transaction and pays the fees. The deployer account does not need to pay fees in this case, but it must still exist on the network with the minimum XLM reserve.
 
-Without a relayer, the deployer pays the deployment fees directly, so you must provide your own funded deployer via `deployerKeypair` in `OZSmartAccountConfig`.
+Without a relayer, the deployer pays the deployment fees directly, so it must be funded before deployment — either fund the default deployer's address externally or provide your own funded deployer via `deployerKeypair` in `OZSmartAccountConfig`.
 
 If you use a custom deployer, an indexer is recommended for wallet discovery, since clients that do not know the deployer keypair cannot derive the contract address independently.
 
@@ -335,13 +312,13 @@ App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles t
 1. On app relaunch, the app calls `connectWallet()` with default options. The SDK checks for a saved session in the `StorageAdapter` (a platform-specific interface for persisting credentials and session data, covered in the [SDK guide](README.md)).
 2. If a valid (non-expired) session exists, the wallet is silently reconnected. No biometric prompt is shown. The SDK loads the credential ID and contract ID from the session and returns `ConnectWalletResult.Connected`. Sessions last 7 days by default, configurable via `sessionExpiryMs` in `OZSmartAccountConfig`.
 3. If no session exists or it has expired, `connectWallet()` returns `null`. The app can then show a "Connect" button and call `connectWallet(ConnectWalletOptions(prompt = true))` when the user taps it, which triggers a WebAuthn biometric prompt.
-4. After authentication, the SDK runs a storage → derivation → indexer cascade to resolve the contract address and verifies it exists on-chain. If the indexer reports the passkey on multiple contracts, the SDK returns `ConnectWalletResult.Ambiguous(candidates)` so the app can let the user pick (see the [SDK guide](README.md#connecting-to-an-existing-wallet) for the picker pattern).
+4. After authentication, the SDK runs a storage → derivation → indexer cascade to resolve the contract address and verifies it exists on-chain. If the indexer reports the passkey on multiple contracts, the SDK returns `ConnectWalletResult.Ambiguous(candidates)` so the app can let the user pick (see the [SDK guide](README.md#reconnecting-to-an-existing-wallet) for the picker pattern).
 
 ---
 
 ## 6. What You Need Before Starting
 
-**Deployed contracts**: For testnet development, pre-deployed contracts are available and you just need their addresses and hashes. The smart account WASM binary is uploaded to the network once and referenced by its SHA-256 hash (a hex string). Individual smart account contracts are then deployed from this WASM. The WebAuthn verifier is a single contract instance shared by all accounts, so it is referenced by its deployed contract address (a `C...` string, 56 characters). The relayer and indexer are optional and can be added later. You do not need to deploy any contracts yourself if you use pre-deployed testnet contracts. Check the OpenZeppelin stellar-contracts repository (https://github.com/OpenZeppelin/stellar-contracts) for current testnet addresses.
+**Deployed contracts**: For testnet development, pre-deployed contracts are available and you just need their addresses and hashes. The smart account WASM binary is uploaded to the network once and referenced by its SHA-256 hash (a hex string). Individual smart account contracts are then deployed from this WASM. The WebAuthn verifier is a single contract instance shared by all accounts, so it is referenced by its deployed contract address (a `C...` string, 56 characters). The relayer and indexer are optional and can be added later. You do not need to deploy any contracts yourself if you use pre-deployed testnet contracts.
 
 Testnet contract hashes can change when contracts are upgraded or testnet is reset. WASM entries may also expire if their TTL is not extended, though they can be restored. Current values are in [DemoConfig.kt](../../smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt). See [Testnet contract addresses](README.md#testnet-contract-addresses) for upload instructions.
 
@@ -353,6 +330,6 @@ Testnet contract hashes can change when contracts are upgraded or testnet is res
 - [macOS](webauthn-macos.md) -- AuthenticationServices configuration
 - [Web](webauthn-web.md) -- Browser WebAuthn API
 
-For testnet development, contract addresses (WASM hash, verifier, policy contracts) are provided by the deployment operator or published alongside the OpenZeppelin contract releases. The SDK guide's configuration reference lists all required addresses. For local development, you can deploy the contracts yourself using the OpenZeppelin stellar-contracts repository.
+For testnet development, current contract addresses (WASM hash, verifier, policy contracts) are listed in the sources referenced above. The SDK guide's configuration reference lists all required addresses. For local development, you can deploy the contracts yourself using the OpenZeppelin stellar-contracts repository.
 
 Once these prerequisites are in place, proceed to the [SDK guide](README.md) for implementation.

@@ -204,8 +204,7 @@ class OZMultiSignerManager internal constructor(
      *
      * @param tokenContract The token contract address (C-address)
      * @param recipient The recipient address (G-address or C-address)
-     * @param amount Decimal amount to transfer (e.g., "100" or "10.5"). Converted to the
-     *   token's base units using the resolved decimals.
+     * @param amount Decimal amount to transfer (e.g., "100" or "10.5")
      * @param decimals The token's decimal scale used to convert [amount] to base units.
      *   When null (default), the token's on-chain `decimals()` is fetched via
      *   [OZTransactionOperations.fetchTokenDecimals]. Supply it to skip the extra

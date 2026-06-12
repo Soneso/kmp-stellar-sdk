@@ -175,8 +175,7 @@ class OZTransactionOperations internal constructor(
      * @param tokenContract The token contract address (C-address). Use the SAC address
      *   for XLM or the token's contract address for custom tokens.
      * @param recipient The recipient address (G-address for accounts, C-address for contracts)
-     * @param amount Decimal amount string (e.g., "10", "100.5"). Converted to the token's
-     *   base units using the resolved decimals.
+     * @param amount Decimal amount string (e.g., "10", "100.5")
      * @param decimals The token's decimal scale used to convert [amount] to base units.
      *   When null (default), the token's on-chain `decimals()` is fetched via
      *   [fetchTokenDecimals]. Supply it to skip the extra simulation round-trip
@@ -245,7 +244,7 @@ class OZTransactionOperations internal constructor(
      * Reads the `decimals()` value from a SEP-41 token contract.
      *
      * Simulates the token contract's `decimals` function and returns the reported
-     * `u32` scale. The simulation is read-only; nothing is submitted on-chain.
+     * `u32` scale.
      *
      * @param tokenContract The SEP-41 token contract address (C-address)
      * @return The token's decimal scale
@@ -1322,8 +1321,7 @@ class OZTransactionOperations internal constructor(
          *
          * Rejects scientific notation, empty or non-numeric strings, values less than
          * or equal to zero, and values carrying more fractional digits than [decimals]
-         * allows. Accepted shape: `^[0-9]+(\.[0-9]+)?$` with at most [decimals]
-         * fractional digits and a result greater than zero.
+         * allows.
          *
          * @param amount Positive decimal amount string (e.g., "10", "100.5")
          * @param decimals The token's decimal scale; must be in `0..MAX_TOKEN_DECIMALS`.
