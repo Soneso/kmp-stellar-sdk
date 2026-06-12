@@ -9,9 +9,9 @@ import SwiftUI
 
 /// A labeled text field with inline validation error display.
 ///
-/// Renders a label above the field and an error message below when `error` is non-nil.
-/// Supports secure input (with show/hide toggle), monospace font for Stellar addresses,
-/// and a disabled state with reduced opacity.
+/// Renders a label above the field and an error message below when `error` is non-nil;
+/// while there is no error, an optional helper text is shown in its place.
+/// Supports monospace font for Stellar addresses and a disabled state with reduced opacity.
 ///
 /// ## Usage
 ///
@@ -22,8 +22,7 @@ import SwiftUI
 ///     error: validationErrors["accountId"],
 ///     placeholder: "G...",
 ///     isMonospace: true,
-///     isEnabled: true,
-///     isSecure: false
+///     isEnabled: true
 /// )
 /// ```
 struct ValidationTextField: View {
@@ -31,28 +30,26 @@ struct ValidationTextField: View {
     @Binding var text: String
     let error: String?
     let placeholder: String
+    let helperText: String?
     let isMonospace: Bool
     let isEnabled: Bool
-    let isSecure: Bool
-
-    @State private var showSecret: Bool = false
 
     init(
         label: String,
         text: Binding<String>,
         error: String? = nil,
         placeholder: String = "",
+        helperText: String? = nil,
         isMonospace: Bool = false,
-        isEnabled: Bool = true,
-        isSecure: Bool = false
+        isEnabled: Bool = true
     ) {
         self.label = label
         self._text = text
         self.error = error
         self.placeholder = placeholder
+        self.helperText = helperText
         self.isMonospace = isMonospace
         self.isEnabled = isEnabled
-        self.isSecure = isSecure
     }
 
     var body: some View {
@@ -64,31 +61,13 @@ struct ValidationTextField: View {
 
             // Input container
             HStack(spacing: 0) {
-                Group {
-                    if isSecure && !showSecret {
-                        SecureField(placeholder, text: $text)
-                    } else {
-                        TextField(placeholder, text: $text)
-                    }
-                }
-                .textFieldStyle(.plain)
-                .font(isMonospace
-                    ? .system(.callout, design: .monospaced)
-                    : .callout)
-                .padding(10)
-                .disabled(!isEnabled)
-
-                // Visibility toggle for secure fields
-                if isSecure {
-                    Button(action: { showSecret.toggle() }) {
-                        Image(systemName: showSecret ? "eye.slash.fill" : "eye.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Material3Colors.onSurfaceVariant)
-                            .frame(width: 36, height: 36)
-                    }
-                    .buttonStyle(.plain)
-                    .help(showSecret ? "Hide" : "Show")
-                }
+                TextField(placeholder, text: $text)
+                    .textFieldStyle(.plain)
+                    .font(isMonospace
+                        ? .system(.callout, design: .monospaced)
+                        : .callout)
+                    .padding(10)
+                    .disabled(!isEnabled)
             }
             .background(Material3Colors.surface)
             .cornerRadius(6)
@@ -103,11 +82,15 @@ struct ValidationTextField: View {
             )
             .opacity(isEnabled ? 1.0 : 0.5)
 
-            // Error message
+            // Error message, or helper text while the input is valid
             if let error = error {
                 Text(error)
                     .font(.footnote)
                     .foregroundColor(Material3Colors.error)
+            } else if let helperText = helperText {
+                Text(helperText)
+                    .font(.footnote)
+                    .foregroundColor(Material3Colors.onSurfaceVariant)
             }
         }
     }

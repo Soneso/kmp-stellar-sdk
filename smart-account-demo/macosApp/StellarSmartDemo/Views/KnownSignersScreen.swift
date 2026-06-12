@@ -12,14 +12,14 @@ import shared
 
 /// Swift value type representing a single unique signer and its rule memberships.
 ///
-/// Created by converting a Kotlin `SignerEntry` so that the view works with native Swift
+/// Created from a `SignerEntryBridge` so that the view works with native Swift value
 /// types and does not retain references to the Kotlin object graph after loading.
 private struct SignerViewModel: Identifiable {
-    /// Unique identifier for SwiftUI diffing — derived from the signer identifier.
+    /// Unique identifier for SwiftUI diffing — derived from the signer type and identifier.
     let id: String
-    /// Signer type tag: "passkey", "delegated", or "ed25519".
+    /// Signer type tag: "passkey", "delegated", "ed25519", or "external".
     let signerType: String
-    /// Display identifier (credential ID, G-address, or hex public key).
+    /// Display identifier (credential ID, G-address, or hex key data).
     let identifier: String
     /// The context rules this signer belongs to.
     let rules: [RuleMembership]
@@ -28,7 +28,7 @@ private struct SignerViewModel: Identifiable {
 /// A single context rule that a signer belongs to.
 private struct RuleMembership {
     /// Numeric rule ID.
-    let ruleId: UInt32
+    let ruleId: Int64
     /// Human-readable rule name, or empty string when unnamed.
     let ruleName: String
     /// Formatted context type description (e.g. "Default (Any Operation)").
@@ -41,15 +41,14 @@ private struct RuleMembership {
 /// all on-chain context rules.
 ///
 /// Mirrors the Compose `KnownSignersScreen` exactly. Loads via
-/// `MacOSBridge.loadAccountSigners()` and converts the Kotlin `SignerEntry` objects to
-/// native Swift view models before rendering.
+/// `MacOSBridge.loadAccountSigners()`, which returns `SignerEntryBridge` values with
+/// pre-classified signer info and pre-formatted rule type descriptions.
 struct KnownSignersScreen: View {
 
     // MARK: - Environment
 
     @EnvironmentObject var bridgeWrapper: MacOSBridgeWrapper
     @EnvironmentObject var appState: AppState
-    @ObservedObject var toastManager: ToastManager
     @Environment(\.dismiss) private var dismiss
 
     // MARK: - Local state
@@ -57,12 +56,6 @@ struct KnownSignersScreen: View {
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
     @State private var signerViewModels: [SignerViewModel] = []
-
-    // MARK: - Init
-
-    init(toastManager: ToastManager) {
-        self.toastManager = toastManager
-    }
 
     // MARK: - Body
 
@@ -75,7 +68,7 @@ struct KnownSignersScreen: View {
                 } else {
                     refreshButton
                     if let error = errorMessage {
-                        errorCard(message: error)
+                        ErrorCard(message: error)
                     }
                     if isLoading && signerViewModels.isEmpty {
                         loadingView
@@ -104,7 +97,7 @@ struct KnownSignersScreen: View {
 
     private var descriptionCard: some View {
         InfoCard(title: "Account Signers", color: .variant) {
-            Text("View all unique signers registered across all context rules on this smart account.")
+            Text("All signers registered on this smart account across all context rules.")
                 .font(.system(size: 13))
                 .foregroundStyle(Material3Colors.onSurfaceVariant)
         }
@@ -135,23 +128,6 @@ struct KnownSignersScreen: View {
             loadingText: "Loading...",
             style: .outlined
         )
-    }
-
-    // MARK: - Error card
-
-    @ViewBuilder
-    private func errorCard(message: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
     }
 
     // MARK: - Loading view
@@ -214,7 +190,7 @@ struct KnownSignersScreen: View {
             isEnabled: true,
             text: "Go Back",
             loadingText: "",
-            style: .outlined
+            style: .filled
         )
     }
 
@@ -229,7 +205,7 @@ struct KnownSignersScreen: View {
         }
         do {
             let rawResult = try await bridgeWrapper.bridge.loadAccountSigners()
-            let entries = KotlinInterop.toArray(rawResult, as: SignerEntry.self)
+            let entries = KotlinInterop.toArray(rawResult, as: SignerEntryBridge.self)
             let viewModels = entries.map { entry in
                 buildSignerViewModel(entry: entry)
             }
@@ -249,80 +225,28 @@ struct KnownSignersScreen: View {
 
     // MARK: - Kotlin interop helpers
 
-    /// Converts a Kotlin `SignerEntry` to a Swift `SignerViewModel`.
+    /// Converts a `SignerEntryBridge` to a Swift `SignerViewModel`.
     ///
-    /// Inspects the concrete Kotlin signer type (`DelegatedSigner` or `ExternalSigner`) to
-    /// determine the display type tag and identifier. Converts the Kotlin `contextRules` list
-    /// to `RuleMembership` values using the ObjC-bridged `ParsedContextRule` properties.
-    private func buildSignerViewModel(entry: SignerEntry) -> SignerViewModel {
-        let signer = entry.signer
-        let signerType: String
-        let identifier: String
-
-        if let delegated = signer as? DelegatedSigner {
-            signerType = "delegated"
-            identifier = delegated.address
-        } else if let external = signer as? ExternalSigner {
-            let keyData = external.keyData
-            // Determine passkey vs Ed25519 by key length:
-            // WebAuthn P-256 keys are 65 bytes (+ credential ID suffix); Ed25519 keys are 32 bytes.
-            if keyData.size <= 32 {
-                signerType = "ed25519"
-                identifier = KotlinInterop.hexString(from: keyData)
-            } else {
-                signerType = "passkey"
-                identifier = bridgeWrapper.bridge.getCredentialIdFromSigner(signer: external) ?? KotlinInterop.hexString(from: keyData)
-            }
-        } else {
-            signerType = "ed25519"
-            identifier = "(unknown)"
-        }
-
-        let ruleMemberships = entry.contextRules.map { rule in
-            buildRuleMembership(rule: rule)
+    /// The bridge delivers the classified signer info and pre-formatted rule type
+    /// descriptions, so this is a value-type copy with no Kotlin type inspection.
+    private func buildSignerViewModel(entry: SignerEntryBridge) -> SignerViewModel {
+        let info = entry.signerInfo
+        let ruleMemberships = KotlinInterop.toArray(
+            entry.ruleMemberships, as: RuleMembershipBridge.self
+        ).map { membership in
+            RuleMembership(
+                ruleId: membership.ruleId,
+                ruleName: membership.ruleName,
+                ruleTypeDescription: membership.typeDescription
+            )
         }
 
         return SignerViewModel(
-            id: "\(signerType):\(identifier)",
-            signerType: signerType,
-            identifier: identifier,
+            id: "\(info.type):\(info.identifier)",
+            signerType: info.type,
+            identifier: info.identifier,
             rules: ruleMemberships
         )
-    }
-
-    /// Converts a Kotlin `ParsedContextRule` to a Swift `RuleMembership`.
-    ///
-    /// The `contextType` sealed class is introspected via ObjC dynamic cast. The Kotlin
-    /// sealed subclasses are exposed with nested Swift names:
-    /// `ContextRuleType.Default`, `ContextRuleType.CallContract`, `ContextRuleType.CreateContract`.
-    private func buildRuleMembership(rule: ParsedContextRule) -> RuleMembership {
-        let ruleId = rule.id
-        let ruleName = rule.name
-        let typeDescription = formatContextType(rule.contextType)
-        return RuleMembership(
-            ruleId: ruleId,
-            ruleName: ruleName,
-            ruleTypeDescription: typeDescription
-        )
-    }
-
-    /// Formats a Kotlin `ContextRuleType` sealed class value to a display string.
-    ///
-    /// Mirrors the Kotlin `formatContextType()` utility in `FormatUtils.kt`.
-    private func formatContextType(_ contextType: ContextRuleType) -> String {
-        if contextType is ContextRuleType.Default {
-            return "Default (Any Operation)"
-        } else if let callContract = contextType as? ContextRuleType.CallContract {
-            let addr = callContract.contractAddress
-            let truncated = KotlinInterop.truncateAddress(addr)
-            return "Call Contract: \(truncated)"
-        } else if let createContract = contextType as? ContextRuleType.CreateContract {
-            let hashBytes = createContract.wasmHash
-            let hex = KotlinInterop.hexString(from: hashBytes)
-            let prefix = String(hex.prefix(8))
-            return "Create Contract: \(prefix)..."
-        }
-        return "Unknown"
     }
 }
 
@@ -344,7 +268,7 @@ private struct SignerEntryRow: View {
 
     private var signerTypeAndIdentifier: some View {
         HStack(alignment: .center, spacing: 8) {
-            SignerBadge(signerType: viewModel.signerType, text: badgeLabel)
+            SignerBadge(signerType: viewModel.signerType)
 
             Text(viewModel.identifier)
                 .font(.system(.caption, design: .monospaced))
@@ -352,16 +276,6 @@ private struct SignerEntryRow: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    /// The badge label for this signer type, mirroring the Compose display logic.
-    private var badgeLabel: String {
-        switch viewModel.signerType.lowercased() {
-        case "passkey":   return "Passkey"
-        case "delegated": return "Stellar Account"
-        case "ed25519":   return "Ed25519"
-        default:          return viewModel.signerType.capitalized
         }
     }
 
@@ -397,13 +311,14 @@ private struct RuleMembershipRow: View {
     // MARK: - Rule ID badge
 
     private var ruleIdBadge: some View {
-        Text("#\(membership.ruleId)")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Material3Colors.primary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Material3Colors.primary.opacity(0.15))
-            .cornerRadius(4)
+        TagPill(
+            text: "#\(membership.ruleId)",
+            font: .system(size: 11, weight: .medium),
+            foreground: Material3Colors.primary,
+            background: Material3Colors.primary.opacity(0.15),
+            horizontalPadding: 6,
+            verticalPadding: 2
+        )
     }
 
     // MARK: - Rule name

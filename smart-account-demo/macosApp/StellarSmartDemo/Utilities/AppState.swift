@@ -68,8 +68,10 @@ final class AppState: ObservableObject {
 
     /// A single parsed entry from the Kotlin `ActivityLogState`.
     struct ActivityLogEntry: Identifiable {
-        /// Stable unique identifier for SwiftUI list diffing.
-        let id = UUID()
+        /// Identifier derived from the entry data (timestamp, level, message, and a
+        /// duplicate ordinal), so rebuilding the array in `syncActivityLog(from:)` keeps
+        /// row identity stable across syncs and SwiftUI only re-renders new rows.
+        let id: String
         /// Human-readable log message.
         let message: String
         /// Severity level: one of `"INFO"`, `"SUCCESS"`, or `"ERROR"`.
@@ -102,15 +104,26 @@ final class AppState: ObservableObject {
     ///
     /// - Parameter bridge: The shared `MacOSBridge` instance.
     func syncActivityLog(from bridge: MacOSBridge) {
-        let kotlinEntries = bridge.getActivityLogEntries()
-        activityLog = (0..<kotlinEntries.count).compactMap { i in
-            guard let entry = kotlinEntries[i] as? ActivityLogEntryBridge else { return nil }
-            return ActivityLogEntry(
+        let bridgeEntries = KotlinInterop.toArray(
+            bridge.getActivityLogEntries(), as: ActivityLogEntryBridge.self
+        )
+        // Entries arrive newest-first. Assign duplicate ordinals from the oldest end so
+        // existing rows keep their identity when new entries are prepended.
+        var occurrenceCounts: [String: Int] = [:]
+        var oldestFirst: [ActivityLogEntry] = []
+        oldestFirst.reserveCapacity(bridgeEntries.count)
+        for entry in bridgeEntries.reversed() {
+            let baseKey = "\(entry.timestampMs):\(entry.level):\(entry.message)"
+            let ordinal = occurrenceCounts[baseKey, default: 0]
+            occurrenceCounts[baseKey] = ordinal + 1
+            oldestFirst.append(ActivityLogEntry(
+                id: "\(baseKey)#\(ordinal)",
                 message: entry.message,
                 level: entry.level,
                 timestamp: Date(timeIntervalSince1970: Double(entry.timestampMs) / 1_000.0)
-            )
+            ))
         }
+        activityLog = oldestFirst.reversed()
     }
 
     /// Clears the activity log both in Swift state and in the Kotlin `ActivityLogState`.

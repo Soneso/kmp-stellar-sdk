@@ -20,6 +20,81 @@ enum SignerConstants {
     static let ed25519SeedHexLength = 64
 }
 
+/// Mutable state for one secret-entry form in the signer picker.
+///
+/// The picker holds two independent instances — one per `Kind` — so the
+/// delegated-key form and the Ed25519-seed form keep separate visibility:
+/// opening one does not close the other.
+struct KeyEntryDraft {
+
+    /// Discriminates the two secret-entry flows and supplies their display strings.
+    enum Kind {
+        /// Stellar secret key (S...) entry for a delegated signer.
+        case secretKey
+        /// Raw 32-byte seed (hex) entry for an Ed25519 signer.
+        case ed25519Seed
+
+        /// Header label for the entry form. The delegated form shows the same
+        /// symmetric address truncation as the signer row; the Ed25519 form shows
+        /// the 8-character public-key prefix.
+        func headerLabel(for identifier: String) -> String {
+            switch self {
+            case .secretKey:
+                return "Secret key for \(KotlinInterop.truncateAddress(identifier, prefixLength: 6, suffixLength: 6))"
+            case .ed25519Seed:
+                return "Ed25519 secret for \(KotlinInterop.truncatePrefix(identifier, length: 8))"
+            }
+        }
+
+        /// Placeholder text for the secure input field.
+        var placeholder: String {
+            switch self {
+            case .secretKey:   return "S..."
+            case .ed25519Seed: return "\(SignerConstants.ed25519SeedHexLength) hex characters"
+            }
+        }
+
+        /// In-memory-only warning shown below the input field.
+        var warningText: String {
+            switch self {
+            case .secretKey:
+                return "Your secret key is stored in memory only and cleared when this sheet closes."
+            case .ed25519Seed:
+                return "Your seed is stored in memory only and cleared when this sheet closes."
+            }
+        }
+    }
+
+    let kind: Kind
+    /// Identifier of the signer currently awaiting key entry; nil when the form is closed.
+    var target: String? = nil
+    /// Current (unverified) secret input.
+    var draft: String = ""
+    /// True while the secret is shown as plain text.
+    var isVisible: Bool = false
+    /// Validation error for the current draft, cleared on every edit.
+    var error: String? = nil
+    /// True while the secret is being verified against the bridge.
+    var isValidating: Bool = false
+
+    /// Opens the form for a signer, clearing any previous draft state.
+    mutating func begin(target identifier: String) {
+        target = identifier
+        draft = ""
+        error = nil
+        isVisible = false
+    }
+
+    /// Closes the form and clears the draft state (cancel, successful verify,
+    /// and sheet re-presentation all route through here).
+    mutating func reset() {
+        target = nil
+        draft = ""
+        error = nil
+        isVisible = false
+    }
+}
+
 /// Modal sheet for selecting one or more signers during a multi-signer transfer.
 ///
 /// Displays available signers grouped by type: passkey, delegated, and Ed25519.
@@ -42,19 +117,22 @@ enum SignerConstants {
 /// SignerPickerSheet(
 ///     signers: availableSigners,
 ///     activeCredentialId: connectedCredentialId,
-///     ed25519VerifierAddress: bridge.getEd25519VerifierAddress(),
+///     description: "Choose which signers co-authorize this transfer. " +
+///         "For Stellar account signers, enter the secret key to enable signing.",
 ///     onConfirm: { selected, secretKeys, ed25519Secrets in
 ///         performTransfer(signers: selected, keys: secretKeys, ed25519Keys: ed25519Secrets)
 ///     },
-///     onDismiss: { showSheet = false }
+///     onDismiss: { showSheet = false },
+///     bridge: bridgeWrapper.bridge
 /// )
 /// ```
 struct SignerPickerSheet: View {
     let signers: [SignerInfoBridge]
     let activeCredentialId: String?
-    /// C-strkey of the Ed25519 verifier contract used to form the identity key
-    /// `"<verifierAddress>:<publicKeyHex>"` passed to the bridge.
-    let ed25519VerifierAddress: String
+    /// Sheet title text.
+    var title: String = "Select Signers"
+    /// Explanatory text shown below the title, specific to the operation being authorized.
+    var description: String = "Choose which signers to use for this transaction."
     let onConfirm: ([SignerInfoBridge], [String: String], [String: String]) -> Void
     let onDismiss: () -> Void
 
@@ -67,23 +145,13 @@ struct SignerPickerSheet: View {
     /// Verified Ed25519 seeds keyed by identity string `"<verifierAddress>:<publicKeyHex>"`.
     @State private var verifiedEd25519Secrets: [String: String] = [:]
 
-    // MARK: - Delegated key entry state
+    // MARK: - Key entry state
 
-    /// Identifier of the delegated signer currently awaiting key entry.
-    @State private var keyEntryTarget: String? = nil
-    @State private var secretKeyDraft: String = ""
-    @State private var secretKeyVisible: Bool = false
-    @State private var secretKeyError: String? = nil
-    @State private var isValidatingKey: Bool = false
+    /// Secret-key entry form state for delegated signers (target is the G-address).
+    @State private var secretKeyEntry = KeyEntryDraft(kind: .secretKey)
 
-    // MARK: - Ed25519 key entry state
-
-    /// Identifier (publicKeyHex) of the Ed25519 signer currently awaiting seed entry.
-    @State private var ed25519KeyEntryTarget: String? = nil
-    @State private var ed25519SeedDraft: String = ""
-    @State private var ed25519SeedVisible: Bool = false
-    @State private var ed25519SeedError: String? = nil
-    @State private var isValidatingEd25519Seed: Bool = false
+    /// Seed entry form state for Ed25519 signers (target is the publicKeyHex identifier).
+    @State private var ed25519SeedEntry = KeyEntryDraft(kind: .ed25519Seed)
 
     // MARK: - Computed groups
 
@@ -126,11 +194,15 @@ struct SignerPickerSheet: View {
                     }
 
                     if !delegatedSigners.isEmpty {
-                        sectionHeader("Delegated Signers")
+                        sectionHeader("Stellar Account Signers")
                         ForEach(delegatedSigners, id: \.identifier) { signer in
                             delegatedRow(signer)
-                            if keyEntryTarget == signer.identifier {
-                                secretKeyForm(for: signer)
+                            if secretKeyEntry.target == signer.identifier {
+                                keyEntryForm(
+                                    for: signer,
+                                    entry: $secretKeyEntry,
+                                    onVerify: { verifySecretKey(for: signer) }
+                                )
                             }
                         }
                     }
@@ -139,8 +211,12 @@ struct SignerPickerSheet: View {
                         sectionHeader("Ed25519 Signers")
                         ForEach(ed25519Signers, id: \.identifier) { signer in
                             ed25519Row(signer)
-                            if ed25519KeyEntryTarget == signer.identifier {
-                                ed25519SeedForm(for: signer)
+                            if ed25519SeedEntry.target == signer.identifier {
+                                keyEntryForm(
+                                    for: signer,
+                                    entry: $ed25519SeedEntry,
+                                    onVerify: { verifyEd25519Seed(for: signer) }
+                                )
                             }
                         }
                     }
@@ -171,7 +247,7 @@ struct SignerPickerSheet: View {
 
     private var sheetHeader: some View {
         HStack {
-            Text("Select Signers")
+            Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(Material3Colors.onSurface)
@@ -193,7 +269,7 @@ struct SignerPickerSheet: View {
     // MARK: - Description
 
     private var descriptionText: some View {
-        Text("Choose which signers to use for this transaction. The transaction will be authorized by all selected signers.")
+        Text(description)
             .font(.callout)
             .foregroundColor(Material3Colors.onSurfaceVariant)
             .fixedSize(horizontal: false, vertical: true)
@@ -230,16 +306,16 @@ struct SignerPickerSheet: View {
                         .foregroundColor(Material3Colors.onSurface)
 
                     if isActive {
-                        Text("Active")
-                            .font(.caption2)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Material3Colors.logSuccess)
-                            .cornerRadius(3)
+                        TagPill(
+                            text: "Active",
+                            background: Material3Colors.logSuccess,
+                            horizontalPadding: 6,
+                            verticalPadding: 2,
+                            cornerRadius: 3
+                        )
                     }
                 }
-                Text(truncated(signer.identifier, prefix: 16))
+                Text(KotlinInterop.truncatePrefix(signer.identifier, length: 16))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(Material3Colors.onSurfaceVariant)
             }
@@ -318,13 +394,13 @@ struct SignerPickerSheet: View {
             Spacer()
 
             if isAuthorized {
-                Text("Verified")
-                    .font(.caption2)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Material3Colors.logSuccess)
-                    .cornerRadius(3)
+                TagPill(
+                    text: "Verified",
+                    background: Material3Colors.logSuccess,
+                    horizontalPadding: 6,
+                    verticalPadding: 2,
+                    cornerRadius: 3
+                )
             } else if !isEnteringKey {
                 Button(action: onEnterKeyTap) {
                     HStack(spacing: 4) {
@@ -362,10 +438,12 @@ struct SignerPickerSheet: View {
 
     private func delegatedRow(_ signer: SignerInfoBridge) -> some View {
         let hasKey = verifiedSecretKeys[signer.identifier] != nil
-        let isEnteringKey = keyEntryTarget == signer.identifier
-        let displayName = signer.displayName.isEmpty
-            ? truncated(signer.identifier, prefix: 8)
-            : signer.displayName
+        let isEnteringKey = secretKeyEntry.target == signer.identifier
+        // The truncated G-address identifies the account; the signer type is already
+        // conveyed by the section header and the badge.
+        let displayName = KotlinInterop.truncateAddress(
+            signer.identifier, prefixLength: 6, suffixLength: 6
+        )
 
         return signerRow(
             signer: signer,
@@ -376,29 +454,7 @@ struct SignerPickerSheet: View {
             pendingStatusText: "Enter secret key to enable signing",
             badgeType: "delegated",
             onToggle: { toggleSelection(signer.identifier) },
-            onEnterKeyTap: {
-                keyEntryTarget = signer.identifier
-                secretKeyDraft = ""
-                secretKeyError = nil
-                secretKeyVisible = false
-            }
-        )
-    }
-
-    // MARK: - Secret key entry form (delegated signers)
-
-    private func secretKeyForm(for signer: SignerInfoBridge) -> some View {
-        signerSecretInputCard(
-            headerLabel: "Secret key for \(truncated(signer.identifier, prefix: 8))",
-            placeholder: "S...",
-            warningText: "Your secret key is stored in memory only and cleared when this sheet closes.",
-            draft: $secretKeyDraft,
-            isVisible: $secretKeyVisible,
-            validationError: secretKeyError,
-            onDraftChange: { secretKeyError = nil },
-            isValidating: isValidatingKey,
-            onVerify: { verifySecretKey(for: signer) },
-            onCancel: cancelKeyEntry
+            onEnterKeyTap: { secretKeyEntry.begin(target: signer.identifier) }
         )
     }
 
@@ -407,9 +463,9 @@ struct SignerPickerSheet: View {
     private func ed25519Row(_ signer: SignerInfoBridge) -> some View {
         let identityKey = ed25519IdentityKey(for: signer)
         let hasSeed = verifiedEd25519Secrets[identityKey] != nil
-        let isEnteringSeed = ed25519KeyEntryTarget == signer.identifier
+        let isEnteringSeed = ed25519SeedEntry.target == signer.identifier
         let displayName = signer.displayName.isEmpty
-            ? truncated(signer.identifier, prefix: 8)
+            ? KotlinInterop.truncatePrefix(signer.identifier, length: 8)
             : signer.displayName
 
         return signerRow(
@@ -421,29 +477,32 @@ struct SignerPickerSheet: View {
             pendingStatusText: "Enter seed to enable signing",
             badgeType: "ed25519",
             onToggle: { toggleSelection(signer.identifier) },
-            onEnterKeyTap: {
-                ed25519KeyEntryTarget = signer.identifier
-                ed25519SeedDraft = ""
-                ed25519SeedError = nil
-                ed25519SeedVisible = false
-            }
+            onEnterKeyTap: { ed25519SeedEntry.begin(target: signer.identifier) }
         )
     }
 
-    // MARK: - Ed25519 seed entry form
+    // MARK: - Key entry form
 
-    private func ed25519SeedForm(for signer: SignerInfoBridge) -> some View {
-        signerSecretInputCard(
-            headerLabel: "Ed25519 seed for \(truncated(signer.identifier, prefix: 8))",
-            placeholder: "\(SignerConstants.ed25519SeedHexLength) hex characters",
-            warningText: "Your seed is stored in memory only and cleared when this sheet closes.",
-            draft: $ed25519SeedDraft,
-            isVisible: $ed25519SeedVisible,
-            validationError: ed25519SeedError,
-            onDraftChange: { ed25519SeedError = nil },
-            isValidating: isValidatingEd25519Seed,
-            onVerify: { verifyEd25519Seed(for: signer) },
-            onCancel: cancelEd25519SeedEntry
+    /// Secret-entry form for the signer currently targeted by `entry`. The form
+    /// kind supplies the header, placeholder, and warning strings; verification
+    /// stays signer-type-specific via `onVerify`.
+    private func keyEntryForm(
+        for signer: SignerInfoBridge,
+        entry: Binding<KeyEntryDraft>,
+        onVerify: @escaping () -> Void
+    ) -> some View {
+        let kind = entry.wrappedValue.kind
+        return signerSecretInputCard(
+            headerLabel: kind.headerLabel(for: signer.identifier),
+            placeholder: kind.placeholder,
+            warningText: kind.warningText,
+            draft: entry.draft,
+            isVisible: entry.isVisible,
+            validationError: entry.wrappedValue.error,
+            onDraftChange: { entry.wrappedValue.error = nil },
+            isValidating: entry.wrappedValue.isValidating,
+            onVerify: onVerify,
+            onCancel: { entry.wrappedValue.reset() }
         )
     }
 
@@ -586,14 +645,8 @@ struct SignerPickerSheet: View {
         selectedIds.removeAll()
         verifiedSecretKeys.removeAll()
         verifiedEd25519Secrets.removeAll()
-        keyEntryTarget = nil
-        secretKeyDraft = ""
-        secretKeyError = nil
-        secretKeyVisible = false
-        ed25519KeyEntryTarget = nil
-        ed25519SeedDraft = ""
-        ed25519SeedError = nil
-        ed25519SeedVisible = false
+        secretKeyEntry.reset()
+        ed25519SeedEntry.reset()
 
         if let credId = activeCredentialId {
             if let passkey = passkeySigners.first(where: { $0.identifier == credId }) {
@@ -612,39 +665,22 @@ struct SignerPickerSheet: View {
 
     // MARK: - Delegated key entry actions
 
-    private func cancelKeyEntry() {
-        keyEntryTarget = nil
-        secretKeyDraft = ""
-        secretKeyError = nil
-        secretKeyVisible = false
-    }
-
     private func verifySecretKey(for signer: SignerInfoBridge) {
-        let trimmed = secretKeyDraft.trimmingCharacters(in: .whitespaces)
+        let trimmed = secretKeyEntry.draft.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
-        secretKeyError = nil
+        secretKeyEntry.error = nil
 
         // Format validation: Stellar secret keys start with S and are strkeySecretLength characters.
         guard trimmed.hasPrefix("S"), trimmed.count == SignerConstants.strkeySecretLength else {
-            secretKeyError = "Invalid secret key. Must start with S and be \(SignerConstants.strkeySecretLength) characters."
+            secretKeyEntry.error = "Invalid secret key. Must start with S and be \(SignerConstants.strkeySecretLength) characters."
             return
         }
 
-        guard let bridge = self.bridge else {
-            // No bridge available (preview path): store optimistically.
-            verifiedSecretKeys[signer.identifier] = trimmed
-            selectedIds.insert(signer.identifier)
-            keyEntryTarget = nil
-            secretKeyDraft = ""
-            secretKeyVisible = false
-            return
-        }
-
-        isValidatingKey = true
+        secretKeyEntry.isValidating = true
 
         Task { @MainActor in
-            defer { isValidatingKey = false }
+            defer { secretKeyEntry.isValidating = false }
             do {
                 let matchesObj = try await bridge.validateDelegatedKey(
                     secretSeed: trimmed,
@@ -653,37 +689,28 @@ struct SignerPickerSheet: View {
                 if matchesObj.boolValue {
                     verifiedSecretKeys[signer.identifier] = trimmed
                     selectedIds.insert(signer.identifier)
-                    keyEntryTarget = nil
-                    secretKeyDraft = ""
-                    secretKeyVisible = false
+                    secretKeyEntry.reset()
                 } else {
-                    secretKeyError = "Secret key does not derive the expected account ID for this signer."
+                    secretKeyEntry.error = "Secret key does not derive the expected account ID for this signer."
                 }
             } catch {
-                secretKeyError = "Validation failed: \(error.localizedDescription)"
+                secretKeyEntry.error = "Validation failed: \(error.localizedDescription)"
             }
         }
     }
 
     // MARK: - Ed25519 seed entry actions
 
-    private func cancelEd25519SeedEntry() {
-        ed25519KeyEntryTarget = nil
-        ed25519SeedDraft = ""
-        ed25519SeedError = nil
-        ed25519SeedVisible = false
-    }
-
     private func verifyEd25519Seed(for signer: SignerInfoBridge) {
-        let trimmed = ed25519SeedDraft.trimmingCharacters(in: .whitespaces).lowercased()
+        let trimmed = ed25519SeedEntry.draft.trimmingCharacters(in: .whitespaces).lowercased()
         guard !trimmed.isEmpty else { return }
 
-        ed25519SeedError = nil
+        ed25519SeedEntry.error = nil
 
         // Format validation: ed25519SeedSizeBytes-byte raw seed = ed25519SeedHexLength hex characters.
         guard trimmed.count == SignerConstants.ed25519SeedHexLength,
               trimmed.allSatisfy({ $0.isHexDigit }) else {
-            ed25519SeedError = "Invalid seed. Must be exactly \(SignerConstants.ed25519SeedHexLength) hex characters (\(SignerConstants.ed25519SeedSizeBytes) bytes)."
+            ed25519SeedEntry.error = "Invalid seed. Must be exactly \(SignerConstants.ed25519SeedHexLength) hex characters (\(SignerConstants.ed25519SeedSizeBytes) bytes)."
             return
         }
 
@@ -691,20 +718,10 @@ struct SignerPickerSheet: View {
         let expectedPubKeyHex = signer.identifier
         let identityKey = ed25519IdentityKey(for: signer)
 
-        isValidatingEd25519Seed = true
+        ed25519SeedEntry.isValidating = true
 
         Task { @MainActor in
-            defer { isValidatingEd25519Seed = false }
-            guard let bridge = self.bridge else {
-                // No bridge available (preview path): store optimistically.
-                verifiedEd25519Secrets[identityKey] = trimmed
-                selectedIds.insert(signer.identifier)
-                ed25519KeyEntryTarget = nil
-                ed25519SeedDraft = ""
-                ed25519SeedVisible = false
-                return
-            }
-
+            defer { ed25519SeedEntry.isValidating = false }
             do {
                 let matchesObj = try await bridge.validateEd25519Key(
                     secretHex: trimmed,
@@ -713,14 +730,12 @@ struct SignerPickerSheet: View {
                 if matchesObj.boolValue {
                     verifiedEd25519Secrets[identityKey] = trimmed
                     selectedIds.insert(signer.identifier)
-                    ed25519KeyEntryTarget = nil
-                    ed25519SeedDraft = ""
-                    ed25519SeedVisible = false
+                    ed25519SeedEntry.reset()
                 } else {
-                    ed25519SeedError = "Seed does not match this signer's public key. Verify you entered the correct seed."
+                    ed25519SeedEntry.error = "Seed does not match this signer's public key. Verify you entered the correct seed."
                 }
             } catch {
-                ed25519SeedError = "Validation failed: \(error.localizedDescription)"
+                ed25519SeedEntry.error = "Validation failed: \(error.localizedDescription)"
             }
         }
     }
@@ -734,22 +749,16 @@ struct SignerPickerSheet: View {
 
     /// Builds the bridge identity key `"<verifierAddress>:<publicKeyHex>"` for an Ed25519 signer.
     ///
-    /// The signer's `identifier` is the hex-encoded public key. The verifier address is
-    /// provided by the caller as `ed25519VerifierAddress`.
+    /// The signer's `identifier` is the hex-encoded public key. The verifier address is the
+    /// signer's own `verifierAddress`, populated by the bridge for every external signer.
     private func ed25519IdentityKey(for signer: SignerInfoBridge) -> String {
-        "\(ed25519VerifierAddress):\(signer.identifier)"
-    }
-
-    private func truncated(_ value: String, prefix length: Int) -> String {
-        guard value.count > length else { return value }
-        return String(value.prefix(length)) + "..."
+        "\(signer.verifierAddress ?? ""):\(signer.identifier)"
     }
 
     // MARK: - Bridge reference for key validation
 
-    /// Optional reference to the Kotlin bridge used for delegated and Ed25519 key validation.
+    /// Reference to the Kotlin bridge used for delegated and Ed25519 key validation.
     ///
     /// Set by the parent view via the `bridge` parameter when constructing this sheet.
-    /// When nil the picker falls back to optimistic acceptance (useful in Xcode previews).
-    var bridge: MacOSBridge? = nil
+    let bridge: MacOSBridge
 }

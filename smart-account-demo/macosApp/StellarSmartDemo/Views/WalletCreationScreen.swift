@@ -61,7 +61,7 @@ struct WalletCreationScreen: View {
             VStack(spacing: 16) {
                 descriptionCard
                 usernameField
-                if let error = errorMessage { errorCard(message: error) }
+                if let error = errorMessage { ErrorCard(message: error) }
                 if let info = infoMessage { infoCard(message: info) }
                 if isLoading { progressCard }
                 if createResult == nil && !isLoading { autoSubmitToggle }
@@ -98,23 +98,6 @@ struct WalletCreationScreen: View {
             placeholder: "Enter a display name for your passkey",
             isEnabled: !isLoading && createResult == nil
         )
-    }
-
-    // MARK: - Error Card
-
-    @ViewBuilder
-    private func errorCard(message: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
     }
 
     // MARK: - Info Card (user cancellation)
@@ -316,32 +299,32 @@ struct WalletCreationScreen: View {
 
     @ViewBuilder
     private func balanceSection(result: WalletCreationResult) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Balance")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundStyle(Material3Colors.primary)
+        BalanceRows(
+            label: "Balance",
+            labelColor: Material3Colors.primary,
+            values: balanceValues(result: result),
+            valueFont: .system(.callout, design: .monospaced),
+            valueColor: Material3Colors.onPrimaryContainer
+        )
+    }
 
-            Text("\(result.xlmBalance) XLM")
-                .font(.system(.callout, design: .monospaced))
-                .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-            if let demoBalance = result.demoTokenBalance {
-                Text("\(demoBalance) DEMO")
-                    .font(.system(.callout, design: .monospaced))
-                    .foregroundStyle(Material3Colors.onPrimaryContainer)
-            }
+    /// Formatted balance lines: XLM always, DEMO only when minted during provisioning.
+    private func balanceValues(result: WalletCreationResult) -> [String] {
+        var values = ["\(result.xlmBalance) XLM"]
+        if let demoBalance = result.demoTokenBalance {
+            values.append("\(demoBalance) DEMO")
         }
+        return values
     }
 
     @ViewBuilder
     private func warningBanner(text: String) -> some View {
         Text(text)
             .font(.system(size: 13))
-            .foregroundStyle(Color(red: 0.902, green: 0.318, blue: 0.000)) // Orange 900
+            .foregroundStyle(Material3Colors.warningText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(Color(red: 1.0, green: 0.953, blue: 0.878)) // Orange 50
+            .background(Material3Colors.warningBackground)
             .cornerRadius(6)
     }
 
@@ -378,14 +361,17 @@ struct WalletCreationScreen: View {
                 await MainActor.run {
                     let message = error.localizedDescription
                     if bridgeWrapper.bridge.isUserCancellation(message: message) {
-                        self.infoMessage = "Passkey registration cancelled by user."
+                        self.infoMessage = "Passkey registration cancelled by user"
+                        ActivityLogState.shared.info(message: "User cancelled passkey registration")
                     } else {
                         self.errorMessage =
                             "Failed to create wallet: \(message)\n\n" +
                             "If a passkey was registered before the failure, " +
                             "go to Connect Wallet and check Pending Deployments " +
                             "to retry the deployment."
+                        ActivityLogState.shared.error(message: message)
                     }
+                    appState.syncActivityLog(from: bridgeWrapper.bridge)
                     self.isLoading = false
                 }
             }

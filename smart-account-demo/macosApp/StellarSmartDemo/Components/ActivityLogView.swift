@@ -9,9 +9,9 @@ import SwiftUI
 
 /// Scrollable activity log section that displays timestamped, level-coded entries.
 ///
-/// Each entry row shows a fixed-width timestamp, a level badge (INFO / SUCCESS / ERROR),
+/// Each entry row shows a fixed-width timestamp, a level badge (INFO / OK / ERR),
 /// and the message text. Clicking a row copies its message to the clipboard.
-/// The header displays an entry count and a "Clear" button.
+/// The header displays an entry count and a "Clear" button, disabled while the log is empty.
 ///
 /// ## Usage
 ///
@@ -38,20 +38,20 @@ struct ActivityLogView: View {
 
                 Spacer()
 
-                if !entries.isEmpty {
-                    Button(action: onClear) {
-                        Text("Clear")
-                            .font(.caption)
-                            .foregroundColor(Material3Colors.primary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Material3Colors.primary, lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
+                Button(action: onClear) {
+                    Text("Clear")
+                        .font(.caption)
+                        .foregroundColor(Material3Colors.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Material3Colors.primary, lineWidth: 1)
+                        )
                 }
+                .buttonStyle(.plain)
+                .disabled(entries.isEmpty)
+                .opacity(entries.isEmpty ? 0.5 : 1.0)
             }
 
             if entries.isEmpty {
@@ -126,20 +126,20 @@ private struct LogEntryRow: View {
 
     private var levelBadge: some View {
         let (label, color) = levelStyle
-        return Text(label)
-            .font(.caption2)
-            .foregroundColor(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color)
-            .cornerRadius(3)
+        return TagPill(
+            text: label,
+            background: color,
+            horizontalPadding: 6,
+            verticalPadding: 2,
+            cornerRadius: 3
+        )
     }
 
     private var levelStyle: (String, Color) {
         switch entry.level.uppercased() {
-        case "SUCCESS": return ("SUCCESS", Material3Colors.logSuccess)
-        case "ERROR":   return ("ERROR",   Material3Colors.logError)
-        default:        return ("INFO",    Material3Colors.logInfo)
+        case "SUCCESS": return ("OK",   Material3Colors.logSuccess)
+        case "ERROR":   return ("ERR",  Material3Colors.logError)
+        default:        return ("INFO", Material3Colors.logInfo)
         }
     }
 }

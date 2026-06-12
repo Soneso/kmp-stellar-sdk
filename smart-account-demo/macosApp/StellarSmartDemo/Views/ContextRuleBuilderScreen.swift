@@ -61,7 +61,11 @@ struct ContextRuleBuilderScreen: View {
                 }
 
                 if let msg = viewModel.errorMessage {
-                    errorCard(message: msg)
+                    ErrorCard(message: msg, font: .callout)
+                }
+
+                if viewModel.signersForPickerLoadFailed {
+                    signerLoadWarning
                 }
 
                 // Edit mode result card.
@@ -97,22 +101,23 @@ struct ContextRuleBuilderScreen: View {
             if viewModel.isEditing {
                 await viewModel.loadRuleForEdit(bridge: bridge)
             } else {
-                // Load available signers for create mode multi-signer authorization
-                do {
-                    let signerInfos = try await bridge.loadAvailableSigners()
-                    let loaded = KotlinInterop.toArray(signerInfos, as: SignerInfoBridge.self)
-                    viewModel.availableSignersForPicker = loaded
-                    viewModel.signersForPickerLoaded = true
-                } catch {
-                    viewModel.signersForPickerLoaded = true
+                // Load available signers for create mode multi-signer authorization.
+                // On failure, single-signer creation stays usable; the load-failed
+                // flag drives the multi-signer-unavailable warning.
+                let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridge)
+                if !result.loadFailed {
+                    viewModel.availableSignersForPicker = result.signers
                 }
+                viewModel.signersForPickerLoaded = true
+                viewModel.signersForPickerLoadFailed = result.loadFailed
             }
         }
         .sheet(isPresented: $viewModel.showSignerPicker) {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                description: "Choose which signers co-authorize editing this context rule. " +
+                    "For Stellar account signers, enter the secret key to enable signing.",
                 onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showSignerPicker = false
                     Task {
@@ -135,7 +140,8 @@ struct ContextRuleBuilderScreen: View {
             SignerPickerSheet(
                 signers: viewModel.availableSignersForPicker,
                 activeCredentialId: appState.credentialId,
-                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                description: "Choose which signers co-authorize creating this context rule. " +
+                    "For Stellar account signers, enter the secret key to enable signing.",
                 onConfirm: { selected, secretKeys, ed25519Secrets in
                     viewModel.showCreateSignerPicker = false
                     Task {
@@ -203,15 +209,15 @@ struct ContextRuleBuilderScreen: View {
         .padding(.vertical, 32)
     }
 
-    // MARK: - Error Card
+    // MARK: - Signer Load Warning
 
-    private func errorCard(message: String) -> some View {
-        InfoCard(color: .error) {
-            Text(message)
-                .font(.callout)
-                .foregroundColor(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-        }
+    /// Non-blocking notice that the signer list could not be loaded. Single-signer
+    /// submissions keep working; only the multi-signer picker is unavailable.
+    private var signerLoadWarning: some View {
+        Text("Could not load signers — multi-signer operations unavailable")
+            .font(.footnote)
+            .foregroundColor(Material3Colors.badgeExpiryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Edit Mode Result Card
@@ -220,9 +226,9 @@ struct ContextRuleBuilderScreen: View {
     private func editResultCard(_ result: EditResult) -> some View {
         let bgColor: Color = {
             if result.success && !result.partialDueToAuthGuard {
-                return Color(red: 0.298, green: 0.686, blue: 0.314).opacity(0.12) // green
+                return Material3Colors.logSuccess.opacity(0.12)
             } else if result.partialDueToAuthGuard {
-                return Color(red: 0.129, green: 0.588, blue: 0.953).opacity(0.12) // blue
+                return Material3Colors.logInfo.opacity(0.12)
             } else {
                 return Material3Colors.errorContainer
             }
@@ -230,9 +236,9 @@ struct ContextRuleBuilderScreen: View {
 
         let titleColor: Color = {
             if result.success && !result.partialDueToAuthGuard {
-                return Color(red: 0.180, green: 0.490, blue: 0.196)
+                return Material3Colors.badgePoliciesText
             } else if result.partialDueToAuthGuard {
-                return Color(red: 0.082, green: 0.396, blue: 0.753)
+                return Material3Colors.badgeSignersText
             } else {
                 return Material3Colors.onErrorContainer
             }
@@ -281,7 +287,7 @@ struct ContextRuleBuilderScreen: View {
             if let authMsg = result.authGuardMessage {
                 Text(authMsg)
                     .font(.callout)
-                    .foregroundColor(Color(red: 0.082, green: 0.396, blue: 0.753))
+                    .foregroundColor(Material3Colors.badgeSignersText)
             }
 
             if let error = result.error {
@@ -343,7 +349,7 @@ struct ContextRuleBuilderScreen: View {
             }
         }
         .padding(16)
-        .background(Color(red: 0.129, green: 0.588, blue: 0.953).opacity(0.08))
+        .background(Material3Colors.logInfo.opacity(0.08))
         .cornerRadius(8)
     }
 
@@ -452,13 +458,13 @@ struct ContextRuleBuilderScreen: View {
                     .font(.callout)
                     .foregroundColor(isEmpty
                         ? Material3Colors.onSurfaceVariant
-                        : Color(red: 0.082, green: 0.396, blue: 0.753))
+                        : Material3Colors.badgeSignersText)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isEmpty
                 ? Material3Colors.surfaceVariant
-                : Color(red: 0.129, green: 0.588, blue: 0.953).opacity(0.08))
+                : Material3Colors.logInfo.opacity(0.08))
             .cornerRadius(8)
         }
     }
@@ -482,6 +488,10 @@ struct ContextRuleBuilderScreen: View {
 
             LoadingButton(
                 action: {
+                    // Synchronous in-flight guard: a second tap in the same runloop tick
+                    // would otherwise spawn a second submission task before the published
+                    // isSubmitting state disables the button.
+                    guard !viewModel.isSubmitting else { return }
                     if viewModel.isEditing {
                         // For edit mode, check if diff is empty first.
                         let diff = viewModel.computeEditDiff()
@@ -495,7 +505,7 @@ struct ContextRuleBuilderScreen: View {
                 isLoading: viewModel.isSubmitting,
                 isEnabled: isSubmitEnabled,
                 icon: viewModel.isEditing ? "pencil" : "plus.circle",
-                text: viewModel.isEditing ? "Update Context Rule" : "Create Context Rule",
+                text: viewModel.isEditing ? "Apply Changes" : "Create Context Rule",
                 loadingText: "Submitting...",
                 style: .filled
             )

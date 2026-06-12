@@ -55,10 +55,14 @@ data class PolicyInfoBridge(
  *   - "delegated": the G-address of the Stellar account.
  *   - "ed25519": lowercase hex-encoded 32-byte public key.
  *   - "passkey": Base64URL-encoded credential ID (used to look up the full signer from context rules).
+ * @property isPending True only for passkeys registered via the WebAuthn ceremony in the current
+ *   editing session, i.e. a local pending credential exists and is cleaned up once the signer is
+ *   added on-chain. False for reused passkeys and all other signer types.
  */
 data class SignerDescriptor(
     val type: String,
-    val value: String
+    val value: String,
+    val isPending: Boolean
 )
 
 /**
@@ -119,21 +123,55 @@ data class ParsedRuleBridge(
  * Aggregates the data needed to render a signer row and determine whether it can
  * participate in a multi-signer transfer without exposing SDK signer types to Swift.
  *
- * @property type Signer type: "passkey", "delegated", or "ed25519".
+ * @property type Signer type: "passkey", "delegated", "ed25519", or "external".
  * @property displayName Human-readable label shown in the picker.
  * @property identifier Stable identifier: credential ID for passkey, G-address for delegated,
- *   hex public key prefix for Ed25519.
+ *   hex-encoded key data for Ed25519 and other external signers.
  * @property canSign Whether the app currently has the credentials to sign with this signer.
  * @property keyData Hex-encoded full key data for passkey signers (needed to reconstruct the
  *   [com.soneso.stellar.sdk.smartaccount.core.ExternalSigner] for the transfer call). Null for
  *   non-passkey signers.
+ * @property verifierAddress Verifier contract C-address of the signer for external signers
+ *   (passkey, Ed25519, other external verifiers). Null for delegated signers, which have no
+ *   verifier contract.
  */
 data class SignerInfoBridge(
     val type: String,
     val displayName: String,
     val identifier: String,
     val canSign: Boolean,
-    val keyData: String?
+    val keyData: String?,
+    val verifierAddress: String?
+)
+
+/**
+ * A context rule membership row for the account-signers screen.
+ *
+ * @property ruleId On-chain context rule ID as Long (converted from UInt to avoid
+ *   Objective-C unsigned integer boxing).
+ * @property ruleName The rule's human-readable name, or empty string when unnamed.
+ * @property typeDescription Pre-formatted context type description
+ *   (e.g. "Default (Any Operation)" or "Call Contract: CABC...WXYZ").
+ */
+data class RuleMembershipBridge(
+    val ruleId: Long,
+    val ruleName: String,
+    val typeDescription: String
+)
+
+/**
+ * A unique account signer with its context rule memberships, suitable for Swift consumption.
+ *
+ * Replaces the SDK [com.soneso.smartdemo.flows.SignerEntry] for Swift interop: the signer is
+ * pre-classified into a [SignerInfoBridge] and the rule memberships are pre-formatted, so the
+ * Swift side renders without inspecting Kotlin sealed class types.
+ *
+ * @property signerInfo Classified signer display info.
+ * @property ruleMemberships All context rules this signer appears in.
+ */
+data class SignerEntryBridge(
+    val signerInfo: SignerInfoBridge,
+    val ruleMemberships: List<RuleMembershipBridge>
 )
 
 /**
@@ -183,6 +221,9 @@ data class ContextRuleEditDiffBridge(
  * @property authGuardMessage Message explaining the auth context guard, or null if not triggered.
  * @property error Error message if [success] is false.
  * @property failedStep Description of the step that failed, or null on success.
+ * @property transactionHashes Hashes of the transactions submitted by the completed
+ *   operations, in execution order (also populated for the operations that succeeded
+ *   before a failure).
  */
 data class ContextRuleEditResultBridge(
     val success: Boolean,

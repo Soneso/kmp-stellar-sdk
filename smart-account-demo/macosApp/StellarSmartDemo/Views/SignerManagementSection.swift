@@ -95,13 +95,14 @@ struct SignerManagementSection: View {
                         .truncationMode(.middle)
 
                     if signer.isOriginal {
-                        Text("on-chain")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Material3Colors.primary.opacity(0.7))
-                            .cornerRadius(3)
+                        TagPill(
+                            text: "on-chain",
+                            font: .system(size: 9, weight: .medium),
+                            background: Material3Colors.primary.opacity(0.7),
+                            horizontalPadding: 5,
+                            verticalPadding: 1,
+                            cornerRadius: 3
+                        )
                     }
                 }
 
@@ -247,37 +248,57 @@ struct SignerManagementSection: View {
                 .foregroundColor(Material3Colors.signerPasskey)
 
             Text(
-                "You can reuse a signer already registered on an existing context rule, " +
-                "or register a new passkey signer for this context rule."
+                viewModel.isEditing
+                    ? "You can reuse a signer from any existing context rule, " +
+                      "or register a new passkey signer for this context rule."
+                    : "You can reuse a signer already registered on an existing context rule, " +
+                      "or register a new passkey signer for this context rule."
             )
             .font(.caption)
             .foregroundColor(Material3Colors.onSurfaceVariant)
 
-            // Load existing passkeys button
-            LoadingButton(
-                action: { Task { await viewModel.loadAvailablePasskeys(bridge: bridge) } },
-                isLoading: viewModel.isLoadingPasskeys,
-                isEnabled: !viewModel.isLoadingPasskeys && !viewModel.isRegistering &&
-                           !viewModel.isSubmitting && !viewModel.passkeysLoaded,
-                text: "Reuse Signer",
-                loadingText: "Loading..."
-            )
-
-            // Available passkeys list
-            if viewModel.passkeysLoaded {
-                if viewModel.availablePasskeys.isEmpty {
-                    Text("No existing passkey signers found on this account.")
-                        .font(.caption)
-                        .foregroundColor(Material3Colors.onSurfaceVariant)
-                } else {
+            if viewModel.isEditing {
+                // Edit mode: signers from all on-chain rules are already loaded with the
+                // rule, so they are listed directly without a load button.
+                if !viewModel.allOnChainSigners.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Available signers from existing context rules:")
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(Material3Colors.onSurface)
 
-                        ForEach(viewModel.availablePasskeys, id: \.identifier) { passkey in
-                            availablePasskeyRow(passkey)
+                        ForEach(viewModel.allOnChainSigners, id: \.identifier) { signer in
+                            onChainSignerRow(signer)
+                        }
+                    }
+                }
+            } else {
+                // Create mode: passkey signers are loaded on demand.
+                LoadingButton(
+                    action: { Task { await viewModel.loadAvailablePasskeys(bridge: bridge) } },
+                    isLoading: viewModel.isLoadingPasskeys,
+                    isEnabled: !viewModel.isLoadingPasskeys && !viewModel.isRegistering &&
+                               !viewModel.isSubmitting && !viewModel.passkeysLoaded,
+                    text: "Reuse Signer",
+                    loadingText: "Loading..."
+                )
+
+                // Available passkeys list
+                if viewModel.passkeysLoaded {
+                    if viewModel.availablePasskeys.isEmpty {
+                        Text("No existing passkey signers found on this account.")
+                            .font(.caption)
+                            .foregroundColor(Material3Colors.onSurfaceVariant)
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Available signers from existing context rules:")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(Material3Colors.onSurface)
+
+                            ForEach(viewModel.availablePasskeys, id: \.identifier) { passkey in
+                                availablePasskeyRow(passkey)
+                            }
                         }
                     }
                 }
@@ -322,7 +343,7 @@ struct SignerManagementSection: View {
     }
 
     private func availablePasskeyRow(_ passkey: SignerInfoBridge) -> some View {
-        let alreadyAdded = viewModel.isPasskeyAlreadyAdded(passkey)
+        let alreadyAdded = viewModel.isSignerAlreadyAdded(passkey)
         let displayName = passkey.displayName.isEmpty
             ? KotlinInterop.truncateAddress(passkey.identifier, prefixLength: 8, suffixLength: 8)
             : passkey.displayName
@@ -333,6 +354,51 @@ struct SignerManagementSection: View {
             HStack(spacing: 8) {
                 SignerBadge(signerType: "passkey")
                 Text(alreadyAdded ? "\(displayName) (already added)" : "Add: \(displayName)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(alreadyAdded
+                        ? Material3Colors.onSurfaceVariant
+                        : Material3Colors.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
+            .background(
+                alreadyAdded
+                    ? Material3Colors.surface
+                    : Material3Colors.primaryContainer
+            )
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Material3Colors.outline, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(alreadyAdded || viewModel.isSubmitting)
+        .opacity(alreadyAdded ? 0.6 : 1.0)
+    }
+
+    /// Row in the edit-mode reuse list for a signer from another on-chain rule.
+    ///
+    /// Any signer type can be reused (passkey, delegated, Ed25519). Adding applies the
+    /// same validation as the other add paths; the entry is staged with `isPending`
+    /// false because no local pending credential exists for a reused signer.
+    private func onChainSignerRow(_ signer: SignerInfoBridge) -> some View {
+        let alreadyAdded = viewModel.isSignerAlreadyAdded(signer)
+        let display = viewModel.onChainSignerDisplay(signer)
+
+        return Button(action: {
+            if !alreadyAdded && viewModel.addSignerFromOnChainList(signer) {
+                ActivityLogState.shared.success(message: "Added signer: \(display)")
+                appState.syncActivityLog(from: bridge)
+            }
+        }) {
+            HStack(spacing: 8) {
+                SignerBadge(signerType: signer.type)
+                Text(alreadyAdded ? "\(display) (already added)" : "Add: \(display)")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(alreadyAdded
                         ? Material3Colors.onSurfaceVariant

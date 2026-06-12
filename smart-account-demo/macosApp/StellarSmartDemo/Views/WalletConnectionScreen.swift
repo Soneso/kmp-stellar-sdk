@@ -82,8 +82,6 @@ struct WalletConnectionScreen: View {
     /// prompt is not required.
     @State private var ambiguousState: AmbiguousState? = nil
 
-    // All sections are always expanded (no collapse/expand toggle).
-
     // MARK: - Derived state
 
     /// `true` when no section is currently loading and the kit is fully initialized.
@@ -93,8 +91,7 @@ struct WalletConnectionScreen: View {
 
     /// `true` when the contract address input is a valid Stellar contract address.
     private var isAddressValid: Bool {
-        let trimmed = contractAddressInput.trimmingCharacters(in: .whitespaces)
-        return trimmed.hasPrefix("C") && trimmed.count == 56
+        FormValidation.validateContractId(contractAddressInput) == nil
     }
 
     // MARK: - Body
@@ -245,7 +242,7 @@ struct WalletConnectionScreen: View {
                 text: $contractAddressInput,
                 error: contractAddressInput.trimmingCharacters(in: .whitespaces).isEmpty
                     ? nil
-                    : (isAddressValid ? nil : "Must be a C-address (56 characters starting with C)"),
+                    : FormValidation.validateContractId(contractAddressInput),
                 placeholder: "C...",
                 isMonospace: true,
                 isEnabled: activeSection == nil
@@ -409,12 +406,7 @@ struct WalletConnectionScreen: View {
             } catch {
                 await MainActor.run {
                     activeSection = nil
-                    let msg = error.localizedDescription
-                    if bridgeWrapper.bridge.isUserCancellation(message: msg) {
-                        autoConnectError = "Connection cancelled."
-                    } else {
-                        autoConnectError = msg
-                    }
+                    handleConnectError(error, errorSetter: { autoConnectError = $0 })
                 }
             }
         }
@@ -437,26 +429,16 @@ struct WalletConnectionScreen: View {
             } catch {
                 await MainActor.run {
                     activeSection = nil
-                    let msg = error.localizedDescription
-                    if bridgeWrapper.bridge.isUserCancellation(message: msg) {
-                        indexerError = "Connection cancelled."
-                    } else {
-                        indexerError = msg
-                    }
+                    handleConnectError(error, errorSetter: { indexerError = $0 })
                 }
             }
         }
     }
 
-    /// Attempts to connect to a known contract address.
-    ///
-    /// - Parameter prefilledAddress: When provided, used directly instead of
-    ///   reading the user-entered field. The picker flow uses this to finalize
-    ///   an Ambiguous result without requiring the user to retype an address.
-    private func performAddressConnect(prefilledAddress: String? = nil) {
+    /// Attempts to connect to the user-entered contract address.
+    private func performAddressConnect() {
         clearAllErrors()
-        let address = prefilledAddress
-            ?? contractAddressInput.trimmingCharacters(in: .whitespaces)
+        let address = contractAddressInput.trimmingCharacters(in: .whitespaces)
         activeSection = .address
         Task {
             do {
@@ -472,15 +454,25 @@ struct WalletConnectionScreen: View {
             } catch {
                 await MainActor.run {
                     activeSection = nil
-                    let msg = error.localizedDescription
-                    if bridgeWrapper.bridge.isUserCancellation(message: msg) {
-                        addressError = "Connection cancelled."
-                    } else {
-                        addressError = msg
-                    }
+                    handleConnectError(error, errorSetter: { addressError = $0 })
                 }
             }
         }
+    }
+
+    /// Routes a thrown connect error to the section's inline error and the activity log.
+    ///
+    /// User cancellation is logged informationally and shows no inline error; any other
+    /// failure sets the inline error and logs it.
+    private func handleConnectError(_ error: Error, errorSetter: (String) -> Void) {
+        let msg = error.localizedDescription
+        if bridgeWrapper.bridge.isUserCancellation(message: msg) {
+            ActivityLogState.shared.info(message: "Passkey authentication cancelled")
+        } else {
+            errorSetter(msg)
+            ActivityLogState.shared.error(message: "Connection failed: \(msg)")
+        }
+        appState.syncActivityLog(from: bridgeWrapper.bridge)
     }
 
     /// Handles a bridge connect result by routing to the right state update.
@@ -541,7 +533,12 @@ struct WalletConnectionScreen: View {
             } catch {
                 await MainActor.run {
                     activeSection = nil
-                    addressError = error.localizedDescription
+                    let msg = error.localizedDescription
+                    addressError = msg
+                    // Finalize has no WebAuthn ceremony, so there is no cancellation
+                    // case to filter; every failure is logged.
+                    ActivityLogState.shared.error(message: "Connection failed: \(msg)")
+                    appState.syncActivityLog(from: bridgeWrapper.bridge)
                 }
             }
         }
@@ -573,8 +570,20 @@ struct WalletConnectionScreen: View {
         activeSection = .pending(credential.credentialId)
         Task {
             do {
-                _ = try await bridgeWrapper.bridge.deletePendingCredential(credentialId: credential.credentialId)
-                await MainActor.run { activeSection = nil }
+                let deleted = try await bridgeWrapper.bridge.deletePendingCredential(
+                    credentialId: credential.credentialId
+                )
+                await MainActor.run {
+                    activeSection = nil
+                    // The flow returns false when the credential could not be removed
+                    // from local storage; surface it instead of silently keeping the row.
+                    if !deleted.boolValue {
+                        toastManager.show(
+                            "Delete failed: credential could not be removed from storage",
+                            isError: true
+                        )
+                    }
+                }
                 await loadPending()
             } catch {
                 await MainActor.run {
@@ -593,7 +602,11 @@ struct WalletConnectionScreen: View {
             let list = try await bridgeWrapper.bridge.loadPendingCredentials()
             pendingCredentials = KotlinInterop.toArray(list, as: StoredCredential.self)
         } catch {
-            // Non-fatal — the section simply stays hidden
+            // Non-fatal — the section simply stays hidden; record the cause.
+            ActivityLogState.shared.error(
+                message: "Failed to load pending credentials: \(error.localizedDescription)"
+            )
+            appState.syncActivityLog(from: bridgeWrapper.bridge)
         }
     }
 }
@@ -603,8 +616,9 @@ struct WalletConnectionScreen: View {
 /// Sheet shown when a connect flow returns an `Ambiguous` bridge result.
 ///
 /// The user picks one contract from the candidate list; the parent
-/// `WalletConnectionScreen` then re-runs the connect via
-/// `performAddressConnect(prefilledAddress:)` with the chosen address.
+/// `WalletConnectionScreen` routes the selection through
+/// `performFinalizeConnect`, which reuses the credential ID from the
+/// original authentication so no second WebAuthn prompt is required.
 private struct ContractPickerSheet: View {
     let candidates: [String]
     let onCancel: () -> Void
@@ -688,7 +702,7 @@ private struct ContractCandidateRow: View {
                 Text("Smart Account")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Material3Colors.onSurface)
-                Text(truncate(address, prefixCount: 8, suffixCount: 8))
+                Text(KotlinInterop.truncateAddress(address, prefixLength: 8, suffixLength: 8))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(Material3Colors.onSurfaceVariant)
             }
@@ -705,12 +719,5 @@ private struct ContractCandidateRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
-    }
-
-    private func truncate(_ value: String, prefixCount: Int, suffixCount: Int) -> String {
-        guard value.count > prefixCount + suffixCount else { return value }
-        let prefix = value.prefix(prefixCount)
-        let suffix = value.suffix(suffixCount)
-        return "\(prefix)...\(suffix)"
     }
 }

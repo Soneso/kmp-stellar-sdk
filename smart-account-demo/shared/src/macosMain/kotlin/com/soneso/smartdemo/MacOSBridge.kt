@@ -42,8 +42,6 @@ import com.soneso.smartdemo.flows.DeployAndProvisionResult
 import com.soneso.smartdemo.flows.deployPendingAndProvision
 import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.flows.transfer
-import com.soneso.smartdemo.flows.updateContextRuleName
-import com.soneso.smartdemo.flows.updateContextRuleValidUntil
 import com.soneso.smartdemo.flows.ContextRuleEditDiff
 import com.soneso.smartdemo.flows.EditSignerEntry
 import com.soneso.smartdemo.flows.EditPolicyEntry
@@ -57,11 +55,11 @@ import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.util.buildSimpleThresholdScVal
 import com.soneso.smartdemo.util.buildSpendingLimitScVal
 import com.soneso.smartdemo.util.buildWeightedThresholdScVal
+import com.soneso.smartdemo.util.describeSignerType
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.hexToByteArray
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.toHexString
-import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.smartaccount.AppleWebAuthnProvider
 import com.soneso.stellar.sdk.smartaccount.UserDefaultsStorageAdapter
@@ -72,7 +70,6 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.OZBuilders
-import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import com.soneso.stellar.sdk.smartaccount.oz.SelectedSigner
 import com.soneso.stellar.sdk.smartaccount.oz.StoredCredential
@@ -82,7 +79,6 @@ import platform.AuthenticationServices.ASAuthorizationController
 import platform.AuthenticationServices.ASAuthorizationControllerPresentationContextProvidingProtocol
 import platform.AuthenticationServices.ASPresentationAnchor
 import platform.darwin.NSObject
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
@@ -167,6 +163,25 @@ private fun ConnectWalletResult.toBridgeResult(): WalletConnectionBridgeResult =
  * - Converting UInt values to Int/Long to avoid Objective-C boxing issues.
  * - Reconstructing complex Kotlin types (SelectedSigner, FlowPolicyEntry) from simple bridge types.
  *
+ * Error conventions:
+ * - User operations that can partially succeed return result data classes
+ *   ([TransferResult], [ApproveResult], [ContextRuleResult], [ContextRuleEditResultBridge])
+ *   with a `success` flag and an optional error message.
+ * - Submission paths throw to abort: an exception means nothing further was attempted and the
+ *   Swift caller surfaces the message in its error UI.
+ * - The connect family ([quickConnect], [manualConnect], [connectWithAddress]) returns null
+ *   on failure with the cause recorded in the activity log; [fetchAllowance] returns null
+ *   on failure without logging.
+ *
+ * DTO boundary: new bridge methods return `*Bridge` DTOs (see `BridgeTypes.kt`); existing
+ * methods that return raw SDK/flow types ([loadPendingCredentials], [loadContextRules],
+ * [registerPasskeySigner]) are converted when next substantially touched.
+ *
+ * Threading: all bridge methods must be called from the main thread. Kotlin/Native's
+ * Objective-C-export restriction on suspend functions enforces this at runtime (no
+ * `objcExportSuspendFunctionLaunchThreadRestriction` override is set), and bridge session
+ * state relies on it.
+ *
  * WebAuthn on macOS requires:
  * - macOS 13.0+ (Ventura) for passkey support.
  * - Associated Domains entitlement configured in the Xcode project.
@@ -177,11 +192,6 @@ class MacOSBridge {
     // =========================================================================
     // MARK: - Initialization
     // =========================================================================
-
-    /**
-     * Returns the bridge version string.
-     */
-    fun getVersion(): String = "0.1.0"
 
     /**
      * Initializes the Smart Account Kit with macOS-specific providers and runs the full
@@ -262,8 +272,8 @@ class MacOSBridge {
      * @return Bridge result. When non-null, exactly one of `connected` and
      *   `ambiguous` is set. `ambiguous` indicates the indexer reported the
      *   passkey on more than one contract; Swift should show a picker and
-     *   then call [connectWithAddress] with the chosen contract. Null means
-     *   no wallet was found or restored.
+     *   then call [finalizeConnect] with the credential ID from the result
+     *   and the chosen contract. Null means no wallet was found or restored.
      * @throws Exception if the WebAuthn ceremony or network call fails.
      */
     @Throws(Exception::class)
@@ -285,8 +295,9 @@ class MacOSBridge {
      *
      * Supplying an explicit contractId bypasses the SDK's discovery cascade,
      * so the result is always the connected arm (or null on failure). This
-     * is the path Swift uses to finalize an ambiguous result after the user
-     * picks from the candidates surfaced by [quickConnect] or [manualConnect].
+     * is the manual address-entry path: Swift calls it when the user types a
+     * contract address directly. (Ambiguous results are finalized via
+     * [finalizeConnect] instead, which reuses the authenticated credential.)
      *
      * @param contractAddress C-address of the smart account contract.
      * @return Bridge result with the connected arm populated, or null if the
@@ -338,8 +349,9 @@ class MacOSBridge {
     /**
      * Deploys a pending wallet and provisions it with XLM and DEMO tokens.
      *
-     * Combines deployment with DEMO token minting and balance refresh. Both Compose
-     * and macOS Swift call this to get identical post-deploy provisioning.
+     * Combines deployment with DEMO token minting and balance refresh by delegating
+     * to the shared flow the Compose app also uses, so Swift gets identical
+     * post-deploy provisioning.
      *
      * @param credentialId Base64URL-encoded credential ID of the pending deployment.
      * @param onProgress Callback for progress messages shown in the UI.
@@ -413,7 +425,23 @@ class MacOSBridge {
         tokenContract: String,
         recipient: String,
         amount: String
-    ): TransferResult = com.soneso.smartdemo.flows.transfer(tokenContract, recipient, amount)
+    ): TransferResult = com.soneso.smartdemo.flows.transfer(
+        tokenContract = tokenContract,
+        recipient = recipient,
+        amount = amount,
+        decimals = knownTokenDecimals(tokenContract)
+    )
+
+    /**
+     * Returns the known decimal scale for the demo's two tokens (XLM SAC and the DEMO
+     * token, both 7), or null for any other contract so the SDK fetches the scale
+     * on-chain. Passing the known scale skips one read-only simulation per transfer.
+     */
+    private fun knownTokenDecimals(tokenContract: String): Int? = when (tokenContract) {
+        DemoConfig.NATIVE_TOKEN_CONTRACT -> 7 // XLM SAC scale
+        DemoState.demoTokenContractId -> DemoConfig.DEMO_TOKEN_DECIMALS
+        else -> null
+    }
 
     /**
      * Transfers tokens using an explicit list of signers.
@@ -454,6 +482,7 @@ class MacOSBridge {
             tokenContract = tokenContract,
             recipient = recipient,
             amount = amount,
+            decimals = knownTokenDecimals(tokenContract),
             selectedSigners = selectedSigners,
             delegatedKeyPairs = toDelegatedKeyPairs(delegatedSecretKeys),
             ed25519Secrets = toEd25519Secrets(ed25519SecretKeys)
@@ -547,12 +576,28 @@ class MacOSBridge {
     /**
      * Loads all unique signers registered on the connected smart account.
      *
-     * @return List of [SignerEntry] (SDK type), each with a unique signer and rule memberships.
+     * Each [SignerEntry] from the flow is converted to a [SignerEntryBridge]: the signer is
+     * classified via [convertSignerInfoToBridge] and each rule membership carries a
+     * pre-formatted context type description, so Swift renders without inspecting Kotlin
+     * sealed class types.
+     *
+     * @return List of [SignerEntryBridge], each with a unique signer and its rule memberships.
      * @throws IllegalStateException if the kit is not initialized.
      */
     @Throws(Exception::class)
-    suspend fun loadAccountSigners(): List<SignerEntry> =
-        com.soneso.smartdemo.flows.loadAccountSigners()
+    suspend fun loadAccountSigners(): List<SignerEntryBridge> =
+        com.soneso.smartdemo.flows.loadAccountSigners().map { entry ->
+            SignerEntryBridge(
+                signerInfo = convertSignerInfoToBridge(entry.signer, canSign = false),
+                ruleMemberships = entry.contextRules.map { rule ->
+                    RuleMembershipBridge(
+                        ruleId = rule.id.toLong(),
+                        ruleName = rule.name,
+                        typeDescription = formatContextType(rule.contextType)
+                    )
+                }
+            )
+        }
 
     // =========================================================================
     // MARK: - Context Rules
@@ -596,41 +641,6 @@ class MacOSBridge {
         ) {
             com.soneso.smartdemo.flows.removeContextRule(ruleId.toUInt(), selectedSigners)
         }
-    }
-
-    /**
-     * Updates the name of an existing context rule.
-     *
-     * Requires passkey authentication.
-     *
-     * @param ruleId Rule ID as an Int (converted to UInt internally).
-     * @param name New name to store on-chain.
-     * @return [ContextRuleResult] with success flag and transaction hash.
-     */
-    @Throws(Exception::class)
-    suspend fun updateContextRuleName(ruleId: Int, name: String): ContextRuleResult =
-        com.soneso.smartdemo.flows.updateContextRuleName(ruleId.toUInt(), name)
-
-    /**
-     * Updates the expiry of an existing context rule.
-     *
-     * If [validUntilOffset] is non-null, the bridge resolves the absolute ledger by adding
-     * the offset to the current ledger sequence. Pass null to remove the expiry.
-     *
-     * Requires passkey authentication.
-     *
-     * @param ruleId Rule ID as an Int (converted to UInt internally).
-     * @param validUntilOffset Ledger offset from now, or null to clear the expiry.
-     * @return [ContextRuleResult] with success flag and transaction hash.
-     */
-    @Throws(Exception::class)
-    suspend fun updateContextRuleValidUntil(ruleId: Int, validUntilOffset: Int?): ContextRuleResult {
-        val absoluteLedger: UInt? = if (validUntilOffset != null) {
-            resolveAbsoluteLedger(validUntilOffset.toUInt())
-        } else {
-            null
-        }
-        return com.soneso.smartdemo.flows.updateContextRuleValidUntil(ruleId.toUInt(), absoluteLedger)
     }
 
     /**
@@ -888,20 +898,6 @@ class MacOSBridge {
     /** Returns the WebAuthn verifier contract address. */
     fun getWebauthnVerifierAddress(): String = DemoConfig.WEBAUTHN_VERIFIER_ADDRESS
 
-    /**
-     * Returns the maximum number of signers allowed per context rule.
-     *
-     * The OpenZeppelin smart account contract enforces a per-rule signer limit.
-     */
-    fun getMaxSigners(): Int = OZConstants.MAX_SIGNERS
-
-    /**
-     * Returns the maximum number of policies allowed per context rule.
-     *
-     * The OpenZeppelin smart account contract enforces a per-rule policy limit.
-     */
-    fun getMaxPolicies(): Int = OZConstants.MAX_POLICIES
-
     /** Returns the approximate number of ledgers per hour (at ~5 s/ledger). */
     fun getLedgersPerHour(): Int = Util.LEDGERS_PER_HOUR.toInt()
 
@@ -911,33 +907,6 @@ class MacOSBridge {
     // =========================================================================
     // MARK: - Utility Methods
     // =========================================================================
-
-    /**
-     * Formats a context type tag and optional parameter into a human-readable display string.
-     *
-     * @param contextTypeName Context type tag: "default", "call_contract", or "create_contract".
-     * @param contextTypeParam Contract address or WASM hash hex. Null for "default".
-     * @return Human-readable string such as "Default (Any Operation)" or "Call Contract: ABCD...WXYZ".
-     */
-    fun formatContextType(contextTypeName: String, contextTypeParam: String?): String {
-        val type = buildContextRuleTypeNoThrow(contextTypeName, contextTypeParam)
-        return formatContextType(type)
-    }
-
-    /**
-     * Returns a human-readable description of a signer type string.
-     *
-     * @param signerType Signer type string: "passkey", "delegated", or "ed25519".
-     * @return Display string such as "Passkey (WebAuthn)", "Stellar Account", or "Ed25519".
-     */
-    fun describeSignerType(signerType: String): String {
-        return when (signerType.lowercase()) {
-            "passkey" -> "Passkey (WebAuthn)"
-            "delegated" -> "Stellar Account"
-            "ed25519" -> "Ed25519"
-            else -> signerType
-        }
-    }
 
     /**
      * Truncates an address string for display by keeping a prefix and suffix separated by "...".
@@ -975,11 +944,12 @@ class MacOSBridge {
     /**
      * Validates that a secret seed derives the expected Stellar G-address.
      *
+     * Never throws: any decoding or derivation failure returns false.
+     *
      * @param secretSeed The secret seed (S...) to validate.
      * @param expectedAddress The expected G-address.
      * @return True if the seed derives the expected address.
      */
-    @Throws(Exception::class)
     suspend fun validateDelegatedKey(secretSeed: String, expectedAddress: String): Boolean {
         return try {
             val keypair = KeyPair.fromSecretSeed(secretSeed)
@@ -995,12 +965,13 @@ class MacOSBridge {
      * Decodes [secretHex] to 32 bytes, derives the corresponding [KeyPair], and compares
      * the derived 32-byte public key to [expectedPublicKeyHex].
      *
+     * Never throws: any decoding or derivation failure returns false.
+     *
      * @param secretHex Lowercase hex string encoding the 32-byte raw Ed25519 seed.
      * @param expectedPublicKeyHex Lowercase hex string encoding the expected 32-byte public key.
      * @return `true` when the derived public key matches [expectedPublicKeyHex] byte-for-byte.
      *   `false` on any decoding failure, wrong-length input, or key mismatch.
      */
-    @Throws(Exception::class)
     suspend fun validateEd25519Key(secretHex: String, expectedPublicKeyHex: String): Boolean {
         return try {
             val seedBytes = hexToByteArray(secretHex)
@@ -1031,6 +1002,8 @@ class MacOSBridge {
      *   for in-process Ed25519 co-signers. Empty if none.
      * @param onProgress Callback for per-operation progress messages.
      * @return [ContextRuleEditResultBridge] with completion details or error.
+     * @throws IllegalStateException if a new-signer descriptor or removed signer ID cannot be
+     *   resolved against the on-chain context rules.
      */
     @Throws(Exception::class)
     suspend fun submitContextRuleEdits(
@@ -1041,7 +1014,9 @@ class MacOSBridge {
         onProgress: (String) -> Unit
     ): ContextRuleEditResultBridge {
         // Load rules once; derive passkey signers from the same snapshot to avoid a second RPC call.
-        val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
+        // A fetch failure propagates: new and removed signers are resolved against this snapshot,
+        // so continuing without it would silently drop requested operations.
+        val rules = loadContextRules()
         val allPasskeySigners = extractPasskeySigners(rules)
 
         // Build new signer entries from descriptors.
@@ -1052,47 +1027,43 @@ class MacOSBridge {
                 signer = signer,
                 onChainId = null,
                 isOriginal = false,
-                isPending = desc.type.lowercase() == "passkey"
+                isPending = desc.isPending
             )
         }
 
         // Build removed signer entries (need on-chain IDs and signer objects for the flow).
-        val removedSignerEntries = editDiff.removedSignerIds.mapNotNull { signerId ->
+        val removedSignerEntries = editDiff.removedSignerIds.map { signerId ->
             val rule = rules.flatMap { r ->
                 r.signers.mapIndexedNotNull { i, s ->
                     if (r.signerIds.getOrNull(i)?.toInt() == signerId) Pair(s, r.signerIds[i])
                     else null
                 }
             }.firstOrNull()
-            if (rule != null) {
-                EditSignerEntry(
-                    signer = rule.first,
-                    onChainId = rule.second,
-                    isOriginal = true
-                )
-            } else {
-                ActivityLogState.error("Could not find signer with on-chain ID $signerId for removal")
-                null
+            if (rule == null) {
+                // Fail the whole submission: silently dropping the removal would
+                // leave the signer on the rule while the UI reports success.
+                val message = "Could not find signer with on-chain ID $signerId for removal"
+                ActivityLogState.error(message)
+                throw IllegalStateException(message)
             }
+            EditSignerEntry(
+                signer = rule.first,
+                onChainId = rule.second,
+                isOriginal = true
+            )
         }
 
-        // Build policy entries (new, removed, modified).
+        // Build policy entries (new, removed, modified). Weighted threshold weights may
+        // reference new, removed, or existing signers, so SCVal encoding resolves against
+        // the combined signer pool.
+        val stagedSigners = newSignerEntries.map { it.signer } +
+            removedSignerEntries.map { it.signer }
+        val existingSigners = rules.flatMap { it.signers }
+        val allSigners = (stagedSigners + existingSigners)
+            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+
         val newPolicyEntries = editDiff.newPolicyDescriptors.map { desc ->
-            val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
-            val signers = newSignerEntries.map { it.signer } +
-                removedSignerEntries.map { it.signer }
-            // Also resolve signers from existing rule for weighted threshold weight resolution.
-            val existingSigners = rules.flatMap { it.signers }
-            val allSigners = (signers + existingSigners).distinctBy { SmartAccountBuilders.getSignerKey(it) }
-            val scVal = buildPolicyScVal(desc, allSigners)
-            EditPolicyEntry(
-                info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
-                label = known?.name ?: "Unknown Policy",
-                address = desc.policyAddress,
-                scVal = scVal,
-                onChainId = null,
-                isOriginal = false
-            )
+            toEditPolicyEntry(desc, allSigners, onChainId = null, modified = false)
         }
 
         val removedPolicyEntries = editDiff.removedPolicyIds.map { policyId ->
@@ -1107,18 +1078,10 @@ class MacOSBridge {
         }
 
         val modifiedPolicyEntries = editDiff.modifiedPolicyDescriptors.mapIndexed { index, desc ->
-            val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
-            val existingSigners = rules.flatMap { it.signers }
-                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-            val scVal = buildPolicyScVal(desc, existingSigners)
-            val onChainId = editDiff.modifiedPolicyIds.getOrNull(index)?.toUInt()
-            EditPolicyEntry(
-                info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
-                label = known?.name ?: "Unknown Policy",
-                address = desc.policyAddress,
-                scVal = scVal,
-                onChainId = onChainId,
-                isOriginal = true,
+            toEditPolicyEntry(
+                desc,
+                allSigners,
+                onChainId = editDiff.modifiedPolicyIds.getOrNull(index)?.toUInt(),
                 modified = true
             )
         }
@@ -1266,25 +1229,36 @@ class MacOSBridge {
 
     /**
      * Loads all unique passkey signers currently registered on-chain across all context rules.
-     * Returns an empty list if rule loading fails.
+     *
+     * @throws Exception if rule loading fails; callers are submission paths where aborting
+     *   with the error is preferable to matching against an empty signer pool.
      */
     private suspend fun loadOnChainPasskeySigners(): List<ExternalSigner> {
-        val rules = try { loadContextRules() } catch (_: Exception) { emptyList() }
-        return extractPasskeySigners(rules)
+        return extractPasskeySigners(loadContextRules())
     }
 
     /**
      * Resolves Swift signer descriptors to a list of [SelectedSigner] instances for multi-signer
      * auth. Returns an empty list when the input is empty or when the resolution collapses to
      * a single-passkey case (which uses the implicit signing path).
+     *
+     * @throws IllegalStateException if any descriptor cannot be resolved to a signer.
      */
     private suspend fun resolveSelectedSigners(
         signerDescriptors: List<SignerDescriptor>,
         allPasskeySigners: List<ExternalSigner>,
     ): List<SelectedSigner> {
         if (signerDescriptors.isEmpty()) return emptyList()
-        val smartAccountSigners = signerDescriptors.mapNotNull { desc ->
-            resolveSignerFromDescriptor(desc, allPasskeySigners + registeredPasskeySigners)
+        val smartAccountSigners = signerDescriptors.map { desc ->
+            val signer = resolveSignerFromDescriptor(desc, allPasskeySigners)
+            if (signer == null) {
+                // Fail the whole submission: silently dropping the signer would
+                // submit with fewer signers than selected while the UI reports success.
+                val message = "Could not resolve signer: ${desc.type}/${desc.value.take(16)}"
+                ActivityLogState.error(message)
+                throw IllegalStateException(message)
+            }
+            signer
         }
         return if (isSinglePasskeyTransfer(smartAccountSigners)) {
             emptyList()
@@ -1297,8 +1271,10 @@ class MacOSBridge {
      * Resolves an ordered list of Swift signer descriptors into the [SelectedSigner] list for a
      * multi-signer transfer or approve operation.
      *
-     * Passkey descriptors are matched against the on-chain passkey signers (loaded from the current
-     * context rules); delegated and Ed25519 descriptors are constructed directly. Registration and
+     * Resolution delegates to [resolveSignerFromDescriptor]: passkey descriptors are matched
+     * against the on-chain passkey signers (loaded from the current context rules) plus any
+     * session-registered passkeys, by credential ID with a keyData-hex fallback; delegated and
+     * Ed25519 descriptors are constructed directly. Registration and
      * cleanup of delegated and Ed25519 signing material are owned by the shared
      * [multiSignerTransferWithEd25519] and [multiSignerApproveAllowanceWithEd25519] flows, which
      * register before submission and clear in a finally block. This helper only performs descriptor
@@ -1306,6 +1282,7 @@ class MacOSBridge {
      *
      * @param signerDescriptors Ordered list of Swift signer descriptors.
      * @return The resolved [SelectedSigner] list, in signing order.
+     * @throws IllegalStateException if any descriptor cannot be resolved to a signer.
      */
     private suspend fun resolveMultiSignerSelection(
         signerDescriptors: List<SignerDescriptor>
@@ -1313,26 +1290,19 @@ class MacOSBridge {
         val allPasskeySigners = loadOnChainPasskeySigners()
         val smartAccountSigners = mutableListOf<SmartAccountSigner>()
         for (desc in signerDescriptors) {
-            when (desc.type.lowercase()) {
-                "passkey" -> {
-                    val found = allPasskeySigners.firstOrNull { signer ->
-                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
-                    }
-                    if (found != null) {
-                        smartAccountSigners.add(found)
-                    } else {
-                        ActivityLogState.error(
-                            "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
-                        )
-                    }
+            val signer = resolveSignerFromDescriptor(desc, allPasskeySigners)
+            if (signer == null) {
+                // Fail the whole submission: silently dropping the signer would
+                // submit with fewer signers than selected while the UI reports success.
+                val message = if (desc.type.lowercase() == "passkey") {
+                    "Could not resolve passkey signer for credential: ${desc.value.take(16)}..."
+                } else {
+                    "Unsupported signer type: ${desc.type}"
                 }
-                "delegated" -> smartAccountSigners.add(buildDelegatedSigner(desc.value))
-                "ed25519" -> {
-                    val pubKeyBytes = hexToByteArray(desc.value)
-                    smartAccountSigners.add(buildEd25519Signer(pubKeyBytes))
-                }
-                else -> ActivityLogState.error("Unsupported signer type: ${desc.type}")
+                ActivityLogState.error(message)
+                throw IllegalStateException(message)
             }
+            smartAccountSigners.add(signer)
         }
         return buildSelectedSigners(smartAccountSigners)
     }
@@ -1360,8 +1330,10 @@ class MacOSBridge {
     /**
      * Constructs a [ContextRuleType] from a type name string and an optional parameter.
      *
-     * @throws IllegalArgumentException if contextTypeName is "create_contract" and contextTypeParam
-     *   is not a valid even-length hex string.
+     * @throws IllegalArgumentException if contextTypeName is not one of "default",
+     *   "call_contract", or "create_contract", if "call_contract" or "create_contract" is
+     *   missing its parameter, or if the "create_contract" parameter is not a valid
+     *   even-length hex string.
      */
     private fun buildContextRuleType(
         contextTypeName: String,
@@ -1378,143 +1350,71 @@ class MacOSBridge {
                     ?: throw IllegalArgumentException("create_contract requires a WASM hash hex string")
                 OZBuilders.createCreateContractContextType(hex)
             }
-            else -> OZBuilders.createDefaultContextType()
+            "default" -> OZBuilders.createDefaultContextType()
+            // An unrecognized tag must not fall through to Default — that would grant the
+            // broadest authorization instead of what the caller asked for.
+            else -> throw IllegalArgumentException("Unknown context type: $contextTypeName")
         }
     }
 
-    /**
-     * Non-throwing variant of [buildContextRuleType], returning Default on error.
-     */
-    private fun buildContextRuleTypeNoThrow(
-        contextTypeName: String,
-        contextTypeParam: String?
-    ): ContextRuleType {
-        return try {
-            buildContextRuleType(contextTypeName, contextTypeParam)
-        } catch (_: Exception) {
-            OZBuilders.createDefaultContextType()
-        }
-    }
-
-    /**
-     * Converts a list of [SignerDescriptor] to [SmartAccountSigner] instances.
-     *
-     * Passkey descriptors are resolved from [allPasskeySigners] by credential ID.
-     * Delegated descriptors are constructed directly from the address.
-     * Ed25519 descriptors are constructed from a hex-encoded 32-byte public key.
-     */
     /**
      * Passkey signers registered during this session via [registerPasskeySigner].
      * Stored here so they can be resolved in [buildSignerList] even before they
      * appear on any on-chain context rule.
+     *
+     * Unsynchronized; safe only under the class's main-thread-only calling contract.
      */
     private val registeredPasskeySigners = mutableListOf<ExternalSigner>()
 
+    /**
+     * Converts a list of [SignerDescriptor] to [SmartAccountSigner] instances via
+     * [resolveSignerFromDescriptor]: passkey descriptors are resolved from
+     * [allPasskeySigners] and [registeredPasskeySigners] by credential ID with a
+     * keyData-hex fallback; delegated and Ed25519 descriptors are constructed
+     * directly. An unresolvable descriptor aborts the submission.
+     */
     private fun buildSignerList(
         descriptors: List<SignerDescriptor>,
         allPasskeySigners: List<ExternalSigner>
     ): List<SmartAccountSigner> {
-        // Combine on-chain signers with session-registered signers for lookup.
-        val allKnown = allPasskeySigners + registeredPasskeySigners
         val result = mutableListOf<SmartAccountSigner>()
         for (desc in descriptors) {
-            when (desc.type.lowercase()) {
-                "passkey" -> {
-                    // Try matching by credential ID first, then by keyData hex.
-                    val found = allKnown.firstOrNull { signer ->
-                        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) == desc.value
-                    } ?: allKnown.firstOrNull { signer ->
-                        signer.keyData.toHexString() == desc.value
-                    }
-                    if (found != null) {
-                        result.add(found)
-                    } else {
-                        ActivityLogState.error(
-                            "Passkey signer not found for credential: ${desc.value.take(16)}..."
-                        )
-                    }
+            val signer = resolveSignerFromDescriptor(desc, allPasskeySigners)
+            if (signer == null) {
+                // Fail the whole submission: silently dropping the signer would
+                // submit with fewer signers than selected while the UI reports success.
+                val message = if (desc.type.lowercase() == "passkey") {
+                    "Passkey signer not found for credential: ${desc.value.take(16)}..."
+                } else {
+                    "Unknown signer type in descriptor: ${desc.type}"
                 }
-                "delegated" -> {
-                    result.add(buildDelegatedSigner(desc.value))
-                }
-                "ed25519" -> {
-                    val pubKeyBytes = hexToByteArray(desc.value)
-                    result.add(buildEd25519Signer(pubKeyBytes))
-                }
-                else -> {
-                    ActivityLogState.error("Unknown signer type in descriptor: ${desc.type}")
-                }
+                ActivityLogState.error(message)
+                throw IllegalStateException(message)
             }
+            result.add(signer)
         }
         return result
     }
 
     /**
-     * Converts a list of [PolicyDescriptor] to [FlowPolicyEntry] instances with encoded SCVal params.
-     *
-     * For "threshold": reads the "threshold" key from params.
-     * For "spending_limit": reads "amount" and "period_days" from params; period is converted to
-     *   ledgers using [getLedgersPerDay].
-     * For "weighted_threshold": reads "threshold" and parses "weights" as a
-     *   comma-separated list of "address:weight" pairs; signer objects are resolved from [signers].
+     * Converts a list of [PolicyDescriptor] to [FlowPolicyEntry] instances with encoded SCVal
+     * params. SCVal encoding delegates to [buildPolicyScVal]; a failed policy build aborts
+     * the submission.
      */
     private fun buildPolicyEntries(
         descriptors: List<PolicyDescriptor>,
         signers: List<SmartAccountSigner>
     ): List<FlowPolicyEntry> {
-        return descriptors.mapNotNull { desc ->
+        return descriptors.map { desc ->
             try {
-                val scVal = when (desc.policyType.lowercase()) {
-                    "threshold" -> {
-                        val threshold = desc.params["threshold"]?.toUIntOrNull()
-                            ?: throw IllegalArgumentException(
-                                "threshold policy requires 'threshold' param (got: ${desc.params["threshold"]})"
-                            )
-                        buildSimpleThresholdScVal(threshold)
-                    }
-                    "spending_limit" -> {
-                        val amount = desc.params["amount"]
-                            ?: throw IllegalArgumentException(
-                                "spending_limit policy requires 'amount' param"
-                            )
-                        val periodDays = desc.params["period_days"]?.toUIntOrNull() ?: 1u
-                        val periodLedgers = periodDays * getLedgersPerDay().toUInt()
-                        buildSpendingLimitScVal(amount, periodLedgers)
-                    }
-                    "weighted_threshold" -> {
-                        val threshold = desc.params["threshold"]?.toUIntOrNull()
-                            ?: throw IllegalArgumentException(
-                                "weighted_threshold policy requires 'threshold' param"
-                            )
-                        // Parse "addr1:3,addr2:2" weight pairs, resolving addresses to signers.
-                        val weightsRaw = desc.params["weights"] ?: ""
-                        val weightMap = mutableMapOf<SmartAccountSigner, UInt>()
-                        if (weightsRaw.isNotBlank()) {
-                            for (pair in weightsRaw.split(",")) {
-                                val parts = pair.trim().split(":")
-                                if (parts.size == 2) {
-                                    val addr = parts[0].trim()
-                                    val w = parts[1].trim().toUIntOrNull() ?: continue
-                                    val signer = signers.firstOrNull { s ->
-                                        when (s) {
-                                            is DelegatedSigner -> s.address == addr
-                                            else -> false
-                                        }
-                                    } ?: DelegatedSigner(addr)
-                                    weightMap[signer] = w
-                                }
-                            }
-                        }
-                        buildWeightedThresholdScVal(weightMap, threshold)
-                    }
-                    else -> throw IllegalArgumentException("Unknown policy type: ${desc.policyType}")
-                }
-                FlowPolicyEntry(address = desc.policyAddress, scVal = scVal)
+                FlowPolicyEntry(address = desc.policyAddress, scVal = buildPolicyScVal(desc, signers))
             } catch (e: Exception) {
+                // Fail the whole submission: silently dropping the policy would create
+                // the rule without it while the UI reports success.
                 ActivityLogState.error(
                     "Failed to build policy ${desc.policyAddress}: ${e.message}"
                 )
-                null
+                throw e
             }
         }
     }
@@ -1531,14 +1431,14 @@ class MacOSBridge {
 
         val signerDescs = rule.signers.map { signer ->
             when (signer) {
-                is DelegatedSigner -> SignerDescriptor(type = "delegated", value = signer.address)
+                is DelegatedSigner -> SignerDescriptor(type = "delegated", value = signer.address, isPending = false)
                 is ExternalSigner -> {
                     val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
                     if (credId != null) {
-                        SignerDescriptor(type = "passkey", value = credId)
+                        SignerDescriptor(type = "passkey", value = credId, isPending = false)
                     } else {
                         // Ed25519 signer: expose hex-encoded public key (full keyData).
-                        SignerDescriptor(type = "ed25519", value = signer.keyData.toHexString())
+                        SignerDescriptor(type = "ed25519", value = signer.keyData.toHexString(), isPending = false)
                     }
                 }
             }
@@ -1569,6 +1469,10 @@ class MacOSBridge {
     /**
      * Converts a [SmartAccountSigner] to a [SignerInfoBridge].
      *
+     * External signers are classified by credential ID first (passkey), then by key size
+     * (32-byte key data = Ed25519); anything else is an external verifier signer labeled
+     * via [describeSignerType].
+     *
      * @param signer The signer instance.
      * @param canSign Whether this signer can currently sign (true for the connected passkey or
      *   registered delegated keypairs).
@@ -1583,7 +1487,8 @@ class MacOSBridge {
                 displayName = "Stellar Account",
                 identifier = signer.address,
                 canSign = canSign,
-                keyData = null
+                keyData = null,
+                verifierAddress = null
             )
             is ExternalSigner -> {
                 val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
@@ -1593,16 +1498,28 @@ class MacOSBridge {
                         displayName = "Passkey (${credId.take(8)}...)",
                         identifier = credId,
                         canSign = canSign,
-                        keyData = signer.keyData.toHexString()
+                        keyData = signer.keyData.toHexString(),
+                        verifierAddress = signer.verifierAddress
                     )
-                } else {
+                } else if (signer.keyData.size == SmartAccountConstants.ED25519_PUBLIC_KEY_SIZE) {
                     val hexKey = signer.keyData.toHexString()
                     SignerInfoBridge(
                         type = "ed25519",
                         displayName = "Ed25519 (${hexKey.take(8)}...)",
                         identifier = hexKey,
                         canSign = canSign,
-                        keyData = null
+                        keyData = null,
+                        verifierAddress = signer.verifierAddress
+                    )
+                } else {
+                    SignerInfoBridge(
+                        type = "external",
+                        displayName = "${describeSignerType(signer)} " +
+                            "(${truncateAddress(signer.verifierAddress, 4, 4)})",
+                        identifier = signer.keyData.toHexString(),
+                        canSign = canSign,
+                        keyData = null,
+                        verifierAddress = signer.verifierAddress
                     )
                 }
             }
@@ -1637,9 +1554,14 @@ class MacOSBridge {
     }
 
     /**
-     * Builds an SCVal from a [PolicyDescriptor] for use in add/modify policy operations.
+     * Builds an SCVal from a [PolicyDescriptor] for use in add/create/modify policy operations.
      *
-     * Delegates to the same SCVal builder functions used by [buildPolicyEntries].
+     * For "threshold": reads the "threshold" key from params.
+     * For "spending_limit": reads "amount" and "period_days" from params; period is converted to
+     *   ledgers using [getLedgersPerDay].
+     * For "weighted_threshold": reads "threshold" and parses "weights" as a
+     *   comma-separated list of "identifier:weight" pairs; signer objects are resolved
+     *   from [signers] via [signerMatchesIdentifier].
      *
      * @param desc The policy descriptor with type and params.
      * @param signers Available signers for resolving weighted threshold weights.
@@ -1653,7 +1575,7 @@ class MacOSBridge {
             "threshold" -> {
                 val threshold = desc.params["threshold"]?.toUIntOrNull()
                     ?: throw IllegalArgumentException(
-                        "threshold policy requires 'threshold' param"
+                        "threshold policy requires 'threshold' param (got: ${desc.params["threshold"]})"
                     )
                 buildSimpleThresholdScVal(threshold)
             }
@@ -1667,27 +1589,99 @@ class MacOSBridge {
             "weighted_threshold" -> {
                 val threshold = desc.params["threshold"]?.toUIntOrNull()
                     ?: throw IllegalArgumentException("weighted_threshold policy requires 'threshold' param")
-                val weightsRaw = desc.params["weights"] ?: ""
-                val weightMap = mutableMapOf<SmartAccountSigner, UInt>()
-                if (weightsRaw.isNotBlank()) {
-                    for (pair in weightsRaw.split(",")) {
-                        val parts = pair.trim().split(":")
-                        if (parts.size == 2) {
-                            val addr = parts[0].trim()
-                            val w = parts[1].trim().toUIntOrNull() ?: continue
-                            val signer = signers.firstOrNull { s ->
-                                when (s) {
-                                    is DelegatedSigner -> s.address == addr
-                                    else -> false
-                                }
-                            } ?: DelegatedSigner(addr)
-                            weightMap[signer] = w
-                        }
-                    }
-                }
-                buildWeightedThresholdScVal(weightMap, threshold)
+                buildWeightedThresholdScVal(
+                    parseSignerWeights(desc.params["weights"] ?: "", signers),
+                    threshold
+                )
             }
             else -> throw IllegalArgumentException("Unknown policy type: ${desc.policyType}")
+        }
+    }
+
+    /**
+     * Builds an [EditPolicyEntry] for the new-policy and modified-policy arms of an edit
+     * diff: KNOWN_POLICIES lookup, SCVal encoding via [buildPolicyScVal], and entry
+     * assembly. A new policy ([modified] = false) is not on-chain yet, and a modified
+     * policy is always an original, so `isOriginal` mirrors [modified] at both call sites.
+     *
+     * @param desc The policy descriptor with type and params.
+     * @param signers Available signers for resolving weighted threshold weights.
+     * @param onChainId The on-chain policy ID for modified policies, null for new ones.
+     * @param modified True when the entry updates an existing on-chain policy.
+     */
+    private fun toEditPolicyEntry(
+        desc: PolicyDescriptor,
+        signers: List<SmartAccountSigner>,
+        onChainId: UInt?,
+        modified: Boolean
+    ): EditPolicyEntry {
+        val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
+        return EditPolicyEntry(
+            info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
+            label = known?.name ?: "Unknown Policy",
+            address = desc.policyAddress,
+            scVal = buildPolicyScVal(desc, signers),
+            onChainId = onChainId,
+            isOriginal = modified,
+            modified = modified
+        )
+    }
+
+    /**
+     * Parses a comma-separated `"identifier:weight"` list into a signer-weight map,
+     * resolving each identifier against [signers].
+     *
+     * Identifier semantics match the Swift entry identifiers: a G-address for delegated
+     * signers, the Base64URL credential ID for passkeys, and the hex-encoded key data
+     * for Ed25519 signers.
+     *
+     * @throws IllegalArgumentException when an entry is not in `"identifier:weight"`
+     *   format, an identifier resolves to none of the provided signers, or a weight
+     *   is not a positive integer.
+     */
+    private fun parseSignerWeights(
+        weightsRaw: String,
+        signers: List<SmartAccountSigner>
+    ): Map<SmartAccountSigner, UInt> {
+        val weightMap = mutableMapOf<SmartAccountSigner, UInt>()
+        if (weightsRaw.isBlank()) return weightMap
+        for (pair in weightsRaw.split(",")) {
+            val parts = pair.trim().split(":")
+            if (parts.size != 2) {
+                throw IllegalArgumentException(
+                    "weighted_threshold weights entry must use 'identifier:weight' format, got: '${pair.trim()}'"
+                )
+            }
+            val identifier = parts[0].trim()
+            val w = parts[1].trim().toUIntOrNull()?.takeIf { it > 0u }
+                ?: throw IllegalArgumentException(
+                    "weighted_threshold weight for '$identifier' must be a positive integer, got: ${parts[1].trim()}"
+                )
+            val signer = signers.firstOrNull { s -> signerMatchesIdentifier(s, identifier) }
+                ?: throw IllegalArgumentException(
+                    "weighted_threshold weight references a signer that is not on the rule: $identifier"
+                )
+            weightMap[signer] = w
+        }
+        return weightMap
+    }
+
+    /**
+     * Returns true when [identifier] denotes [signer]: the address of a delegated
+     * signer, the Base64URL credential ID of a passkey signer, or the hex-encoded
+     * key data of an Ed25519 signer (case-insensitive hex).
+     */
+    private fun signerMatchesIdentifier(signer: SmartAccountSigner, identifier: String): Boolean {
+        return when (signer) {
+            is DelegatedSigner -> signer.address == identifier
+            is ExternalSigner -> {
+                val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+                if (credId != null) {
+                    credId == identifier
+                } else {
+                    signer.keyData.toHexString().equals(identifier, ignoreCase = true)
+                }
+            }
         }
     }
 
@@ -1700,7 +1694,10 @@ class MacOSBridge {
  * returns the NSWindow in which to present the authorization sheet. Without this,
  * the controller fails with error code 1004 ("No host window provided").
  *
- * This implementation returns the application's key window.
+ * This implementation returns the application's key window, falling back to the main
+ * window and then to the first visible window, so the passkey sheet stays attached to
+ * a window the user can see. A detached NSWindow is constructed only when the
+ * application has no visible window at all.
  */
 private class MacOSPresentationContextProvider :
     NSObject(),
@@ -1709,6 +1706,10 @@ private class MacOSPresentationContextProvider :
     override fun presentationAnchorForAuthorizationController(
         controller: ASAuthorizationController
     ): ASPresentationAnchor {
-        return NSApplication.sharedApplication.keyWindow ?: NSWindow()
+        val app = NSApplication.sharedApplication
+        return app.keyWindow
+            ?: app.mainWindow
+            ?: app.windows.filterIsInstance<NSWindow>().firstOrNull { it.visible }
+            ?: NSWindow()
     }
 }

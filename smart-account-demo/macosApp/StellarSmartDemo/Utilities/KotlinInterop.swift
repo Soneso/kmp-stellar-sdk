@@ -15,8 +15,9 @@ import shared
 /// scattered across view files. Centralizing those conversions here keeps view code clean and
 /// makes the bridging semantics explicit.
 ///
-/// None of these functions call into the Kotlin runtime or perform network operations; they are
-/// synchronous pure-Swift helpers.
+/// All of these functions are synchronous and side-effect free: they only convert or format
+/// values already in memory (including accessors on Kotlin-bridged objects such as
+/// `KotlinByteArray`) and never invoke suspend functions, network calls, or business logic.
 enum KotlinInterop {
 
     // MARK: - Collection Conversion
@@ -57,45 +58,6 @@ enum KotlinInterop {
         return result
     }
 
-    // MARK: - Date Formatting
-
-    /// Cached short timestamp formatter (`HH:mm:ss`).
-    ///
-    /// `DateFormatter` initialization is expensive; caching as a static property avoids
-    /// creating a new instance on every log row render.
-    private static let shortFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
-    /// Cached full timestamp formatter (`yyyy-MM-dd HH:mm:ss`).
-    private static let fullFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f
-    }()
-
-    /// Formats a `Date` as a short `HH:mm:ss` timestamp string.
-    ///
-    /// Used to render activity log entry timestamps in list rows.
-    ///
-    /// - Parameter date: The date to format.
-    /// - Returns: A string in `HH:mm:ss` format using the current locale's time zone.
-    static func formatTimestamp(_ date: Date) -> String {
-        shortFormatter.string(from: date)
-    }
-
-    /// Formats a `Date` as a full `yyyy-MM-dd HH:mm:ss` timestamp string.
-    ///
-    /// Used when detailed log timestamps are needed (e.g. in expandable detail rows).
-    ///
-    /// - Parameter date: The date to format.
-    /// - Returns: A string in `yyyy-MM-dd HH:mm:ss` format.
-    static func formatFullTimestamp(_ date: Date) -> String {
-        fullFormatter.string(from: date)
-    }
-
     // MARK: - Address Formatting
 
     /// Truncates a Stellar address to a short form for display in compact UI elements.
@@ -120,6 +82,21 @@ enum KotlinInterop {
         let prefix = address.prefix(prefixLength)
         let suffix = address.suffix(suffixLength)
         return "\(prefix)...\(suffix)"
+    }
+
+    /// Truncates a value to its first `length` characters followed by an ellipsis.
+    ///
+    /// Used for identifiers where only the leading characters are meaningful for
+    /// display (e.g. credential IDs in the signer picker). Values that are not
+    /// longer than `length` are returned unchanged.
+    ///
+    /// - Parameters:
+    ///   - value: The full string.
+    ///   - length: Number of leading characters to retain.
+    /// - Returns: The truncated string, or the original if no truncation is needed.
+    static func truncatePrefix(_ value: String, length: Int) -> String {
+        guard value.count > length else { return value }
+        return String(value.prefix(length)) + "..."
     }
 }
 

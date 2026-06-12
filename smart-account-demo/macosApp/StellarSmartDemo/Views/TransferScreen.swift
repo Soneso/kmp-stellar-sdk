@@ -52,12 +52,13 @@ struct TransferScreen: View {
 
     @State private var availableSigners: [SignerInfoBridge] = []
     @State private var signersLoaded = false
+    /// True when the signer fetch failed; distinguishes load-failed from loaded-empty
+    /// so the UI can warn that multi-signer routing is unavailable.
+    @State private var signerLoadFailed = false
 
     // MARK: - Signer picker
 
     @State private var showSignerPicker = false
-    @State private var selectedSignerDescriptors: [SignerDescriptor] = []
-    @State private var delegatedSecretKeys: [String: String] = [:]
 
     // MARK: - Init
 
@@ -105,15 +106,21 @@ struct TransferScreen: View {
         ScrollView {
             VStack(spacing: 16) {
                 if !appState.isConnected {
-                    notConnectedSection
+                    NotConnectedCard(
+                        message: "No wallet connected. Please connect a wallet first.",
+                        onGoBack: { dismiss() }
+                    )
                 } else {
                     infoCard
                     balanceCard
+                    if signerLoadFailed {
+                        signerLoadWarning
+                    }
                     tokenPicker
                     recipientField
                     amountField
                     if let error = errorMessage {
-                        errorCard(message: error)
+                        ErrorCard(message: error)
                     }
                     if txHash == nil {
                         transferButton
@@ -137,7 +144,8 @@ struct TransferScreen: View {
             SignerPickerSheet(
                 signers: availableSigners,
                 activeCredentialId: appState.credentialId,
-                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                description: "Choose which signers co-authorize this transfer. " +
+                    "For Stellar account signers, enter the secret key to enable signing.",
                 onConfirm: { selected, secretKeys, ed25519Secrets in
                     showSignerPicker = false
                     performMultiSignerTransfer(
@@ -152,31 +160,6 @@ struct TransferScreen: View {
                 bridge: bridgeWrapper.bridge
             )
         }
-    }
-
-    // MARK: - Not-connected section
-
-    @ViewBuilder
-    private var notConnectedSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("No wallet connected. Please connect a wallet first.")
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
-
-        LoadingButton(
-            action: { dismiss() },
-            isLoading: false,
-            isEnabled: true,
-            text: "Go Back",
-            loadingText: "",
-            style: .filled
-        )
     }
 
     // MARK: - Info card
@@ -195,27 +178,28 @@ struct TransferScreen: View {
     // MARK: - Balance card
 
     private var balanceCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Balance")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-            HStack(spacing: 16) {
-                Text("\(appState.xlmBalance ?? "0.0") XLM")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-                if let demoBalance = appState.demoTokenBalance {
-                    Text("\(demoBalance) DEMO")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Material3Colors.onPrimaryContainer)
-                }
-            }
-        }
+        BalanceRows(
+            label: "Balance",
+            labelFont: .system(size: 12, weight: .semibold),
+            labelColor: Material3Colors.onPrimaryContainer,
+            values: balanceValues,
+            valueFont: .system(size: 15, weight: .bold),
+            valueColor: Material3Colors.onPrimaryContainer,
+            horizontal: true
+        )
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Material3Colors.primaryContainer)
         .cornerRadius(8)
+    }
+
+    /// Formatted balance lines: XLM always, DEMO only when its balance is known.
+    private var balanceValues: [String] {
+        var values = ["\(appState.xlmBalance ?? "0.0") XLM"]
+        if let demoBalance = appState.demoTokenBalance {
+            values.append("\(demoBalance) DEMO")
+        }
+        return values
     }
 
     // MARK: - Token picker
@@ -228,16 +212,33 @@ struct TransferScreen: View {
 
             Picker("", selection: $selectedToken) {
                 Text("XLM (Native)").tag(TransferScreen.tokenXLM)
-                Text(isDemoAvailable ? "Demo Token (DEMO)" : "Demo Token (DEMO) — unavailable")
-                    .tag(TransferScreen.tokenDemo)
+                demoSegmentLabel.tag(TransferScreen.tokenDemo)
             }
             .pickerStyle(.segmented)
             .disabled(isLoading || txHash != nil)
-            .onChange(of: selectedToken) { _ in
+            .onChange(of: selectedToken) { newValue in
+                // The DEMO segment is selectable only when the DEMO token contract is
+                // resolved; on macOS 13 (no per-segment disabling) revert the selection.
+                if newValue == TransferScreen.tokenDemo && !isDemoAvailable {
+                    selectedToken = TransferScreen.tokenXLM
+                    return
+                }
                 // Reset error when token selection changes
                 errorMessage = nil
             }
             .opacity((isLoading || txHash != nil) ? 0.5 : 1.0)
+        }
+    }
+
+    /// Label for the DEMO token segment, disabled for selection when the DEMO token
+    /// contract is not resolved (macOS 14+; older versions rely on the onChange revert).
+    @ViewBuilder
+    private var demoSegmentLabel: some View {
+        let label = Text(isDemoAvailable ? "Demo Token (DEMO)" : "Demo Token (DEMO) — unavailable")
+        if #available(macOS 14.0, *) {
+            label.selectionDisabled(!isDemoAvailable)
+        } else {
+            label
         }
     }
 
@@ -248,7 +249,8 @@ struct TransferScreen: View {
             label: "Recipient Address",
             text: $recipient,
             error: recipientError,
-            placeholder: "G... or C...",
+            placeholder: "G... or C... address",
+            helperText: "Stellar account (G...) or contract (C...) address",
             isMonospace: true,
             isEnabled: !isLoading && txHash == nil
         )
@@ -262,27 +264,22 @@ struct TransferScreen: View {
             label: "Amount",
             text: $amount,
             error: amountError,
-            placeholder: "0.0",
+            placeholder: "e.g. 10.0",
+            helperText: "Amount to transfer",
             isEnabled: !isLoading && txHash == nil
         )
         .onChange(of: amount) { _ in errorMessage = nil }
     }
 
-    // MARK: - Error card
+    // MARK: - Signer load warning
 
-    @ViewBuilder
-    private func errorCard(message: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
+    /// Non-blocking notice that the signer list could not be loaded. Single-signer
+    /// transfers keep working; only the multi-signer picker is unavailable.
+    private var signerLoadWarning: some View {
+        Text("Could not load signers — multi-signer operations unavailable")
+            .font(.footnote)
+            .foregroundColor(Material3Colors.badgeExpiryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Transfer button
@@ -339,28 +336,18 @@ struct TransferScreen: View {
                 Text(submittedRecipient)
                     .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Updated Balance")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-                HStack(spacing: 16) {
-                    Text("\(appState.xlmBalance ?? "0.0") XLM")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-                    if let demoBalance = appState.demoTokenBalance {
-                        Text("\(demoBalance) DEMO")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Material3Colors.onPrimaryContainer)
-                    }
-                }
-            }
+            BalanceRows(
+                label: "Updated Balance",
+                labelColor: Material3Colors.onPrimaryContainer,
+                values: balanceValues,
+                valueFont: .system(size: 14, weight: .bold),
+                valueColor: Material3Colors.onPrimaryContainer,
+                horizontal: true
+            )
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -394,19 +381,17 @@ struct TransferScreen: View {
 
     // MARK: - Actions
 
+    /// Loads the available signers. On failure, single-signer transfers stay usable;
+    /// the load-failed flag drives the multi-signer-unavailable warning.
     private func loadSigners() async {
         guard appState.isConnected else { return }
-        do {
-            let result = try await bridgeWrapper.bridge.loadAvailableSigners()
-            let signers = KotlinInterop.toArray(result, as: SignerInfoBridge.self)
-            await MainActor.run {
-                availableSigners = signers
-                signersLoaded = true
+        let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridgeWrapper.bridge)
+        await MainActor.run {
+            if !result.loadFailed {
+                availableSigners = result.signers
             }
-        } catch {
-            await MainActor.run {
-                signersLoaded = true
-            }
+            signersLoaded = true
+            signerLoadFailed = result.loadFailed
         }
     }
 
@@ -417,7 +402,10 @@ struct TransferScreen: View {
     private func handleTransferTap() {
         guard !isLoading, isFormValid else { return }
 
-        if !signersLoaded || availableSigners.count <= 1 {
+        if SignerSelectionSupport.usesSingleSignerPath(
+            signersLoaded: signersLoaded,
+            availableSigners: availableSigners
+        ) {
             performSingleSignerTransfer()
         } else {
             showSignerPicker = true
@@ -427,12 +415,18 @@ struct TransferScreen: View {
     /// Executes a simple passkey-authenticated transfer.
     private func performSingleSignerTransfer() {
         let tokenContract = resolveTokenContract()
-        let capturedRecipient = recipient
-        let capturedAmount = amount
+        // Validators accept surrounding whitespace by trimming; capture the same
+        // trimmed values so the bridge never sees padded input.
+        let capturedRecipient = recipient.trimmingCharacters(in: .whitespaces)
+        let capturedAmount = amount.trimmingCharacters(in: .whitespaces)
         let capturedLabel = tokenLabel
 
         isLoading = true
         errorMessage = nil
+        ActivityLogState.shared.info(
+            message: "Transferring \(capturedAmount) \(capturedLabel) to \(capturedRecipient.prefix(8))..."
+        )
+        appState.syncActivityLog(from: bridgeWrapper.bridge)
 
         Task {
             do {
@@ -443,16 +437,12 @@ struct TransferScreen: View {
                 )
 
                 await MainActor.run {
-                    if result.success {
-                        submittedTokenLabel = capturedLabel
-                        submittedRecipient = capturedRecipient
-                        submittedAmount = capturedAmount
-                        txHash = result.hash
-                        appState.sync(from: bridgeWrapper.bridge)
-                    } else {
-                        handleTransferError(result.error ?? "Transfer failed")
-                    }
-                    isLoading = false
+                    applyTransferResult(
+                        result,
+                        tokenLabel: capturedLabel,
+                        recipient: capturedRecipient,
+                        amount: capturedAmount
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -473,28 +463,38 @@ struct TransferScreen: View {
         ed25519Secrets: [String: String] = [:]
     ) {
         let tokenContract = resolveTokenContract()
-        let capturedRecipient = recipient
-        let capturedAmount = amount
+        // Validators accept surrounding whitespace by trimming; capture the same
+        // trimmed values so the bridge never sees padded input.
+        let capturedRecipient = recipient.trimmingCharacters(in: .whitespaces)
+        let capturedAmount = amount.trimmingCharacters(in: .whitespaces)
         let capturedLabel = tokenLabel
 
         isLoading = true
         errorMessage = nil
 
-        // Build SignerDescriptor list for the bridge.
+        // Build SignerDescriptor list for the bridge. Auth signers are existing
+        // on-chain signers, so isPending is always false here.
         let descriptors = selected.map { signer in
-            SignerDescriptor(type: signer.type, value: signer.identifier)
+            SignerDescriptor(type: signer.type, value: signer.identifier, isPending: false)
         }
 
         // Determine if only the connected passkey was selected — use the simple path.
-        let isSingleOwnPasskey: Bool = {
-            guard selected.count == 1,
-                  let only = selected.first,
-                  only.type.lowercased() == "passkey",
-                  let credId = appState.credentialId,
-                  only.identifier == credId
-            else { return false }
-            return true
-        }()
+        let isSingleOwnPasskey = SignerSelectionSupport.isSingleOwnPasskey(
+            selected: selected,
+            connectedCredentialId: appState.credentialId
+        )
+
+        if isSingleOwnPasskey {
+            ActivityLogState.shared.info(
+                message: "Transferring \(capturedAmount) \(capturedLabel) to \(capturedRecipient.prefix(8))..."
+            )
+        } else {
+            ActivityLogState.shared.info(
+                message: "Multi-signer transfer: \(capturedAmount) \(capturedLabel) " +
+                    "to \(capturedRecipient.prefix(8))... (\(descriptors.count) signer(s))"
+            )
+        }
+        appState.syncActivityLog(from: bridgeWrapper.bridge)
 
         Task {
             do {
@@ -518,16 +518,12 @@ struct TransferScreen: View {
                 }
 
                 await MainActor.run {
-                    if result.success {
-                        submittedTokenLabel = capturedLabel
-                        submittedRecipient = capturedRecipient
-                        submittedAmount = capturedAmount
-                        txHash = result.hash
-                        appState.sync(from: bridgeWrapper.bridge)
-                    } else {
-                        handleTransferError(result.error ?? "Transfer failed")
-                    }
-                    isLoading = false
+                    applyTransferResult(
+                        result,
+                        tokenLabel: capturedLabel,
+                        recipient: capturedRecipient,
+                        amount: capturedAmount
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -538,16 +534,38 @@ struct TransferScreen: View {
         }
     }
 
-    /// Interprets the error message and sets `errorMessage` accordingly.
+    /// Applies a completed transfer result on the main actor: records the submitted
+    /// values for the success card on success, or routes the error message.
+    private func applyTransferResult(
+        _ result: TransferResult,
+        tokenLabel: String,
+        recipient: String,
+        amount: String
+    ) {
+        if result.success {
+            submittedTokenLabel = tokenLabel
+            submittedRecipient = recipient
+            submittedAmount = amount
+            txHash = result.hash
+            appState.sync(from: bridgeWrapper.bridge)
+        } else {
+            handleTransferError(result.error ?? "Transfer failed")
+        }
+        isLoading = false
+    }
+
+    /// Interprets the error message, sets `errorMessage`, and records the outcome in the
+    /// activity log.
     ///
     /// User cancellation (Touch ID dismissed) is shown as a distinct informational message
     /// rather than a generic failure string.
     private func handleTransferError(_ message: String) {
-        if bridgeWrapper.bridge.isUserCancellation(message: message) {
-            errorMessage = "Passkey authentication cancelled"
-        } else {
-            errorMessage = "Transfer failed: \(message)"
-        }
+        errorMessage = SignerSelectionSupport.interpretOperationError(
+            message,
+            failurePrefix: "Transfer failed:",
+            bridge: bridgeWrapper.bridge,
+            appState: appState
+        )
     }
 
     /// Resets all form and result state for a new transfer.

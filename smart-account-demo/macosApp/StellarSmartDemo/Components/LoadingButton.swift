@@ -40,8 +40,6 @@ struct LoadingButton: View {
         case filled
         /// Transparent background with a colored border and text.
         case outlined
-        /// Solid red background with white text for destructive actions.
-        case error
     }
 
     var body: some View {
@@ -80,7 +78,6 @@ struct LoadingButton: View {
         switch style {
         case .filled:  return .white
         case .outlined: return Material3Colors.primary
-        case .error:   return .white
         }
     }
 
@@ -88,7 +85,6 @@ struct LoadingButton: View {
         switch style {
         case .filled:  return Material3Colors.primary
         case .outlined: return .clear
-        case .error:   return Material3Colors.error
         }
     }
 

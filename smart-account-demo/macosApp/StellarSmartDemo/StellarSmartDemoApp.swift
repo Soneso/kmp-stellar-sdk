@@ -18,6 +18,7 @@ import shared
 // - WalletCreationScreen: Create smart account with passkey
 // - WalletConnectionScreen: Connect via session restore, indexer, or address
 // - TransferScreen: Send XLM or DEMO tokens (single or multi-signer)
+// - ApproveScreen: Approve a token spending allowance for another address
 // - ContextRulesScreen: View and manage on-chain authorization rules
 // - ContextRuleBuilderScreen: Create or edit context rules
 // - KnownSignersScreen: View all unique signers across rules
