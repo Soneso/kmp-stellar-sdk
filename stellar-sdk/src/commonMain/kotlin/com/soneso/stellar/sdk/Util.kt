@@ -286,10 +286,18 @@ internal expect suspend fun platformDelay(timeMillis: Long)
  *
  * On JVM, this delegates to [kotlin.synchronized] for proper thread synchronization.
  * On JS, this simply executes the block directly since JavaScript is single-threaded.
- * On Native, this uses [kotlin.native.concurrent.AtomicReference]-based spinlock or
- * platform-specific synchronization to protect shared state under the new memory model.
+ * On Native, this uses a single process-global, NON-REENTRANT busy-wait spinlock that
+ * ignores the [lock] argument — every caller in the SDK contends on the same lock.
  *
- * @param lock The object to use as the monitor lock
+ * CONTRACT (load-bearing on Native):
+ * - [block] must NEVER call [platformSynchronized] again, directly or transitively
+ *   (e.g. by emitting an event or touching another synchronized registry). On Native
+ *   this deadlocks the calling thread with no diagnostic; on JVM (reentrant monitor)
+ *   and JS (no-op) the same code works, so the deadlock surfaces only on iOS/macOS.
+ * - [block] must be short and must not suspend or block: waiters busy-spin on Native,
+ *   so a slow block burns CPU on every waiting thread.
+ *
+ * @param lock The monitor object on JVM; ignored by the Native implementation
  * @param block The block to execute under mutual exclusion
  * @return The result of executing [block]
  */

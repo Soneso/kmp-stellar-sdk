@@ -394,9 +394,9 @@ object SmartAccountUtils {
      *         the extracted key coordinates do not lie on the secp256r1 curve
      */
     internal fun extractPublicKeyFromAuthenticatorData(authenticatorData: ByteArray): ByteArray? {
-        // Minimum size: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen)
-        // = 55, plus at least the COSE key prefix (10) + X (32) + separator (3) + Y (32) = 77
-        // Total minimum: 132 bytes
+        // Header minimum: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen) = 55.
+        // Only the header is checked here; the COSE key portion (prefix 10 + X 32 +
+        // separator 3 + Y 32) is gated downstream by the prefix and full-key-length checks.
         if (authenticatorData.size < 55) {
             return null
         }

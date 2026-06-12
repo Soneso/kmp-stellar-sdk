@@ -181,9 +181,12 @@ class WebAuthnCborParserTest {
     }
 
     // =========================================================================
-    // Known test key material (NIST P-256 generator point G)
+    // Coordinate fixtures
     // =========================================================================
 
+    // Arbitrary 32-byte patterns, deliberately NOT on the secp256r1 curve: the parser
+    // is purely structural (CBOR layout, separator, lengths); curve validation lives
+    // in SmartAccountUtils and is tested there with real on-curve points.
     private val testX = ByteArray(32) { (it + 1).toByte() }
     private val testY = ByteArray(32) { (it + 33).toByte() }
 
