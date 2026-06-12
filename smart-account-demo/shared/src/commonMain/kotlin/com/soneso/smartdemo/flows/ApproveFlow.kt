@@ -187,7 +187,8 @@ suspend fun fetchAllowance(
             rpcUrl = DemoConfig.RPC_URL,
             network = Network(DemoConfig.NETWORK_PASSPHRASE)
         )
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        ActivityLogState.error("Failed to fetch allowance: ${e.message}")
         return null
     }
 
@@ -203,7 +204,8 @@ suspend fun fetchAllowance(
             signer = null
         )
         parseDemoBalance(result)
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        ActivityLogState.error("Failed to fetch allowance: ${e.message}")
         null
     } finally {
         client.close()

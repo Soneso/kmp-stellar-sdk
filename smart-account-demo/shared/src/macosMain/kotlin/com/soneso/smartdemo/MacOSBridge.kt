@@ -23,6 +23,7 @@ import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.connectWithAddress
 import com.soneso.smartdemo.flows.deletePendingCredential
 import com.soneso.smartdemo.flows.disconnect
+import com.soneso.smartdemo.flows.extractPasskeySigners
 import com.soneso.smartdemo.flows.finalizeConnect
 import com.soneso.smartdemo.flows.initializeKit
 import com.soneso.smartdemo.flows.loadAccountSigners
@@ -40,7 +41,6 @@ import com.soneso.smartdemo.flows.removeContextRule
 import com.soneso.smartdemo.flows.resolveAbsoluteLedger
 import com.soneso.smartdemo.flows.DeployAndProvisionResult
 import com.soneso.smartdemo.flows.deployPendingAndProvision
-import com.soneso.smartdemo.flows.retryPendingDeploy
 import com.soneso.smartdemo.flows.transfer
 import com.soneso.smartdemo.flows.ContextRuleEditDiff
 import com.soneso.smartdemo.flows.EditSignerEntry
@@ -169,9 +169,8 @@ private fun ConnectWalletResult.toBridgeResult(): WalletConnectionBridgeResult =
  *   with a `success` flag and an optional error message.
  * - Submission paths throw to abort: an exception means nothing further was attempted and the
  *   Swift caller surfaces the message in its error UI.
- * - The connect family ([quickConnect], [manualConnect], [connectWithAddress]) returns null
- *   on failure with the cause recorded in the activity log; [fetchAllowance] returns null
- *   on failure without logging.
+ * - The connect family ([quickConnect], [manualConnect], [connectWithAddress]) and
+ *   [fetchAllowance] return null on failure with the cause recorded in the activity log.
  *
  * DTO boundary: new bridge methods return `*Bridge` DTOs (see `BridgeTypes.kt`); existing
  * methods that return raw SDK/flow types ([loadPendingCredentials], [loadContextRules],
@@ -327,24 +326,6 @@ class MacOSBridge {
         contractAddress: String
     ): WalletConnectionBridgeResult? =
         com.soneso.smartdemo.flows.finalizeConnect(credentialId, contractAddress)?.toBridgeResult()
-
-    /**
-     * Retries a pending wallet deployment for a previously registered passkey.
-     *
-     * The SDK looks up the contract ID and public key from stored credential data.
-     * This path always produces a single connected contract; the bridge result
-     * always has `connected` populated and `ambiguous` null.
-     *
-     * @param credentialId Base64URL-encoded credential ID of the pending deployment.
-     * @return Bridge result with the connected arm populated.
-     * @throws Exception if the credential is not found, missing required fields, or the
-     *   deploy transaction fails.
-     */
-    @Throws(Exception::class)
-    suspend fun retryPendingDeploy(
-        credentialId: String,
-    ): WalletConnectionBridgeResult =
-        com.soneso.smartdemo.flows.retryPendingDeploy(credentialId).toBridgeResult()
 
     /**
      * Deploys a pending wallet and provisions it with XLM and DEMO tokens.
@@ -816,13 +797,7 @@ class MacOSBridge {
      */
     @Throws(Exception::class)
     suspend fun loadAllOnChainSigners(): List<SignerInfoBridge> {
-        val allRules = com.soneso.smartdemo.flows.loadContextRules()
-        val uniqueSigners = allRules.flatMap { it.signers }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-            .filter { signer ->
-                val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                credId == null || credId != DemoState.credentialId
-            }
+        val uniqueSigners = com.soneso.smartdemo.flows.loadAllOnChainSigners()
         return uniqueSigners.map { signer -> convertSignerInfoToBridge(signer, canSign = false) }
     }
 
@@ -1213,18 +1188,6 @@ class MacOSBridge {
             result[identity] = hexToByteArray(seedHex)
         }
         return result
-    }
-
-    /**
-     * Extracts all unique passkey signers from an already-loaded list of context rules.
-     *
-     * Call this when the caller already holds the rules list to avoid redundant RPC fetches.
-     */
-    private fun extractPasskeySigners(rules: List<ParsedContextRule>): List<ExternalSigner> {
-        return rules.flatMap { it.signers }
-            .filterIsInstance<ExternalSigner>()
-            .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
-            .distinctBy { SmartAccountBuilders.getSignerKey(it) }
     }
 
     /**

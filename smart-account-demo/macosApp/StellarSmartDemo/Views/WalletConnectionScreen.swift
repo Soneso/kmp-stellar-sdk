@@ -548,14 +548,22 @@ struct WalletConnectionScreen: View {
         activeSection = .pending(credential.credentialId)
         Task {
             do {
-                let result = try await bridgeWrapper.bridge.retryPendingDeploy(
-                    credentialId: credential.credentialId
+                let result = try await bridgeWrapper.bridge.deployPendingAndProvision(
+                    credentialId: credential.credentialId,
+                    onProgress: { _ in }
                 )
                 await MainActor.run {
                     activeSection = nil
                     appState.sync(from: bridgeWrapper.bridge)
-                    toastManager.show("Connected successfully")
-                    dismiss()
+                    if result.success {
+                        toastManager.show("Connected successfully")
+                        dismiss()
+                    } else {
+                        toastManager.show(
+                            "Retry failed: \(result.error ?? "Unknown error")",
+                            isError: true
+                        )
+                    }
                 }
             } catch {
                 await MainActor.run {

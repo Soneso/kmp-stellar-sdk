@@ -85,8 +85,8 @@ import com.soneso.smartdemo.flows.FlowPolicyEntry
 import com.soneso.smartdemo.flows.addContextRule
 import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
+import com.soneso.smartdemo.flows.loadAllOnChainSigners
 import com.soneso.smartdemo.flows.loadAvailableSigners
-import com.soneso.smartdemo.flows.loadContextRules
 import com.soneso.smartdemo.flows.loadParsedContextRule
 import com.soneso.smartdemo.flows.readPolicyParamsWithServer
 import com.soneso.smartdemo.flows.withInProcessMultiSigner
@@ -264,13 +264,7 @@ class ContextRuleBuilderScreen(
             }
 
             // Load all signers from all on-chain rules for the "Reuse Signer" picker.
-            val allRules = loadContextRules()
-            allOnChainSigners = allRules.flatMap { it.signers }
-                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-                .filter { signer ->
-                    val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                    credId == null || credId != DemoState.credentialId
-                }
+            allOnChainSigners = loadAllOnChainSigners()
 
             ActivityLogState.info(
                 "Loaded rule #$ruleId for editing: " +
