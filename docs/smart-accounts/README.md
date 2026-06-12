@@ -9,7 +9,7 @@ New to smart accounts? Start with the [onboarding guide](onboarding.md) for back
 A smart account is a Soroban contract that replaces traditional Stellar key management with programmable authorization. Each smart account supports:
 
 - **Passkey authentication**: Users sign transactions with WebAuthn (secp256r1) instead of Ed25519 secret keys
-- **Multiple signers**: Combine passkeys, delegated Stellar accounts, and Ed25519 keys on a single account. All three signer types support full multi-signer signing through the `OZMultiSignerManager` pipeline.
+- **Multiple signers**: Combine passkeys, delegated Stellar addresses (accounts or contracts), and Ed25519 keys on a single account. All three signer types support full multi-signer signing through the `OZMultiSignerManager` pipeline.
 - **Context rules**: Define different authorization requirements for different operation types
 - **Policies**: Enforce authorization constraints such as spending limits and multi-signature thresholds, or add custom policy contracts
 - **Fee sponsoring**: Submit transactions through a relayer so users never pay gas fees
@@ -49,6 +49,10 @@ The kit is split into two layers: a protocol-agnostic `core/` layer (signer type
 |  | credentialManager     |  | events                     |            |
 |  | (OZCredentialManager) |  | (SmartAccountEventEmitter) |            |
 |  +-----------------------+  +----------------------------+            |
+|  +--------------------------+                                         |
+|  | externalSigners          |                                         |
+|  | (OZExternalSignerManager)|                                         |
+|  +--------------------------+                                         |
 +-----------------------------------------------------------------------+
         |                    |                      |
         v                    v                      v
@@ -69,7 +73,7 @@ The kit is split into two layers: a protocol-agnostic `core/` layer (signer type
 
 **WebAuthnProvider** is a platform-specific interface you implement, or use the provided implementation. It triggers the OS-level biometric prompt and returns raw WebAuthn attestation/assertion data.
 
-**StorageAdapter** persists credentials and sessions. The SDK includes an in-memory adapter for testing and platform-storage adapters for production (see the Configuration Reference).
+**StorageAdapter** persists credentials and sessions. The SDK includes an in-memory adapter for testing and platform adapters for production: `KeychainStorageAdapter` and `UserDefaultsStorageAdapter` (Apple), `AndroidStorageAdapter`, `IndexedDBStorageAdapter` and `LocalStorageAdapter` (web). See the platform guides.
 
 **External signing** flows through one kit-owned `OZExternalSignerManager`, exposed as `kit.externalSigners` — the single front door for all external (non-passkey) signers. Supply adapters for external wallet signers (e.g. Freighter or WalletConnect) and for raw Ed25519 signers (e.g. an HSM or remote signing service) via configuration, or register in-memory keypairs at runtime. See the [demo app](../../smart-account-demo) for examples.
 
@@ -78,6 +82,7 @@ The kit is split into two layers: a protocol-agnostic `core/` layer (signer type
 This example creates a smart account, connects to it, and sends a token transfer. All class names, method names, and parameters shown here are from the actual SDK.
 
 ```kotlin
+import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import com.soneso.stellar.sdk.smartaccount.core.*
 
@@ -134,7 +139,7 @@ val wallet = kit.walletOperations.createWallet(
 val result = kit.transactionOperations.transfer(
     tokenContract = "<C-address of token contract>",
     recipient = "<recipient G-address>",
-    amount = "10"  // decimal amount (automatically converted to stroops)
+    amount = "10"  // decimal amount (converted to the token's base units)
 )
 
 if (result.success) {
@@ -149,6 +154,11 @@ if (result.success) {
 // Credentials remain in storage for reconnection.
 
 kit.disconnect()
+
+// Call close() when finished with the kit entirely: it releases the HTTP
+// clients and in-memory keys. Call disconnect() first if you also want to
+// end the session.
+kit.close()
 ```
 
 ### Reconnecting to an Existing Wallet
@@ -301,7 +311,7 @@ val result = kit.policyManager.addPolicy(
 
 ### Multi-Signer Operations
 
-When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers; `multiSignerContractCall()` handles arbitrary external contract calls (e.g., governance votes, multisig swaps), authorized through the matching call-contract context rule; and `multiSignerExecuteAndSubmit()` routes a call through the smart account's `execute` entry point.
+When a context rule requires multiple signers, use `kit.multiSignerManager` to coordinate signatures. `multiSignerTransfer()` handles token transfers; `multiSignerContractCall()` handles arbitrary external contract calls (e.g., governance votes, multisig swaps), authorized through the matching context rule; and `multiSignerExecuteAndSubmit()` routes a call through the smart account's `execute` entry point.
 
 All three signer kinds — passkey (`SelectedSigner.Passkey`), delegated wallet (`SelectedSigner.Wallet`), and Ed25519 external (`SelectedSigner.Ed25519`) — may be mixed in the same `selectedSigners` list. Wallet and Ed25519 signers resolve through the kit-owned `kit.externalSigners` manager: register an in-memory key at runtime (`kit.externalSigners.addFromSecret(...)` / `kit.externalSigners.addEd25519FromRawKey(...)`) or supply an adapter at kit construction (`externalWallet` / `externalEd25519Adapter`).
 
@@ -381,7 +391,7 @@ val config = OZSmartAccountConfig.builder(
     .build()
 ```
 
-## Testnet contract addresses
+## Testnet Contract Addresses
 
 The SDK needs two values that depend on the network: a WASM hash (`accountWasmHash`) for the uploaded smart account binary, and a verifier contract address (`webauthnVerifierAddress`). Both can change when contracts are upgraded, testnet is reset, or their TTL expires.
 
@@ -391,7 +401,7 @@ Current testnet values are in `DemoConfig.kt` in the demo app:
 smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt
 ```
 
-### Uploading your own WASM
+### Uploading Your Own WASM
 
 If the testnet hash has expired or you need a custom contract, clone the [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) repository and build/upload:
 
@@ -414,7 +424,7 @@ When `createWallet()` is called, the SDK deploys a Soroban smart account contrac
 
 **Deployer keypair**: The deployer is the source account of the deployment transaction. It serves two purposes:
 
-1. **Address derivation**: The contract address is computed from `hash(deployer_public_key + credential_id)`. This makes the address deterministic — the same credential and deployer always produce the same contract address.
+1. **Address derivation**: The credential ID is hashed (SHA-256) to a salt, and the contract address derives from the deployer's public key, that salt, and the network passphrase. This makes the address deterministic — the same credential, deployer, and network always produce the same contract address.
 2. **Transaction signing**: The deployer signs the deployment transaction as the source account.
 
 After deployment, the deployer has no privileges over the contract. Only the configured signers (passkeys, delegated accounts, Ed25519 keys) can authorize operations on the smart account.
@@ -423,7 +433,7 @@ After deployment, the deployer has no privileges over the contract. Only the con
 
 ## Deterministic Address Derivation
 
-Contract address derivation is deterministic: given the same deployer keypair, credential ID, and network passphrase, the SDK always produces the same contract address. This is a correctness property, not a special feature -- it follows from how Soroban computes contract addresses.
+Contract address derivation is deterministic: given the same deployer keypair, credential ID, and network passphrase, `SmartAccountUtils.deriveContractAddress()` always produces the same contract address. This enables wallet discovery without an indexer (derive the address, check if it exists on-chain), consistent address display across applications, and cross-implementation verification.
 
 ### Default Deployer
 
@@ -448,19 +458,7 @@ val config = OZSmartAccountConfig(
 )
 ```
 
-When using a custom deployer, address derivation still works the same way: the same deployer + credential ID always produces the same contract address. An indexer is recommended for wallet discovery with custom deployers, since clients that do not know the deployer keypair cannot derive the address independently.
-
-### Deterministic Contract Addresses
-
-Given the same credential ID and deployer, `SmartAccountUtils.deriveContractAddress()` computes the same C-address. This enables:
-
-- Wallet discovery without an indexer (derive the address, check if it exists on-chain)
-- Consistent address display across applications
-- Correctness verification (same inputs produce the same outputs regardless of SDK implementation)
-
-### Signer Format Compatibility
-
-Signer representations (`DelegatedSigner`, `ExternalSigner`) encode to the standard Soroban SCVal structure defined by the OpenZeppelin smart account contract. The `ExternalSigner.webAuthn()` factory produces the `keyData` format (65-byte public key + credential ID bytes) expected by the on-chain verifier. Signers added by any compatible SDK are recognized on-chain.
+When using a custom deployer, an indexer is recommended for wallet discovery, since clients that do not know the deployer keypair cannot derive the address independently.
 
 ## Contract Limits
 

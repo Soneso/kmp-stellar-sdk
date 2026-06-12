@@ -4,12 +4,11 @@ package com.soneso.smartdemo.flows
  * Edit orchestrator for context rule modifications.
  *
  * [submitContextRuleEdits] executes a sequence of on-chain transactions to apply all
- * changes described in a [ContextRuleEditDiff]. The execution order matches the TS SDK
- * demo's edit-mode submission flow:
+ * changes described in a [ContextRuleEditDiff]. The execution order is:
  *
  * 1. Update name (if changed)
- * 2. Add new signers
- * 3. Remove deleted signers
+ * 2. Remove deleted signers
+ * 3. Add new signers
  * 4. Auth context guard (if new signers were added, skip policy/expiry changes)
  * 5. Remove policies marked for deletion
  * 6. Update modified policies (remove + re-add)
@@ -101,12 +100,17 @@ suspend fun submitContextRuleEdits(
         }
     }
 
-    // Step 2: Add new signers (each is a separate transaction)
-    for ((index, signerEntry) in diff.newSigners.withIndex()) {
-        val stepName = "Adding signer ${index + 1} of ${diff.newSigners.size}"
+    // Step 2: Remove deleted signers (each is a separate transaction).
+    // Removals run before additions so that removing a signer and re-adding an equal
+    // signer in the same edit does not hit the contract's duplicate-signer check (3007).
+    for ((index, signerEntry) in diff.removedSigners.withIndex()) {
+        val stepName = "Removing signer ${index + 1} of ${diff.removedSigners.size}"
         onProgress("$stepName...")
         try {
-            val result = addSignerByType(ruleId, signerEntry, selectedSigners)
+            val signerId = signerEntry.onChainId
+                ?: throw IllegalStateException("Cannot remove signer without on-chain ID")
+
+            val result = removeSignerFromRule(ruleId, signerId, selectedSigners)
             if (!result.success) {
                 return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }
@@ -117,15 +121,12 @@ suspend fun submitContextRuleEdits(
         }
     }
 
-    // Step 3: Remove deleted signers (each is a separate transaction)
-    for ((index, signerEntry) in diff.removedSigners.withIndex()) {
-        val stepName = "Removing signer ${index + 1} of ${diff.removedSigners.size}"
+    // Step 3: Add new signers (each is a separate transaction)
+    for ((index, signerEntry) in diff.newSigners.withIndex()) {
+        val stepName = "Adding signer ${index + 1} of ${diff.newSigners.size}"
         onProgress("$stepName...")
         try {
-            val signerId = signerEntry.onChainId
-                ?: throw IllegalStateException("Cannot remove signer without on-chain ID")
-
-            val result = removeSignerFromRule(ruleId, signerId, selectedSigners)
+            val result = addSignerByType(ruleId, signerEntry, selectedSigners)
             if (!result.success) {
                 return failureResult(completedOps, diff.totalOperations, stepName, result.error, txHashes)
             }

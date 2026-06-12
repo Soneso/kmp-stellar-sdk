@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 /**
  * Returns a display color for a signer based on its type description string.
  *
- * The [signerType] is the value returned by [SmartAccountBuilders.describeSignerType]:
+ * The [signerType] is the value returned by the demo's [describeSignerType] helper:
  * - "Passkey (WebAuthn)" -> purple
  * - "Stellar Account"    -> blue
  * - "Ed25519"            -> teal

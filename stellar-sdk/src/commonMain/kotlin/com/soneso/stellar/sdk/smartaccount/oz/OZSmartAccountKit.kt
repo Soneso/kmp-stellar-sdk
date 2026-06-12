@@ -292,10 +292,9 @@ class OZSmartAccountKit private constructor(
     // MARK: - Resource Management
 
     /**
-     * Closes this kit and releases all held HTTP client resources.
-     *
-     * Closes the Soroban RPC server connection and the indexer HTTP client if present.
-     * The relayer client manages its own per-request connections and requires no explicit cleanup.
+     * Closes this kit and releases all held resources: the Soroban RPC, indexer, and
+     * relayer HTTP clients, plus in-memory state (event listeners and registered
+     * signing keys).
      *
      * This method does not clear the connection state or stored session. Call [disconnect]
      * before [close] if you also want to end the session. The kit must not be used after
@@ -314,6 +313,15 @@ class OZSmartAccountKit private constructor(
     fun close() {
         sorobanServer.close()
         indexerClient?.close()
+        relayerClient?.close()
+
+        // Drop subscriber references so listener closures do not keep consumer
+        // objects reachable through the kit.
+        events.removeAllListeners()
+
+        // Drop in-memory signing secrets (registered keypairs / Ed25519 keys). The
+        // external-wallet adapter is intentionally left intact.
+        externalSigners.clearInMemorySigners()
     }
 
     // MARK: - Internal Helpers
@@ -361,11 +369,12 @@ class OZSmartAccountKit private constructor(
      * SHA256("openzeppelin-smart-account-kit") for deterministic address derivation.
      *
      * Note: The deployer only pays for deployment transactions. It does not control user wallets.
+     * The deployer's G-address is needed to fund it externally on networks without Friendbot.
      *
      * @return The configured or default deployer keypair
      * @throws ConfigurationException if default deployer creation fails
      */
-    internal suspend fun getDeployer(): KeyPair {
+    suspend fun getDeployer(): KeyPair {
         return cachedDeployer ?: config.effectiveDeployer().also { cachedDeployer = it }
     }
 
@@ -431,7 +440,6 @@ class OZSmartAccountKit private constructor(
                 externalSigners = OZExternalSignerManager(
                     networkPassphrase = config.networkPassphrase,
                     walletAdapter = config.externalWallet,
-                    walletConnectionStorage = null,
                     ed25519Adapter = config.externalEd25519Adapter,
                 ),
                 sorobanServer = SorobanServer(config.rpcUrl)
@@ -453,7 +461,6 @@ class OZSmartAccountKit private constructor(
             externalSigners = OZExternalSignerManager(
                 networkPassphrase = config.networkPassphrase,
                 walletAdapter = config.externalWallet,
-                walletConnectionStorage = null,
                 ed25519Adapter = config.externalEd25519Adapter,
             ),
             sorobanServer = sorobanServer

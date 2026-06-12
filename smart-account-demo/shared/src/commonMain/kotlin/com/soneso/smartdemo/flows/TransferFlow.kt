@@ -72,7 +72,9 @@ private val registeredDelegatedAddresses = mutableSetOf<String>()
  *   Use [DemoConfig.NATIVE_TOKEN_CONTRACT] for XLM or [DemoState.demoTokenContractId] for DEMO.
  * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
  * @param amount The amount to transfer as a decimal string (e.g. "10" or "10.5").
- *   The SDK converts this to stroops internally.
+ *   The SDK converts this to the token's base units.
+ * @param decimals The token's decimal scale. Pass it when known (both demo tokens use 7)
+ *   to skip the SDK's on-chain decimals() lookup; null lets the SDK fetch it.
  * @return [TransferResult] with success/failure status, transaction hash, and optional error.
  * @throws Exception if the kit is not initialized, amount is invalid, or the passkey
  *   ceremony is cancelled. Check [isUserCancellation] to distinguish user cancellations.
@@ -80,7 +82,8 @@ private val registeredDelegatedAddresses = mutableSetOf<String>()
 suspend fun transfer(
     tokenContract: String,
     recipient: String,
-    amount: String
+    amount: String,
+    decimals: Int? = null
 ): TransferResult {
     val kit = DemoState.kit
         ?: throw IllegalStateException("Smart Account Kit not initialized")
@@ -90,7 +93,8 @@ suspend fun transfer(
     val result = kit.transactionOperations.transfer(
         tokenContract = tokenContract,
         recipient = recipient,
-        amount = amount
+        amount = amount,
+        decimals = decimals
     )
 
     if (result.success) {
@@ -126,6 +130,8 @@ suspend fun transfer(
  * @param tokenContract The contract address (C-address) of the token to transfer.
  * @param recipient The recipient's Stellar account (G-address) or contract (C-address).
  * @param amount The amount to transfer as a decimal string (e.g. "10" or "10.5").
+ * @param decimals The token's decimal scale. Pass it when known (both demo tokens use 7)
+ *   to skip the SDK's on-chain decimals() lookup; null lets the SDK fetch it.
  * @param selectedSigners All signers that must participate, in signing order.
  * @return [TransferResult] with success/failure status, transaction hash, and optional error.
  */
@@ -133,6 +139,7 @@ suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
     amount: String,
+    decimals: Int? = null,
     selectedSigners: List<SelectedSigner>
 ): TransferResult {
     val kit = DemoState.kit
@@ -145,6 +152,7 @@ suspend fun multiSignerTransfer(
         tokenContract = tokenContract,
         recipient = recipient,
         amount = amount,
+        decimals = decimals,
         selectedSigners = selectedSigners
     )
 
@@ -274,6 +282,7 @@ suspend fun multiSignerTransferWithEd25519(
     tokenContract: String,
     recipient: String,
     amount: String,
+    decimals: Int? = null,
     selectedSigners: List<SelectedSigner>,
     delegatedKeyPairs: Map<String, com.soneso.stellar.sdk.KeyPair>,
     ed25519Secrets: Map<Ed25519SignerIdentity, ByteArray>
@@ -282,6 +291,7 @@ suspend fun multiSignerTransferWithEd25519(
         tokenContract = tokenContract,
         recipient = recipient,
         amount = amount,
+        decimals = decimals,
         selectedSigners = selectedSigners
     )
 }

@@ -11,7 +11,8 @@ package com.soneso.smartdemo.flows
  * - Policy operations: [addPolicyToRule], [removePolicyFromRule]
  * - Policy reading: [readPolicyParams], [readPolicyParamsWithServer]
  * - Signer construction: [registerPasskeySigner], [buildDelegatedSigner], [buildEd25519Signer]
- * - Helpers: [resolveAbsoluteLedger], [loadAvailablePasskeySigners]
+ * - Helpers: [resolveAbsoluteLedger], [extractPasskeySigners], [loadAvailablePasskeySigners],
+ *   [loadAllOnChainSigners]
  *
  * Context rules define on-chain authorization: each rule specifies which signers can
  * authorize which operations (Default, CallContract, or CreateContract) and which
@@ -835,8 +836,9 @@ private fun parseSpendingLimitParams(scVal: SCValXdr): PolicyParams? {
  * - "threshold": U32 value
  * - "signer_weights": map of signer SCVal -> U32 weight
  *
- * Signer keys in the weights map are converted to their string representation
- * using [SmartAccountBuilders.getSignerKey] or a hex fallback.
+ * Signer keys in the weights map are converted to their canonical signer-key form
+ * via [SmartAccountBuilders.getSignerKey], falling back to the SCVal discriminant
+ * name if parsing fails.
  */
 private fun parseWeightedThresholdParams(scVal: SCValXdr): PolicyParams? {
     val map = Scv.fromMap(scVal)
@@ -855,7 +857,8 @@ private fun parseWeightedThresholdParams(scVal: SCValXdr): PolicyParams? {
                 val weights = mutableMapOf<String, UInt>()
                 for ((signerKey, weightVal) in weightsScMap) {
                     // The signer key is the full signer SCVal (Vec with type + address + keyData).
-                    // Convert to a readable string key for display.
+                    // Convert to the canonical signer-key string so consumers can
+                    // resolve it via SmartAccountBuilders.getSignerKey lookups.
                     val signerKeyStr = signerScValToString(signerKey)
                     val weight = Scv.fromUint32(weightVal)
                     weights[signerKeyStr] = weight
@@ -877,9 +880,11 @@ private fun parseWeightedThresholdParams(scVal: SCValXdr): PolicyParams? {
 }
 
 /**
- * Converts a signer SCVal to a display string.
+ * Converts a signer SCVal to its canonical signer-key string.
  *
- * Attempts to parse the signer SCVal as a SmartAccountSigner and extract a readable key.
+ * Parses the signer SCVal as a SmartAccountSigner and returns the key produced by
+ * [SmartAccountBuilders.getSignerKey] ("delegated:..." or "external:..."), so weights-map
+ * entries match lookups that consumers build from [SmartAccountBuilders.getSignerKey].
  * Falls back to the SCVal discriminant name if parsing fails.
  */
 private fun signerScValToString(scVal: SCValXdr): String {
@@ -891,7 +896,8 @@ private fun signerScValToString(scVal: SCValXdr): String {
                 "Delegated" -> {
                     // Vec([Symbol("Delegated"), Address(addr)])
                     val address = Address.fromSCVal(vec[1])
-                    address.toString()
+                    val signer = DelegatedSigner(address.toString())
+                    SmartAccountBuilders.getSignerKey(signer)
                 }
                 "External" -> {
                     // Vec([Symbol("External"), Address(verifier), Bytes(keyData)])
@@ -1009,14 +1015,55 @@ fun buildEd25519Signer(publicKey: ByteArray): ExternalSigner {
  * @throws IllegalStateException if the kit is not initialized.
  */
 suspend fun loadAvailablePasskeySigners(excludeCredentialId: String?): List<ExternalSigner> {
-    val rules = loadContextRules()
-    return rules
+    return extractPasskeySigners(loadContextRules(), excludeCredentialId)
+}
+
+/**
+ * Extracts all unique passkey signers from an already-loaded list of context rules.
+ *
+ * Passkey signers are [ExternalSigner] instances whose verifier address matches the
+ * configured WebAuthn verifier contract. They are deduplicated by signer key. Operates
+ * on the given rules list, so no RPC fetch is performed.
+ *
+ * @param rules Parsed context rules to extract passkey signers from.
+ * @param excludeCredentialId Base64URL credential ID of a passkey to exclude (the
+ *   connected wallet owner). Pass null to include all passkeys.
+ * @return Deduplicated list of [ExternalSigner] passkey instances.
+ */
+fun extractPasskeySigners(
+    rules: List<ParsedContextRule>,
+    excludeCredentialId: String? = null
+): List<ExternalSigner> {
+    val passkeys = rules
         .flatMap { it.signers }
         .filterIsInstance<ExternalSigner>()
         .filter { it.verifierAddress == DemoConfig.WEBAUTHN_VERIFIER_ADDRESS }
         .distinctBy { SmartAccountBuilders.getSignerKey(it) }
+    if (excludeCredentialId == null) {
+        return passkeys
+    }
+    return passkeys.filter { signer ->
+        SmartAccountBuilders.getCredentialIdStringFromSigner(signer) != excludeCredentialId
+    }
+}
+
+/**
+ * Loads all unique signers from all on-chain context rules, excluding the connected
+ * wallet's own passkey.
+ *
+ * Signers of every type are included (delegated, Ed25519, passkey) and deduplicated by
+ * signer key. Signers without a credential ID are always kept; a passkey signer is
+ * dropped only when its credential ID matches the connected wallet's credential ID.
+ *
+ * @return Deduplicated list of [SmartAccountSigner] instances across all rules.
+ * @throws IllegalStateException if the kit is not initialized.
+ */
+suspend fun loadAllOnChainSigners(): List<SmartAccountSigner> {
+    return loadContextRules()
+        .flatMap { it.signers }
+        .distinctBy { SmartAccountBuilders.getSignerKey(it) }
         .filter { signer ->
-            val signerCredId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-            signerCredId != excludeCredentialId
+            val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
+            credId == null || credId != DemoState.credentialId
         }
 }

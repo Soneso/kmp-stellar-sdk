@@ -26,8 +26,6 @@ struct InfoCard<Content: View>: View {
         case error
         /// Secondary container background with on-secondary-container text.
         case secondary
-        /// Soft green background with green text for successful states.
-        case success
         /// Plain surface background with on-surface text.
         case surface
 
@@ -37,7 +35,6 @@ struct InfoCard<Content: View>: View {
             case .variant:   return Material3Colors.surfaceVariant
             case .error:     return Material3Colors.errorContainer
             case .secondary: return Material3Colors.secondaryContainer
-            case .success:   return Material3Colors.logSuccess.opacity(0.12)
             case .surface:   return Material3Colors.surface
             }
         }
@@ -48,7 +45,6 @@ struct InfoCard<Content: View>: View {
             case .variant:   return Material3Colors.onSurfaceVariant
             case .error:     return Material3Colors.onErrorContainer
             case .secondary: return Material3Colors.onSecondaryContainer
-            case .success:   return Material3Colors.badgePoliciesText
             case .surface:   return Material3Colors.onSurface
             }
         }

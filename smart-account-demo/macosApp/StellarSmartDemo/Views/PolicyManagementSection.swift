@@ -8,11 +8,12 @@
 import SwiftUI
 import shared
 
-/// Form section for attaching policies to a context rule being created.
+/// Form section for managing policies on a context rule.
 ///
-/// Only visible in create mode — policy changes require separate SDK calls in edit mode.
-/// Supports threshold, spending limit, and weighted threshold policies. Policy types
-/// already added to the rule are excluded from the picker.
+/// Shown in both create and edit mode. Supports threshold, spending limit, and weighted
+/// threshold policies. Policy types already added to the rule are excluded from the picker.
+/// In edit mode, existing on-chain policies additionally render inline parameter-editing
+/// forms pre-populated from their on-chain values.
 struct PolicyManagementSection: View {
 
     @ObservedObject var viewModel: ContextRuleBuilderViewModel
@@ -21,6 +22,9 @@ struct PolicyManagementSection: View {
         VStack(spacing: 12) {
             sectionHeader
             policyList
+            if viewModel.isEditing {
+                editPolicyParamsForms
+            }
             if !viewModel.isSubmitting && viewModel.policies.count < viewModel.maxPolicies {
                 addPolicyCard
             }
@@ -41,7 +45,35 @@ struct PolicyManagementSection: View {
                 )
                 .font(.callout)
                 .foregroundColor(Material3Colors.onSurfaceVariant)
+                if viewModel.isEditing {
+                    Text("Each policy change requires a separate passkey authentication.")
+                        .font(.caption)
+                        .foregroundColor(Material3Colors.primary)
+                }
+
+                if let error = viewModel.fieldErrors["policies"] {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundColor(Material3Colors.error)
+                }
             }
+        }
+    }
+
+    // MARK: - Edit Mode: Inline Policy Parameter Forms
+
+    /// Inline editing forms for existing on-chain policies with loaded parameters.
+    @ViewBuilder
+    private var editPolicyParamsForms: some View {
+        let editablePolicies = viewModel.policies.filter {
+            $0.isOriginal && $0.originalParams != nil && $0.onChainId != nil
+        }
+        ForEach(editablePolicies, id: \.onChainId) { policy in
+            EditPolicyParamsForm(
+                viewModel: viewModel,
+                onChainId: policy.onChainId!,
+                params: policy.originalParams!
+            )
         }
     }
 
@@ -76,32 +108,28 @@ struct PolicyManagementSection: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 // Type badge
-                Text(policy.policyName)
-                    .font(.caption2)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(chipColor)
-                    .cornerRadius(4)
+                TagPill(text: policy.policyName, background: chipColor)
 
                 if policy.isOriginal {
-                    Text("on-chain")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Material3Colors.primary.opacity(0.7))
-                        .cornerRadius(3)
+                    TagPill(
+                        text: "on-chain",
+                        font: .system(size: 9, weight: .medium),
+                        background: Material3Colors.primary.opacity(0.7),
+                        horizontalPadding: 5,
+                        verticalPadding: 1,
+                        cornerRadius: 3
+                    )
                 }
 
                 if policy.modified {
-                    Text("modified")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.orange.opacity(0.8))
-                        .cornerRadius(3)
+                    TagPill(
+                        text: "modified",
+                        font: .system(size: 9, weight: .medium),
+                        background: Color.orange.opacity(0.8),
+                        horizontalPadding: 5,
+                        verticalPadding: 1,
+                        cornerRadius: 3
+                    )
                 }
 
                 Text(policy.label)
@@ -446,6 +474,229 @@ struct PolicyManagementSection: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(Material3Colors.outline, lineWidth: 1)
             )
+        }
+    }
+}
+
+// MARK: - Edit Policy Params Form
+
+/// Inline form for editing parameters of an existing on-chain policy.
+///
+/// Fields are pre-populated from the policy's on-chain parameters. Changing a value marks
+/// the entry as modified and stages the new parameters for submission; reverting to the
+/// original values clears the modified flag.
+private struct EditPolicyParamsForm: View {
+
+    @ObservedObject var viewModel: ContextRuleBuilderViewModel
+    let onChainId: Int32
+    let params: PolicyParamsBridge
+
+    @State private var editThreshold: String = ""
+    @State private var editAmount: String = ""
+    @State private var editPeriodDays: String = ""
+    @State private var editWeightedThreshold: String = ""
+    @State private var prefilled: Bool = false
+
+    /// The current entry in the view model, looked up by on-chain ID.
+    private var entry: PolicyEntry? {
+        viewModel.policies.first(where: { $0.isOriginal && $0.onChainId == onChainId })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Edit \(entry?.policyName ?? "Policy") Parameters")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Material3Colors.primary)
+
+            if entry?.modified == true {
+                Text("Parameters modified (will be updated on submit)")
+                    .font(.caption)
+                    .foregroundColor(Color.orange)
+            }
+
+            switch params.type {
+            case "threshold":          thresholdEditFields
+            case "spending_limit":     spendingLimitEditFields
+            case "weighted_threshold": weightedThresholdEditFields
+            default:                   EmptyView()
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Material3Colors.logInfo.opacity(0.06))
+        .cornerRadius(8)
+        .onAppear { prefillFromParams() }
+    }
+
+    // MARK: - Threshold
+
+    private var thresholdEditFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ValidationTextField(
+                label: "Threshold (required signers)",
+                text: Binding(
+                    get: { editThreshold },
+                    set: { value in
+                        let filtered = value.filter { $0.isNumber }
+                        editThreshold = filtered
+                        viewModel.updateThresholdPolicyEntry(onChainId: onChainId, thresholdStr: filtered)
+                    }
+                ),
+                isEnabled: !viewModel.isSubmitting
+            )
+            Text("Current on-chain value: \(params.threshold.map { "\($0)" } ?? "unknown")")
+                .font(.caption)
+                .foregroundColor(Material3Colors.onSurfaceVariant)
+        }
+    }
+
+    // MARK: - Spending Limit
+
+    private var spendingLimitEditFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ValidationTextField(
+                label: "Amount",
+                text: Binding(
+                    get: { editAmount },
+                    set: { value in
+                        let filtered = value.filter { $0.isNumber || $0 == "." }
+                        if filtered.components(separatedBy: ".").count <= 2 {
+                            editAmount = filtered
+                            viewModel.updateSpendingLimitPolicyEntry(
+                                onChainId: onChainId,
+                                amountStr: filtered,
+                                periodDaysStr: editPeriodDays
+                            )
+                        }
+                    }
+                ),
+                isEnabled: !viewModel.isSubmitting
+            )
+            Text("Current on-chain value: \(params.spendingLimit ?? "unknown")")
+                .font(.caption)
+                .foregroundColor(Material3Colors.onSurfaceVariant)
+
+            ValidationTextField(
+                label: "Period (days)",
+                text: Binding(
+                    get: { editPeriodDays },
+                    set: { value in
+                        let filtered = value.filter { $0.isNumber }
+                        editPeriodDays = filtered
+                        viewModel.updateSpendingLimitPolicyEntry(
+                            onChainId: onChainId,
+                            amountStr: editAmount,
+                            periodDaysStr: filtered
+                        )
+                    }
+                ),
+                isEnabled: !viewModel.isSubmitting
+            )
+            Text("Current on-chain value: \(params.periodDays.map { "\($0)" } ?? "unknown") day(s)")
+                .font(.caption)
+                .foregroundColor(Material3Colors.onSurfaceVariant)
+        }
+    }
+
+    // MARK: - Weighted Threshold
+
+    private var weightedThresholdEditFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ValidationTextField(
+                label: "Weight Threshold",
+                text: Binding(
+                    get: { editWeightedThreshold },
+                    set: { value in
+                        let filtered = value.filter { $0.isNumber }
+                        editWeightedThreshold = filtered
+                        viewModel.updateWeightedThresholdPolicyEntry(
+                            onChainId: onChainId,
+                            thresholdStr: filtered
+                        )
+                    }
+                ),
+                isEnabled: !viewModel.isSubmitting
+            )
+            Text("Current on-chain value: \(params.threshold.map { "\($0)" } ?? "unknown")")
+                .font(.caption)
+                .foregroundColor(Material3Colors.onSurfaceVariant)
+
+            // Per-signer weight fields with original values
+            if !viewModel.signers.isEmpty {
+                Text("Per-Signer Weights")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Material3Colors.onSurface)
+
+                ForEach(viewModel.signers) { signer in
+                    editSignerWeightRow(signer: signer)
+                }
+            }
+        }
+    }
+
+    private func editSignerWeightRow(signer: SignerItem) -> some View {
+        HStack(spacing: 8) {
+            SignerBadge(signerType: signer.type)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(signer.displayName)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(Material3Colors.onSurface)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let weight = viewModel.onChainWeight(for: signer, in: params) {
+                    Text("On-chain: \(weight)")
+                        .font(.system(size: 9))
+                        .foregroundColor(Material3Colors.onSurfaceVariant)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            TextField("Wt.", text: Binding(
+                get: { viewModel.signerWeights[signer.identifier] ?? "" },
+                set: { value in
+                    viewModel.signerWeights[signer.identifier] = value.filter { $0.isNumber }
+                    viewModel.updateWeightedThresholdPolicyEntry(
+                        onChainId: onChainId,
+                        thresholdStr: editWeightedThreshold
+                    )
+                }
+            ))
+            .textFieldStyle(.plain)
+            .font(.callout)
+            .multilineTextAlignment(.center)
+            .padding(6)
+            .frame(width: 60)
+            .background(Material3Colors.surface)
+            .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Material3Colors.outline, lineWidth: 1)
+            )
+            .disabled(viewModel.isSubmitting)
+        }
+    }
+
+    // MARK: - Prefill
+
+    /// Pre-populates the form fields from the on-chain parameters on first appearance.
+    private func prefillFromParams() {
+        guard !prefilled else { return }
+        prefilled = true
+        switch params.type {
+        case "threshold":
+            editThreshold = params.threshold.map { "\($0)" } ?? ""
+        case "spending_limit":
+            editAmount = params.spendingLimit ?? ""
+            editPeriodDays = params.periodDays.map { "\($0)" } ?? ""
+        case "weighted_threshold":
+            editWeightedThreshold = params.threshold.map { "\($0)" } ?? ""
+            for signer in viewModel.signers {
+                if let weight = viewModel.onChainWeight(for: signer, in: params) {
+                    viewModel.signerWeights[signer.identifier] = "\(weight)"
+                }
+            }
+        default:
+            break
         }
     }
 }

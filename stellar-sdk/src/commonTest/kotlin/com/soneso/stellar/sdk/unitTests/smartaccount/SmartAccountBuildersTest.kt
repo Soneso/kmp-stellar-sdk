@@ -168,12 +168,14 @@ class SmartAccountBuildersTest {
     // describeSignerType
     // ========================================================================
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_delegatedSigner_returnsStellarAccount() {
         val signer = delegatedSigner()
         assertEquals("Stellar Account", SmartAccountBuilders.describeSignerType(signer))
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_webAuthnSigner_returnsPasskeyWebAuthn() {
         val signer = webAuthnSigner()
@@ -182,6 +184,7 @@ class SmartAccountBuildersTest {
         assertEquals("Passkey (WebAuthn)", SmartAccountBuilders.describeSignerType(signer))
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_ed25519Signer_returnsEd25519() {
         val signer = ed25519Signer()
@@ -189,6 +192,7 @@ class SmartAccountBuildersTest {
         assertEquals("Ed25519", SmartAccountBuilders.describeSignerType(signer))
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_externalSignerWithOtherKeySize_returnsExternalVerifier() {
         // Key data that is neither >65 bytes nor 32 bytes (e.g. 48 bytes)
@@ -443,6 +447,65 @@ class SmartAccountBuildersTest {
     }
 
     // ========================================================================
+    // getPublicKeyFromSigner
+    // ========================================================================
+
+    @Test
+    fun testGetPublicKeyFromSigner_delegatedSigner_returnsNull() {
+        val signer = delegatedSigner()
+        kotlin.test.assertNull(SmartAccountBuilders.getPublicKeyFromSigner(signer))
+    }
+
+    @Test
+    fun testGetPublicKeyFromSigner_ed25519ExternalSigner_returnsNull() {
+        // 32-byte key data is <= 65, so there is no public-key prefix to extract
+        val signer = ed25519Signer()
+        kotlin.test.assertNull(SmartAccountBuilders.getPublicKeyFromSigner(signer))
+    }
+
+    @Test
+    fun testGetPublicKeyFromSigner_exactly65ByteKeyData_returnsNull() {
+        // Boundary: keyData.size == 65 satisfies <= 65, so no credential ID follows
+        // and the signer is not treated as a WebAuthn signer
+        val signer = ExternalSigner(validContractAddress1, ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE))
+        kotlin.test.assertNull(SmartAccountBuilders.getPublicKeyFromSigner(signer))
+    }
+
+    @Test
+    fun testGetPublicKeyFromSigner_webAuthnSigner_returns65BytePublicKey() {
+        val pubKey = secp256r1PublicKey()
+        val signer = webAuthnSigner(publicKey = pubKey)
+        val result = SmartAccountBuilders.getPublicKeyFromSigner(signer)
+        kotlin.test.assertNotNull(result)
+        assertEquals(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE, result.size)
+        assertTrue(result.contentEquals(pubKey))
+    }
+
+    @Test
+    fun testGetPublicKeyFromSigner_webAuthnSigner_returnsOnlyPublicKeyPortion() {
+        val pubKey = secp256r1PublicKey()
+        val credBytes = credentialIdBytes()
+        val signer = webAuthnSigner(publicKey = pubKey, credentialId = credBytes)
+        val result = SmartAccountBuilders.getPublicKeyFromSigner(signer)
+        kotlin.test.assertNotNull(result)
+        assertEquals(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE, result.size)
+        assertTrue(result.contentEquals(pubKey))
+    }
+
+    @Test
+    fun testGetPublicKeyFromSigner_complementsCredentialId() {
+        // publicKey + credentialId from the two accessors reassemble the full keyData
+        val pubKey = secp256r1PublicKey()
+        val credBytes = credentialIdBytes()
+        val signer = webAuthnSigner(publicKey = pubKey, credentialId = credBytes)
+        val extractedKey = SmartAccountBuilders.getPublicKeyFromSigner(signer)
+        val extractedCred = SmartAccountBuilders.getCredentialIdFromSigner(signer)
+        kotlin.test.assertNotNull(extractedKey)
+        kotlin.test.assertNotNull(extractedCred)
+        assertTrue((extractedKey + extractedCred).contentEquals(pubKey + credBytes))
+    }
+
+    // ========================================================================
     // getCredentialIdStringFromSigner
     // ========================================================================
 
@@ -486,6 +549,7 @@ class SmartAccountBuildersTest {
     // describeSignerType — 65-byte boundary
     // ========================================================================
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_exactly65ByteKeyData_returnsExternalVerifier() {
         // keyData.size == 65: the check is > 65, so this does NOT match WebAuthn.
@@ -494,6 +558,7 @@ class SmartAccountBuildersTest {
         assertEquals("External Verifier", SmartAccountBuilders.describeSignerType(signer))
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testDescribeSignerType_66ByteKeyData_returnsPasskeyWebAuthn() {
         // One byte above the boundary: size > 65, so classified as WebAuthn.

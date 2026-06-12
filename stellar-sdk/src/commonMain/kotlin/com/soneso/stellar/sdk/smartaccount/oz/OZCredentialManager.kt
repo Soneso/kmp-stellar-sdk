@@ -730,7 +730,7 @@ class OZCredentialManager internal constructor(
     }
 
     /**
-     * Clears all credentials from storage.
+     * Clears all credentials and the stored session from storage.
      *
      * This operation is irreversible. Use with caution.
      *
@@ -738,7 +738,7 @@ class OZCredentialManager internal constructor(
      *
      * Example:
      * ```kotlin
-     * // Clear all credentials (e.g., on account deletion or reset)
+     * // Clear all credentials and the session (e.g., on account deletion or reset)
      * manager.clearAll()
      * ```
      */

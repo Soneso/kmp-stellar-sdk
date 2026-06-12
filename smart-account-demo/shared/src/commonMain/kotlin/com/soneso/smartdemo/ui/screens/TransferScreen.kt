@@ -117,6 +117,14 @@ class TransferScreen : Screen {
             DemoState.demoTokenContractId ?: ""
         }
 
+        // Both demo tokens use a known 7-decimal scale; passing it skips the SDK's
+        // on-chain decimals() lookup before each transfer.
+        val tokenDecimals = if (selectedTokenOption == TOKEN_OPTION_XLM) {
+            7 // XLM SAC scale
+        } else {
+            DemoConfig.DEMO_TOKEN_DECIMALS
+        }
+
         // Validation
         val recipientError = validateRecipient(recipient)
         val amountError = validateAmount(amount)
@@ -385,7 +393,8 @@ class TransferScreen : Screen {
                                         val result = transfer(
                                             tokenContract = tokenContract,
                                             recipient = recipient,
-                                            amount = amount
+                                            amount = amount,
+                                            decimals = tokenDecimals
                                         )
 
                                         if (result.success) {
@@ -584,7 +593,8 @@ class TransferScreen : Screen {
                                 val result = transfer(
                                     tokenContract = tokenContract,
                                     recipient = recipient,
-                                    amount = amount
+                                    amount = amount,
+                                    decimals = tokenDecimals
                                 )
 
                                 if (result.success) {
@@ -604,6 +614,7 @@ class TransferScreen : Screen {
                                     tokenContract = tokenContract,
                                     recipient = recipient,
                                     amount = amount,
+                                    decimals = tokenDecimals,
                                     selectedSigners = selected,
                                     delegatedKeyPairs = delegatedKeyPairs,
                                     ed25519Secrets = ed25519Secrets

@@ -21,7 +21,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountUtils
-import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnCborParser
+import com.soneso.stellar.sdk.smartaccount.core.WebAuthnCborParser
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnException
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult

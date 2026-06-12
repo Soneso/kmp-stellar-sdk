@@ -16,8 +16,8 @@ import SwiftUI
 /// ## Usage
 ///
 /// ```swift
-/// SignerBadge(signerType: "passkey")
-/// SignerBadge(signerType: "delegated", text: "Stellar Account")
+/// SignerBadge(signerType: "delegated")
+/// SignerBadge(signerType: "passkey", text: "WebAuthn")
 /// ```
 struct SignerBadge: View {
     let signerType: String
@@ -29,13 +29,7 @@ struct SignerBadge: View {
     }
 
     var body: some View {
-        Text(displayText)
-            .font(.caption2)
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(badgeColor)
-            .cornerRadius(4)
+        TagPill(text: displayText, background: badgeColor)
     }
 
     // MARK: - Helpers
@@ -44,7 +38,7 @@ struct SignerBadge: View {
         if let text = text { return text }
         switch signerType.lowercased() {
         case "passkey":   return "Passkey"
-        case "delegated": return "Delegated"
+        case "delegated": return "G-Address"
         case "ed25519":   return "Ed25519"
         default:          return signerType.capitalized
         }

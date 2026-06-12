@@ -256,16 +256,6 @@ object SmartAccountAuth {
             signature = credentials.signature
         )
 
-        // KEY: Signer identity as ScVal
-        val signerKey = try {
-            signer.toScVal()
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to convert signer to SCVal",
-                e
-            )
-        }
-
         // VALUE: Verifier-appropriate bytes for the on-wire signers map.
         // The exact content is verifier-dependent: WebAuthn/Policy XDR-encode their ScVal;
         // Ed25519 passes the raw 64-byte signature directly. See

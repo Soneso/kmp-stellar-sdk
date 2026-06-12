@@ -105,9 +105,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "CBCD1234...",
-    rpId = "your-domain.com",
-    rpName = "My Stellar Wallet",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     webauthnProvider = webauthnProvider,
     storage = storage
 )
@@ -137,9 +135,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "CBCD1234...",
-    rpId = "localhost",
-    rpName = "Dev Stellar Wallet",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     webauthnProvider = webauthnProvider
 )
 ```
@@ -169,16 +165,18 @@ The user dismissed the passkey dialog or the browser blocked the request. The SD
 ### Cross-origin iframe restrictions
 
 WebAuthn does not work in cross-origin iframes by default. If your app runs inside an iframe:
-- The parent frame must include `allow="publickey-credentials-create; publickey-credentials-get"` on the iframe element
-- Both the parent and iframe origins must serve appropriate `Permissions-Policy` headers
+- The embedding page must include `allow="publickey-credentials-create; publickey-credentials-get"` on the iframe element
+- The embedding page's own `Permissions-Policy` must not deny those features
 
 ### IndexedDB not available
 
-`IndexedDBStorageAdapter` throws `StorageException.ReadFailed` if IndexedDB is unavailable (e.g., in some private browsing modes or web workers). Fall back to `LocalStorageAdapter`:
+`IndexedDBStorageAdapter` throws `StorageException.ReadFailed` if IndexedDB is unavailable (e.g., in some private browsing modes). The database opens lazily on the first storage operation, not at construction, so probe it before relying on it:
 
 ```kotlin
+val indexedDb = IndexedDBStorageAdapter()
 val storage = try {
-    IndexedDBStorageAdapter()
+    indexedDb.getAll() // forces the database open
+    indexedDb
 } catch (e: Exception) {
     LocalStorageAdapter()
 }
@@ -189,6 +187,6 @@ val storage = try {
 Passkey sync depends on the browser and platform:
 - **Chrome**: Syncs via Google Password Manager when signed in
 - **Safari**: Syncs via iCloud Keychain
-- **Firefox**: Currently stores passkeys locally (no sync)
+- **Firefox**: Varies by version and OS; check current Firefox documentation
 
 Ensure the `rpId` is identical across all environments where passkeys should be shared.

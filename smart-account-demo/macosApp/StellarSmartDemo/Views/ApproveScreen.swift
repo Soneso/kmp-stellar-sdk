@@ -52,6 +52,9 @@ struct ApproveScreen: View {
 
     @State private var availableSigners: [SignerInfoBridge] = []
     @State private var signersLoaded = false
+    /// True when the signer fetch failed; distinguishes load-failed from loaded-empty
+    /// so the UI can warn that multi-signer routing is unavailable.
+    @State private var signerLoadFailed = false
 
     // MARK: - Signer picker
 
@@ -89,16 +92,22 @@ struct ApproveScreen: View {
         ScrollView {
             VStack(spacing: 16) {
                 if !appState.isConnected {
-                    notConnectedSection
+                    NotConnectedCard(
+                        message: "No wallet connected. Please connect a wallet first.",
+                        onGoBack: { dismiss() }
+                    )
                 } else {
                     infoCard
                     balanceCard
                     tokenContractCard
+                    if signerLoadFailed {
+                        signerLoadWarning
+                    }
                     spenderField
                     amountField
                     expirationPicker
                     if let error = errorMessage {
-                        errorCard(message: error)
+                        ErrorCard(message: error)
                     }
                     if txHash == nil {
                         approveButton
@@ -122,7 +131,8 @@ struct ApproveScreen: View {
             SignerPickerSheet(
                 signers: availableSigners,
                 activeCredentialId: appState.credentialId,
-                ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                description: "Choose which signers co-authorize this approval. " +
+                    "For Stellar account signers, enter the secret key to enable signing.",
                 onConfirm: { selected, secretKeys, ed25519Secrets in
                     showSignerPicker = false
                     performMultiSignerApprove(
@@ -137,31 +147,6 @@ struct ApproveScreen: View {
                 bridge: bridgeWrapper.bridge
             )
         }
-    }
-
-    // MARK: - Not-connected section
-
-    @ViewBuilder
-    private var notConnectedSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("No wallet connected. Please connect a wallet first.")
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
-
-        LoadingButton(
-            action: { dismiss() },
-            isLoading: false,
-            isEnabled: true,
-            text: "Go Back",
-            loadingText: "",
-            style: .filled
-        )
     }
 
     // MARK: - Info card
@@ -181,15 +166,14 @@ struct ApproveScreen: View {
     // MARK: - Balance card
 
     private var balanceCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("DEMO Balance")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Material3Colors.onPrimaryContainer)
-
-            Text("\(appState.demoTokenBalance ?? "0.0") DEMO")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Material3Colors.onPrimaryContainer)
-        }
+        BalanceRows(
+            label: "DEMO Balance",
+            labelFont: .system(size: 12, weight: .semibold),
+            labelColor: Material3Colors.onPrimaryContainer,
+            values: ["\(appState.demoTokenBalance ?? "0.0") DEMO"],
+            valueFont: .system(size: 15, weight: .bold),
+            valueColor: Material3Colors.onPrimaryContainer
+        )
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Material3Colors.primaryContainer)
@@ -219,6 +203,17 @@ struct ApproveScreen: View {
         .cornerRadius(8)
     }
 
+    // MARK: - Signer load warning
+
+    /// Non-blocking notice that the signer list could not be loaded. Single-signer
+    /// approvals keep working; only the multi-signer picker is unavailable.
+    private var signerLoadWarning: some View {
+        Text("Could not load signers — multi-signer operations unavailable")
+            .font(.footnote)
+            .foregroundColor(Material3Colors.badgeExpiryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     // MARK: - Spender field
 
     private var spenderField: some View {
@@ -227,6 +222,7 @@ struct ApproveScreen: View {
             text: $spender,
             error: spenderError,
             placeholder: "G... or C...",
+            helperText: "Address to grant the allowance to",
             isMonospace: true,
             isEnabled: !isLoading && txHash == nil
         )
@@ -240,7 +236,8 @@ struct ApproveScreen: View {
             label: "Amount",
             text: $amount,
             error: amountError,
-            placeholder: "0.0",
+            placeholder: "e.g. 10.0",
+            helperText: "Amount to approve",
             isEnabled: !isLoading && txHash == nil
         )
         .onChange(of: amount) { _ in errorMessage = nil }
@@ -264,23 +261,6 @@ struct ApproveScreen: View {
             .opacity((isLoading || txHash != nil) ? 0.5 : 1.0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Error card
-
-    @ViewBuilder
-    private func errorCard(message: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Material3Colors.errorContainer)
-        .cornerRadius(8)
     }
 
     // MARK: - Approve button
@@ -337,8 +317,8 @@ struct ApproveScreen: View {
                 Text(submittedSpender)
                     .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(Material3Colors.onPrimaryContainer)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -392,19 +372,17 @@ struct ApproveScreen: View {
 
     // MARK: - Actions
 
+    /// Loads the available signers. On failure, single-signer approvals stay usable;
+    /// the load-failed flag drives the multi-signer-unavailable warning.
     private func loadSigners() async {
         guard appState.isConnected else { return }
-        do {
-            let result = try await bridgeWrapper.bridge.loadAvailableSigners()
-            let signers = KotlinInterop.toArray(result, as: SignerInfoBridge.self)
-            await MainActor.run {
-                availableSigners = signers
-                signersLoaded = true
+        let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridgeWrapper.bridge)
+        await MainActor.run {
+            if !result.loadFailed {
+                availableSigners = result.signers
             }
-        } catch {
-            await MainActor.run {
-                signersLoaded = true
-            }
+            signersLoaded = true
+            signerLoadFailed = result.loadFailed
         }
     }
 
@@ -415,7 +393,10 @@ struct ApproveScreen: View {
     private func handleApproveTap() {
         guard !isLoading, isFormValid else { return }
 
-        if !signersLoaded || availableSigners.count <= 1 {
+        if SignerSelectionSupport.usesSingleSignerPath(
+            signersLoaded: signersLoaded,
+            availableSigners: availableSigners
+        ) {
             performSingleSignerApprove()
         } else {
             showSignerPicker = true
@@ -425,12 +406,18 @@ struct ApproveScreen: View {
     /// Executes a simple passkey-authenticated approve.
     private func performSingleSignerApprove() {
         let tokenContract = resolveTokenContract()
-        let capturedSpender = spender
-        let capturedAmount = amount
+        // Validators accept surrounding whitespace by trimming; capture the same
+        // trimmed values so the bridge never sees padded input.
+        let capturedSpender = spender.trimmingCharacters(in: .whitespaces)
+        let capturedAmount = amount.trimmingCharacters(in: .whitespaces)
         let capturedOffset = ApproveScreen.expirationOffsets[selectedExpirationIndex]
 
         isLoading = true
         errorMessage = nil
+        ActivityLogState.shared.info(
+            message: "Approving \(capturedAmount) DEMO for \(capturedSpender.prefix(8))..."
+        )
+        appState.syncActivityLog(from: bridgeWrapper.bridge)
 
         Task {
             do {
@@ -442,19 +429,12 @@ struct ApproveScreen: View {
                 )
 
                 await MainActor.run {
-                    if result.success {
-                        submittedSpender = capturedSpender
-                        submittedAmount = capturedAmount
-                        txHash = result.hash
-                        appState.sync(from: bridgeWrapper.bridge)
-                        fetchCurrentAllowance(
-                            tokenContract: tokenContract,
-                            spenderAddress: capturedSpender
-                        )
-                    } else {
-                        handleApproveError(result.error ?? "Approve failed")
-                    }
-                    isLoading = false
+                    applyApproveResult(
+                        result,
+                        tokenContract: tokenContract,
+                        spender: capturedSpender,
+                        amount: capturedAmount
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -475,27 +455,37 @@ struct ApproveScreen: View {
         ed25519Secrets: [String: String] = [:]
     ) {
         let tokenContract = resolveTokenContract()
-        let capturedSpender = spender
-        let capturedAmount = amount
+        // Validators accept surrounding whitespace by trimming; capture the same
+        // trimmed values so the bridge never sees padded input.
+        let capturedSpender = spender.trimmingCharacters(in: .whitespaces)
+        let capturedAmount = amount.trimmingCharacters(in: .whitespaces)
         let capturedOffset = ApproveScreen.expirationOffsets[selectedExpirationIndex]
 
         isLoading = true
         errorMessage = nil
 
+        // Auth signers are existing on-chain signers, so isPending is always false here.
         let descriptors = selected.map { signer in
-            SignerDescriptor(type: signer.type, value: signer.identifier)
+            SignerDescriptor(type: signer.type, value: signer.identifier, isPending: false)
         }
 
         // Determine if only the connected passkey was selected — use the simple path.
-        let isSingleOwnPasskey: Bool = {
-            guard selected.count == 1,
-                  let only = selected.first,
-                  only.type.lowercased() == "passkey",
-                  let credId = appState.credentialId,
-                  only.identifier == credId
-            else { return false }
-            return true
-        }()
+        let isSingleOwnPasskey = SignerSelectionSupport.isSingleOwnPasskey(
+            selected: selected,
+            connectedCredentialId: appState.credentialId
+        )
+
+        if isSingleOwnPasskey {
+            ActivityLogState.shared.info(
+                message: "Approving \(capturedAmount) DEMO for \(capturedSpender.prefix(8))..."
+            )
+        } else {
+            ActivityLogState.shared.info(
+                message: "Multi-signer approve: \(capturedAmount) DEMO " +
+                    "for \(capturedSpender.prefix(8))... (\(descriptors.count) signer(s))"
+            )
+        }
+        appState.syncActivityLog(from: bridgeWrapper.bridge)
 
         Task {
             do {
@@ -521,19 +511,12 @@ struct ApproveScreen: View {
                 }
 
                 await MainActor.run {
-                    if result.success {
-                        submittedSpender = capturedSpender
-                        submittedAmount = capturedAmount
-                        txHash = result.hash
-                        appState.sync(from: bridgeWrapper.bridge)
-                        fetchCurrentAllowance(
-                            tokenContract: tokenContract,
-                            spenderAddress: capturedSpender
-                        )
-                    } else {
-                        handleApproveError(result.error ?? "Approve failed")
-                    }
-                    isLoading = false
+                    applyApproveResult(
+                        result,
+                        tokenContract: tokenContract,
+                        spender: capturedSpender,
+                        amount: capturedAmount
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -542,6 +525,30 @@ struct ApproveScreen: View {
                 }
             }
         }
+    }
+
+    /// Applies a completed approve result on the main actor: records the submitted
+    /// values for the success card and starts the allowance fetch on success, or
+    /// routes the error message.
+    private func applyApproveResult(
+        _ result: ApproveResult,
+        tokenContract: String,
+        spender: String,
+        amount: String
+    ) {
+        if result.success {
+            submittedSpender = spender
+            submittedAmount = amount
+            txHash = result.hash
+            appState.sync(from: bridgeWrapper.bridge)
+            fetchCurrentAllowance(
+                tokenContract: tokenContract,
+                spenderAddress: spender
+            )
+        } else {
+            handleApproveError(result.error ?? "Approve failed")
+        }
+        isLoading = false
     }
 
     /// Fetches the current allowance after a successful approve and updates the UI.
@@ -558,16 +565,18 @@ struct ApproveScreen: View {
         }
     }
 
-    /// Interprets the error message and sets `errorMessage` accordingly.
+    /// Interprets the error message, sets `errorMessage`, and records the outcome in the
+    /// activity log.
     ///
     /// User cancellation (Touch ID dismissed) is shown as a distinct informational message
     /// rather than a generic failure string.
     private func handleApproveError(_ message: String) {
-        if bridgeWrapper.bridge.isUserCancellation(message: message) {
-            errorMessage = "Passkey authentication cancelled"
-        } else {
-            errorMessage = "Approve failed: \(message)"
-        }
+        errorMessage = SignerSelectionSupport.interpretOperationError(
+            message,
+            failurePrefix: "Approve failed:",
+            bridge: bridgeWrapper.bridge,
+            appState: appState
+        )
     }
 
     /// Resets all form and result state for a new approval.

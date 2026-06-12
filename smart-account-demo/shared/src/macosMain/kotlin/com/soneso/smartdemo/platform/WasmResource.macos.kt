@@ -20,7 +20,7 @@ actual suspend fun loadWasmResource(wasmFilename: String): ByteArray {
         val bundle = NSBundle.mainBundle
 
         // NSBundle's pathForResource requires the base name and extension separately.
-        // The subdirectory parameter matches the wasm/ folder inside the bundle's Resources.
+        // The wasm/ folder inside the bundle's Resources is part of the resource name.
         val resourceName = wasmFilename.removeSuffix(".wasm")
         val resourcePath = bundle.pathForResource("wasm/$resourceName", ofType = "wasm")
             ?: throw IllegalArgumentException(

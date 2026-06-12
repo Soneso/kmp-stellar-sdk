@@ -128,10 +128,8 @@ data class OZSmartAccountConfig(
     val signatureExpirationLedgers: Int = Util.LEDGERS_PER_HOUR,
 
     /**
-     * Default timeout for operations in seconds.
-     *
-     * Used for network requests and transaction submission.
-     * Default: 30 seconds
+     * Transaction time bounds in seconds: how long a built transaction stays valid
+     * for submission. Default: 30 seconds
      */
     val timeoutInSeconds: Int = OZConstants.DEFAULT_TIMEOUT_SECONDS,
 
@@ -292,8 +290,8 @@ data class OZSmartAccountConfig(
      * Returns the indexer URL that will be used after applying fallback logic.
      *
      * If an indexer URL is explicitly configured, it is returned. Otherwise, falls back
-     * to the built-in default URL for well-known networks (testnet has a default; mainnet
-     * does not).
+     * to the built-in default URL for well-known networks (testnet and mainnet have
+     * defaults).
      *
      * @return The resolved indexer URL, or null if no URL is configured and no default exists for the network
      */

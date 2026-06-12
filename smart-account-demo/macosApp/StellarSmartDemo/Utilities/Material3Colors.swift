@@ -78,11 +78,6 @@ struct Material3Colors {
     /// OutlineLight — #E5E7EB. Dividers, borders, and separator lines.
     static let outline = Color(red: 0.898, green: 0.906, blue: 0.922)
 
-    // MARK: - On-Colour Variants
-
-    /// StarWhite — #FAFAFA. Content placed on top of primary-coloured areas.
-    static let onPrimary = Color(red: 0.980, green: 0.980, blue: 0.980)
-
     // MARK: - Card Shadow
 
     /// Subtle card elevation shadow.
@@ -151,4 +146,13 @@ struct Material3Colors {
 
     /// Expiry badge foreground — #E65100.
     static let badgeExpiryText = Color(red: 0.902, green: 0.318, blue: 0.000)
+
+    // MARK: - Warning Colours
+
+    /// Warning text and accents — Orange 900 #E65100. Used by the
+    /// wallet-not-deployed cards.
+    static let warningText = Color(red: 0.902, green: 0.318, blue: 0.000)
+
+    /// Warning container background — Orange 50 #FFF3E0.
+    static let warningBackground = Color(red: 1.0, green: 0.953, blue: 0.878)
 }

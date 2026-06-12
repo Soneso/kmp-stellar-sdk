@@ -1,18 +1,16 @@
 package com.soneso.smartdemo.util
 
-import com.soneso.stellar.sdk.Util
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
-import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
+import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.oz.OZTransactionOperations
+import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * Builds the [SCValXdr] for a simple threshold policy.
  *
- * Delegates to [SmartAccountBuilders.createThresholdParams] for validation (threshold >= 1),
- * then encodes the result as an SCVal map.
+ * Delegates validation and encoding to [PolicyInstallParams.SimpleThreshold].
  *
  * On-chain map structure: `{ "threshold": U32(threshold) }`
  *
@@ -21,59 +19,52 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * @throws ValidationException if threshold is less than 1.
  */
 fun buildSimpleThresholdScVal(threshold: UInt): SCValXdr {
-    SmartAccountBuilders.createThresholdParams(threshold.toInt())
-    val map = linkedMapOf(
-        Scv.toSymbol("threshold") to Scv.toUint32(threshold)
-    )
-    return Scv.toMap(map)
+    return PolicyInstallParams.SimpleThreshold(threshold).toScVal()
 }
 
 /**
- * Builds the [SCValXdr] for a spending limit policy from a pre-converted stroops value.
+ * Builds the [SCValXdr] for a spending limit policy from a pre-converted base-units value.
  *
- * On-chain map structure: `{ "period_ledgers": U32(periodLedgers), "spending_limit": I128(stroops) }`
+ * On-chain map structure: `{ "period_ledgers": U32(periodLedgers), "spending_limit": I128(baseUnits) }`
  *
- * @param stroops Maximum spending amount in stroops.
+ * @param baseUnits Maximum spending amount in the token's base units.
  * @param periodLedgers Reset period expressed as a number of ledgers.
  * @return Encoded SCVal map for the spending limit policy.
+ * @throws ValidationException if [baseUnits] or [periodLedgers] is not positive.
  */
-fun buildSpendingLimitScVal(stroops: BigInteger, periodLedgers: UInt): SCValXdr {
-    val limitI128 = Util.stroopsToI128ScVal(stroops)
-    val map = linkedMapOf(
-        Scv.toSymbol("period_ledgers") to Scv.toUint32(periodLedgers),
-        Scv.toSymbol("spending_limit") to limitI128
-    )
-    return Scv.toMap(map)
+fun buildSpendingLimitScVal(baseUnits: BigInteger, periodLedgers: UInt): SCValXdr {
+    return PolicyInstallParams.SpendingLimit(baseUnits, periodLedgers).toScVal()
 }
 
 /**
  * Builds the [SCValXdr] for a spending limit policy from a display amount string.
  *
- * Delegates to [SmartAccountBuilders.createSpendingLimitParams] for validation (positive amount,
- * period >= 1), then encodes the result as an SCVal map.
+ * The amount is converted with the demo token scale (7 decimals) via
+ * [OZTransactionOperations.amountToBaseUnits]; validation and encoding are
+ * delegated to [PolicyInstallParams.SpendingLimit].
  *
- * On-chain map structure: `{ "period_ledgers": U32(periodLedgers), "spending_limit": I128(stroops) }`
+ * On-chain map structure: `{ "period_ledgers": U32(periodLedgers), "spending_limit": I128(baseUnits) }`
  *
  * @param amountStr Spending limit as a decimal string (e.g., "100.0").
  * @param periodLedgers Reset period expressed as a number of ledgers.
  * @return Encoded SCVal map for the spending limit policy.
- * @throws ValidationException if [amountStr] cannot be parsed as a valid positive amount
- *   or [periodLedgers] is less than 1.
+ * @throws ValidationException if [amountStr] is not a valid positive amount with at
+ *   most 7 fractional digits, or [periodLedgers] is less than 1.
  */
 fun buildSpendingLimitScVal(amountStr: String, periodLedgers: UInt): SCValXdr {
-    val params = SmartAccountBuilders.createSpendingLimitParams(amountStr, periodLedgers.toInt())
-    return buildSpendingLimitScVal(params.spendingLimit, periodLedgers)
+    val baseUnits = OZTransactionOperations.amountToBaseUnits(amountStr, decimals = 7)
+    return buildSpendingLimitScVal(baseUnits, periodLedgers)
 }
 
 /**
  * Returns true if [amountStr] is a valid spending limit amount (parseable by
- * [Util.amountToStroops] without throwing).
+ * [OZTransactionOperations.amountToBaseUnits] at the demo token scale without throwing).
  *
  * @param amountStr The amount string to validate.
  */
 fun isValidSpendingAmount(amountStr: String): Boolean {
     return try {
-        Util.amountToStroops(amountStr)
+        OZTransactionOperations.amountToBaseUnits(amountStr, decimals = 7)
         true
     } catch (_: Exception) {
         false
@@ -83,9 +74,8 @@ fun isValidSpendingAmount(amountStr: String): Boolean {
 /**
  * Builds the [SCValXdr] for a weighted threshold policy.
  *
- * Delegates to [SmartAccountBuilders.createWeightedThresholdParams] for validation
- * (threshold >= 1, all weights > 0, total weight >= threshold), then encodes the
- * result as an SCVal map.
+ * Checks the demo-level constraints (all weights > 0, total weight >= threshold)
+ * before delegating validation and encoding to [PolicyInstallParams.WeightedThreshold].
  *
  * On-chain map structure: `{ "signer_weights": Map[Signer => U32], "threshold": U32(threshold) }`
  *
@@ -94,27 +84,29 @@ fun isValidSpendingAmount(amountStr: String): Boolean {
  * @param weights Map of each signer to its assigned voting weight.
  * @param threshold Minimum total weight required for authorization.
  * @return Encoded SCVal map for the weighted threshold policy.
- * @throws ValidationException if threshold is less than 1, any weight is less than 1,
- *   or the total weight is less than the threshold.
+ * @throws ValidationException if threshold is less than 1, the weights map is empty,
+ *   any weight is less than 1, or the total weight is less than the threshold.
  */
 fun buildWeightedThresholdScVal(
     weights: Map<SmartAccountSigner, UInt>,
     threshold: UInt
 ): SCValXdr {
-    SmartAccountBuilders.createWeightedThresholdParams(
-        threshold = threshold.toInt(),
-        signerWeights = weights.mapValues { (_, w) -> w.toInt() }
-    )
-
-    val weightsMap = linkedMapOf<SCValXdr, SCValXdr>()
-    for ((signer, weight) in weights) {
-        weightsMap[signer.toScVal()] = Scv.toUint32(weight)
+    var totalWeight = 0uL
+    for ((_, weight) in weights) {
+        if (weight == 0u) {
+            throw ValidationException.invalidInput(
+                "signerWeights",
+                "All weights must be positive integers, got: $weight"
+            )
+        }
+        totalWeight += weight.toULong()
     }
-    val sortedWeightsMap = OZPolicyManager.sortMapByKeyXdr(weightsMap)
+    if (totalWeight < threshold.toULong()) {
+        throw ValidationException.invalidInput(
+            "signerWeights",
+            "Sum of weights ($totalWeight) must be >= threshold ($threshold)"
+        )
+    }
 
-    val map = linkedMapOf(
-        Scv.toSymbol("signer_weights") to Scv.toMap(sortedWeightsMap),
-        Scv.toSymbol("threshold") to Scv.toUint32(threshold)
-    )
-    return Scv.toMap(map)
+    return PolicyInstallParams.WeightedThreshold(weights, threshold).toScVal()
 }

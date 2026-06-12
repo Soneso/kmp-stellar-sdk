@@ -34,6 +34,11 @@ final class ToastManager: ObservableObject {
     /// The currently displayed toast, or nil when no toast is visible.
     @Published var currentToast: ToastData?
 
+    /// Monotonic token identifying the most recent `show(_:)` call. Scheduled present and
+    /// dismiss blocks capture the token at scheduling time and bail out when it no longer
+    /// matches, so a pending dismissal from an earlier toast cannot hide a newer one.
+    private var generation = 0
+
     /// Presents a toast message.
     ///
     /// Any existing toast is dismissed before the new one appears, ensuring the entry
@@ -44,12 +49,15 @@ final class ToastManager: ObservableObject {
     ///   - isError: When `true`, the toast uses the error colour scheme.
     ///   - duration: How long the toast remains visible. Defaults to 2.5 seconds.
     func show(_ message: String, isError: Bool = false, duration: TimeInterval = 2.5) {
+        generation += 1
+        let token = generation
         currentToast = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self else { return }
+            guard let self, self.generation == token else { return }
             self.currentToast = ToastData(message: message, isError: isError)
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-                self?.currentToast = nil
+                guard let self, self.generation == token else { return }
+                self.currentToast = nil
             }
         }
     }

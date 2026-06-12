@@ -48,9 +48,9 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  *     threshold = 100u
  * )
  *
- * // Create a spending limit (1000 tokens per day, in stroops)
+ * // Create a spending limit (1000 tokens per day, in the token's base units)
  * val spendingPolicy = PolicyInstallParams.SpendingLimit(
- *     spendingLimit = Util.amountToStroops("1000"),
+ *     spendingLimit = OZTransactionOperations.amountToBaseUnits("1000", decimals = 7),
  *     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
  * )
  * ```
@@ -61,6 +61,20 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * calling [OZPolicyManager.addPolicy] with custom parameters.
  */
 sealed class PolicyInstallParams {
+
+    /**
+     * Encodes these policy parameters as the SCVal map expected by the policy
+     * contract's install entry point.
+     *
+     * Map keys are emitted in the order the contract requires. Use the result as the
+     * `installParams` argument of [OZPolicyManager.addPolicy] or as a value in
+     * [OZContextRuleManager.addContextRule]'s policies map.
+     *
+     * @return SCVal map with installation parameters
+     * @throws ValidationException if the parameters are invalid
+     */
+    abstract fun toScVal(): SCValXdr
+
     /**
      * Simple threshold policy requiring at least M-of-N signers to authorize.
      *
@@ -81,7 +95,7 @@ sealed class PolicyInstallParams {
          * @return SCVal map with installation parameters
          * @throws ValidationException if threshold is zero
          */
-        internal fun toScVal(): SCValXdr {
+        override fun toScVal(): SCValXdr {
             if (threshold == 0u) {
                 throw ValidationException.invalidInput("threshold", "Threshold must be greater than zero")
             }
@@ -118,7 +132,7 @@ sealed class PolicyInstallParams {
          * @return SCVal map with installation parameters
          * @throws ValidationException if threshold is zero or signer weights map is empty
          */
-        internal fun toScVal(): SCValXdr {
+        override fun toScVal(): SCValXdr {
             if (threshold == 0u) {
                 throw ValidationException.invalidInput("threshold", "Threshold must be greater than zero")
             }
@@ -154,7 +168,7 @@ sealed class PolicyInstallParams {
      * Limits the total amount that can be spent within a rolling time window.
      * The period is specified in ledgers (approximately 5 seconds per ledger).
      *
-     * @property spendingLimit Maximum amount in stroops for the period (as BigInteger)
+     * @property spendingLimit Maximum amount per period in the token's base units (as BigInteger)
      * @property periodLedgers Time window in ledgers (e.g., 17,280 for one day)
      */
     data class SpendingLimit(
@@ -173,7 +187,7 @@ sealed class PolicyInstallParams {
          * @return SCVal map with installation parameters
          * @throws ValidationException if spending limit or period is invalid
          */
-        internal fun toScVal(): SCValXdr {
+        override fun toScVal(): SCValXdr {
             // Validate inputs
             if (spendingLimit <= BigInteger.ZERO) {
                 throw ValidationException.invalidInput(
@@ -190,7 +204,7 @@ sealed class PolicyInstallParams {
             }
 
             // Convert limit to I128 ScVal
-            val limitI128 = Util.stroopsToI128ScVal(spendingLimit)
+            val limitI128 = Scv.toInt128(spendingLimit)
 
             // Map with alphabetically sorted keys: ["period_ledgers", "spending_limit"]
             val map = linkedMapOf(
@@ -408,7 +422,8 @@ class OZPolicyManager internal constructor(
      * a rolling time window. The period is specified in ledgers (approximately
      * 5 seconds per ledger, 720 per hour, 17,280 per day).
      *
-     * Converts the amount to stroops and delegates to [addPolicy].
+     * Converts the amount to the token's base units using [decimals] and delegates
+     * to [addPolicy].
      *
      * IMPORTANT: This operation requires the connected wallet to have authorization
      * on the smart account. The user will be prompted for biometric authentication
@@ -422,9 +437,14 @@ class OZPolicyManager internal constructor(
      *
      * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
      * @param policyAddress The policy contract address (C-address)
-     * @param spendingLimit Maximum amount per period as a decimal string
-     *   (e.g., "100" or "10.5"). Converted to stroops (7 decimal places) internally.
+     * @param spendingLimit Maximum amount per period as a positive decimal string
+     *   (e.g., "100" or "10.5") with up to [decimals] fractional digits. Converted to
+     *   the token's base units internally using [decimals].
      * @param periodLedgers Period duration in ledgers (17,280 = approximately 1 day)
+     * @param decimals The token's decimal scale used to convert [spendingLimit] to base
+     *   units. Defaults to 7 (XLM and SAC-wrapped classic assets). Pass the token's
+     *   `decimals()` value for tokens with a different scale (see
+     *   [OZTransactionOperations.fetchTokenDecimals]).
      * @param selectedSigners Optional list of signers for multi-signer authorization.
      *   When empty (default), uses single-signer auth with the connected passkey.
      *   When non-empty, coordinates signatures from all listed signers.
@@ -456,11 +476,22 @@ class OZPolicyManager internal constructor(
         policyAddress: String,
         spendingLimit: String,
         periodLedgers: UInt,
+        decimals: Int = 7,
         selectedSigners: List<SelectedSigner> = emptyList(),
         forceMethod: SubmissionMethod? = null
     ): TransactionResult {
-        val stroops = Util.amountToStroops(spendingLimit)
-        val params = PolicyInstallParams.SpendingLimit(stroops, periodLedgers)
+        val baseUnits = try {
+            OZTransactionOperations.amountToBaseUnits(spendingLimit, decimals)
+        } catch (e: ValidationException.InvalidAmount) {
+            // Re-surface as a field-tagged validation error so the message refers
+            // to the policy parameter the caller supplied.
+            throw ValidationException.invalidInput(
+                "spendingLimit",
+                "Invalid spending limit: ${e.message}",
+                e
+            )
+        }
+        val params = PolicyInstallParams.SpendingLimit(baseUnits, periodLedgers)
         return addPolicy(contextRuleId, policyAddress, params.toScVal(), selectedSigners, forceMethod)
     }
 
@@ -691,6 +722,51 @@ class OZPolicyManager internal constructor(
         } else {
             kit.multiSignerManager.submitWithMultipleSigners(hostFunction, selectedSigners, forceMethod = forceMethod)
         }
+    }
+
+    /**
+     * Adds a policy to a context rule using typed installation parameters.
+     *
+     * Convenience overload that encodes [installParams] via [PolicyInstallParams.toScVal]
+     * and delegates to the [SCValXdr]-based [addPolicy]. For policy contracts not modelled
+     * by a [PolicyInstallParams] variant, use the [SCValXdr] overload with parameters built
+     * via the [Scv] factories.
+     *
+     * @param contextRuleId The context rule ID to add the policy to (0 for Default rule)
+     * @param policyAddress The policy contract address (C-address)
+     * @param installParams Typed installation parameters for one of the built-in policy types
+     * @param selectedSigners Optional list of signers for multi-signer authorization.
+     *   When empty (default), uses single-signer auth with the connected passkey.
+     *   When non-empty, coordinates signatures from all listed signers.
+     * @param forceMethod Optional submission method override. When null (default), uses the
+     *   configured submission method (relayer if available, RPC otherwise).
+     * @return [TransactionResult] indicating success or failure
+     * @throws ValidationException if validation fails or the parameters are invalid
+     * @throws TransactionException if transaction submission fails
+     *
+     * Example:
+     * ```kotlin
+     * val result = policyManager.addPolicy(
+     *     contextRuleId = 0u,
+     *     policyAddress = "CBCD5678...",
+     *     installParams = PolicyInstallParams.SimpleThreshold(threshold = 2u)
+     * )
+     * ```
+     */
+    suspend fun addPolicy(
+        contextRuleId: UInt,
+        policyAddress: String,
+        installParams: PolicyInstallParams,
+        selectedSigners: List<SelectedSigner> = emptyList(),
+        forceMethod: SubmissionMethod? = null
+    ): TransactionResult {
+        return addPolicy(
+            contextRuleId = contextRuleId,
+            policyAddress = policyAddress,
+            installParams = installParams.toScVal(),
+            selectedSigners = selectedSigners,
+            forceMethod = forceMethod
+        )
     }
 
     // MARK: - Private Helpers

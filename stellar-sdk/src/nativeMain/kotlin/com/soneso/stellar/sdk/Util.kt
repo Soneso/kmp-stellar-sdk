@@ -39,6 +39,10 @@ internal actual suspend fun platformDelay(timeMillis: Long) {
  * Under the new Kotlin/Native memory model, objects can be shared across threads.
  * This implementation uses a simple spinlock via AtomicReference<Boolean> to provide
  * mutual exclusion for short critical sections (listener list management).
+ *
+ * The lock is process-global (the `lock` argument is ignored) and NON-REENTRANT: a
+ * nested platformSynchronized call on the same thread spins forever. The contract on
+ * the expect declaration forbids nesting; keep it that way.
  */
 private val nativeLock = AtomicReference(false)
 

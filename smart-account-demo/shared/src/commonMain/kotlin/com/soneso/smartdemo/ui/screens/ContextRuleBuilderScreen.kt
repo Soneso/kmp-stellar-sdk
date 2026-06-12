@@ -85,8 +85,8 @@ import com.soneso.smartdemo.flows.FlowPolicyEntry
 import com.soneso.smartdemo.flows.addContextRule
 import com.soneso.smartdemo.flows.buildSelectedSigners
 import com.soneso.smartdemo.flows.isSinglePasskeyTransfer
+import com.soneso.smartdemo.flows.loadAllOnChainSigners
 import com.soneso.smartdemo.flows.loadAvailableSigners
-import com.soneso.smartdemo.flows.loadContextRules
 import com.soneso.smartdemo.flows.loadParsedContextRule
 import com.soneso.smartdemo.flows.readPolicyParamsWithServer
 import com.soneso.smartdemo.flows.withInProcessMultiSigner
@@ -264,13 +264,7 @@ class ContextRuleBuilderScreen(
             }
 
             // Load all signers from all on-chain rules for the "Reuse Signer" picker.
-            val allRules = loadContextRules()
-            allOnChainSigners = allRules.flatMap { it.signers }
-                .distinctBy { SmartAccountBuilders.getSignerKey(it) }
-                .filter { signer ->
-                    val credId = SmartAccountBuilders.getCredentialIdStringFromSigner(signer)
-                    credId == null || credId != DemoState.credentialId
-                }
+            allOnChainSigners = loadAllOnChainSigners()
 
             ActivityLogState.info(
                 "Loaded rule #$ruleId for editing: " +
@@ -313,14 +307,19 @@ class ContextRuleBuilderScreen(
         // Compute the edit diff for operation summary and submission.
         val editDiff: ContextRuleEditDiff? = if (isEditing && editRuleId != null) {
             val nameChanged = ruleName.trim() != originalName
+            // Only entries that are themselves originals can cancel out an original in the
+            // removal diff. A staged entry that equals a dropped original (same signer
+            // re-added, or a same-type policy whose contract address matches) must NOT
+            // suppress the removal — the removal and the add are both submitted, in that
+            // order, otherwise the contract rejects the add as a duplicate (3007/3009).
             val removedSigners = originalSignerEntries.filter { orig ->
-                signerEntries.none { SmartAccountBuilders.signersEqual(it.signer, orig.signer) }
+                signerEntries.none { it.isOriginal && SmartAccountBuilders.signersEqual(it.signer, orig.signer) }
             }
             val newSigners = signerEntries.filter { entry ->
                 !entry.isOriginal
             }
             val removedPolicies = originalPolicyEntries.filter { orig ->
-                policyEntries.none { it.address == orig.address }
+                policyEntries.none { it.isOriginal && it.address == orig.address }
             }
             val newPolicies = policyEntries.filter { entry ->
                 !entry.isOriginal
@@ -1517,11 +1516,11 @@ class ContextRuleBuilderScreen(
         wasmHashHex: String
     ): ContextRuleType {
         return when (option) {
-            ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContext()
+            ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContextType()
             ContextTypeOption.CALL_CONTRACT ->
-                OZBuilders.createCallContractContext(contractAddress.trim())
+                OZBuilders.createCallContractContextType(contractAddress.trim())
             ContextTypeOption.CREATE_CONTRACT ->
-                OZBuilders.createCreateContractContext(wasmHashHex.trim().lowercase())
+                OZBuilders.createCreateContractContextType(wasmHashHex.trim().lowercase())
         }
     }
 

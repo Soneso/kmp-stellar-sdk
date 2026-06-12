@@ -274,7 +274,7 @@ The contract rejects removing the final signer when the rule has no policies —
 
 ### The Default rule
 
-Every smart account is deployed with one rule at `id = 0u`: `contextType = Default`, `name = "DefaultRule"`, signers `[initial passkey]`, policies `[]`. The Default rule is the fallback — any operation that does not match a more specific rule goes through it. You can add signers/policies to it, but you should not remove it unless you have replaced it with a rule of equivalent (or greater) coverage — otherwise the account becomes unusable.
+Every smart account is deployed with one rule at `id = 0u`: `contextType = Default`, `name = "DefaultRule"`, signers `[initial passkey]`, policies `[]`. A Default rule matches any operation context. You can add signers/policies to it; do not remove it (see [removeContextRule](#removecontextrule)).
 
 ### ContextRuleType
 
@@ -306,17 +306,17 @@ CreateContract  ->  Vec([Symbol("CreateContract"), Bytes(wasmHash)])
 
 // WRONG: ContextRuleType.CreateContract("abcd...")     — parameter is ByteArray, not hex string
 // CORRECT: ContextRuleType.CreateContract(wasmHashBytes)  — raw 32-byte ByteArray
-//   Use OZBuilders.createCreateContractContext("abcd...") to convert hex ->
+//   Use OZBuilders.createCreateContractContextType("abcd...") to convert hex ->
 //   ContextRuleType.CreateContract automatically.
 ```
 
 The `OZBuilders` helpers wrap construction with validation:
 
 ```kotlin
-val defaultCtx = OZBuilders.createDefaultContext()                      // Default
-val callCtx    = OZBuilders.createCallContractContext("CBCD...")        // validates C-address
-val createCtx1 = OZBuilders.createCreateContractContext("abc123...")    // hex String, 64 chars (0x-prefix ok)
-val createCtx2 = OZBuilders.createCreateContractContext(wasmHash32Bytes) // ByteArray, 32 bytes
+val defaultCtx = OZBuilders.createDefaultContextType()                  // Default
+val callCtx    = OZBuilders.createCallContractContextType("CBCD...")    // validates C-address
+val createCtx1 = OZBuilders.createCreateContractContextType("abc123...") // hex String, 64 chars (0x-prefix ok)
+val createCtx2 = OZBuilders.createCreateContractContextType(wasmHash32Bytes) // ByteArray, 32 bytes
 ```
 
 ### addContextRule
@@ -339,11 +339,11 @@ Example — create a rule that applies to a specific token contract, signed by t
 val signerA = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
 val signerB = DelegatedSigner("GC3C4MCEADMY26BVBPJIIUOKD5WZEZW5XI2LSU5F4QDZARBVAM4UTZEL")
 
-// Build the install params for the spending-limit policy inline (symbol keys alphabetical)
-val spendingLimitParams = Scv.toMap(linkedMapOf(
-    Scv.toSymbol("period_ledgers") to Scv.toUint32(Util.LEDGERS_PER_DAY.toUInt()),
-    Scv.toSymbol("spending_limit") to Util.stroopsToI128ScVal(Util.amountToStroops("1000"))
-))
+// Build the install params with the typed builder (validated, correct encoding)
+val spendingLimitParams = PolicyInstallParams.SpendingLimit(
+    spendingLimit = OZTransactionOperations.amountToBaseUnits("1000", decimals = 7),
+    periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
+).toScVal()
 
 val result = kit.contextRuleManager.addContextRule(
     contextType = ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
@@ -474,7 +474,7 @@ Do not remove rule `0u` (Default) unless you have added equivalent coverage — 
 
 ## Policies
 
-`kit.policyManager` (type `OZPolicyManager`) installs and removes policies on a context rule. A policy is a separate, already-deployed Soroban contract that implements `can_enforce()` and `enforce()`. Policy contracts are shared network-wide (one deployment serves all smart accounts on the network); you provide the C-address and per-account install parameters.
+`kit.policyManager` (type `OZPolicyManager`) installs and removes policies on a context rule. A policy is a separate, already-deployed Soroban contract that implements `enforce()`, `install()`, and `uninstall()`. Policy contracts are shared network-wide (one deployment serves all smart accounts on the network); you provide the C-address and per-account install parameters.
 
 ### Finding policy contract addresses
 
@@ -580,8 +580,9 @@ Caps the total amount transferred by the rule's context within a rolling window 
 suspend fun addSpendingLimit(
     contextRuleId: UInt,
     policyAddress: String,
-    spendingLimit: String,                 // decimal XLM-style string, e.g. "1000" or "10.5"
+    spendingLimit: String,                 // positive decimal string, e.g. "1000" or "10.5"
     periodLedgers: UInt,                   // window in ledgers (~5 s each)
+    decimals: Int = 7,                     // token scale for the conversion (no on-chain fetch here)
     selectedSigners: List<SelectedSigner> = emptyList(),
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
@@ -620,7 +621,7 @@ kit.policyManager.addSpendingLimit(
 
 ```kotlin
 // WRONG: spendingLimit = "10000000000"     — interpreted as 10 billion XLM (decimal string!)
-// CORRECT: spendingLimit = "1000"          — SDK converts to stroops internally
+// CORRECT: spendingLimit = "1000"          — SDK converts to base units (decimals param, default 7)
 // WRONG: spendingLimit = 1000.0            — parameter is a String, not Double
 // CORRECT: spendingLimit = "1000"
 // WRONG: periodLedgers = 86400u            — 86,400 ledgers is ~5 days at 5 s/ledger
@@ -667,35 +668,26 @@ kit.policyManager.addPolicy(
 
 Map keys must be symbols in **lexicographic (alphabetical) order** by XDR bytes — the SDK sorts the top-level policies map internally, but the install-params map inside each entry is your responsibility.
 
-### PolicyInstallParams (SDK-internal — do NOT use directly)
+### PolicyInstallParams (typed install parameters)
 
-This sealed class is internal to the SDK. Its `toScVal()` method is declared `internal` and is not callable from user code — `addPolicy(installParams: SCValXdr)` takes a raw `SCValXdr`, not a `PolicyInstallParams`. The three variants are listed here **for reference only**, so you can recognize them when reading kit internals or logs:
+The sealed class models the three built-in policy types. Its `toScVal()` method is public and encodes the variant as the SCVal map the policy contract's install entry point expects. `addPolicy` accepts either a `PolicyInstallParams` (typed overload, encodes internally) or a raw `SCValXdr` (for custom policy contracts):
 
 ```kotlin
-// INTERNAL SDK TYPE — shown for reference. Do not construct these to pass
-// into addPolicy; they cannot be converted to SCValXdr from outside the SDK.
 sealed class PolicyInstallParams {
+    abstract fun toScVal(): SCValXdr
     data class SimpleThreshold(val threshold: UInt) : PolicyInstallParams()
     data class WeightedThreshold(
         val signerWeights: Map<SmartAccountSigner, UInt>,
         val threshold: UInt
     ) : PolicyInstallParams()
     data class SpendingLimit(
-        val spendingLimit: BigInteger,    // stroops, NOT a decimal string
+        val spendingLimit: BigInteger,    // token base units, NOT a decimal string
         val periodLedgers: UInt
     ) : PolicyInstallParams()
 }
 ```
 
-**Always use one of:** `addSimpleThreshold` / `addWeightedThreshold` / `addSpendingLimit` on `OZPolicyManager` (they encode the params correctly), or the generic `addPolicy(installParams: SCValXdr)` with an `SCValXdr` you build yourself via `Scv.toMap(...)` for custom policy contracts.
-
-`SmartAccountBuilders` exposes a separate set of **inspection-only** factories (`createThresholdParams(Int)`, `createWeightedThresholdParams(Int, Map<SmartAccountSigner, Int>)`, `createSpendingLimitParams(String, Int)`) that produce `SimpleThresholdParams` / `WeightedThresholdParams` / `SpendingLimitParams` data classes. These are also not wired into `addPolicy` — they exist to let you diff / compare policy params locally without touching XDR.
-
-```kotlin
-// WRONG: kit.policyManager.addPolicy(installParams = PolicyInstallParams.SimpleThreshold(2u))
-//   — toScVal() is internal; this does not compile from user code.
-// CORRECT: kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "...", threshold = 2u)
-```
+Install via the convenience methods (`addSimpleThreshold` / `addWeightedThreshold` / `addSpendingLimit`), the typed `addPolicy(installParams: PolicyInstallParams)` overload, or the generic `addPolicy(installParams: SCValXdr)` for custom policy contracts.
 
 ### removePolicy — by ID
 
@@ -811,7 +803,7 @@ val rule = kit.contextRuleManager.listContextRules().first { it.id == contextRul
 // Base64URL credentialId from keyData and check whether it is stored locally.
 val available = rule.signers.mapNotNull { signer ->
     when {
-        // ExternalSigner has three keyData shapes (see SmartAccountBuilders.describeSignerType):
+        // ExternalSigner has three keyData shapes (WebAuthn: 65-byte pubkey + credential ID; Ed25519: 32-byte key; other: verifier-specific):
         //   size == ED25519_PUBLIC_KEY_SIZE (32)    -> Ed25519
         //   size  > SECP256R1_PUBLIC_KEY_SIZE (65)  -> WebAuthn passkey (65-byte pubkey || credentialId)
         //   any other size                          -> generic external verifier (no local signer; skipped)
@@ -855,7 +847,8 @@ val available = rule.signers.mapNotNull { signer ->
 suspend fun multiSignerTransfer(
     tokenContract: String,
     recipient: String,
-    amount: String,                       // decimal string, NOT stroops
+    amount: String,                       // decimal string, NOT base units
+    decimals: Int? = null,                // token scale; null fetches decimals() on-chain
     selectedSigners: List<SelectedSigner>,
     forceMethod: SubmissionMethod? = null,
     resolveContextRuleIds: ResolveContextRuleIds? = null
@@ -897,12 +890,15 @@ suspend fun multiSignerContractCall(
 ```
 
 ```kotlin
-// approve() on a SEP-41 token: from=smart account, spender=dex, amount=100, exp=720
+// approve() on a SEP-41 token: from=smart account, spender=dex, amount=100.
+// expiration_ledger is an ABSOLUTE ledger sequence — add the offset to the
+// current ledger.
+val currentLedger = SorobanServer(kit.config.rpcUrl).use { it.getLatestLedger().sequence.toUInt() }
 val args = listOf(
     Scv.toAddress(Address(kit.contractId!!).toSCAddress()),
-    Scv.toAddress(Address("CDEX1234...").toSCAddress()),
-    Util.stroopsToI128ScVal(Util.amountToStroops("100")),
-    Scv.toUint32(Util.LEDGERS_PER_HOUR.toUInt())
+    Scv.toAddress(Address("<C-address of the spender>").toSCAddress()),
+    Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),
+    Scv.toUint32(currentLedger + Util.LEDGERS_PER_HOUR.toUInt())
 )
 kit.multiSignerManager.multiSignerContractCall(
     target = "CTOKEN1234...",
@@ -974,6 +970,8 @@ If the automatic resolver cannot find a unique rule, it throws `ValidationExcept
 
 ### External wallet requirements
 
+For `SelectedSigner.Ed25519` signers, register a signing source via `kit.externalSigners.addEd25519FromRawKey(...)` or `config.externalEd25519Adapter` — see [smart_accounts.md](./smart_accounts.md) External Signer Manager.
+
 A `SelectedSigner.Wallet` (G-address) signer resolves through the kit-owned `kit.externalSigners` manager. Register a signing source by either custody model: register an in-memory keypair at runtime with `kit.externalSigners.addFromSecret("S...")`, or supply an `ExternalWalletAdapter` via `OZSmartAccountConfig.externalWallet` at kit construction. Resolution tries the in-memory keypair first, then the adapter. The adapter interface (minimal):
 
 ```kotlin
@@ -1024,10 +1022,12 @@ Three worked end-to-end flows that combine the building blocks above. Each one a
 // old passkey's signer entry on the Default rule.
 val oldPasskeyCredentialIdBase64Url: String = /* fetched from your backup */ TODO()
 
-// 1. Register a fresh passkey on the new device. 32 random bytes for both
-//    challenge and userId; the SDK does the same in addNewPasskeySigner.
-val challenge    = kotlin.random.Random.nextBytes(32)
-val userIdBytes  = kotlin.random.Random.nextBytes(32)
+// 1. Register a fresh passkey on the new device. Use a cryptographically
+//    secure source for challenge and userId (kotlin.random.Random is NOT one);
+//    getEd25519Crypto() is the SDK's own CSPRNG.
+val crypto       = com.soneso.stellar.sdk.crypto.getEd25519Crypto()
+val challenge    = crypto.generatePrivateKey()   // 32 secure random bytes
+val userIdBytes  = crypto.generatePrivateKey()
 val webauthn     = kit.config.webauthnProvider
     ?: error("webauthnProvider must be configured for recovery")
 val reg          = webauthn.register(challenge, userIdBytes, userName = "Recovery Device")
@@ -1196,7 +1196,7 @@ try {
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK — only `ContractErrorCodes` constants for the five codes the SDK interprets directly (`MATH_OVERFLOW = 3012`, `KEY_DATA_TOO_LARGE = 3013`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014`, `NAME_TOO_LONG = 3015`, `UNAUTHORIZED_SIGNER = 3016`). For every other code in the 3000-/3100-/3200-ranges you parse the message yourself and map to action. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK, and the SDK does not parse or map contract error codes — `ContractErrorCodes` is a consumer-side reference catalog declaring five constants (`MATH_OVERFLOW = 3012`, `KEY_DATA_TOO_LARGE = 3013`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014`, `NAME_TOO_LONG = 3015`, `UNAUTHORIZED_SIGNER = 3016`). For every code in the 3000-/3100-/3200-ranges you parse the message yourself and map to action. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
 // WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class

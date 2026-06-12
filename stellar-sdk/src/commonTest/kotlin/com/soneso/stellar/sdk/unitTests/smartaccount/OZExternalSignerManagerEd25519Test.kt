@@ -402,68 +402,6 @@ class OZExternalSignerManagerEd25519Test {
     }
 
     // ========================================================================
-    // addFromWallet — connect() returns null (user cancelled)
-    // ========================================================================
-
-    @Test
-    fun test_addFromWallet_adapterConnectReturnsNull_returnsNull() = runTest {
-        val nullConnectAdapter = object : ExternalWalletAdapter {
-            override suspend fun connect(): ConnectedWallet? = null
-            override suspend fun disconnect() {}
-            override fun canSignFor(address: String): Boolean = false
-            override fun getConnectedWallets(): List<ConnectedWallet> = emptyList()
-            override suspend fun signAuthEntry(
-                preimageXdr: String,
-                options: SignAuthEntryOptions?
-            ): SignAuthEntryResult = throw UnsupportedOperationException()
-        }
-
-        val manager = OZExternalSignerManager(
-            networkPassphrase = TEST_NETWORK_PASSPHRASE,
-            walletAdapter = nullConnectAdapter
-        )
-
-        val result = manager.addFromWallet()
-        assertNull(result, "addFromWallet must return null when adapter.connect() returns null")
-    }
-
-    // ========================================================================
-    // addFromWallet — connect() succeeds, no storage (no persistence attempt)
-    // ========================================================================
-
-    @Test
-    fun test_addFromWallet_successfulConnect_noStorage_returnsWallet() = runTest {
-        val expectedWallet = ConnectedWallet(
-            address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
-            walletId = "freighter",
-            walletName = "Freighter"
-        )
-        val connectAdapter = object : ExternalWalletAdapter {
-            override suspend fun connect(): ConnectedWallet = expectedWallet
-            override suspend fun disconnect() {}
-            override fun canSignFor(address: String): Boolean = address == expectedWallet.address
-            override fun getConnectedWallets(): List<ConnectedWallet> = listOf(expectedWallet)
-            override suspend fun signAuthEntry(
-                preimageXdr: String,
-                options: SignAuthEntryOptions?
-            ): SignAuthEntryResult = throw UnsupportedOperationException()
-        }
-
-        // No walletConnectionStorage — saves nothing, but must still return the wallet.
-        val manager = OZExternalSignerManager(
-            networkPassphrase = TEST_NETWORK_PASSPHRASE,
-            walletAdapter = connectAdapter,
-            walletConnectionStorage = null
-        )
-
-        val result = manager.addFromWallet()
-        assertNotNull(result, "addFromWallet must return the connected wallet")
-        assertEquals(expectedWallet.address, result.address)
-        assertEquals(expectedWallet.walletId, result.walletId)
-        assertEquals(expectedWallet.walletName, result.walletName)
-    }
-
-    // ========================================================================
     // get() — wallet adapter path (no keypair for address, adapter has it)
     // ========================================================================
 

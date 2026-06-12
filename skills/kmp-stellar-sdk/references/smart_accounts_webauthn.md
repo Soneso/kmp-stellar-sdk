@@ -107,8 +107,9 @@ data class WebAuthnRegistrationResult(
 // WRONG: result.publicKey.size == 33  — that would be the compressed point form
 // CORRECT: result.publicKey.size == 65 && result.publicKey[0] == 0x04.toByte()
 
-// If the platform returns the key in COSE or SPKI encoding, providers can pass the
-// raw bytes and the SDK will extract via SmartAccountUtils.extractPublicKeyFromRegistration.
+// Providers must return the 65-byte uncompressed key. The SDK's COSE/SPKI
+// extraction fallback applies only during createWallet; addNewPasskeySigner
+// validates publicKey strictly (65 bytes, 0x04 prefix).
 ```
 
 ### `WebAuthnAuthenticationResult`
@@ -203,11 +204,10 @@ val storage = InMemoryStorageAdapter()  // default in OZSmartAccountConfig
 ```kotlin
 // app-level build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.6.1")
 
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 }
 ```
 
@@ -231,7 +231,7 @@ keytool -list -v -keystore your-release.keystore -alias your-alias
 ```json
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": ["delegate_permission/common.get_login_creds"],
     "target": {
       "namespace": "android_app",
       "package_name": "com.example.yourapp",
@@ -255,7 +255,7 @@ Serve with HTTPS, `Content-Type: application/json`, and no redirects.
 3. Verify the file resolves via Google's Asset Links API:
 
 ```
-https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-domain.com&relation=delegate_permission/common.handle_all_urls
+https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-domain.com&relation=delegate_permission/common.get_login_creds
 ```
 
 Digital Asset Links are not needed for non-passkey builds, but `AndroidWebAuthnProvider.register()` and `.authenticate()` both fail with a `SecurityException` (mapped to `WebAuthnException.RegistrationFailed` / `AuthenticationFailed`) if the fingerprint or domain mismatch.
@@ -357,7 +357,7 @@ class MainActivity : ComponentActivity() {
             rpcUrl = "https://soroban-testnet.stellar.org",
             networkPassphrase = "Test SDF Network ; September 2015",
             accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-            webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
+            webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
             webauthnProvider = webauthn,
             storage = storage
         )
@@ -410,8 +410,8 @@ val webauthn = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_
 The SDK needs libsodium for crypto. Add Clibsodium via Swift Package Manager:
 
 1. In Xcode: File > Add Package Dependencies
-2. URL: `https://github.com/nicklama/Clibsodium`
-3. Select "Up to Next Major Version"
+2. URL: `https://github.com/jedisct1/swift-sodium`
+3. Select "Up to Next Major Version" and add the `Clibsodium` product to the app target
 
 No extra dependency is needed for WebAuthn — `AppleWebAuthnProvider` uses the built-in AuthenticationServices framework.
 
@@ -521,25 +521,12 @@ import com.soneso.stellar.sdk.smartaccount.KeychainStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 
-suspend fun buildKit(): OZSmartAccountKit {
-    val webauthn = AppleWebAuthnProvider(
-        rpId = "your-domain.com",
-        rpName = "My Stellar Wallet"
-    )
-    val storage = KeychainStorageAdapter(serviceName = "com.yourapp.stellar")
-
-    val config = OZSmartAccountConfig(
-        rpcUrl = "https://soroban-testnet.stellar.org",
-        networkPassphrase = "Test SDF Network ; September 2015",
-        accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-        webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
-        rpId = "your-domain.com",
-        rpName = "My Stellar Wallet",
-        webauthnProvider = webauthn,
-        storage = storage
-    )
-    return OZSmartAccountKit.create(config)
-}
+val webauthn = AppleWebAuthnProvider(
+    rpId = "your-domain.com",
+    rpName = "My Stellar Wallet"
+)
+val storage = KeychainStorageAdapter(serviceName = "com.yourapp.stellar")
+// Config and kit creation are identical to the Android example above.
 ```
 
 From Swift (passing the shared framework into SwiftUI or UIKit):
@@ -571,7 +558,7 @@ let kit = OZSmartAccountKit.Companion().create(config: config)
 
 ### Troubleshooting (iOS)
 
-- **Passkeys unavailable on iOS Simulator** — Passkey ceremonies fail with `WebAuthnException.NotSupported` or ASAuthorization error code 1003 on the simulator. Test on a physical device with Face ID or Touch ID.
+- **Passkeys on the iOS Simulator** — Supported since the iOS 16 Simulator (Xcode 14). Simulator passkeys are stored locally and do not sync via iCloud Keychain; associated-domain validation still applies (`?mode=developer` during development).
 - **ASAuthorization error 1001 (cancelled)** — User dismissed the system sheet. Maps to `WebAuthnException.Cancelled`. Surface as a neutral UI state, not an error.
 - **ASAuthorization error 1004 (failed)** — Usually an associated-domains problem. Verify:
   - `rpId` matches the `webcredentials:` entitlement value (bare domain both)
@@ -593,9 +580,9 @@ let kit = OZSmartAccountKit.Companion().create(config: config)
 - Developer ID signing **or** the App Sandbox entitlement for associated domains (macOS ignores AASA without one)
 - A domain you control for `apple-app-site-association`
 
-### SPM dependencies
+### libsodium dependency
 
-Same as iOS — add `Clibsodium` for libsodium.
+macOS links the system libsodium from Homebrew (`brew install libsodium`); add `/opt/homebrew/opt/libsodium/lib` to Library Search Paths and `-lsodium` to Other Linker Flags of a native Swift app target.
 
 ### Associated Domains on macOS
 
@@ -644,7 +631,7 @@ let webauthn = AppleWebAuthnProvider(rpId: "your-domain.com", rpName: "My Wallet
 webauthn.presentationContextProvider = WindowProvider()
 ```
 
-Keep a strong reference to the `WindowProvider` instance — AuthenticationServices holds the provider weakly.
+The `presentationContextProvider` property retains the `WindowProvider`; keep the `AppleWebAuthnProvider` itself alive across the ceremony.
 
 ```kotlin
 // WRONG (macOS): creating AppleWebAuthnProvider without setting presentationContextProvider
@@ -696,28 +683,17 @@ val webauthn = AppleWebAuthnProvider(
     rpId = "your-domain.com",
     rpName = "My Stellar Wallet"
 )
-// IMPORTANT on macOS: set presentationContextProvider from Swift side
+// IMPORTANT on macOS: set presentationContextProvider from the Swift side
 
 val storage = UserDefaultsStorageAdapter(
     suiteName = "com.yourapp.stellar.macos"
 )
-
-val config = OZSmartAccountConfig(
-    rpcUrl = "https://soroban-testnet.stellar.org",
-    networkPassphrase = "Test SDF Network ; September 2015",
-    accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-    webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
-    rpId = "your-domain.com",
-    rpName = "My Stellar Wallet",
-    webauthnProvider = webauthn,
-    storage = storage
-)
-val kit = OZSmartAccountKit.create(config)
+// Config and kit creation are identical to the Android example above.
 ```
 
 ### Troubleshooting (macOS)
 
-- **Associated Domains ignored without Developer ID / sandbox** — The system silently skips fetching the AASA file. Enable App Sandbox (dev) or sign with Developer ID (distribution).
+- **AASA file not fetched / validated** — Use `?mode=developer` on the domain entry during development (bypasses Apple's CDN cache) and confirm the entitlement is present in the built product (`codesign -d --entitlements - YourApp.app`). No sandbox or special signing setup is required.
 - **ASAuthorization error 1004 ("no host window")** — `presentationContextProvider` unset or the anchor's `NSWindow` is nil (app minimized, main window closed). Hold a strong reference to the provider and ensure a visible key window before calling kit sign operations.
 - **Passkeys synced from iOS missing** — Verify iCloud Keychain is enabled on both devices, both are signed into the same Apple ID, and `rpId` matches exactly.
 - **Sandbox keychain restrictions** — Sandboxed apps have restricted Keychain access. If `KeychainStorageAdapter` throws unexpected `OSStatus` codes, add `keychain-access-groups` to the entitlements (matching the service name) or fall back to `UserDefaultsStorageAdapter`.
@@ -800,7 +776,7 @@ val storage: StorageAdapter = try {
 }
 ```
 
-`IndexedDBStorageAdapter` creates an object store `credentials` (keyPath `credentialId`, index on `contractId`) and `sessions` (keyPath `key`). The version-1 schema is managed by the adapter — do not open the database yourself with a different version.
+`IndexedDBStorageAdapter` creates an object store `credentials` (keyPath `credentialId`, indexes incl. `contractId`) and `sessions` (keyPath `key`). The version-1 schema is managed by the adapter — do not open the database yourself with a different version.
 
 ### Localhost development
 
@@ -845,16 +821,7 @@ fun bootstrap() {
     )
     val storage = IndexedDBStorageAdapter(dbName = "my_app_smart_account")
 
-    val config = OZSmartAccountConfig(
-        rpcUrl = "https://soroban-testnet.stellar.org",
-        networkPassphrase = "Test SDF Network ; September 2015",
-        accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-        webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
-        rpId = "your-domain.com",
-        rpName = "My Stellar Wallet",
-        webauthnProvider = webauthn,
-        storage = storage
-    )
+    // Config and kit creation are identical to the Android example above.
     val kit = OZSmartAccountKit.create(config)
 
     scope.launch {
@@ -966,7 +933,7 @@ Most developers use the platform adapters above. Reasons to implement your own:
 
 | Field | Requirement |
 |-------|-------------|
-| `WebAuthnRegistrationResult.publicKey` | 65 bytes, uncompressed secp256r1 (`0x04 \|\| X (32) \|\| Y (32)`). If the platform returns COSE or SPKI, the SDK can extract via `SmartAccountUtils.extractPublicKeyFromRegistration(publicKey = raw, attestationObject = attest)`. |
+| `WebAuthnRegistrationResult.publicKey` | 65 bytes, uncompressed secp256r1 (`0x04 \|\| X (32) \|\| Y (32)`). The COSE/SPKI extraction fallback (`SmartAccountUtils.extractPublicKeyFromRegistration`) applies only during `createWallet`; `addNewPasskeySigner` requires the 65-byte form. |
 | `WebAuthnRegistrationResult.credentialId` | Raw bytes. The SDK Base64URL-encodes on its own for storage. |
 | `WebAuthnRegistrationResult.attestationObject` | Raw CBOR object as delivered by the authenticator. Used by SDK fallback extraction strategies. |
 | `WebAuthnAuthenticationResult.signature` | DER-encoded ECDSA P-256 signature. The SDK normalizes via `SmartAccountUtils.normalizeSignature` to 64-byte compact `r \|\| s` with low-S. Do **not** pre-normalize. |
@@ -1044,7 +1011,7 @@ When bringing up a new app on an additional platform, walk this table end-to-end
 | Choose `rpId` (bare domain, no scheme) | `example.com` | `example.com` | `example.com` | `example.com` (or `"localhost"` for dev) |
 | Publish domain-association file | `.well-known/assetlinks.json` | `.well-known/apple-app-site-association` | `.well-known/apple-app-site-association` | — |
 | Configure app capability / manifest | `keytool` SHA-256 in `assetlinks.json` | Xcode Associated Domains `webcredentials:...` | Xcode Associated Domains + App Sandbox / Developer ID | — |
-| Add dependency | `androidx.credentials:credentials:1.3.0`, `credentials-play-services-auth:1.3.0`, `androidx.security:security-crypto:1.1.0-alpha06` | Clibsodium via SPM | Clibsodium via SPM | — |
+| Add dependency | `androidx.credentials:credentials:1.3.0`, `credentials-play-services-auth:1.3.0`, `androidx.security:security-crypto:1.1.0` | Clibsodium via SPM | Clibsodium via SPM | — |
 | Import WebAuthn provider | `com.soneso.stellar.sdk.smartaccount.AndroidWebAuthnProvider` | `com.soneso.stellar.sdk.smartaccount.AppleWebAuthnProvider` | `com.soneso.stellar.sdk.smartaccount.AppleWebAuthnProvider` | `com.soneso.stellar.sdk.smartaccount.JsWebAuthnProvider` |
 | Context requirement | Activity context for provider, Application context for storage | None | **Set `presentationContextProvider` to an `NSWindow` anchor** | None |
 | Import storage adapter | `AndroidStorageAdapter` | `KeychainStorageAdapter` or `UserDefaultsStorageAdapter` | `KeychainStorageAdapter` or `UserDefaultsStorageAdapter` | `IndexedDBStorageAdapter` or `LocalStorageAdapter` |

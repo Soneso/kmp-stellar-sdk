@@ -847,8 +847,10 @@ object SmartAccountConstants {
 /**
  * Contract-level error codes from the OZ smart account contract.
  *
- * These codes are returned in contract error responses and can be mapped to
- * exceptions by the SDK when interpreting failed transaction results.
+ * A reference catalog for consumers. The SDK does not parse or map these codes —
+ * a failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the
+ * thrown exception, and the consumer extracts the code and matches it against these
+ * constants.
  *
  * Error code range: 3xxx (credential errors, aligned with the contract's Error enum).
  */

@@ -558,7 +558,7 @@ class SmartAccountUtilsTest {
         val ex = assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountUtils.extractPublicKeyFromAuthenticatorData(authData)
         }
-        assertTrue(ex.message!!.contains("Y-coordinate marker"))
+        assertTrue(ex.message!!.contains("COSE key structure is invalid"))
     }
 
     @Test
@@ -640,7 +640,7 @@ class SmartAccountUtilsTest {
         val ex = assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountUtils.extractPublicKeyFromAttestationObject(data)
         }
-        assertTrue(ex.message!!.contains("Insufficient data"))
+        assertTrue(ex.message!!.contains("COSE key structure is malformed"))
     }
 
     @Test
@@ -652,7 +652,7 @@ class SmartAccountUtilsTest {
         val ex = assertFailsWith<ValidationException.InvalidInput> {
             SmartAccountUtils.extractPublicKeyFromAttestationObject(attestation)
         }
-        assertTrue(ex.message!!.contains("Y-coordinate marker"))
+        assertTrue(ex.message!!.contains("COSE key structure is malformed"))
     }
 
     @Test

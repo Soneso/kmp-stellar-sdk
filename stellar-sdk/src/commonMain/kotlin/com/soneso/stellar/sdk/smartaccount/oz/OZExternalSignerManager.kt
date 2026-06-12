@@ -11,13 +11,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Util
-import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.soneso.stellar.sdk.platformSynchronized
 
 // MARK: - Ed25519 Adapter Interface
 
@@ -103,8 +98,8 @@ enum class ExternalSignerType {
     KEYPAIR,
 
     /**
-     * External wallet signer (e.g., Freighter, LOBSTR). Connection info
-     * can be persisted to storage for session restoration.
+     * External wallet signer (e.g., Freighter, LOBSTR). The connection is
+     * owned and surfaced by the configured [ExternalWalletAdapter].
      */
     WALLET
 }
@@ -132,7 +127,7 @@ enum class ExternalSignerType {
  * @property address The Stellar G-address of the signer
  * @property type Whether this signer is a keypair or wallet
  * @property walletName Human-readable wallet name (only for WALLET type)
- * @property walletId Wallet identifier for reconnection (only for WALLET type)
+ * @property walletId Wallet identifier (only for WALLET type)
  */
 data class ExternalSignerInfo(
     val address: String,
@@ -141,79 +136,7 @@ data class ExternalSignerInfo(
     val walletId: String? = null
 )
 
-// MARK: - Wallet Connection Storage
-
-/**
- * Simple key-value storage interface for persisting external wallet connections.
- *
- * Implementations must be thread-safe. Platform-specific implementations can use
- * SharedPreferences (Android), UserDefaults (iOS), localStorage (Web), or any
- * other persistent key-value store.
- *
- * Example implementation:
- * ```kotlin
- * class LocalStorageWalletConnectionStorage : WalletConnectionStorage {
- *     override suspend fun getItem(key: String): String? = localStorage.getItem(key)
- *     override suspend fun setItem(key: String, value: String) = localStorage.setItem(key, value)
- *     override suspend fun removeItem(key: String) = localStorage.removeItem(key)
- * }
- * ```
- */
-interface WalletConnectionStorage {
-    /**
-     * Retrieves a value by key.
-     *
-     * @param key The storage key
-     * @return The stored value, or null if the key does not exist
-     */
-    suspend fun getItem(key: String): String?
-
-    /**
-     * Stores a value for a key. Overwrites any existing value.
-     *
-     * @param key The storage key
-     * @param value The value to store
-     */
-    suspend fun setItem(key: String, value: String)
-
-    /**
-     * Removes a value by key. No-op if the key does not exist.
-     *
-     * @param key The storage key to remove
-     */
-    suspend fun removeItem(key: String)
-}
-
-/**
- * In-memory implementation of [WalletConnectionStorage].
- *
- * Used internally as a default when no [WalletConnectionStorage] is provided.
- * Data is not persisted across application restarts.
- */
-internal class InMemoryWalletConnectionStorage : WalletConnectionStorage {
-    private val data = mutableMapOf<String, String>()
-    private val mutex = Mutex()
-
-    override suspend fun getItem(key: String): String? = mutex.withLock {
-        data[key]
-    }
-
-    override suspend fun setItem(key: String, value: String): Unit = mutex.withLock {
-        data[key] = value
-    }
-
-    override suspend fun removeItem(key: String): Unit = mutex.withLock {
-        data.remove(key)
-        Unit
-    }
-}
-
 // MARK: - External Signer Manager
-
-/**
- * Storage key for persisted wallet connections in [WalletConnectionStorage].
- */
-private const val WALLET_STORAGE_KEY = "external_wallets"
 
 /**
  * Manager for external (non-passkey) signers for multi-signature smart account operations.
@@ -226,32 +149,25 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
  *    These are held in memory only and are never persisted to storage. The secret key
  *    material is accessible only through the in-memory KeyPair instance.
  *
- * 2. **Wallet signers** (via [addFromWallet]): Connected through an [ExternalWalletAdapter].
- *    Wallet connection metadata (address, wallet ID, wallet name) is persisted to
- *    [WalletConnectionStorage] so that connections can be restored across app launches
- *    via [restoreConnections].
+ * 2. **Wallet signers**: Connected through an [ExternalWalletAdapter]. The adapter owns the
+ *    connection lifecycle (e.g., WalletConnect sessions) and surfaces live connections via
+ *    [ExternalWalletAdapter.getConnectedWallets]; the manager delegates signing to it.
  *
  * Thread Safety:
- * All mutable state is protected by a [Mutex]. Public methods can be safely called from
- * any coroutine context.
+ * The in-memory signer registries are protected by a non-suspending platform lock so they
+ * can also be cleared from non-suspend teardown paths ([OZSmartAccountKit.close]). Public
+ * methods can be safely called from any coroutine context.
  *
  * Example usage:
  * ```kotlin
  * val manager = OZExternalSignerManager(
  *     networkPassphrase = "Test SDF Network ; September 2015",
- *     walletAdapter = myWalletAdapter,
- *     walletConnectionStorage = myStorage
+ *     walletAdapter = myWalletAdapter
  * )
  *
  * // Add from secret key (memory-only)
  * val address = manager.addFromSecret("SCZANGBA5YHT...")
  * println("Added keypair signer: $address")
- *
- * // Add from external wallet
- * val wallet = manager.addFromWallet()
- * if (wallet != null) {
- *     println("Connected wallet: ${wallet.walletName} (${wallet.address})")
- * }
  *
  * // Check signing capability
  * if (manager.canSignFor("GABC...")) {
@@ -266,8 +182,6 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
  * @param networkPassphrase The Stellar network passphrase used when delegating to wallet adapters.
  * @param walletAdapter Optional wallet adapter backing the wallet (G-address) custody model.
  *   The SDK never sees the wallet's private key — signing is delegated out of process.
- * @param walletConnectionStorage Optional persistent store for external-wallet connection
- *   metadata. Defaults to an in-memory store that does not survive application restarts.
  * @param ed25519Adapter Optional adapter backing the Ed25519 adapter custody model. When set,
  *   it is consulted via [OZExternalEd25519SignerAdapter.canSignFor] before the in-memory
  *   Ed25519 keypair registry (adapter-first precedence rule). Set a concrete
@@ -278,7 +192,6 @@ private const val WALLET_STORAGE_KEY = "external_wallets"
 class OZExternalSignerManager(
     private val networkPassphrase: String,
     private val walletAdapter: ExternalWalletAdapter? = null,
-    private val walletConnectionStorage: WalletConnectionStorage? = null,
     private val ed25519Adapter: OZExternalEd25519SignerAdapter? = null,
 ) {
     // MARK: - Internal State
@@ -296,15 +209,13 @@ class OZExternalSignerManager(
     private val ed25519Signers = mutableMapOf<Ed25519SignerKey, KeyPair>()
 
     /**
-     * Whether [restoreConnections] has been called.
-     * Prevents duplicate restoration attempts.
+     * Non-suspending lock protecting [keypairSigners] and [ed25519Signers].
+     *
+     * A platform lock (rather than a coroutine Mutex) is used so the registries can be
+     * cleared from the non-suspend [OZSmartAccountKit.close] via [clearInMemorySigners].
+     * All critical sections are short, non-suspending map operations.
      */
-    private var restored = false
-
-    /**
-     * Mutex protecting all mutable state.
-     */
-    private val mutex = Mutex()
+    private val registryLock = Any()
 
     // MARK: - Wallet Adapter Access
 
@@ -312,10 +223,8 @@ class OZExternalSignerManager(
      * Whether an external wallet adapter is configured.
      *
      * Returns true if the manager was initialized with a non-null [ExternalWalletAdapter].
-     * Wallet-related operations ([addFromWallet], [restoreConnections]) require this
-     * to be true.
      */
-    internal val hasWalletAdapter: Boolean
+    val hasWalletAdapter: Boolean
         get() = walletAdapter != null
 
     // MARK: - Add Signers
@@ -328,9 +237,7 @@ class OZExternalSignerManager(
      * application terminates or the manager is garbage collected.
      *
      * If a signer with the same G-address already exists (either keypair or wallet),
-     * the keypair signer takes precedence and overwrites the existing entry. Any
-     * persisted wallet connection for the same address is removed from storage to
-     * prevent it from reappearing on the next [restoreConnections] call.
+     * the keypair signer takes precedence and overwrites the existing entry.
      *
      * @param secretKey A valid Stellar secret key (S-address, 56 characters)
      * @return The derived G-address of the signer
@@ -355,53 +262,11 @@ class OZExternalSignerManager(
 
         val address = keypair.getAccountId()
 
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             keypairSigners[address] = keypair
         }
 
-        // Remove any stale wallet entry for the same address from storage.
-        // Keypair signers take precedence; without this cleanup the wallet
-        // would reappear on the next restoreConnections() call.
-        removeWalletFromStorage(address)
-
         return address
-    }
-
-    /**
-     * Connects an external wallet and adds it as a signer.
-     *
-     * Delegates to the configured [ExternalWalletAdapter] to prompt the user for wallet
-     * authorization (e.g., showing a wallet selection modal). If the connection succeeds
-     * and [WalletConnectionStorage] is configured, the connection metadata is persisted
-     * for later restoration via [restoreConnections].
-     *
-     * @return The connected wallet info, or null if the user cancelled or the operation
-     *   was unavailable
-     * @throws ConfigurationException.MissingConfig if no wallet adapter is configured
-     * @throws SmartAccountException if the wallet connection fails
-     *
-     * Example:
-     * ```kotlin
-     * val wallet = manager.addFromWallet()
-     * if (wallet != null) {
-     *     println("Connected: ${wallet.walletName} (${wallet.address})")
-     * }
-     * ```
-     */
-    suspend fun addFromWallet(): ConnectedWallet? {
-        val adapter = walletAdapter ?: throw ConfigurationException.missingConfig(
-            "walletAdapter: No wallet adapter configured. Pass an ExternalWalletAdapter " +
-                    "to OZExternalSignerManager to enable wallet connections."
-        )
-
-        val wallet = adapter.connect() ?: return null
-
-        // Persist the connection if storage is configured
-        if (walletConnectionStorage != null) {
-            saveWalletToStorage(wallet)
-        }
-
-        return wallet
     }
 
     // MARK: - Query Signers
@@ -424,7 +289,7 @@ class OZExternalSignerManager(
      */
     suspend fun canSignFor(address: String): Boolean {
         // Check keypair signers first
-        val hasKeypair = mutex.withLock {
+        val hasKeypair = platformSynchronized(registryLock) {
             keypairSigners.containsKey(address)
         }
         if (hasKeypair) return true
@@ -453,9 +318,9 @@ class OZExternalSignerManager(
      * }
      * ```
      */
-    internal suspend fun get(address: String): ExternalSignerInfo? {
+    suspend fun get(address: String): ExternalSignerInfo? {
         // Check keypair signers
-        val hasKeypair = mutex.withLock {
+        val hasKeypair = platformSynchronized(registryLock) {
             keypairSigners.containsKey(address)
         }
         if (hasKeypair) {
@@ -499,19 +364,18 @@ class OZExternalSignerManager(
      */
     suspend fun getAll(): List<ExternalSignerInfo> {
         val signers = mutableListOf<ExternalSignerInfo>()
-        val keypairAddresses: Set<String>
 
-        // Add keypair signers
-        mutex.withLock {
-            keypairAddresses = keypairSigners.keys.toSet()
-            for (address in keypairAddresses) {
-                signers.add(
-                    ExternalSignerInfo(
-                        address = address,
-                        type = ExternalSignerType.KEYPAIR
-                    )
+        // Add keypair signers (snapshot taken under the registry lock)
+        val keypairAddresses: Set<String> = platformSynchronized(registryLock) {
+            keypairSigners.keys.toSet()
+        }
+        for (address in keypairAddresses) {
+            signers.add(
+                ExternalSignerInfo(
+                    address = address,
+                    type = ExternalSignerType.KEYPAIR
                 )
-            }
+            )
         }
 
         // Add wallet signers (skip addresses already present as keypair)
@@ -539,8 +403,8 @@ class OZExternalSignerManager(
      *
      * @return True if at least one signer is managed
      */
-    internal suspend fun hasSigners(): Boolean {
-        val hasKeypairs = mutex.withLock {
+    suspend fun hasSigners(): Boolean {
+        val hasKeypairs = platformSynchronized(registryLock) {
             keypairSigners.isNotEmpty()
         }
         if (hasKeypairs) return true
@@ -582,7 +446,7 @@ class OZExternalSignerManager(
         authEntry: String
     ): SignAuthEntryResult {
         // Try keypair signer first
-        val keypair = mutex.withLock {
+        val keypair = platformSynchronized(registryLock) {
             keypairSigners[address]
         }
 
@@ -622,8 +486,8 @@ class OZExternalSignerManager(
      * Removes a signer by address.
      *
      * For keypair signers, removes the keypair from memory. For wallet signers,
-     * removes the connection from storage and calls [ExternalWalletAdapter.disconnectByAddress]
-     * to clean up the adapter's runtime state. Both types are cleaned up if present.
+     * calls [ExternalWalletAdapter.disconnectByAddress] to clean up the adapter's
+     * runtime state. Both types are cleaned up if present.
      *
      * @param address The G-address of the signer to remove
      *
@@ -635,20 +499,19 @@ class OZExternalSignerManager(
      */
     suspend fun remove(address: String) {
         // Remove from keypair signers
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             keypairSigners.remove(address)
         }
 
-        // Disconnect from wallet adapter and remove from storage
+        // Disconnect from wallet adapter
         walletAdapter?.disconnectByAddress(address)
-        removeWalletFromStorage(address)
     }
 
     /**
      * Removes all signers.
      *
-     * Clears all keypair signers and all Ed25519 registrations from memory, disconnects
-     * all external wallets, and removes all persisted wallet connections from storage.
+     * Clears all keypair signers and all Ed25519 registrations from memory and
+     * disconnects all external wallets.
      *
      * Example:
      * ```kotlin
@@ -657,16 +520,25 @@ class OZExternalSignerManager(
      * ```
      */
     suspend fun removeAll() {
-        mutex.withLock {
-            keypairSigners.clear()
-            ed25519Signers.clear()
-        }
+        clearInMemorySigners()
 
         // Disconnect all wallets
         walletAdapter?.disconnect()
+    }
 
-        // Clear storage
-        walletConnectionStorage?.removeItem(WALLET_STORAGE_KEY)
+    /**
+     * Removes the in-memory signing secrets: all keypair signers registered via
+     * [addFromSecret] and all Ed25519 keypairs registered via [addEd25519FromRawKey].
+     *
+     * The external wallet adapter is left intact — unlike [removeAll], this does not
+     * disconnect wallets. Called from [OZSmartAccountKit.close] so that raw key material
+     * does not outlive the kit.
+     */
+    internal fun clearInMemorySigners() {
+        platformSynchronized(registryLock) {
+            keypairSigners.clear()
+            ed25519Signers.clear()
+        }
     }
 
     // MARK: - Ed25519 Methods
@@ -717,7 +589,7 @@ class OZExternalSignerManager(
             publicKeyHex = Util.bytesToHex(publicKey)
         )
 
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             ed25519Signers[storeKey] = keypair
         }
 
@@ -745,7 +617,9 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        return ed25519Signers.containsKey(storeKey)
+        return platformSynchronized(registryLock) {
+            ed25519Signers.containsKey(storeKey)
+        }
     }
 
     /**
@@ -756,7 +630,7 @@ class OZExternalSignerManager(
      * it can sign, it is invoked via [OZExternalEd25519SignerAdapter.signAuthDigest]. Otherwise
      * the in-memory keypair registry is used. Throws when neither source is available.
      *
-     * The registry mutex is released before the adapter's
+     * The registry lock is never held while the adapter's
      * [OZExternalEd25519SignerAdapter.signAuthDigest] is awaited, preventing deadlock with
      * adapters that may call back into the manager.
      *
@@ -775,9 +649,9 @@ class OZExternalSignerManager(
         val adapter = ed25519Adapter
 
         if (adapter != null && adapter.canSignFor(verifierAddress, publicKey)) {
-            // The mutex is NOT held during the adapter await — the adapter may take several
-            // seconds (e.g. user confirmation on a hardware device) and may itself call back
-            // into this manager. Holding the mutex across the suspend point would deadlock.
+            // The registry lock is NOT held during the adapter await — the adapter may take
+            // several seconds (e.g. user confirmation on a hardware device) and may itself call
+            // back into this manager. Holding the lock across the suspend point would deadlock.
             val rawSignature: ByteArray = try {
                 adapter.signAuthDigest(authDigest, publicKey)
             } catch (e: Exception) {
@@ -793,7 +667,7 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        val keypair = mutex.withLock { ed25519Signers[storeKey] }
+        val keypair = platformSynchronized(registryLock) { ed25519Signers[storeKey] }
 
         if (keypair == null) {
             val prefix = verifierAddress.take(SmartAccountConstants.ADDRESS_PREFIX_LENGTH)
@@ -828,66 +702,9 @@ class OZExternalSignerManager(
             verifierAddress = verifierAddress,
             publicKeyHex = Util.bytesToHex(publicKey)
         )
-        mutex.withLock {
+        platformSynchronized(registryLock) {
             ed25519Signers.remove(storeKey)
         }
-    }
-
-    // MARK: - Wallet Connection Persistence
-
-    /**
-     * Restores previously connected wallets from storage.
-     *
-     * Reads stored wallet connection metadata from [WalletConnectionStorage] and
-     * attempts to reconnect each wallet via [ExternalWalletAdapter.reconnect].
-     * Wallets that fail to reconnect are removed from storage.
-     *
-     * This method is idempotent: subsequent calls after the first successful restoration
-     * return the currently connected wallets without re-reading storage.
-     *
-     * @return List of successfully restored wallet connections
-     *
-     * Example:
-     * ```kotlin
-     * val restored = manager.restoreConnections()
-     * println("Restored ${restored.size} wallet connections")
-     * ```
-     */
-    suspend fun restoreConnections(): List<ConnectedWallet> {
-        val alreadyRestored = mutex.withLock {
-            val current = restored
-            restored = true
-            current
-        }
-
-        if (alreadyRestored) {
-            // Already restored, return current wallet connections
-            return walletAdapter?.getConnectedWallets() ?: emptyList()
-        }
-
-        if (walletConnectionStorage == null || walletAdapter == null) {
-            return emptyList()
-        }
-
-        val stored = getStoredWallets()
-        val restoredWallets = mutableListOf<ConnectedWallet>()
-
-        for (savedWallet in stored) {
-            try {
-                val wallet = walletAdapter.reconnect(savedWallet.walletId)
-                if (wallet != null) {
-                    restoredWallets.add(wallet)
-                } else {
-                    // Reconnection returned null -- remove stale entry
-                    removeWalletFromStorage(savedWallet.address)
-                }
-            } catch (_: Exception) {
-                // Reconnection failed -- remove stale entry
-                removeWalletFromStorage(savedWallet.address)
-            }
-        }
-
-        return restoredWallets
     }
 
     // MARK: - Private Signing Helpers
@@ -941,110 +758,5 @@ class OZExternalSignerManager(
             signedAuthEntry = signatureBase64,
             signerAddress = address
         )
-    }
-
-    // =========================================================================
-    // Private Storage Helpers
-    // =========================================================================
-
-    /**
-     * Stored wallet connection info for serialization.
-     */
-    @Serializable
-    internal data class StoredWalletConnection(
-        val address: String,
-        val walletId: String,
-        val walletName: String,
-        val connectedAt: Long
-    )
-
-    private val json = Json { ignoreUnknownKeys = true }
-
-    /**
-     * Retrieves stored wallet connections from storage.
-     *
-     * Parses the JSON array stored under [WALLET_STORAGE_KEY]. Returns an empty
-     * list if storage is not configured, the key does not exist, or parsing fails.
-     */
-    private suspend fun getStoredWallets(): List<StoredWalletConnection> {
-        if (walletConnectionStorage == null) return emptyList()
-
-        return try {
-            val data = walletConnectionStorage.getItem(WALLET_STORAGE_KEY) ?: return emptyList()
-            parseStoredWallets(data)
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
-    /**
-     * Saves a wallet connection to storage.
-     *
-     * Performs upsert semantics: if a connection with the same address already exists,
-     * it is replaced. The connection list is serialized as a JSON array.
-     */
-    private suspend fun saveWalletToStorage(wallet: ConnectedWallet) {
-        if (walletConnectionStorage == null) return
-
-        val stored = getStoredWallets().toMutableList()
-
-        // Remove existing entry for this address (if any)
-        stored.removeAll { it.address == wallet.address }
-
-        // Add new entry
-        stored.add(
-            StoredWalletConnection(
-                address = wallet.address,
-                walletId = wallet.walletId,
-                walletName = wallet.walletName,
-                connectedAt = currentTimeMillis()
-            )
-        )
-
-        walletConnectionStorage.setItem(WALLET_STORAGE_KEY, serializeWallets(stored))
-    }
-
-    /**
-     * Removes a wallet connection from storage by address.
-     *
-     * If no connections remain after removal, the storage key is deleted entirely.
-     */
-    private suspend fun removeWalletFromStorage(address: String) {
-        if (walletConnectionStorage == null) return
-
-        val stored = getStoredWallets().toMutableList()
-        stored.removeAll { it.address == address }
-
-        if (stored.isEmpty()) {
-            walletConnectionStorage.removeItem(WALLET_STORAGE_KEY)
-        } else {
-            walletConnectionStorage.setItem(WALLET_STORAGE_KEY, serializeWallets(stored))
-        }
-    }
-
-    // =========================================================================
-    // JSON Serialization
-    // =========================================================================
-
-    /**
-     * Serializes wallet connections to a JSON array string using kotlinx.serialization.
-     */
-    private fun serializeWallets(wallets: List<StoredWalletConnection>): String {
-        return json.encodeToString(wallets)
-    }
-
-    /**
-     * Parses wallet connections from a JSON array string using kotlinx.serialization.
-     *
-     * Parses atomically — if the JSON is malformed, returns an empty list rather than
-     * partial results. This is acceptable because the serializer always produces valid
-     * JSON.
-     */
-    private fun parseStoredWallets(jsonString: String): List<StoredWalletConnection> {
-        return try {
-            json.decodeFromString<List<StoredWalletConnection>>(jsonString)
-        } catch (_: Exception) {
-            emptyList()
-        }
     }
 }

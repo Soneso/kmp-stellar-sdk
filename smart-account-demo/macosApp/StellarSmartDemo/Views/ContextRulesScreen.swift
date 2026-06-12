@@ -26,7 +26,6 @@ struct ContextRulesScreen: View {
     @EnvironmentObject var bridgeWrapper: MacOSBridgeWrapper
     @EnvironmentObject var appState: AppState
     @ObservedObject var toastManager: ToastManager
-    @Environment(\.dismiss) private var dismiss
 
     // MARK: - Rule list state
 
@@ -45,6 +44,9 @@ struct ContextRulesScreen: View {
     // Multi-signer state for rule removal
     @State private var availableSigners: [SignerInfoBridge] = []
     @State private var signersLoaded = false
+    /// True when the signer fetch failed; distinguishes load-failed from loaded-empty
+    /// so the UI can warn that multi-signer routing is unavailable.
+    @State private var signerLoadFailed = false
     @State private var showRemoveSignerPicker = false
     @State private var ruleToRemoveWithSigners: ParsedContextRule? = nil
 
@@ -61,8 +63,11 @@ struct ContextRulesScreen: View {
             VStack(spacing: 16) {
                 descriptionCard
                 actionButtonsRow
+                if signerLoadFailed {
+                    signerLoadWarning
+                }
                 if let message = errorMessage {
-                    errorCard(message: message)
+                    ErrorCard(message: message, font: .callout)
                 }
                 if !appState.isConnected {
                     notConnectedCard
@@ -126,10 +131,12 @@ struct ContextRulesScreen: View {
                 SignerPickerSheet(
                     signers: availableSigners,
                     activeCredentialId: appState.credentialId,
-                    ed25519VerifierAddress: bridgeWrapper.bridge.getEd25519VerifierAddress(),
+                    description: "Choose which signers co-authorize removing this context rule. " +
+                        "For Stellar account signers, enter the secret key to enable signing.",
                     onConfirm: { selected, secretKeys, ed25519Secrets in
                         showRemoveSignerPicker = false
-                        let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier) }
+                        // Auth signers are existing on-chain signers, so isPending is always false here.
+                        let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier, isPending: false) }
                         let capturedRule = rule
                         ruleToRemoveWithSigners = nil
                         Task {
@@ -175,15 +182,10 @@ struct ContextRulesScreen: View {
         HStack(spacing: 8) {
             // Refresh — outlined
             Button(action: { Task { await loadRules() } }) {
-                Text(isLoading ? "Loading..." : "Refresh")
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .foregroundColor(Material3Colors.primary)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Material3Colors.primary, lineWidth: 1.5)
-                    )
+                PrimaryButtonLabel(
+                    text: isLoading ? "Loading..." : "Refresh",
+                    style: .outlined(color: Material3Colors.primary)
+                )
             }
             .buttonStyle(.plain)
             .disabled(isLoading || isRemoving || !appState.isConnected)
@@ -196,32 +198,30 @@ struct ContextRulesScreen: View {
                     onRuleChanged: { Task { await loadRules() } }
                 )
             ) {
-                Text("+ Add Rule")
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .foregroundColor(.white)
-                    .background(
-                        (isLoading || isRemoving || !appState.isConnected)
+                PrimaryButtonLabel(
+                    text: "+ Add Rule",
+                    style: .filled(
+                        foreground: .white,
+                        background: (isLoading || isRemoving || !appState.isConnected)
                             ? Material3Colors.primary.opacity(0.5)
                             : Material3Colors.primary
                     )
-                    .cornerRadius(8)
+                )
             }
             .buttonStyle(.plain)
             .disabled(isLoading || isRemoving || !appState.isConnected)
         }
     }
 
-    // MARK: - Error card
+    // MARK: - Signer load warning
 
-    private func errorCard(message: String) -> some View {
-        InfoCard(color: .error) {
-            Text(message)
-                .font(.callout)
-                .foregroundColor(Material3Colors.onErrorContainer)
-                .textSelection(.enabled)
-        }
+    /// Non-blocking notice that the signer list could not be loaded. Single-signer
+    /// rule removal keeps working; only the multi-signer picker is unavailable.
+    private var signerLoadWarning: some View {
+        Text("Could not load signers — multi-signer operations unavailable")
+            .font(.footnote)
+            .foregroundColor(Material3Colors.badgeExpiryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Not connected card
@@ -313,14 +313,11 @@ struct ContextRulesScreen: View {
                     // Top row: ID badge + name + chevron
                     HStack(spacing: 8) {
                         // Rule ID badge
-                        Text("#\(ruleId)")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Material3Colors.primary)
-                            .cornerRadius(4)
+                        TagPill(
+                            text: "#\(ruleId)",
+                            font: .caption2.bold(),
+                            background: Material3Colors.primary
+                        )
 
                         // Rule name
                         Text(rule.name.isEmpty ? "Unnamed Rule" : rule.name)
@@ -345,33 +342,27 @@ struct ContextRulesScreen: View {
                     HStack(spacing: 8) {
                         // Signers badge
                         let signerCount = signers.count
-                        Text("\(signerCount) signer\(signerCount != 1 ? "s" : "")")
-                            .font(.caption2)
-                            .foregroundColor(Material3Colors.badgeSignersText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Material3Colors.badgeSignersBackground)
-                            .cornerRadius(4)
+                        TagPill(
+                            text: "\(signerCount) signer\(signerCount != 1 ? "s" : "")",
+                            foreground: Material3Colors.badgeSignersText,
+                            background: Material3Colors.badgeSignersBackground
+                        )
 
                         // Policies badge
                         let policyCount = policies.count
-                        Text("\(policyCount) polic\(policyCount != 1 ? "ies" : "y")")
-                            .font(.caption2)
-                            .foregroundColor(Material3Colors.badgePoliciesText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Material3Colors.badgePoliciesBackground)
-                            .cornerRadius(4)
+                        TagPill(
+                            text: "\(policyCount) polic\(policyCount != 1 ? "ies" : "y")",
+                            foreground: Material3Colors.badgePoliciesText,
+                            background: Material3Colors.badgePoliciesBackground
+                        )
 
                         // Expiry badge (only when validUntil is set)
                         if let expiry = validUntil {
-                            Text("Expires: ledger \(expiry.uint32Value)")
-                                .font(.caption2)
-                                .foregroundColor(Material3Colors.badgeExpiryText)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Material3Colors.badgeExpiryBackground)
-                                .cornerRadius(4)
+                            TagPill(
+                                text: "Expires: ledger \(expiry.uint32Value)",
+                                foreground: Material3Colors.badgeExpiryText,
+                                background: Material3Colors.badgeExpiryBackground
+                            )
                         }
                     }
                 }
@@ -404,24 +395,14 @@ struct ContextRulesScreen: View {
                                     onRuleChanged: { Task { await loadRules() } }
                                 )
                             ) {
-                                Text("Edit Rule")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .foregroundColor(
-                                        isRemoving
+                                PrimaryButtonLabel(
+                                    text: "Edit Rule",
+                                    style: .outlined(
+                                        color: isRemoving
                                             ? Material3Colors.primary.opacity(0.5)
                                             : Material3Colors.primary
                                     )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(
-                                                isRemoving
-                                                    ? Material3Colors.primary.opacity(0.5)
-                                                    : Material3Colors.primary,
-                                                lineWidth: 1.5
-                                            )
-                                    )
+                                )
                             }
                             .buttonStyle(.plain)
                             .disabled(isRemoving)
@@ -432,17 +413,15 @@ struct ContextRulesScreen: View {
                                     ruleToRemove = rule
                                 }
                             }) {
-                                Text(canRemove ? "Remove Rule" : "Last Rule")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .foregroundColor(.white)
-                                    .background(
-                                        (!canRemove || isRemoving)
+                                PrimaryButtonLabel(
+                                    text: canRemove ? "Remove Rule" : "Last Rule",
+                                    style: .filled(
+                                        foreground: .white,
+                                        background: (!canRemove || isRemoving)
                                             ? Material3Colors.error.opacity(0.5)
                                             : Material3Colors.error
                                     )
-                                    .cornerRadius(8)
+                                )
                             }
                             .buttonStyle(.plain)
                             .disabled(!canRemove || isRemoving)
@@ -531,14 +510,11 @@ struct ContextRulesScreen: View {
         let truncated = KotlinInterop.truncateAddress(address, prefixLength: 8, suffixLength: 8)
 
         return HStack(spacing: 8) {
-            Text("P")
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Material3Colors.logSuccess)
-                .cornerRadius(4)
+            TagPill(
+                text: "P",
+                font: .caption2.bold(),
+                background: Material3Colors.logSuccess
+            )
 
             Text(truncated)
                 .font(.system(size: 12, design: .monospaced))
@@ -557,15 +533,23 @@ struct ContextRulesScreen: View {
 
     /// Extracts a signer type tag and display identifier from a `SmartAccountSigner`.
     ///
-    /// - For `ExternalSigner`: type = "passkey", identifier = hex-encoded `keyData` (truncated).
+    /// - For `ExternalSigner` with a credential ID: type = "passkey", identifier = credential ID.
+    /// - For `ExternalSigner` with 32-byte key data: type = "ed25519", identifier = hex prefix.
+    /// - For any other `ExternalSigner`: type = "external", identifier = truncated verifier address.
     /// - For `DelegatedSigner`: type = "delegated", identifier = truncated address.
     private func signerTypeInfo(signer: SmartAccountSigner) -> (type: String, identifier: String) {
         if let external = signer as? ExternalSigner {
-            let hexStr = KotlinInterop.hexString(from: external.keyData)
-            let display = hexStr.isEmpty
-                ? "(no key data)"
-                : KotlinInterop.truncateAddress(hexStr, prefixLength: 8, suffixLength: 8)
-            return ("passkey", display)
+            if let credentialId = bridgeWrapper.bridge.getCredentialIdFromSigner(signer: external) {
+                return ("passkey", credentialId)
+            }
+            if external.keyData.size == 32 {
+                let hexStr = KotlinInterop.hexString(from: external.keyData)
+                return ("ed25519", "\(hexStr.prefix(8))...")
+            }
+            let display = KotlinInterop.truncateAddress(
+                external.verifierAddress, prefixLength: 4, suffixLength: 4
+            )
+            return ("external", display)
         } else if let delegated = signer as? DelegatedSigner {
             let display = KotlinInterop.truncateAddress(
                 delegated.address, prefixLength: 8, suffixLength: 8
@@ -596,8 +580,9 @@ struct ContextRulesScreen: View {
                 callContract.contractAddress, prefixLength: 8, suffixLength: 8
             )
             return "Call Contract: \(truncated)"
-        } else if contextType is ContextRuleType.CreateContract {
-            return "Create Contract"
+        } else if let createContract = contextType as? ContextRuleType.CreateContract {
+            let hex = KotlinInterop.hexString(from: createContract.wasmHash)
+            return "Create Contract: \(hex.prefix(8))..."
         } else {
             return "Default (Any Operation)"
         }
@@ -613,7 +598,9 @@ struct ContextRulesScreen: View {
 
     // MARK: - Actions
 
-    private func loadRules() async {
+    /// Loads the rule list. `failureMessage` prefixes the error shown when the
+    /// fetch fails (the post-removal refresh uses its own wording).
+    private func loadRules(failureMessage: String = "Failed to fetch context rules") async {
         guard appState.isConnected else { return }
         let bridge = bridgeWrapper.bridge
         await MainActor.run {
@@ -629,27 +616,15 @@ struct ContextRulesScreen: View {
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Failed to fetch context rules: \(error.localizedDescription)"
+                errorMessage = "\(failureMessage): \(error.localizedDescription)"
                 isLoading = false
             }
         }
     }
 
     private func performRemove(rule: ParsedContextRule) async {
-        let bridge = bridgeWrapper.bridge
-
         // Check if multi-signer authorization is needed
-        let isSinglePasskey: Bool = {
-            guard signersLoaded, availableSigners.count > 1 else { return true }
-            let credId = bridge.getCredentialId()
-            if availableSigners.count == 1,
-               availableSigners[0].type == "passkey",
-               let cId = credId,
-               availableSigners[0].identifier == cId {
-                return true
-            }
-            return availableSigners.count <= 1
-        }()
+        let isSinglePasskey = !(signersLoaded && availableSigners.count > 1)
 
         if !isSinglePasskey {
             await MainActor.run {
@@ -683,24 +658,9 @@ struct ContextRulesScreen: View {
                 ed25519SecretKeys: ed25519Secrets
             )
             if result.success {
+                await loadRules(failureMessage: "Failed to refresh rules")
                 await MainActor.run {
-                    isLoading = true
-                    errorMessage = nil
-                }
-                do {
-                    let refreshed = try await bridge.loadContextRules()
-                    let loaded = KotlinInterop.toArray(refreshed, as: ParsedContextRule.self)
-                    await MainActor.run {
-                        rules = loaded
-                        isLoading = false
-                        isRemoving = false
-                    }
-                } catch {
-                    await MainActor.run {
-                        errorMessage = "Failed to refresh rules: \(error.localizedDescription)"
-                        isLoading = false
-                        isRemoving = false
-                    }
+                    isRemoving = false
                 }
             } else {
                 let errMsg = result.error ?? "Unknown error"
@@ -722,20 +682,17 @@ struct ContextRulesScreen: View {
         }
     }
 
+    /// Loads the available signers. On failure, single-signer rule removal stays
+    /// usable; the load-failed flag drives the multi-signer-unavailable warning.
     private func loadSigners() async {
         guard appState.isConnected else { return }
-        let bridge = bridgeWrapper.bridge
-        do {
-            let result = try await bridge.loadAvailableSigners()
-            let loaded = KotlinInterop.toArray(result, as: SignerInfoBridge.self)
-            await MainActor.run {
-                availableSigners = loaded
-                signersLoaded = true
+        let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridgeWrapper.bridge)
+        await MainActor.run {
+            if !result.loadFailed {
+                availableSigners = result.signers
             }
-        } catch {
-            await MainActor.run {
-                signersLoaded = true
-            }
+            signersLoaded = true
+            signerLoadFailed = result.loadFailed
         }
     }
 }

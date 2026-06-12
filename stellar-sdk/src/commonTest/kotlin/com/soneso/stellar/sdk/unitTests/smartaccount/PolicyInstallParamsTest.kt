@@ -8,16 +8,21 @@
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.core.WalletException
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -570,6 +575,71 @@ class PolicyInstallParamsTest {
         }
         assertEquals("simple", typeName)
     }
+
+    // ========================================================================
+    // Polymorphic toScVal dispatch
+    // ========================================================================
+
+    @Test
+    fun testToScVal_polymorphicDispatchThroughBaseType() {
+        // toScVal is declared on the sealed base, so a caller holding a
+        // PolicyInstallParams reference can encode without knowing the variant
+        val params: List<PolicyInstallParams> = listOf(
+            PolicyInstallParams.SimpleThreshold(threshold = 2u),
+            PolicyInstallParams.SpendingLimit(
+                spendingLimit = BigInteger.fromLong(10_000_000L),
+                periodLedgers = 17280u
+            )
+        )
+
+        for (p in params) {
+            val scVal: SCValXdr = p.toScVal()
+            assertIs<SCValXdr.Map>(scVal)
+        }
+    }
+
+    // ========================================================================
+    // Typed addPolicy overload
+    // ========================================================================
+
+    @Test
+    fun testAddPolicyTypedOverload_invalidParams_throwBeforeConnectionCheck() = runTest {
+        // The typed overload encodes the params first, so invalid parameters are
+        // rejected even on a disconnected kit (offline)
+        val kit = OZSmartAccountKit.create(buildOfflineConfig())
+
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.policyManager.addPolicy(
+                contextRuleId = 0u,
+                policyAddress = TEST_CONTRACT_ADDRESS,
+                installParams = PolicyInstallParams.SimpleThreshold(threshold = 0u)
+            )
+        }
+    }
+
+    @Test
+    fun testAddPolicyTypedOverload_validParams_delegatesToScValOverload() = runTest {
+        // Valid params encode successfully; the call then fails at the
+        // connected-state check inside the SCValXdr overload, proving delegation
+        val kit = OZSmartAccountKit.create(buildOfflineConfig())
+
+        assertFailsWith<WalletException.NotConnected> {
+            kit.policyManager.addPolicy(
+                contextRuleId = 0u,
+                policyAddress = TEST_CONTRACT_ADDRESS,
+                installParams = PolicyInstallParams.SimpleThreshold(threshold = 2u)
+            )
+        }
+    }
+
+    private val TEST_CONTRACT_ADDRESS = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+
+    private fun buildOfflineConfig(): OZSmartAccountConfig = OZSmartAccountConfig(
+        rpcUrl = "https://soroban-testnet.stellar.org",
+        networkPassphrase = Network.TESTNET.networkPassphrase,
+        accountWasmHash = "a" + "0".repeat(63),
+        webauthnVerifierAddress = TEST_CONTRACT_ADDRESS
+    )
 
     // ========================================================================
     // Helper Functions

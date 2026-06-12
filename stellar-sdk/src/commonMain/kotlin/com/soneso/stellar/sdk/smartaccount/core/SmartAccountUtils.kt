@@ -379,23 +379,24 @@ object SmartAccountUtils {
      *
      * **Validation performed:**
      * - The 10-byte ES256 COSE key prefix is verified at the credential data offset before
-     *   reading coordinates. A prefix mismatch causes null to be returned (not an exception),
+     *   parsing. A prefix mismatch causes null to be returned (not an exception),
      *   consistent with the early-exit pattern for non-ES256 or missing credential data.
-     * - The 3-byte Y-coordinate separator (0x22, 0x58, 0x20) is verified at the exact
-     *   offset following the 32-byte X coordinate.
+     * - Coordinate parsing is delegated to [WebAuthnCborParser.extractPublicKeyFromCoseKey],
+     *   which handles CBOR map iteration (order-tolerant) and a strict pattern fallback
+     *   that validates the 3-byte Y-coordinate separator (0x22, 0x58, 0x20).
      * - The extracted (X, Y) point is verified to lie on the secp256r1 curve.
      *
      * @param authenticatorData Raw authenticator data bytes
      * @return Uncompressed secp256r1 public key (65 bytes), or null if the data
      *         is too short, does not contain attested credential data, or does not carry
      *         an ES256 COSE key at the expected offset
-     * @throws ValidationException.InvalidInput if the COSE Y-marker is malformed or
+     * @throws ValidationException.InvalidInput if the COSE key structure is malformed or
      *         the extracted key coordinates do not lie on the secp256r1 curve
      */
     internal fun extractPublicKeyFromAuthenticatorData(authenticatorData: ByteArray): ByteArray? {
-        // Minimum size: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen)
-        // = 55, plus at least the COSE key prefix (10) + X (32) + separator (3) + Y (32) = 77
-        // Total minimum: 132 bytes
+        // Header minimum: 37 (rpIdHash + flags + signCount) + 16 (AAGUID) + 2 (credIdLen) = 55.
+        // Only the header is checked here; the COSE key portion (prefix 10 + X 32 +
+        // separator 3 + Y 32) is gated downstream by the prefix and full-key-length checks.
         if (authenticatorData.size < 55) {
             return null
         }
@@ -433,34 +434,31 @@ object SmartAccountUtils {
             return null  // Not an ES256 COSE key
         }
 
-        val xStart = coseKeyStart + 10 // After the 10-byte COSE prefix
-        val separatorStart = xStart + 32
-        val yStart = separatorStart + 3
-        val requiredLength = yStart + 32
-
-        if (authenticatorData.size < requiredLength) {
+        // Full-key length guard. Returns null (not throw) so the public method falls
+        // through to the attestation-object strategy when the buffer is truncated after
+        // the prefix but before the complete key (prefix 10 + X 32 + separator 3 + Y 32).
+        val fullKeyRequiredLength = coseKeyStart + 10 + 32 + 3 + 32
+        if (authenticatorData.size < fullKeyRequiredLength) {
             return null
         }
 
-        // Validate the Y-coordinate marker bytes at the expected position.
-        // These must be exactly [0x22, 0x58, 0x20] (CBOR map key -3, bstr, length 32).
-        // Validating the separator confirms the X-coordinate starts at the correct offset
-        // and guards against coincidental prefix matches in credential ID or other data.
-        validateCoseYMarker(authenticatorData, separatorStart, "authenticatorData")
-
-        // Extract X and Y coordinates
-        val x = authenticatorData.copyOfRange(xStart, xStart + 32)
-        val y = authenticatorData.copyOfRange(yStart, yStart + 32)
+        // All structural gates passed — delegate parsing to WebAuthnCborParser, which
+        // handles CBOR map iteration (order-tolerant) and a strict pattern fallback
+        // (validates the [0x22, 0x58, 0x20] Y-coordinate separator).
+        val coseKeySlice = authenticatorData.copyOfRange(coseKeyStart, authenticatorData.size)
+        val publicKey = WebAuthnCborParser.extractPublicKeyFromCoseKey(coseKeySlice)
+            ?: throw ValidationException.invalidInput(
+                "authenticatorData",
+                "COSE key structure is invalid: could not extract secp256r1 " +
+                    "coordinates from authenticator data"
+            )
 
         // Verify the extracted point lies on the secp256r1 curve.
         // This prevents accepting garbage coordinates that happen to follow the COSE prefix.
-        validatePointOnCurve(x, y)
-
-        // Construct uncompressed public key: 0x04 || X || Y
-        val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
-        publicKey[0] = SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
-        x.copyInto(publicKey, 1)
-        y.copyInto(publicKey, 33)
+        validatePointOnCurve(
+            publicKey.copyOfRange(1, 33),
+            publicKey.copyOfRange(33, 65)
+        )
 
         return publicKey
     }
@@ -475,9 +473,9 @@ object SmartAccountUtils {
      * This is an internal extraction strategy used by [extractPublicKeyFromRegistration].
      * Callers should use [extractPublicKeyFromRegistration] instead of calling this directly.
      *
-     * This is a pattern-matching approach that works regardless of the CBOR structure
-     * surrounding the key. It searches for the known 10-byte COSE key prefix for ES256
-     * (P-256) keys.
+     * This strategy works regardless of the CBOR structure surrounding the key: it
+     * probes for the known 10-byte COSE key prefix for ES256 (P-256) keys, then
+     * delegates parsing to [WebAuthnCborParser.extractPublicKeyFromCoseKey].
      *
      * COSE key structure:
      * ```
@@ -489,16 +487,20 @@ object SmartAccountUtils {
      * ```
      *
      * **Validation performed:**
-     * - The 3-byte Y-coordinate marker (0x22, 0x58, 0x20) is verified at the exact
-     *   offset following the 32-byte X coordinate.
+     * - The 10-byte ES256 COSE key prefix must be present somewhere in the data;
+     *   its absence is reported as a distinct error.
+     * - Coordinate parsing is delegated to [WebAuthnCborParser.extractPublicKeyFromCoseKey],
+     *   which handles CBOR map iteration (order-tolerant) and a strict pattern fallback
+     *   that validates the 3-byte Y-coordinate separator (0x22, 0x58, 0x20) and the
+     *   available data length.
      * - The extracted (X, Y) point is verified to lie on the secp256r1 curve.
      *
      * @param attestationObject Raw attestation object data from WebAuthn registration
      * @return Uncompressed secp256r1 public key (65 bytes: 0x04 prefix + X + Y)
-     * @throws ValidationException.InvalidInput if the COSE key structure is not found,
-     *         if there is insufficient data after the prefix, if the Y-coordinate marker
-     *         is not present at the expected offset, or if the extracted coordinates do
-     *         not lie on the secp256r1 curve
+     * @throws ValidationException.InvalidInput if the COSE key prefix is not found,
+     *         if the COSE key structure is malformed (truncated data or an invalid
+     *         Y-coordinate separator), or if the extracted coordinates do not lie on
+     *         the secp256r1 curve
      */
     internal fun extractPublicKeyFromAttestationObject(attestationObject: ByteArray): ByteArray {
         // COSE key prefix for secp256r1 public keys in WebAuthn attestation
@@ -516,40 +518,22 @@ object SmartAccountUtils {
             )
         }
 
-        val xStart = prefixIndex + prefix.size
-        val separatorStart = xStart + 32
-        val yStart = separatorStart + 3
-
-        // Ensure we have enough data for X (32 bytes) + separator (3 bytes) + Y (32 bytes)
-        val requiredLength = yStart + 32
-        if (attestationObject.size < requiredLength) {
-            throw ValidationException.invalidInput(
+        // Prefix present — delegate parsing to WebAuthnCborParser. Its pattern fallback
+        // locates the prefix, checks the available data length, and strictly validates
+        // the [0x22, 0x58, 0x20] Y-coordinate separator.
+        val publicKey = WebAuthnCborParser.extractPublicKeyFromCoseKey(attestationObject)
+            ?: throw ValidationException.invalidInput(
                 "attestationObject",
-                "Insufficient data after COSE key prefix"
+                "COSE key structure is malformed: could not extract secp256r1 " +
+                    "coordinates from attestation object"
             )
-        }
-
-        // Validate the Y-coordinate marker bytes at the expected position.
-        // These must be exactly [0x22, 0x58, 0x20] (CBOR map key -3, bstr, length 32).
-        // Validating the separator confirms the prefix match corresponds to a real COSE key
-        // and not a coincidental byte sequence in other parts of the attestation object.
-        validateCoseYMarker(attestationObject, separatorStart, "attestationObject")
-
-        // Extract X coordinate (32 bytes after prefix)
-        val x = attestationObject.copyOfRange(xStart, xStart + 32)
-
-        // Extract Y coordinate (32 bytes after separator)
-        val y = attestationObject.copyOfRange(yStart, yStart + 32)
 
         // Verify the extracted point lies on the secp256r1 curve.
         // This prevents accepting garbage coordinates that happen to surround the COSE prefix.
-        validatePointOnCurve(x, y)
-
-        // Construct uncompressed public key: 0x04 || X || Y
-        val publicKey = ByteArray(SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE)
-        publicKey[0] = SmartAccountConstants.UNCOMPRESSED_PUBKEY_PREFIX
-        x.copyInto(publicKey, 1)
-        y.copyInto(publicKey, 33)
+        validatePointOnCurve(
+            publicKey.copyOfRange(1, 33),
+            publicKey.copyOfRange(33, 65)
+        )
 
         return publicKey
     }
@@ -697,36 +681,6 @@ object SmartAccountUtils {
     // ========================================================================
     // Private Helper Functions
     // ========================================================================
-
-    /**
-     * Validates the 3-byte COSE Y-coordinate separator at the given offset.
-     *
-     * The separator bytes [0x22, 0x58, 0x20] are the CBOR encoding of map key -3 (Y),
-     * a byte string of length 32. Their presence at the exact offset after the X coordinate
-     * confirms that the surrounding structure is a valid ES256 COSE key and not a coincidental
-     * byte match in credential ID data or other attestation fields.
-     *
-     * @param data The byte array to validate against
-     * @param offset The starting offset of the 3-byte separator
-     * @param sourceName The parameter name to include in the error message (e.g., "authenticatorData")
-     * @throws ValidationException.InvalidInput if the bytes at [offset..offset+2] do not equal
-     *         [0x22, 0x58, 0x20]
-     */
-    private fun validateCoseYMarker(data: ByteArray, offset: Int, sourceName: String) {
-        val sep0 = data[offset].toInt() and 0xFF
-        val sep1 = data[offset + 1].toInt() and 0xFF
-        val sep2 = data[offset + 2].toInt() and 0xFF
-        if (sep0 != 0x22 || sep1 != 0x58 || sep2 != 0x20) {
-            throw ValidationException.invalidInput(
-                sourceName,
-                "COSE key structure is invalid: Y-coordinate marker [0x22, 0x58, 0x20] " +
-                    "not found at expected offset $offset " +
-                    "(found [0x${sep0.toString(16).padStart(2, '0')}, " +
-                    "0x${sep1.toString(16).padStart(2, '0')}, " +
-                    "0x${sep2.toString(16).padStart(2, '0')}])"
-            )
-        }
-    }
 
     /**
      * Validates that the point (x, y) lies on the secp256r1 curve.

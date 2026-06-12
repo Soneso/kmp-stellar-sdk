@@ -58,7 +58,7 @@ import com.soneso.smartdemo.flows.loadPendingCredentials
 import com.soneso.smartdemo.flows.connectWithAddress
 import com.soneso.smartdemo.flows.manualConnect
 import com.soneso.smartdemo.flows.quickConnect
-import com.soneso.smartdemo.flows.retryPendingDeploy
+import com.soneso.smartdemo.flows.deployPendingAndProvision
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.ui.components.ContractPickerDialog
@@ -131,6 +131,7 @@ class WalletConnectionScreen : Screen {
         // Pending deployments
         val pendingCredentials = remember { mutableStateListOf<StoredCredential>() }
         var pendingActionInProgress by remember { mutableStateOf(false) }
+        var pendingActionError by remember { mutableStateOf<String?>(null) }
 
         fun clearAllErrors() {
             autoConnectError = null
@@ -139,6 +140,7 @@ class WalletConnectionScreen : Screen {
         }
 
         suspend fun refreshPendingList() {
+            pendingActionError = null
             val updated = loadPendingCredentials()
             pendingCredentials.clear()
             pendingCredentials.addAll(updated)
@@ -448,12 +450,18 @@ class WalletConnectionScreen : Screen {
                                                     onClick = {
                                                         scope.launch {
                                                             pendingActionInProgress = true
+                                                            pendingActionError = null
                                                             try {
-                                                                val result = retryPendingDeploy(
+                                                                val result = deployPendingAndProvision(
                                                                     credential.credentialId,
                                                                 )
-                                                                refreshPendingList()
-                                                                navigator.pop()
+                                                                if (result.success) {
+                                                                    refreshPendingList()
+                                                                    navigator.pop()
+                                                                } else {
+                                                                    pendingActionError = "Deployment failed: ${result.error}"
+                                                                    ActivityLogState.error("Deployment failed: ${result.error}")
+                                                                }
                                                             } catch (e: Throwable) {
                                                                 ActivityLogState.error("Retry failed: ${e.message}")
                                                             } finally {
@@ -481,9 +489,13 @@ class WalletConnectionScreen : Screen {
                                                     onClick = {
                                                         scope.launch {
                                                             pendingActionInProgress = true
+                                                            pendingActionError = null
                                                             try {
-                                                                deletePendingCredential(credential.credentialId)
+                                                                val deleted = deletePendingCredential(credential.credentialId)
                                                                 refreshPendingList()
+                                                                if (!deleted) {
+                                                                    pendingActionError = "Delete failed: credential could not be removed from storage"
+                                                                }
                                                             } catch (e: Throwable) {
                                                                 ActivityLogState.error("Delete failed: ${e.message}")
                                                             } finally {
@@ -500,6 +512,8 @@ class WalletConnectionScreen : Screen {
                                         }
                                     }
                                 }
+
+                            InlineError(pendingActionError)
                         }
                     }
                 }

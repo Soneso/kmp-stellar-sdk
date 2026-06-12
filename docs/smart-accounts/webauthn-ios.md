@@ -5,19 +5,19 @@ Platform-specific guide for configuring WebAuthn passkey authentication in iOS a
 ## Prerequisites
 
 - iOS 16.0+ (passkeys require AuthenticationServices with platform public key credential support)
-
-> The KMP Stellar SDK supports iOS 14.0+. Passkey features require iOS 16.0+.
 - Xcode 14+
 - An Apple Developer account with associated domains capability
 - A domain you control for apple-app-site-association
+
+> The KMP Stellar SDK supports iOS 14.0+. Passkey features require iOS 16.0+.
 
 ## SPM Dependencies
 
 The SDK requires libsodium for cryptographic operations. Add Clibsodium via Swift Package Manager in Xcode:
 
 1. File > Add Package Dependencies
-2. Enter URL: `https://github.com/nicklama/Clibsodium`
-3. Select "Up to Next Major Version"
+2. Enter URL: `https://github.com/jedisct1/swift-sodium`
+3. Select "Up to Next Major Version" and add the `Clibsodium` product to your app target
 
 No additional dependencies are needed for WebAuthn -- it uses the built-in AuthenticationServices framework.
 
@@ -113,7 +113,7 @@ val storage = UserDefaultsStorageAdapter(suiteName = "com.yourapp.smartaccount")
 
 ### KeychainStorageAdapter
 
-Stores data in the iOS Keychain using the Security framework. Provides encryption at rest, `kSecAttrAccessibleAfterFirstUnlock` access control, and optional iCloud Keychain sync. Use this when stronger data protection is required.
+Stores data in the iOS Keychain using the Security framework. Provides encryption at rest and `kSecAttrAccessibleAfterFirstUnlock` access control. Use this when stronger data protection is required.
 
 **Constructor parameters:**
 
@@ -149,9 +149,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "CBCD1234...",
-    rpId = "your-domain.com",
-    rpName = "My Stellar Wallet",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     webauthnProvider = webauthnProvider,
     storage = storage
 )
@@ -161,9 +159,9 @@ val kit = OZSmartAccountKit.create(config)
 
 ## Troubleshooting
 
-### Passkeys are not available on the iOS Simulator
+### Passkeys on the iOS Simulator
 
-The iOS Simulator does not support passkeys. Passkey operations will fail with `WebAuthnException.NotSupported` or an ASAuthorization error code 1003. Test passkey flows on a physical device with Face ID or Touch ID.
+The iOS Simulator supports passkeys starting with the iOS 16 Simulator (Xcode 14). Simulator passkeys are stored locally and do not sync via iCloud Keychain, so credentials created on a device are not available on the simulator and vice versa. The associated-domain validation still applies — use `?mode=developer` on the domain entry during development.
 
 ### ASAuthorizationError code 1001 (cancelled)
 

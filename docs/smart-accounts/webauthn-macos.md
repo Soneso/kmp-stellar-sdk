@@ -8,29 +8,25 @@ Platform-specific guide for configuring WebAuthn passkey authentication in macOS
 - Xcode 14+
 - An Apple Developer account
 - A domain you control for apple-app-site-association
-- Developer ID signing or App Sandbox entitlement for associated domains
 
-## SPM Dependencies
+## libsodium Dependency
 
-The SDK requires libsodium for cryptographic operations. Add Clibsodium via Swift Package Manager in Xcode:
+On macOS the SDK links the system libsodium installed via Homebrew:
 
-1. File > Add Package Dependencies
-2. Enter URL: `https://github.com/nicklama/Clibsodium`
-3. Select "Up to Next Major Version"
+```bash
+brew install libsodium
+```
+
+For a native Swift app embedding the shared framework, add the library to the app target's build settings:
+- Header Search Paths: `/opt/homebrew/opt/libsodium/include`
+- Library Search Paths: `/opt/homebrew/opt/libsodium/lib`
+- Other Linker Flags: `-lsodium`
 
 No additional dependencies are needed for WebAuthn -- it uses the built-in AuthenticationServices framework.
 
 ## Associated Domains
 
-macOS passkeys require Associated Domains, similar to iOS. However, macOS has additional signing requirements.
-
-### Signing Requirements
-
-Associated Domains on macOS requires one of:
-- **Developer ID signing**: For apps distributed outside the Mac App Store
-- **App Sandbox entitlement**: For sandboxed apps (Mac App Store or local development)
-
-During development with Xcode, enable the App Sandbox capability to allow associated domains without Developer ID signing.
+macOS passkeys require the same Associated Domains entitlement as iOS. A development-signed build with the `?mode=developer` flag on the domain entry is sufficient during development; no sandbox or special signing setup is required.
 
 ### 1. Enable the Entitlement
 
@@ -98,7 +94,9 @@ From Swift (typical macOS integration):
 ```swift
 class WindowProvider: NSObject, ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        return NSApplication.shared.keyWindow ?? NSWindow()
+        // Fall back to the main window; a freshly constructed NSWindow would
+        // present the sheet off-screen.
+        return NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow!
     }
 }
 provider.presentationContextProvider = WindowProvider()
@@ -106,7 +104,7 @@ provider.presentationContextProvider = WindowProvider()
 
 ## Storage Adapter
 
-`UserDefaultsStorageAdapter` stores data in an isolated NSUserDefaults suite. Use a different `suiteName` from your iOS app if you want separate credential stores per platform.
+`UserDefaultsStorageAdapter` stores data in an isolated NSUserDefaults suite.
 
 **Constructor parameters:**
 
@@ -157,9 +155,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "CBCD1234...",
-    rpId = "your-domain.com",
-    rpName = "My Stellar Wallet",
+    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
     webauthnProvider = webauthnProvider,
     storage = storage
 )
@@ -169,13 +165,12 @@ val kit = OZSmartAccountKit.create(config)
 
 ## Troubleshooting
 
-### Associated Domains not working without Developer ID
+### Associated Domains validation fails
 
-macOS requires Developer ID signing or the App Sandbox entitlement for associated domains. During development:
-1. Enable "App Sandbox" in Signing & Capabilities
-2. Use `?mode=developer` in the domain entry to bypass CDN caching
-
-Without either of these, the system will not fetch or validate the `apple-app-site-association` file.
+If the system does not fetch or validate the `apple-app-site-association` file:
+1. Use `?mode=developer` in the domain entry during development to bypass Apple's CDN cache
+2. Confirm the entitlement is present in the built product (`codesign -d --entitlements - YourApp.app`)
+3. Verify the file is served over HTTPS with `Content-Type: application/json` and no redirects
 
 ### ASAuthorizationError code 1004 (no host window)
 
