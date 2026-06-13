@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-06-13
+
+### Added
+- **Configurable token decimals for smart accounts**: `transfer`,
+  `multiSignerTransfer`, and spending limit amounts accept a `decimals`
+  parameter. Transfers fetch the token's on-chain `decimals()` when not
+  specified (`fetchTokenDecimals` is public); spending limits default to 7.
+  `amountToBaseUnits` is available for manual conversions.
+- `OZExternalSignerManager` query surface: `get`, `hasSigners`, and
+  `hasWalletAdapter`.
+- `OZSmartAccountKit.getDeployer()` is now public;
+  `SmartAccountBuilders.getPublicKeyFromSigner` was added.
+- Typed context type builders (`createDefaultContextType`,
+  `createCallContractContextType`, `createCreateContractContextType`) and
+  typed policy install params (`PolicyInstallParams` with public `toScVal()`)
+  with a matching `addPolicy` overload.
+
+### Changed
+- Amount validation is stricter: amounts with more fractional digits than the
+  token's decimals are rejected instead of silently rounded, and invalid
+  amounts throw `ValidationException.InvalidAmount` instead of
+  `IllegalArgumentException`.
+- The new optional `decimals` parameter changes the JVM binary signatures of
+  `transfer`, `multiSignerTransfer`, and `addSpendingLimit`: callers using
+  named arguments are source-compatible but need a recompile; precompiled JVM
+  consumers and positional calls that pass arguments after the new parameter
+  fail loudly and need updating.
+- Smart account docs and skill references corrected: platform setup
+  instructions (Android Digital Asset Links, macOS libsodium linking, iOS
+  package source), configuration snippets, stale conceptual descriptions, and
+  throws documentation; trimmed redundant content.
+- Smart account demo: the macOS app is aligned with the Compose UI (in-place
+  policy editing, cross-rule signer reuse, validation parity, shared view
+  components).
+
+### Deprecated
+- `SmartAccountBuilders.describeSignerType`; map signer types to display
+  labels in your app.
+
+### Removed
+- The non-functional external wallet connection persistence:
+  `WalletConnectionStorage`, `ExternalWalletAdapter.reconnect`,
+  `OZExternalSignerManager.addFromWallet` / `restoreConnections`, and the
+  `walletConnectionStorage` constructor parameter. The kit never wired
+  connection storage, so the reconnect path was unreachable.
+- The orphan policy param builders from `SmartAccountBuilders`
+  (`createThresholdParams`, `createWeightedThresholdParams`,
+  `createSpendingLimitParams`); use `PolicyInstallParams` instead.
+
+### Fixed
+- `OZSmartAccountKit.close()` now clears in-memory external signer secrets,
+  closes the relayer HTTP client, and removes event listeners.
+- `InMemoryStorageAdapter.clear()` also clears the stored session.
+- Smart account demo, all platforms: weighted-threshold weight prefill for
+  account signers, pending-list deployments provision XLM and demo tokens,
+  pending credential delete failures are surfaced, allowance fetch failures
+  are logged. Context rule edits submit removals before additions, fixing
+  contract errors when replacing signers or policies in one edit.
+
 ## [1.6.1] - 2026-05-29
 
 ### Added

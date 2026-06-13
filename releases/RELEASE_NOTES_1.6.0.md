@@ -111,7 +111,7 @@ No platform support changes in this release. Continued support:
 
 - Kotlin 2.2+
 - Maven: `com.soneso.stellar:stellar-sdk:1.6.0`
-- Stellar Protocol 23 compatible
+- Stellar Protocol 26 compatible
 - Horizon API: full REST coverage
 - Soroban RPC: full method coverage
 - SEPs implemented: SEP-1, SEP-2, SEP-5, SEP-6, SEP-8, SEP-9, SEP-10, SEP-12, SEP-24, SEP-30, **SEP-31 (new)**, SEP-38, SEP-45, SEP-46, SEP-47, SEP-48, SEP-53
