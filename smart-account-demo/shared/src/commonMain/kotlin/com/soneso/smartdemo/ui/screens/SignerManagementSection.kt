@@ -645,6 +645,7 @@ fun SignerManagementSection(
                                                     // Also add to available list so it shows as "already added"
                                                     onAvailablePasskeysChanged(availablePasskeys + newSigner)
                                                     onPasskeysLoadedChanged(true)
+                                                    onNewPasskeyNameChanged("")
                                                     ActivityLogState.success("Registered and added new passkey signer")
                                                 }
                                             } catch (e: Throwable) {
