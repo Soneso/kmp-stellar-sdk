@@ -166,6 +166,11 @@ val webAuth = WebAuthForContracts(
 5. Sign the client authorization entry with the provided keypairs
 6. POST signed entries to server and return a `Sep45AuthToken`
 
+Challenge entries are validated and signed across all three Soroban credential
+arms (legacy `ADDRESS`, `ADDRESS_V2`, and `ADDRESS_WITH_DELEGATES`), selecting
+the matching hash preimage automatically. This is transparent: there is no API
+change for callers.
+
 Method signature:
 ```
 suspend fun jwtToken(

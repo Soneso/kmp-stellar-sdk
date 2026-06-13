@@ -422,6 +422,32 @@ val signedBase64: String = signedEntry.toXdrBase64()
 // CORRECT: SorobanAuthorizationEntryXdr.fromXdrBase64(base64) — XDR types use Xdr suffix
 ```
 
+**Credential arms (`SorobanCredentialsXdr`).** The credentials are a sealed
+union over four arms: `Void` (source account, no signature), `Address`
+(legacy `SOROBAN_CREDENTIALS_ADDRESS`, the default), `AddressV2`
+(`SOROBAN_CREDENTIALS_ADDRESS_V2`), and `AddressWithDelegates`
+(`SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES`, wrapping
+`SorobanAddressCredentialsWithDelegatesXdr` with a recursive
+`SorobanDelegateSignatureXdr` tree). The V2 and WITH_DELEGATES arms (CAP-71) are
+valid only on Protocol 27+. `Address` and `AddressV2` wrap
+`SorobanAddressCredentialsXdr`; match exhaustively when reading:
+
+```kotlin
+import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
+
+val address = when (val creds = authEntry.credentials) {
+    is SorobanCredentialsXdr.Void -> null
+    is SorobanCredentialsXdr.Address -> creds.value.address
+    is SorobanCredentialsXdr.AddressV2 -> creds.value.address
+    is SorobanCredentialsXdr.AddressWithDelegates -> creds.value.addressCredentials.address
+}
+```
+
+`Auth` selects the hash preimage per arm: `Address` uses the legacy
+`ENVELOPE_TYPE_SOROBAN_AUTHORIZATION`; `AddressV2` and `AddressWithDelegates` use
+the address-bound `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`
+(`HashIDPreimageSorobanAuthorizationWithAddressXdr`).
+
 ## Generic XDR Base64 Encoding/Decoding
 
 The SDK provides `toXdrBase64()` and `fromXdrBase64()` extension functions (in `com.soneso.stellar.sdk.xdr`) for these XDR types:

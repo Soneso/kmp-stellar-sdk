@@ -31,6 +31,8 @@ import com.soneso.stellar.sdk.Network
  * @property autoSubmit Whether to auto-submit write calls (default: true). When true,
  *           write calls are automatically signed and submitted. When false, only simulation
  *           is performed and you can inspect the transaction before submitting manually.
+ * @property authV2 Whether to request Protocol-27 ADDRESS_V2 auth entries during simulation
+ *           (default: false). Ignored by pre-27 RPCs, which return legacy ADDRESS entries.
  */
 data class ClientOptions(
     val sourceAccountKeyPair: KeyPair,
@@ -42,5 +44,6 @@ data class ClientOptions(
     val submitTimeout: Int = 30,
     val simulate: Boolean = true,
     val restore: Boolean = true,
-    val autoSubmit: Boolean = true
+    val autoSubmit: Boolean = true,
+    val authV2: Boolean = false
 )

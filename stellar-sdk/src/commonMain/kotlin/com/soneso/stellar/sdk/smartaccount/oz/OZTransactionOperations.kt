@@ -12,6 +12,8 @@ import com.soneso.stellar.sdk.crypto.getEd25519Crypto
 import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.addressCredentials
+import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MemoNone
@@ -493,10 +495,11 @@ class OZTransactionOperations internal constructor(
             val signed = mutableListOf<SorobanAuthorizationEntryXdr>()
 
             for ((entryIndex, entry) in simulatedAuthEntries.withIndex()) {
-                // Check if this entry has address credentials
-                val addressCreds = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+                // Extract the inner address credentials across all address arms
+                // (Address, AddressV2, AddressWithDelegates); null for source-account (Void).
+                val addressCreds = entry.credentials.addressCredentials()
                 if (addressCreds == null) {
-                    // Not an address credential (e.g., sourceAccount), pass through unchanged
+                    // Source-account (Void) credentials, pass through unchanged
                     signed.add(entry)
                     continue
                 }
@@ -1027,15 +1030,22 @@ class OZTransactionOperations internal constructor(
                     credentials = SorobanCredentialsXdr.Address(addressCredentials),
                     rootInvocation = entry.rootInvocation
                 )
-            } else if (credType is SorobanCredentialsXdr.Address) {
-                // For Address credentials, sign them
+            } else {
+                // Address-bearing credentials (Address, AddressV2, AddressWithDelegates):
+                // sign them, preserving the credential arm. A Void here is impossible —
+                // that arm is handled above — and any other non-address-bearing arm
+                // must fail fast rather than silently pass through unsigned.
                 // Clone the entry to avoid mutating the original
                 val entryBytes = XdrWriter().also { entry.encode(it) }.toByteArray()
                 val entryCopy = SorobanAuthorizationEntryXdr.decode(XdrReader(entryBytes))
 
-                val credentials = (entryCopy.credentials as SorobanCredentialsXdr.Address).value
+                val credentials = entryCopy.credentials.addressCredentials()
+                    ?: throw TransactionException.signingFailed(
+                        "Unexpected non-address-bearing credentials in funding auth entry; " +
+                            "expected Address, AddressV2, or AddressWithDelegates"
+                    )
 
-                // Build auth payload hash
+                // Build auth payload hash (arm-aware preimage selection)
                 val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
                     entry = entryCopy,
                     expirationLedger = expirationLedger,
@@ -1061,12 +1071,9 @@ class OZTransactionOperations internal constructor(
                 )
 
                 SorobanAuthorizationEntryXdr(
-                    credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+                    credentials = entryCopy.credentials.withUpdatedAddressCredentials(updatedCredentials),
                     rootInvocation = entryCopy.rootInvocation
                 )
-            } else {
-                // Unknown credential type - pass through unchanged
-                entry
             }
         }
     }

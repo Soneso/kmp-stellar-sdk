@@ -7,6 +7,9 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
+import com.soneso.stellar.sdk.Auth
+import com.soneso.stellar.sdk.addressCredentials
+import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
@@ -16,7 +19,6 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
-import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.XdrReader
@@ -112,15 +114,24 @@ object SmartAccountAuth {
      * hash = SHA256(XDR_encode(payload))
      * ```
      *
-     * CRITICAL: The entry must have `.Address` credentials and the expiration ledger
-     * is used in the hash computation before any signatures are added.
+     * The preimage type is selected by the credential arm. Legacy ADDRESS credentials
+     * use the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage; ADDRESS_V2 and
+     * ADDRESS_WITH_DELEGATES use the address-bound
+     * ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS preimage. The host reconstructs
+     * the preimage from the submitted credential arm, so a mismatched arm yields a hash
+     * the host rejects. Selection is delegated to [Auth.buildHashIDPreimage].
      *
-     * @param entry The authorization entry to build the payload hash for
+     * The expiration ledger is applied to the credentials before the preimage is built;
+     * the host reconstructs the preimage from the submitted credentials, so the
+     * expiration must be present at hash time.
+     *
+     * @param entry The authorization entry to build the payload hash for. Must carry
+     *   address-bearing credentials (Address, AddressV2, or AddressWithDelegates).
      * @param expirationLedger The ledger number at which the signature expires
      * @param networkPassphrase The network passphrase (e.g., "Test SDF Network ; September 2015")
      * @return The 32-byte SHA-256 hash of the authorization payload
-     * @throws TransactionException.SigningFailed if credentials is not `.Address`
-     *         type or if XDR encoding fails
+     * @throws TransactionException.SigningFailed if the credentials are source-account
+     *         (Void) or if XDR encoding fails
      *
      * Example:
      * ```kotlin
@@ -138,17 +149,23 @@ object SmartAccountAuth {
         expirationLedger: UInt,
         networkPassphrase: String
     ): ByteArray {
-        val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+        val addressCredentials = entry.credentials.addressCredentials()
             ?: throw TransactionException.signingFailed(
-                "Credentials must be of type address to build auth payload hash"
+                "Credentials must be address-bearing (Address, AddressV2, or " +
+                    "AddressWithDelegates) to build auth payload hash"
             )
 
-        return hashAuthPreimage(
-            nonce = credentials.nonce,
-            expirationLedger = expirationLedger,
-            invocation = entry.rootInvocation,
-            networkPassphrase = networkPassphrase
+        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
+        val updatedAddressCredentials = addressCredentials.copy(
+            signatureExpirationLedger = Uint32Xdr(expirationLedger)
         )
+        val preimage = Auth.buildHashIDPreimage(
+            credentials = entry.credentials.withUpdatedAddressCredentials(updatedAddressCredentials),
+            networkId = networkId,
+            invocation = entry.rootInvocation
+        )
+
+        return hashPreimage(preimage)
     }
 
     /**
@@ -183,7 +200,7 @@ object SmartAccountAuth {
         expirationLedger: UInt,
         networkPassphrase: String
     ): ByteArray {
-        return hashAuthPreimage(
+        return hashLegacySourceAccountPreimage(
             nonce = nonce,
             expirationLedger = expirationLedger,
             invocation = entry.rootInvocation,
@@ -244,9 +261,10 @@ object SmartAccountAuth {
             )
         }
 
-        var credentials = (entryCopy.credentials as? SorobanCredentialsXdr.Address)?.value
+        var credentials = entryCopy.credentials.addressCredentials()
             ?: throw TransactionException.signingFailed(
-                "Credentials must be of type address to sign auth entry"
+                "Credentials must be address-bearing (Address, AddressV2, or " +
+                    "AddressWithDelegates) to sign auth entry"
             )
 
         credentials = SorobanAddressCredentialsXdr(
@@ -284,7 +302,7 @@ object SmartAccountAuth {
         // Write updated payload back as SCVal
         val payloadScVal = SmartAccountAuthPayloadCodec.write(updatedPayload)
 
-        // Build updated credentials with new signature
+        // Build updated credentials with new signature, preserving the credential arm.
         val updatedCredentials = SorobanAddressCredentialsXdr(
             address = credentials.address,
             nonce = credentials.nonce,
@@ -293,7 +311,7 @@ object SmartAccountAuth {
         )
 
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            credentials = entryCopy.credentials.withUpdatedAddressCredentials(updatedCredentials),
             rootInvocation = entryCopy.rootInvocation
         )
     }
@@ -321,9 +339,10 @@ object SmartAccountAuth {
         signatureValue: SCValXdr,
         contextRuleIds: List<UInt> = emptyList()
     ): SorobanAuthorizationEntryXdr {
-        val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+        val credentials = entry.credentials.addressCredentials()
             ?: throw TransactionException.signingFailed(
-                "Credentials must be of type address to add signature map entry"
+                "Credentials must be address-bearing (Address, AddressV2, or " +
+                    "AddressWithDelegates) to add signature map entry"
             )
 
         // Read existing payload
@@ -367,7 +386,7 @@ object SmartAccountAuth {
         )
 
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            credentials = entry.credentials.withUpdatedAddressCredentials(updatedCredentials),
             rootInvocation = entry.rootInvocation
         )
     }
@@ -377,20 +396,22 @@ object SmartAccountAuth {
     // ========================================================================
 
     /**
-     * Hashes a Soroban authorization preimage.
+     * Hashes a legacy source-account authorization preimage.
      *
-     * Constructs a `HashIDPreimage::SorobanAuthorization` from the given parameters,
-     * XDR-encodes it, and returns SHA-256(encoded bytes). Used by both
-     * [buildAuthPayloadHash] and [buildSourceAccountAuthPayloadHash].
+     * Constructs the legacy `HashIDPreimage::SorobanAuthorization` from the given
+     * parameters, XDR-encodes it, and returns SHA-256(encoded bytes). This is the
+     * fixed preimage type for source-account funding: a Void credential is converted
+     * to a fresh ADDRESS credential, which is never V2 or WITH_DELEGATES, so the
+     * legacy preimage is always correct here.
      *
-     * @param nonce The nonce from the address credentials
+     * @param nonce The nonce for the fresh address credentials
      * @param expirationLedger The signature expiration ledger number
      * @param invocation The root invocation from the authorization entry
      * @param networkPassphrase The network passphrase
      * @return The 32-byte SHA-256 hash of the encoded preimage
      * @throws TransactionException.SigningFailed if XDR encoding fails
      */
-    private suspend fun hashAuthPreimage(
+    private suspend fun hashLegacySourceAccountPreimage(
         nonce: Int64Xdr,
         expirationLedger: UInt,
         invocation: SorobanAuthorizedInvocationXdr,
@@ -405,8 +426,15 @@ object SmartAccountAuth {
             invocation = invocation
         )
 
-        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
+        return hashPreimage(HashIDPreimageXdr.SorobanAuthorization(authPreimage))
+    }
 
+    /**
+     * XDR-encodes [preimage] and returns SHA-256(encoded bytes).
+     *
+     * @throws TransactionException.SigningFailed if XDR encoding fails
+     */
+    private suspend fun hashPreimage(preimage: HashIDPreimageXdr): ByteArray {
         val encodedPreimage: ByteArray = try {
             val writer = XdrWriter()
             preimage.encode(writer)

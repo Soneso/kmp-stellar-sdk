@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Protocol 27 Soroban authorization arms (CAP-71)**: Soroban authorization
+  credentials now have three address arms in `SorobanCredentialsXdr`: the legacy
+  `Address` (`SOROBAN_CREDENTIALS_ADDRESS`), the address-bound `AddressV2`
+  (`SOROBAN_CREDENTIALS_ADDRESS_V2`), and `AddressWithDelegates`
+  (`SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES`), a recursive sorted
+  delegate-signature tree. New XDR types: `SorobanAddressCredentialsWithDelegatesXdr`,
+  `SorobanDelegateSignatureXdr`, and the `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`
+  preimage `HashIDPreimageSorobanAuthorizationWithAddressXdr`. The V2 and
+  WITH_DELEGATES arms are valid only on Protocol 27+ networks; legacy `Address`
+  remains the default and is fully valid everywhere.
+- `Auth.AuthOptions` with `forAddress`: passing `AuthOptions(forAddress = ...)`
+  to `Auth.authorizeEntry(...)` routes the signature to every node in the
+  credential tree (top-level address or any delegate, at any depth) whose
+  address matches. The default (`null`) signs the top-level address.
+- `Auth.attachDelegates(entry, validUntilLedgerSeq, delegates)` builds an
+  `AddressWithDelegates` entry from an `Address` or `AddressV2` entry, sorting
+  and validating the delegate tree. `DelegateDescriptor` describes a delegate
+  node (address, optional signature, nested delegates).
+- `Auth.authorizeInvocation(...)` gained an `authV2: Boolean = false` flag that
+  emits `AddressV2` credentials instead of the legacy `Address` arm.
+- `authV2` flag on `SorobanServer.simulateTransaction(...)`,
+  `SorobanServer.prepareTransaction(...)`, `SimulateTransactionRequest`, and
+  `ClientOptions`. When set, a Protocol 27+ RPC returns `AddressV2` auth entries
+  in recording modes; pre-27 RPCs ignore the flag and return legacy entries.
+
+### Changed
+- `AssembledTransaction.needsNonInvokerSigningBy()` and `signAuthEntries()` are
+  arm-aware: they walk the delegate tree depth-first and report or sign matching
+  delegate nodes as well as the top-level address. A delegates-only entry whose
+  top-level signature stays void but whose delegate nodes are all signed is
+  treated as fully signed.
+- SEP-45 (`WebAuthForContracts`) verifies and signs challenge entries across all
+  three credential arms, selecting the matching hash preimage automatically. No
+  API change for callers.
+- Smart-account and OpenZeppelin signing paths select the correct preimage per
+  credential arm. No API change for callers.
+- The new optional parameters change the JVM binary signatures of
+  `Auth.authorizeEntry`, `Auth.authorizeInvocation`,
+  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`, and
+  the `SimulateTransactionRequest` and `ClientOptions` constructors: callers
+  using named arguments are source-compatible but need a recompile; precompiled
+  JVM consumers and positional calls that pass arguments after the new parameter
+  fail loudly and need updating.
+- `SorobanCredentialsXdr` and `HashIDPreimageXdr` gain new sealed arms, and
+  `SorobanCredentialsTypeXdr` and `EnvelopeTypeXdr` gain new entries. Code with
+  an exhaustive `when` over any of these public types must add branches for the
+  new Protocol 27 arms (or an `else`) to compile.
+
 ## [1.7.1] - 2026-06-13
 
 ### Added

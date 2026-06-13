@@ -1322,6 +1322,8 @@ Authorization entries provide cryptographic proof of consent for contract invoca
 
 For complete authorization workflows (multi-signature, atomic swaps), see the [Advanced Contract Control (buildInvoke)](#advanced-contract-control-buildinvoke) section which demonstrates `AssembledTransaction.signAuthEntries()` usage.
 
+> Authorization credentials have three address arms: the legacy `ADDRESS` (the default, valid on every network) and the Protocol 27+ `ADDRESS_V2` and `ADDRESS_WITH_DELEGATES` (CAP-71). Signing a legacy entry is unchanged; opt into V2 with `simulateTransaction(tx, authV2 = true)` or `ClientOptions(authV2 = true)`, and build delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`. See [Advanced SDK Usage](advanced.md) for the delegate and multi-party signing flows.
+
 ```kotlin
 // Example 1: Sign a single authorization entry
 // Use case: You have an auth entry from simulation and need to sign it manually

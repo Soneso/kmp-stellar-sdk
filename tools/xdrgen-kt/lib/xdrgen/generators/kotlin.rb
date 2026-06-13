@@ -11,6 +11,11 @@ module Xdrgen
     # - strings -> String
     # - opaque -> ByteArray
     class Kotlin < Base
+      # Structs that contain a variable-length array of themselves (directly recursive).
+      # Their generated decode method wraps each recursive element with depth-guard calls.
+      RECURSIVE_TYPES = %w[SorobanDelegateSignatureXdr].freeze
+      XDR_RECURSION_CAP = 128
+
       def generate
         @output_files = {}
         @package = @namespace.gsub('::', '.')
@@ -192,7 +197,7 @@ module Xdrgen
                 base_name = member.name.underscore.camelize(:lower)
                 # Use 'value' as local variable name if property is a keyword
                 local_name = base_name == "val" ? "value" : base_name
-                out.puts "val #{local_name} = #{decode_expression(member.declaration, 'reader')}"
+                out.puts "val #{local_name} = #{decode_expression_guarded(struct_name, member.declaration, 'reader')}"
               end
 
               param_list = struct.members.map { |m|
@@ -802,6 +807,23 @@ module Xdrgen
           name(typespec.resolved_type)
         else
           name(typespec)
+        end
+      end
+
+      # Like decode_expression but wraps variable-array element decodes with depth-guard
+      # calls when the containing struct is in RECURSIVE_TYPES and the element type
+      # resolves to the same struct (self-referential recursion).
+      def decode_expression_guarded(struct_name, decl, reader_var)
+        if RECURSIVE_TYPES.include?(struct_name) &&
+           decl.is_a?(AST::Declarations::Array) &&
+           !decl.fixed? &&
+           kotlin_type_for_typespec(decl.type) == struct_name
+          inner_decode = decode_expression_for_typespec(decl.type, reader_var)
+          "List(#{reader_var}.readInt()) { " \
+            "#{reader_var}.enterRecursion(#{XDR_RECURSION_CAP}); " \
+            "try { #{inner_decode} } finally { #{reader_var}.exitRecursion() } }"
+        else
+          decode_expression(decl, reader_var)
         end
       end
 

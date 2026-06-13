@@ -9,6 +9,8 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.addressCredentials
+import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
@@ -664,10 +666,12 @@ class WebAuthForContracts(
                 }
             }
 
-            // Identify which entry this is (server, client, or client domain)
-            val credentials = entry.credentials
-            if (credentials is SorobanCredentialsXdr.Address) {
-                val addressCredentials = credentials.value
+            // Identify which entry this is (server, client, or client domain).
+            // Address-bearing credentials cover all three arms (ADDRESS, ADDRESS_V2,
+            // ADDRESS_WITH_DELEGATES); source-account (Void) credentials carry no
+            // address and are skipped here.
+            val addressCredentials = entry.credentials.addressCredentials()
+            if (addressCredentials != null) {
                 val credentialsAddressStr = scAddressToString(addressCredentials.address)
 
                 when (credentialsAddressStr) {
@@ -737,9 +741,11 @@ class WebAuthForContracts(
         val signedEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
         for (entry in authEntries) {
-            val credentials = entry.credentials
-            if (credentials is SorobanCredentialsXdr.Address) {
-                val addressCredentials = credentials.value
+            // Address-bearing credentials cover all three arms (ADDRESS, ADDRESS_V2,
+            // ADDRESS_WITH_DELEGATES); source-account (Void) entries carry no address
+            // and are passed through unchanged below.
+            val addressCredentials = entry.credentials.addressCredentials()
+            if (addressCredentials != null) {
                 val credentialsAddressStr = scAddressToString(addressCredentials.address)
 
                 // Sign client entry
@@ -775,12 +781,15 @@ class WebAuthForContracts(
                     clientDomainAccountId != null &&
                     credentialsAddressStr == clientDomainAccountId
                 ) {
-                    // Update expiration ledger before sending to delegate
+                    // Update expiration ledger before sending to delegate, preserving
+                    // the credential arm (ADDRESS, ADDRESS_V2, or ADDRESS_WITH_DELEGATES).
                     val entryWithExpiration = if (signatureExpirationLedger != null) {
                         val updatedCredentials = addressCredentials.copy(
                             signatureExpirationLedger = Uint32Xdr(signatureExpirationLedger.toUInt())
                         )
-                        entry.copy(credentials = SorobanCredentialsXdr.Address(updatedCredentials))
+                        entry.copy(
+                            credentials = entry.credentials.withUpdatedAddressCredentials(updatedCredentials)
+                        )
                     } else {
                         entry
                     }
@@ -994,21 +1003,21 @@ class WebAuthForContracts(
      */
     private suspend fun verifyServerSignature(entry: SorobanAuthorizationEntryXdr): Boolean {
         return try {
-            val credentials = entry.credentials
-            if (credentials !is SorobanCredentialsXdr.Address) {
-                return false
-            }
+            // Address-bearing credentials cover all three arms; a source-account
+            // (Void) entry carries no signature to verify.
+            val addressCredentials = entry.credentials.addressCredentials()
+                ?: return false
 
-            val addressCredentials = credentials.value
-
-            // Build authorization preimage using entry's existing values
-            val preimage = HashIDPreimageXdr.SorobanAuthorization(
-                HashIDPreimageSorobanAuthorizationXdr(
-                    networkId = HashXdr(network.networkId()),
-                    nonce = addressCredentials.nonce,
-                    signatureExpirationLedger = addressCredentials.signatureExpirationLedger,
-                    invocation = entry.rootInvocation
-                )
+            // Build the authorization preimage from the entry's credentials so the
+            // preimage arm matches the credential arm: ADDRESS yields the legacy
+            // ENVELOPE_TYPE_SOROBAN_AUTHORIZATION; ADDRESS_V2 and ADDRESS_WITH_DELEGATES
+            // yield the address-bound ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS.
+            // A V2 entry verified against a legacy preimage hashes differently and the
+            // signature would never match.
+            val preimage = Auth.buildHashIDPreimage(
+                credentials = entry.credentials,
+                networkId = network.networkId(),
+                invocation = entry.rootInvocation
             )
 
             // Hash the preimage

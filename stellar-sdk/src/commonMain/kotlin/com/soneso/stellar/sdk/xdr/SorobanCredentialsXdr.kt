@@ -11,6 +11,10 @@ package com.soneso.stellar.sdk.xdr
  *     void;
  * case SOROBAN_CREDENTIALS_ADDRESS:
  *     SorobanAddressCredentials address;
+ * case SOROBAN_CREDENTIALS_ADDRESS_V2:
+ *     SorobanAddressCredentials addressV2;
+ * case SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES:
+ *     SorobanAddressCredentialsWithDelegates addressWithDelegates;
  * };
  */
 sealed class SorobanCredentialsXdr {
@@ -20,6 +24,18 @@ sealed class SorobanCredentialsXdr {
     val value: SorobanAddressCredentialsXdr
   ) : SorobanCredentialsXdr() {
     override val discriminant: SorobanCredentialsTypeXdr = SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS
+  }
+
+  data class AddressV2(
+    val value: SorobanAddressCredentialsXdr
+  ) : SorobanCredentialsXdr() {
+    override val discriminant: SorobanCredentialsTypeXdr = SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS_V2
+  }
+
+  data class AddressWithDelegates(
+    val value: SorobanAddressCredentialsWithDelegatesXdr
+  ) : SorobanCredentialsXdr() {
+    override val discriminant: SorobanCredentialsTypeXdr = SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES
   }
 
   data object Void : SorobanCredentialsXdr() {
@@ -36,6 +52,14 @@ sealed class SorobanCredentialsXdr {
           val value = SorobanAddressCredentialsXdr.decode(reader)
           Address(value)
         }
+        SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS_V2 -> {
+          val value = SorobanAddressCredentialsXdr.decode(reader)
+          AddressV2(value)
+        }
+        SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES -> {
+          val value = SorobanAddressCredentialsWithDelegatesXdr.decode(reader)
+          AddressWithDelegates(value)
+        }
         else -> throw IllegalArgumentException("Unknown SorobanCredentialsXdr discriminant: $discriminant")
       }
     }
@@ -46,6 +70,12 @@ sealed class SorobanCredentialsXdr {
     when (this) {
       is Void -> {}
       is Address -> {
+        value.encode(writer)
+      }
+      is AddressV2 -> {
+        value.encode(writer)
+      }
+      is AddressWithDelegates -> {
         value.encode(writer)
       }
     }
