@@ -8,8 +8,10 @@
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.oz.ConnectedWallet
 import com.soneso.stellar.sdk.smartaccount.oz.ExternalWalletAdapter
@@ -30,10 +32,14 @@ import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -113,6 +119,20 @@ class OZMultiSignerWalletAuthP27Test {
         )
     }
 
+    /**
+     * Decodes the auth entries the manager actually submitted, from the captured
+     * sendTransaction JSON-RPC request body. The `params.transaction` field holds the
+     * signed transaction envelope; the InvokeHostFunctionOperation in it carries the
+     * auth entries handed to the network.
+     */
+    private fun submittedAuthEntries(sendBody: String): List<SorobanAuthorizationEntryXdr> {
+        val root = Json.parseToJsonElement(sendBody).jsonObject
+        val envelopeB64 = root["params"]!!.jsonObject["transaction"]!!.jsonPrimitive.content
+        val tx = Transaction.fromEnvelopeXdr(envelopeB64, Network.TESTNET)
+        val op = tx.operations.first { it is InvokeHostFunctionOperation } as InvokeHostFunctionOperation
+        return op.auth
+    }
+
     private fun buildConfig(deployer: KeyPair, adapter: ExternalWalletAdapter): OZSmartAccountConfig =
         OZSmartAccountConfig(
             rpcUrl = "https://soroban-testnet.stellar.org",
@@ -136,12 +156,14 @@ class OZMultiSignerWalletAuthP27Test {
         val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
         val txHash = "b4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
 
+        var capturedSendBody: String? = null
         val mockServer = buildSequentialMockServerWithSubmission(
             accountXdrBase64 = accountXdr,
             authEntryBase64 = authEntryXdr,
             sorobanDataBase64 = sorobanDataXdr,
             countXdrBase64 = countZeroXdr,
-            txHash = txHash
+            txHash = txHash,
+            onSendTransaction = { capturedSendBody = it }
         )
 
         val kit = OZSmartAccountKit.createWithServer(
@@ -161,6 +183,28 @@ class OZMultiSignerWalletAuthP27Test {
         assertTrue(result.success, "TransactionResult must be successful; error=${result.error}")
         assertEquals(txHash, result.hash)
         assertEquals(1, adapter.signCallCount, "wallet adapter must be asked to sign exactly once")
+
+        // Inspect the actual entry that was submitted to the network.
+        assertNotNull(capturedSendBody, "sendTransaction request must have been captured")
+        val submitted = submittedAuthEntries(capturedSendBody!!)
+        val walletEntrySubmitted = submitted.first {
+            it.credentials is SorobanCredentialsXdr.Address &&
+                Address.fromSCAddress(
+                    (it.credentials as SorobanCredentialsXdr.Address).value.address
+                ).toString() == walletAddress
+        }
+        val submittedCreds = (walletEntrySubmitted.credentials as SorobanCredentialsXdr.Address).value
+        // The original credential arm is preserved (legacy ADDRESS, not rewritten to V2).
+        // The expiration is stamped away from the original 0, and the wallet's signature
+        // is written in (non-void).
+        assertTrue(
+            submittedCreds.signatureExpirationLedger.value > 0u,
+            "submitted entry must carry a stamped (non-zero) expiration"
+        )
+        assertTrue(
+            submittedCreds.signature !is SCValXdr.Void,
+            "submitted wallet entry must carry the wallet signature (non-void)"
+        )
     }
 
     @Test
@@ -181,12 +225,14 @@ class OZMultiSignerWalletAuthP27Test {
         val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
         val txHash = "d4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
 
+        var capturedSendBody: String? = null
         val mockServer = buildSequentialMockServerWithSubmission(
             accountXdrBase64 = accountXdr,
             authEntryBase64 = authEntryXdr,
             sorobanDataBase64 = sorobanDataXdr,
             countXdrBase64 = countZeroXdr,
-            txHash = txHash
+            txHash = txHash,
+            onSendTransaction = { capturedSendBody = it }
         )
 
         val kit = OZSmartAccountKit.createWithServer(
@@ -202,5 +248,30 @@ class OZMultiSignerWalletAuthP27Test {
 
         assertTrue(result.success, "TransactionResult must be successful; error=${result.error}")
         assertEquals(txHash, result.hash)
+
+        // The submitted entry whose address is not the connected contract is passed through
+        // unchanged: its credential arm, address and nonce survive the signing loop intact.
+        assertNotNull(capturedSendBody, "sendTransaction request must have been captured")
+        val submitted = submittedAuthEntries(capturedSendBody!!)
+        val original = walletAuthEntry()
+        val originalCreds = (original.credentials as SorobanCredentialsXdr.Address).value
+        val passedThrough = submitted.first {
+            it.credentials is SorobanCredentialsXdr.Address &&
+                Address.fromSCAddress(
+                    (it.credentials as SorobanCredentialsXdr.Address).value.address
+                ).toString() == walletAddress
+        }
+        val passedCreds = (passedThrough.credentials as SorobanCredentialsXdr.Address).value
+        // Credential arm preserved (still legacy ADDRESS).
+        assertTrue(passedThrough.credentials is SorobanCredentialsXdr.Address)
+        // Address and nonce unchanged from the simulated entry.
+        assertEquals(originalCreds.nonce.value, passedCreds.nonce.value)
+        assertEquals(walletAddress, Address.fromSCAddress(passedCreds.address).toString())
+        // No signature was added: this signer was not the connected contract, so the entry
+        // is forwarded with its original void signature.
+        assertTrue(
+            passedCreds.signature is SCValXdr.Void,
+            "pass-through entry must keep its original void signature"
+        )
     }
 }

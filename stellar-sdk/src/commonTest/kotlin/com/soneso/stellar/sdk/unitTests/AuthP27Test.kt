@@ -50,6 +50,11 @@ class AuthP27Test {
         // A second account address for delegate/forAddress tests (distinct from SIGNER_ACCOUNT)
         // This is a deterministic test address, not a real key
         const val DELEGATE_ACCOUNT = "GADBBY4WFXKKFJ7CMTG3J5YAUXMQDBILRQ6W3U5IWN5TQFZU4MWZ5T4K"
+
+        // A second signer with a real key, distinct from SIGNER_*, used as a delegate node
+        // whose KeyPair can actually sign. The account is the public key of DELEGATE_B_SEED.
+        const val DELEGATE_B_SEED = "SAEZSI6DY7AXJFIYA4PM6SIBNEYYXIEM2MSOTHFGKHDW32MBQ7KVO6EN"
+        const val DELEGATE_B_ACCOUNT = "GBMLPRFCZDZJPKUPHUSHCKA737GOZL7ERZLGGMJ6YGHBFJZ6ZKMKCZTM"
     }
 
     // ========================================================================
@@ -115,40 +120,55 @@ class AuthP27Test {
         return writer.toByteArray()
     }
 
+    private fun nodeBytes(node: SorobanDelegateSignatureXdr): ByteArray {
+        val writer = XdrWriter()
+        node.encode(writer)
+        return writer.toByteArray()
+    }
+
     // ========================================================================
     // Credential extraction helpers
     // ========================================================================
 
     @Test
     fun testAddressCredentialsReturnsValueForAddressArm() {
+        val expectedAddress = Address(SIGNER_ACCOUNT).toSCAddress()
         val creds = SorobanCredentialsXdr.Address(
             SorobanAddressCredentialsXdr(
-                address = Address(SIGNER_ACCOUNT).toSCAddress(),
+                address = expectedAddress,
                 nonce = Int64Xdr(1L),
                 signatureExpirationLedger = Uint32Xdr(100u),
                 signature = Scv.toVoid()
             )
         )
-        assertNotNull(creds.addressCredentials())
+        val inner = creds.addressCredentials()
+        assertNotNull(inner)
+        assertContentEquals(expectedAddress.toXdrBytes(), inner.address.toXdrBytes())
+        assertEquals(1L, inner.nonce.value)
     }
 
     @Test
     fun testAddressCredentialsReturnsValueForAddressV2Arm() {
+        val expectedAddress = Address(SIGNER_ACCOUNT).toSCAddress()
         val creds = SorobanCredentialsXdr.AddressV2(
             SorobanAddressCredentialsXdr(
-                address = Address(SIGNER_ACCOUNT).toSCAddress(),
+                address = expectedAddress,
                 nonce = Int64Xdr(1L),
                 signatureExpirationLedger = Uint32Xdr(100u),
                 signature = Scv.toVoid()
             )
         )
-        assertNotNull(creds.addressCredentials())
+        val inner = creds.addressCredentials()
+        assertNotNull(inner)
+        assertContentEquals(expectedAddress.toXdrBytes(), inner.address.toXdrBytes())
+        assertEquals(1L, inner.nonce.value)
     }
 
     @Test
     fun testAddressCredentialsReturnsValueForAddressWithDelegatesArm() {
+        val expectedAddress = Address(SIGNER_ACCOUNT).toSCAddress()
         val base = SorobanAddressCredentialsXdr(
-            address = Address(SIGNER_ACCOUNT).toSCAddress(),
+            address = expectedAddress,
             nonce = Int64Xdr(1L),
             signatureExpirationLedger = Uint32Xdr(100u),
             signature = Scv.toVoid()
@@ -156,7 +176,11 @@ class AuthP27Test {
         val creds = SorobanCredentialsXdr.AddressWithDelegates(
             SorobanAddressCredentialsWithDelegatesXdr(base, emptyList())
         )
-        assertNotNull(creds.addressCredentials())
+        val inner = creds.addressCredentials()
+        assertNotNull(inner)
+        // The WITH_DELEGATES arm exposes the top-level credential's address and nonce.
+        assertContentEquals(expectedAddress.toXdrBytes(), inner.address.toXdrBytes())
+        assertEquals(1L, inner.nonce.value)
     }
 
     @Test
@@ -441,6 +465,20 @@ class AuthP27Test {
         val signed = Auth.authorizeEntry(entry, signer, EXPIRATION, NETWORK)
         val signedCreds = (signed.credentials as SorobanCredentialsXdr.AddressV2).value
         assertEquals(EXPIRATION.toUInt(), signedCreds.signatureExpirationLedger.value)
+
+        // The signature must verify against the V2 (WITH_ADDRESS) preimage rebuilt from
+        // the signed credentials. This proves the signature was made over the stamped
+        // expiration, not merely that the field was written into the returned entry.
+        val networkId = NETWORK.networkId()
+        val preimage = Auth.buildHashIDPreimage(signed.credentials, networkId, signed.rootInvocation)
+        assertTrue(preimage is HashIDPreimageXdr.SorobanAuthorizationWithAddress)
+        val payload = Util.hash(xdrBytes(preimage))
+
+        val sigVec = (signedCreds.signature as SCValXdr.Vec).value!!.value
+        val sigMap = (sigVec[0] as SCValXdr.Map).value!!.value
+        val sigEntry = sigMap.find { it.key is SCValXdr.Sym && (it.key as SCValXdr.Sym).value.value == "signature" }
+        val sigBytes = (sigEntry!!.`val` as SCValXdr.Bytes).value.value
+        assertTrue(signer.verify(payload, sigBytes), "V2 signature must verify over the stamped expiration")
     }
 
     // ========================================================================
@@ -630,6 +668,73 @@ class AuthP27Test {
 
         assertTrue(signer.verify(payload, topSig))
         assertTrue(signer.verify(payload, delSig))
+    }
+
+    @Test
+    fun testSigningOneDelegateLeavesOtherDelegateAndTopLevelUntouched() = runTest {
+        // Two distinct delegate nodes A and B. Signing A must touch only A: B's node and
+        // the top-level credential must be byte-identical before/after. This proves the
+        // signature routing maps exactly the matching delegate node, not every node.
+        val signerA = KeyPair.fromSecretSeed(SIGNER_SEED)             // delegate A
+        val signerB = KeyPair.fromSecretSeed(DELEGATE_B_SEED)         // delegate B
+        val addrA = signerA.getAccountId()
+        val addrB = signerB.getAccountId()
+
+        // Build a WITH_DELEGATES entry over a top-level credential that is NOT either
+        // delegate, so the top-level node stays void throughout.
+        val topLevel = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(
+                SorobanAddressCredentialsXdr(
+                    address = Address(DELEGATE_ACCOUNT).toSCAddress(),
+                    nonce = Int64Xdr(NONCE),
+                    signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
+                    signature = Scv.toVoid()
+                )
+            ),
+            rootInvocation = goldenInvocation()
+        )
+        val withDelegates = Auth.attachDelegates(
+            topLevel,
+            EXPIRATION,
+            listOf(DelegateDescriptor(address = addrA), DelegateDescriptor(address = addrB))
+        )
+
+        val addrABytes = Address(addrA).toSCAddress().toXdrBytes()
+
+        // Sign delegate A.
+        val afterA = Auth.authorizeEntry(
+            withDelegates, signerA, EXPIRATION, NETWORK, Auth.AuthOptions(forAddress = addrA)
+        )
+        val credsAfterA = (afterA.credentials as SorobanCredentialsXdr.AddressWithDelegates).value
+        val nodeAAfterAOnly = credsAfterA.delegates.first { it.address.toXdrBytes().contentEquals(addrABytes) }
+        // Capture A's signed node bytes after signing A but before signing B.
+        val nodeABytesBeforeB = nodeBytes(nodeAAfterAOnly)
+        assertTrue(nodeAAfterAOnly.signature is SCValXdr.Vec, "delegate A must be signed after signing A")
+
+        // Now sign delegate B on top of the A-signed entry.
+        val afterB = Auth.authorizeEntry(
+            afterA, signerB, EXPIRATION, NETWORK, Auth.AuthOptions(forAddress = addrB)
+        )
+        val credsAfterB = (afterB.credentials as SorobanCredentialsXdr.AddressWithDelegates).value
+
+        // Delegate A's node must be byte-identical: signing B did not touch A.
+        val nodeAAfterB = credsAfterB.delegates.first { it.address.toXdrBytes().contentEquals(addrABytes) }
+        assertContentEquals(
+            nodeABytesBeforeB,
+            nodeBytes(nodeAAfterB),
+            "signing delegate B must leave delegate A's node byte-identical"
+        )
+
+        // Delegate B is now signed.
+        val addrBBytes = Address(addrB).toSCAddress().toXdrBytes()
+        val nodeBAfterB = credsAfterB.delegates.first { it.address.toXdrBytes().contentEquals(addrBBytes) }
+        assertTrue(nodeBAfterB.signature is SCValXdr.Vec, "delegate B must be signed after signing B")
+
+        // The top-level credential stays void: neither delegate signing touched it.
+        assertTrue(
+            credsAfterB.addressCredentials.signature is SCValXdr.Void,
+            "top-level signature must remain void"
+        )
     }
 
     @Test

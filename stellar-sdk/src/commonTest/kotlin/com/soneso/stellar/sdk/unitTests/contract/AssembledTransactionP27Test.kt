@@ -437,4 +437,115 @@ class AssembledTransactionP27Test {
             assertEquals(20100u, creds.value.signatureExpirationLedger.value)
         }
     }
+
+    // ========================================================================
+    // signAuthEntries: authorizeEntryDelegate callback contract
+    // ========================================================================
+
+    /** A legacy ADDRESS entry whose inner expiration starts at 0. */
+    private fun legacyEntryWithZeroExpiration(): SorobanAuthorizationEntryXdr =
+        SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(
+                SorobanAddressCredentialsXdr(
+                    address = Address(SIGNER_ACCOUNT).toSCAddress(),
+                    nonce = Int64Xdr(NONCE),
+                    signatureExpirationLedger = Uint32Xdr(0u),
+                    signature = Scv.toVoid()
+                )
+            ),
+            rootInvocation = invocation()
+        )
+
+    @Test
+    fun testSignAuthEntriesCallbackReceivesStampedExpiration() = runTest {
+        // The delegate must receive the entry with the requested expiration already
+        // stamped onto its inner credentials. If the stamp happened after the callback,
+        // the network would reconstruct a different preimage and reject the signature.
+        var captured: SorobanAuthorizationEntryXdr? = null
+        mockServer(listOf(legacyEntryWithZeroExpiration())).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            tx.signAuthEntries(
+                authEntriesSigner = KeyPair.fromSecretSeed(SIGNER_SEED),
+                validUntilLedgerSequence = 1_000_000L,
+                authorizeEntryDelegate = { entry, _ ->
+                    captured = entry
+                    entry
+                }
+            )
+        }
+        assertNotNull(captured, "delegate must be invoked for the matching entry")
+        val capturedCreds = (captured!!.credentials as SorobanCredentialsXdr.Address).value
+        // The expiration the delegate sees must be the requested value, not the original 0.
+        assertEquals(
+            1_000_000u,
+            capturedCreds.signatureExpirationLedger.value,
+            "delegate must receive the entry with the expiration already stamped"
+        )
+    }
+
+    @Test
+    fun testSignAuthEntriesCallbackDoesNotModifySiblingSignedByAnotherParty() = runTest {
+        // Two distinct entries: A is addressed to and already signed by signerA; B is
+        // addressed to signerB and void. signAuthEntries(signerB, delegate) must hand
+        // the delegate only B, leaving A's already-present signature byte-identical.
+        val signerA = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val signerB = KeyPair.fromSecretSeed(DELEGATE_SEED)
+
+        // Entry A: legacy ADDRESS for signerA, pre-signed so its signature is non-void.
+        val entryAUnsigned = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(
+                SorobanAddressCredentialsXdr(
+                    address = Address(SIGNER_ACCOUNT).toSCAddress(),
+                    nonce = Int64Xdr(NONCE),
+                    signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
+                    signature = Scv.toVoid()
+                )
+            ),
+            rootInvocation = invocation()
+        )
+        val entryA = Auth.authorizeEntry(entryAUnsigned, signerA, EXPIRATION, NETWORK)
+        // Sanity: A is genuinely signed (non-void) going in.
+        assertTrue(
+            (entryA.credentials as SorobanCredentialsXdr.Address).value.signature is SCValXdr.Vec,
+            "precondition: entry A must already carry a signature"
+        )
+        val entryABefore = entryA.toXdrBase64()
+
+        // Entry B: legacy ADDRESS for signerB, void.
+        val entryB = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Address(
+                SorobanAddressCredentialsXdr(
+                    address = Address(DELEGATE_ACCOUNT).toSCAddress(),
+                    nonce = Int64Xdr(NONCE + 1),
+                    signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
+                    signature = Scv.toVoid()
+                )
+            ),
+            rootInvocation = invocation()
+        )
+
+        var delegateCallCount = 0
+        mockServer(listOf(entryA, entryB)).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            tx.signAuthEntries(
+                authEntriesSigner = signerB,
+                validUntilLedgerSequence = EXPIRATION,
+                authorizeEntryDelegate = { e, _ ->
+                    delegateCallCount++
+                    Auth.authorizeEntry(e, signerB, EXPIRATION, NETWORK)
+                }
+            )
+
+            val op = tx.builtTransaction!!.operations.first() as InvokeHostFunctionOperation
+            val entryAAfter = op.auth.first().toXdrBase64()
+            // The sibling signed by another party is untouched, byte for byte.
+            assertEquals(
+                entryABefore,
+                entryAAfter,
+                "entry A signed by another party must be byte-identical after signing B"
+            )
+            // The delegate fired exactly once: only the matching entry B was handed to it.
+            assertEquals(1, delegateCallCount, "delegate must fire exactly once, for entry B only")
+        }
+    }
 }
