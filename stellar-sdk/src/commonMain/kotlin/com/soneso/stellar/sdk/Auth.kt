@@ -35,8 +35,8 @@ import com.soneso.stellar.sdk.xdr.*
  *
  * Emitting `ADDRESS_V2` or `ADDRESS_WITH_DELEGATES` on a network below
  * Protocol 27 invalidates the transaction. Legacy `ADDRESS` is the default
- * everywhere; the new arms are opt-in via [AuthOptions.authV2] or
- * [attachDelegates].
+ * everywhere; the new arms are opt-in via the `authV2` flag on
+ * [authorizeInvocation] or via [attachDelegates].
  */
 object Auth {
 
