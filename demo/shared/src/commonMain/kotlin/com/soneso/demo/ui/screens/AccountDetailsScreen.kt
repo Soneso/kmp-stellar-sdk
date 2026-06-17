@@ -257,7 +257,7 @@ private fun AccountDetailsCard(account: AccountResponse) {
         DetailRow("Subentry Count", account.subentryCount.toString())
         account.homeDomain?.let { DetailRow("Home Domain", it) }
         DetailRow("Last Modified Ledger", account.lastModifiedLedger.toString())
-        DetailRow("Last Modified Time", account.lastModifiedTime)
+        account.lastModifiedTime?.let { DetailRow("Last Modified Time", it) }
     }
 
     // Balances - Individual collapsible entries with Native XLM first
