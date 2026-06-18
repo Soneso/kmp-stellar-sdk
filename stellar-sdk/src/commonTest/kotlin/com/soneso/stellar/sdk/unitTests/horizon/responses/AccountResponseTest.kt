@@ -103,6 +103,64 @@ class AccountResponseTest {
     }
 
     @Test
+    fun testDeserializationWithoutLastModifiedTime() {
+        // Horizon omits last_modified_time when it cannot resolve the close time of the
+        // account's last_modified_ledger (e.g. the ledger has been purged by the history
+        // retention window). The field must deserialize to null rather than throwing.
+        val accountJsonWithoutLastModifiedTime = """
+        {
+            "id": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+            "account_id": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+            "sequence": 3298702387052545,
+            "subentry_count": 0,
+            "last_modified_ledger": 7654321,
+            "thresholds": {
+                "low_threshold": 0,
+                "med_threshold": 0,
+                "high_threshold": 0
+            },
+            "flags": {
+                "auth_required": false,
+                "auth_revocable": false,
+                "auth_immutable": false,
+                "auth_clawback_enabled": false
+            },
+            "balances": [
+                {
+                    "asset_type": "native",
+                    "balance": "999.9999900",
+                    "buying_liabilities": "0.0000000",
+                    "selling_liabilities": "0.0000000"
+                }
+            ],
+            "signers": [
+                {
+                    "key": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+                    "type": "ed25519_public_key",
+                    "weight": 1
+                }
+            ],
+            "paging_token": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+            "_links": {
+                "self": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7"},
+                "transactions": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/transactions{?cursor,limit,order}", "templated": true},
+                "operations": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/operations{?cursor,limit,order}", "templated": true},
+                "payments": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/payments{?cursor,limit,order}", "templated": true},
+                "effects": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/effects{?cursor,limit,order}", "templated": true},
+                "offers": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/offers{?cursor,limit,order}", "templated": true},
+                "trades": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/trades{?cursor,limit,order}", "templated": true},
+                "data": {"href": "https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7/data/{key}", "templated": true}
+            }
+        }
+        """.trimIndent()
+
+        val account = json.decodeFromString<AccountResponse>(accountJsonWithoutLastModifiedTime)
+        assertEquals("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7", account.accountId)
+        assertEquals(7654321, account.lastModifiedLedger)
+        assertNull(account.lastModifiedTime)
+    }
+
+    @Test
     fun testThresholds() {
         val account = json.decodeFromString<AccountResponse>(accountJson)
         assertEquals(0, account.thresholds.lowThreshold)
