@@ -241,7 +241,6 @@ if (simResponse.error != null) {
 - `transaction: Transaction` -- the transaction to simulate
 - `resourceConfig: SimulateTransactionRequest.ResourceConfig?` -- optional instruction leeway
 - `authMode: SimulateTransactionRequest.AuthMode?` -- optional auth mode (ENFORCE, RECORD, RECORD_ALLOW_NONROOT)
-- `authV2: Boolean?` -- when `true`, a Protocol 27+ RPC returns ADDRESS_V2 (CAP-71) auth entries in recording modes. Pre-27 RPCs ignore it and return legacy ADDRESS entries; detect support by inspecting the returned arm, not by error. `prepareTransaction(tx, authV2 = true)` forwards the same flag. Legacy ADDRESS is the default.
 
 **Response fields:** `error` (String?), `transactionData` (String?), `events` (List\<String\>?), `minResourceFee` (Long?), `results` (List\<SimulateHostFunctionResult\>?), `restorePreamble` (RestorePreamble?), `stateChanges` (List\<LedgerEntryChange\>?), `latestLedger` (Long?).
 

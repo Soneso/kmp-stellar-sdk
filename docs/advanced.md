@@ -88,21 +88,21 @@ val signed = Auth.authorizeEntry(
 )
 ```
 
-**Opting into V2** is a simulation flag. A Protocol 27+ RPC returns `AddressV2`
-auth entries in recording mode; sign them the same way as legacy entries:
+**Opting into V2** is client-side. Simulation returns legacy `Address` auth
+entries; build the address-bound `AddressV2` arm with `Auth.authorizeInvocation`:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanServer
-
-val server = SorobanServer("https://soroban-rpc.stellar.org:443")
-val simulation = server.simulateTransaction(transaction, authV2 = true)
-// Or, in one step:
-val prepared = server.prepareTransaction(transaction, authV2 = true)
+val signed = Auth.authorizeInvocation(
+    signer = aliceKeyPair,
+    validUntilLedgerSeq = currentLedger + 100L,
+    invocation = invocationFromSimulation,
+    network = Network.PUBLIC,
+    authV2 = true
+)
 ```
 
-`ContractClient` exposes the same opt-in through `ClientOptions(authV2 = true)`.
-A pre-27 RPC silently ignores the flag and returns legacy entries; detect support
-by inspecting the returned credential arm, never by catching an error.
+`AddressV2` is only valid on Protocol 27+ networks; emitting it on an older
+network invalidates the transaction.
 
 **Building a delegated entry.** Simulation never returns a delegate tree; you
 assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and

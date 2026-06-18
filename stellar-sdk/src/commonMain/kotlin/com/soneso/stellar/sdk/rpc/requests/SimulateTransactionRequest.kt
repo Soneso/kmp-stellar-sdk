@@ -12,9 +12,6 @@ import kotlinx.serialization.Serializable
  * @property transaction Base64-encoded XDR TransactionEnvelope to simulate.
  * @property resourceConfig Optional configuration for resource estimation.
  * @property authMode Authorization mode for simulation. Controls how auth entries are handled.
- * @property authV2 When true, requests Protocol-27 ADDRESS_V2 auth entries instead of legacy
- *                  ADDRESS entries in recording modes. RPC servers below Protocol 27 ignore the
- *                  flag and still return legacy ADDRESS entries.
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference/methods/simulateTransaction">simulateTransaction documentation</a>
  */
@@ -22,8 +19,7 @@ import kotlinx.serialization.Serializable
 data class SimulateTransactionRequest(
     val transaction: String,
     val resourceConfig: ResourceConfig? = null,
-    val authMode: AuthMode? = null,
-    val authV2: Boolean? = null
+    val authMode: AuthMode? = null
 ) {
     init {
         require(transaction.isNotBlank()) { "transaction must not be blank" }

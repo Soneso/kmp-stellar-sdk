@@ -702,8 +702,6 @@ class SorobanServer(
      * @param transaction The transaction to simulate
      * @param resourceConfig Optional resource configuration for additional headroom
      * @param authMode Optional authorization mode (ENFORCE, RECORD, RECORD_ALLOW_NONROOT)
-     * @param authV2 When true, requests Protocol-27 ADDRESS_V2 auth entries in recording modes;
-     *               ignored by pre-27 RPCs, which return legacy ADDRESS entries.
      * @return Simulation results including costs, footprint, and results
      * @throws SorobanRpcException If the RPC request fails
      *
@@ -712,15 +710,13 @@ class SorobanServer(
     suspend fun simulateTransaction(
         transaction: Transaction,
         resourceConfig: SimulateTransactionRequest.ResourceConfig? = null,
-        authMode: SimulateTransactionRequest.AuthMode? = null,
-        authV2: Boolean? = null
+        authMode: SimulateTransactionRequest.AuthMode? = null
     ): SimulateTransactionResponse {
         val transactionXdr = transaction.toEnvelopeXdr().toXdrBase64()
         val request = SimulateTransactionRequest(
             transaction = transactionXdr,
             resourceConfig = resourceConfig,
-            authMode = authMode,
-            authV2 = authV2
+            authMode = authMode
         )
         return sendRequest("simulateTransaction", request)
     }
@@ -744,14 +740,12 @@ class SorobanServer(
      * ```
      *
      * @param transaction The transaction to prepare
-     * @param authV2 When true, requests Protocol-27 ADDRESS_V2 auth entries during simulation;
-     *               ignored by pre-27 RPCs, which return legacy ADDRESS entries.
      * @return A copy of the transaction with footprint and fees populated
      * @throws PrepareTransactionException If simulation fails
      * @throws SorobanRpcException If the RPC request fails
      */
-    suspend fun prepareTransaction(transaction: Transaction, authV2: Boolean? = null): Transaction {
-        val simulation = simulateTransaction(transaction, authV2 = authV2)
+    suspend fun prepareTransaction(transaction: Transaction): Transaction {
+        val simulation = simulateTransaction(transaction)
         return prepareTransaction(transaction, simulation)
     }
 

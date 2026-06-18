@@ -294,10 +294,10 @@ pre-27 network invalidates the tx). `needsNonInvokerSigningBy()` and
 `signAuthEntries(keyPair)` handle all three: they walk the delegate tree
 depth-first, report every unsigned delegate node, and route a signer's signature
 to the matching top-level address or delegate node. A delegates-only entry
-(void top-level, all delegates signed) is treated as fully signed. To request
-ADDRESS_V2 entries during simulation, set `ClientOptions(authV2 = true)`; pre-27
-RPCs ignore it. Build delegate trees with `Auth.attachDelegates` +
-`DelegateDescriptor`, then sign nodes with `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`. See [advanced.md](./advanced.md).
+(void top-level, all delegates signed) is treated as fully signed. To emit
+ADDRESS_V2 entries, set `authV2 = true` on `Auth.authorizeInvocation`. Build
+delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`, then sign
+nodes with `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`. See [advanced.md](./advanced.md).
 
 **Adding memos or custom preconditions via buildInvoke:**
 

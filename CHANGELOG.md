@@ -28,10 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   node (address, optional signature, nested delegates).
 - `Auth.authorizeInvocation(...)` gained an `authV2: Boolean = false` flag that
   emits `AddressV2` credentials instead of the legacy `Address` arm.
-- `authV2` flag on `SorobanServer.simulateTransaction(...)`,
-  `SorobanServer.prepareTransaction(...)`, `SimulateTransactionRequest`, and
-  `ClientOptions`. When set, a Protocol 27+ RPC returns `AddressV2` auth entries
-  in recording modes; pre-27 RPCs ignore the flag and return legacy entries.
 
 ### Changed
 - `AssembledTransaction.needsNonInvokerSigningBy()` and `signAuthEntries()` are
@@ -45,12 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Smart-account and OpenZeppelin signing paths select the correct preimage per
   credential arm. No API change for callers.
 - The new optional parameters change the JVM binary signatures of
-  `Auth.authorizeEntry`, `Auth.authorizeInvocation`,
-  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`, and
-  the `SimulateTransactionRequest` and `ClientOptions` constructors: callers
-  using named arguments are source-compatible but need a recompile; precompiled
-  JVM consumers and positional calls that pass arguments after the new parameter
-  fail loudly and need updating.
+  `Auth.authorizeEntry` and `Auth.authorizeInvocation`: callers using named
+  arguments are source-compatible but need a recompile; precompiled JVM consumers
+  and positional calls that pass arguments after the new parameter fail loudly
+  and need updating.
 - `SorobanCredentialsXdr` and `HashIDPreimageXdr` gain new sealed arms, and
   `SorobanCredentialsTypeXdr` and `EnvelopeTypeXdr` gain new entries. Code with
   an exhaustive `when` over any of these public types must add branches for the
