@@ -135,6 +135,37 @@ val withDelegateSig = Auth.authorizeEntry(
 // A delegates-only entry whose top-level signature stays void is legitimate.
 ```
 
+**Submitting V2 or delegated entries.** Simulation and the high-level
+`ContractClient` / `AssembledTransaction` only emit legacy `Address` entries, so
+the V2 and delegate arms built above are also submitted at the `SorobanServer`
+level. Attach the signed entries to the operation, then **re-simulate in
+enforcing mode** before submitting: when the authorizing address is a contract
+account, its `__check_auth` runs only in the enforcing pass, and the storage it
+reads (plus any delegate account entries) must be in the footprint.
+
+```kotlin
+val signedOp = InvokeHostFunctionOperation(
+    hostFunction = operation.hostFunction,
+    auth = signedEntries
+)
+// Rebuild the transaction with the signed auth, then re-simulate. With auth
+// present the RPC simulates in enforcing mode and returns the full footprint.
+val rebuiltTransaction = TransactionBuilder(sourceAccount = account, network = Network.PUBLIC)
+    .addOperation(signedOp)
+    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+    .build()
+val enforcing = sorobanServer.simulateTransaction(rebuiltTransaction)
+val prepared = sorobanServer.prepareTransaction(rebuiltTransaction, enforcing)
+prepared.sign(sourceKeyPair)
+sorobanServer.sendTransaction(prepared)
+```
+
+When converting a simulated `Address` entry to `AddressV2` in place, reuse its
+nonce (rebuild the credentials on the `AddressV2` arm); a fresh nonce will not
+match the original simulation, so it then relies on the enforcing re-simulation
+above.
+
 ### Multi-Signature Contract Workflows with buildInvoke
 
 Use `buildInvoke` for complex multi-signature scenarios:

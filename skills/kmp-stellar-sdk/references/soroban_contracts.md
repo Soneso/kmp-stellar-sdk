@@ -287,17 +287,20 @@ swapTx.signAuthEntries(
 )
 ```
 
-**Protocol 27 auth arms (CAP-71).** Entries carry one of three address credential
-arms: legacy `Address` (the default, valid on every network), `AddressV2`, and
-`AddressWithDelegates` (V2 and delegates require Protocol 27+; emitting them on a
-pre-27 network invalidates the tx). `needsNonInvokerSigningBy()` and
-`signAuthEntries(keyPair)` handle all three: they walk the delegate tree
-depth-first, report every unsigned delegate node, and route a signer's signature
-to the matching top-level address or delegate node. A delegates-only entry
-(void top-level, all delegates signed) is treated as fully signed. To emit
-ADDRESS_V2 entries, set `authV2 = true` on `Auth.authorizeInvocation`. Build
-delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`, then sign
-nodes with `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`. See [advanced.md](./advanced.md).
+**Protocol 27 auth arms (CAP-71).** Address credentials use one of three arms:
+legacy `Address` (default, every network), `AddressV2`, or `AddressWithDelegates`
+(V2/delegates require Protocol 27+; emitting them pre-27 invalidates the tx).
+Simulation and the high-level `ContractClient`/`AssembledTransaction` only ever
+produce the legacy `Address` arm — build V2/delegate entries client-side with the
+low-level `Auth` helpers and submit via `SorobanServer`. Emit `AddressV2` with
+`Auth.authorizeInvocation(..., authV2 = true)`. Build a delegate tree with
+`Auth.attachDelegates(entry, validUntilLedgerSeq, listOf(DelegateDescriptor(addr)))`,
+then sign each node via `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`
+(a delegates-only entry keeps a void top-level signature). `needsNonInvokerSigningBy()`
+and `signAuthEntries(keyPair)` walk and sign an existing delegate tree by address
+but do not create one. When the authorizing address is a contract account (its
+`__check_auth` reads storage or consumes delegates), re-simulate in enforcing mode
+after signing to capture the footprint before submitting.
 
 **Adding memos or custom preconditions via buildInvoke:**
 
