@@ -38,7 +38,7 @@ data class AccountResponse(
     val lastModifiedLedger: Int,
 
     @SerialName("last_modified_time")
-    val lastModifiedTime: String,
+    val lastModifiedTime: String? = null,
 
     @SerialName("thresholds")
     val thresholds: Thresholds,
