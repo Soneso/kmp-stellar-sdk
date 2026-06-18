@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
@@ -31,7 +32,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SorobanP27AuthIntegrationTest {
 
-    private val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
+    private val rpcUrl = "https://soroban-testnet.stellar.org"
+    private val sorobanServer = SorobanServer(rpcUrl)
     private val network = Network.TESTNET
 
     /**
@@ -46,9 +48,14 @@ class SorobanP27AuthIntegrationTest {
         FriendBot.fundTestnetAccount(invoker.getAccountId())
         realDelay(5000)
 
-        // Upload and deploy the auth contract.
-        val wasmId = uploadContract(submitter)
-        val contractId = createContract(submitter, wasmId)
+        // Deploy the auth contract.
+        val contractId = ContractClient.deploy(
+            wasmBytes = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm"),
+            source = submitter.getAccountId(),
+            signer = submitter,
+            network = network,
+            rpcUrl = rpcUrl
+        ).contractId
 
         // Build the increment invocation; the invoker differs from the source, so simulation
         // returns an ADDRESS authorization entry for the invoker.
@@ -161,77 +168,5 @@ class SorobanP27AuthIntegrationTest {
         // increment returns the invoker's accumulated counter; a fresh invoker starts at 0, so a
         // single increment by 5 returns 5.
         assertEquals(5u, resultValue.value.value, "increment should return the accumulated counter value")
-    }
-
-    // ============================================================================
-    // Helper Methods
-    // ============================================================================
-
-    /** Uploads the auth contract WASM and returns its WASM id. */
-    private suspend fun uploadContract(submitter: KeyPair): String {
-        val account = sorobanServer.getAccount(submitter.getAccountId())
-        assertNotNull(account, "Submitter account should be loaded")
-
-        val contractCode = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
-        assertTrue(contractCode.isNotEmpty(), "Auth contract code should not be empty")
-
-        val transaction = TransactionBuilder(sourceAccount = account, network = network)
-            .addOperation(InvokeHostFunctionOperation.uploadContractWasm(contractCode))
-            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-            .build()
-
-        val simulateResponse = sorobanServer.simulateTransaction(transaction)
-        assertNull(simulateResponse.error, "Upload simulation should not have error")
-        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
-        preparedTransaction.sign(submitter)
-
-        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
-        assertNotNull(sendResponse.hash, "Upload transaction hash should not be null")
-        val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash, maxAttempts = 30, sleepStrategy = { 3000L }
-        )
-        assertEquals(GetTransactionStatus.SUCCESS, rpcTransactionResponse.status, "Upload should succeed")
-
-        val wasmId = rpcTransactionResponse.getWasmId()
-        assertNotNull(wasmId, "WASM id should be returned")
-        assertTrue(wasmId.isNotEmpty(), "WASM id should not be empty")
-        return wasmId
-    }
-
-    /** Deploys a contract instance from the uploaded WASM and returns its contract id. */
-    private suspend fun createContract(submitter: KeyPair, wasmId: String): String {
-        realDelay(5000)
-        val account = sorobanServer.getAccount(submitter.getAccountId())
-        assertNotNull(account, "Submitter account should be loaded")
-
-        val transaction = TransactionBuilder(sourceAccount = account, network = network)
-            .addOperation(
-                InvokeHostFunctionOperation.createContract(
-                    wasmId = wasmId,
-                    address = Address(submitter.getAccountId()),
-                    salt = ByteArray(32) { 0 }
-                )
-            )
-            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
-            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
-            .build()
-
-        val simulateResponse = sorobanServer.simulateTransaction(transaction)
-        assertNull(simulateResponse.error, "Create simulation should not have error")
-        val preparedTransaction = sorobanServer.prepareTransaction(transaction, simulateResponse)
-        preparedTransaction.sign(submitter)
-
-        val sendResponse = sorobanServer.sendTransaction(preparedTransaction)
-        assertNotNull(sendResponse.hash, "Create transaction hash should not be null")
-        val rpcTransactionResponse = sorobanServer.pollTransaction(
-            hash = sendResponse.hash, maxAttempts = 30, sleepStrategy = { 3000L }
-        )
-        assertEquals(GetTransactionStatus.SUCCESS, rpcTransactionResponse.status, "Create should succeed")
-
-        val contractId = rpcTransactionResponse.getCreatedContractId()
-        assertNotNull(contractId, "Contract id should be returned")
-        assertTrue(contractId.isNotEmpty(), "Contract id should not be empty")
-        return contractId
     }
 }
