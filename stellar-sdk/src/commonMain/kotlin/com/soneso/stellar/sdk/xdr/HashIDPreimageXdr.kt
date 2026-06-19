@@ -37,6 +37,15 @@ package com.soneso.stellar.sdk.xdr
  *         uint32 signatureExpirationLedger;
  *         SorobanAuthorizedInvocation invocation;
  *     } sorobanAuthorization;
+ * case ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS:
+ *     struct
+ *     {
+ *         Hash networkID;
+ *         int64 nonce;
+ *         uint32 signatureExpirationLedger;
+ *         SCAddress address;
+ *         SorobanAuthorizedInvocation invocation;
+ *     } sorobanAuthorizationWithAddress;
  * };
  */
 sealed class HashIDPreimageXdr {
@@ -66,6 +75,12 @@ sealed class HashIDPreimageXdr {
     override val discriminant: EnvelopeTypeXdr = EnvelopeTypeXdr.ENVELOPE_TYPE_SOROBAN_AUTHORIZATION
   }
 
+  data class SorobanAuthorizationWithAddress(
+    val value: HashIDPreimageSorobanAuthorizationWithAddressXdr
+  ) : HashIDPreimageXdr() {
+    override val discriminant: EnvelopeTypeXdr = EnvelopeTypeXdr.ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS
+  }
+
   companion object {
 
     fun decode(reader: XdrReader): HashIDPreimageXdr {
@@ -87,6 +102,10 @@ sealed class HashIDPreimageXdr {
           val value = HashIDPreimageSorobanAuthorizationXdr.decode(reader)
           SorobanAuthorization(value)
         }
+        EnvelopeTypeXdr.ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS -> {
+          val value = HashIDPreimageSorobanAuthorizationWithAddressXdr.decode(reader)
+          SorobanAuthorizationWithAddress(value)
+        }
         else -> throw IllegalArgumentException("Unknown HashIDPreimageXdr discriminant: $discriminant")
       }
     }
@@ -105,6 +124,9 @@ sealed class HashIDPreimageXdr {
         value.encode(writer)
       }
       is SorobanAuthorization -> {
+        value.encode(writer)
+      }
+      is SorobanAuthorizationWithAddress -> {
         value.encode(writer)
       }
     }

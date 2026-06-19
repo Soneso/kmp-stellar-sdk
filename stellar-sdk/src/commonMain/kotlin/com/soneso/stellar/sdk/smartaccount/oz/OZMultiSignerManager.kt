@@ -11,6 +11,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Auth
+import com.soneso.stellar.sdk.addressCredentials
+import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
@@ -19,9 +21,6 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.Util
-import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
-import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
-import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.scval.Scv
@@ -31,7 +30,6 @@ import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
-import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -462,7 +460,8 @@ class OZMultiSignerManager internal constructor(
         val signedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
         for ((entryIndex, entry) in authEntries.withIndex()) {
-            val credentials = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+            // Extract inner address credentials across all address arms; null for Void.
+            val credentials = entry.credentials.addressCredentials()
             if (credentials == null) {
                 signedAuthEntries.add(entry)
                 continue
@@ -865,20 +864,20 @@ class OZMultiSignerManager internal constructor(
         // Clone and set the expiration ledger
         val signedEntry = cloneEntryWithExpiration(entry, expirationLedger)
 
-        val credentials = (signedEntry.credentials as? SorobanCredentialsXdr.Address)?.value
+        val credentials = signedEntry.credentials.addressCredentials()
             ?: throw TransactionException.signingFailed(
-                "Expected Address credentials on wallet auth entry for ${walletSigner.address}"
+                "Expected address-bearing credentials on wallet auth entry for ${walletSigner.address}"
             )
 
-        // Build HashIDPreimage::SorobanAuthorization from the cloned entry's credentials
+        // Build the preimage from the cloned entry's credentials. The arm selects the
+        // preimage type (legacy vs address-bound); construction is delegated to
+        // Auth.buildHashIDPreimage so the host-reconstructed hash always matches.
         val networkId = getSha256ForNetworkPassphrase(kit.config.networkPassphrase)
-        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
-            networkId = HashXdr(networkId),
-            nonce = credentials.nonce,
-            signatureExpirationLedger = credentials.signatureExpirationLedger,
+        val preimage = Auth.buildHashIDPreimage(
+            credentials = signedEntry.credentials,
+            networkId = networkId,
             invocation = signedEntry.rootInvocation
         )
-        val preimage = HashIDPreimageXdr.SorobanAuthorization(authPreimage)
 
         val writer = XdrWriter()
         preimage.encode(writer)
@@ -899,7 +898,7 @@ class OZMultiSignerManager internal constructor(
         )
         val signatureScVal = Scv.toVec(listOf(Scv.toMap(sigMap)))
 
-        // Set the signature on the cloned entry's credentials
+        // Set the signature on the cloned entry's credentials, preserving the arm.
         val updatedCredentials = SorobanAddressCredentialsXdr(
             address = credentials.address,
             nonce = credentials.nonce,
@@ -908,7 +907,7 @@ class OZMultiSignerManager internal constructor(
         )
 
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(updatedCredentials),
+            credentials = signedEntry.credentials.withUpdatedAddressCredentials(updatedCredentials),
             rootInvocation = signedEntry.rootInvocation
         )
     }
@@ -933,8 +932,9 @@ class OZMultiSignerManager internal constructor(
         val reader = XdrReader(writer.toByteArray())
         val cloned = SorobanAuthorizationEntryXdr.decode(reader)
 
-        // Set expiration on the cloned entry
-        val credentials = (cloned.credentials as? SorobanCredentialsXdr.Address)?.value
+        // Set expiration on the cloned entry, preserving the credential arm.
+        // Source-account (Void) entries carry no expiration and are returned as-is.
+        val credentials = cloned.credentials.addressCredentials()
             ?: return cloned
 
         val updated = SorobanAddressCredentialsXdr(
@@ -945,7 +945,7 @@ class OZMultiSignerManager internal constructor(
         )
 
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(updated),
+            credentials = cloned.credentials.withUpdatedAddressCredentials(updated),
             rootInvocation = cloned.rootInvocation
         )
     }

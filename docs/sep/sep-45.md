@@ -141,6 +141,8 @@ val authToken = webAuth.jwtToken(
 
 Most developers should use `jwtToken()` for authentication. Use the low-level API when you need custom validation logic, multi-step user approval flows, or integration with external signing systems.
 
+> Challenge entries are validated and signed across all three Soroban credential arms — legacy `ADDRESS`, `ADDRESS_V2`, and `ADDRESS_WITH_DELEGATES` (CAP-71) — and the matching hash preimage is selected automatically. This is transparent: no API change is required for any of the calls below.
+
 ```kotlin
 // Manual control over each authentication step
 val webAuth = WebAuthForContracts.fromDomain("testanchor.stellar.org", Network.TESTNET)

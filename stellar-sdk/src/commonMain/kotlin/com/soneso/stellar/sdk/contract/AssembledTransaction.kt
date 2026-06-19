@@ -358,14 +358,19 @@ class AssembledTransaction<T> internal constructor(
      *
      * ## How It Works
      *
-     * 1. The method finds all auth entries that match the signer's address
+     * 1. The method finds all auth entries that match the signer's address, against
+     *    both the top-level credential address and, for ADDRESS_WITH_DELEGATES
+     *    entries, every delegate node address in the tree.
      * 2. For each matching entry:
-     *    - Sets the expiration ledger
-     *    - Signs the entry using Auth.authorizeEntry() or the delegate
+     *    - Sets the expiration ledger on the inner credentials, preserving the
+     *      credential arm (ADDRESS, ADDRESS_V2, or ADDRESS_WITH_DELEGATES)
+     *    - Signs at the top level when the top-level address matches, or routes the
+     *      signature into the matching delegate node(s) when a delegate matches
      *    - Updates the signature in the entry
      * 3. Rebuilds the transaction with the updated auth entries
      *
-     * @param authEntriesSigner The KeyPair to sign auth entries with (must match address in entry)
+     * @param authEntriesSigner The KeyPair to sign auth entries with (must match the
+     *   top-level address or a delegate node address in an entry)
      * @param validUntilLedgerSequence Ledger sequence until which signatures are valid (null = current + 100)
      * @param authorizeEntryDelegate Optional function for custom signing logic (enables remote signing)
      * @return This AssembledTransaction for chaining
@@ -383,6 +388,7 @@ class AssembledTransaction<T> internal constructor(
         }
 
         val signerAddress = authEntriesSigner.getAccountId()
+        val signerSCAddressBytes = Address(signerAddress).toSCAddress().toXdrBytes()
 
         // Validate signer has entries to sign (unless using delegate)
         if (authorizeEntryDelegate == null) {
@@ -422,42 +428,52 @@ class AssembledTransaction<T> internal constructor(
 
         // Iterate through auth entries and sign matching ones
         for (entry in operation.auth) {
-            // Check if this entry uses address credentials
-            if (entry.credentials.discriminant != SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS) {
-                updatedAuthEntries.add(entry)
-                continue
-            }
-
-            val addressCreds = entry.credentials as? SorobanCredentialsXdr.Address
+            // Source-account (Void) credentials carry no address and are never signed here.
+            val addressCreds = entry.credentials.addressCredentials()
             if (addressCreds == null) {
                 updatedAuthEntries.add(entry)
                 continue
             }
 
-            // Get the address from the credentials
-            val entryAddress = Address.fromSCAddress(addressCreds.value.address).toString()
+            // Determine where the signer applies: the top-level address, a delegate
+            // node (only for WITH_DELEGATES), or neither.
+            val topLevelMatches =
+                Address.fromSCAddress(addressCreds.address).toString() == signerAddress
+            val delegateMatches = when (val creds = entry.credentials) {
+                is SorobanCredentialsXdr.AddressWithDelegates ->
+                    findDelegateNodes(creds.value.delegates, signerSCAddressBytes).isNotEmpty()
+                else -> false
+            }
 
-            // Skip if this entry is for a different signer
-            if (entryAddress != signerAddress) {
+            // Entry not addressed to this signer: pass through unchanged.
+            if (!topLevelMatches && !delegateMatches) {
                 updatedAuthEntries.add(entry)
                 continue
             }
 
-            // Create updated address credentials with new expiration
-            val updatedAddressCreds = addressCreds.value.copy(
+            // Apply the new expiration to the inner credentials before signing,
+            // preserving the credential arm.
+            val updatedAddressCreds = addressCreds.copy(
                 signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt())
             )
-
-            // Create updated entry with new expiration
             val entryToSign = entry.copy(
-                credentials = SorobanCredentialsXdr.Address(updatedAddressCreds)
+                credentials = entry.credentials.withUpdatedAddressCredentials(updatedAddressCreds)
             )
 
-            // Sign the entry
+            // Route via forAddress so the signature lands on every node that
+            // matches the signer: the top-level credential and/or any delegate
+            // node. The same address may legitimately appear at both levels, so
+            // both must be signed in a single pass.
             val signedEntry = if (authorizeEntryDelegate != null) {
                 authorizeEntryDelegate(entryToSign, transactionBuilder.network)
             } else {
-                Auth.authorizeEntry(entryToSign, authEntriesSigner, expirationLedger, transactionBuilder.network)
+                Auth.authorizeEntry(
+                    entryToSign,
+                    authEntriesSigner,
+                    expirationLedger,
+                    transactionBuilder.network,
+                    Auth.AuthOptions(forAddress = signerAddress)
+                )
             }
 
             updatedAuthEntries.add(signedEntry)
@@ -513,6 +529,14 @@ class AssembledTransaction<T> internal constructor(
      * Returns account or contract addresses (G.., C..) that need to sign auth entries.
      * Useful for multi-sig scenarios where you need to collect signatures.
      *
+     * All three address credential arms are considered. For ADDRESS_WITH_DELEGATES
+     * entries the delegate tree is walked depth-first, and every delegate node is
+     * reported on the same terms as the top-level address. A node is reported when
+     * its signature is void (no signature yet) or, when [includeAlreadySigned] is
+     * true, regardless of its signature. A delegates-only entry whose top-level
+     * signature stays void but whose delegate nodes are all signed does not report
+     * the top-level address. Source-account (Void) credentials contribute nothing.
+     *
      * @param includeAlreadySigned Whether to include already-signed entries (default false)
      * @return Set of addresses that need to sign
      * @throws NotYetSimulatedException if not yet simulated
@@ -527,24 +551,76 @@ class AssembledTransaction<T> internal constructor(
             return emptySet()
         }
 
-        return operation.auth
-            .filter { it.credentials.discriminant == SorobanCredentialsTypeXdr.SOROBAN_CREDENTIALS_ADDRESS }
-            .filter { entry ->
-                val addressCreds = entry.credentials as? SorobanCredentialsXdr.Address
-                if (addressCreds == null) {
-                    false
-                } else {
-                    includeAlreadySigned ||
-                    addressCreds.value.signature.discriminant == SCValTypeXdr.SCV_VOID
-                }
+        val result = mutableSetOf<String>()
+        for (entry in operation.auth) {
+            collectSignersNeeded(entry.credentials, includeAlreadySigned, result)
+        }
+        return result
+    }
+
+    /**
+     * Adds the addresses that still require a signature in [credentials] to [out].
+     *
+     * Exhaustive over the credential arms. The top-level address is reported when
+     * its signature is void (or unconditionally when [includeAlreadySigned]); for
+     * ADDRESS_WITH_DELEGATES the delegate tree is walked and each node reported on
+     * the same terms.
+     */
+    private fun collectSignersNeeded(
+        credentials: SorobanCredentialsXdr,
+        includeAlreadySigned: Boolean,
+        out: MutableSet<String>
+    ) {
+        when (credentials) {
+            is SorobanCredentialsXdr.Void -> Unit
+            is SorobanCredentialsXdr.Address ->
+                addIfUnsigned(credentials.value.address, credentials.value.signature, includeAlreadySigned, out)
+            is SorobanCredentialsXdr.AddressV2 ->
+                addIfUnsigned(credentials.value.address, credentials.value.signature, includeAlreadySigned, out)
+            is SorobanCredentialsXdr.AddressWithDelegates -> {
+                val inner = credentials.value.addressCredentials
+                addIfUnsigned(inner.address, inner.signature, includeAlreadySigned, out)
+                collectDelegateSignersNeeded(credentials.value.delegates, includeAlreadySigned, out)
             }
-            .mapNotNull { entry ->
-                val addressCreds = entry.credentials as? SorobanCredentialsXdr.Address
-                addressCreds?.let {
-                    Address.fromSCAddress(it.value.address).toString()
-                }
-            }
-            .toSet()
+        }
+    }
+
+    /**
+     * Walks the delegate tree depth-first and reports every node whose signature is
+     * void (or every node when [includeAlreadySigned]).
+     *
+     * @throws IllegalArgumentException if the tree exceeds [DELEGATE_TRAVERSAL_CAP]
+     */
+    private fun collectDelegateSignersNeeded(
+        delegates: List<SorobanDelegateSignatureXdr>,
+        includeAlreadySigned: Boolean,
+        out: MutableSet<String>,
+        depth: Int = 0
+    ) {
+        if (depth > DELEGATE_TRAVERSAL_CAP) {
+            throw IllegalArgumentException(
+                "Delegate tree traversal depth $depth exceeds cap $DELEGATE_TRAVERSAL_CAP"
+            )
+        }
+        for (node in delegates) {
+            addIfUnsigned(node.address, node.signature, includeAlreadySigned, out)
+            collectDelegateSignersNeeded(node.nestedDelegates, includeAlreadySigned, out, depth + 1)
+        }
+    }
+
+    /**
+     * Adds the StrKey form of [address] to [out] when [signature] is void or when
+     * [includeAlreadySigned] is set.
+     */
+    private fun addIfUnsigned(
+        address: SCAddressXdr,
+        signature: SCValXdr,
+        includeAlreadySigned: Boolean,
+        out: MutableSet<String>
+    ) {
+        if (includeAlreadySigned || signature.discriminant == SCValTypeXdr.SCV_VOID) {
+            out.add(Address.fromSCAddress(address).toString())
+        }
     }
 
     /**

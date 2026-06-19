@@ -38,6 +38,7 @@ import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -281,11 +282,16 @@ internal fun buildSequentialMockServerWithSubmission(
     authEntryBase64: String,
     sorobanDataBase64: String,
     countXdrBase64: String,
-    txHash: String
+    txHash: String,
+    onSendTransaction: ((String) -> Unit)? = null
 ): SorobanServer {
     var requestIndex = 0
-    val mockEngine = MockEngine { _ ->
-        val responseBody = when (requestIndex++) {
+    val mockEngine = MockEngine { request ->
+        val index = requestIndex++
+        if (index == 7) {
+            onSendTransaction?.invoke(request.body.toByteArray().decodeToString())
+        }
+        val responseBody = when (index) {
             0 -> ledgerEntriesResponseJson(accountXdrBase64)
             1 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
             2 -> latestLedgerResponseJson()

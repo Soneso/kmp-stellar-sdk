@@ -5,209 +5,166 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 
 /**
- * Helper class for signing Soroban authorization entries.
+ * Helper for signing Soroban authorization entries.
  *
- * This class provides methods to authorize smart contract invocations by:
- * - Signing existing authorization entries (typically from transaction simulation)
- * - Building new authorization entries from scratch
- * - Supporting custom signing logic through the [Signer] interface
+ * Supports legacy ADDRESS credentials (Protocol 20+), ADDRESS_V2 credentials
+ * (Protocol 27+), and ADDRESS_WITH_DELEGATES credentials (Protocol 27+) with
+ * recursive delegate trees.
  *
- * ## Usage Examples
+ * ## Preimage selection
  *
- * ### Authorize an existing entry with a KeyPair
- * ```kotlin
- * val entry = SorobanAuthorizationEntryXdr.fromXdrBase64("...")
- * val signer = KeyPair.fromSecretSeed("S...")
- * val network = Network.TESTNET
- * val validUntilLedgerSeq = 1000000L
+ * The hash preimage type is determined by the credential arm:
+ * - `ADDRESS` -> `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION` (legacy; not address-bound)
+ * - `ADDRESS_V2` and `ADDRESS_WITH_DELEGATES` -> `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`
  *
- * val signedEntry = Auth.authorizeEntry(
- *     entry = entry,
- *     signer = signer,
- *     validUntilLedgerSeq = validUntilLedgerSeq,
- *     network = network
- * )
- * ```
+ * For `ADDRESS_WITH_DELEGATES`, the address in the preimage is always the
+ * top-level credential address, never a delegate address. All signers in the
+ * tree (top-level and every delegate at any depth) sign the same hash.
  *
- * ### Build a new authorization from scratch
- * ```kotlin
- * val invocation = SorobanAuthorizedInvocationXdr(...)
- * val signer = KeyPair.fromSecretSeed("S...")
- * val network = Network.TESTNET
- * val validUntilLedgerSeq = 1000000L
+ * ## Signature write-back
  *
- * val authEntry = Auth.authorizeInvocation(
- *     signer = signer,
- *     validUntilLedgerSeq = validUntilLedgerSeq,
- *     invocation = invocation,
- *     network = network
- * )
- * ```
+ * Signing appends a new `{public_key, signature}` map element to the node's
+ * existing signature vector. A void signature becomes a one-element vector.
+ * Existing non-void signatures are never overwritten. Append order is
+ * call order; callers are responsible for supplying signatures in ascending
+ * public-key order where the host requires it (G-address, medium threshold
+ * multi-sig). Calling [authorizeEntry] twice with the same key on the same
+ * node appends a duplicate the host will reject.
  *
- * ### Use a custom signer
- * ```kotlin
- * val customSigner = object : Auth.Signer {
- *     override suspend fun sign(preimage: HashIDPreimageXdr): Auth.Signature {
- *         val payload = Util.hash(preimage.toXdrByteArray())
- *         // Custom signing logic (e.g., hardware wallet)
- *         val signature = myCustomSigningDevice.sign(payload)
- *         return Auth.Signature(publicKey = "G...", signature = signature)
- *     }
- * }
+ * ## Protocol gating
  *
- * val signedEntry = Auth.authorizeEntry(
- *     entry = entry,
- *     signer = customSigner,
- *     validUntilLedgerSeq = validUntilLedgerSeq,
- *     network = network
- * )
- * ```
- *
- * @see <a href="https://developers.stellar.org/docs/learn/encyclopedia/security/authorization/">Smart Contract Authorization</a>
+ * Emitting `ADDRESS_V2` or `ADDRESS_WITH_DELEGATES` on a network below
+ * Protocol 27 invalidates the transaction. Legacy `ADDRESS` is the default
+ * everywhere; the new arms are opt-in via the `authV2` flag on
+ * [authorizeInvocation] or via [attachDelegates].
  */
 object Auth {
 
+    // ============================================================================
+    // Public API — authorizeEntry overloads
+    // ============================================================================
+
     /**
-     * Authorizes an existing authorization entry using a KeyPair.
+     * Authorizes an existing authorization entry (base64) using a KeyPair.
      *
-     * This "fills out" the authorization entry with a signature, indicating to the
-     * InvokeHostFunctionOperation it's attached to that:
-     * - a particular identity (signing KeyPair) approves
-     * - the execution of an invocation tree
-     * - on a particular network (replay protection)
-     * - until a particular ledger sequence is reached
-     *
-     * @param entry The base64 encoded unsigned Soroban authorization entry
-     * @param signer The KeyPair to sign with (must correspond to the address in the entry)
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if entry cannot be decoded or signature verification fails
+     * @param entry Base64-encoded unsigned Soroban authorization entry
+     * @param signer KeyPair to sign with
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param network Network for replay protection
+     * @param options Signing options; see [AuthOptions]
+     * @return Signed authorization entry
+     * @throws IllegalArgumentException if the entry cannot be decoded or the signature is invalid
      */
     suspend fun authorizeEntry(
         entry: String,
         signer: KeyPair,
         validUntilLedgerSeq: Long,
-        network: Network
+        network: Network,
+        options: AuthOptions = AuthOptions()
     ): SorobanAuthorizationEntryXdr {
         val entryXdr = try {
             SorobanAuthorizationEntryXdr.fromXdrBase64(entry)
         } catch (e: Exception) {
             throw IllegalArgumentException("Unable to convert entry to SorobanAuthorizationEntry", e)
         }
-        return authorizeEntry(entryXdr, signer, validUntilLedgerSeq, network)
+        return authorizeEntry(entryXdr, signer, validUntilLedgerSeq, network, options)
     }
 
     /**
      * Authorizes an existing authorization entry using a KeyPair.
      *
-     * This "fills out" the authorization entry with a signature, indicating to the
-     * InvokeHostFunctionOperation it's attached to that:
-     * - a particular identity (signing KeyPair) approves
-     * - the execution of an invocation tree
-     * - on a particular network (replay protection)
-     * - until a particular ledger sequence is reached
-     *
-     * @param entry The unsigned Soroban authorization entry
-     * @param signer The KeyPair to sign with (must correspond to the address in the entry)
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if signature verification fails
+     * @param entry Unsigned Soroban authorization entry
+     * @param signer KeyPair to sign with
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param network Network for replay protection
+     * @param options Signing options; see [AuthOptions]
+     * @return Signed authorization entry
+     * @throws IllegalArgumentException if the signature is invalid
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
         signer: KeyPair,
         validUntilLedgerSeq: Long,
-        network: Network
+        network: Network,
+        options: AuthOptions = AuthOptions()
     ): SorobanAuthorizationEntryXdr {
         val entrySigner = Signer { preimage ->
-            val data = preimage.toXdrByteArray()
-            val payload = Util.hash(data)
+            val payload = Util.hash(preimage.toXdrByteArray())
             val signature = signer.sign(payload)
             Signature(signer.getAccountId(), signature)
         }
-        return authorizeEntry(entry, entrySigner, validUntilLedgerSeq, network)
+        return authorizeEntry(entry, entrySigner, validUntilLedgerSeq, network, options)
     }
 
     /**
-     * Authorizes an existing authorization entry using a custom Signer.
+     * Authorizes an existing authorization entry (base64) using a custom [Signer].
      *
-     * This "fills out" the authorization entry with a signature, indicating to the
-     * InvokeHostFunctionOperation it's attached to that:
-     * - a particular identity (custom Signer) approves
-     * - the execution of an invocation tree
-     * - on a particular network (replay protection)
-     * - until a particular ledger sequence is reached
-     *
-     * @param entry The base64 encoded unsigned Soroban authorization entry
-     * @param signer A function that signs the hash of a HashIDPreimage
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if entry cannot be decoded or signature verification fails
+     * @param entry Base64-encoded unsigned Soroban authorization entry
+     * @param signer Custom signer
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param network Network for replay protection
+     * @param options Signing options; see [AuthOptions]
+     * @return Signed authorization entry
+     * @throws IllegalArgumentException if the entry cannot be decoded or the signature is invalid
      */
     suspend fun authorizeEntry(
         entry: String,
         signer: Signer,
         validUntilLedgerSeq: Long,
-        network: Network
+        network: Network,
+        options: AuthOptions = AuthOptions()
     ): SorobanAuthorizationEntryXdr {
         val entryXdr = try {
             SorobanAuthorizationEntryXdr.fromXdrBase64(entry)
         } catch (e: Exception) {
             throw IllegalArgumentException("Unable to convert entry to SorobanAuthorizationEntry", e)
         }
-        return authorizeEntry(entryXdr, signer, validUntilLedgerSeq, network)
+        return authorizeEntry(entryXdr, signer, validUntilLedgerSeq, network, options)
     }
 
     /**
-     * Authorizes an existing authorization entry using a custom Signer.
+     * Authorizes an existing authorization entry using a custom [Signer].
      *
-     * This "fills out" the authorization entry with a signature, indicating to the
-     * InvokeHostFunctionOperation it's attached to that:
-     * - a particular identity (custom Signer) approves
-     * - the execution of an invocation tree
-     * - on a particular network (replay protection)
-     * - until a particular ledger sequence is reached
-     *
-     * @param entry The unsigned Soroban authorization entry
-     * @param signer A function that signs the hash of a HashIDPreimage
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if signature verification fails
+     * @param entry Unsigned Soroban authorization entry
+     * @param signer Custom signer
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param network Network for replay protection
+     * @param options Signing options; see [AuthOptions]
+     * @return Signed authorization entry
+     * @throws IllegalArgumentException if the signature is invalid
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
         signer: Signer,
         validUntilLedgerSeq: Long,
-        network: Network
+        network: Network,
+        options: AuthOptions = AuthOptions()
     ): SorobanAuthorizationEntryXdr {
-        return authorizeEntryInternal(entry, signer, validUntilLedgerSeq, network)
+        return authorizeEntryInternal(entry, signer, validUntilLedgerSeq, network, options)
     }
 
+    // ============================================================================
+    // Public API — authorizeInvocation
+    // ============================================================================
+
     /**
-     * Builds and authorizes a new entry from scratch using a KeyPair.
+     * Builds and signs a new authorization entry from scratch using a KeyPair.
      *
-     * This builds an entry from scratch, allowing you to express authorization as a function of:
-     * - a particular identity (signing KeyPair)
-     * - approving the execution of an invocation tree
-     * - on a particular network
-     * - until a particular ledger sequence is reached
-     *
-     * @param signer The KeyPair to sign with
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param invocation The invocation tree being authorized (typically from simulation)
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if authorization fails
+     * @param signer KeyPair to sign with
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param invocation Invocation tree being authorized (typically from simulation)
+     * @param network Network for replay protection
+     * @param authV2 When true, creates ADDRESS_V2 credentials instead of the legacy
+     *   ADDRESS arm. ADDRESS_V2 requires Protocol 27 or later; emitting it on an
+     *   older network invalidates the transaction.
+     * @return Signed authorization entry
      */
     suspend fun authorizeInvocation(
         signer: KeyPair,
         validUntilLedgerSeq: Long,
         invocation: SorobanAuthorizedInvocationXdr,
-        network: Network
+        network: Network,
+        authV2: Boolean = false
     ): SorobanAuthorizationEntryXdr {
         val entrySigner = Signer { preimage ->
             val payload = Util.hash(preimage.toXdrByteArray())
@@ -219,54 +176,132 @@ object Auth {
             signer.getAccountId(),
             validUntilLedgerSeq,
             invocation,
-            network
+            network,
+            authV2
         )
     }
 
     /**
-     * Builds and authorizes a new entry from scratch using a custom Signer.
+     * Builds and signs a new authorization entry from scratch using a custom [Signer].
      *
-     * This builds an entry from scratch, allowing you to express authorization as a function of:
-     * - a particular identity (custom Signer)
-     * - approving the execution of an invocation tree
-     * - on a particular network
-     * - until a particular ledger sequence is reached
-     *
-     * @param signer A function that signs the hash of a HashIDPreimage
-     * @param publicKey The public identity of the signer (G... address)
-     * @param validUntilLedgerSeq The exclusive future ledger sequence until which this is valid
-     * @param invocation The invocation tree being authorized (typically from simulation)
-     * @param network The network (incorporated into the signature for replay protection)
-     * @return A signed Soroban authorization entry
-     * @throws IllegalArgumentException if authorization fails
+     * @param signer Custom signer
+     * @param publicKey Public identity of the signer (G... address)
+     * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
+     * @param invocation Invocation tree being authorized (typically from simulation)
+     * @param network Network for replay protection
+     * @param authV2 When true, creates ADDRESS_V2 credentials instead of the legacy
+     *   ADDRESS arm. ADDRESS_V2 requires Protocol 27 or later; emitting it on an
+     *   older network invalidates the transaction.
+     * @return Signed authorization entry
      */
     suspend fun authorizeInvocation(
         signer: Signer,
         publicKey: String,
         validUntilLedgerSeq: Long,
         invocation: SorobanAuthorizedInvocationXdr,
-        network: Network
+        network: Network,
+        authV2: Boolean = false
     ): SorobanAuthorizationEntryXdr {
         val nonce = generateNonce()
+        val addressCredentials = SorobanAddressCredentialsXdr(
+            address = Address(publicKey).toSCAddress(),
+            nonce = Int64Xdr(nonce),
+            signatureExpirationLedger = Uint32Xdr(validUntilLedgerSeq.toUInt()),
+            signature = Scv.toVoid()
+        )
+        val credentials = if (authV2) {
+            SorobanCredentialsXdr.AddressV2(addressCredentials)
+        } else {
+            SorobanCredentialsXdr.Address(addressCredentials)
+        }
         val entry = SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(
-                SorobanAddressCredentialsXdr(
-                    address = Address(publicKey).toSCAddress(),
-                    nonce = Int64Xdr(nonce),
-                    signatureExpirationLedger = Uint32Xdr(validUntilLedgerSeq.toUInt()),
-                    signature = Scv.toVoid()
-                )
-            ),
+            credentials = credentials,
             rootInvocation = invocation
         )
         return authorizeEntry(entry, signer, validUntilLedgerSeq, network)
     }
 
+    // ============================================================================
+    // Public API — delegate tree construction
+    // ============================================================================
+
     /**
-     * A signature, consisting of a public key and a signature.
+     * Constructs a WITH_DELEGATES authorization entry from an ADDRESS or ADDRESS_V2
+     * entry, attaching a sorted, validated delegate tree.
      *
-     * @property publicKey The signer's account ID (G... address)
-     * @property signature The 64-byte Ed25519 signature
+     * The [delegates] list (and every nested delegate array) is sorted ascending by
+     * the XDR-encoded bytes of each delegate's [SCAddressXdr]. This order is required
+     * by the host; strkey ordering differs (G... < C... as strings, but ACCOUNT <
+     * CONTRACT by XDR discriminant, so account addresses sort before contract
+     * addresses under XDR byte comparison).
+     *
+     * Within any single delegate array, duplicate addresses are rejected. The same
+     * address may appear at different nesting levels.
+     *
+     * The top-level signature in the returned entry is void; call [authorizeEntry]
+     * (with [AuthOptions.forAddress] = null to sign the top-level, or set to a
+     * delegate's address to sign that node) to add signatures.
+     *
+     * After attaching delegates the initial simulation does not include the delegate
+     * authorization. Re-simulate in enforcing mode to capture the updated resource
+     * usage before submitting (see CAP-0071-01 Appendix).
+     *
+     * @param entry Source entry with ADDRESS or ADDRESS_V2 credentials. Throws if the
+     *   entry already carries AddressWithDelegates credentials.
+     * @param validUntilLedgerSeq Expiration ledger sequence for the top-level credentials
+     * @param delegates Delegate descriptors; sorted and duplicate-checked on construction
+     * @return A new entry with AddressWithDelegates credentials and void top-level signature
+     * @throws IllegalArgumentException if the entry already has AddressWithDelegates
+     *   credentials, if the source entry has Void credentials, if any address is invalid
+     *   or muxed, or if duplicates exist within a single delegate array
+     */
+    fun attachDelegates(
+        entry: SorobanAuthorizationEntryXdr,
+        validUntilLedgerSeq: Long,
+        delegates: List<DelegateDescriptor>
+    ): SorobanAuthorizationEntryXdr {
+        require(entry.credentials !is SorobanCredentialsXdr.AddressWithDelegates) {
+            "Entry already has AddressWithDelegates credentials; cannot re-attach delegates"
+        }
+        val baseCredentials = entry.credentials.requireAddressCredentials()
+
+        val xdrDelegates = sortAndValidateDelegates(delegates.map { it.toXdr() })
+
+        val updatedBase = baseCredentials.copy(
+            signatureExpirationLedger = Uint32Xdr(validUntilLedgerSeq.toUInt()),
+            signature = Scv.toVoid()
+        )
+        val newCredentials = SorobanCredentialsXdr.AddressWithDelegates(
+            SorobanAddressCredentialsWithDelegatesXdr(
+                addressCredentials = updatedBase,
+                delegates = xdrDelegates
+            )
+        )
+        return entry.copy(credentials = newCredentials)
+    }
+
+    // ============================================================================
+    // Public types
+    // ============================================================================
+
+    /**
+     * Options controlling [authorizeEntry] behavior.
+     *
+     * @property forAddress When null (default), the top-level credential address is
+     *   signed. When set to a StrKey address, the signature is routed to every node
+     *   in the credential tree (top-level or delegate, depth-first) whose address
+     *   matches; throws if no matching node is found. Muxed (M...) addresses are
+     *   not valid Soroban auth addresses and are not accepted.
+     */
+    data class AuthOptions(
+        val forAddress: String? = null
+    )
+
+    /**
+     * A signature: public key and 64-byte Ed25519 signature bytes.
+     *
+     * @property publicKey Signer's account ID (G... address)
+     * @property signature 64-byte Ed25519 signature
      */
     data class Signature(
         val publicKey: String,
@@ -289,129 +324,240 @@ object Auth {
     }
 
     /**
-     * An interface for signing a HashIDPreimage to produce a signature.
+     * Signs a [HashIDPreimageXdr] and returns the resulting [Signature].
      *
-     * This enables custom signing logic such as:
-     * - Hardware wallet signing
-     * - Multi-signature coordination
-     * - Custom key management systems
+     * Typical implementation:
+     * 1. Encode the preimage to bytes and hash with SHA-256
+     * 2. Sign the 32-byte hash with Ed25519
+     * 3. Return the public key and signature
      *
-     * ## Implementation Example
-     * ```kotlin
-     * val signer = object : Auth.Signer {
-     *     override suspend fun sign(preimage: HashIDPreimageXdr): Auth.Signature {
-     *         // 1. Convert preimage to bytes and hash
-     *         val payload = Util.hash(preimage.toXdrByteArray())
-     *         // 2. Sign with your custom method
-     *         val signature = myHardwareWallet.sign(payload)
-     *         // 3. Return signature with public key
-     *         return Auth.Signature("G...", signature)
-     *     }
-     * }
-     * ```
+     * The same preimage hash is used for every node in a WITH_DELEGATES tree;
+     * callers signing delegate nodes receive the same preimage as the top-level
+     * signer.
      */
     fun interface Signer {
         /**
-         * Signs a HashIDPreimage and returns the signature.
-         *
-         * The implementation should:
-         * 1. Convert the preimage to XDR bytes
-         * 2. Hash the bytes with SHA-256
-         * 3. Sign the hash with Ed25519
-         * 4. Return the public key and signature
-         *
          * @param preimage The hash preimage to sign
-         * @return The signature containing public key and signature bytes
+         * @return Signature containing public key and signature bytes
          */
         suspend fun sign(preimage: HashIDPreimageXdr): Signature
     }
 
     // ============================================================================
-    // Internal Helper Methods
+    // Internal implementation
     // ============================================================================
 
     /**
-     * Core authorization logic that handles signing an entry.
+     * Core authorization logic.
      *
-     * @param entry The authorization entry to sign
-     * @param signer The signer function
-     * @param validUntilLedgerSeq The expiration ledger sequence
-     * @param network The network for replay protection
-     * @return A signed authorization entry
+     * Source-account (Void) credentials are returned unchanged (clone only).
+     * For all three address arms, expiration is set before hashing, and the
+     * preimage type is selected per the arm. When [AuthOptions.forAddress] is
+     * set, the signature is routed into every matching node in the tree; when
+     * null the top-level credentials are signed.
      */
     private suspend fun authorizeEntryInternal(
         entry: SorobanAuthorizationEntryXdr,
         signer: Signer,
         validUntilLedgerSeq: Long,
-        network: Network
+        network: Network,
+        options: AuthOptions = AuthOptions()
     ): SorobanAuthorizationEntryXdr {
-        // 1. Clone the entry to avoid mutation
         val clone = cloneEntry(entry)
 
-        // 2. Check if credentials are address-based (only type we can sign)
-        if (clone.credentials !is SorobanCredentialsXdr.Address) {
-            return clone
-        }
+        // Source-account credentials need no signing.
+        val addressCredentials = clone.credentials.addressCredentials()
+            ?: return clone
 
-        // 3. Update signature expiration in credentials
-        val addressCredentials = (clone.credentials as SorobanCredentialsXdr.Address).value
+        // Set expiration before building the preimage — the network reconstructs
+        // the preimage from the submitted credentials, so the expiration value
+        // must be present at hash time.
         val updatedCredentials = addressCredentials.copy(
             signatureExpirationLedger = Uint32Xdr(validUntilLedgerSeq.toUInt())
         )
 
-        // 4. Build the hash preimage
         val preimage = buildHashIDPreimage(
+            credentials = clone.credentials.withUpdatedAddressCredentials(updatedCredentials),
             networkId = network.networkId(),
-            nonce = updatedCredentials.nonce,
-            invocation = clone.rootInvocation,
-            signatureExpirationLedger = updatedCredentials.signatureExpirationLedger
+            invocation = clone.rootInvocation
         )
 
-        // 5. Sign the preimage
         val signature = signer.sign(preimage)
-
-        // 6. Verify the signature
         verifySignature(preimage, signature)
 
-        // 7. Build the signature SCVal by APPENDING to existing signatures
-        val signatureScVal = buildSignatureScVal(signature, updatedCredentials.signature)
-        val signedCredentials = updatedCredentials.copy(signature = signatureScVal)
+        val targetAddress = options.forAddress
 
-        // 8. Return the signed entry
-        return clone.copy(credentials = SorobanCredentialsXdr.Address(signedCredentials))
+        return if (targetAddress == null) {
+            // Sign the top-level credentials.
+            val newSig = buildSignatureScVal(signature, updatedCredentials.signature)
+            val signedCredentials = updatedCredentials.copy(signature = newSig)
+            clone.copy(credentials = clone.credentials.withUpdatedAddressCredentials(signedCredentials))
+        } else {
+            // Route the signature to every node whose address matches targetAddress.
+            signForAddress(clone, updatedCredentials, signature, preimage, targetAddress)
+        }
     }
 
     /**
-     * Builds a HashIDPreimage for Soroban authorization signing.
+     * Routes a signature to every node in the credential tree whose address
+     * matches [targetAddress] (StrKey).
      *
-     * @param networkId The SHA-256 hash of the network passphrase
-     * @param nonce The nonce from the address credentials
-     * @param invocation The invocation tree being authorized
-     * @param signatureExpirationLedger The signature expiration ledger sequence
-     * @return A HashIDPreimage ready for signing
+     * Checks both the top-level credential address and every delegate node
+     * (depth-first). Throws if no matching node is found. The top-level
+     * expiration is always set; signature is only appended to matching nodes.
+     *
+     * Muxed (M...) target addresses are rejected; they are not valid Soroban
+     * auth addresses.
      */
-    private fun buildHashIDPreimage(
-        networkId: ByteArray,
-        nonce: Int64Xdr,
-        invocation: SorobanAuthorizedInvocationXdr,
-        signatureExpirationLedger: Uint32Xdr
-    ): HashIDPreimageXdr {
-        return HashIDPreimageXdr.SorobanAuthorization(
-            HashIDPreimageSorobanAuthorizationXdr(
-                networkId = HashXdr(networkId),
-                nonce = nonce,
-                signatureExpirationLedger = signatureExpirationLedger,
-                invocation = invocation
-            )
-        )
+    private fun signForAddress(
+        clone: SorobanAuthorizationEntryXdr,
+        updatedTopCredentials: SorobanAddressCredentialsXdr,
+        signature: Signature,
+        preimage: HashIDPreimageXdr,
+        targetAddress: String
+    ): SorobanAuthorizationEntryXdr {
+        val targetAddr = Address(targetAddress)
+        require(targetAddr.addressType != Address.AddressType.MUXED_ACCOUNT) {
+            "Muxed (M...) addresses are not valid Soroban auth addresses: $targetAddress"
+        }
+        val targetBytes = targetAddr.toSCAddress().toXdrBytes()
+
+        val topLevelBytes = updatedTopCredentials.address.toXdrBytes()
+        val topLevelMatches = topLevelBytes.contentEquals(targetBytes)
+
+        // For AddressWithDelegates, also traverse the delegate tree.
+        val delegateMatchFound = when (clone.credentials) {
+            is SorobanCredentialsXdr.AddressWithDelegates -> {
+                val delegates = clone.credentials.value.delegates
+                findDelegateNodes(delegates, targetBytes).isNotEmpty()
+            }
+            else -> false
+        }
+
+        require(topLevelMatches || delegateMatchFound) {
+            "No node in the credential tree matches the target address: $targetAddress"
+        }
+
+        val newCredentials: SorobanCredentialsXdr = when (clone.credentials) {
+            is SorobanCredentialsXdr.Void -> {
+                // Unreachable: caller already returned early for Void.
+                clone.credentials
+            }
+            is SorobanCredentialsXdr.Address -> {
+                val newSig = if (topLevelMatches) {
+                    buildSignatureScVal(signature, updatedTopCredentials.signature)
+                } else {
+                    updatedTopCredentials.signature
+                }
+                SorobanCredentialsXdr.Address(updatedTopCredentials.copy(signature = newSig))
+            }
+            is SorobanCredentialsXdr.AddressV2 -> {
+                val newSig = if (topLevelMatches) {
+                    buildSignatureScVal(signature, updatedTopCredentials.signature)
+                } else {
+                    updatedTopCredentials.signature
+                }
+                SorobanCredentialsXdr.AddressV2(updatedTopCredentials.copy(signature = newSig))
+            }
+            is SorobanCredentialsXdr.AddressWithDelegates -> {
+                val topSig = if (topLevelMatches) {
+                    buildSignatureScVal(signature, updatedTopCredentials.signature)
+                } else {
+                    updatedTopCredentials.signature
+                }
+                val updatedTopWithSig = updatedTopCredentials.copy(signature = topSig)
+
+                val updatedDelegates = clone.credentials.value.delegates.mapMatchingDelegates(targetBytes) { node ->
+                    node.copy(signature = buildSignatureScVal(signature, node.signature))
+                }
+
+                SorobanCredentialsXdr.AddressWithDelegates(
+                    SorobanAddressCredentialsWithDelegatesXdr(
+                        addressCredentials = updatedTopWithSig,
+                        delegates = updatedDelegates
+                    )
+                )
+            }
+        }
+
+        return clone.copy(credentials = newCredentials)
     }
 
+    // ============================================================================
+    // Preimage builder — the single construction point for all signing code
+    // ============================================================================
+
     /**
-     * Verifies that a signature is valid for the given preimage.
+     * Builds the [HashIDPreimageXdr] for a Soroban authorization entry.
      *
-     * @param preimage The hash preimage that was signed
-     * @param signature The signature to verify
-     * @throws IllegalArgumentException if signature verification fails
+     * Preimage type is determined by the credential arm:
+     * - [SorobanCredentialsXdr.Address] -> [HashIDPreimageXdr.SorobanAuthorization]
+     *   (legacy; ENVELOPE_TYPE_SOROBAN_AUTHORIZATION, not address-bound)
+     * - [SorobanCredentialsXdr.AddressV2] and [SorobanCredentialsXdr.AddressWithDelegates]
+     *   -> [HashIDPreimageXdr.SorobanAuthorizationWithAddress]
+     *   (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS; address is always the
+     *   top-level credential address, never a delegate address)
+     *
+     * The [signatureExpirationLedger] in [credentials] must already be set to the
+     * correct value before calling this function; the network reconstructs the
+     * preimage from the submitted credentials.
+     *
+     * Exhaustive over [SorobanCredentialsXdr] arms.
+     */
+    internal fun buildHashIDPreimage(
+        credentials: SorobanCredentialsXdr,
+        networkId: ByteArray,
+        invocation: SorobanAuthorizedInvocationXdr
+    ): HashIDPreimageXdr = when (credentials) {
+        is SorobanCredentialsXdr.Void ->
+            throw IllegalArgumentException(
+                "Cannot build a hash preimage for source-account (Void) credentials"
+            )
+        is SorobanCredentialsXdr.Address -> {
+            val c = credentials.value
+            HashIDPreimageXdr.SorobanAuthorization(
+                HashIDPreimageSorobanAuthorizationXdr(
+                    networkId = HashXdr(networkId),
+                    nonce = c.nonce,
+                    signatureExpirationLedger = c.signatureExpirationLedger,
+                    invocation = invocation
+                )
+            )
+        }
+        is SorobanCredentialsXdr.AddressV2 -> {
+            val c = credentials.value
+            HashIDPreimageXdr.SorobanAuthorizationWithAddress(
+                HashIDPreimageSorobanAuthorizationWithAddressXdr(
+                    networkId = HashXdr(networkId),
+                    nonce = c.nonce,
+                    signatureExpirationLedger = c.signatureExpirationLedger,
+                    address = c.address,
+                    invocation = invocation
+                )
+            )
+        }
+        is SorobanCredentialsXdr.AddressWithDelegates -> {
+            val c = credentials.value.addressCredentials
+            HashIDPreimageXdr.SorobanAuthorizationWithAddress(
+                HashIDPreimageSorobanAuthorizationWithAddressXdr(
+                    networkId = HashXdr(networkId),
+                    nonce = c.nonce,
+                    signatureExpirationLedger = c.signatureExpirationLedger,
+                    address = c.address,
+                    invocation = invocation
+                )
+            )
+        }
+    }
+
+    // ============================================================================
+    // Private helpers
+    // ============================================================================
+
+    /**
+     * Verifies that [signature] is a valid Ed25519 signature for [preimage].
+     *
+     * @throws IllegalArgumentException if verification fails
      */
     private suspend fun verifySignature(
         preimage: HashIDPreimageXdr,
@@ -419,51 +565,36 @@ object Auth {
     ) {
         val payload = Util.hash(preimage.toXdrByteArray())
         val keyPair = KeyPair.fromAccountId(signature.publicKey)
-
         if (!keyPair.verify(payload, signature.signature)) {
             throw IllegalArgumentException("Signature does not match payload")
         }
     }
 
     /**
-     * Builds a signature SCVal structure per Stellar account contract specification.
+     * Appends a new `{public_key, signature}` map element to the existing signature
+     * SCVal, returning the updated vector.
      *
-     * The structure is: Vec<Map<Symbol, Bytes>> where the map contains:
-     * - "public_key": Bytes (32-byte Ed25519 public key)
-     * - "signature": Bytes (64-byte Ed25519 signature)
+     * When [existingSignature] is void, the result is a one-element vector.
+     * When it is already a Vec, the new element is appended at the end (call order).
+     * The existing elements are never reordered or removed.
      *
-     * **Important**: This method APPENDS the new signature to any existing signatures
-     * in the credentials, matching the Flutter SDK behavior. This is critical for
-     * multi-party authorization scenarios (e.g., atomic swaps).
-     *
-     * @see <a href="https://developers.stellar.org/docs/learn/encyclopedia/contract-development/contract-interactions/stellar-transaction#stellar-account-signatures">Stellar Account Signatures</a>
-     * @param signature The signature containing public key and signature bytes
-     * @param existingSignature The existing signature SCVal from the credentials (may contain prior signatures)
-     * @return An SCVal containing the signature structure with all signatures (existing + new)
+     * Callers that need ascending public-key order (G-address, medium-threshold
+     * multi-sig) must supply signatures in that order across successive calls.
      */
     private fun buildSignatureScVal(signature: Signature, existingSignature: SCValXdr): SCValXdr {
         val publicKeyBytes = KeyPair.fromAccountId(signature.publicKey).getPublicKey()
-
-        // Build the new signature map
         val newSigMap = linkedMapOf(
             Scv.toSymbol("public_key") to Scv.toBytes(publicKeyBytes),
             Scv.toSymbol("signature") to Scv.toBytes(signature.signature)
         )
 
-        // Collect existing signatures from the Vec (if any)
-        val existingSignatures = mutableListOf<SCValXdr>()
+        val existingElements = mutableListOf<SCValXdr>()
         if (existingSignature is SCValXdr.Vec) {
             val vec = existingSignature.value?.value
-            if (vec != null) {
-                existingSignatures.addAll(vec)
-            }
+            if (vec != null) existingElements.addAll(vec)
         }
-
-        // Append the new signature to existing signatures
-        existingSignatures.add(Scv.toMap(newSigMap))
-
-        // Return a Vec containing all signatures
-        return Scv.toVec(existingSignatures)
+        existingElements.add(Scv.toMap(newSigMap))
+        return Scv.toVec(existingElements)
     }
 
     /**
@@ -471,29 +602,19 @@ object Auth {
      *
      * Uses the platform's Ed25519 crypto implementation to generate 32 random bytes,
      * then converts the first 8 bytes to a Long.
-     *
-     * @return A random Long suitable for use as a nonce
      */
     private suspend fun generateNonce(): Long {
-        // Use the existing crypto infrastructure for secure random generation
-        val randomBytes = getEd25519Crypto().generatePrivateKey() // 32 bytes
-
-        // Convert first 8 bytes to Long
+        val randomBytes = getEd25519Crypto().generatePrivateKey()
         var nonce = 0L
         for (i in 0..7) {
             nonce = (nonce shl 8) or (randomBytes[i].toLong() and 0xFF)
         }
-
         return nonce
     }
 
     /**
-     * Creates a deep copy of a SorobanAuthorizationEntry.
+     * Creates a deep copy of a [SorobanAuthorizationEntryXdr] via XDR round-trip.
      *
-     * This ensures we don't mutate the input parameter.
-     *
-     * @param entry The entry to clone
-     * @return A deep copy of the entry
      * @throws IllegalArgumentException if cloning fails
      */
     private fun cloneEntry(entry: SorobanAuthorizationEntryXdr): SorobanAuthorizationEntryXdr {
@@ -507,9 +628,7 @@ object Auth {
     }
 
     /**
-     * Converts an XDR object to its byte array representation.
-     *
-     * @return The XDR-encoded byte array
+     * XDR-encodes this [HashIDPreimageXdr] to a byte array.
      */
     private fun HashIDPreimageXdr.toXdrByteArray(): ByteArray {
         val writer = XdrWriter()
@@ -518,9 +637,7 @@ object Auth {
     }
 
     /**
-     * Converts an XDR object to its byte array representation.
-     *
-     * @return The XDR-encoded byte array
+     * XDR-encodes this [SorobanAuthorizationEntryXdr] to a byte array.
      */
     private fun SorobanAuthorizationEntryXdr.toXdrByteArray(): ByteArray {
         val writer = XdrWriter()

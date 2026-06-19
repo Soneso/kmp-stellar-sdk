@@ -62,6 +62,110 @@ val signedEntry = Auth.authorizeEntry(
 )
 ```
 
+### Protocol 27 Authorization Arms (CAP-71)
+
+A Soroban authorization entry carries one of three address credential arms:
+
+- `Address` (the default, `SOROBAN_CREDENTIALS_ADDRESS`) — valid on every network.
+- `AddressV2` (`SOROBAN_CREDENTIALS_ADDRESS_V2`) — the same fields, but the
+  signature is bound to the credential address. Valid only on Protocol 27+.
+- `AddressWithDelegates` (`SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES`) — adds a
+  recursive tree of delegate signatures. Valid only on Protocol 27+.
+
+Emitting a V2 or WITH_DELEGATES entry on a pre-27 network invalidates the
+transaction, so the legacy `Address` arm stays the default. Opt into V2 only
+when you target a Protocol 27+ network.
+
+**Signing a legacy entry** is unchanged — `Auth.authorizeEntry` signs the
+top-level address, whatever the arm:
+
+```kotlin
+val signed = Auth.authorizeEntry(
+    entry = authEntryFromSimulation,
+    signer = aliceKeyPair,
+    validUntilLedgerSeq = currentLedger + 100L,
+    network = Network.PUBLIC
+)
+```
+
+**Opting into V2** is client-side. Simulation returns legacy `Address` auth
+entries; build the address-bound `AddressV2` arm with `Auth.authorizeInvocation`:
+
+```kotlin
+val signed = Auth.authorizeInvocation(
+    signer = aliceKeyPair,
+    validUntilLedgerSeq = currentLedger + 100L,
+    invocation = invocationFromSimulation,
+    network = Network.PUBLIC,
+    authV2 = true
+)
+```
+
+`AddressV2` is only valid on Protocol 27+ networks; emitting it on an older
+network invalidates the transaction.
+
+**Building a delegated entry.** Simulation never returns a delegate tree; you
+assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and
+`DelegateDescriptor`, then sign each node with `AuthOptions(forAddress = ...)`:
+
+```kotlin
+import com.soneso.stellar.sdk.Auth
+import com.soneso.stellar.sdk.DelegateDescriptor
+
+// Attach a sorted, validated delegate tree to a base entry (top-level signature
+// stays void). Delegates may nest further via DelegateDescriptor.nestedDelegates.
+val delegated = Auth.attachDelegates(
+    entry = authEntryFromSimulation,
+    validUntilLedgerSeq = currentLedger + 100L,
+    delegates = listOf(
+        DelegateDescriptor(address = delegateKeyPair.getAccountId())
+    )
+)
+
+// Sign the delegate node: forAddress routes the signature to every matching node.
+val withDelegateSig = Auth.authorizeEntry(
+    entry = delegated,
+    signer = delegateKeyPair,
+    validUntilLedgerSeq = currentLedger + 100L,
+    network = Network.PUBLIC,
+    options = Auth.AuthOptions(forAddress = delegateKeyPair.getAccountId())
+)
+
+// Optionally also sign the top-level address (forAddress = null, the default).
+// A delegates-only entry whose top-level signature stays void is legitimate.
+```
+
+**Submitting V2 or delegated entries.** Simulation and the high-level
+`ContractClient` / `AssembledTransaction` only emit legacy `Address` entries, so
+the V2 and delegate arms built above are also submitted at the `SorobanServer`
+level. Attach the signed entries to the operation, then **re-simulate in
+enforcing mode** before submitting: when the authorizing address is a contract
+account, its `__check_auth` runs only in the enforcing pass, and the storage it
+reads (plus any delegate account entries) must be in the footprint.
+
+```kotlin
+val signedOp = InvokeHostFunctionOperation(
+    hostFunction = operation.hostFunction,
+    auth = signedEntries
+)
+// Rebuild the transaction with the signed auth, then re-simulate. With auth
+// present the RPC simulates in enforcing mode and returns the full footprint.
+val rebuiltTransaction = TransactionBuilder(sourceAccount = account, network = Network.PUBLIC)
+    .addOperation(signedOp)
+    .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+    .build()
+val enforcing = sorobanServer.simulateTransaction(rebuiltTransaction)
+val prepared = sorobanServer.prepareTransaction(rebuiltTransaction, enforcing)
+prepared.sign(sourceKeyPair)
+sorobanServer.sendTransaction(prepared)
+```
+
+When converting a simulated `Address` entry to `AddressV2` in place, reuse its
+nonce (rebuild the credentials on the `AddressV2` arm); a fresh nonce will not
+match the original simulation, so it then relies on the enforcing re-simulation
+above.
+
 ### Multi-Signature Contract Workflows with buildInvoke
 
 Use `buildInvoke` for complex multi-signature scenarios:
@@ -114,6 +218,32 @@ for (entry in signedEntries) {
     }
 }
 val result = assembled.signAndSubmit(sourceKeypair)
+```
+
+For collecting the addresses that still need to sign, prefer
+`needsNonInvokerSigningBy()` over inspecting credential arms by hand: it walks
+all three arms (`Address`, `AddressV2`, `AddressWithDelegates`) and, for delegate
+trees, reports every unsigned delegate node alongside the top-level address.
+`signAuthEntries(keyPair)` then signs every entry whose top-level address or any
+delegate node matches the signer:
+
+```kotlin
+val assembled = swapClient.buildInvoke<Unit>(
+    functionName = "swap",
+    arguments = swapParams,
+    source = invokerAccount,
+    signer = invokerKeyPair
+)
+assembled.simulate()
+
+// Addresses still needing a signature — top-level and delegate nodes alike.
+val pending: Set<String> = assembled.needsNonInvokerSigningBy()
+
+// Each signer signs its own entries; a delegate signer is routed to its node.
+if (aliceKeyPair.getAccountId() in pending) assembled.signAuthEntries(aliceKeyPair)
+if (delegateKeyPair.getAccountId() in pending) assembled.signAuthEntries(delegateKeyPair)
+
+val swapResult = assembled.signAndSubmit(invokerKeyPair)
 ```
 
 ### Custom Result Parsing with funcResToNative
@@ -877,6 +1007,7 @@ suspend fun authorizeCustomInvocation(
         validUntilLedgerSeq = currentLedger + 100000L,
         invocation = invocation,
         network = Network.PUBLIC
+        // authV2 = true emits ADDRESS_V2 credentials (Protocol 27+ networks only).
     )
 }
 ```

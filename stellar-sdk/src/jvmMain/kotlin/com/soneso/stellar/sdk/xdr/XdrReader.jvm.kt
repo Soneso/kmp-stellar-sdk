@@ -6,6 +6,7 @@ import java.io.DataInputStream
 
 actual class XdrReader actual constructor(input: ByteArray) {
     private val stream = DataInputStream(ByteArrayInputStream(input))
+    private var recursionDepth: Int = 0
 
     actual fun readInt(): Int = stream.readInt()
 
@@ -43,5 +44,18 @@ actual class XdrReader actual constructor(input: ByteArray) {
     actual fun readVariableOpaque(): ByteArray {
         val length = stream.readInt()
         return readFixedOpaque(length)
+    }
+
+    actual fun enterRecursion(cap: Int) {
+        recursionDepth++
+        if (recursionDepth > cap) {
+            throw IllegalArgumentException(
+                "XDR decode recursion depth $recursionDepth exceeds cap $cap"
+            )
+        }
+    }
+
+    actual fun exitRecursion() {
+        recursionDepth--
     }
 }
