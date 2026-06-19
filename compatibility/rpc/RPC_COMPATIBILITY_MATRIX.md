@@ -1,16 +1,16 @@
 # Soroban RPC vs KMP Stellar SDK Compatibility Matrix
 
-**RPC Version:** v26.0.0 (released 2026-04-03)  
-**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v26.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v26.0.0)  
-**SDK Version:** 1.7.1  
-**Generated:** 2026-06-13 07:59:00
+**RPC Version:** v27.0.0 (released 2026-06-11)  
+**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0)  
+**SDK Version:** 1.8.0  
+**Generated:** 2026-06-19 09:54:26
 
 ## Overall Coverage
 
-**Coverage:** 100.0%
+**Coverage:** 91.67%
 
-- ✅ **Fully Supported:** 12/12
-- ⚠️ **Partially Supported:** 0/12
+- ✅ **Fully Supported:** 11/12
+- ⚠️ **Partially Supported:** 1/12
 - ❌ **Not Supported:** 0/12
 
 ## Method Comparison
@@ -28,7 +28,7 @@
 | `getTransactions` | ✅ Fully Supported | `getTransactions` | 1/1 | 6/6 | All parameters and response fields implemented |
 | `getVersionInfo` | ✅ Fully Supported | `getVersionInfo` | N/A | 5/5 | All parameters and response fields implemented |
 | `sendTransaction` | ✅ Fully Supported | `sendTransaction` | 1/1 | N/A | All parameters and response fields implemented |
-| `simulateTransaction` | ✅ Fully Supported | `simulateTransaction` | 1/1 | N/A | All parameters and response fields implemented |
+| `simulateTransaction` | ⚠️ Partially Supported | `simulateTransaction` | 1/1 | N/A | Missing optional parameters: useUpgradedAuth |
 
 ## Response Field Coverage
 
@@ -46,4 +46,11 @@ Detailed breakdown of response field support per method.
 | `getTransaction` | 5 | 5 | - |
 | `getTransactions` | 6 | 6 | - |
 | `getVersionInfo` | 5 | 5 | - |
+
+## Implementation Gaps
+
+### 🟠 High Priority (1 items)
+
+- `simulateTransaction` - ⚠️ Partially Supported
+  - Missing optional parameters: useUpgradedAuth
 

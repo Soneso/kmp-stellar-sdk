@@ -2212,7 +2212,7 @@ val intoMuxedId: String?
 constructor(id: String, account: String?, accountMuxed: String? = null, accountMuxedId: String? = null, type: String, createdAt: String, pagingToken: String, links: EffectLinks)
 
 ## data AccountResponse : Response, Pageable
-constructor(val id: String, val accountId: String, val sequenceNumber: Long, val sequenceLedger: Long? = null, val sequenceTime: Long? = null, val subentryCount: Int, val inflationDestination: String? = null, val homeDomain: String? = null, val lastModifiedLedger: Int, val lastModifiedTime: String, val thresholds: Thresholds, val flags: Flags, val balances: List<Balance>, val signers: List<Signer>, val data: Map<String, String> = emptyMap(), val numSponsoring: Int? = null, val numSponsored: Int? = null, val sponsor: String? = null, pagingToken: String, val links: Links)
+constructor(val id: String, val accountId: String, val sequenceNumber: Long, val sequenceLedger: Long? = null, val sequenceTime: Long? = null, val subentryCount: Int, val inflationDestination: String? = null, val homeDomain: String? = null, val lastModifiedLedger: Int, val lastModifiedTime: String? = null, val thresholds: Thresholds, val flags: Flags, val balances: List<Balance>, val signers: List<Signer>, val data: Map<String, String> = emptyMap(), val numSponsoring: Int? = null, val numSponsored: Int? = null, val sponsor: String? = null, pagingToken: String, val links: Links)
 val id: String
 val accountId: String
 val sequenceNumber: Long
@@ -2222,7 +2222,7 @@ val subentryCount: Int
 val inflationDestination: String?
 val homeDomain: String?
 val lastModifiedLedger: Int
-val lastModifiedTime: String
+val lastModifiedTime: String?
 val thresholds: Thresholds
 val flags: Flags
 val balances: List<Balance>

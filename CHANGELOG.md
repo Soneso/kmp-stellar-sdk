@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.8.0] - 2026-06-19
 
 ### Added
 - **Protocol 27 Soroban authorization arms (CAP-71)**: Soroban authorization
@@ -49,6 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SorobanCredentialsTypeXdr` and `EnvelopeTypeXdr` gain new entries. Code with
   an exhaustive `when` over any of these public types must add branches for the
   new Protocol 27 arms (or an `else`) to compile.
+- Compatibility matrices regenerated against Horizon v27.0.0 and Soroban RPC
+  v27.0.0. The RPC `simulateTransaction` `useUpgradedAuth` parameter is
+  intentionally not yet implemented; server-side support has not shipped.
+
+### Fixed
+- `AccountResponse.lastModifiedTime` is now nullable, fixing Horizon account
+  parsing when the field is absent (#39).
 
 ## [1.7.1] - 2026-06-13
 
