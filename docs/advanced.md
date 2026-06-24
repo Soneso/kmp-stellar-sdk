@@ -88,7 +88,26 @@ val signed = Auth.authorizeEntry(
 )
 ```
 
-**Opting into V2** is client-side. Simulation returns legacy `Address` auth
+**Opting into V2 via simulation** is a request flag. A Protocol 27+ RPC that
+supports it returns `AddressV2` auth entries in recording mode; sign them the
+same way as legacy entries:
+
+```kotlin
+import com.soneso.stellar.sdk.rpc.SorobanServer
+
+val server = SorobanServer("https://soroban-testnet.stellar.org")
+val simulation = server.simulateTransaction(transaction, useUpgradedAuth = true)
+// Or, in one step:
+val prepared = server.prepareTransaction(transaction, useUpgradedAuth = true)
+```
+
+`ContractClient` exposes the same opt-in through `ClientOptions(useUpgradedAuth = true)`.
+An RPC that does not yet support the flag silently ignores it and returns legacy
+entries; detect support by inspecting the returned credential arm, never by
+catching an error.
+
+**Opting into V2 client-side** works without the request flag (or against an
+RPC that does not support it): simulation then returns legacy `Address` auth
 entries; build the address-bound `AddressV2` arm with `Auth.authorizeInvocation`:
 
 ```kotlin

@@ -16,14 +16,15 @@ import kotlin.time.Duration.Companion.seconds
  * Integration test for the Protocol 27 (CAP-71) ADDRESS_V2 credential arm against a live testnet.
  *
  * Uploads and deploys the auth contract, then invokes its `increment` function with the authorizing
- * account (the invoker) different from the transaction source. Simulation returns a legacy ADDRESS
- * authorization entry for the invoker; the entry's credential arm is converted to ADDRESS_V2
- * client-side, preserving the simulated nonce so the recorded footprint still matches, and signed
- * with [Auth.authorizeEntry]. authorizeEntry preserves the arm and signs over the address-bound
- * (WITH_ADDRESS) preimage. The transaction is submitted and the returned value is verified.
+ * account (the invoker) different from the transaction source. Simulation with `useUpgradedAuth`
+ * returns an ADDRESS_V2 authorization entry for the invoker — a hard assertion proves the flag was
+ * sent on the wire and honored by the server — and the entry is signed with [Auth.authorizeEntry],
+ * which preserves the arm and signs over the address-bound (WITH_ADDRESS) preimage. The transaction
+ * is submitted and the returned value is verified.
  *
  * ADDRESS_V2 is only valid on Protocol 27 or later, so this test requires a testnet running
- * Protocol 27 and network access to the Soroban testnet RPC and Friendbot:
+ * Protocol 27 with a stellar-rpc that honors `useUpgradedAuth` (v27.1.0+), and network access to
+ * the Soroban testnet RPC and Friendbot:
  * ```bash
  * ./gradlew :stellar-sdk:jvmTest --tests "SorobanP27AuthIntegrationTest"
  * ```
@@ -58,7 +59,8 @@ class SorobanP27AuthIntegrationTest {
         ).contractId
 
         // Build the increment invocation; the invoker differs from the source, so simulation
-        // returns an ADDRESS authorization entry for the invoker.
+        // returns an authorization entry for the invoker (with the ADDRESS_V2 arm, since
+        // useUpgradedAuth is set below).
         realDelay(5000)
         val account = sorobanServer.getAccount(submitter.getAccountId())
         assertNotNull(account, "Submitter account should be loaded")
@@ -75,7 +77,10 @@ class SorobanP27AuthIntegrationTest {
             .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
             .build()
 
-        val simulateResponse = sorobanServer.simulateTransaction(transaction)
+        // Request ADDRESS_V2 entries from the RPC. stellar-rpc v27.1.0+ honors the flag in
+        // recording mode and records ADDRESS_V2 entries; servers without support silently
+        // ignore it and return legacy ADDRESS entries.
+        val simulateResponse = sorobanServer.simulateTransaction(transaction, useUpgradedAuth = true)
         assertNull(simulateResponse.error, "Simulation should not have error")
         assertNotNull(simulateResponse.results, "Simulation results should not be null")
         assertTrue(simulateResponse.results.isNotEmpty(), "Simulation should return a result")
@@ -87,23 +92,23 @@ class SorobanP27AuthIntegrationTest {
         assertTrue(authBase64List.isNotEmpty(), "There should be at least one authorization entry")
         val simulatedEntries = authBase64List.map { SorobanAuthorizationEntryXdr.fromXdrBase64(it) }
 
+        // Testnet runs stellar-rpc v27.1.0+, so the invoker's entry must come back from
+        // simulation with the ADDRESS_V2 arm already set — this proves the flag was sent on
+        // the wire and honored by the server.
+        assertTrue(
+            simulatedEntries.any { it.credentials is SorobanCredentialsXdr.AddressV2 },
+            "Simulation must return an ADDRESS_V2 auth entry when useUpgradedAuth is set " +
+                "(requires stellar-rpc v27.1.0+)"
+        )
+
         // Set the signature expiration from the latest ledger.
         val signatureExpirationLedger = sorobanServer.getLatestLedger().sequence + 100
 
-        // Convert each ADDRESS entry to the ADDRESS_V2 arm, preserving the simulated nonce so the
-        // recorded footprint still matches, then sign with the invoker.
+        // Sign the server-returned ADDRESS_V2 entries with the invoker; authorizeEntry
+        // preserves the arm and signs over the address-bound (WITH_ADDRESS) preimage.
         val signedAuthEntries = simulatedEntries.map { entry ->
-            val addressCredentials = when (val credentials = entry.credentials) {
-                is SorobanCredentialsXdr.Address -> credentials.value
-                is SorobanCredentialsXdr.AddressV2 -> credentials.value
-                else -> fail("Expected an address-based credential arm from simulation, got $credentials")
-            }
-            val v2Entry = SorobanAuthorizationEntryXdr(
-                credentials = SorobanCredentialsXdr.AddressV2(addressCredentials),
-                rootInvocation = entry.rootInvocation
-            )
             Auth.authorizeEntry(
-                entry = v2Entry,
+                entry = entry,
                 signer = invoker,
                 validUntilLedgerSeq = signatureExpirationLedger,
                 network = network
