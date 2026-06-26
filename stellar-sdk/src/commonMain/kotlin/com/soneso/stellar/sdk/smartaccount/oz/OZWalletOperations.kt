@@ -29,7 +29,10 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 
 // MARK: - Result Types
 
@@ -465,10 +468,13 @@ class OZWalletOperations internal constructor(
                         "nativeTokenContract",
                         "nativeTokenContract is required when autoFund is true"
                     )
-                // Wait for the deployment transaction to propagate to Soroban RPC.
-                // The deploy may be confirmed on Horizon but not yet visible to
-                // RPC simulation until the next ledger close (~5s on testnet).
-                delay(5000)
+                // Wait for the deployed contract instance to propagate to the Soroban RPC.
+                // The deploy may be confirmed on Horizon but not yet visible to RPC
+                // simulation until a later ledger close. fundWallet simulates against the
+                // contract and fails if the instance is not yet applied to the RPC state,
+                // so poll the RPC until the instance is visible rather than assuming a
+                // fixed propagation delay.
+                waitForContractVisibleToRpc(contractId)
                 kit.transactionOperations.fundWallet(
                     nativeTokenContract = tokenContract,
                     forceMethod = forceMethod
@@ -1340,6 +1346,33 @@ class OZWalletOperations internal constructor(
     }
 
     /**
+     * Waits until the freshly deployed smart-account contract instance is visible to the
+     * Soroban RPC before funding.
+     *
+     * Polls the contract-instance ledger entry via [SorobanServer.getContractData] for
+     * [contractId] on the [OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS] interval, up to an
+     * overall [OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS] budget, and returns once the
+     * instance entry is observed. A null result means the contract is not yet visible (the
+     * expected pre-propagation state); transient RPC or transport errors are retried until
+     * the deadline.
+     *
+     * The lookup mirrors [verifyContractExists]: it queries the persistent contract-instance
+     * ledger key, so it observes the same structural signal the funding simulation depends on.
+     *
+     * @param contractId The deployed smart-account contract address (C-address) to wait for
+     * @throws TransactionException.Timeout if the contract is not visible within the budget
+     */
+    private suspend fun waitForContractVisibleToRpc(contractId: String) {
+        pollUntilContractVisibleToRpc(contractId) { id ->
+            kit.sorobanServer.getContractData(
+                contractId = id,
+                key = Scv.toLedgerKeyContractInstance(),
+                durability = SorobanServer.Durability.PERSISTENT
+            ) != null
+        }
+    }
+
+    /**
      * Saves a session to storage for reconnection.
      *
      * @param credentialId The Base64URL-encoded credential ID
@@ -1502,7 +1535,11 @@ class OZWalletOperations internal constructor(
 
         // Fund wallet if requested
         if (autoFund) {
-            delay(5000)
+            // Wait for the deployed contract instance to propagate to the Soroban RPC
+            // before funding. fundWallet simulates against the contract and fails if the
+            // instance is not yet applied to the RPC state, so poll the RPC until the
+            // instance is visible rather than assuming a fixed propagation delay.
+            waitForContractVisibleToRpc(contractId)
             kit.transactionOperations.fundWallet(
                 nativeTokenContract = nativeTokenContract!!,
                 forceMethod = forceMethod
@@ -1889,5 +1926,75 @@ class OZWalletOperations internal constructor(
         } else {
             SubmissionMethod.RPC
         }
+    }
+}
+
+/**
+ * Polls [isVisible] until the deployed contract instance is visible to the Soroban RPC,
+ * the timeout elapses, or the coroutine is cancelled.
+ *
+ * Used by [OZWalletOperations] after an auto-submitted deploy transaction is included in a
+ * ledger, to bridge the gap between the deploy confirming and the Soroban RPC reflecting the
+ * new contract-instance entry in its simulation state. The subsequent
+ * [OZTransactionOperations.fundWallet] simulates against the contract and fails if the
+ * instance is not yet applied to the RPC state. Polling avoids assuming a fixed propagation
+ * delay, which fails when testnet propagation is slower than the assumed wait.
+ *
+ * [isVisible] performs a single structural lookup of the contract-instance ledger entry for
+ * the supplied contract ID. It must:
+ * - return true once the contract-instance entry is present in the RPC state;
+ * - return false while the entry is absent (the expected pre-propagation state), which keeps
+ *   polling without recording a cause;
+ * - throw any exception for a transient RPC or transport error, which is retried until the
+ *   deadline and surfaced as the timeout cause.
+ *
+ * The total wait is bounded by [timeoutSeconds] (covering both lookups and the interval
+ * sleeps) and is cooperatively cancellable: [delay] and the enclosing timeout both observe
+ * cancellation, and any [CancellationException] thrown by [isVisible] is rethrown rather than
+ * treated as a transient error.
+ *
+ * @param contractId The deployed contract address (C-address) to wait for, used in the timeout message
+ * @param pollIntervalMs Delay between polls in milliseconds
+ * @param timeoutSeconds Overall budget in seconds before failing
+ * @param isVisible Suspending visibility check with the present / absent / transient-error contract above
+ * @throws TransactionException.Timeout if the contract is not visible within the budget
+ */
+internal suspend fun pollUntilContractVisibleToRpc(
+    contractId: String,
+    pollIntervalMs: Long = OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
+    timeoutSeconds: Int = OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS,
+    isVisible: suspend (String) -> Boolean
+) {
+    var lastTransientError: Throwable? = null
+
+    val completed = withTimeoutOrNull(timeoutSeconds.toLong() * 1000L) {
+        while (true) {
+            ensureActive()
+            try {
+                if (isVisible(contractId)) {
+                    return@withTimeoutOrNull
+                }
+                // Contract instance not yet visible to the RPC (the expected state while
+                // the deploy transaction propagates). Keep polling without recording a cause.
+            } catch (e: CancellationException) {
+                // Cooperative cancellation (including the enclosing timeout): never swallow
+                // it as a transient error.
+                throw e
+            } catch (e: Exception) {
+                // Transient RPC/transport error: retry until the deadline and surface the
+                // last failure as the timeout cause.
+                lastTransientError = e
+            }
+            delay(pollIntervalMs)
+        }
+    }
+
+    if (completed == null) {
+        throw TransactionException.timeout(
+            details = "Deployed contract $contractId not visible to the Soroban RPC within " +
+                "${timeoutSeconds}s after deployment; testnet propagation may be delayed. " +
+                "Retry shortly",
+            cause = lastTransientError
+        )
     }
 }

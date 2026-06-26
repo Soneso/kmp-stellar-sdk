@@ -2301,10 +2301,11 @@ class SmartAccountKitTest {
     // MARK: - Friendbot funding: poll RPC until the funded account is visible
 
     @Test
-    fun testFriendbotVisibility_constants() {
-        // The funding poll budget is fixed and must not silently drift.
-        assertEquals(1_500L, OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS)
-        assertEquals(45, OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS)
+    fun testRpcVisibility_constants() {
+        // The RPC visibility poll budget is fixed and must not silently drift. Shared by
+        // the funding-account wait and the deploy contract-instance wait.
+        assertEquals(1_500L, OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS)
+        assertEquals(45, OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS)
     }
 
     @Test
@@ -2327,7 +2328,7 @@ class SmartAccountKitTest {
         assertEquals(notFoundPolls + 1, calls)
         // It waited exactly one interval between each retry before succeeding.
         assertEquals(
-            notFoundPolls * OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
+            notFoundPolls * OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
             testScheduler.currentTime
         )
     }
@@ -2371,7 +2372,7 @@ class SmartAccountKitTest {
         // Budget consumed at the configured interval: 45s / 1.5s = 30 polls.
         assertTrue(calls > 0)
         assertEquals(
-            OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS.toLong() * 1000L,
+            OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS.toLong() * 1000L,
             testScheduler.currentTime
         )
     }
@@ -2418,7 +2419,7 @@ class SmartAccountKitTest {
 
         assertEquals(3, calls)
         assertEquals(
-            2 * OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
+            2 * OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
             testScheduler.currentTime
         )
     }
@@ -2466,6 +2467,209 @@ class SmartAccountKitTest {
         assertFalse(
             thrown is TransactionException.Timeout,
             "A CancellationException must not be converted into a timeout"
+        )
+    }
+
+    // MARK: - Deploy funding: poll RPC until the deployed contract instance is visible
+
+    @Test
+    fun testPollUntilContractVisible_waitsForAbsentThenProceeds() = runTest {
+        // The deployed contract instance is not yet visible to the RPC for the first three
+        // polls (the instance ledger entry is absent), then appears. The poll must keep
+        // waiting and return once the instance entry is present.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        val absentPolls = 3
+        var calls = 0
+
+        pollUntilContractVisibleToRpc(contractId) { _ ->
+            calls++
+            // Visible (instance entry present) from the fourth lookup onward.
+            calls > absentPolls
+        }
+
+        // One lookup per attempt: three "absent" plus the successful one.
+        assertEquals(absentPolls + 1, calls)
+        // It waited exactly one interval between each retry before succeeding, and did not
+        // sleep again after the successful lookup.
+        assertEquals(
+            absentPolls * OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilContractVisible_returnsImmediatelyWhenAlreadyVisible() = runTest {
+        // When the contract instance is visible on the first lookup, the poll proceeds
+        // without delay.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        var calls = 0
+
+        pollUntilContractVisibleToRpc(contractId) { _ ->
+            calls++
+            true // Visible immediately.
+        }
+
+        assertEquals(1, calls)
+        assertEquals(0L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun testPollUntilContractVisible_throwsClearTimeoutWhenNeverVisible() = runTest {
+        // The contract instance never becomes visible. The poll must exhaust its budget and
+        // throw a clear, dedicated timeout rather than letting the opaque funding simulation
+        // fail with an unrelated error.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        var calls = 0
+
+        val error = assertFailsWith<TransactionException.Timeout> {
+            pollUntilContractVisibleToRpc(contractId) { _ ->
+                calls++
+                false // Never visible.
+            }
+        }
+
+        assertTrue(error.message.contains(contractId), "Timeout message should name the contract")
+        assertTrue(
+            error.message.contains("not visible to the Soroban RPC"),
+            "Timeout message should explain the visibility failure, but was: ${error.message}"
+        )
+        assertTrue(
+            error.message.contains("Retry shortly"),
+            "Timeout message should advise retrying, but was: ${error.message}"
+        )
+        // The message must be ASCII only: no em dash (U+2014) is permitted.
+        assertFalse(
+            error.message.contains('—'),
+            "Timeout message must be ASCII (no em dash), but was: ${error.message}"
+        )
+        // A pure "not visible" timeout has no transient RPC error to surface as the cause.
+        assertNull(error.cause)
+        // Budget consumed at the configured interval: 45s / 1.5s = 30 polls.
+        assertTrue(calls > 0)
+        assertEquals(
+            OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS.toLong() * 1000L,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilContractVisible_retriesTransientErrorsAndSurfacesLastAsCause() = runTest {
+        // Transient RPC/transport errors (anything other than a clean absent/present result)
+        // must be retried until the deadline, and the last one surfaced as the timeout cause
+        // for diagnosability.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        var calls = 0
+
+        val error = assertFailsWith<TransactionException.Timeout> {
+            pollUntilContractVisibleToRpc(contractId) { _ ->
+                calls++
+                throw IllegalStateException("rpc unavailable #$calls")
+            }
+        }
+
+        assertTrue(calls > 1, "Transient errors should be retried, not surfaced immediately")
+        val cause = error.cause
+        assertNotNull(cause, "The last transient error should be surfaced as the timeout cause")
+        assertTrue(cause is IllegalStateException)
+        assertTrue(
+            cause.message?.contains("rpc unavailable") == true,
+            "Cause should be the last transient error, but was: ${cause.message}"
+        )
+    }
+
+    @Test
+    fun testPollUntilContractVisible_recoversAfterTransientErrors() = runTest {
+        // A transient error, then an absent instance, then a present instance must complete
+        // normally, proving transient failures and the absent state do not abort the poll.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        var calls = 0
+
+        pollUntilContractVisibleToRpc(contractId) { _ ->
+            calls++
+            when (calls) {
+                1 -> throw IllegalStateException("transient rpc error")
+                2 -> false // Instance not yet visible.
+                else -> true // Visible on the third lookup.
+            }
+        }
+
+        assertEquals(3, calls)
+        assertEquals(
+            2 * OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilContractVisible_cancellationPropagatesAndIsNotConvertedToTimeout() = runTest {
+        // A CancellationException surfaced by the lookup must propagate unchanged. It must not
+        // be swallowed by the generic transient-error catch, recorded as a transient cause, or
+        // converted into a TransactionException.Timeout. If the dedicated CancellationException
+        // rethrow were removed or reordered after the generic catch, the cancellation would be
+        // treated as a transient error, retried across the whole budget, and surfaced as a
+        // timeout, which would fail this test.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        var calls = 0
+        var thrown: Throwable? = null
+
+        val job = launch {
+            try {
+                pollUntilContractVisibleToRpc(contractId) { _ ->
+                    calls++
+                    // The lookup's cancellable work is cancelled and surfaces a
+                    // CancellationException from inside the poll's try block.
+                    throw CancellationException("lookup cancelled")
+                }
+            } catch (e: Throwable) {
+                // Capture the propagated outcome, then rethrow so the job reflects the real
+                // completion state (cancelled vs failed).
+                thrown = e
+                throw e
+            }
+        }
+
+        job.join()
+
+        // The cancellation aborted the poll on the first lookup instead of being retried as a
+        // transient error across the budget.
+        assertEquals(1, calls, "Cancellation must abort the poll, not be retried as transient")
+        assertEquals(0L, testScheduler.currentTime, "No poll interval should elapse after cancellation")
+        // The child coroutine ended cancelled, not completed normally and not failed.
+        assertTrue(job.isCancelled, "Cancellation must propagate so the job ends cancelled")
+        assertTrue(
+            thrown is CancellationException,
+            "The CancellationException must propagate unchanged, but was: $thrown"
+        )
+        assertFalse(
+            thrown is TransactionException.Timeout,
+            "A CancellationException must not be converted into a timeout"
+        )
+    }
+
+    @Test
+    fun testPollUntilContractVisible_absentEntryNotVisiblePresentEntryVisible() = runTest {
+        // Wiring contract: waitForContractVisibleToRpc passes
+        // `getContractData(...) != null` as the visibility check, so an empty entries result
+        // (getContractData returns null) must read as "not visible" and a present entry as
+        // "visible". Emulate that exact mapping to pin the structural visibility signal the
+        // deploy/fund flow depends on.
+        val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+        // null = instance ledger entry absent (RPC reports NotFound); non-null = present.
+        val getContractDataResults: List<Any?> = listOf(null, null, Any())
+        var calls = 0
+
+        pollUntilContractVisibleToRpc(contractId) { _ ->
+            val result = getContractDataResults[calls]
+            calls++
+            // Exactly the production lambda's structural mapping.
+            result != null
+        }
+
+        // Two absent (null) lookups kept polling; the present (non-null) entry returned.
+        assertEquals(3, calls)
+        assertEquals(
+            2 * OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
+            testScheduler.currentTime
         )
     }
 }

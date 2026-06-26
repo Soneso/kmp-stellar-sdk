@@ -939,8 +939,8 @@ class OZTransactionOperations internal constructor(
      * Waits until the Friendbot-funded temporary account is visible to the Soroban RPC.
      *
      * Polls [SorobanServer.getAccount] for [accountId] on the
-     * [OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS] interval, up to an overall
-     * [OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS] budget, and returns once the
+     * [OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS] interval, up to an overall
+     * [OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS] budget, and returns once the
      * account entry is observed. The lookup throws [AccountNotFoundException] while the
      * account is not yet visible (the expected pre-propagation state); transient RPC or
      * transport errors are retried until the deadline.
@@ -1477,8 +1477,8 @@ class OZTransactionOperations internal constructor(
  */
 internal suspend fun pollUntilAccountVisibleToRpc(
     accountId: String,
-    pollIntervalMs: Long = OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
-    timeoutSeconds: Int = OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS,
+    pollIntervalMs: Long = OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
+    timeoutSeconds: Int = OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS,
     lookup: suspend (String) -> Unit
 ) {
     var lastTransientError: Throwable? = null
