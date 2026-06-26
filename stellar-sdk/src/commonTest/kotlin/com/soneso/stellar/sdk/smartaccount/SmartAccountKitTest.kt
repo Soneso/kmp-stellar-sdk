@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.Util
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.crypto.getEd25519Crypto
+import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 import io.ktor.client.*
@@ -21,6 +22,7 @@ import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -2294,6 +2296,177 @@ class SmartAccountKitTest {
                 options = OZWalletOperations.ConnectWalletOptions(fresh = true, prompt = true)
             )
         }
+    }
+
+    // MARK: - Friendbot funding: poll RPC until the funded account is visible
+
+    @Test
+    fun testFriendbotVisibility_constants() {
+        // The funding poll budget is fixed and must not silently drift.
+        assertEquals(1_500L, OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS)
+        assertEquals(45, OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS)
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_waitsForNotFoundThenProceeds() = runTest {
+        // The funding account is not yet visible to the RPC for the first three polls,
+        // then appears. The poll must keep waiting and return once the account is visible.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        val notFoundPolls = 3
+        var calls = 0
+
+        pollUntilAccountVisibleToRpc(accountId) { id ->
+            calls++
+            if (calls <= notFoundPolls) {
+                throw AccountNotFoundException(id)
+            }
+            // Visible from the fourth lookup onward — return normally.
+        }
+
+        // One lookup per attempt: three "not found" plus the successful one.
+        assertEquals(notFoundPolls + 1, calls)
+        // It waited exactly one interval between each retry before succeeding.
+        assertEquals(
+            notFoundPolls * OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_returnsImmediatelyWhenAlreadyVisible() = runTest {
+        // When the account is visible on the first lookup, the poll proceeds without delay.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        var calls = 0
+
+        pollUntilAccountVisibleToRpc(accountId) { _ ->
+            calls++
+            // Visible immediately.
+        }
+
+        assertEquals(1, calls)
+        assertEquals(0L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_throwsClearTimeoutWhenNeverVisible() = runTest {
+        // The account never becomes visible. The poll must exhaust its budget and throw a
+        // clear, dedicated timeout rather than letting the opaque balance simulation fail.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        var calls = 0
+
+        val error = assertFailsWith<TransactionException.Timeout> {
+            pollUntilAccountVisibleToRpc(accountId) { id ->
+                calls++
+                throw AccountNotFoundException(id)
+            }
+        }
+
+        assertTrue(error.message.contains(accountId), "Timeout message should name the account")
+        assertTrue(
+            error.message.contains("not visible to the Soroban RPC"),
+            "Timeout message should explain the visibility failure, but was: ${error.message}"
+        )
+        // A pure "not found" timeout has no transient RPC error to surface as the cause.
+        assertNull(error.cause)
+        // Budget consumed at the configured interval: 45s / 1.5s = 30 polls.
+        assertTrue(calls > 0)
+        assertEquals(
+            OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS.toLong() * 1000L,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_retriesTransientErrorsAndSurfacesLastAsCause() = runTest {
+        // Transient RPC/transport errors (not "account not found") must be retried until the
+        // deadline, and the last one surfaced as the timeout cause for diagnosability.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        var calls = 0
+
+        val error = assertFailsWith<TransactionException.Timeout> {
+            pollUntilAccountVisibleToRpc(accountId) { _ ->
+                calls++
+                throw IllegalStateException("rpc unavailable #$calls")
+            }
+        }
+
+        assertTrue(calls > 1, "Transient errors should be retried, not surfaced immediately")
+        val cause = error.cause
+        assertNotNull(cause, "The last transient error should be surfaced as the timeout cause")
+        assertTrue(cause is IllegalStateException)
+        assertTrue(
+            cause.message?.contains("rpc unavailable") == true,
+            "Cause should be the last transient error, but was: ${cause.message}"
+        )
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_recoversAfterTransientErrors() = runTest {
+        // A transient error followed by a successful lookup must complete normally,
+        // proving transient failures do not abort the poll.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        var calls = 0
+
+        pollUntilAccountVisibleToRpc(accountId) { id ->
+            calls++
+            when (calls) {
+                1 -> throw IllegalStateException("transient rpc error")
+                2 -> throw AccountNotFoundException(id)
+                else -> { /* visible on the third lookup */ }
+            }
+        }
+
+        assertEquals(3, calls)
+        assertEquals(
+            2 * OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
+            testScheduler.currentTime
+        )
+    }
+
+    @Test
+    fun testPollUntilAccountVisible_cancellationPropagatesAndIsNotConvertedToTimeout() = runTest {
+        // A CancellationException surfaced by the lookup must propagate unchanged. It must not
+        // be swallowed by the generic transient-error catch, recorded as a transient cause, or
+        // converted into a TransactionException.Timeout. If the dedicated CancellationException
+        // rethrow were removed or reordered after the generic catch, the cancellation would be
+        // treated as a transient error, retried across the whole budget, and surfaced as a
+        // timeout, which would fail this test.
+        val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+        var calls = 0
+        var thrown: Throwable? = null
+
+        val job = launch {
+            try {
+                pollUntilAccountVisibleToRpc(accountId) { _ ->
+                    calls++
+                    // The lookup's cancellable work is cancelled and surfaces a
+                    // CancellationException from inside the poll's try block.
+                    throw CancellationException("lookup cancelled")
+                }
+            } catch (e: Throwable) {
+                // Capture the propagated outcome, then rethrow so the job reflects the real
+                // completion state (cancelled vs failed).
+                thrown = e
+                throw e
+            }
+        }
+
+        job.join()
+
+        // The cancellation aborted the poll on the first lookup instead of being retried as a
+        // transient error across the budget.
+        assertEquals(1, calls, "Cancellation must abort the poll, not be retried as transient")
+        assertEquals(0L, testScheduler.currentTime, "No poll interval should elapse after cancellation")
+        // The child coroutine ended cancelled, not completed normally and not failed.
+        assertTrue(job.isCancelled, "Cancellation must propagate so the job ends cancelled")
+        assertTrue(
+            thrown is CancellationException,
+            "The CancellationException must propagate unchanged, but was: $thrown"
+        )
+        assertFalse(
+            thrown is TransactionException.Timeout,
+            "A CancellationException must not be converted into a timeout"
+        )
     }
 }
 

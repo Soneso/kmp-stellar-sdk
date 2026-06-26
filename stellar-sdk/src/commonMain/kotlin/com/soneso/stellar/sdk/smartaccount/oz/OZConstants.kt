@@ -39,6 +39,20 @@ object OZConstants {
     const val FRIENDBOT_RESERVE_XLM = 5
 
     /**
+     * Interval in milliseconds between polls while waiting for a Friendbot-funded
+     * temporary account to become visible to the Soroban RPC during wallet funding.
+     */
+    const val FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS = 1_500L
+
+    /**
+     * Overall timeout in seconds to observe a Friendbot-funded temporary account on
+     * the Soroban RPC before failing wallet funding. Friendbot confirms the funding
+     * transaction on Horizon, but the RPC simulation state can lag by several ledger
+     * closes when testnet propagation is slow.
+     */
+    const val FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS = 45
+
+    /**
      * Default timeout for transaction submission and polling in seconds.
      */
     const val DEFAULT_TIMEOUT_SECONDS = 30

@@ -21,6 +21,7 @@ import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
+import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
@@ -37,7 +38,10 @@ import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.scval.Scv
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Result of a transaction submission and polling operation.
@@ -715,7 +719,7 @@ class OZTransactionOperations internal constructor(
      * Flow:
      * 1. Generate random temporary keypair
      * 2. Fund temp account via Friendbot HTTP GET
-     * 3. Wait briefly for funding to confirm
+     * 3. Poll the Soroban RPC until the funded temp account is visible to simulation
      * 4. Query temp account balance via native token contract simulation
      * 5. Calculate transfer amount (balance - reserve)
      * 6. Build transfer from temp to smart account
@@ -790,9 +794,12 @@ class OZTransactionOperations internal constructor(
 
         // STEP 3: Wait for Friendbot funding to propagate to Soroban RPC state.
         // Friendbot's HTTP response confirms the Horizon transaction, but the Soroban
-        // RPC simulation endpoint may not reflect the new account entry until the
-        // next ledger close (~5 seconds on testnet).
-        delay(5000)
+        // RPC simulation endpoint may not reflect the new account entry until a later
+        // ledger close. Poll the RPC until the temp account is visible rather than
+        // assuming a fixed propagation delay; the subsequent balance simulation reads a
+        // classic account entry and fails with "account entry is missing" if the entry
+        // is not yet applied to the RPC state.
+        waitForAccountVisibleToRpc(tempKeypair.getAccountId())
 
         // STEP 4: Get temp account
         val tempAccount = kit.sorobanServer.getAccount(tempKeypair.getAccountId())
@@ -925,6 +932,25 @@ class OZTransactionOperations internal constructor(
         } else {
             val fractionStr = xlmFraction.toString().padStart(7, '0').trimEnd('0')
             "$xlmWhole.$fractionStr"
+        }
+    }
+
+    /**
+     * Waits until the Friendbot-funded temporary account is visible to the Soroban RPC.
+     *
+     * Polls [SorobanServer.getAccount] for [accountId] on the
+     * [OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS] interval, up to an overall
+     * [OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS] budget, and returns once the
+     * account entry is observed. The lookup throws [AccountNotFoundException] while the
+     * account is not yet visible (the expected pre-propagation state); transient RPC or
+     * transport errors are retried until the deadline.
+     *
+     * @param accountId The temporary funding account ID (G-address) to wait for
+     * @throws TransactionException.Timeout if the account is not visible within the budget
+     */
+    private suspend fun waitForAccountVisibleToRpc(accountId: String) {
+        pollUntilAccountVisibleToRpc(accountId) { id ->
+            kit.sorobanServer.getAccount(id)
         }
     }
 
@@ -1419,5 +1445,72 @@ class OZTransactionOperations internal constructor(
 
         /** Accepted decimal-amount shape: digits with an optional fractional part. */
         private val AMOUNT_REGEX = Regex("^[0-9]+(\\.[0-9]+)?$")
+    }
+}
+
+/**
+ * Polls [lookup] until the account is visible to the Soroban RPC, the timeout elapses,
+ * or the coroutine is cancelled.
+ *
+ * Used by [OZTransactionOperations.fundWallet] to bridge the gap between Friendbot
+ * confirming a funding transaction on Horizon and the Soroban RPC reflecting the new
+ * account entry in its simulation state. Polling avoids assuming a fixed propagation
+ * delay, which fails when testnet propagation is slower than the assumed wait.
+ *
+ * [lookup] performs a single RPC account fetch for the supplied account ID. It must:
+ * - return normally once the account entry is visible to the RPC;
+ * - throw [AccountNotFoundException] while the account is not yet visible — the expected
+ *   pre-propagation state, which is swallowed so polling continues;
+ * - throw any other exception for a transient RPC or transport error, which is retried
+ *   until the deadline and surfaced as the timeout cause.
+ *
+ * The total wait is bounded by [timeoutSeconds] (covering both lookups and the interval
+ * sleeps) and is cooperatively cancellable: [delay] and the enclosing timeout both
+ * observe cancellation, and any [CancellationException] thrown by [lookup] is rethrown
+ * rather than treated as a transient error.
+ *
+ * @param accountId The account ID (G-address) to wait for, used in the timeout message
+ * @param pollIntervalMs Delay between polls in milliseconds
+ * @param timeoutSeconds Overall budget in seconds before failing
+ * @param lookup Suspending account lookup with the not-found / transient-error contract above
+ * @throws TransactionException.Timeout if the account is not visible within the budget
+ */
+internal suspend fun pollUntilAccountVisibleToRpc(
+    accountId: String,
+    pollIntervalMs: Long = OZConstants.FRIENDBOT_VISIBILITY_POLL_INTERVAL_MS,
+    timeoutSeconds: Int = OZConstants.FRIENDBOT_VISIBILITY_TIMEOUT_SECONDS,
+    lookup: suspend (String) -> Unit
+) {
+    var lastTransientError: Throwable? = null
+
+    val completed = withTimeoutOrNull(timeoutSeconds.toLong() * 1000L) {
+        while (true) {
+            ensureActive()
+            try {
+                lookup(accountId)
+                return@withTimeoutOrNull
+            } catch (_: AccountNotFoundException) {
+                // Account not yet visible to the RPC — the expected state while
+                // Friendbot funding propagates. Keep polling without recording a cause.
+            } catch (e: CancellationException) {
+                // Cooperative cancellation (including the enclosing timeout) — never
+                // swallow it as a transient error.
+                throw e
+            } catch (e: Exception) {
+                // Transient RPC/transport error — retry until the deadline and surface
+                // the last failure as the timeout cause.
+                lastTransientError = e
+            }
+            delay(pollIntervalMs)
+        }
+    }
+
+    if (completed == null) {
+        throw TransactionException.timeout(
+            details = "Funding account $accountId not visible to the Soroban RPC within " +
+                "${timeoutSeconds}s after Friendbot funding; testnet propagation may be delayed. " +
+                "Retry shortly",
+            cause = lastTransientError
+        )
     }
 }
