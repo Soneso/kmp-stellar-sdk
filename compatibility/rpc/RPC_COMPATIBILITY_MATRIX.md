@@ -3,14 +3,14 @@
 **RPC Version:** v27.0.0 (released 2026-06-11)  
 **RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0)  
 **SDK Version:** 1.8.0  
-**Generated:** 2026-06-19 09:54:26
+**Generated:** 2026-06-26 14:07:30
 
 ## Overall Coverage
 
-**Coverage:** 91.67%
+**Coverage:** 100.0%
 
-- ✅ **Fully Supported:** 11/12
-- ⚠️ **Partially Supported:** 1/12
+- ✅ **Fully Supported:** 12/12
+- ⚠️ **Partially Supported:** 0/12
 - ❌ **Not Supported:** 0/12
 
 ## Method Comparison
@@ -28,7 +28,7 @@
 | `getTransactions` | ✅ Fully Supported | `getTransactions` | 1/1 | 6/6 | All parameters and response fields implemented |
 | `getVersionInfo` | ✅ Fully Supported | `getVersionInfo` | N/A | 5/5 | All parameters and response fields implemented |
 | `sendTransaction` | ✅ Fully Supported | `sendTransaction` | 1/1 | N/A | All parameters and response fields implemented |
-| `simulateTransaction` | ⚠️ Partially Supported | `simulateTransaction` | 1/1 | N/A | Missing optional parameters: useUpgradedAuth |
+| `simulateTransaction` | ✅ Fully Supported | `simulateTransaction` | 1/1 | N/A | All parameters and response fields implemented |
 
 ## Response Field Coverage
 
@@ -46,11 +46,4 @@ Detailed breakdown of response field support per method.
 | `getTransaction` | 5 | 5 | - |
 | `getTransactions` | 6 | 6 | - |
 | `getVersionInfo` | 5 | 5 | - |
-
-## Implementation Gaps
-
-### 🟠 High Priority (1 items)
-
-- `simulateTransaction` - ⚠️ Partially Supported
-  - Missing optional parameters: useUpgradedAuth
 

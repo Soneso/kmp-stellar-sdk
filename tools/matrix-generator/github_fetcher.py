@@ -351,6 +351,62 @@ def get_latest_rpc_release() -> GitHubRelease:
         ) from e
 
 
+def get_latest_go_stellar_sdk_release() -> GitHubRelease:
+    """
+    Fetch the latest go-stellar-sdk module release metadata from GitHub API.
+
+    The RPC request/response struct definitions (protocols/rpc) live in the
+    go-stellar-sdk module, versioned as bare ``vX.Y.Z`` tags (e.g. ``v0.6.0``).
+    Module-scoped tags such as ``horizon-*`` / ``horizonclient-*`` are excluded.
+    Reading the structs from a released tag (instead of master) keeps fields that
+    are not yet in a released RPC out of the compatibility matrix.
+
+    Returns:
+        GitHubRelease instance for the latest go-stellar-sdk module release
+
+    Raises:
+        ReleaseNotFoundError: If no module release is found
+        GitHubFetchError: If API request fails
+    """
+    api_url = 'https://api.github.com/repos/stellar/go-stellar-sdk/releases'
+
+    try:
+        response_data = _make_request(api_url)
+        releases = json.loads(response_data.decode('utf-8'))
+
+        if not releases:
+            raise ReleaseNotFoundError("No release data returned from GitHub API")
+
+        # Module releases are bare vX.Y.Z tags; exclude module-scoped tags
+        # (horizon-*, horizonclient-*, etc.) which carry a '-'.
+        module_releases = [
+            release for release in releases
+            if release.get('tag_name', '').startswith('v')
+            and '-' not in release.get('tag_name', '')
+        ]
+
+        if not module_releases:
+            raise ReleaseNotFoundError(
+                "No go-stellar-sdk module releases found (only module-scoped tags)"
+            )
+
+        # Releases are already sorted by published date (newest first).
+        return GitHubRelease.from_api_response(module_releases[0])
+
+    except json.JSONDecodeError as e:
+        raise GitHubFetchError(
+            f"Invalid JSON response from GitHub API: {e}"
+        ) from e
+    except KeyError as e:
+        raise GitHubFetchError(
+            f"Missing required field in API response: {e}"
+        ) from e
+    except ValueError as e:
+        raise GitHubFetchError(
+            f"Invalid data format in API response: {e}"
+        ) from e
+
+
 def fetch_rpc_jsonrpc_source(tag: str) -> str:
     """
     Fetch jsonrpc.go source code for a specific Stellar RPC release tag.
@@ -383,6 +439,25 @@ def fetch_rpc_jsonrpc_source(tag: str) -> str:
         ) from e
 
 
+_GO_SDK_PROTOCOLS_REF: Optional[str] = None
+
+
+def _go_stellar_sdk_protocols_ref() -> str:
+    """Resolve (and cache) the go-stellar-sdk ref for protocol/response struct files.
+
+    Uses the latest go-stellar-sdk module release so fields not yet in a released
+    RPC are excluded from the comparison; falls back to ``master`` if the release
+    cannot be determined.
+    """
+    global _GO_SDK_PROTOCOLS_REF
+    if _GO_SDK_PROTOCOLS_REF is None:
+        try:
+            _GO_SDK_PROTOCOLS_REF = get_latest_go_stellar_sdk_release().version
+        except GitHubFetchError:
+            _GO_SDK_PROTOCOLS_REF = "master"
+    return _GO_SDK_PROTOCOLS_REF
+
+
 def fetch_rpc_response_file(tag: str, method_name: str) -> str:
     """
     Fetch response struct source file from go-stellar-sdk for a specific method.
@@ -405,12 +480,13 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
     if not method_name:
         raise ValueError("method_name parameter cannot be empty")
 
-    # Construct raw GitHub URL for the response file in go-stellar-sdk
-    # Note: go-stellar-sdk uses different versioning, so we use master branch
-    # which contains the latest protocol definitions
+    # Construct raw GitHub URL for the response file in go-stellar-sdk. Pin to the
+    # latest go-stellar-sdk module release (not master) so response fields not yet
+    # in a released RPC are excluded from the comparison.
+    go_sdk_ref = _go_stellar_sdk_protocols_ref()
     source_url = (
         f"https://raw.githubusercontent.com/stellar/go-stellar-sdk/"
-        f"master/protocols/rpc/get_{method_name}.go"
+        f"{go_sdk_ref}/protocols/rpc/get_{method_name}.go"
     )
 
     try:
@@ -418,7 +494,7 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
         return response_data.decode('utf-8')
     except GitHubFetchError as e:
         raise SourceFileNotFoundError(
-            f"Failed to fetch get_{method_name}.go from master branch: {e}"
+            f"Failed to fetch get_{method_name}.go from go-stellar-sdk {go_sdk_ref}: {e}"
         ) from e
 
 

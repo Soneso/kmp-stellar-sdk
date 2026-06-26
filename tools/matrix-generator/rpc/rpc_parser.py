@@ -32,6 +32,7 @@ from github_fetcher import (
     fetch_rpc_response_file,
     fetch_all_rpc_response_files,
     get_latest_rpc_release,
+    get_latest_go_stellar_sdk_release,
     GitHubFetchError,
     SourceFileNotFoundError,
 )
@@ -78,15 +79,18 @@ class GoProtocolParser:
 
     Args:
         protocol_source: Base URL of the GitHub directory that contains the
-            per-method Go files.  Defaults to ``GITHUB_METHODS_BASE_URL``.
+            per-method Go files.  Defaults to the latest go-stellar-sdk
+            release's ``protocols/rpc/`` URL.
     """
 
     # Base URL for the per-method Go files.
     # Request/response struct definitions live in the go-stellar-sdk repository
     # under protocols/rpc/, not in stellar-rpc/methods/ (which contains handler
     # logic only and no longer defines the canonical request structs).
-    GITHUB_METHODS_BASE_URL = (
-        "https://raw.githubusercontent.com/stellar/go-stellar-sdk/master"
+    # {ref} is resolved at runtime to the latest go-stellar-sdk module release, so
+    # request-struct fields not yet in a released RPC are not measured against the SDK.
+    GITHUB_METHODS_BASE_URL_TEMPLATE = (
+        "https://raw.githubusercontent.com/stellar/go-stellar-sdk/{ref}"
         "/protocols/rpc/"
     )
 
@@ -124,7 +128,11 @@ class GoProtocolParser:
 
     def __init__(self, protocol_source: Optional[str] = None) -> None:
         if protocol_source is None:
-            protocol_source = self.GITHUB_METHODS_BASE_URL
+            try:
+                go_sdk_ref = get_latest_go_stellar_sdk_release().version
+            except GitHubFetchError:
+                go_sdk_ref = "master"
+            protocol_source = self.GITHUB_METHODS_BASE_URL_TEMPLATE.format(ref=go_sdk_ref)
 
         if not protocol_source.endswith("/"):
             protocol_source += "/"
