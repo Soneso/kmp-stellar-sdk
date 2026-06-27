@@ -1301,6 +1301,80 @@ class OZWalletOperations internal constructor(
         )
     }
 
+    // MARK: - Headless Connect
+
+    /**
+     * Connects the kit to an existing smart account by contract address alone, with no passkey
+     * credential and no WebAuthn ceremony.
+     *
+     * Intended for backends and autonomous signers (e.g. a reference agent holding an Ed25519
+     * key) that operate via the multi-signer / external-signer pipeline. The connected state is
+     * populated with the real [contractId] and an empty sentinel credential
+     * ([OZConstants.HEADLESS_CREDENTIAL_ID]), preserving the non-null type invariant of
+     * [OZSmartAccountKit.setConnectedState] / [OZSmartAccountKit.requireConnected]. After this
+     * call, [OZSmartAccountKit.isConnected] is `true`, [OZSmartAccountKit.contractId] is
+     * [contractId], and [OZSmartAccountKit.credentialId] is the empty sentinel.
+     *
+     * Behaviour:
+     * 1. Validates [contractId] is a contract address (C...), before any network call.
+     * 2. Verifies the contract exists on-chain (reuses the shared existence check).
+     * 3. Best-effort clears any previously saved session so a later silent [connectWallet]
+     *    restore cannot resurrect a stale passkey session that contradicts this headless
+     *    in-memory state. A persistent-storage write failure here is swallowed so it cannot
+     *    leave the kit unconnected; a later [connectWallet] could then still restore a stale
+     *    session.
+     * 4. Sets the connected state with the empty sentinel credential.
+     * 5. Emits [SmartAccountEvent.HeadlessConnected] (never [SmartAccountEvent.WalletConnected],
+     *    so no empty credential leaks onto a public event).
+     *
+     * This path writes no session and performs no WebAuthn or credential-storage work.
+     *
+     * ## Operating boundary
+     *
+     * Only the multi-signer / external-signer pipeline (calls made with a non-empty
+     * `selectedSigners`) is usable after a headless connect. The single-passkey paths
+     * ([OZTransactionOperations.submit], [OZTransactionOperations.executeAndSubmit],
+     * [OZTransactionOperations.transfer], and any manager operation left at the default empty
+     * `selectedSigners`) throw [WalletException.HeadlessConnection].
+     *
+     * @param contractId The smart account contract address (C-address) to attach to.
+     * @return The connected contract address (the validated [contractId]).
+     * @throws ValidationException.InvalidAddress if [contractId] is not a valid C-address.
+     * @throws WalletException.NotFound if no contract instance exists at [contractId].
+     */
+    suspend fun connectToContract(contractId: String): String {
+        // Validate the address is a contract address (C...), before any network call.
+        requireContractAddress(contractId, "contractId")
+
+        // Verify the contract exists on-chain. Reuses the shared existence check: a missing
+        // instance entry becomes WalletException.NotFound; RPC/transport errors propagate as-is.
+        verifyContractExists(contractId)
+
+        // Clear any previously saved session so a later silent connectWallet() restore cannot
+        // resurrect a stale passkey session over this headless in-memory state. Best-effort: a
+        // persistent-storage write failure must not leave the kit unconnected, so it is swallowed
+        // here (a later connectWallet() could then still restore a stale session).
+        try {
+            kit.getStorage().clearSession()
+        } catch (_: Exception) {
+            // Non-critical — see above.
+        }
+
+        // Set connected state with the real contractId and the empty sentinel credential,
+        // preserving the non-null type invariant.
+        kit.setConnectedState(
+            credentialId = OZConstants.HEADLESS_CREDENTIAL_ID,
+            contractId = contractId
+        )
+
+        // Emit the dedicated headless event (carries only the contract id).
+        kit.events.emit(
+            SmartAccountEvent.HeadlessConnected(contractId = contractId)
+        )
+
+        return contractId
+    }
+
     // MARK: - Shared Helpers
 
     /**

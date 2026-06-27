@@ -182,8 +182,13 @@ class SmartAccountErrorsTest {
     }
 
     @Test
-    fun testErrorCode_totalEnumEntries_is28() {
-        assertEquals(28, SmartAccountErrorCode.entries.size)
+    fun testErrorCode_walletHeadlessConnection_is2004() {
+        assertEquals(2004, SmartAccountErrorCode.WALLET_HEADLESS_CONNECTION.code)
+    }
+
+    @Test
+    fun testErrorCode_totalEnumEntries_is29() {
+        assertEquals(29, SmartAccountErrorCode.entries.size)
     }
 
     @Test

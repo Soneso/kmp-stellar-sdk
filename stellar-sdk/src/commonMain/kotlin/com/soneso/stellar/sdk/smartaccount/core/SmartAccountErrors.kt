@@ -31,6 +31,7 @@ enum class SmartAccountErrorCode(val code: Int) {
     WALLET_NOT_CONNECTED(2001),
     WALLET_ALREADY_EXISTS(2002),
     WALLET_NOT_FOUND(2003),
+    WALLET_HEADLESS_CONNECTION(2004),
 
     // 3xxx: Credential errors
     CREDENTIAL_NOT_FOUND(3001),
@@ -139,6 +140,8 @@ sealed class SmartAccountException(
                     WalletException.AlreadyExists(message, err)
                 SmartAccountErrorCode.WALLET_NOT_FOUND ->
                     WalletException.NotFound(message, err)
+                SmartAccountErrorCode.WALLET_HEADLESS_CONNECTION ->
+                    WalletException.HeadlessConnection(message, err)
                 SmartAccountErrorCode.CREDENTIAL_NOT_FOUND ->
                     CredentialException.NotFound(message, err)
                 SmartAccountErrorCode.CREDENTIAL_ALREADY_EXISTS ->
@@ -269,6 +272,16 @@ sealed class WalletException(
     class NotFound(message: String, cause: Throwable? = null) :
         WalletException(SmartAccountErrorCode.WALLET_NOT_FOUND, message, cause)
 
+    /**
+     * Operation not available on a headless connection.
+     *
+     * Thrown by the single-passkey submit path when the kit is connected headlessly
+     * (by contract address only, with no passkey credential). A headless kit must operate
+     * via the multi-signer / external-signer pipeline with explicit non-empty selectedSigners.
+     */
+    class HeadlessConnection(message: String, cause: Throwable? = null) :
+        WalletException(SmartAccountErrorCode.WALLET_HEADLESS_CONNECTION, message, cause)
+
     companion object {
         /**
          * Creates a wallet not connected error.
@@ -299,6 +312,19 @@ sealed class WalletException(
          */
         fun notFound(identifier: String, cause: Throwable? = null) =
             NotFound("Wallet not found: $identifier", cause)
+
+        /**
+         * Creates a headless-connection error for the single-passkey submit path.
+         *
+         * @param cause Optional underlying cause
+         * @return HeadlessConnection exception instance
+         */
+        fun headlessConnection(cause: Throwable? = null) =
+            HeadlessConnection(
+                "This kit is connected headlessly (no passkey); use the multi-signer " +
+                    "pipeline with explicit selectedSigners for headless operations.",
+                cause
+            )
     }
 }
 

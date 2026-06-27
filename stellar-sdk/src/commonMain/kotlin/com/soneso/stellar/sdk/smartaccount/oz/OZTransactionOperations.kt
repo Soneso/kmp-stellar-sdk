@@ -461,6 +461,14 @@ class OZTransactionOperations internal constructor(
         // STEP 1: Require connected wallet
         val (credentialId, contractId) = kit.requireConnected()
 
+        // Reject the single-passkey path on a headless connection: the empty sentinel
+        // credential decodes silently and would otherwise fail late with no valid signature.
+        // A headless kit must operate via the multi-signer / external-signer pipeline with
+        // explicit non-empty selectedSigners.
+        if (credentialId == OZConstants.HEADLESS_CREDENTIAL_ID) {
+            throw WalletException.headlessConnection()
+        }
+
         // STEP 2: Get deployer account
         val deployer = kit.getDeployer()
 
