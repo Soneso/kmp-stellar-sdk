@@ -22,12 +22,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -111,9 +117,16 @@ class MainScreen : Screen {
                             )
                         }
                     },
+                    actions = {
+                        InboxBell(
+                            pendingCount = DemoState.pendingRequestCount,
+                            onClick = { navigator.push(ApprovalInboxScreen()) }
+                        )
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 )
             }
@@ -434,6 +447,30 @@ class MainScreen : Screen {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Badged inbox bell shown in the top app bar. The badge displays the number of pending
+     * agent escalations for the connected account; tapping opens the approval inbox.
+     */
+    @Composable
+    private fun InboxBell(pendingCount: Int, onClick: () -> Unit) {
+        IconButton(onClick = onClick) {
+            BadgedBox(
+                badge = {
+                    if (pendingCount > 0) {
+                        Badge {
+                            Text(if (pendingCount > 99) "99+" else pendingCount.toString())
+                        }
+                    }
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = "Approval inbox"
+                )
             }
         }
     }

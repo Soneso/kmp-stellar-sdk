@@ -94,6 +94,17 @@ object DemoConfig {
      *  The contract uses monotonically increasing IDs with gaps from removed rules. */
     val MAX_CONTEXT_RULE_SCAN_ID = 25u
 
+    // -- Coordination Server (agent-signer flow) --
+
+    /** Base URL of the coordination server that brokers policy-rejected agent calls.
+     *  The reference agent posts escalations here; the approval inbox reads them.
+     *  Override per environment; the default points at a locally run server. */
+    const val COORDINATION_URL = "http://localhost:8787"
+
+    /** Bearer token sent on every coordination-server request. Must match the
+     *  token the coordination server was started with (`--token`). */
+    const val COORDINATION_TOKEN = "dev-token-change-me"
+
     // -- Reown (WalletConnect) --
 
     /**

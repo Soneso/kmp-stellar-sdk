@@ -1,5 +1,7 @@
 package com.soneso.smartdemo.util
 
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
@@ -139,6 +141,26 @@ fun formatStroopsAsXlm(stroops: Long): String {
 fun formatStroopsAsXlm(stroopsStr: String): String {
     val stroops = stroopsStr.toLongOrNull() ?: return "0.0"
     return formatStroopsAsXlm(stroops)
+}
+
+/**
+ * Formats a base-units integer amount as a decimal string at the token's scale.
+ *
+ * Divides [baseUnits] by 10^[decimals] using exact decimal arithmetic and renders
+ * the result as a plain (non-scientific) string. Used by the approval inbox to show
+ * the on-chain amount decoded from the call arguments at the demo token's scale.
+ *
+ * @param baseUnits The amount in the token's smallest indivisible unit.
+ * @param decimals The token's decimal scale (non-negative).
+ * @return The decimal representation, for example "10.5" for 105000000 at 7 decimals.
+ */
+fun formatBaseUnitsAsDecimal(baseUnits: BigInteger, decimals: Int): String {
+    if (decimals <= 0) {
+        return baseUnits.toString()
+    }
+    val scale = BigInteger.parseString("1" + "0".repeat(decimals))
+    val value = BigDecimal.fromBigInteger(baseUnits).divide(BigDecimal.fromBigInteger(scale))
+    return value.toPlainString()
 }
 
 // ============================================================================

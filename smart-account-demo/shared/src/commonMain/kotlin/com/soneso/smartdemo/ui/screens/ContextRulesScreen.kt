@@ -349,6 +349,18 @@ class ContextRulesScreen : Screen {
                     }
                 }
 
+                // Delegate to an autonomous agent: builds a CallContract-scoped context
+                // rule with the agent's Ed25519 signer and a spending-limit policy.
+                OutlinedButton(
+                    onClick = {
+                        navigator.push(DelegateToAgentScreen())
+                    },
+                    enabled = !isLoading && !isRemoving && DemoState.isConnected,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Delegate to Agent")
+                }
+
                 // Error card
                 if (errorMessage != null) {
                     Card(
