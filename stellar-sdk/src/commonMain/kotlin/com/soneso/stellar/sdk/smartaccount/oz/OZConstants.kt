@@ -83,14 +83,4 @@ object OZConstants {
      * SDK name sent in client identification headers.
      */
     const val CLIENT_NAME = "kmp-stellar-sdk"
-
-    /**
-     * Sentinel credential ID written into the connected state by a headless connect
-     * ([OZWalletOperations.connectToContract]). Empty string is the natural "no credential"
-     * marker: it is non-null, so it satisfies the non-null credential invariant of
-     * [OZSmartAccountKit.setConnectedState] and [OZSmartAccountKit.requireConnected], while a
-     * real WebAuthn credential ID is never empty. The single-passkey submit path compares the
-     * connected credential against this value to fail loudly when invoked on a headless kit.
-     */
-    internal const val HEADLESS_CREDENTIAL_ID: String = ""
 }

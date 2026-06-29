@@ -101,7 +101,7 @@ class HeadlessConnectTest {
     }
 
     // ========================================================================
-    // Test 3 — existing contract sets connected state with the empty sentinel
+    // Test 3 — existing contract sets a headless connected state (null credential)
     // ========================================================================
 
     @Test
@@ -112,8 +112,9 @@ class HeadlessConnectTest {
 
         assertEquals(contractId, returned, "Return value must equal the connected contract address")
         assertTrue(kit.isConnected, "Kit must be connected after a successful headless connect")
+        assertTrue(kit.isHeadless, "A contract-only connect must be marked headless")
         assertEquals(contractId, kit.contractId, "kit.contractId must equal the connected address")
-        assertEquals("", kit.credentialId, "kit.credentialId must be the empty headless sentinel")
+        assertNull(kit.credentialId, "A headless connection must expose a null credentialId")
     }
 
     // ========================================================================
@@ -136,7 +137,7 @@ class HeadlessConnectTest {
         assertEquals(
             0,
             walletConnectedCount,
-            "WalletConnected must not fire — the empty sentinel must not leak onto a public event"
+            "WalletConnected must not fire: a headless connection has no credential to carry on the event"
         )
     }
 
@@ -179,7 +180,7 @@ class HeadlessConnectTest {
 
         assertNull(
             kit.getStorage().getSession(),
-            "Headless connect must not persist a session (no sentinel credential written to storage)"
+            "Headless connect must not persist a session (it writes no credential and no session to storage)"
         )
     }
 
@@ -195,7 +196,7 @@ class HeadlessConnectTest {
 
         assertNull(
             kit.credentialManager.getCredential(""),
-            "Headless connect must not write a credential for the empty sentinel id"
+            "Headless connect must not write a credential under any id"
         )
         assertTrue(
             kit.credentialManager.getAllCredentials().isEmpty(),

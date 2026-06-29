@@ -63,8 +63,8 @@ sealed class SmartAccountEvent {
      * with no passkey credential). Used by backends and autonomous signers that
      * operate via the multi-signer / external-signer pipeline.
      *
-     * Distinct from [WalletConnected]: it carries no credential ID, so the empty
-     * headless sentinel never leaks onto a public event.
+     * Distinct from [WalletConnected]: a headless connection has no credential
+     * ID, so this event carries only the contract address.
      *
      * @property contractId The smart account contract address (C-address)
      */

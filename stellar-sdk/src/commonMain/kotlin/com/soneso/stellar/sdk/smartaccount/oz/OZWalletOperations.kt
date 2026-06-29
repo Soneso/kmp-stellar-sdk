@@ -29,10 +29,7 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withTimeoutOrNull
 
 // MARK: - Result Types
 
@@ -275,6 +272,14 @@ class OZWalletOperations internal constructor(
      * - `nativeTokenContract` must be provided (the native token contract address)
      * - Must be on testnet (Friendbot is testnet-only)
      * - Relayer may be used for fee sponsoring if configured
+     *
+     * Latency: with `autoFund = true` the call performs two sequential RPC-visibility polls
+     * after deployment, each bounded by [OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS] (45s): one
+     * waits for the deployed contract instance to become visible to the Soroban RPC, then
+     * [OZTransactionOperations.fundWallet] waits for the Friendbot-funded temporary account to
+     * become visible. When testnet propagation is slow, the worst-case added latency is the sum
+     * of both budgets, up to roughly 90s, before the call either returns or raises
+     * [TransactionException.Timeout]. The common case returns within a few seconds.
      *
      * IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config.
      * Throws WEBAUTHN_NOT_SUPPORTED if no provider is configured.
@@ -1309,11 +1314,10 @@ class OZWalletOperations internal constructor(
      *
      * Intended for backends and autonomous signers (e.g. a reference agent holding an Ed25519
      * key) that operate via the multi-signer / external-signer pipeline. The connected state is
-     * populated with the real [contractId] and an empty sentinel credential
-     * ([OZConstants.HEADLESS_CREDENTIAL_ID]), preserving the non-null type invariant of
-     * [OZSmartAccountKit.setConnectedState] / [OZSmartAccountKit.requireConnected]. After this
-     * call, [OZSmartAccountKit.isConnected] is `true`, [OZSmartAccountKit.contractId] is
-     * [contractId], and [OZSmartAccountKit.credentialId] is the empty sentinel.
+     * populated with the real [contractId] and a null credential, marking the connection as
+     * headless. After this call, [OZSmartAccountKit.isConnected] is `true`,
+     * [OZSmartAccountKit.isHeadless] is `true`, [OZSmartAccountKit.contractId] is [contractId],
+     * and [OZSmartAccountKit.credentialId] is null.
      *
      * Behaviour:
      * 1. Validates [contractId] is a contract address (C...), before any network call.
@@ -1323,19 +1327,24 @@ class OZWalletOperations internal constructor(
      *    in-memory state. A persistent-storage write failure here is swallowed so it cannot
      *    leave the kit unconnected; a later [connectWallet] could then still restore a stale
      *    session.
-     * 4. Sets the connected state with the empty sentinel credential.
+     * 4. Sets the connected state with a null credential.
      * 5. Emits [SmartAccountEvent.HeadlessConnected] (never [SmartAccountEvent.WalletConnected],
-     *    so no empty credential leaks onto a public event).
+     *    which carries a credential a headless connection does not have).
      *
      * This path writes no session and performs no WebAuthn or credential-storage work.
      *
      * ## Operating boundary
      *
-     * Only the multi-signer / external-signer pipeline (calls made with a non-empty
-     * `selectedSigners`) is usable after a headless connect. The single-passkey paths
-     * ([OZTransactionOperations.submit], [OZTransactionOperations.executeAndSubmit],
-     * [OZTransactionOperations.transfer], and any manager operation left at the default empty
-     * `selectedSigners`) throw [WalletException.HeadlessConnection].
+     * The single-passkey signing paths ([OZTransactionOperations.submit],
+     * [OZTransactionOperations.executeAndSubmit], [OZTransactionOperations.transfer],
+     * [OZTransactionOperations.contractCall], and any
+     * manager operation left at the default empty `selectedSigners`) throw
+     * [WalletException.HeadlessConnection] after a headless connect: they need a passkey
+     * credential to produce a WebAuthn signature, and a headless connection holds none. Use the
+     * multi-signer / external-signer pipeline (calls made with a non-empty `selectedSigners`)
+     * instead. [OZTransactionOperations.fundWallet] is the exception: it works headlessly on
+     * testnet because it signs with a temporary Friendbot keypair and never routes through the
+     * single-passkey submit path.
      *
      * @param contractId The smart account contract address (C-address) to attach to.
      * @return The connected contract address (the validated [contractId]).
@@ -1357,13 +1366,13 @@ class OZWalletOperations internal constructor(
         try {
             kit.getStorage().clearSession()
         } catch (_: Exception) {
-            // Non-critical — see above.
+            // Non-critical, see above.
         }
 
-        // Set connected state with the real contractId and the empty sentinel credential,
-        // preserving the non-null type invariant.
+        // Set connected state with the real contractId and a null credential, marking the
+        // connection headless.
         kit.setConnectedState(
-            credentialId = OZConstants.HEADLESS_CREDENTIAL_ID,
+            credentialId = null,
             contractId = contractId
         )
 
@@ -1400,11 +1409,7 @@ class OZWalletOperations internal constructor(
      */
     private suspend fun verifyContractExists(contractId: String) {
         val instanceEntry = try {
-            kit.sorobanServer.getContractData(
-                contractId = contractId,
-                key = Scv.toLedgerKeyContractInstance(),
-                durability = SorobanServer.Durability.PERSISTENT
-            )
+            getContractInstanceEntry(contractId)
         } catch (e: IllegalArgumentException) {
             // Malformed C-address. By definition no contract exists at it.
             throw WalletException.notFound(
@@ -1418,6 +1423,25 @@ class OZWalletOperations internal constructor(
             )
         }
     }
+
+    /**
+     * Reads the persistent contract-instance ledger entry for [contractId] from the Soroban RPC.
+     *
+     * The single point that issues the contract-instance `getContractData` lookup shared by
+     * [verifyContractExists] (existence check) and [waitForContractVisibleToRpc] (post-deploy
+     * visibility poll), so both observe the exact same structural signal: a non-null result means
+     * the instance entry is present (live or archived); null means the RPC reports the key as
+     * NotFound.
+     *
+     * @param contractId The smart-account contract address (C-address) to look up.
+     * @return The contract-instance ledger entry, or null when no entry exists on-chain.
+     */
+    private suspend fun getContractInstanceEntry(contractId: String) =
+        kit.sorobanServer.getContractData(
+            contractId = contractId,
+            key = Scv.toLedgerKeyContractInstance(),
+            durability = SorobanServer.Durability.PERSISTENT
+        )
 
     /**
      * Waits until the freshly deployed smart-account contract instance is visible to the
@@ -1437,12 +1461,13 @@ class OZWalletOperations internal constructor(
      * @throws TransactionException.Timeout if the contract is not visible within the budget
      */
     private suspend fun waitForContractVisibleToRpc(contractId: String) {
-        pollUntilContractVisibleToRpc(contractId) { id ->
-            kit.sorobanServer.getContractData(
-                contractId = id,
-                key = Scv.toLedgerKeyContractInstance(),
-                durability = SorobanServer.Durability.PERSISTENT
-            ) != null
+        pollUntilVisibleToRpc(
+            timeoutMessage = deployedContractNotVisibleMessage(contractId)
+        ) {
+            // A null contract-instance entry is the not-yet-visible signal; map it to "not
+            // visible" so the poll keeps waiting. This observes the same structural signal the
+            // funding simulation depends on.
+            getContractInstanceEntry(contractId) != null
         }
     }
 
@@ -2004,71 +2029,15 @@ class OZWalletOperations internal constructor(
 }
 
 /**
- * Polls [isVisible] until the deployed contract instance is visible to the Soroban RPC,
- * the timeout elapses, or the coroutine is cancelled.
+ * Builds the timeout detail message for the post-deploy contract-instance visibility poll.
  *
- * Used by [OZWalletOperations] after an auto-submitted deploy transaction is included in a
- * ledger, to bridge the gap between the deploy confirming and the Soroban RPC reflecting the
- * new contract-instance entry in its simulation state. The subsequent
- * [OZTransactionOperations.fundWallet] simulates against the contract and fails if the
- * instance is not yet applied to the RPC state. Polling avoids assuming a fixed propagation
- * delay, which fails when testnet propagation is slower than the assumed wait.
+ * Shared by [OZWalletOperations.waitForContractVisibleToRpc] and the poll unit tests so the
+ * production wording (which names the contract, explains the visibility failure, and advises
+ * retrying) has a single ASCII-only source.
  *
- * [isVisible] performs a single structural lookup of the contract-instance ledger entry for
- * the supplied contract ID. It must:
- * - return true once the contract-instance entry is present in the RPC state;
- * - return false while the entry is absent (the expected pre-propagation state), which keeps
- *   polling without recording a cause;
- * - throw any exception for a transient RPC or transport error, which is retried until the
- *   deadline and surfaced as the timeout cause.
- *
- * The total wait is bounded by [timeoutSeconds] (covering both lookups and the interval
- * sleeps) and is cooperatively cancellable: [delay] and the enclosing timeout both observe
- * cancellation, and any [CancellationException] thrown by [isVisible] is rethrown rather than
- * treated as a transient error.
- *
- * @param contractId The deployed contract address (C-address) to wait for, used in the timeout message
- * @param pollIntervalMs Delay between polls in milliseconds
- * @param timeoutSeconds Overall budget in seconds before failing
- * @param isVisible Suspending visibility check with the present / absent / transient-error contract above
- * @throws TransactionException.Timeout if the contract is not visible within the budget
+ * @param contractId The deployed contract address (C-address) the poll waited on.
  */
-internal suspend fun pollUntilContractVisibleToRpc(
-    contractId: String,
-    pollIntervalMs: Long = OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
-    timeoutSeconds: Int = OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS,
-    isVisible: suspend (String) -> Boolean
-) {
-    var lastTransientError: Throwable? = null
-
-    val completed = withTimeoutOrNull(timeoutSeconds.toLong() * 1000L) {
-        while (true) {
-            ensureActive()
-            try {
-                if (isVisible(contractId)) {
-                    return@withTimeoutOrNull
-                }
-                // Contract instance not yet visible to the RPC (the expected state while
-                // the deploy transaction propagates). Keep polling without recording a cause.
-            } catch (e: CancellationException) {
-                // Cooperative cancellation (including the enclosing timeout): never swallow
-                // it as a transient error.
-                throw e
-            } catch (e: Exception) {
-                // Transient RPC/transport error: retry until the deadline and surface the
-                // last failure as the timeout cause.
-                lastTransientError = e
-            }
-            delay(pollIntervalMs)
-        }
-    }
-
-    if (completed == null) {
-        throw TransactionException.timeout(
-            details = "Deployed contract $contractId not visible to the Soroban RPC within " +
-                "${timeoutSeconds}s after deployment; testnet propagation may be delayed. " +
-                "Retry shortly",
-            cause = lastTransientError
-        )
-    }
-}
+internal fun deployedContractNotVisibleMessage(contractId: String): String =
+    "Deployed contract $contractId not visible to the Soroban RPC within " +
+        "${OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS}s after deployment; " +
+        "testnet propagation may be delayed. Retry shortly"

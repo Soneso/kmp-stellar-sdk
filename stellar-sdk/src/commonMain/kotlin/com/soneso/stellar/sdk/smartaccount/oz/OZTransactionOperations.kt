@@ -445,6 +445,8 @@ class OZTransactionOperations internal constructor(
      *   bypass auto-resolution entirely.
      * @return TransactionResult indicating success or failure
      * @throws WalletException.NotConnected if no wallet is connected
+     * @throws WalletException.HeadlessConnection if the kit is connected headlessly (no passkey
+     *   credential); use the multi-signer / external-signer pipeline instead
      * @throws ValidationException if configuration is invalid
      * @throws TransactionException if simulation, signing, or submission fails
      * @throws WebAuthnException if biometric authentication fails
@@ -461,11 +463,12 @@ class OZTransactionOperations internal constructor(
         // STEP 1: Require connected wallet
         val (credentialId, contractId) = kit.requireConnected()
 
-        // Reject the single-passkey path on a headless connection: the empty sentinel
-        // credential decodes silently and would otherwise fail late with no valid signature.
-        // A headless kit must operate via the multi-signer / external-signer pipeline with
-        // explicit non-empty selectedSigners.
-        if (credentialId == OZConstants.HEADLESS_CREDENTIAL_ID) {
+        // Reject the single-passkey path on a headless connection: a headless kit holds no
+        // passkey credential, so it cannot produce a WebAuthn signature and must operate via
+        // the multi-signer / external-signer pipeline with explicit non-empty selectedSigners.
+        // The null check fires early and smart-casts credentialId to non-null for the rest of
+        // the path.
+        if (credentialId == null) {
             throw WalletException.headlessConnection()
         }
 
@@ -749,6 +752,16 @@ class OZTransactionOperations internal constructor(
      *
      * When no relayer is configured, submits directly via RPC with temp keypair signature.
      *
+     * ## Latency
+     *
+     * After Friendbot funding, the call waits for the temporary account to become visible to
+     * the Soroban RPC before simulating the balance read. That wait is a single poll bounded by
+     * [OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS] (45s); when testnet propagation is slow the
+     * worst-case added latency approaches that budget before the call either proceeds or raises
+     * [TransactionException.Timeout]. Invoked from `createWallet(autoFund = true)` this poll runs
+     * after the deploy contract-visibility poll, so the two budgets add up to roughly 90s in the
+     * worst case. The common case returns within a few seconds.
+     *
      * ## Source Account Auth Conversion
      *
      * The funding flow converts source_account (Void) credentials to Address credentials
@@ -957,8 +970,18 @@ class OZTransactionOperations internal constructor(
      * @throws TransactionException.Timeout if the account is not visible within the budget
      */
     private suspend fun waitForAccountVisibleToRpc(accountId: String) {
-        pollUntilAccountVisibleToRpc(accountId) { id ->
-            kit.sorobanServer.getAccount(id)
+        pollUntilVisibleToRpc(
+            timeoutMessage = fundingAccountNotVisibleMessage(accountId)
+        ) {
+            // The funding account's not-yet-visible signal is an AccountNotFoundException from
+            // getAccount; map it to "not visible" so the poll keeps waiting. Any other error
+            // propagates as a transient failure for the helper to retry.
+            try {
+                kit.sorobanServer.getAccount(accountId)
+                true
+            } catch (_: AccountNotFoundException) {
+                false
+            }
         }
     }
 
@@ -1457,67 +1480,84 @@ class OZTransactionOperations internal constructor(
 }
 
 /**
- * Polls [lookup] until the account is visible to the Soroban RPC, the timeout elapses,
- * or the coroutine is cancelled.
+ * Builds the timeout detail message for the Friendbot funding-account visibility poll.
  *
- * Used by [OZTransactionOperations.fundWallet] to bridge the gap between Friendbot
- * confirming a funding transaction on Horizon and the Soroban RPC reflecting the new
- * account entry in its simulation state. Polling avoids assuming a fixed propagation
- * delay, which fails when testnet propagation is slower than the assumed wait.
+ * Shared by [OZTransactionOperations.waitForAccountVisibleToRpc] and the poll unit tests so the
+ * production wording (which names the account, explains the visibility failure, and advises
+ * retrying) has a single ASCII-only source.
  *
- * [lookup] performs a single RPC account fetch for the supplied account ID. It must:
- * - return normally once the account entry is visible to the RPC;
- * - throw [AccountNotFoundException] while the account is not yet visible — the expected
- *   pre-propagation state, which is swallowed so polling continues;
- * - throw any other exception for a transient RPC or transport error, which is retried
- *   until the deadline and surfaced as the timeout cause.
- *
- * The total wait is bounded by [timeoutSeconds] (covering both lookups and the interval
- * sleeps) and is cooperatively cancellable: [delay] and the enclosing timeout both
- * observe cancellation, and any [CancellationException] thrown by [lookup] is rethrown
- * rather than treated as a transient error.
- *
- * @param accountId The account ID (G-address) to wait for, used in the timeout message
- * @param pollIntervalMs Delay between polls in milliseconds
- * @param timeoutSeconds Overall budget in seconds before failing
- * @param lookup Suspending account lookup with the not-found / transient-error contract above
- * @throws TransactionException.Timeout if the account is not visible within the budget
+ * @param accountId The funding account ID (G-address) the poll waited on.
  */
-internal suspend fun pollUntilAccountVisibleToRpc(
-    accountId: String,
-    pollIntervalMs: Long = OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS,
-    timeoutSeconds: Int = OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS,
-    lookup: suspend (String) -> Unit
+internal fun fundingAccountNotVisibleMessage(accountId: String): String =
+    "Funding account $accountId not visible to the Soroban RPC within " +
+        "${OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS}s after Friendbot funding; " +
+        "testnet propagation may be delayed. Retry shortly"
+
+/**
+ * Polls [probe] until it reports the target is visible to the Soroban RPC, the timeout
+ * elapses, or the coroutine is cancelled.
+ *
+ * Bridges the gap between an off-chain confirmation (Friendbot funding on Horizon, or a deploy
+ * transaction included in a ledger) and the Soroban RPC reflecting the new ledger entry in its
+ * simulation state. Polling avoids assuming a fixed propagation delay, which fails when testnet
+ * propagation is slower than the assumed wait.
+ *
+ * [probe] performs a single visibility check. It must:
+ * - return true once the target entry is visible to the RPC;
+ * - return false while the entry is not yet visible (the expected pre-propagation state), which
+ *   keeps polling without recording a cause;
+ * - throw any exception for a transient RPC or transport error, which is retried until the
+ *   deadline and surfaced as the timeout cause.
+ *
+ * Callers adapt their domain-specific not-yet-visible signal to `false` inside [probe]: an
+ * account caller maps the [AccountNotFoundException] thrown by `getAccount`, and a contract
+ * caller maps a null `getContractData` result.
+ *
+ * The total wait is bounded by [OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS] (covering both the
+ * probes and the [OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS] interval sleeps) and is
+ * cooperatively cancellable: [delay] and the enclosing timeout both observe cancellation, and
+ * any [CancellationException] thrown by [probe] is rethrown rather than treated as a transient
+ * error.
+ *
+ * @param timeoutMessage Detail message for the [TransactionException.Timeout] raised when the
+ *   budget is exhausted.
+ * @param probe Suspending visibility check with the visible / not-visible / transient-error
+ *   contract above.
+ * @throws TransactionException.Timeout if the target is not visible within the budget.
+ */
+internal suspend fun pollUntilVisibleToRpc(
+    timeoutMessage: String,
+    probe: suspend () -> Boolean
 ) {
     var lastTransientError: Throwable? = null
 
-    val completed = withTimeoutOrNull(timeoutSeconds.toLong() * 1000L) {
+    val completed = withTimeoutOrNull(
+        OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS.toLong() * 1000L
+    ) {
         while (true) {
             ensureActive()
             try {
-                lookup(accountId)
-                return@withTimeoutOrNull
-            } catch (_: AccountNotFoundException) {
-                // Account not yet visible to the RPC — the expected state while
-                // Friendbot funding propagates. Keep polling without recording a cause.
+                if (probe()) {
+                    return@withTimeoutOrNull
+                }
+                // Not yet visible to the RPC (the expected pre-propagation state). Keep
+                // polling without recording a cause.
             } catch (e: CancellationException) {
-                // Cooperative cancellation (including the enclosing timeout) — never
-                // swallow it as a transient error.
+                // Cooperative cancellation (including the enclosing timeout): never swallow
+                // it as a transient error.
                 throw e
             } catch (e: Exception) {
-                // Transient RPC/transport error — retry until the deadline and surface
-                // the last failure as the timeout cause.
+                // Transient RPC/transport error: retry until the deadline and surface the
+                // last failure as the timeout cause.
                 lastTransientError = e
             }
-            delay(pollIntervalMs)
+            delay(OZConstants.RPC_VISIBILITY_POLL_INTERVAL_MS)
         }
     }
 
     if (completed == null) {
         throw TransactionException.timeout(
-            details = "Funding account $accountId not visible to the Soroban RPC within " +
-                "${timeoutSeconds}s after Friendbot funding; testnet propagation may be delayed. " +
-                "Retry shortly",
+            details = timeoutMessage,
             cause = lastTransientError
         )
     }

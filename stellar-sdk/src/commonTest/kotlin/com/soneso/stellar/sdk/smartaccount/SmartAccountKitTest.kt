@@ -2316,12 +2316,20 @@ class SmartAccountKitTest {
         val notFoundPolls = 3
         var calls = 0
 
-        pollUntilAccountVisibleToRpc(accountId) { id ->
+        pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
             calls++
-            if (calls <= notFoundPolls) {
-                throw AccountNotFoundException(id)
+            // Account visibility signal: getAccount throws AccountNotFoundException while the
+            // account is not yet visible. Map that to "not visible" exactly as the production
+            // waitForAccountVisibleToRpc adaptation does.
+            try {
+                if (calls <= notFoundPolls) {
+                    throw AccountNotFoundException(accountId)
+                }
+                // Visible from the fourth lookup onward.
+                true
+            } catch (_: AccountNotFoundException) {
+                false
             }
-            // Visible from the fourth lookup onward — return normally.
         }
 
         // One lookup per attempt: three "not found" plus the successful one.
@@ -2339,9 +2347,15 @@ class SmartAccountKitTest {
         val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
         var calls = 0
 
-        pollUntilAccountVisibleToRpc(accountId) { _ ->
+        pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
             calls++
-            // Visible immediately.
+            // getAccount returns normally on the first lookup: the account adaptation yields
+            // "visible" with no not-found mapping in play.
+            try {
+                true
+            } catch (_: AccountNotFoundException) {
+                false
+            }
         }
 
         assertEquals(1, calls)
@@ -2356,9 +2370,15 @@ class SmartAccountKitTest {
         var calls = 0
 
         val error = assertFailsWith<TransactionException.Timeout> {
-            pollUntilAccountVisibleToRpc(accountId) { id ->
+            pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
                 calls++
-                throw AccountNotFoundException(id)
+                // Always not visible: getAccount keeps throwing AccountNotFoundException, which
+                // the account adaptation maps to "not visible" until the budget is exhausted.
+                try {
+                    throw AccountNotFoundException(accountId)
+                } catch (_: AccountNotFoundException) {
+                    false
+                }
             }
         }
 
@@ -2366,6 +2386,15 @@ class SmartAccountKitTest {
         assertTrue(
             error.message.contains("not visible to the Soroban RPC"),
             "Timeout message should explain the visibility failure, but was: ${error.message}"
+        )
+        assertTrue(
+            error.message.contains("Retry shortly"),
+            "Timeout message should advise retrying, but was: ${error.message}"
+        )
+        // The message must be ASCII only: no em dash (U+2014) is permitted.
+        assertFalse(
+            error.message.contains('—'),
+            "Timeout message must be ASCII (no em dash), but was: ${error.message}"
         )
         // A pure "not found" timeout has no transient RPC error to surface as the cause.
         assertNull(error.cause)
@@ -2385,8 +2414,10 @@ class SmartAccountKitTest {
         var calls = 0
 
         val error = assertFailsWith<TransactionException.Timeout> {
-            pollUntilAccountVisibleToRpc(accountId) { _ ->
+            pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
                 calls++
+                // Transient RPC/transport errors propagate out of the account lookup (they are
+                // not the AccountNotFoundException not-visible signal) for the helper to retry.
                 throw IllegalStateException("rpc unavailable #$calls")
             }
         }
@@ -2408,12 +2439,18 @@ class SmartAccountKitTest {
         val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
         var calls = 0
 
-        pollUntilAccountVisibleToRpc(accountId) { id ->
+        pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
             calls++
-            when (calls) {
-                1 -> throw IllegalStateException("transient rpc error")
-                2 -> throw AccountNotFoundException(id)
-                else -> { /* visible on the third lookup */ }
+            // call 1 transient error (propagates), call 2 not-yet-visible (AccountNotFound mapped
+            // to false by the account adaptation), call 3 visible.
+            try {
+                when (calls) {
+                    1 -> throw IllegalStateException("transient rpc error")
+                    2 -> throw AccountNotFoundException(accountId)
+                    else -> true // visible on the third lookup
+                }
+            } catch (_: AccountNotFoundException) {
+                false
             }
         }
 
@@ -2438,7 +2475,7 @@ class SmartAccountKitTest {
 
         val job = launch {
             try {
-                pollUntilAccountVisibleToRpc(accountId) { _ ->
+                pollUntilVisibleToRpc(timeoutMessage = fundingAccountNotVisibleMessage(accountId)) {
                     calls++
                     // The lookup's cancellable work is cancelled and surfaces a
                     // CancellationException from inside the poll's try block.
@@ -2481,9 +2518,11 @@ class SmartAccountKitTest {
         val absentPolls = 3
         var calls = 0
 
-        pollUntilContractVisibleToRpc(contractId) { _ ->
+        pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
             calls++
-            // Visible (instance entry present) from the fourth lookup onward.
+            // Contract visibility signal: a null getContractData result (absent instance entry)
+            // maps to "not visible". Here the instance entry is present (visible) from the
+            // fourth lookup onward.
             calls > absentPolls
         }
 
@@ -2504,9 +2543,9 @@ class SmartAccountKitTest {
         val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
         var calls = 0
 
-        pollUntilContractVisibleToRpc(contractId) { _ ->
+        pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
             calls++
-            true // Visible immediately.
+            true // Instance entry present on the first lookup: visible immediately.
         }
 
         assertEquals(1, calls)
@@ -2522,9 +2561,9 @@ class SmartAccountKitTest {
         var calls = 0
 
         val error = assertFailsWith<TransactionException.Timeout> {
-            pollUntilContractVisibleToRpc(contractId) { _ ->
+            pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
                 calls++
-                false // Never visible.
+                false // Instance entry never present: never visible.
             }
         }
 
@@ -2561,7 +2600,7 @@ class SmartAccountKitTest {
         var calls = 0
 
         val error = assertFailsWith<TransactionException.Timeout> {
-            pollUntilContractVisibleToRpc(contractId) { _ ->
+            pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
                 calls++
                 throw IllegalStateException("rpc unavailable #$calls")
             }
@@ -2584,12 +2623,12 @@ class SmartAccountKitTest {
         val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
         var calls = 0
 
-        pollUntilContractVisibleToRpc(contractId) { _ ->
+        pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
             calls++
             when (calls) {
                 1 -> throw IllegalStateException("transient rpc error")
-                2 -> false // Instance not yet visible.
-                else -> true // Visible on the third lookup.
+                2 -> false // Instance entry absent: not yet visible.
+                else -> true // Instance entry present on the third lookup.
             }
         }
 
@@ -2614,7 +2653,7 @@ class SmartAccountKitTest {
 
         val job = launch {
             try {
-                pollUntilContractVisibleToRpc(contractId) { _ ->
+                pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
                     calls++
                     // The lookup's cancellable work is cancelled and surfaces a
                     // CancellationException from inside the poll's try block.
@@ -2648,17 +2687,18 @@ class SmartAccountKitTest {
 
     @Test
     fun testPollUntilContractVisible_absentEntryNotVisiblePresentEntryVisible() = runTest {
-        // Wiring contract: waitForContractVisibleToRpc passes
-        // `getContractData(...) != null` as the visibility check, so an empty entries result
-        // (getContractData returns null) must read as "not visible" and a present entry as
-        // "visible". Emulate that exact mapping to pin the structural visibility signal the
-        // deploy/fund flow depends on.
+        // Pins the `entry != null` mapping that waitForContractVisibleToRpc applies on top of the
+        // poll: a null getContractData result (absent instance entry) reads as "not visible" and
+        // keeps polling, while a non-null result reads as "visible" and completes. This exercises
+        // the mapping/loop semantics over a representative absent/absent/present sequence; the
+        // real SorobanServer.getContractData JSON decode (empty entries -> null, instance entries
+        // -> non-null) is covered separately by HeadlessConnectTest via verifyContractExists.
         val contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
         // null = instance ledger entry absent (RPC reports NotFound); non-null = present.
         val getContractDataResults: List<Any?> = listOf(null, null, Any())
         var calls = 0
 
-        pollUntilContractVisibleToRpc(contractId) { _ ->
+        pollUntilVisibleToRpc(timeoutMessage = deployedContractNotVisibleMessage(contractId)) {
             val result = getContractDataResults[calls]
             calls++
             // Exactly the production lambda's structural mapping.
