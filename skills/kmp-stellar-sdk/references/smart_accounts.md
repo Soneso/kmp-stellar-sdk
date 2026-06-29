@@ -51,7 +51,7 @@ Smart accounts are in the same artifact as the rest of the KMP SDK:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.8.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.8.1")
 }
 ```
 
@@ -524,6 +524,37 @@ When `credentialId` is provided (or after WebAuthn), the SDK resolves the contra
    - N > 1 contracts → return `ConnectWalletResult.Ambiguous(credentialId, candidates)`. Connection state is NOT set; the caller must let the user pick.
 
 When the explicit `contractId` is supplied (direct connect or session restore), the cascade is bypassed and only the on-chain verification runs.
+
+### Headless connect (no passkey)
+
+`connectToContract(contractId)` binds the kit to an existing smart account by contract address alone — no WebAuthn ceremony, no credential, no persisted session. It validates the C-address, verifies the contract exists on-chain, clears any saved session, sets the connected state with a null credential, and emits `SmartAccountEvent.HeadlessConnected`. Intended for backends and autonomous signers (e.g. a reference agent holding an Ed25519 key) that operate through the multi-signer / external-signer pipeline.
+
+```kotlin
+// Member of OZWalletOperations.
+suspend fun connectToContract(contractId: String): String   // returns the connected contract id
+```
+
+```kotlin
+val contractId = kit.walletOperations.connectToContract("CABC...")
+// kit.isConnected == true, kit.isHeadless == true, kit.credentialId == null
+```
+
+A headless connection sets `isHeadless` (`contractId != null && credentialId == null`). Use it to tell a headless connection (`isConnected == true`, no credential) apart from no connection at all; `credentialId` is null in this state.
+
+**Operating boundary.** A headless connection is usable ONLY through the multi-signer / external-signer pipeline — calls made with a non-empty `selectedSigners`. The single-passkey signing paths reject it with `WalletException.HeadlessConnection`, because they need a passkey credential to produce a WebAuthn signature and a headless connection holds none:
+
+- `transactionOperations.submit`, `executeAndSubmit`, `transfer`, `contractCall`
+- any manager operation (signer / context-rule / policy) left at the default empty `selectedSigners`
+
+`fundWallet` is the exception: on testnet it signs with a temporary Friendbot keypair and never routes through the single-passkey submit path, so it works headlessly.
+
+```kotlin
+// WRONG: after connectToContract(...), kit.transactionOperations.transfer(...)  — throws WalletException.HeadlessConnection
+// CORRECT: route through the multi-signer pipeline with a non-empty selectedSigners
+//   (see smart_accounts_policies.md → Multi-Signer Operations)
+```
+
+Throws `ValidationException.InvalidAddress` if `contractId` is not a valid C-address, `WalletException.NotFound` if no contract instance exists at that address; an RPC / transport error during the on-chain check propagates as its original type. Existing passkey connect/create flows are unchanged — this path is additive.
 
 ---
 
@@ -1168,6 +1199,7 @@ suspend fun removeAll()                  // clears every signer, disconnects all
 sealed class SmartAccountEvent {
     data class WalletConnected(val contractId: String, val credentialId: String) : SmartAccountEvent()
     data class WalletDisconnected(val contractId: String) : SmartAccountEvent()
+    data class HeadlessConnected(val contractId: String) : SmartAccountEvent()  // connectToContract: no passkey credential
     data class CredentialCreated(val credential: StoredCredential) : SmartAccountEvent()
     data class CredentialDeleted(val credentialId: String) : SmartAccountEvent()
     data class SessionExpired(val contractId: String, val credentialId: String) : SmartAccountEvent()

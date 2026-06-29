@@ -19,21 +19,21 @@ This document describes the Android-specific setup for the Smart Account Demo.
 - **Note**: Replace `your-domain.example.com` with your actual domain
 
 ### 4. MainActivity.kt
-- **Added**: `OZSmartAccountKit` initialization with Android providers
+- **Added**: Android provider setup for the Smart Account Kit
 - **Components**:
   - `AndroidStorageAdapter(context)` - Encrypted storage using EncryptedSharedPreferences
-  - `AndroidWebAuthnProvider(context, rpId, rpName)` - Passkey authentication
-  - `OZSmartAccountConfig` with platform-specific providers
-  - `OZSmartAccountKit.create()` factory method
+  - `AndroidWebAuthnProvider(context, rpId, rpName)` - Passkey authentication; `rpId` and `rpName` are read from `DemoConfig`
+  - Registers the WebAuthn provider and storage adapter into `DemoState` (`setWebAuthnProvider`, `setStorage`); the shared code builds `OZSmartAccountConfig` and calls `OZSmartAccountKit.create()` once the WebAuthn provider is registered (storage is optional and falls back to an in-memory adapter)
+  - Registers the Reown wallet connector when not running on an emulator and `REOWN_PROJECT_ID` is set
   - Error handling with `ActivityLogState`
 
 ## Production Setup
 
 ### Step 1: Configure Your Domain
 
-Replace `your-domain.example.com` in both:
-- `MainActivity.kt` (line 35: `rpId = "your-domain.example.com"`)
-- `res/values/strings.xml` (line 8: `https://your-domain.example.com/.well-known/assetlinks.json`)
+The RP ID is read from `DemoConfig.DEFAULT_RP_ID` (default `soneso.com`). To use your own domain, set it there and update the hosted `assetlinks.json` URL:
+- `DEFAULT_RP_ID` in `shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt`
+- the `your-domain.example.com` placeholder (the `assetlinks.json` include URL) in `res/values/strings.xml`
 
 ### Step 2: Generate SHA-256 Fingerprint
 
@@ -91,12 +91,12 @@ MainActivity.onCreate()
        │    └─> Uses EncryptedSharedPreferences with AES-256-GCM
        ├─> AndroidWebAuthnProvider(context, rpId, rpName)
        │    └─> Uses Credential Manager API for passkeys
-       ├─> OZSmartAccountConfig(...)
-       │    └─> Includes network, contracts, and providers
-       └─> OZSmartAccountKit.create(config)
-            ├─> Creates operation managers (wallet, transaction, signer, etc.)
-            ├─> Initializes Soroban RPC server
-            └─> Sets up relayer/indexer clients (if configured)
+       └─> DemoState.setStorage(...) / DemoState.setWebAuthnProvider(...)
+            └─> Shared code builds the kit once the WebAuthn provider is registered (storage optional):
+                 OZSmartAccountConfig(...) -> OZSmartAccountKit.create(config)
+                  ├─> Creates operation managers (wallet, transaction, signer, etc.)
+                  ├─> Initializes Soroban RPC server
+                  └─> Sets up relayer/indexer clients (if configured)
 ```
 
 ## Dependencies
@@ -120,7 +120,7 @@ Already included in the SDK:
 - Verify `minSdk = 28` in `build.gradle.kts`
 - Check that `assetlinks.json` is accessible at the correct URL
 - Confirm SHA-256 fingerprint matches your signing certificate
-- Ensure rpId in MainActivity.kt matches the domain in assetlinks.json
+- Ensure the RP ID (`DemoConfig.DEFAULT_RP_ID`) matches the domain in assetlinks.json
 
 ### Storage Initialization Fails
 - Check that device supports Android Keystore (API 24+)

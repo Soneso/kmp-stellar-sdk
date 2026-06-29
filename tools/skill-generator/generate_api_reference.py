@@ -137,14 +137,24 @@ def strip_comments(content: str) -> str:
             if i < n and content[i] == "'":
                 result.append("'")
                 i += 1
-        # Multi-line comments (/* ... */)
+        # Block comments (/* ... */). Kotlin block comments nest, so a KDoc
+        # whose code example contains an inner /* ... */ must be skipped as a
+        # whole; tracking depth prevents the inner */ from ending the outer
+        # comment early (which would leak example code into the parsed output).
         elif content[i : i + 2] == "/*":
             i += 2
-            while i < n and content[i : i + 2] != "*/":
-                if content[i] == "\n":
-                    result.append("\n")
-                i += 1
-            i += 2  # skip */
+            depth = 1
+            while i < n and depth > 0:
+                if content[i : i + 2] == "/*":
+                    depth += 1
+                    i += 2
+                elif content[i : i + 2] == "*/":
+                    depth -= 1
+                    i += 2
+                else:
+                    if content[i] == "\n":
+                        result.append("\n")
+                    i += 1
         # Single-line comments
         elif content[i : i + 2] == "//":
             while i < n and content[i] != "\n":

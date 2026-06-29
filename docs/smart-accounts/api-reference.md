@@ -84,14 +84,21 @@ Event emitter for wallet lifecycle events. Subscribe to receive notifications ab
 val isConnected: Boolean
 ```
 
-True if a wallet is currently connected (both credential ID and contract ID are set).
+True when a contract address is connected. The credential is optional and is absent for a headless `walletOperations.connectToContract()` connection. Reflects in-memory state only; after an app restart, call `walletOperations.connectWallet()` to restore a saved session.
+
+#### isHeadless
+```kotlin
+val isHeadless: Boolean
+```
+
+True when the kit is connected to a contract with no passkey credential (contract address set, `credentialId == null`) -- the state established by `walletOperations.connectToContract()`. Headless connections operate only through the multi-signer / external-signer pipeline; the single-passkey paths reject them.
 
 #### credentialId
 ```kotlin
 val credentialId: String?
 ```
 
-Base64URL-encoded credential ID of the currently connected wallet, or null if not connected.
+Base64URL-encoded credential ID of the currently connected wallet, or null when no wallet is connected and for a headless `walletOperations.connectToContract()` connection. Use `isHeadless` to tell a headless connection apart from no connection.
 
 #### contractId
 ```kotlin
@@ -534,6 +541,49 @@ walletOps.connectWallet(
     ConnectWalletOptions(
         credentialId = "abc123...",
         contractId = "CBCD..."
+    )
+)
+```
+
+---
+
+#### connectToContract
+
+```kotlin
+suspend fun connectToContract(contractId: String): String
+```
+
+Connects to an existing smart account by its contract address alone, with no passkey credential and no WebAuthn ceremony. Validates the address is a contract address (`C...`), verifies the contract exists on-chain (a one-shot existence check, not a poll), clears any previously saved session, then sets the connected state with a null credential and emits `SmartAccountEvent.HeadlessConnected(contractId)`. After the call, `isConnected` and `isHeadless` are both `true`, `contractId` is the connected address, and `credentialId` is null.
+
+Intended for backends and autonomous signers (for example a reference agent holding an Ed25519 key) that operate through the multi-signer / external-signer pipeline.
+
+**Operating boundary**: a headless connection holds no passkey credential, so the single-passkey signing paths -- `transactionOperations.submit`, `executeAndSubmit`, `transfer`, `contractCall`, and any manager operation left at the default empty `selectedSigners` -- reject it with `WalletException.HeadlessConnection`. Drive these through the multi-signer / external-signer pipeline (calls made with a non-empty `selectedSigners`) instead. `transactionOperations.fundWallet` is the exception: it works headlessly on testnet because it signs with a temporary keypair and never routes through the single-passkey submit path.
+
+**Parameters**:
+- `contractId`: Smart account contract address (`C...` strkey) to attach to.
+
+**Returns**: The connected contract address (the validated `contractId`).
+
+**Throws**:
+- `ValidationException.InvalidAddress`: `contractId` is not a valid C-address
+- `WalletException.NotFound`: no contract instance exists at `contractId`
+- `SorobanRpcException`: the on-chain existence check returned a server-side RPC error -- propagated as-is so callers can distinguish "contract is not on-chain" from "lookup was inconclusive". A genuine transport/network failure (connection refused, timeout) surfaces as its own exception type, not `SorobanRpcException`
+
+**Example**:
+
+```kotlin
+// Backend or autonomous signer: attach to a known smart account, no passkey
+val contractId = kit.walletOperations.connectToContract("CABC...")
+println("Headless: ${kit.isHeadless}") // true
+
+// Register an Ed25519 signer and sign through the multi-signer pipeline
+val publicKey = kit.externalSigners.addEd25519FromRawKey(secretKeyBytes, verifierAddress)
+val result = kit.multiSignerManager.multiSignerTransfer(
+    tokenContract = "C...",
+    recipient = "C...",
+    amount = "10",
+    selectedSigners = listOf(
+        SelectedSigner.Ed25519(verifierAddress = verifierAddress, publicKey = publicKey)
     )
 )
 ```
@@ -3340,6 +3390,10 @@ sealed class SmartAccountEvent {
         val contractId: String
     ) : SmartAccountEvent()
 
+    data class HeadlessConnected(
+        val contractId: String
+    ) : SmartAccountEvent()
+
     data class CredentialCreated(
         val credential: StoredCredential
     ) : SmartAccountEvent()
@@ -3527,6 +3581,7 @@ enum class SmartAccountErrorCode(val code: Int) {
     WALLET_NOT_CONNECTED(2001),
     WALLET_ALREADY_EXISTS(2002),
     WALLET_NOT_FOUND(2003),
+    WALLET_HEADLESS_CONNECTION(2004),
 
     // 3xxx: Credential
     CREDENTIAL_NOT_FOUND(3001),
@@ -3591,10 +3646,13 @@ sealed class WalletException : SmartAccountException {
     class NotConnected(message: String = "Wallet is not connected", cause: Throwable? = null)
     class NotFound(message: String, cause: Throwable? = null)
     class AlreadyExists(message: String, cause: Throwable? = null)
+    class HeadlessConnection(message: String, cause: Throwable? = null)
 }
 ```
 
-**Error Codes**: 2001 (NOT_CONNECTED), 2002 (ALREADY_EXISTS), 2003 (NOT_FOUND)
+`HeadlessConnection` is thrown by the single-passkey signing paths when the kit is connected headlessly via `walletOperations.connectToContract()` (no passkey credential). A headless kit must operate through the multi-signer / external-signer pipeline with a non-empty `selectedSigners`.
+
+**Error Codes**: 2001 (NOT_CONNECTED), 2002 (ALREADY_EXISTS), 2003 (NOT_FOUND), 2004 (HEADLESS_CONNECTION)
 
 ---
 

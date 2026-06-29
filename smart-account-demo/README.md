@@ -1,6 +1,6 @@
 # Smart Account Demo App
 
-A Kotlin Multiplatform application for testing the Smart Account Kit SDK with WebAuthn passkey authentication on Stellar testnet. The app covers wallet creation, token transfers, multi-signer authorization, and on-chain context rule management.
+A Kotlin Multiplatform application for testing the Smart Account Kit SDK with WebAuthn passkey authentication on Stellar testnet. The app covers wallet creation, token transfers, multi-signer authorization, on-chain context rule management, and an agent-signer flow that delegates scoped, spend-capped authority to an autonomous agent.
 
 The primary purpose of this app is to test and validate the SDK implementation across platforms. It is not intended as a production application template.
 
@@ -8,10 +8,10 @@ Supported platforms: Android, iOS, macOS, and Web. Android, iOS, and Web use Com
 
 ## Features
 
-The demo includes 8 screens:
+The demo includes 10 screens:
 
 ### 1. Main Dashboard
-Wallet status display with XLM and DEMO token balances, navigation to all other screens, activity log showing SDK operations in real time, balance refresh, and wallet disconnect.
+Wallet status display with XLM and DEMO token balances, navigation to all other screens, an approval-inbox bell that badges pending agent escalations, activity log showing SDK operations in real time, balance refresh, and wallet disconnect.
 
 ### 2. Wallet Creation
 Collects a username, registers a passkey via the platform's WebAuthn provider, deploys a smart account contract to testnet, funds the wallet with XLM via Friendbot, and mints 10,000 DEMO tokens. Displays the credential ID, contract address, transaction hash, and initial balances on completion.
@@ -37,6 +37,12 @@ Displays all unique signers registered across all context rules. Each signer ent
 
 ### 8. Approve
 Grants a SEP-41 token spending allowance that delegates spending authority over the smart account's tokens to another address. This screen demonstrates an arbitrary contract call: unlike Transfer (which uses the dedicated transfer helper), Approve invokes the token's `approve` function through the generic contract-call path, with both single-signer and multi-signer support.
+
+### 9. Delegate to an Agent
+Reached from the Context Rules screen. Creates an on-chain context rule that scopes a raw Ed25519 agent key to a single token contract with a spending cap and an expiry, so an autonomous agent can sign transfers within that scope without a passkey. The result card displays the agent key and exposes the scoped token contract and the transaction hash as copyable values for wiring the reference agent.
+
+### 10. Approval Inbox
+Reached from the bell on the Main Dashboard, which badges the count of pending escalations. When the agent attempts an over-cap call, the call is rejected on-chain and escalated to the coordination server; the inbox lists each pending request with its decoded call, and the user approves it (re-submitting it under the Default rule) or rejects it. An approved request shows its on-chain transaction hash as a copyable value.
 
 ## Architecture
 
@@ -64,12 +70,26 @@ smart-account-demo/
 │       ├── Views/                       # Screens, sections, view model
 │       ├── Components/                  # Reusable UI components
 │       └── Utilities/                   # Helper files
-└── webApp/                              # Web entry point (Compose via Kotlin/JS)
+├── webApp/                              # Web entry point (Compose via Kotlin/JS)
+├── coordination-server/                 # Ktor JVM relay service (agent-signer flow)
+├── reference-agent/                     # Kotlin JVM reference agent (agent-signer flow)
+└── documentation/                       # agent-flow.md end-to-end runbook
 ```
 
 **Shared module**: All business logic lives in `flows/`. State management uses `DemoState` (wallet connection, balances, kit instance) and `ActivityLogState` (operation log). Platform-specific code is limited to clipboard access, WebAuthn providers, and storage adapters.
 
 **macOS app**: Uses native SwiftUI instead of Compose. A Kotlin bridge in `macosMain` exposes the shared flow functions to Swift; the SwiftUI layer handles UI rendering while all SDK interaction goes through the bridge.
+
+## Agent-signer flow
+
+The demo includes an end-to-end agent-signer flow: a user delegates a scoped, spend-capped Ed25519 authority to an autonomous agent (Delegate to an Agent), the agent signs calls within that scope, and an over-cap call is rejected on-chain and escalated to the user for approval (Approval Inbox). The subsystem is all-Kotlin, built from two Gradle modules:
+
+- `:smart-account-demo:coordination-server` -- a Ktor (CIO) JVM service that relays escalated calls between the agent and the app. Pure relay, no SDK dependency. Run with `./gradlew :smart-account-demo:coordination-server:run`.
+- `:smart-account-demo:reference-agent` -- a Kotlin JVM executable that connects to the smart account headlessly (`connectToContract`), attempts a token transfer, and escalates over-cap calls. Run with `./gradlew :smart-account-demo:reference-agent:run`.
+
+The agent-flow UI (Delegate to an Agent, Approval Inbox, and the badged bell) lives in the shared Compose module and is surfaced by the web, Android, and iOS shells; the native SwiftUI macOS app does not host these Compose screens. The web app is the recommended manual-test target -- passkeys work on `localhost` with no entitlement setup.
+
+See [documentation/agent-flow.md](documentation/agent-flow.md) for the end-to-end runbook.
 
 ## Prerequisites
 

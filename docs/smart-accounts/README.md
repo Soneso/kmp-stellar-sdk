@@ -69,7 +69,7 @@ The kit is split into two layers: a protocol-agnostic `core/` layer (signer type
 +----------------+  +------------------+  +---------------------+
 ```
 
-**OZSmartAccountKit** is the single entry point. It holds configuration, connection state (`isConnected`, `credentialId`, `contractId`), and exposes all operations through sub-managers. Each sub-manager receives a reference to the kit and uses its Soroban server, relayer, indexer, and storage internally.
+**OZSmartAccountKit** is the single entry point. It holds configuration, connection state (`isConnected`, `isHeadless`, `credentialId`, `contractId`), and exposes all operations through sub-managers. Each sub-manager receives a reference to the kit and uses its Soroban server, relayer, indexer, and storage internally.
 
 **WebAuthnProvider** is a platform-specific interface you implement, or use the provided implementation. It triggers the OS-level biometric prompt and returns raw WebAuthn attestation/assertion data.
 
@@ -228,6 +228,16 @@ val connection = kit.walletOperations.connectWallet(
     )
 )
 ```
+
+#### Headless connection (no passkey)
+
+Backends and autonomous signers that have no passkey can attach to a smart account by contract address alone. `connectToContract()` runs no WebAuthn ceremony, holds no credential, and leaves `credentialId` null while setting `isHeadless` to `true`:
+
+```kotlin
+val contractId = kit.walletOperations.connectToContract("CABC...")
+```
+
+A headless connection is operable only through the multi-signer / external-signer pipeline (calls with a non-empty `selectedSigners`). The single-passkey signing paths reject it with `WalletException.HeadlessConnection`. See [connectToContract](api-reference.md#connecttocontract) for the operating boundary and a signing example.
 
 ### Retrying Failed Deployments
 

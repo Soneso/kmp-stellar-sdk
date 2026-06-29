@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-06-29
+
+### Added
+- **Headless smart-account connect**: `connectToContract(contractId)` on the
+  OpenZeppelin smart-account kit connects to a deployed account by contract
+  address with no passkey. The connection is usable through the multi-signer /
+  external-signer pipeline; single-passkey paths reject a headless connection.
+  Adds the public `isHeadless` discriminator, the
+  `SmartAccountEvent.HeadlessConnected` event, and
+  `WalletException.HeadlessConnection` (error code 2004).
+- Soroban-RPC-visibility polling for wallet auto-funding, replacing fixed delays.
+- An agent-signer flow demo in the smart-account demo: delegate-to-agent plus an
+  approval inbox, backed by a Ktor coordination server and a Kotlin reference
+  agent.
+
+### Changed
+- The published `-javadoc.jar` is now empty (the Dokka HTML still deploys to
+  GitHub Pages) to keep the Maven Central artifact size under the free threshold.
+
+### Fixed
+- The agent-skill API-reference generator now handles Kotlin nested block
+  comments, so members declared after a KDoc containing an inner block comment
+  are no longer dropped.
+
 ## [1.8.0] - 2026-06-19
 
 ### Added

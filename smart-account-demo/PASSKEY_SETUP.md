@@ -19,7 +19,7 @@ WebAuthn passkeys require a trust relationship between the app and a domain. The
 
 ### RP ID
 
-On the web, the RP ID defaults to the current page's hostname if not explicitly set. For example, if the demo runs at `http://localhost:8081`, the RP ID is `localhost`.
+On the web, the RP ID defaults to the current page's hostname if not explicitly set. For example, if the demo runs at `http://localhost:9003`, the RP ID is `localhost`.
 
 The RP ID is set on `JsWebAuthnProvider`, not on `OZSmartAccountConfig`. For web apps, the `rpId` parameter of `JsWebAuthnProvider` can be omitted — the browser's WebAuthn API uses the current origin's effective domain.
 
@@ -252,7 +252,7 @@ macOS uses the same AuthenticationServices framework as iOS. The configuration i
 
 ### Web Demo
 
-The web demo runs on `localhost` during development (e.g., `http://localhost:8081` via Vite dev server). No RP ID configuration or domain association is needed because:
+The web demo runs on `localhost` during development (e.g., `http://localhost:9003` via Vite dev server). No RP ID configuration or domain association is needed because:
 - Browsers treat `localhost` as a secure context.
 - The browser automatically uses `localhost` as the RP ID when none is specified.
 

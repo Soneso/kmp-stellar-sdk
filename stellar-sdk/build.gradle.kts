@@ -327,11 +327,14 @@ kover {
 // Dokka 2.x generates docs from shared source sets without requiring native compilation
 // No special configuration needed for cross-compilation on CI
 
-// Dokka Configuration for API Documentation (V2 mode)
+// Maven Central requires a -javadoc.jar to exist but does not validate its
+// contents, so the published jar is intentionally empty. The full Dokka HTML
+// (~30 MB per publication) is redundant on Maven Central: the API docs ship to
+// GitHub Pages via the pages.yml workflow, and IDEs use the sources jar. This
+// keeps the per-release size under the Maven Central free threshold.
+// dokkaGeneratePublicationHtml still exists for the GitHub Pages site.
 tasks.register<Jar>("javadocJar") {
     archiveClassifier.set("javadoc")
-    dependsOn(tasks.named("dokkaGeneratePublicationHtml"))
-    from(tasks.named("dokkaGeneratePublicationHtml").get().outputs)
 }
 
 // Maven Publishing Configuration

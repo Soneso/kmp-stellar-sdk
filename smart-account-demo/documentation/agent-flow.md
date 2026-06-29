@@ -182,7 +182,10 @@ This installs one on-chain context rule that scopes the agent to one token via a
 caps its spend with a spending-limit policy, and expires on its own via
 `validUntil`. The coordination server is not involved in this step.
 
-Copy the value the agent needs from the app's wallet status card: the account
+After the rule is installed, the delegate result card shows the **Agent Key**
+and exposes the scoped **Token Contract** (tap to copy — this is the agent's
+`AGENT_TOKEN_CONTRACT`) and the transaction **Hash** as copyable values. Copy
+the value the agent needs from the app's wallet status card: the account
 **Contract address** (`C...`). The agent connects headlessly by contract address
 alone — it holds no passkey credential.
 
