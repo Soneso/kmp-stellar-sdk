@@ -14,6 +14,7 @@ import io.ktor.server.application.log
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.header
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
@@ -23,12 +24,20 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import java.time.Instant
 
 /** `Bearer ` prefix on the Authorization header. */
 private const val BEARER_PREFIX = "Bearer "
+
+/**
+ * Largest request body the API decodes, in bytes. Bodies declaring or carrying
+ * more than this are rejected with HTTP 413 before any JSON parsing, bounding the
+ * memory a single request can pin. Generous for the small JSON call descriptors
+ * this relay handles while still capping abuse.
+ */
+private const val MAX_REQUEST_BODY_BYTES = 256L * 1024
 
 /**
  * JSON codec for the wire contract: nullable fields are always present (as
@@ -38,7 +47,7 @@ private const val BEARER_PREFIX = "Bearer "
  * that default rather than rejected, matching the iOS and Dart servers which
  * treat a missing or null amount as the empty string.
  */
-private val json = Json {
+internal val wireJson = Json {
     encodeDefaults = true
     explicitNulls = true
     ignoreUnknownKeys = true
@@ -73,7 +82,14 @@ fun Application.coordinationModule(store: RequestStore, token: String) {
         exception<StoreFormatException> { call, cause ->
             call.respondError(HttpStatusCode.BadRequest, cause.message)
         }
+        exception<PayloadTooLargeException> { call, cause ->
+            call.respondError(HttpStatusCode.PayloadTooLarge, cause.message)
+        }
         exception<Throwable> { call, cause ->
+            // Cancellation is cooperative coroutine control flow (client disconnects,
+            // shutdown), not a server fault: propagate it untouched so it is not
+            // logged as an error or masked behind a 500.
+            if (cause is CancellationException) throw cause
             call.application.log.error("Unhandled error", cause)
             call.respondError(HttpStatusCode.InternalServerError, "internal server error")
         }
@@ -89,16 +105,17 @@ fun Application.coordinationModule(store: RequestStore, token: String) {
         }
     }
 
-    // Request logging: one line per request to stdout. CORS `OPTIONS` preflights are
-    // short-circuited noise and are not logged.
+    // Request logging: one line per request through the application logger, which
+    // adds its own timestamp. CORS `OPTIONS` preflights are short-circuited noise
+    // and are not logged.
     intercept(ApplicationCallPipeline.Monitoring) {
         val start = System.nanoTime()
         proceed()
         if (call.request.httpMethod == HttpMethod.Options) return@intercept
         val millis = (System.nanoTime() - start) / 1_000_000
         val status = call.response.status()?.value ?: 0
-        println(
-            "${Instant.now()} ${call.request.httpMethod.value} ${call.request.path()} $status ${millis}ms"
+        call.application.log.info(
+            "${call.request.httpMethod.value} ${call.request.path()} $status ${millis}ms"
         )
     }
 
@@ -138,7 +155,7 @@ fun Application.coordinationModule(store: RequestStore, token: String) {
         }
 
         post("/requests") {
-            val input = decodeBody(call.receiveText(), CreateRequestInput.serializer(), allowEmpty = false)
+            val input = decodeBody(call.receiveBoundedText(), CreateRequestInput.serializer(), allowEmpty = false)
                 .validated()
             val created = store.create(input)
             call.respondJson(HttpStatusCode.Created, SmartAccountRequest.serializer(), created)
@@ -163,7 +180,7 @@ fun Application.coordinationModule(store: RequestStore, token: String) {
 
         post("/requests/{id}/approve") {
             val id = call.parameters["id"].orEmpty()
-            val body = decodeBody(call.receiveText(), ApproveBody.serializer(), allowEmpty = false)
+            val body = decodeBody(call.receiveBoundedText(), ApproveBody.serializer(), allowEmpty = false)
             val resultHash = body.resultHash
             if (resultHash.isNullOrEmpty()) {
                 throw ValidationException("field 'resultHash' must be a non-empty string")
@@ -174,7 +191,7 @@ fun Application.coordinationModule(store: RequestStore, token: String) {
 
         post("/requests/{id}/reject") {
             val id = call.parameters["id"].orEmpty()
-            val body = decodeBody(call.receiveText(), RejectBody.serializer(), allowEmpty = true)
+            val body = decodeBody(call.receiveBoundedText(), RejectBody.serializer(), allowEmpty = true)
             val updated = store.reject(id, body.note)
             call.respondJson(HttpStatusCode.OK, SmartAccountRequest.serializer(), updated)
         }
@@ -191,6 +208,27 @@ fun buildServer(store: RequestStore, token: String, port: Int) =
     }
 
 /**
+ * Reads the request body as text, rejecting anything larger than
+ * [MAX_REQUEST_BODY_BYTES] with a [PayloadTooLargeException] (HTTP 413).
+ *
+ * A declared `Content-Length` over the limit is rejected before the body is read,
+ * so an oversized request never reaches [receiveText]. Bodies without a usable
+ * `Content-Length` (e.g. chunked transfer) are checked again after reading, since
+ * their true size is only known once buffered.
+ */
+private suspend fun ApplicationCall.receiveBoundedText(): String {
+    val declaredLength = request.contentLength()
+    if (declaredLength != null && declaredLength > MAX_REQUEST_BODY_BYTES) {
+        throw PayloadTooLargeException("request body exceeds the $MAX_REQUEST_BODY_BYTES byte limit")
+    }
+    val text = receiveText()
+    if (text.toByteArray(Charsets.UTF_8).size.toLong() > MAX_REQUEST_BODY_BYTES) {
+        throw PayloadTooLargeException("request body exceeds the $MAX_REQUEST_BODY_BYTES byte limit")
+    }
+    return text
+}
+
+/**
  * Decodes a JSON object request body into [T].
  *
  * When [allowEmpty] is true an empty body yields an all-defaults object (used by
@@ -201,12 +239,12 @@ private fun <T> decodeBody(text: String, serializer: KSerializer<T>, allowEmpty:
     val trimmed = text.trim()
     if (trimmed.isEmpty()) {
         if (allowEmpty) {
-            return json.decodeFromString(serializer, "{}")
+            return wireJson.decodeFromString(serializer, "{}")
         }
         throw ValidationException("request body must be a JSON object")
     }
     return try {
-        json.decodeFromString(serializer, trimmed)
+        wireJson.decodeFromString(serializer, trimmed)
     } catch (e: Exception) {
         throw ValidationException("request body is not a valid JSON object: ${e.message}")
     }
@@ -217,12 +255,12 @@ private suspend fun <T> ApplicationCall.respondJson(
     serializer: KSerializer<T>,
     value: T,
 ) {
-    respondText(json.encodeToString(serializer, value), jsonContentType, status)
+    respondText(wireJson.encodeToString(serializer, value), jsonContentType, status)
 }
 
 private suspend fun ApplicationCall.respondError(status: HttpStatusCode, message: String?) {
     respondText(
-        json.encodeToString(ErrorResponse.serializer(), ErrorResponse(message ?: "error")),
+        wireJson.encodeToString(ErrorResponse.serializer(), ErrorResponse(message ?: "error")),
         jsonContentType,
         status,
     )

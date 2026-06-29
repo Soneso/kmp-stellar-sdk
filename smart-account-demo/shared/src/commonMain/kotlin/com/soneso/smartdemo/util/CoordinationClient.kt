@@ -20,13 +20,13 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * A coordination-server request record (the inbox side of the agent-signer flow).
  *
- * Mirrors the canonical request object served by the coordination server and the
- * reference agent's own client, so the two stay byte-for-byte consistent. All
- * fields are present in a server response; nullable fields are `null` until the
- * request is resolved. The [args] entries are base64-encoded `SCValXdr` strings,
- * opaque to the server and stored verbatim so the inbox can rebuild the original
- * call exactly. The [amount] is display-only — the inbox decodes the authoritative
- * amount from [args], never from this field.
+ * Agrees field-for-field with the canonical `SmartAccountRequest` the coordination server
+ * serves (see the server's `Models.kt`). All fields are present in a server response;
+ * nullable fields are `null` until the request is resolved. The [args] entries are
+ * base64-encoded `SCValXdr` strings, opaque to the server and stored verbatim so the inbox
+ * can rebuild the original call exactly. [args] defaults to an empty list so a response that
+ * omits it decodes tolerantly rather than failing the whole listing. The [amount] is
+ * display-only — the inbox decodes the authoritative amount from [args], never from this field.
  */
 @Serializable
 data class CoordinationRequest(
@@ -34,7 +34,7 @@ data class CoordinationRequest(
     val smartAccount: String,
     val target: String,
     val targetFn: String,
-    val args: List<String>,
+    val args: List<String> = emptyList(),
     val amount: String = "",
     val reason: Int,
     val status: String,
@@ -48,6 +48,7 @@ data class CoordinationRequest(
         get() = status == STATUS_APPROVED || status == STATUS_REJECTED
 
     companion object {
+        // Wire values, matching the server's RequestStatus.wireName in Models.kt.
         const val STATUS_PENDING = "pending"
         const val STATUS_APPROVED = "approved"
         const val STATUS_REJECTED = "rejected"

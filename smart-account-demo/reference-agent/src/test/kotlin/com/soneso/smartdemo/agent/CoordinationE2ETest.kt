@@ -102,7 +102,8 @@ class CoordinationE2ETest {
                 )
                 val smartAccount = "CSMARTACCOUNTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                 val target = "CTOKENXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-                val reason = 3016
+                // Spending-limit policy denial: the reason an agent escalates.
+                val reason = 3221
 
                 val created = agentClient.createRequest(
                     smartAccount = smartAccount,

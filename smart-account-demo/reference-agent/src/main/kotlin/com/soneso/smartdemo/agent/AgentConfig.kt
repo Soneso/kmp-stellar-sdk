@@ -1,6 +1,8 @@
 package com.soneso.smartdemo.agent
 
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.oz.OZTransactionOperations
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -140,9 +142,9 @@ data class AgentConfig(
         if (seed.isNullOrEmpty()) {
             throw AgentConfigException("agentSecretSeed is required.")
         }
-        if (seed.length != 64 || !Hex.isHexString(seed)) {
+        if (!isValidHexSeed(seed)) {
             throw AgentConfigException(
-                "agentSecretSeed is not a valid 64-character hex Ed25519 seed."
+                "agentSecretSeed is not a valid $AGENT_HEX_KEY_LENGTH-character hex Ed25519 seed."
             )
         }
 
@@ -171,6 +173,40 @@ data class AgentConfig(
         }
         if (coordinationToken.isEmpty()) {
             throw AgentConfigException("coordinationToken is required.")
+        }
+
+        if (tokenDecimals !in 0..OZTransactionOperations.MAX_TOKEN_DECIMALS) {
+            throw AgentConfigException(
+                "tokenDecimals must be between 0 and " +
+                    "${OZTransactionOperations.MAX_TOKEN_DECIMALS}, got: $tokenDecimals."
+            )
+        }
+        // The transfer call converts amount to base units with the SDK's
+        // amountToBaseUnits at this token scale. Run the same conversion here so
+        // the validator rejects exactly what run() would reject: amounts that are
+        // not strictly positive and fractions with more digits than tokenDecimals
+        // allows. This fails fast, before any network or identity work.
+        try {
+            OZTransactionOperations.amountToBaseUnits(amount, tokenDecimals)
+        } catch (e: ValidationException) {
+            throw AgentConfigException(
+                "amount is not a valid transfer amount at $tokenDecimals token decimals: " +
+                    (e.message ?: amount)
+            )
+        }
+
+        // The poll budget must do at least one bounded iteration: a non-positive
+        // interval would busy-loop the network, and fewer than one attempt would
+        // create the escalation and immediately abandon it.
+        if (pollIntervalSeconds <= 0) {
+            throw AgentConfigException(
+                "pollIntervalSeconds must be greater than zero, got: $pollIntervalSeconds."
+            )
+        }
+        if (pollMaxAttempts < 1) {
+            throw AgentConfigException(
+                "pollMaxAttempts must be at least one, got: $pollMaxAttempts."
+            )
         }
     }
 

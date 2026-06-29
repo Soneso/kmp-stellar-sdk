@@ -94,14 +94,14 @@ object DemoState {
     /**
      * Lazily-created coordination client used by the approval inbox and the
      * pending-count poller. Configured from [DemoConfig.COORDINATION_URL] and
-     * [DemoConfig.COORDINATION_TOKEN]. Created once and reused across screens.
+     * [DemoConfig.COORDINATION_TOKEN]. Created once, thread-safely, and reused across screens.
      */
-    private var _coordinationClient: CoordinationClient? = null
-    val coordinationClient: CoordinationClient
-        get() = _coordinationClient ?: HttpCoordinationClient(
+    val coordinationClient: CoordinationClient by lazy {
+        HttpCoordinationClient(
             baseUrl = DemoConfig.COORDINATION_URL,
             token = DemoConfig.COORDINATION_TOKEN,
-        ).also { _coordinationClient = it }
+        )
+    }
 
     /**
      * Transaction hashes of approval requests whose on-chain submission already
@@ -197,7 +197,7 @@ object DemoState {
         demoTokenBalance = null
         pendingRequestCount = 0
         confirmedApprovalHashes.clear()
-        // _coordinationClient is NOT reset — it is a stateless HTTP client reused
-        // across wallet sessions and configured from static DemoConfig values.
+        // coordinationClient is NOT reset — it is a lazily-initialised, stateless HTTP client
+        // reused across wallet sessions and configured from static DemoConfig values.
     }
 }

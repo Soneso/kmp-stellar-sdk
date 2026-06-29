@@ -31,7 +31,6 @@ import kotlinx.serialization.json.putJsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val TOKEN = "test-token-123"
@@ -213,6 +212,14 @@ class HttpTest {
     fun returns400WhenARequiredStringFieldIsEmpty() = httpTest {
         val response = post("/requests", createBody(smartAccount = "").toString())
         assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun returns413WhenTheRequestBodyExceedsTheSizeLimit() = httpTest {
+        // A body well past the server's 256 KiB cap must be rejected with 413
+        // before any JSON parsing is attempted.
+        val oversized = createBody(targetFn = "x".repeat(512 * 1024)).toString()
+        assertEquals(HttpStatusCode.PayloadTooLarge, post("/requests", oversized).status)
     }
 
     // MARK: - GET /requests

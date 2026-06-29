@@ -113,6 +113,35 @@ class CoordinationClientTest {
     }
 
     @Test
+    fun decodeToleratesMissingArgsAsEmptyList() = runTest {
+        // The client agrees with the server's canonical wire format even when args is absent
+        // from a record: it defaults to an empty list rather than failing the whole decode.
+        val engine = MockEngine {
+            respond(
+                content = """
+                    {
+                      "id": "req-1",
+                      "smartAccount": "CACCOUNT",
+                      "target": "CTOKEN",
+                      "targetFn": "transfer",
+                      "amount": "10",
+                      "reason": 3017,
+                      "status": "pending",
+                      "createdAt": 1700000000000
+                    }
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = jsonHeaders,
+            )
+        }
+
+        val result = client(engine).getRequest("req-1")
+
+        assertTrue(result.args.isEmpty())
+        assertEquals("req-1", result.id)
+    }
+
+    @Test
     fun approveSendsResultHashBody() = runTest {
         var seenMethod: HttpMethod? = null
         var seenPath: String? = null

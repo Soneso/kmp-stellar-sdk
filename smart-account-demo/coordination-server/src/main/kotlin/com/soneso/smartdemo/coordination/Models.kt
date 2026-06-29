@@ -10,23 +10,18 @@ import kotlinx.serialization.Serializable
  * [APPROVED] or [REJECTED]. No other transition is permitted.
  */
 @Serializable
-enum class RequestStatus {
+enum class RequestStatus(
+    /** The string used on the wire and in persisted JSON. */
+    val wireName: String,
+) {
     @SerialName("pending")
-    PENDING,
+    PENDING("pending"),
 
     @SerialName("approved")
-    APPROVED,
+    APPROVED("approved"),
 
     @SerialName("rejected")
-    REJECTED;
-
-    /** The string used on the wire and in persisted JSON. */
-    val wireName: String
-        get() = when (this) {
-            PENDING -> "pending"
-            APPROVED -> "approved"
-            REJECTED -> "rejected"
-        }
+    REJECTED("rejected");
 
     companion object {
         /**
@@ -34,14 +29,11 @@ enum class RequestStatus {
          *
          * Throws [ValidationException] when [value] is not a known status.
          */
-        fun fromWire(value: String): RequestStatus = when (value) {
-            "pending" -> PENDING
-            "approved" -> APPROVED
-            "rejected" -> REJECTED
-            else -> throw ValidationException(
-                "status must be one of 'pending', 'approved', 'rejected'"
-            )
-        }
+        fun fromWire(value: String): RequestStatus =
+            entries.firstOrNull { it.wireName == value }
+                ?: throw ValidationException(
+                    "status must be one of ${entries.joinToString(", ") { "'${it.wireName}'" }}"
+                )
     }
 }
 

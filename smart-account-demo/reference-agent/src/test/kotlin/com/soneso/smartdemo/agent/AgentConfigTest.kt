@@ -1,7 +1,5 @@
 package com.soneso.smartdemo.agent
 
-import com.soneso.stellar.sdk.KeyPair
-import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,8 +11,6 @@ import kotlin.test.assertTrue
 class AgentConfigTest {
 
     private val validSeed = "01".repeat(32)
-
-    private fun randomGAddress(): String = runBlocking { KeyPair.random().getAccountId() }
 
     private fun completeConfig(): AgentConfig = AgentConfig(
         smartAccountContractId = AgentDefaults.NATIVE_TOKEN_CONTRACT,
@@ -206,5 +202,86 @@ class AgentConfigTest {
     @Test
     fun acceptsAContractDestinationAddress() {
         completeConfig().copy(destinationAddress = AgentDefaults.NATIVE_TOKEN_CONTRACT).validateForLiveRun()
+    }
+
+    @Test
+    fun rejectsTokenDecimalsOutsideTheSaneRange() {
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(tokenDecimals = -1).validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(tokenDecimals = 39).validateForLiveRun()
+        }
+    }
+
+    @Test
+    fun acceptsTokenDecimalsAtTheRangeBoundaries() {
+        completeConfig().copy(tokenDecimals = 0).validateForLiveRun()
+        completeConfig().copy(tokenDecimals = 38).validateForLiveRun()
+    }
+
+    @Test
+    fun rejectsANonNumericOrNegativeAmount() {
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "abc").validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "-5").validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "").validateForLiveRun()
+        }
+    }
+
+    @Test
+    fun rejectsAZeroAmount() {
+        // amountToBaseUnits rejects values <= 0, so the transfer call would throw
+        // at run time. The validator must reject a zero amount up front rather than
+        // letting it pass and fail later inside run().
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "0").validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "0.0").validateForLiveRun()
+        }
+    }
+
+    @Test
+    fun rejectsAnAmountWithMoreFractionalDigitsThanTokenDecimals() {
+        // The default token scale is 7 decimals; eight fractional digits cannot be
+        // represented and amountToBaseUnits rejects it, so the validator must too.
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(amount = "1.12345678").validateForLiveRun()
+        }
+        // The same amount is acceptable when the token carries enough decimals.
+        completeConfig().copy(amount = "1.12345678", tokenDecimals = 8).validateForLiveRun()
+    }
+
+    @Test
+    fun acceptsAWellFormedPositiveAmount() {
+        completeConfig().copy(amount = "1").validateForLiveRun()
+        completeConfig().copy(amount = "10.5").validateForLiveRun()
+        // Exactly tokenDecimals fractional digits is the maximum precision allowed.
+        completeConfig().copy(amount = "0.1234567").validateForLiveRun()
+    }
+
+    @Test
+    fun rejectsANonPositivePollInterval() {
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(pollIntervalSeconds = 0).validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(pollIntervalSeconds = -1).validateForLiveRun()
+        }
+    }
+
+    @Test
+    fun rejectsFewerThanOnePollAttempt() {
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(pollMaxAttempts = 0).validateForLiveRun()
+        }
+        assertFailsWith<AgentConfigException> {
+            completeConfig().copy(pollMaxAttempts = -1).validateForLiveRun()
+        }
     }
 }

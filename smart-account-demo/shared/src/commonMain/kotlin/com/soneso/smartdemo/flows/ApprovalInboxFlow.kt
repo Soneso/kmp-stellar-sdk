@@ -100,7 +100,9 @@ data class DecodedArgument(
  * @property recipient Decoded recipient address (`to`/`spender`), or null for unknown/undecodable.
  * @property recipientLabel Label for [recipient]: `Recipient` for transfer, `Spender` for approve.
  * @property amountBaseUnits Raw decoded on-chain amount in base units (the i128), or null.
- * @property amount [amountBaseUnits] formatted at the token's decimal scale, or null.
+ * @property amount [amountBaseUnits] formatted at the request token's resolved decimal scale,
+ *   or the raw base units with a label when that scale could not be read; null for
+ *   unknown/undecodable shapes.
  * @property arguments Full decoded argument list, populated when [kind] is [DecodedCallKind.UNKNOWN].
  * @property error User-facing message when [kind] is [DecodedCallKind.UNDECODABLE].
  */
@@ -138,9 +140,6 @@ data class RejectionResult(
     val error: String? = null,
 )
 
-/** Base URL for a Stellar testnet transaction on the stellar.expert block explorer. */
-const val STELLAR_EXPERT_TESTNET_TX_BASE = "https://stellar.expert/explorer/testnet/tx/"
-
 /**
  * A resolved approval retained on the inbox screen for the session.
  *
@@ -165,7 +164,7 @@ data class ApprovedEntry(
 ) {
     /** Explorer URL for [hash], or null when there is no hash to link to. */
     val explorerUrl: String?
-        get() = hash?.let { STELLAR_EXPERT_TESTNET_TX_BASE + it }
+        get() = hash?.let { DemoConfig.STELLAR_EXPERT_TESTNET_TX_BASE + it }
 }
 
 /**
@@ -257,19 +256,29 @@ object DemoStateConfirmedHashStore : ConfirmedHashStore {
  * @param resolveConnectedAccount Returns the C-address of the connected smart account,
  *   or null when disconnected.
  * @param confirmedHashStore Durable store of confirmed-on-chain hashes (never re-submit guard).
- * @param tokenDecimals Decimal scale used to format decoded amounts. Defaults to the demo
- *   token's scale: the agent flow scopes the delegation to the 7-decimal demo token, and
- *   the inbox does not make a network call to resolve a per-request token's `decimals()`.
+ * @param resolveDecimals Seam that resolves the decimal scale of a request's target token so
+ *   decoded amounts are formatted at the token's true precision rather than a hardcoded scale.
+ *   Defaults to [resolveSpendingLimitDecimals], which resolves the native and demo tokens
+ *   without a network call and fetches any other token's `decimals()` over RPC. Injected in
+ *   tests to supply a deterministic scale.
  */
 class ApprovalInboxFlow(
     private val coordination: CoordinationClient,
     private val resolveContractCall: () -> ContractCallSubmitter?,
     private val resolveConnectedAccount: () -> String?,
     private val confirmedHashStore: ConfirmedHashStore = DemoStateConfirmedHashStore,
-    private val tokenDecimals: Int = DemoConfig.DEMO_TOKEN_DECIMALS,
+    private val resolveDecimals: suspend (tokenContract: String) -> Int = { resolveSpendingLimitDecimals(it) },
 ) {
     /** True while an approve call is executing, guarding against concurrent in-flight submissions. */
     private var isApproving = false
+
+    /**
+     * Decimal scales resolved during this inbox session, keyed by token contract. Successful
+     * resolutions are cached so a refresh does not re-issue a `decimals()` RPC for the same
+     * token; failures are not cached so a later attempt can retry. Decoding is sequential, so
+     * no synchronisation is needed.
+     */
+    private val decimalsCache = mutableMapOf<String, Int>()
 
     // -------------------------------------------------------------------------
     // Reads
@@ -313,11 +322,13 @@ class ApprovalInboxFlow(
      *
      * Decodes each base64 `SCValXdr` entry in [request].args and, for the known
      * `transfer(from, to, amount)` and `approve(from, spender, amount, expiry)` shapes,
-     * derives the on-chain recipient and amount. For any other shape the full decoded
-     * argument list is returned. The server-supplied [CoordinationRequest.amount] is
-     * deliberately ignored: it is display-only and untrusted.
+     * derives the on-chain recipient and amount. The amount is formatted at the request
+     * token's resolved decimal scale (so a non-7-decimal token is not misrepresented), or
+     * shown as raw base units with a label when that scale cannot be read. For any other
+     * shape the full decoded argument list is returned. The server-supplied
+     * [CoordinationRequest.amount] is deliberately ignored: it is display-only and untrusted.
      */
-    fun decodeCall(request: CoordinationRequest): DecodedCall {
+    suspend fun decodeCall(request: CoordinationRequest): DecodedCall {
         val args: List<SCValXdr> = try {
             decodeArgs(request.args)
         } catch (_: Exception) {
@@ -329,12 +340,16 @@ class ApprovalInboxFlow(
 
         when (request.targetFn) {
             "transfer" -> if (args.size == 3) {
-                decodeTransferLike(args, recipientIndex = 1, amountIndex = 2, recipientLabel = "Recipient")
-                    ?.let { return it }
+                decodeTransferLike(
+                    args, resolveDecimalsOrNull(request.target),
+                    recipientIndex = 1, amountIndex = 2, recipientLabel = "Recipient",
+                )?.let { return it }
             }
             "approve" -> if (args.size == 4) {
-                decodeTransferLike(args, recipientIndex = 1, amountIndex = 2, recipientLabel = "Spender")
-                    ?.let { return it }
+                decodeTransferLike(
+                    args, resolveDecimalsOrNull(request.target),
+                    recipientIndex = 1, amountIndex = 2, recipientLabel = "Spender",
+                )?.let { return it }
             }
         }
 
@@ -346,20 +361,42 @@ class ApprovalInboxFlow(
         )
     }
 
+    /**
+     * Resolves the decimal scale of [tokenContract], caching successes, or null when it
+     * cannot be read. A null scale formats the amount in raw base units with a label rather
+     * than at a guessed scale, so a non-7-decimal token is never silently misrepresented.
+     */
+    private suspend fun resolveDecimalsOrNull(tokenContract: String): Int? {
+        decimalsCache[tokenContract]?.let { return it }
+        return try {
+            resolveDecimals(tokenContract).also { decimalsCache[tokenContract] = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun decodeTransferLike(
         args: List<SCValXdr>,
+        decimals: Int?,
         recipientIndex: Int,
         amountIndex: Int,
         recipientLabel: String,
     ): DecodedCall? {
         val recipient = decodeAddress(args[recipientIndex]) ?: return null
         val amountBaseUnits = decodeInteger(args[amountIndex]) ?: return null
+        val amount = if (decimals != null) {
+            formatBaseUnitsAsDecimal(amountBaseUnits, decimals)
+        } else {
+            "$amountBaseUnits base units"
+        }
         return DecodedCall(
             kind = if (recipientLabel == "Spender") DecodedCallKind.APPROVE else DecodedCallKind.TRANSFER,
             recipient = recipient,
             recipientLabel = recipientLabel,
             amountBaseUnits = amountBaseUnits,
-            amount = formatBaseUnitsAsDecimal(amountBaseUnits, tokenDecimals),
+            amount = amount,
         )
     }
 
@@ -457,22 +494,19 @@ class ApprovalInboxFlow(
 
             val hash = result.hash ?: ""
             // The transaction confirmed on-chain. From here on this request must NEVER be
-            // re-submitted, even when the hash is empty or the report-back fails. Record
-            // it before attempting the report so the guard survives navigation.
-            confirmedHashStore.put(
-                request.id,
-                if (hash.isEmpty()) CONFIRMED_NO_HASH_SENTINEL else hash,
-            )
-
+            // re-submitted, even when the hash is empty or the report-back fails. Record it
+            // before attempting the report so the guard survives navigation.
             if (hash.isEmpty()) {
-                val message = "Approval confirmed on-chain but no transaction hash was returned; " +
-                    "the agent could not be notified automatically."
-                ActivityLogState.error(message)
-                return ApprovalResult(success = false, error = message, confirmedOnChain = true)
+                // Confirmed on-chain but the SDK returned no hash: record the no-hash sentinel
+                // (blocks any re-submit) and report a marker so the escalation leaves the
+                // pending set instead of re-surfacing forever.
+                confirmedHashStore.put(request.id, CONFIRMED_NO_HASH_SENTINEL)
+                return reportConfirmedWithoutHash(request.id)
             }
+            confirmedHashStore.put(request.id, hash)
 
             // Step 5: report the confirmed hash back so the agent learns the outcome.
-            return reportApproval(request.id, hash)
+            return postApproval(request.id, hash)
         } finally {
             isApproving = false
         }
@@ -483,48 +517,45 @@ class ApprovalInboxFlow(
      *
      * Used by the inbox's "Retry report" affordance after [approveRequest] confirmed the
      * transaction on-chain but the report-back POST failed. Looks up the recorded hash and
-     * POSTs only `/requests/{id}/approve`. Never calls [ContractCallSubmitter.contractCall].
-     * A `409` (already resolved) is treated as success.
+     * POSTs only `/requests/{id}/approve`; never calls [ContractCallSubmitter.contractCall].
+     * A confirmed-without-hash request reports its marker via [reportConfirmedWithoutHash].
      */
     suspend fun retryReport(request: CoordinationRequest): ApprovalResult {
         val recordedHash = confirmedHashStore.get(request.id)
-        if (recordedHash == null || recordedHash == CONFIRMED_NO_HASH_SENTINEL) {
+        if (recordedHash == null) {
             val message = "No confirmed transaction hash is available to report for this escalation."
             ActivityLogState.error(message)
             return ApprovalResult(success = false, error = message)
         }
-
-        try {
-            coordination.approve(request.id, recordedHash)
-        } catch (e: CoordinationException) {
-            if (e.statusCode == 409) {
-                // Already resolved server-side: the report is effectively complete.
-                confirmedHashStore.remove(request.id)
-                ActivityLogState.info("Escalation already resolved on the coordination server. Hash: $recordedHash")
-                return ApprovalResult(success = true, hash = recordedHash)
-            }
-            val message = "Reporting the approval failed: ${e.message} " +
-                "(transaction confirmed on-chain: $recordedHash)"
-            ActivityLogState.error(message)
-            return ApprovalResult(success = false, hash = recordedHash, error = message, confirmedOnChain = true)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val message = "Reporting the approval failed: ${e.message ?: "Unknown error"} " +
-                "(transaction confirmed on-chain: $recordedHash)"
-            ActivityLogState.error(message)
-            return ApprovalResult(success = false, hash = recordedHash, error = message, confirmedOnChain = true)
+        if (recordedHash == CONFIRMED_NO_HASH_SENTINEL) {
+            return reportConfirmedWithoutHash(request.id)
         }
-
-        confirmedHashStore.remove(request.id)
-        ActivityLogState.success("Agent call approved. Hash: $recordedHash")
-        return ApprovalResult(success = true, hash = recordedHash)
+        return postApproval(request.id, recordedHash)
     }
 
-    /** Reports a confirmed [hash] back to the coordination server for [id]. */
-    private suspend fun reportApproval(id: String, hash: String): ApprovalResult {
+    /**
+     * Reports a confirmed on-chain [hash] for [id] to the coordination server, shared by the
+     * first report after [approveRequest] and the [retryReport] retry.
+     *
+     * On success the never-re-submit guard for [id] is cleared and the result reported as
+     * approved. A `409` (already resolved server-side) is idempotent success: the report is
+     * effectively complete, so the guard is cleared too. Any other failure leaves the guard in
+     * place and returns [ApprovalResult.confirmedOnChain] true so the caller can offer a retry
+     * without re-submitting on-chain.
+     */
+    private suspend fun postApproval(id: String, hash: String): ApprovalResult {
         try {
             coordination.approve(id, hash)
+        } catch (e: CoordinationException) {
+            if (e.statusCode == 409) {
+                confirmedHashStore.remove(id)
+                ActivityLogState.info("Escalation already resolved on the coordination server. Hash: $hash")
+                return ApprovalResult(success = true, hash = hash)
+            }
+            val message = "Reporting the approval failed: ${e.message} " +
+                "(transaction confirmed on-chain: $hash)"
+            ActivityLogState.error(message)
+            return ApprovalResult(success = false, hash = hash, error = message, confirmedOnChain = true)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -539,13 +570,47 @@ class ApprovalInboxFlow(
     }
 
     /**
-     * Whether [id] has a confirmed on-chain transaction whose report-back is still
-     * outstanding. The no-hash sentinel does not count: there is nothing to report.
+     * Reports a confirmed-on-chain approval whose SDK call returned no transaction hash.
+     *
+     * The transaction executed but its hash was not captured, so there is nothing to copy or
+     * link. A non-hash marker ([CONFIRMED_NO_HASH_REPORT]) is reported to the coordination
+     * server so the escalation leaves the pending set instead of re-surfacing forever; the
+     * agent learns it was approved even though the exact hash is unavailable. On success (or a
+     * `409` already-resolved) the never-re-submit guard is cleared; if the report fails the
+     * guard is kept so a later approval retries the report — the on-chain call is never repeated.
      */
-    fun isAwaitingReport(id: String): Boolean {
-        val hash = confirmedHashStore.get(id) ?: return false
-        return hash != CONFIRMED_NO_HASH_SENTINEL
+    private suspend fun reportConfirmedWithoutHash(id: String): ApprovalResult {
+        val base = "Approval confirmed on-chain but no transaction hash was returned."
+        try {
+            coordination.approve(id, CONFIRMED_NO_HASH_REPORT)
+        } catch (e: CoordinationException) {
+            if (e.statusCode == 409) {
+                confirmedHashStore.remove(id)
+                ActivityLogState.info("$base The escalation was already resolved on the coordination server.")
+                return ApprovalResult(success = true, confirmedOnChain = true)
+            }
+            val message = "$base Reporting it to the agent failed: ${e.message}. A later approval retries the report."
+            ActivityLogState.error(message)
+            return ApprovalResult(success = false, error = message, confirmedOnChain = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val message = "$base Reporting it to the agent failed: ${e.message ?: "Unknown error"}. " +
+                "A later approval retries the report."
+            ActivityLogState.error(message)
+            return ApprovalResult(success = false, error = message, confirmedOnChain = true)
+        }
+        confirmedHashStore.remove(id)
+        ActivityLogState.success("$base The agent was notified that it executed on-chain.")
+        return ApprovalResult(success = true, confirmedOnChain = true)
     }
+
+    /**
+     * Whether [id] has a confirmed on-chain approval whose report-back to the coordination
+     * server is still outstanding — a real transaction hash, or the no-hash sentinel that is
+     * reported as a marker. Cleared once the report (or its retry) resolves the escalation.
+     */
+    fun isAwaitingReport(id: String): Boolean = confirmedHashStore.get(id) != null
 
     // -------------------------------------------------------------------------
     // Reject
@@ -662,8 +727,15 @@ class ApprovalInboxFlow(
     }
 
     companion object {
-        /** Marks a request that confirmed on-chain but produced no reportable hash. */
+        /** Marks (in the local store) a request that confirmed on-chain but produced no reportable hash. */
         const val CONFIRMED_NO_HASH_SENTINEL = "<confirmed-without-hash>"
+
+        /**
+         * Marker reported to the coordination server in the `resultHash` field for a
+         * confirmed-without-hash approval, so the escalation leaves the pending set. The server
+         * requires a non-empty value; this clearly-non-hash string signals the missing hash.
+         */
+        const val CONFIRMED_NO_HASH_REPORT = "confirmed-on-chain-without-hash"
 
         const val NO_WALLET_ERROR = "No wallet connected. Connect a wallet to approve."
         const val ACCOUNT_MISMATCH_ERROR =

@@ -72,11 +72,18 @@ import com.soneso.smartdemo.flows.validateDelegationAmount
 import com.soneso.smartdemo.platform.getClipboard
 import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
-import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.isValidContractAddress
 import com.soneso.smartdemo.util.truncateAddress
 import com.soneso.stellar.sdk.Util
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * Debounce before a custom token's `decimals()` is fetched for the display hint, so a burst
+ * of keystrokes while pasting or editing a contract address collapses to a single RPC call.
+ */
+private const val TOKEN_DECIMALS_DEBOUNCE_MS = 400L
 
 /** Spending-limit rolling-window presets, in ledgers (~5s per ledger on testnet). */
 private enum class DelegatePeriodOption(val label: String, val ledgers: UInt) {
@@ -117,10 +124,10 @@ class DelegateToAgentScreen : Screen {
         var tokenError by remember { mutableStateOf<String?>(null) }
         var amountError by remember { mutableStateOf<String?>(null) }
 
-        // Resolved decimal scale of the guarded token; defaults to the demo token's scale
-        // until a custom token's decimals() is fetched. The resolver below is keyed on the
-        // token contract, so Compose cancels an in-flight resolution when the token changes
-        // and a stale late response cannot overwrite a newer one.
+        // Resolved decimal scale of the guarded token, used ONLY for the display hint below.
+        // The submit path does not trust it: delegateToAgent re-resolves the decimals itself
+        // and fails closed. Defaults to the demo token's scale until a custom token's
+        // decimals() is fetched.
         var tokenDecimals by remember { mutableStateOf(DemoConfig.DEMO_TOKEN_DECIMALS) }
 
         // --- Operation state ---
@@ -130,13 +137,29 @@ class DelegateToAgentScreen : Screen {
         var resultPeriod by remember { mutableStateOf(DelegatePeriodOption.PER_DAY) }
         var resultExpiry by remember { mutableStateOf(DelegateExpiryOption.ONE_DAY) }
 
-        // Resolve the guarded token's decimal scale whenever the token changes. Failures
-        // are non-fatal: keep the current scale; submit surfaces any real error.
+        // Resolve the guarded token's decimal scale for the display hint whenever the token
+        // changes. The native and demo tokens resolve without a network call; any other token
+        // is fetched over RPC, but only once it is a complete, valid contract address and after
+        // a short debounce, so the decimals() call does not fire on every keystroke. Re-keying
+        // on the token cancels an in-flight resolution when the token changes, so a stale late
+        // response cannot overwrite a newer one. Failures are non-fatal: keep the current scale.
         LaunchedEffect(tokenContract) {
             val token = tokenContract.trim()
-            if (token.isEmpty()) return@LaunchedEffect
+            if (token.isEmpty() ||
+                token == DemoConfig.NATIVE_TOKEN_CONTRACT ||
+                token == DemoState.demoTokenContractId
+            ) {
+                tokenDecimals = DemoConfig.DEMO_TOKEN_DECIMALS
+                return@LaunchedEffect
+            }
+            if (!isValidContractAddress(token)) return@LaunchedEffect
+            delay(TOKEN_DECIMALS_DEBOUNCE_MS)
             try {
                 tokenDecimals = resolveSpendingLimitDecimals(token)
+            } catch (e: CancellationException) {
+                // Re-keying the effect cancels this RPC resolution; let the
+                // cancellation propagate instead of swallowing it as a failure.
+                throw e
             } catch (_: Exception) {
                 // Keep the previous scale.
             }
@@ -181,10 +204,10 @@ class DelegateToAgentScreen : Screen {
                         result = successResult,
                         period = resultPeriod,
                         expiry = resultExpiry,
-                        onCopyHash = { hash ->
+                        onCopy = { value, what ->
                             scope.launch {
-                                clipboard.copyToClipboard(hash)
-                                snackbarHostState.showSnackbar("Hash copied to clipboard")
+                                clipboard.copyToClipboard(value)
+                                snackbarHostState.showSnackbar("$what copied to clipboard")
                             }
                         },
                         onDone = { navigator.pop() }
@@ -253,7 +276,11 @@ class DelegateToAgentScreen : Screen {
                         enabled = !isSubmitting,
                         isError = amountError != null,
                         supportingText = {
-                            Text(amountError ?: "Maximum the agent may spend per period")
+                            Text(
+                                amountError
+                                    ?: "Maximum the agent may spend per period " +
+                                    "(up to $tokenDecimals decimal places)"
+                            )
                         }
                     )
 
@@ -326,8 +353,7 @@ class DelegateToAgentScreen : Screen {
                                         tokenContract = trimmedToken,
                                         amount = amount.trim(),
                                         periodLedgers = submitPeriod.ledgers,
-                                        validUntilOffsetLedgers = submitExpiry.offset,
-                                        tokenDecimals = tokenDecimals
+                                        validUntilOffsetLedgers = submitExpiry.offset
                                     )
                                     if (submitted.success) {
                                         resultPeriod = submitPeriod
@@ -336,14 +362,15 @@ class DelegateToAgentScreen : Screen {
                                     } else {
                                         errorMessage = submitted.error ?: "Delegation failed."
                                     }
+                                } catch (e: CancellationException) {
+                                    throw e
                                 } catch (e: Throwable) {
+                                    // delegateToAgent maps its own failures (including a
+                                    // passkey cancellation) to DelegationResult.error; this
+                                    // guards only against an unexpected throw escaping it.
                                     val msg = e.message ?: "Unknown error"
-                                    errorMessage = if (isUserCancellation(msg)) {
-                                        "Passkey authentication cancelled"
-                                    } else {
-                                        ActivityLogState.error("Delegation failed: $msg")
-                                        msg
-                                    }
+                                    ActivityLogState.error("Delegation failed: $msg")
+                                    errorMessage = msg
                                 } finally {
                                     isSubmitting = false
                                 }
@@ -434,7 +461,7 @@ class DelegateToAgentScreen : Screen {
         result: DelegationResult,
         period: DelegatePeriodOption,
         expiry: DelegateExpiryOption,
-        onCopyHash: (String) -> Unit,
+        onCopy: (value: String, what: String) -> Unit,
         onDone: () -> Unit
     ) {
         Card(
@@ -463,7 +490,17 @@ class DelegateToAgentScreen : Screen {
                 val summary = result.summary
                 if (summary != null) {
                     KeyValueRow("Agent Key", summary.agentPublicKey, monospace = true)
-                    KeyValueRow("Scope", "CallContract(${truncateAddress(summary.tokenContract)})")
+                    KeyValueRow("Scope", "CallContract")
+                    CopyableRow(
+                        label = "Token Contract",
+                        value = summary.tokenContract,
+                        onCopy = { onCopy(summary.tokenContract, "Token contract") }
+                    )
+                    Text(
+                        text = "Start the reference agent with this token contract (AGENT_TOKEN_CONTRACT).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF2E7D32)
+                    )
                     KeyValueRow("Cap", "${summary.amount} ${period.label.lowercase()}")
                     KeyValueRow(
                         "Expires",
@@ -479,7 +516,7 @@ class DelegateToAgentScreen : Screen {
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = Color(0xFF2E7D32),
-                        modifier = Modifier.clickable { onCopyHash(result.hash) }
+                        modifier = Modifier.clickable { onCopy(result.hash, "Transaction hash") }
                     )
                     Text(
                         text = "Tap to copy",
@@ -507,6 +544,34 @@ class DelegateToAgentScreen : Screen {
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
+            )
+        }
+    }
+
+    /**
+     * A labelled monospace value that copies its full content when tapped. Used
+     * for the scoped token contract on the result card so it can be pasted into
+     * the reference agent's `AGENT_TOKEN_CONTRACT`.
+     */
+    @Composable
+    private fun CopyableRow(label: String, value: String, onCopy: () -> Unit) {
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFF2E7D32),
+                modifier = Modifier.clickable(onClick = onCopy)
+            )
+            Text(
+                text = "Tap to copy",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF2E7D32).copy(alpha = 0.6f)
             )
         }
     }

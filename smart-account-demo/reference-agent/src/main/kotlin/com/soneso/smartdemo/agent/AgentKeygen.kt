@@ -40,7 +40,8 @@ suspend fun resolveAgentKey(seed: String? = null): AgentKeyResult {
         val bytes = if (isValidHexSeed(normalized)) Hex.decode(normalized.lowercase()) else null
         if (bytes == null) {
             throw AgentConfigException(
-                "AGENT_SECRET_SEED is set but is not a valid 64-character hex Ed25519 seed."
+                "AGENT_SECRET_SEED is set but is not a valid " +
+                    "$AGENT_HEX_KEY_LENGTH-character hex Ed25519 seed."
             )
         }
         val keypair = KeyPair.fromSecretSeed(bytes)
@@ -86,6 +87,12 @@ fun shouldPrintAgentKey(env: Map<String, String> = emptyMap(), args: List<String
     return fromEnv || fromArgs
 }
 
-/** Whether [value] is exactly 64 hex characters (a raw 32-byte seed). */
-private fun isValidHexSeed(value: String): Boolean =
+/**
+ * Whether [value] is a raw 32-byte Ed25519 seed encoded as exactly
+ * [AGENT_HEX_KEY_LENGTH] hex characters.
+ *
+ * The single hex-seed predicate shared by the keygen and [AgentConfig]
+ * validation so both agree on what a well-formed seed is.
+ */
+internal fun isValidHexSeed(value: String): Boolean =
     value.length == AGENT_HEX_KEY_LENGTH && Hex.isHexString(value)

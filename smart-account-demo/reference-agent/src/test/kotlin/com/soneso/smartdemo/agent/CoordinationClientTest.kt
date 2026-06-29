@@ -34,12 +34,13 @@ class CoordinationClientTest {
         resultHash: String? = null,
         note: String? = null,
         includeAmount: Boolean = true,
+        includeArgs: Boolean = true,
     ): String = buildJsonObject {
         put("id", id)
         put("smartAccount", "CSMART")
         put("target", "CTARGET")
         put("targetFn", "transfer")
-        putJsonArray("args") { args.forEach { add(it) } }
+        if (includeArgs) putJsonArray("args") { args.forEach { add(it) } }
         if (includeAmount) put("amount", "10.5")
         put("reason", 3016)
         put("status", status)
@@ -80,6 +81,13 @@ class CoordinationClientTest {
     @Test
     fun aMissingAmountDecodesAsTheEmptyString() {
         assertEquals("", decode(requestJson(includeAmount = false)).amount)
+    }
+
+    @Test
+    fun aMissingArgsDecodesAsAnEmptyList() {
+        // The decode tolerates an absent args array so the client stays compatible
+        // with the server's wire contract instead of rejecting an omitted empty list.
+        assertEquals(emptyList<String>(), decode(requestJson(includeArgs = false)).args)
     }
 
     // MARK: - HttpCoordinationClient

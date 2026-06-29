@@ -11,6 +11,8 @@ import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -112,6 +114,8 @@ class ApprovalInboxFlowTest {
     private class FakeSubmitter(
         var outcome: ContractCallOutcome = ContractCallOutcome(true, "TXHASH", null),
         var throwable: Throwable? = null,
+        private val reachedSubmit: CompletableDeferred<Unit>? = null,
+        private val release: CompletableDeferred<Unit>? = null,
     ) : ContractCallSubmitter {
         var calls = 0
         var lastArgs: List<SCValXdr>? = null
@@ -122,6 +126,9 @@ class ApprovalInboxFlowTest {
         ): ContractCallOutcome {
             calls++
             lastArgs = targetArgs
+            // Park here (when wired) so a concurrent second submission can be observed.
+            reachedSubmit?.complete(Unit)
+            release?.await()
             throwable?.let { throw it }
             return outcome
         }
@@ -139,12 +146,13 @@ class ApprovalInboxFlowTest {
         submitter: ContractCallSubmitter? = FakeSubmitter(),
         connectedAccount: String? = ACCOUNT,
         store: ConfirmedHashStore = InMemoryHashStore(),
+        resolveDecimals: suspend (String) -> Int = { 7 },
     ): ApprovalInboxFlow = ApprovalInboxFlow(
         coordination = coordination,
         resolveContractCall = { submitter },
         resolveConnectedAccount = { connectedAccount },
         confirmedHashStore = store,
-        tokenDecimals = 7,
+        resolveDecimals = resolveDecimals,
     )
 
     // -------------------------------------------------------------------------
@@ -152,7 +160,7 @@ class ApprovalInboxFlowTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun decodeTransferDerivesRecipientAndAmountFromArgsNotDisplayAmount() {
+    fun decodeTransferDerivesRecipientAndAmountFromArgsNotDisplayAmount() = runTest {
         val f = flow(FakeCoordination())
         val decoded = f.decodeCall(request(amount = "1.0"))
         assertEquals(DecodedCallKind.TRANSFER, decoded.kind)
@@ -164,7 +172,28 @@ class ApprovalInboxFlowTest {
     }
 
     @Test
-    fun decodeApproveUsesSpenderLabel() {
+    fun decodeFormatsAmountAtTheResolvedTokenDecimalsNotAFixedScale() = runTest {
+        // A 6-decimal token: 105_000_000 base units = 105.0, not the 10.5 a fixed 7-decimal
+        // scale would show. The displayed amount must follow the request token's true scale.
+        val f = flow(FakeCoordination(), resolveDecimals = { 6 })
+        val decoded = f.decodeCall(request())
+        assertEquals(DecodedCallKind.TRANSFER, decoded.kind)
+        assertEquals("105", decoded.amount)
+    }
+
+    @Test
+    fun decodeShowsRawBaseUnitsWhenTokenDecimalsCannotBeResolved() = runTest {
+        // When the token's decimals() cannot be read the amount is labelled raw base units
+        // rather than formatted at a guessed scale, so it cannot silently misrepresent.
+        val f = flow(FakeCoordination(), resolveDecimals = { error("rpc down") })
+        val decoded = f.decodeCall(request())
+        assertEquals(DecodedCallKind.TRANSFER, decoded.kind)
+        assertEquals("105000000 base units", decoded.amount)
+        assertEquals(BigInteger.fromLong(105_000_000L), decoded.amountBaseUnits)
+    }
+
+    @Test
+    fun decodeApproveUsesSpenderLabel() = runTest {
         val f = flow(FakeCoordination())
         val req = request(
             targetFn = "approve",
@@ -178,7 +207,7 @@ class ApprovalInboxFlowTest {
     }
 
     @Test
-    fun decodeUnknownFunctionListsArguments() {
+    fun decodeUnknownFunctionListsArguments() = runTest {
         val f = flow(FakeCoordination())
         val req = request(targetFn = "custom_fn", args = listOf(encode(addressArg(RECIPIENT))))
         val decoded = f.decodeCall(req)
@@ -189,7 +218,7 @@ class ApprovalInboxFlowTest {
     }
 
     @Test
-    fun decodeUndecodableArgsReturnsUndecodable() {
+    fun decodeUndecodableArgsReturnsUndecodable() = runTest {
         val f = flow(FakeCoordination())
         val req = request(args = listOf("@@not-base64@@"))
         val decoded = f.decodeCall(req)
@@ -324,12 +353,96 @@ class ApprovalInboxFlowTest {
         assertNull(store.get(req.id))
     }
 
+    @Test
+    fun concurrentSecondApproveIsRejectedAndDoesNotSubmitTwice() = runTest {
+        val req = request()
+        val reachedSubmit = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val submitter = FakeSubmitter(
+            outcome = ContractCallOutcome(true, "TXHASH", null),
+            reachedSubmit = reachedSubmit,
+            release = release,
+        )
+        val coord = FakeCoordination().apply { getResult = { req } }
+        val f = flow(coord, submitter = submitter, store = InMemoryHashStore())
+
+        // The first approval parks inside the submitter while holding the in-flight guard.
+        val first = async { f.approveRequest(req) }
+        reachedSubmit.await()
+
+        // A second approval issued meanwhile must be rejected without a second on-chain submit.
+        val second = f.approveRequest(req)
+        assertFalse(second.success)
+        assertTrue(second.error!!.contains("already in progress"))
+        assertEquals(1, submitter.calls)
+
+        // Release the first call; it completes successfully and the submit count stays at one.
+        release.complete(Unit)
+        val firstResult = first.await()
+        assertTrue(firstResult.success)
+        assertEquals("TXHASH", firstResult.hash)
+        assertEquals(1, submitter.calls)
+    }
+
+    @Test
+    fun approveConfirmedWithoutHashReportsMarkerAndLeavesPending() = runTest {
+        val req = request()
+        val submitter = FakeSubmitter(outcome = ContractCallOutcome(true, null, null))
+        val store = InMemoryHashStore()
+        val coord = FakeCoordination().apply { getResult = { req } }
+        val f = flow(coord, submitter = submitter, store = store)
+
+        val result = f.approveRequest(req)
+
+        // The call executed on-chain; with no hash the flow reports a non-hash marker so the
+        // escalation leaves the pending set instead of re-surfacing forever.
+        assertTrue(result.confirmedOnChain)
+        assertNull(result.hash)
+        assertEquals(listOf(req.id to ApprovalInboxFlow.CONFIRMED_NO_HASH_REPORT), coord.approveCalls)
+        assertEquals(1, submitter.calls)
+        // Reported successfully, so the never-re-submit guard is cleared and nothing is outstanding.
+        assertNull(store.get(req.id))
+        assertFalse(f.isAwaitingReport(req.id))
+    }
+
+    @Test
+    fun confirmedWithoutHashKeepsGuardAndStaysReportableWhenReportFails() = runTest {
+        val req = request()
+        val submitter = FakeSubmitter(outcome = ContractCallOutcome(true, null, null))
+        val store = InMemoryHashStore()
+        val coord = FakeCoordination().apply {
+            getResult = { req }
+            approveBehavior = { _, _ -> throw CoordinationException("server down") }
+        }
+        val f = flow(coord, submitter = submitter, store = store)
+
+        val result = f.approveRequest(req)
+
+        // The report failed, but the call must never be re-submitted: the no-hash guard stays
+        // and the escalation remains reportable (a later approval retries the report only).
+        assertFalse(result.success)
+        assertTrue(result.confirmedOnChain)
+        assertEquals(ApprovalInboxFlow.CONFIRMED_NO_HASH_SENTINEL, store.get(req.id))
+        assertTrue(f.isAwaitingReport(req.id))
+
+        // A second approval re-reports the marker without a second on-chain submit.
+        coord.approveBehavior = { id, hash ->
+            CoordinationRequest(id, "C", "C", "transfer", emptyList(), "", 0, "approved", 0L, resultHash = hash)
+        }
+        val retry = f.approveRequest(req)
+        assertTrue(retry.confirmedOnChain)
+        assertEquals(1, submitter.calls)
+        assertEquals(2, coord.approveCalls.size)
+        assertEquals(ApprovalInboxFlow.CONFIRMED_NO_HASH_REPORT, coord.approveCalls.last().second)
+        assertNull(store.get(req.id))
+    }
+
     // -------------------------------------------------------------------------
     // Approved-results presentation state
     // -------------------------------------------------------------------------
 
     @Test
-    fun approvedEntryForSuccessCarriesFullHashContextLabelAndExplorerUrl() {
+    fun approvedEntryForSuccessCarriesFullHashContextLabelAndExplorerUrl() = runTest {
         val f = flow(FakeCoordination())
         val req = request()
         val decoded = f.decodeCall(req)
@@ -345,7 +458,7 @@ class ApprovalInboxFlowTest {
     }
 
     @Test
-    fun approvedEntryForConfirmedWithoutHashDegradesGracefully() {
+    fun approvedEntryForConfirmedWithoutHashDegradesGracefully() = runTest {
         val f = flow(FakeCoordination())
         val req = request()
         val decoded = f.decodeCall(req)
@@ -363,7 +476,7 @@ class ApprovalInboxFlowTest {
     }
 
     @Test
-    fun approvalContextLabelFallsBackToFunctionAndTargetForUnknownShape() {
+    fun approvalContextLabelFallsBackToFunctionAndTargetForUnknownShape() = runTest {
         val f = flow(FakeCoordination())
         val req = request(targetFn = "custom_fn", args = listOf(encode(addressArg(RECIPIENT))))
         val decoded = f.decodeCall(req)

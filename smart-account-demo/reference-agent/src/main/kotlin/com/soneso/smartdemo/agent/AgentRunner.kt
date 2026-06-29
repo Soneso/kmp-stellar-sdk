@@ -144,11 +144,14 @@ class AgentRunner(
         // escalation and polling never sign. Register it immediately before the
         // call and drop the adapter's copy the moment the call returns, regardless
         // of outcome, so the key is not retained for the whole escalation/poll
-        // window. attemptCall classifies any throw into a CallOutcome rather than
-        // rethrowing, so clearAll always runs.
+        // window. clearAll runs in a finally so the seed is dropped on every exit
+        // path, including a cooperative cancellation that attemptCall re-raises.
         signerAdapter.add(config.ed25519VerifierAddress, agentPublicKey, agentSeed)
-        val outcome = attemptCall(args, selectedSigners)
-        signerAdapter.clearAll()
+        val outcome = try {
+            attemptCall(args, selectedSigners)
+        } finally {
+            signerAdapter.clearAll()
+        }
 
         return when (outcome) {
             is CallOutcome.Succeeded -> {
@@ -162,6 +165,7 @@ class AgentRunner(
             is CallOutcome.Rejected -> escalateAndPoll(
                 errorCode = outcome.errorCode,
                 errorName = outcome.errorName,
+                rawMessage = outcome.rawMessage,
                 args = args,
                 smartAccount = smartAccount,
             )
@@ -179,6 +183,10 @@ class AgentRunner(
             selectedSigners = selectedSigners,
         )
         classifyResult(result)
+    } catch (e: CancellationException) {
+        // Cooperative cancellation must propagate, never be misclassified as a
+        // contract failure. The caller's finally still clears the registered seed.
+        throw e
     } catch (e: Throwable) {
         classifyError(e)
     }
@@ -186,11 +194,12 @@ class AgentRunner(
     private suspend fun escalateAndPoll(
         errorCode: Int,
         errorName: String?,
+        rawMessage: String,
         args: List<SCValXdr>,
         smartAccount: String,
     ): AgentResult {
         logger.info(
-            "Policy rejection (code $errorCode${errorName?.let { " / $it" } ?: ""}). " +
+            "Policy rejection (code $errorCode${errorName?.let { " / $it" } ?: ""}): $rawMessage. " +
                 "Escalating to ${config.coordinationBaseUrl}."
         )
 
@@ -207,9 +216,12 @@ class AgentRunner(
         val requestId = created.id
         logger.info("Escalation request created: id=$requestId (pending).")
 
-        // Half-open range so a non-positive pollMaxAttempts yields an empty loop
-        // (returns pending with attempts 0) instead of trapping on an invalid range.
-        for (attempt in 0 until config.pollMaxAttempts) {
+        // A live run validates pollMaxAttempts >= 1, but the runner is also driven
+        // directly in tests. Clamp to a non-negative bound so a non-positive value
+        // yields an empty loop (returns pending with attempts 0) instead of trapping
+        // on an invalid range.
+        val maxAttempts = config.pollMaxAttempts.coerceAtLeast(0)
+        for (attempt in 0 until maxAttempts) {
             sleep(config.pollIntervalSeconds * 1000L)
 
             val current = try {
@@ -220,11 +232,11 @@ class AgentRunner(
                 throw e
             } catch (e: Exception) {
                 // A single failed poll (e.g. a transient network blip) must not
-                // abort the escalation: the loop is bounded by pollMaxAttempts.
-                // Log it and try again on the next attempt; the request resolves
+                // abort the escalation: the loop is bounded by maxAttempts. Log it
+                // and try again on the next attempt; the request resolves
                 // server-side independently of our polling.
                 logger.info(
-                    "Poll attempt ${attempt + 1}/${config.pollMaxAttempts} for $requestId failed: " +
+                    "Poll attempt ${attempt + 1}/$maxAttempts for $requestId failed: " +
                         "${e.message}. Retrying."
                 )
                 continue
@@ -250,8 +262,8 @@ class AgentRunner(
             }
         }
 
-        logger.info("Escalation $requestId still pending after ${config.pollMaxAttempts} polls; stopping.")
-        return AgentResult.EscalationPending(requestId, errorCode, config.pollMaxAttempts)
+        logger.info("Escalation $requestId still pending after $maxAttempts polls; stopping.")
+        return AgentResult.EscalationPending(requestId, errorCode, maxAttempts)
     }
 
     /**

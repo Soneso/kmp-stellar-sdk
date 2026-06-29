@@ -35,10 +35,6 @@ class RequestStore(
     /** Insertion order of ids. Reversed when listing so newest appears first. */
     private val order = mutableListOf<String>()
 
-    /** Path of the backing JSON file, or `null` when persistence is disabled. */
-    val backingStorePath: String?
-        get() = storePath
-
     /**
      * Loads persisted records when a store path is configured and the file
      * exists. Safe to call once during startup.
@@ -170,27 +166,35 @@ class RequestStore(
                 Files.createDirectories(directory)
             }
             val temp = Files.createTempFile(directory, "coordination-store", ".tmp")
-            Files.writeString(temp, data)
             try {
-                Files.move(
-                    temp,
-                    target,
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE,
-                )
-            } catch (_: Exception) {
-                // ATOMIC_MOVE is unsupported on some filesystems; fall back to a
-                // replace move so persistence still works for those targets.
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
+                Files.writeString(temp, data)
+                try {
+                    Files.move(
+                        temp,
+                        target,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE,
+                    )
+                } catch (_: Exception) {
+                    // ATOMIC_MOVE is unsupported on some filesystems; fall back to a
+                    // replace move so persistence still works for those targets.
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
+                }
+            } catch (e: Exception) {
+                // A failed write or move leaves the temp file behind; remove it so a
+                // failed flush does not leak orphaned temp files into the store
+                // directory, then propagate the failure to the caller.
+                Files.deleteIfExists(temp)
+                throw e
             }
         }
     }
 
     private companion object {
-        val json = Json {
-            encodeDefaults = true
-            explicitNulls = true
-            ignoreUnknownKeys = true
-        }
+        // Strict variant of the shared wire codec: persistence reads disable input
+        // coercion so a corrupt or hand-edited store file fails loudly instead of
+        // silently coercing malformed values to defaults. Encoding is identical to
+        // the wire codec, so the persisted JSON matches the wire shape field-for-field.
+        val json = Json(from = wireJson) { coerceInputValues = false }
     }
 }

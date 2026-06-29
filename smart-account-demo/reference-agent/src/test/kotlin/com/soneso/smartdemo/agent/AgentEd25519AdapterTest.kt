@@ -14,7 +14,7 @@ class AgentEd25519AdapterTest {
     private val verifier = AgentDefaults.ED25519_VERIFIER_ADDRESS
     private val seed = ByteArray(32) { (it + 1).toByte() }
 
-    private fun publicKey(): ByteArray = runBlocking { KeyPair.fromSecretSeed(seed).getPublicKey() }
+    private fun publicKey(): ByteArray = publicKeyFor(seed)
 
     @Test
     fun canSignForReportsRegisteredSlotsOnly() = runBlocking {
@@ -46,6 +46,18 @@ class AgentEd25519AdapterTest {
         adapter.add(verifier, pub, seed)
         adapter.clearAll()
         assertFalse(adapter.canSignFor(verifier, pub))
+    }
+
+    @Test
+    fun clearAllZeroesItsOwnCopyAndLeavesTheCallersSeedIntact() = runBlocking {
+        val adapter = AgentEd25519Adapter()
+        val pub = publicKey()
+        val callerSeed = seed.copyOf()
+        adapter.add(verifier, pub, callerSeed)
+        adapter.clearAll()
+        // clearAll wipes the adapter's private copy, never the array the caller
+        // passed to add, so the caller's seed is unchanged.
+        assertContentEquals(seed, callerSeed)
     }
 
     @Test

@@ -98,12 +98,26 @@ object DemoConfig {
 
     /** Base URL of the coordination server that brokers policy-rejected agent calls.
      *  The reference agent posts escalations here; the approval inbox reads them.
-     *  Override per environment; the default points at a locally run server. */
+     *  The default points at a locally run server, reachable as `localhost` from the iOS
+     *  simulator, macOS, and the web build. On the Android emulator the host machine is NOT
+     *  `localhost` (that resolves to the emulator itself); use `http://10.0.2.2:8787` to reach
+     *  a coordination server running on the developer machine. Override per environment.
+     *
+     *  The bearer-token-over-HTTP default here is for local dev / testnet only. Any non-localhost
+     *  deployment MUST serve the coordination API over HTTPS so the token below is never sent in
+     *  clear text. */
     const val COORDINATION_URL = "http://localhost:8787"
 
     /** Bearer token sent on every coordination-server request. Must match the
-     *  token the coordination server was started with (`--token`). */
+     *  token the coordination server was started with (`--token`). Dev/testnet-only:
+     *  see [COORDINATION_URL] for the HTTPS-off-localhost requirement. */
     const val COORDINATION_TOKEN = "dev-token-change-me"
+
+    // -- Block Explorer --
+
+    /** Base URL for a Stellar testnet transaction on the stellar.expert block explorer.
+     *  The approval inbox appends a confirmed transaction hash to build a viewable link. */
+    const val STELLAR_EXPERT_TESTNET_TX_BASE = "https://stellar.expert/explorer/testnet/tx/"
 
     // -- Reown (WalletConnect) --
 

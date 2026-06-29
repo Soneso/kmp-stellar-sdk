@@ -11,6 +11,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -19,9 +20,14 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * A coordination-server request record.
  *
- * Mirrors the canonical request object served by the coordination server. All
- * fields are present in a server response; optional fields are `null` until the
- * request is resolved. The amount defaults to the empty string when absent.
+ * Mirrors the canonical request object served by the coordination server. The
+ * server emits every field, but the decode tolerates an absent `args` (defaulting
+ * to an empty list) and an absent `amount` (defaulting to the empty string) so
+ * the client stays compatible with the wire contract rather than rejecting a
+ * response that omits an empty collection or value.
+ *
+ * The [status] string values match the server's [RequestStatus] wire names
+ * (`pending`, `approved`, `rejected`).
  */
 @Serializable
 data class CoordinationRequest(
@@ -29,7 +35,7 @@ data class CoordinationRequest(
     val smartAccount: String,
     val target: String,
     val targetFn: String,
-    val args: List<String>,
+    val args: List<String> = emptyList(),
     val amount: String = "",
     val reason: Int,
     val status: String,
@@ -127,6 +133,10 @@ class HttpCoordinationClient(
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
+        } catch (e: CancellationException) {
+            // Cooperative cancellation must propagate unwrapped so the runner's
+            // poll loop can stop promptly; do not rewrap it as a request failure.
+            throw e
         } catch (e: Exception) {
             throw CoordinationException("POST /requests failed: ${e.message}")
         }
@@ -138,6 +148,10 @@ class HttpCoordinationClient(
             client.get("$base/requests/${id.encodeURLPathPart()}") {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
+        } catch (e: CancellationException) {
+            // Cooperative cancellation must propagate unwrapped so the runner's
+            // poll loop can stop promptly; do not rewrap it as a request failure.
+            throw e
         } catch (e: Exception) {
             throw CoordinationException("GET /requests/$id failed: ${e.message}")
         }

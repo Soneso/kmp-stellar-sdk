@@ -25,22 +25,22 @@ import kotlin.test.fail
  * spending-limit amount grammar that must agree with the on-chain base-units encoding, and
  * the configured spending-limit policy address) and the [delegateToAgent] composition itself.
  *
- * The composition tests inject the [delegateToAgent] submission and ledger seams so the rule
- * the flow hands to the SDK can be inspected without a chain or passkey ceremony. They assert
- * that the flow builds the same fail-CLOSED rule as the Flutter and iOS originals: a
- * `CallContract(token)` scope, a single Ed25519 external signer carrying the 32-byte agent key
- * under the configured verifier, a spending-limit policy with the cap pre-encoded at the token
- * scale, and `validUntil = currentLedger + offset` (with no ledger read when the offset is zero
- * and no submission when the cap or key is invalid).
+ * The composition tests inject the [delegateToAgent] submission, ledger, and decimals seams so
+ * the rule the flow hands to the SDK can be inspected without a chain or passkey ceremony. They
+ * assert that the flow builds the fail-CLOSED rule: a `CallContract(token)` scope, a single
+ * Ed25519 external signer carrying the 32-byte agent key under the configured verifier, a
+ * spending-limit policy with the cap pre-encoded at the token scale, and
+ * `validUntil = currentLedger + offset` (with no ledger read when the offset is zero and no
+ * submission when the cap or key is invalid).
  */
 class DelegateToAgentFlowTest {
 
     private val validKey = "a".repeat(64)
 
     /**
-     * A demo token contract used as the [ContextRuleType.CallContract] scope. The native demo
-     * token resolves decimals without a fetch, so the composition tests pass [TOKEN_DECIMALS]
-     * directly the way the screen does after [resolveSpendingLimitDecimals].
+     * A demo token contract used as the [ContextRuleType.CallContract] scope. The composition
+     * tests inject the decimal scale through the [delegateToAgent] decimals seam, so the rule
+     * is composed at a deterministic precision without resolving the token's decimals() over RPC.
      */
     private val tokenContract = DemoConfig.NATIVE_TOKEN_CONTRACT
 
@@ -85,7 +85,6 @@ class DelegateToAgentFlowTest {
             amount = amount,
             periodLedgers = periodLedgers,
             validUntilOffsetLedgers = validUntilOffsetLedgers,
-            tokenDecimals = tokenDecimals,
             submitContextRule = { contextType, name, validUntil, signers, policies ->
                 submitCount++
                 captured = CapturedRule(contextType, name, validUntil, signers, policies)
@@ -95,6 +94,7 @@ class DelegateToAgentFlowTest {
                 ledgerReadCount++
                 currentLedger + offset
             },
+            resolveTokenDecimals = { tokenDecimals },
         )
     }
 
@@ -356,6 +356,31 @@ class DelegateToAgentFlowTest {
     }
 
     @Test
+    fun delegateFailsClosedWhenTokenDecimalsCannotBeResolved() = runTest {
+        var submitCount = 0
+
+        // A non-native custom token whose decimals() cannot be read must abort the delegation
+        // before submitting, rather than encoding the cap at a guessed scale.
+        val result = delegateToAgent(
+            agentPublicKey = agentKeyHex,
+            tokenContract = tokenContract,
+            amount = "10",
+            periodLedgers = ledgersPerDay,
+            validUntilOffsetLedgers = ledgersPerDay,
+            submitContextRule = { _, _, _, _, _ ->
+                submitCount++
+                ContextRuleResult(true, "unexpected", null)
+            },
+            resolveValidUntilLedger = { offset -> offset },
+            resolveTokenDecimals = { throw IllegalStateException("rpc down") },
+        )
+
+        assertTrue(!result.success)
+        assertEquals(0, submitCount)
+        assertTrue(result.error!!.contains("decimal precision"))
+    }
+
+    @Test
     fun delegateSurfacesAnOnChainFailureAsASanitisedError() = runTest {
         val harness = Harness(
             submitResult = ContextRuleResult(false, null, "simulation rejected the rule"),
@@ -386,12 +411,12 @@ class DelegateToAgentFlowTest {
             amount = "10",
             periodLedgers = ledgersPerDay,
             validUntilOffsetLedgers = ledgersPerDay,
-            tokenDecimals = DemoConfig.DEMO_TOKEN_DECIMALS,
             submitContextRule = { _, _, _, _, _ ->
                 submitCount++
                 ContextRuleResult(true, "unexpected", null)
             },
             resolveValidUntilLedger = { throw IllegalStateException("rpc down") },
+            resolveTokenDecimals = { DemoConfig.DEMO_TOKEN_DECIMALS },
         )
 
         assertTrue(!result.success)
@@ -413,13 +438,13 @@ class DelegateToAgentFlowTest {
                 amount = "10",
                 periodLedgers = ledgersPerDay,
                 validUntilOffsetLedgers = 0u,
-                tokenDecimals = DemoConfig.DEMO_TOKEN_DECIMALS,
                 submitContextRule = { _, _, _, _, _ ->
                     firstReachedSubmit.complete(Unit)
                     releaseFirst.await()
                     ContextRuleResult(true, "firsthash", null)
                 },
                 resolveValidUntilLedger = { offset -> offset },
+                resolveTokenDecimals = { DemoConfig.DEMO_TOKEN_DECIMALS },
             )
         }
 
@@ -432,12 +457,12 @@ class DelegateToAgentFlowTest {
             amount = "10",
             periodLedgers = ledgersPerDay,
             validUntilOffsetLedgers = 0u,
-            tokenDecimals = DemoConfig.DEMO_TOKEN_DECIMALS,
             submitContextRule = { _, _, _, _, _ ->
                 secondSubmitCount++
                 ContextRuleResult(true, "secondhash", null)
             },
             resolveValidUntilLedger = { offset -> offset },
+            resolveTokenDecimals = { DemoConfig.DEMO_TOKEN_DECIMALS },
         )
 
         assertTrue(!second.success)
@@ -456,9 +481,9 @@ class DelegateToAgentFlowTest {
             amount = "10",
             periodLedgers = ledgersPerDay,
             validUntilOffsetLedgers = 0u,
-            tokenDecimals = DemoConfig.DEMO_TOKEN_DECIMALS,
             submitContextRule = { _, _, _, _, _ -> ContextRuleResult(true, "thirdhash", null) },
             resolveValidUntilLedger = { offset -> offset },
+            resolveTokenDecimals = { DemoConfig.DEMO_TOKEN_DECIMALS },
         )
         assertTrue(third.success)
         assertEquals("thirdhash", third.hash)

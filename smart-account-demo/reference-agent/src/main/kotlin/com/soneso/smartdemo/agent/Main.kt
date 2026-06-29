@@ -24,7 +24,11 @@ fun main(args: Array<String>) = runBlocking {
     when {
         shouldPrintAgentKey(env, argv) -> {
             try {
-                val result = resolveAgentKey(env["AGENT_SECRET_SEED"])
+                // Resolve the seed with the same precedence the run mode uses
+                // (CLI arg over environment) so an operator can derive the public
+                // key for a seed passed either way.
+                val seed = AgentConfig.parseArgs(argv)["secret-seed"] ?: env["AGENT_SECRET_SEED"]
+                val result = resolveAgentKey(seed)
                 for (line in formatAgentKeyOutput(result)) {
                     println("[agent] [KEY] $line")
                 }
@@ -73,7 +77,13 @@ private fun printUsage() {
                                  AGENT_DESTINATION, AGENT_COORDINATION_URL,
                                  AGENT_COORDINATION_TOKEN.
 
-        Without a gate this usage is printed and nothing else happens.
+        Known testnet policy contracts (operator reference for the delegation flow):
         """.trimIndent()
     )
+    // Printed line by line so the addresses align regardless of map contents.
+    for ((type, address) in AgentDefaults.knownPolicies) {
+        println("  ${type.padEnd(18)} $address")
+    }
+    println()
+    println("Without a gate this usage is printed and nothing else happens.")
 }

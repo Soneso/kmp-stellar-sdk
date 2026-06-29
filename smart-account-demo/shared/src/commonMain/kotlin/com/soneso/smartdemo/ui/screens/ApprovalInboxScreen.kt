@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -98,6 +99,9 @@ class ApprovalInboxScreen : Screen {
         var loaded by remember { mutableStateOf(false) }
         var loadError by remember { mutableStateOf<String?>(null) }
         val pending = remember { mutableStateListOf<CoordinationRequest>() }
+        // Decoded consent data per request, populated once in load() (which can fetch the
+        // token's decimals over RPC) so the card never decodes XDR during composition.
+        val decodedById = remember { mutableStateMapOf<String, DecodedCall>() }
 
         // IDs with an action in flight (card spinner) and a global in-flight guard so a
         // second card cannot start a concurrent approval.
@@ -120,6 +124,8 @@ class ApprovalInboxScreen : Screen {
                 val result = flow.loadPending()
                 pending.clear()
                 pending.addAll(result)
+                decodedById.clear()
+                result.forEach { decodedById[it.id] = flow.decodeCall(it) }
                 reportPending.clear()
                 reportPending.addAll(result.map { it.id }.filter { flow.isAwaitingReport(it) })
                 DemoState.setPendingRequestCount(result.size)
@@ -136,6 +142,7 @@ class ApprovalInboxScreen : Screen {
         fun removeResolved(id: String) {
             pending.removeAll { it.id == id }
             reportPending.remove(id)
+            decodedById.remove(id)
             DemoState.setPendingRequestCount(pending.size)
         }
 
@@ -148,78 +155,67 @@ class ApprovalInboxScreen : Screen {
             approvedResults.add(0, entry)
         }
 
-        fun approve(request: CoordinationRequest) {
+        // Runs a single card action under the global in-flight guard: it refuses a concurrent
+        // second action, owns the per-card spinner (busyIds) and the guard flag, and clears
+        // both when the action finishes (even on cancellation). Callers supply only the body.
+        fun runCardAction(id: String, block: suspend () -> Unit) {
             if (actionInFlight) { showSnack("Another approval is in progress."); return }
             actionInFlight = true
-            busyIds.add(request.id)
+            busyIds.add(id)
             scope.launch {
-                val decoded = flow.decodeCall(request)
-                val result = flow.approveRequest(request)
-                busyIds.remove(request.id)
-                actionInFlight = false
-                when {
-                    result.success -> {
-                        recordApproved(approvedEntryFor(request, decoded, result))
-                        removeResolved(request.id)
-                        showSnack("Approved.")
-                    }
-                    result.confirmedOnChain && result.hash.isNullOrEmpty() -> {
-                        // Confirmed on-chain but the SDK returned no hash: nothing to report
-                        // or copy. Surface it in the approved list as a graceful note rather
-                        // than offering a report that can never carry a hash.
-                        recordApproved(approvedEntryFor(request, decoded, result))
-                        removeResolved(request.id)
-                        showSnack("Confirmed on-chain.")
-                    }
-                    result.confirmedOnChain -> {
-                        // Hash known but report-back failed: surface the confirmed hash in the
-                        // persistent approved list so it stays copyable, and keep the card so the
-                        // user can retry the report without re-submitting the call.
-                        recordApproved(approvedEntryFor(request, decoded, result))
-                        if (!reportPending.contains(request.id)) reportPending.add(request.id)
-                        showSnack(
-                            result.error
-                                ?: "Transaction confirmed on-chain, but reporting it back failed. Retry the report."
-                        )
-                    }
-                    else -> showSnack(result.error ?: "Approval failed.")
+                try {
+                    block()
+                } finally {
+                    busyIds.remove(id)
+                    actionInFlight = false
                 }
             }
         }
 
-        fun retryReport(request: CoordinationRequest) {
-            if (actionInFlight) { showSnack("Another approval is in progress."); return }
-            actionInFlight = true
-            busyIds.add(request.id)
-            scope.launch {
-                val decoded = flow.decodeCall(request)
-                val result = flow.retryReport(request)
-                busyIds.remove(request.id)
-                actionInFlight = false
-                if (result.success) {
+        fun approve(request: CoordinationRequest) = runCardAction(request.id) {
+            val decoded = decodedById[request.id] ?: flow.decodeCall(request)
+            val result = flow.approveRequest(request)
+            when {
+                result.success -> {
                     recordApproved(approvedEntryFor(request, decoded, result))
                     removeResolved(request.id)
-                    showSnack("Reported.")
-                } else {
-                    showSnack(result.error ?: "Reporting failed.")
+                    showSnack("Approved.")
                 }
+                result.confirmedOnChain -> {
+                    // Confirmed on-chain but the report-back failed: surface the result in the
+                    // persistent approved list and keep the card so the user can retry the
+                    // report without re-submitting the call. This also covers the
+                    // confirmed-without-hash case, whose report is retryable too.
+                    recordApproved(approvedEntryFor(request, decoded, result))
+                    if (!reportPending.contains(request.id)) reportPending.add(request.id)
+                    showSnack(
+                        result.error
+                            ?: "Transaction confirmed on-chain, but reporting it back failed. Retry the report."
+                    )
+                }
+                else -> showSnack(result.error ?: "Approval failed.")
             }
         }
 
-        fun reject(request: CoordinationRequest, note: String) {
-            if (actionInFlight) { showSnack("Another approval is in progress."); return }
-            actionInFlight = true
-            busyIds.add(request.id)
-            scope.launch {
-                val result = flow.rejectRequest(request, note)
-                busyIds.remove(request.id)
-                actionInFlight = false
-                if (result.success) {
-                    removeResolved(request.id)
-                    showSnack("Rejected.")
-                } else {
-                    showSnack(result.error ?: "Rejection failed.")
-                }
+        fun retryReport(request: CoordinationRequest) = runCardAction(request.id) {
+            val decoded = decodedById[request.id] ?: flow.decodeCall(request)
+            val result = flow.retryReport(request)
+            if (result.success) {
+                recordApproved(approvedEntryFor(request, decoded, result))
+                removeResolved(request.id)
+                showSnack("Reported.")
+            } else {
+                showSnack(result.error ?: "Reporting failed.")
+            }
+        }
+
+        fun reject(request: CoordinationRequest, note: String) = runCardAction(request.id) {
+            val result = flow.rejectRequest(request, note)
+            if (result.success) {
+                removeResolved(request.id)
+                showSnack("Rejected.")
+            } else {
+                showSnack(result.error ?: "Rejection failed.")
             }
         }
 
@@ -418,9 +414,12 @@ class ApprovalInboxScreen : Screen {
                     }
                     else -> {
                         pending.forEach { request ->
+                            // Decoded in load(); a request without an entry is not rendered
+                            // rather than decoded during composition.
+                            val decoded = decodedById[request.id] ?: return@forEach
                             RequestCard(
                                 request = request,
-                                decoded = flow.decodeCall(request),
+                                decoded = decoded,
                                 busy = busyIds.contains(request.id),
                                 enabled = !actionInFlight,
                                 needsReport = reportPending.contains(request.id),
@@ -680,10 +679,9 @@ class ApprovalInboxScreen : Screen {
         monospace: Boolean = false,
         emphasised: Boolean = false
     ) {
-        // Fixed-width label column with the value left-aligned beside it (mirrors
-        // the Flutter demo's KeyValueRow). A SpaceBetween row flings the value to
-        // the far edge on wide web layouts; weighting the value keeps it next to
-        // its label while still filling the remaining width on mobile.
+        // Fixed-width label column with the value left-aligned beside it. A SpaceBetween row
+        // flings the value to the far edge on wide web layouts; weighting the value keeps it
+        // next to its label while still filling the remaining width on mobile.
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top

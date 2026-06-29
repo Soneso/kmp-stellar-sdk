@@ -41,8 +41,16 @@ class AgentEd25519Adapter : OZExternalEd25519SignerAdapter {
         registry[slot] = seedBytes.copyOf()
     }
 
-    /** Removes every registered seed. */
+    /**
+     * Removes every registered seed, zeroing each stored copy first so the seed
+     * bytes do not linger in the heap after the reference is dropped. The stored
+     * arrays are private copies (see [add]); zeroing them does not affect the
+     * caller's seed array.
+     */
     fun clearAll() {
+        for (seed in registry.values) {
+            seed.fill(0)
+        }
         registry.clear()
     }
 

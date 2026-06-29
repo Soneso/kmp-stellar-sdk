@@ -1,7 +1,6 @@
 package com.soneso.smartdemo.agent
 
 import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.oz.OZTransactionOperations
@@ -157,9 +156,7 @@ class AgentRunnerTest {
     private val ed25519Verifier = AgentDefaults.ED25519_VERIFIER_ADDRESS
     private val seed = ByteArray(32) { 1 }
 
-    private fun publicKey(): ByteArray = runBlocking { KeyPair.fromSecretSeed(seed).getPublicKey() }
-
-    private fun randomGAddress(): String = runBlocking { KeyPair.random().getAccountId() }
+    private fun publicKey(): ByteArray = publicKeyFor(seed)
 
     private fun buildConfig(destination: String): AgentConfig = AgentConfig(
         tokenContractId = AgentDefaults.NATIVE_TOKEN_CONTRACT,
@@ -229,6 +226,16 @@ class AgentRunnerTest {
         assertEquals("transfer", contractCall.lastTargetFn)
         assertEquals(AgentDefaults.NATIVE_TOKEN_CONTRACT, contractCall.lastTarget)
 
+        // The call carried the exact transfer(from, to, amount) vector: source is
+        // the connected smart account, destination is the configured recipient, and
+        // the amount is "5" scaled by the default 7 decimals -> 50_000_000 base units.
+        val expectedArgs = listOf(
+            Scv.toAddress(Address(smartAccount).toSCAddress()),
+            Scv.toAddress(Address(destination).toSCAddress()),
+            Scv.toInt128(OZTransactionOperations.amountToBaseUnits("5", 7)),
+        ).map { encode(it) }
+        assertEquals(expectedArgs, assertNotNull(contractCall.lastArgs).map { encode(it) })
+
         // No escalation occurred.
         assertNull(coordination.createArgs)
         assertEquals(0, coordination.getCount)
@@ -267,30 +274,45 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun aNonPolicyContractCodeFailsWithoutEscalating() = runBlocking {
+        // 3016 (UNAUTHORIZED_SIGNER) is a contract error code but not a policy
+        // denial, so the runner reports a failure and never escalates.
+        val contractCall = FakeContractCall(TransactionResult(success = false, error = "HostError: Error(Contract, #3016)"))
+        val coordination = FakeCoordinationClient(emptyList())
+
+        val result = buildRunner(buildConfig(randomGAddress()), contractCall, coordination, FakeWalletSession(smartAccount)).run()
+
+        assertTrue(result is AgentResult.CallFailed)
+        assertTrue(result.message.contains("#3016"))
+        assertNull(coordination.createArgs)
+        assertEquals(0, coordination.getCount)
+    }
+
+    @Test
     fun policyRejectionEscalatesAndReturnsApprovedWithTheResultHash() = runBlocking {
         val destination = randomGAddress()
-        val contractCall = FakeContractCall(TransactionResult(success = false, error = "HostError: Error(Contract, #3016)"))
+        val contractCall = FakeContractCall(TransactionResult(success = false, error = "HostError: Error(Contract, #3221)"))
         val approved = CoordinationRequest(
             id = "req-1", smartAccount = smartAccount, target = smartAccount, targetFn = "transfer",
-            args = emptyList(), amount = "5", reason = 3016, status = CoordinationRequest.STATUS_APPROVED,
+            args = emptyList(), amount = "5", reason = 3221, status = CoordinationRequest.STATUS_APPROVED,
             createdAt = 1, resolvedAt = 2, resultHash = "RESOLVEDHASH",
         )
         val pending = CoordinationRequest(
             id = "req-1", smartAccount = smartAccount, target = smartAccount, targetFn = "transfer",
-            args = emptyList(), amount = "5", reason = 3016, status = CoordinationRequest.STATUS_PENDING, createdAt = 1,
+            args = emptyList(), amount = "5", reason = 3221, status = CoordinationRequest.STATUS_PENDING, createdAt = 1,
         )
         val coordination = FakeCoordinationClient(listOf(pending, approved))
         val config = buildConfig(destination)
 
         val result = buildRunner(config, contractCall, coordination, FakeWalletSession(smartAccount)).run()
 
-        assertEquals(AgentResult.EscalationApproved("req-1", "RESOLVEDHASH", 3016), result)
+        assertEquals(AgentResult.EscalationApproved("req-1", "RESOLVEDHASH", 3221), result)
         assertEquals(2, coordination.getCount)
 
         assertEquals(smartAccount, coordination.createSmartAccount)
         assertEquals(config.tokenContractId, coordination.createTarget)
         assertEquals("transfer", coordination.createTargetFn)
-        assertEquals(3016, coordination.createReason)
+        assertEquals(3221, coordination.createReason)
         assertEquals("5", coordination.createAmount)
 
         // The escalated args are the exact base64 SCVal call args (from, to, amount):
@@ -308,13 +330,13 @@ class AgentRunnerTest {
 
     @Test
     fun escalationWithPollMaxAttemptsZeroReturnsPendingWithoutPollingOrTrapping() = runBlocking {
-        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3016)"))
+        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3221)"))
         val coordination = FakeCoordinationClient(emptyList())
         val config = buildConfig(randomGAddress()).copy(pollMaxAttempts = 0)
 
         val result = buildRunner(config, contractCall, coordination, FakeWalletSession(smartAccount)).run()
 
-        assertEquals(AgentResult.EscalationPending("req-1", 3016, 0), result)
+        assertEquals(AgentResult.EscalationPending("req-1", 3221, 0), result)
         assertNotNull(coordination.createArgs)
         assertEquals(0, coordination.getCount)
     }
@@ -322,25 +344,25 @@ class AgentRunnerTest {
     @Test
     fun policyRejectionEscalatesAndReturnsRejectedWithTheNote() = runBlocking {
         // Exercise the thrown-error classification path.
-        val contractCall = FakeContractCall(TransactionException.simulationFailed("Error(Contract, #3016)"))
+        val contractCall = FakeContractCall(TransactionException.simulationFailed("Error(Contract, #3221)"))
         val rejected = CoordinationRequest(
             id = "req-1", smartAccount = smartAccount, target = smartAccount, targetFn = "transfer",
-            args = emptyList(), amount = "5", reason = 3016, status = CoordinationRequest.STATUS_REJECTED,
+            args = emptyList(), amount = "5", reason = 3221, status = CoordinationRequest.STATUS_REJECTED,
             createdAt = 1, resolvedAt = 2, note = "looks malicious",
         )
         val coordination = FakeCoordinationClient(listOf(rejected))
 
         val result = buildRunner(buildConfig(randomGAddress()), contractCall, coordination, FakeWalletSession(smartAccount)).run()
 
-        assertEquals(AgentResult.EscalationRejected("req-1", 3016, "looks malicious"), result)
+        assertEquals(AgentResult.EscalationRejected("req-1", 3221, "looks malicious"), result)
     }
 
     @Test
     fun aTransientPollErrorIsToleratedAndPollingContinuesUntilResolution() = runBlocking {
-        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3016)"))
+        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3221)"))
         val approved = CoordinationRequest(
             id = "req-1", smartAccount = smartAccount, target = smartAccount, targetFn = "transfer",
-            args = emptyList(), amount = "5", reason = 3016, status = CoordinationRequest.STATUS_APPROVED,
+            args = emptyList(), amount = "5", reason = 3221, status = CoordinationRequest.STATUS_APPROVED,
             createdAt = 1, resolvedAt = 2, resultHash = "RESOLVEDHASH",
         )
         // First poll attempt throws a transient error; the second resolves.
@@ -348,22 +370,22 @@ class AgentRunnerTest {
 
         val result = buildRunner(buildConfig(randomGAddress()), contractCall, coordination, FakeWalletSession(smartAccount)).run()
 
-        assertEquals(AgentResult.EscalationApproved("req-1", "RESOLVEDHASH", 3016), result)
+        assertEquals(AgentResult.EscalationApproved("req-1", "RESOLVEDHASH", 3221), result)
         assertEquals(2, coordination.getCount)
     }
 
     @Test
     fun escalationThatNeverResolvesReturnsEscalationPending() = runBlocking {
-        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3016)"))
+        val contractCall = FakeContractCall(TransactionResult(success = false, error = "Error(Contract, #3221)"))
         val pending = CoordinationRequest(
             id = "req-1", smartAccount = smartAccount, target = smartAccount, targetFn = "transfer",
-            args = emptyList(), amount = "5", reason = 3016, status = CoordinationRequest.STATUS_PENDING, createdAt = 1,
+            args = emptyList(), amount = "5", reason = 3221, status = CoordinationRequest.STATUS_PENDING, createdAt = 1,
         )
         val coordination = FakeCoordinationClient(listOf(pending))
 
         val result = buildRunner(buildConfig(randomGAddress()), contractCall, coordination, FakeWalletSession(smartAccount)).run()
 
-        assertEquals(AgentResult.EscalationPending("req-1", 3016, 5), result)
+        assertEquals(AgentResult.EscalationPending("req-1", 3221, 5), result)
         assertEquals(5, coordination.getCount)
     }
 }

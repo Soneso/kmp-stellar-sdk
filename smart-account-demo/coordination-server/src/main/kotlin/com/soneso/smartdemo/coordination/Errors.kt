@@ -17,6 +17,11 @@ class NotFoundException(override val message: String) : Exception(message)
 class ConflictException(override val message: String) : Exception(message)
 
 /**
+ * Raised when a request body exceeds the accepted size limit. Maps to HTTP 413.
+ */
+class PayloadTooLargeException(override val message: String) : Exception(message)
+
+/**
  * Raised when configuration cannot be resolved into a runnable state.
  */
 class ConfigException(override val message: String) : Exception(message)
