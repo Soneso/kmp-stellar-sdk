@@ -39,6 +39,22 @@ object OZConstants {
     const val FRIENDBOT_RESERVE_XLM = 5
 
     /**
+     * Interval in milliseconds between polls while waiting for a ledger entry to become
+     * visible to the Soroban RPC. Shared by the funding-account wait (a Friendbot-funded
+     * temporary account) and the deploy wait (a freshly deployed contract instance).
+     */
+    const val RPC_VISIBILITY_POLL_INTERVAL_MS = 1_500L
+
+    /**
+     * Overall timeout in seconds to observe a ledger entry on the Soroban RPC before
+     * failing. A transaction confirmed on Horizon may not be reflected in the RPC
+     * simulation state until a later ledger close; the RPC state can lag by several
+     * ledger closes when testnet propagation is slow. Shared by the funding-account wait
+     * and the deploy wait.
+     */
+    const val RPC_VISIBILITY_TIMEOUT_SECONDS = 45
+
+    /**
      * Default timeout for transaction submission and polling in seconds.
      */
     const val DEFAULT_TIMEOUT_SECONDS = 30
@@ -67,5 +83,4 @@ object OZConstants {
      * SDK name sent in client identification headers.
      */
     const val CLIENT_NAME = "kmp-stellar-sdk"
-
 }

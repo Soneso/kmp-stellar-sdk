@@ -10,13 +10,20 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.AccountEntryExtXdr
 import com.soneso.stellar.sdk.xdr.AccountEntryXdr
 import com.soneso.stellar.sdk.xdr.AccountIDXdr
+import com.soneso.stellar.sdk.xdr.ContractDataDurabilityXdr
+import com.soneso.stellar.sdk.xdr.ContractDataEntryXdr
+import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
+import com.soneso.stellar.sdk.xdr.ExtensionPointXdr
+import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
+import com.soneso.stellar.sdk.xdr.SCContractInstanceXdr
 import com.soneso.stellar.sdk.xdr.LedgerFootprintXdr
 import com.soneso.stellar.sdk.xdr.PublicKeyXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
@@ -35,6 +42,7 @@ import com.soneso.stellar.sdk.xdr.String32Xdr
 import com.soneso.stellar.sdk.xdr.ThresholdsXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.toXdrBase64
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -63,6 +71,17 @@ internal fun ledgerEntriesResponseJson(accountXdrBase64: String): String = """
         "lastModifiedLedgerSeq": 100
       }
     ],
+    "latestLedger": 100
+  }
+}
+""".trimIndent()
+
+internal fun emptyLedgerEntriesResponseJson(): String = """
+{
+  "jsonrpc": "2.0",
+  "id": "test-id",
+  "result": {
+    "entries": [],
     "latestLedger": 100
   }
 }
@@ -203,6 +222,29 @@ internal fun buildMinimalSorobanData(): SorobanTransactionDataXdr = SorobanTrans
     resourceFee = Int64Xdr(0L)
 )
 
+/**
+ * Builds a `getLedgerEntries` result whose single entry carries a
+ * [LedgerEntryDataXdr.ContractData] for the contract-instance key of [contractId]. This makes
+ * `SorobanServer.getContractData(...)` return a non-null entry — the structural signal
+ * `verifyContractExists` reads to confirm the contract exists on-chain.
+ */
+internal fun contractInstanceEntriesResponseJson(contractId: String): String {
+    val instance = SCContractInstanceXdr(
+        executable = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32) { 0 })),
+        storage = null
+    )
+    val entryData = LedgerEntryDataXdr.ContractData(
+        ContractDataEntryXdr(
+            ext = ExtensionPointXdr.Void,
+            contract = Address(contractId).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            durability = ContractDataDurabilityXdr.PERSISTENT,
+            `val` = Scv.toContractInstance(instance)
+        )
+    )
+    return ledgerEntriesResponseJson(entryData.toXdrBase64())
+}
+
 internal fun stubHostFunction(contractId: String): HostFunctionXdr =
     HostFunctionXdr.InvokeContract(
         InvokeContractArgsXdr(
@@ -224,6 +266,90 @@ private fun buildMockHttpClient(engine: MockEngine): HttpClient = HttpClient(eng
             encodeDefaults = false
         })
     }
+}
+
+/**
+ * Creates a [SorobanServer] that returns [responseBody] for every request. Used by the
+ * headless connect tests whose successful path makes exactly one `getLedgerEntries` call
+ * (the contract-existence check).
+ */
+internal fun buildConstantResponseMockServer(responseBody: String): SorobanServer {
+    val mockEngine = MockEngine { _ ->
+        respond(
+            content = ByteReadChannel(responseBody),
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType, "application/json")
+        )
+    }
+    return SorobanServer("https://soroban-testnet.stellar.org", buildMockHttpClient(mockEngine))
+}
+
+/**
+ * Creates a [SorobanServer] that fails on any request. Used by tests that must prove a code
+ * path short-circuits before reaching the network (address validation, or the headless submit
+ * guard).
+ */
+internal fun buildNoRpcMockServer(): SorobanServer {
+    val mockEngine = MockEngine { _ -> error("no RPC expected") }
+    return SorobanServer("https://soroban-testnet.stellar.org", buildMockHttpClient(mockEngine))
+}
+
+/**
+ * Creates a [SorobanServer] that answers the first request with [contractInstanceJson] (the
+ * headless connect existence check) and fails on every subsequent request. Used by the submit
+ * guard tests to prove the guard fires before any further network round-trip.
+ */
+internal fun buildContractInstanceThenNoRpcMockServer(contractInstanceJson: String): SorobanServer {
+    var requestIndex = 0
+    val mockEngine = MockEngine { _ ->
+        val responseBody = when (requestIndex++) {
+            0 -> contractInstanceJson
+            else -> error("no RPC expected after headless connect")
+        }
+        respond(
+            content = ByteReadChannel(responseBody),
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType, "application/json")
+        )
+    }
+    return SorobanServer("https://soroban-testnet.stellar.org", buildMockHttpClient(mockEngine))
+}
+
+/**
+ * Creates a [SorobanServer] that first answers the headless connect existence check with
+ * [contractInstanceJson], then drives the full 9-response
+ * [OZMultiSignerManager.submitWithMultipleSigners] submission round-trip. Used by the headline
+ * acceptance test that operates a headless kit via the multi-signer pipeline.
+ */
+internal fun buildHeadlessConnectThenSubmissionMockServer(
+    contractInstanceJson: String,
+    accountXdrBase64: String,
+    authEntryBase64: String,
+    sorobanDataBase64: String,
+    countXdrBase64: String,
+    txHash: String
+): SorobanServer {
+    var requestIndex = 0
+    val mockEngine = MockEngine { _ ->
+        val responseBody = when (requestIndex++) {
+            0 -> contractInstanceJson
+            1 -> ledgerEntriesResponseJson(accountXdrBase64)
+            2 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
+            3 -> latestLedgerResponseJson()
+            4 -> ledgerEntriesResponseJson(accountXdrBase64)
+            5 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
+            6 -> ledgerEntriesResponseJson(accountXdrBase64)
+            7 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
+            8 -> sendTransactionPendingResponseJson(txHash)
+            else -> getTransactionSuccessResponseJson(txHash)
+        }
+        respond(
+            content = ByteReadChannel(responseBody),
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType, "application/json")
+        )
+    }
+    return SorobanServer("https://soroban-testnet.stellar.org", buildMockHttpClient(mockEngine))
 }
 
 /**

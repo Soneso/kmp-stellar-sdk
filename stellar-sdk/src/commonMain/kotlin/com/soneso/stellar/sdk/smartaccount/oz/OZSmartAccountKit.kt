@@ -212,18 +212,33 @@ class OZSmartAccountKit private constructor(
     /**
      * Indicates whether a wallet is currently connected.
      *
-     * A wallet is connected when both the credential ID and contract ID are set.
-     * This property reflects in-memory state only. After an app restart, call
+     * A connection is defined by the smart-account contract; the credential is optional and is
+     * absent for a headless [walletOperations].connectToContract() connection. This property
+     * reflects in-memory state only. After an app restart, call
      * [walletOperations].connectWallet() to restore a saved session.
      */
     val isConnected: Boolean
-        get() = _credentialId != null && _contractId != null
+        get() = _contractId != null
 
     /**
-     * The credential ID of the currently connected wallet.
+     * Indicates whether the current connection is headless: bound to a smart-account contract
+     * with no passkey credential.
      *
-     * Returns null if no wallet is connected. The credential ID is Base64URL-encoded
-     * without padding, matching the WebAuthn specification.
+     * `true` only for a connection established through
+     * [walletOperations].connectToContract(). Headless connections are operable only through
+     * the multi-signer / external-signer pipeline; the single-passkey paths reject them.
+     */
+    val isHeadless: Boolean
+        get() = _contractId != null && _credentialId == null
+
+    /**
+     * The credential ID of the currently connected wallet, when one is present.
+     *
+     * Returns null when no wallet is connected, and also for a headless
+     * [walletOperations].connectToContract() connection, which binds a contract without a
+     * passkey credential. Use [isHeadless] to tell a headless connection apart from no
+     * connection. When present, the credential ID is Base64URL-encoded without padding,
+     * matching the WebAuthn specification.
      */
     val credentialId: String?
         get() = _credentialId
@@ -248,10 +263,11 @@ class OZSmartAccountKit private constructor(
      *
      * Thread-safe: This method can be called from any coroutine.
      *
-     * @param credentialId The Base64URL-encoded credential ID
+     * @param credentialId The Base64URL-encoded credential ID, or null for a headless
+     *   connection bound to the contract alone.
      * @param contractId The smart account contract address (C-address)
      */
-    internal suspend fun setConnectedState(credentialId: String, contractId: String) {
+    internal suspend fun setConnectedState(credentialId: String?, contractId: String) {
         stateLock.withLock {
             _credentialId = credentialId
             _contractId = contractId
@@ -330,10 +346,11 @@ class OZSmartAccountKit private constructor(
      * Requires that a wallet is currently connected, throwing an error if not.
      *
      * This helper method is used by operations that require an active connection.
-     * It provides a consistent error message and atomic access to both credential ID
-     * and contract ID.
+     * It provides a consistent error message and atomic access to the credential ID
+     * and contract ID. A connection is defined by the contract alone, so the returned
+     * credential ID is null for a headless connection.
      *
-     * @return A pair containing the credential ID and contract ID
+     * @return A pair containing the (nullable) credential ID and the non-null contract ID
      * @throws WalletException.NotConnected if no wallet is connected
      *
      * Example usage in operation modules:
@@ -342,11 +359,11 @@ class OZSmartAccountKit private constructor(
      * // Proceed with operation using credentialId and contractId
      * ```
      */
-    internal suspend fun requireConnected(): Pair<String, String> {
+    internal suspend fun requireConnected(): Pair<String?, String> {
         return stateLock.withLock {
             val cId = _credentialId
             val ctId = _contractId
-            if (cId == null || ctId == null) {
+            if (ctId == null) {
                 throw WalletException.notConnected(
                     "No wallet connected. Call createWallet() or connectWallet() first."
                 )

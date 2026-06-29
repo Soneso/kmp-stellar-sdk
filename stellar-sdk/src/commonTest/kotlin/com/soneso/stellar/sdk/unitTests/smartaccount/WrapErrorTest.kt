@@ -105,6 +105,13 @@ class WrapErrorTest {
         assertEquals(SmartAccountErrorCode.WALLET_NOT_FOUND, result.code)
     }
 
+    @Test
+    fun testWrapError_walletHeadlessConnection() {
+        val result = SmartAccountException.wrapError(RuntimeException("headless"), SmartAccountErrorCode.WALLET_HEADLESS_CONNECTION)
+        assertIs<WalletException.HeadlessConnection>(result)
+        assertEquals(SmartAccountErrorCode.WALLET_HEADLESS_CONNECTION, result.code)
+    }
+
     // MARK: - Credential exceptions (3xxx)
 
     @Test

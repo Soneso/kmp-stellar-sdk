@@ -59,6 +59,20 @@ sealed class SmartAccountEvent {
     ) : SmartAccountEvent()
 
     /**
+     * Emitted when a wallet is connected headlessly (by contract address only,
+     * with no passkey credential). Used by backends and autonomous signers that
+     * operate via the multi-signer / external-signer pipeline.
+     *
+     * Distinct from [WalletConnected]: a headless connection has no credential
+     * ID, so this event carries only the contract address.
+     *
+     * @property contractId The smart account contract address (C-address)
+     */
+    data class HeadlessConnected(
+        val contractId: String
+    ) : SmartAccountEvent()
+
+    /**
      * Emitted when a new credential is created (passkey registered).
      *
      * This event is fired after successful WebAuthn credential creation, whether

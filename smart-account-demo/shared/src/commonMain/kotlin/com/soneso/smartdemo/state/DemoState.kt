@@ -3,7 +3,10 @@ package com.soneso.smartdemo.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.soneso.smartdemo.config.DemoConfig
+import com.soneso.smartdemo.util.CoordinationClient
 import com.soneso.smartdemo.util.ExternalSignerManagerAdapter
+import com.soneso.smartdemo.util.HttpCoordinationClient
 import com.soneso.smartdemo.wallet.DemoEd25519Adapter
 import com.soneso.smartdemo.wallet.WalletConnector
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
@@ -80,8 +83,54 @@ object DemoState {
     var demoTokenBalance: String? by mutableStateOf(null)
         private set
 
+    /**
+     * Number of pending agent escalations for the connected smart account, driving
+     * the approval-inbox bell badge on the main screen. Kept in sync by the inbox
+     * poller and the inbox screen; reset to 0 on disconnect.
+     */
+    var pendingRequestCount: Int by mutableStateOf(0)
+        private set
+
+    /**
+     * Lazily-created coordination client used by the approval inbox and the
+     * pending-count poller. Configured from [DemoConfig.COORDINATION_URL] and
+     * [DemoConfig.COORDINATION_TOKEN]. Created once, thread-safely, and reused across screens.
+     */
+    val coordinationClient: CoordinationClient by lazy {
+        HttpCoordinationClient(
+            baseUrl = DemoConfig.COORDINATION_URL,
+            token = DemoConfig.COORDINATION_TOKEN,
+        )
+    }
+
+    /**
+     * Transaction hashes of approval requests whose on-chain submission already
+     * confirmed, keyed by request id. A request recorded here must NEVER be
+     * re-submitted on-chain; only its report-back may be retried. Living on the
+     * shared state lets the guard survive navigation and be observed by any inbox
+     * flow instance rebuilt after a fresh inbox view.
+     */
+    private val confirmedApprovalHashes = mutableMapOf<String, String>()
+
     fun setKitInstance(newKit: OZSmartAccountKit) {
         kit = newKit
+    }
+
+    fun setPendingRequestCount(count: Int) {
+        pendingRequestCount = count
+    }
+
+    /** Records the confirmed on-chain hash (or a sentinel) for an approval request. */
+    fun recordConfirmedApprovalHash(requestId: String, hash: String) {
+        confirmedApprovalHashes[requestId] = hash
+    }
+
+    /** Returns the recorded confirmed hash for [requestId], or null if none. */
+    fun confirmedApprovalHash(requestId: String): String? = confirmedApprovalHashes[requestId]
+
+    /** Clears the recorded confirmed hash for [requestId] once its report-back succeeds. */
+    fun clearConfirmedApprovalHash(requestId: String) {
+        confirmedApprovalHashes.remove(requestId)
     }
 
     fun setWalletSignerAdapter(adapter: ExternalSignerManagerAdapter?) {
@@ -146,5 +195,9 @@ object DemoState {
         balance = null
         demoTokenContractId = null
         demoTokenBalance = null
+        pendingRequestCount = 0
+        confirmedApprovalHashes.clear()
+        // coordinationClient is NOT reset — it is a lazily-initialised, stateless HTTP client
+        // reused across wallet sessions and configured from static DemoConfig values.
     }
 }

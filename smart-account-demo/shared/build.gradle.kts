@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
+    kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.compose")
 }
@@ -80,6 +81,13 @@ kotlin {
                 // Date/Time
                 // ============================================================
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+
+                // ============================================================
+                // Coordination server client (agent-signer flow)
+                // Ktor + kotlinx.serialization. Versions track the stellar-sdk.
+                // ============================================================
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation("io.ktor:ktor-client-core:3.3.2")
             }
         }
 
@@ -87,6 +95,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("io.ktor:ktor-client-mock:3.3.2")
             }
         }
 
@@ -97,6 +106,9 @@ kotlin {
             dependencies {
                 implementation("androidx.activity:activity-compose:1.8.2")
                 implementation("androidx.appcompat:appcompat:1.6.1")
+
+                // Ktor engine for the coordination client on Android.
+                implementation("io.ktor:ktor-client-cio:3.3.2")
 
                 // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
                 // Required by ReownConnector which implements WalletConnector for Android.
@@ -110,6 +122,10 @@ kotlin {
         // ============================================================
         val iosMain by creating {
             dependsOn(commonMain)
+            dependencies {
+                // Ktor engine for the coordination client on iOS.
+                implementation("io.ktor:ktor-client-darwin:3.3.2")
+            }
         }
 
         val iosX64Main by getting {
@@ -129,6 +145,10 @@ kotlin {
         // ============================================================
         val macosMain by creating {
             dependsOn(commonMain)
+            dependencies {
+                // Ktor engine for the coordination client on macOS.
+                implementation("io.ktor:ktor-client-darwin:3.3.2")
+            }
         }
 
         val macosX64Main by getting {
@@ -147,6 +167,9 @@ kotlin {
                 implementation(compose.html.core)
                 // Freighter browser extension API for web wallet signing
                 implementation(npm("@stellar/freighter-api", "6.0.1"))
+
+                // Ktor engine for the coordination client on the web.
+                implementation("io.ktor:ktor-client-js:3.3.2")
             }
         }
     }
