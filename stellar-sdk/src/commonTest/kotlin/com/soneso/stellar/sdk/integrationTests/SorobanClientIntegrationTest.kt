@@ -2,6 +2,10 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.ContractClient
+import com.soneso.stellar.sdk.contract.bindings.AtomicSwapContract
+import com.soneso.stellar.sdk.contract.bindings.AuthContract
+import com.soneso.stellar.sdk.contract.bindings.HelloContract
+import com.soneso.stellar.sdk.contract.bindings.TokenContract
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -15,15 +19,15 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Comprehensive integration tests for Soroban smart contract operations using the high-level ContractClient API.
  *
- * These tests are ported from the Flutter Stellar SDK's soroban_client_test.dart and demonstrate:
+ * These tests demonstrate:
  * - Simple contract invocation (hello contract)
  * - Authorization handling (auth contract)
  * - Complex multi-party contracts (atomic swap)
  * - Contract deployment with constructors
  * - Read vs write call auto-detection
  * - Manual result parsing with parseResultXdrFn or funcResToNative
- *
- * **Ported From**: `/Users/chris/projects/Stellar/stellar_flutter_sdk/test/soroban_client_test.dart`
+ * - The same hello, auth, and atomic swap flows through generated contract bindings
+ *   (typed clients over the positional invoke path, no contract spec loaded)
  *
  * **Test Network**: Tests run against Stellar testnet with automatic account funding via FriendBot.
  *
@@ -70,8 +74,6 @@ class SorobanClientIntegrationTest {
      *
      * The hello contract has a "hello" function that takes a string parameter
      * and returns a vector with two strings: ["Hello", <parameter>].
-     *
-     * **Ported From**: Flutter SDK's `test hello contract`
      *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~60-90 seconds (includes upload, deploy, and invocation)
@@ -138,8 +140,6 @@ class SorobanClientIntegrationTest {
      *
      * The auth contract has an "increment" function that requires authorization
      * from a specific user account and takes a u32 value to increment.
-     *
-     * **Ported From**: Flutter SDK's `test auth` (lines 183-245)
      *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~90-120 seconds
@@ -259,8 +259,6 @@ class SorobanClientIntegrationTest {
      *
      * This is the most comprehensive test showing real-world multi-party
      * smart contract interactions.
-     *
-     * **Ported From**: Flutter SDK's `test atomic swap` (lines 297-410)
      *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~240-300 seconds (multiple contract deployments)
@@ -453,8 +451,6 @@ class SorobanClientIntegrationTest {
      * This pattern is useful when the signer is on a different device
      * or signing server (e.g., hardware wallet, HSM, remote API).
      *
-     * **Ported From**: Flutter SDK's `test auth` with delegate (lines 382-402)
-     *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~120-150 seconds
      */
@@ -551,8 +547,6 @@ class SorobanClientIntegrationTest {
      *
      * This pattern is useful for deploying multiple instances of the same
      * contract (e.g., token factory, multi-tenant applications).
-     *
-     * **Ported From**: Flutter SDK's deployment pattern (lines 31-52)
      *
      * **Prerequisites**: Testnet connectivity
      * **Duration**: ~120-150 seconds
@@ -848,5 +842,272 @@ class SorobanClientIntegrationTest {
         assertNotNull(result)
         assertTrue(result.isNotEmpty())
         println("✓ Transaction control completed")
+    }
+
+    /**
+     * Test hello contract through its generated contract binding.
+     *
+     * Same flow as [testHelloContract], but the call goes through the generated
+     * [HelloContract] client: it encodes arguments and decodes results itself, so no
+     * contract spec is loaded and the invocation uses the positional invoke path.
+     *
+     * **Prerequisites**: Testnet connectivity
+     * **Duration**: ~60-90 seconds
+     */
+    @Test
+    fun testHelloContractWithBinding() = runTest(timeout = 180.seconds) {
+        // Step 1: Create and fund test account
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+        }
+        realDelay(5000)
+
+        // Step 2: Deploy hello contract; the binding embeds all type knowledge, so the
+        // client stays spec-free.
+        val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+        val deployed = ContractClient.deploy(
+            wasmBytes = helloContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl,
+            loadSpec = false
+        )
+        println("Deployed hello contract: ${deployed.contractId}")
+
+        // Step 3: Invoke through the generated binding (typed argument and result)
+        val helloContract = HelloContract.forContract(deployed.contractId, rpcUrl, network)
+        val result = helloContract.hello("John", sourceAccountId, signer = null)
+        assertEquals(listOf("Hello", "John"), result, "hello returns [Hello, <to>]")
+        println("✓ HelloContract binding successfully invoked hello method")
+
+        helloContract.client.close()
+        deployed.close()
+    }
+
+    /**
+     * Test auth contract through its generated contract binding.
+     *
+     * Same flow as [testAuthContract], but through the generated [AuthContract] client:
+     * the same-invoker call auto-submits, and the different-invoker call uses the
+     * generated buildIncrementTx with needsNonInvokerSigningBy, signAuthEntries, and
+     * signAndSubmit.
+     *
+     * **Prerequisites**: Testnet connectivity
+     * **Duration**: ~90-120 seconds
+     */
+    @Test
+    fun testAuthContractWithBinding() = runTest(timeout = 240.seconds) {
+        // Step 1: Create and fund test account
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+        }
+        realDelay(5000)
+
+        // Step 2: Deploy auth contract
+        val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
+        val deployed = ContractClient.deploy(
+            wasmBytes = authContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl,
+            loadSpec = false
+        )
+        println("Deployed auth contract: ${deployed.contractId}")
+
+        val authContract = AuthContract.forContract(deployed.contractId, rpcUrl, network)
+
+        // Step 3: Same-invoker scenario - the source account authorizes its own increment
+        val result1 = authContract.increment(Address(sourceAccountId), 3u, sourceAccountId, signer = sourceKeyPair)
+        assertEquals(3u, result1, "same-invoker increment returns the new counter value")
+        println("✓ AuthContract binding: same-invoker increment succeeded, result: $result1")
+
+        // Step 4: Different-invoker scenario - the invoker signs its auth entry separately
+        val invokerKeyPair = KeyPair.random()
+        val invokerAccountId = invokerKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(invokerAccountId)
+        } else {
+            FriendBot.fundFuturenetAccount(invokerAccountId)
+        }
+        realDelay(5000)
+
+        val assembled = authContract.buildIncrementTx(
+            Address(invokerAccountId), 4u, sourceAccountId, signer = sourceKeyPair
+        )
+        val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
+        assertEquals(setOf(invokerAccountId), whoNeedsToSign.toSet(), "only the invoker must sign")
+        assembled.signAuthEntries(invokerKeyPair)
+        val result2 = assembled.signAndSubmit(sourceKeyPair, force = false)
+        assertEquals(4u, result2, "different-invoker increment returns the invoker's counter")
+        println("✓ AuthContract binding: different-invoker increment with auth succeeded, result: $result2")
+
+        authContract.client.close()
+        deployed.close()
+    }
+
+    /**
+     * Test atomic swap through generated contract bindings.
+     *
+     * Same flow as [testAtomicSwap], but the swap, mints, and balance queries go through
+     * the generated [AtomicSwapContract] and [TokenContract] clients, and the post-swap
+     * balances are verified: the swap contract deposits each party's offered amount,
+     * transfers the counterparty's minimum acceptable amount, and refunds the difference,
+     * so each side receives exactly min_*.
+     *
+     * **Prerequisites**: Testnet connectivity
+     * **Duration**: ~240-300 seconds
+     */
+    @Test
+    fun testAtomicSwapWithBinding() = runTest(timeout = 600.seconds) {
+        // Step 1: Create and fund test accounts
+        val sourceKeyPair = KeyPair.random()
+        val sourceAccountId = sourceKeyPair.getAccountId()
+
+        val adminKeyPair = KeyPair.random()
+        val adminId = adminKeyPair.getAccountId()
+
+        val aliceKeyPair = KeyPair.random()
+        val aliceId = aliceKeyPair.getAccountId()
+
+        val bobKeyPair = KeyPair.random()
+        val bobId = bobKeyPair.getAccountId()
+
+        if (testOn == "testnet") {
+            FriendBot.fundTestnetAccount(sourceAccountId)
+            realDelay(3000)
+            FriendBot.fundTestnetAccount(adminId)
+            realDelay(3000)
+            FriendBot.fundTestnetAccount(aliceId)
+            realDelay(3000)
+            FriendBot.fundTestnetAccount(bobId)
+        } else {
+            FriendBot.fundFuturenetAccount(sourceAccountId)
+            realDelay(3000)
+            FriendBot.fundFuturenetAccount(adminId)
+            realDelay(3000)
+            FriendBot.fundFuturenetAccount(aliceId)
+            realDelay(3000)
+            FriendBot.fundFuturenetAccount(bobId)
+        }
+        realDelay(5000)
+
+        // Step 2: Deploy the swap contract (no constructor) and the two tokens (the
+        // constructor arguments are converted from the spec parsed out of the wasm)
+        val swapContractWasm = TestResourceUtil.readWasmFile("soroban_atomic_swap_contract.wasm")
+        val swapDeployed = ContractClient.deploy(
+            wasmBytes = swapContractWasm,
+            constructorArgs = emptyMap(),
+            source = sourceAccountId,
+            signer = sourceKeyPair,
+            network = network,
+            rpcUrl = rpcUrl,
+            loadSpec = false
+        )
+        println("Deployed swap contract: ${swapDeployed.contractId}")
+
+        realDelay(5000)
+        val tokenContractWasm = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
+        val tokenADeployed = ContractClient.deploy(
+            wasmBytes = tokenContractWasm,
+            constructorArgs = mapOf("admin" to adminId, "decimal" to 8, "name" to "TokenA", "symbol" to "TokenA"),
+            source = adminId,
+            signer = adminKeyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        println("Deployed TokenA: ${tokenADeployed.contractId}")
+
+        realDelay(5000)
+        val tokenBDeployed = ContractClient.deploy(
+            wasmBytes = tokenContractWasm,
+            constructorArgs = mapOf("admin" to adminId, "decimal" to 8, "name" to "TokenB", "symbol" to "TokenB"),
+            source = adminId,
+            signer = adminKeyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        println("Deployed TokenB: ${tokenBDeployed.contractId}")
+
+        val swapContract = AtomicSwapContract.forContract(swapDeployed.contractId, rpcUrl, network)
+        val tokenA = TokenContract.forContract(tokenADeployed.contractId, rpcUrl, network)
+        val tokenB = TokenContract.forContract(tokenBDeployed.contractId, rpcUrl, network)
+
+        // Step 3: Token metadata through the generated read methods
+        assertEquals("TokenA", tokenA.name(sourceAccountId, signer = null))
+        assertEquals("TokenB", tokenB.symbol(sourceAccountId, signer = null))
+        assertEquals(8u, tokenA.decimals(sourceAccountId, signer = null))
+
+        // Step 4: Mint through the generated write path (admin signs and submits)
+        val supply = BigInteger.fromLong(10000000000000L)
+        realDelay(5000)
+        tokenA.mint(Address(aliceId), supply, adminId, signer = adminKeyPair)
+        println("✓ Minted TokenA to Alice")
+        realDelay(5000)
+        tokenB.mint(Address(bobId), supply, adminId, signer = adminKeyPair)
+        println("✓ Minted TokenB to Bob")
+
+        realDelay(5000)
+        assertEquals(supply, tokenA.balance(Address(aliceId), sourceAccountId, signer = null), "Alice holds the TokenA supply")
+        assertEquals(supply, tokenB.balance(Address(bobId), sourceAccountId, signer = null), "Bob holds the TokenB supply")
+
+        // Step 5: Swap - Alice gives 1000 TokenA for at least 4500 TokenB; Bob gives
+        // 5000 TokenB for at least 950 TokenA. Both parties sign their auth entries.
+        realDelay(10000)
+        val swapTx = swapContract.buildSwapTx(
+            a = Address(aliceId),
+            b = Address(bobId),
+            tokenA = Address(tokenADeployed.contractId),
+            tokenB = Address(tokenBDeployed.contractId),
+            amountA = BigInteger.fromLong(1000),
+            minBForA = BigInteger.fromLong(4500),
+            amountB = BigInteger.fromLong(5000),
+            minAForB = BigInteger.fromLong(950),
+            source = sourceAccountId,
+            signer = sourceKeyPair
+        )
+
+        val whoElseNeedsToSign = swapTx.needsNonInvokerSigningBy()
+        assertEquals(setOf(aliceId, bobId), whoElseNeedsToSign.toSet(), "Alice and Bob must sign")
+        swapTx.signAuthEntries(aliceKeyPair)
+        println("✓ Signed by Alice")
+        swapTx.signAuthEntries(bobKeyPair)
+        println("✓ Signed by Bob")
+        swapTx.signAndSubmit(sourceKeyPair, force = false)
+
+        // Step 6: Post-swap balances through the generated read path
+        realDelay(5000)
+        assertEquals(
+            BigInteger.fromLong(4500),
+            tokenB.balance(Address(aliceId), sourceAccountId, signer = null),
+            "Alice received min_b_for_a TokenB"
+        )
+        assertEquals(
+            BigInteger.fromLong(950),
+            tokenA.balance(Address(bobId), sourceAccountId, signer = null),
+            "Bob received min_a_for_b TokenA"
+        )
+
+        swapContract.client.close()
+        tokenA.client.close()
+        tokenB.client.close()
+        swapDeployed.close()
+        tokenADeployed.close()
+        tokenBDeployed.close()
+        println("✓ Atomic swap through generated bindings completed successfully!")
     }
 }
