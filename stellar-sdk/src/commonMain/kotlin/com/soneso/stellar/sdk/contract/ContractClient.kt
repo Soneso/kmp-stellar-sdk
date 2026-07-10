@@ -79,6 +79,14 @@ import kotlin.random.Random
  * | option<T>    | T?          |
  * | void         | null        |
  *
+ * ## Spec-Free Usage
+ *
+ * A client without a loaded spec can be built with [forContractWithoutSpec], which performs
+ * no network round-trip, and invoked through the positional `List<SCValXdr>` [invoke] /
+ * [buildInvoke] overloads. This is the path used by generated bindings, which carry their
+ * own type knowledge. The Map-based overloads and the spec-backed conversion helpers require
+ * a loaded spec and are unavailable on such a client.
+ *
  * @property contractId The contract ID to interact with (C... address)
  * @property rpcUrl The RPC server URL
  * @property network The network to interact with
@@ -88,14 +96,18 @@ class ContractClient private constructor(
     val contractId: String,
     val rpcUrl: String,
     val network: Network,
-    private val contractSpec: ContractSpec?
-) {
+    private val contractSpec: ContractSpec?,
     val server: SorobanServer = SorobanServer(rpcUrl)
+) {
 
     /**
      * Get the contract specification.
      *
-     * The spec is always present as it's loaded during client initialization.
+     * The spec is present when the client was created via [forContract] (or another
+     * spec-loading path). It is `null` for clients created via [forContractWithoutSpec],
+     * in which case the Map-based [invoke]/[buildInvoke] overloads and the spec-backed
+     * conversion helpers are unavailable; use the positional `List<SCValXdr>` overloads
+     * instead.
      */
     fun getContractSpec(): ContractSpec? = contractSpec
 
@@ -106,6 +118,19 @@ class ContractClient private constructor(
     fun getMethodNames(): Set<String> {
         return contractSpec?.funcs()?.map { it.name.value }?.toSet() ?: emptySet()
     }
+
+    /**
+     * The [ClientOptions] every invoke/buildInvoke overload defaults to: this client's
+     * contract and network, with [signer] (or a signing-incapable keypair for [source])
+     * as the transaction source keypair.
+     */
+    private fun defaultOptions(source: String, signer: KeyPair?): ClientOptions =
+        ClientOptions(
+            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
+            contractId = contractId,
+            network = network,
+            rpcUrl = rpcUrl
+        )
 
     /**
      * Invoke a contract function with automatic type conversion (RECOMMENDED).
@@ -172,12 +197,7 @@ class ContractClient private constructor(
         source: String,
         signer: KeyPair?,
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
-        options: ClientOptions = ClientOptions(
-            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
-            contractId = contractId,
-            network = network,
-            rpcUrl = rpcUrl
-        )
+        options: ClientOptions = defaultOptions(source, signer)
     ): T {
         val spec = contractSpec
             ?: throw IllegalStateException(
@@ -202,8 +222,8 @@ class ContractClient private constructor(
             )
         }
 
-        // Build and simulate transaction
-        val assembled = buildTransaction(
+        // Build, simulate, and execute
+        val assembled = assembleAndSimulate(
             functionName = functionName,
             parameters = parameters,
             source = source,
@@ -212,25 +232,56 @@ class ContractClient private constructor(
             options = options
         )
 
-        if (options.simulate) {
-            assembled.simulate(restore = options.restore)
-        }
+        return executeAssembled(assembled, functionName, signer, options)
+    }
 
-        // Auto-detect read/write and execute
-        return if (options.autoSubmit) {
-            if (assembled.isReadCall()) {
-                assembled.result()
-            } else {
-                if (signer == null) {
-                    throw IllegalArgumentException(
-                        "Signer required for write call to '$functionName'"
-                    )
-                }
-                assembled.signAndSubmit(signer, force = false)
-            }
-        } else {
-            assembled.result()
-        }
+    /**
+     * Invoke a contract function with pre-encoded XDR arguments.
+     *
+     * This is the spec-free counterpart to the Map-based [invoke]. Arguments are supplied
+     * as [SCValXdr] values that the caller has already encoded, so no [ContractSpec] is
+     * required and the method works on clients created via [forContractWithoutSpec]. It is
+     * the primary entry point for generated bindings, which embed all type knowledge and
+     * encode arguments themselves.
+     *
+     * Semantics match the Map-based [invoke] exactly, minus the spec-driven argument
+     * conversion and method-name validation (an unknown function fails at simulation
+     * time instead of before the request):
+     * - The transaction is built and (when [ClientOptions.simulate] is set) simulated.
+     * - Read/write is auto-detected from the simulation's auth entries and read-write
+     *   footprint.
+     * - Read calls return the simulated result; write calls are signed and submitted when
+     *   [ClientOptions.autoSubmit] is set.
+     * - A write call requires a non-null [signer] when auto submission applies; otherwise
+     *   [IllegalArgumentException] is thrown.
+     *
+     * @param functionName The contract function to invoke
+     * @param parameters Function arguments as pre-encoded [SCValXdr] values, in declaration order
+     * @param source The source account (G... or M... address)
+     * @param signer KeyPair for signing (null for read-only calls)
+     * @param parseResultXdrFn Optional custom function to parse result XDR
+     * @param options Invocation options
+     * @return The parsed result value (using parseResultXdrFn if provided, otherwise raw SCValXdr)
+     * @throws IllegalArgumentException if a write call is attempted without a signer
+     */
+    suspend fun <T> invoke(
+        functionName: String,
+        parameters: List<SCValXdr>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)? = null,
+        options: ClientOptions = defaultOptions(source, signer)
+    ): T {
+        val assembled = assembleAndSimulate(
+            functionName = functionName,
+            parameters = parameters,
+            source = source,
+            signer = signer,
+            parseResultXdrFn = parseResultXdrFn,
+            options = options
+        )
+
+        return executeAssembled(assembled, functionName, signer, options)
     }
 
     /**
@@ -320,12 +371,7 @@ class ContractClient private constructor(
         source: String,
         signer: KeyPair?,
         parseResultXdrFn: ((SCValXdr) -> T)? = null,
-        options: ClientOptions = ClientOptions(
-            sourceAccountKeyPair = signer ?: KeyPair.fromAccountId(source),
-            contractId = contractId,
-            network = network,
-            rpcUrl = rpcUrl
-        )
+        options: ClientOptions = defaultOptions(source, signer)
     ): AssembledTransaction<T> {
         val spec = contractSpec
             ?: throw IllegalStateException(
@@ -351,7 +397,7 @@ class ContractClient private constructor(
         }
 
         // Build transaction (simulate if enabled in options)
-        val assembled = buildTransaction(
+        return assembleAndSimulate(
             functionName = functionName,
             parameters = parameters,
             source = source,
@@ -359,12 +405,47 @@ class ContractClient private constructor(
             parseResultXdrFn = parseResultXdrFn,
             options = options
         )
+    }
 
-        if (options.simulate) {
-            assembled.simulate(restore = options.restore)
-        }
-
-        return assembled
+    /**
+     * Build a transaction for invoking a contract method with pre-encoded XDR arguments.
+     *
+     * This is the spec-free counterpart to the Map-based [buildInvoke]. Arguments are
+     * supplied as [SCValXdr] values that the caller has already encoded, so no
+     * [ContractSpec] is required and the method works on clients created via
+     * [forContractWithoutSpec]. It is the primary entry point for generated bindings that
+     * need transaction control (multi-signature workflows, memos, custom preconditions).
+     *
+     * The transaction is built and, when [ClientOptions.simulate] is set, simulated; the
+     * returned [AssembledTransaction] is not signed or submitted. This mirrors the Map-based
+     * [buildInvoke] exactly, minus the spec-driven argument conversion and method-name
+     * validation (an unknown function fails at simulation time instead of before the
+     * request).
+     *
+     * @param functionName The contract function to invoke
+     * @param parameters Function arguments as pre-encoded [SCValXdr] values, in declaration order
+     * @param source The source account (G... or M... address)
+     * @param signer KeyPair for signing (null for read-only calls)
+     * @param parseResultXdrFn Optional custom function to parse result XDR
+     * @param options Invocation options
+     * @return AssembledTransaction for manual control
+     */
+    suspend fun <T> buildInvoke(
+        functionName: String,
+        parameters: List<SCValXdr>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)? = null,
+        options: ClientOptions = defaultOptions(source, signer)
+    ): AssembledTransaction<T> {
+        return assembleAndSimulate(
+            functionName = functionName,
+            parameters = parameters,
+            source = source,
+            signer = signer,
+            parseResultXdrFn = parseResultXdrFn,
+            options = options
+        )
     }
 
     /**
@@ -376,7 +457,7 @@ class ContractClient private constructor(
      *
      * @param functionName The function name
      * @param arguments Map of argument names to native Kotlin values
-     * @return List of SCValXdr ready to pass to invokeWithXdr
+     * @return List of SCValXdr ready to pass to the positional [invoke] or [buildInvoke]
      * @throws IllegalStateException if contract spec not loaded
      *
      * @sample
@@ -492,6 +573,64 @@ class ContractClient private constructor(
     }
 
     /**
+     * Shared helper: build the transaction from pre-encoded parameters and, when
+     * [ClientOptions.simulate] is set, simulate it. Used by both the Map-based and
+     * positional [invoke]/[buildInvoke] overloads so their build-and-simulate behavior is
+     * identical.
+     */
+    private suspend fun <T> assembleAndSimulate(
+        functionName: String,
+        parameters: List<SCValXdr>,
+        source: String,
+        signer: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)?,
+        options: ClientOptions
+    ): AssembledTransaction<T> {
+        val assembled = buildTransaction(
+            functionName = functionName,
+            parameters = parameters,
+            source = source,
+            signer = signer,
+            parseResultXdrFn = parseResultXdrFn,
+            options = options
+        )
+
+        if (options.simulate) {
+            assembled.simulate(restore = options.restore)
+        }
+
+        return assembled
+    }
+
+    /**
+     * Shared helper: auto-detect read/write from the simulated transaction and execute
+     * accordingly. Read calls return the simulated result; write calls are signed and
+     * submitted when [ClientOptions.autoSubmit] is set and require a non-null [signer].
+     * Used by both the Map-based and positional [invoke] overloads.
+     */
+    private suspend fun <T> executeAssembled(
+        assembled: AssembledTransaction<T>,
+        functionName: String,
+        signer: KeyPair?,
+        options: ClientOptions
+    ): T {
+        return if (options.autoSubmit) {
+            if (assembled.isReadCall()) {
+                assembled.result()
+            } else {
+                if (signer == null) {
+                    throw IllegalArgumentException(
+                        "Signer required for write call to '$functionName'"
+                    )
+                }
+                assembled.signAndSubmit(signer, force = false)
+            }
+        } else {
+            assembled.result()
+        }
+    }
+
+    /**
      * Internal helper to build transaction.
      */
     private suspend fun <T> buildTransaction(
@@ -564,7 +703,7 @@ class ContractClient private constructor(
                 if (contractInfo?.specEntries?.isNotEmpty() == true) {
                     ContractSpec(contractInfo.specEntries)
                 } else {
-                    // CHANGE: Throw exception instead of returning null
+                    // forContract guarantees a usable spec; an empty spec entry set is a load failure.
                     throw IllegalStateException(
                         "Contract spec not found for contract $contractId. " +
                         "Ensure the contract is deployed and has a valid spec."
@@ -580,6 +719,47 @@ class ContractClient private constructor(
             }
 
             return ContractClient(contractId, rpcUrl, network, contractSpec)
+        }
+
+        /**
+         * Create a ContractClient without loading the contract spec from the network.
+         *
+         * Unlike [forContract], this factory performs no RPC round-trip: it builds the
+         * client immediately. Because no [ContractSpec] is loaded, the Map-based
+         * [invoke]/[buildInvoke] overloads and the spec-backed conversion helpers
+         * (`funcArgsToXdrSCValues`, `funcResToNative`, ...) are unavailable and throw
+         * [IllegalStateException]; use the positional `List<SCValXdr>` overloads instead.
+         *
+         * This is the construction path for generated bindings, which embed all contract
+         * type knowledge and therefore neither need the network spec nor the runtime
+         * conversion it enables. It also supports interacting with contracts whose spec is
+         * unavailable.
+         *
+         * @param contractId The contract ID (C... address)
+         * @param rpcUrl The RPC server URL
+         * @param network The network (TESTNET/PUBLIC)
+         * @return ContractClient without a contract spec
+         */
+        fun forContractWithoutSpec(
+            contractId: String,
+            rpcUrl: String,
+            network: Network
+        ): ContractClient {
+            return ContractClient(contractId, rpcUrl, network, null)
+        }
+
+        /**
+         * Test-only factory that injects a preconstructed [SorobanServer] (typically a
+         * mock-engine backed one) and an optional spec. Not part of the public API.
+         */
+        internal fun forServer(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            server: SorobanServer,
+            contractSpec: ContractSpec? = null
+        ): ContractClient {
+            return ContractClient(contractId, rpcUrl, network, contractSpec, server)
         }
 
         /**

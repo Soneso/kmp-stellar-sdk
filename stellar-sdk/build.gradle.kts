@@ -177,8 +177,10 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:3.3.2")
                 implementation("io.ktor:ktor-client-content-negotiation:3.3.2")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.2")
-                // BigInteger support for multiplatform
-                implementation("com.ionspin.kotlin:bignum:0.3.10")
+                // BigInteger support for multiplatform. Exposed via `api` because the
+                // SDK's public surface (e.g. Scv.toInt128) and generated contract bindings
+                // return com.ionspin.kotlin.bignum.integer.BigInteger.
+                api("com.ionspin.kotlin:bignum:0.3.10")
             }
         }
 

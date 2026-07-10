@@ -28,19 +28,19 @@ import kotlinx.coroutines.delay
  *
  * ### Read-Only Call (No Signing)
  * ```kotlin
- * val assembled = client.invoke<Long>(
+ * val assembled = client.buildInvoke<Long>(
  *     functionName = "balance",
- *     parameters = listOf(Scv.toAddress(account)),
+ *     parameters = listOf(Address(account).toSCVal()),
  *     source = account,
  *     signer = null,
- *     parseResultXdrFn = { Scv.fromInt128(it).toLong() }
+ *     parseResultXdrFn = { Scv.fromInt128(it).longValue() }
  * )
  * val balance = assembled.result() // Returns simulated result
  * ```
  *
  * ### Write Call (Standard Flow)
  * ```kotlin
- * val assembled = client.invoke<Unit>(
+ * val assembled = client.buildInvoke<Unit>(
  *     functionName = "transfer",
  *     parameters = listOf(from, to, amount),
  *     source = account,
@@ -52,7 +52,7 @@ import kotlinx.coroutines.delay
  *
  * ### Advanced Flow (Separate Steps)
  * ```kotlin
- * val assembled = client.invoke<TransferResult>(...)
+ * val assembled = client.buildInvoke<TransferResult>(...)
  * assembled.sign(keypair)            // Sign transaction
  * assembled.signAuthEntries(keypair) // Sign auth entries if needed
  * val result = assembled.submit()    // Submit and wait
@@ -61,7 +61,7 @@ import kotlinx.coroutines.delay
  * ### Multi-Auth Workflow (Atomic Swaps, etc.)
  * ```kotlin
  * // Build transaction (e.g., atomic swap between Alice and Bob)
- * val tx = atomicSwapClient.invoke<Unit>(
+ * val tx = atomicSwapClient.buildInvoke<Unit>(
  *     functionName = "swap",
  *     parameters = listOf(alice, bob, tokenA, tokenB, amounts...),
  *     source = invokerAccount,
