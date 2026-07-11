@@ -24,12 +24,18 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * Generated contract client for AtomicSwapContract.
+ *
+ * The constructor is internal so same-module tests can inject a preconfigured
+ * [ContractClient]; use [forContract] to create instances.
  */
 class AtomicSwapContract internal constructor(val client: ContractClient) {
 
     companion object {
         /**
          * Create a client for a deployed contract without loading its spec from the network.
+         *
+         * The generated methods encode and decode all values themselves, so the on-chain
+         * spec download would be a wasted round-trip.
          *
          * @param contractId The contract ID (C... address)
          * @param rpcUrl The Soroban RPC server URL

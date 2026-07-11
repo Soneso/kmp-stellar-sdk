@@ -50,12 +50,18 @@ sealed class AuthContractDataKey {
 
 /**
  * Generated contract client for AuthContract.
+ *
+ * The constructor is internal so same-module tests can inject a preconfigured
+ * [ContractClient]; use [forContract] to create instances.
  */
 class AuthContract internal constructor(val client: ContractClient) {
 
     companion object {
         /**
          * Create a client for a deployed contract without loading its spec from the network.
+         *
+         * The generated methods encode and decode all values themselves, so the on-chain
+         * spec download would be a wasted round-trip.
          *
          * @param contractId The contract ID (C... address)
          * @param rpcUrl The Soroban RPC server URL
@@ -68,7 +74,7 @@ class AuthContract internal constructor(val client: ContractClient) {
     /**
      * Increment increments a counter for the user, and returns the value.
      * @param user Address
-     * @param `value` UInt
+     * @param value UInt
      * @param source The source account (G... or M... address)
      * @param signer KeyPair for signing; null for read-only calls
      * @return UInt
@@ -93,7 +99,7 @@ class AuthContract internal constructor(val client: ContractClient) {
      * Use this when you need to inspect or manipulate the transaction (memos, additional
      * signatures, preconditions) before signing and submitting.
      * @param user Address
-     * @param `value` UInt
+     * @param value UInt
      * @param source The source account (G... or M... address)
      * @param signer KeyPair for signing; null for read-only calls
      */

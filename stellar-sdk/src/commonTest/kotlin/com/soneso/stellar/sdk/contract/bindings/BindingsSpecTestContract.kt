@@ -313,12 +313,18 @@ data class BindingsSpecTestContractSimpleStruct(
 
 /**
  * Generated contract client for BindingsSpecTestContract.
+ *
+ * The constructor is internal so same-module tests can inject a preconfigured
+ * [ContractClient]; use [forContract] to create instances.
  */
 class BindingsSpecTestContract internal constructor(val client: ContractClient) {
 
     companion object {
         /**
          * Create a client for a deployed contract without loading its spec from the network.
+         *
+         * The generated methods encode and decode all values themselves, so the on-chain
+         * spec download would be a wasted round-trip.
          *
          * @param contractId The contract ID (C... address)
          * @param rpcUrl The Soroban RPC server URL
@@ -712,7 +718,7 @@ class BindingsSpecTestContract internal constructor(val client: ContractClient) 
 
     /**
      * Invoke the from contract function.
-     * @param `finally` String
+     * @param finally String
      * @param source The source account (G... or M... address)
      * @param signer KeyPair for signing; null for read-only calls
      * @return String
@@ -735,7 +741,7 @@ class BindingsSpecTestContract internal constructor(val client: ContractClient) 
      *
      * Use this when you need to inspect or manipulate the transaction (memos, additional
      * signatures, preconditions) before signing and submitting.
-     * @param `finally` String
+     * @param finally String
      * @param source The source account (G... or M... address)
      * @param signer KeyPair for signing; null for read-only calls
      */
