@@ -222,17 +222,8 @@ class ContractClient private constructor(
             )
         }
 
-        // Build, simulate, and execute
-        val assembled = assembleAndSimulate(
-            functionName = functionName,
-            parameters = parameters,
-            source = source,
-            signer = signer,
-            parseResultXdrFn = parseResultXdrFn,
-            options = options
-        )
-
-        return executeAssembled(assembled, functionName, signer, options)
+        // The Map path is the positional path plus spec-driven conversion and validation.
+        return invoke(functionName, parameters, source, signer, parseResultXdrFn, options)
     }
 
     /**
@@ -396,15 +387,8 @@ class ContractClient private constructor(
             )
         }
 
-        // Build transaction (simulate if enabled in options)
-        return assembleAndSimulate(
-            functionName = functionName,
-            parameters = parameters,
-            source = source,
-            signer = signer,
-            parseResultXdrFn = parseResultXdrFn,
-            options = options
-        )
+        // The Map path is the positional path plus spec-driven conversion and validation.
+        return buildInvoke(functionName, parameters, source, signer, parseResultXdrFn, options)
     }
 
     /**
@@ -574,9 +558,8 @@ class ContractClient private constructor(
 
     /**
      * Shared helper: build the transaction from pre-encoded parameters and, when
-     * [ClientOptions.simulate] is set, simulate it. Used by both the Map-based and
-     * positional [invoke]/[buildInvoke] overloads so their build-and-simulate behavior is
-     * identical.
+     * [ClientOptions.simulate] is set, simulate it. Used by the positional
+     * [invoke]/[buildInvoke] overloads; the Map-based overloads reach it through them.
      */
     private suspend fun <T> assembleAndSimulate(
         functionName: String,
@@ -606,7 +589,8 @@ class ContractClient private constructor(
      * Shared helper: auto-detect read/write from the simulated transaction and execute
      * accordingly. Read calls return the simulated result; write calls are signed and
      * submitted when [ClientOptions.autoSubmit] is set and require a non-null [signer].
-     * Used by both the Map-based and positional [invoke] overloads.
+     * Used by the positional [invoke] overload; the Map-based overload reaches it
+     * through the positional one.
      */
     private suspend fun <T> executeAssembled(
         assembled: AssembledTransaction<T>,

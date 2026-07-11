@@ -193,7 +193,7 @@ internal fun mockRpcServer(
                   "resultMetaXdr": "${successResultMetaBase64(submittedReturnValue)}"
                 }
             """.trimIndent()
-            else -> "{}"
+            else -> error("unrouted JSON-RPC request in mockRpcServer: $body")
         }
         respond(
             content = ByteReadChannel("""{ "jsonrpc": "2.0", "id": "1", "result": $resultJson }"""),
