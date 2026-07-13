@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Spec-free contract invocation**: `ContractClient` gains positional
+  `invoke(functionName, parameters: List<SCValXdr>, ...)` and
+  `buildInvoke(functionName, parameters: List<SCValXdr>, ...)` overloads that take
+  pre-encoded XDR arguments and require no loaded `ContractSpec`. They replicate the full
+  behavior of the Map-based overloads (build, simulate, read/write auto-detection,
+  signer-required-for-write check, auto submit) minus the spec-driven argument conversion
+  and method-name validation (an unknown function fails at simulation time instead of
+  before the request). These are the entry points for generated contract bindings, which
+  embed all type knowledge and encode arguments themselves.
+- `ContractClient.forContractWithoutSpec(contractId, rpcUrl, network)`: a non-suspend
+  factory that constructs a client without the network spec-load round-trip. The Map-based
+  overloads and spec-backed helpers remain unavailable on such a client (they throw
+  `IllegalStateException`); use the positional overloads instead.
+
+### Changed
+- The `com.ionspin.kotlin:bignum` dependency is now exposed via `api` (was
+  `implementation`) in `commonMain`. The SDK's public surface and generated bindings return
+  `com.ionspin.kotlin.bignum.integer.BigInteger`, so it must be visible transitively to
+  consumers.
+
 ## [1.8.1] - 2026-06-29
 
 ### Added

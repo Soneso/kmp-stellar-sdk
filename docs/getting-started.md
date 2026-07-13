@@ -322,24 +322,20 @@ import com.soneso.stellar.sdk.contract.ContractClient
 import java.io.File
 
 suspend fun deployContract() {
-    // Deploy a smart contract
-    val client = ContractClient(
-        rpcUrl = "https://soroban-testnet.stellar.org",
-        network = Network.TESTNET
-    )
-
     // Read WASM file
     val wasmBytes = File("path/to/contract.wasm").readBytes()
 
-    // Deploy contract with constructor arguments
-    val contractId = client.deploy(
+    // Deploy contract with constructor arguments; returns a client for the new contract
+    val client = ContractClient.deploy(
         wasmBytes = wasmBytes,
         constructorArgs = mapOf("admin" to "GABC..."),
         source = sourceKeypair.getAccountId(),
-        signer = sourceKeypair
+        signer = sourceKeypair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org"
     )
 
-    println("Contract deployed: $contractId")
+    println("Contract deployed: ${client.contractId}")
 }
 ```
 
@@ -422,12 +418,12 @@ val balance = client.invoke<Long>(
     arguments = mapOf("account" to "GABC..."),
     source = "GABC...",
     signer = null,  // Read-only, no signing needed
-    parseResultXdrFn = { Scval.fromInt128(it).toLong() }
+    parseResultXdrFn = { Scv.fromInt128(it).longValue() }
 )
 println("Balance: $balance")
 
-// Invoke write function (requires signing and submission)
-val txHash = client.invoke<String>(
+// Invoke write function (auto-signs and submits, returns the parsed result)
+client.invoke<Unit>(
     functionName = "transfer",
     arguments = mapOf(
         "from" to "GABC...",
@@ -436,9 +432,8 @@ val txHash = client.invoke<String>(
     ),
     source = sourceKeypair.getAccountId(),
     signer = sourceKeypair,  // Signs and submits transaction
-    parseResultXdrFn = { it.toString() }  // Return transaction hash
+    parseResultXdrFn = { }  // transfer returns void
 )
-println("Transfer transaction: $txHash")
 
 // Alternative: Use automatic type conversion
 val balanceXdr = client.invoke<SCValXdr>(
