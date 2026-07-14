@@ -21,12 +21,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   factory that constructs a client without the network spec-load round-trip. The Map-based
   overloads and spec-backed helpers remain unavailable on such a client (they throw
   `IllegalStateException`); use the positional overloads instead.
+- `useUpgradedAuth` flag on `SorobanServer.simulateTransaction(...)`,
+  `SorobanServer.prepareTransaction(...)`, `SimulateTransactionRequest`, and
+  `ClientOptions`. When set, a supporting Protocol 27+ RPC returns `AddressV2`
+  auth entries in recording modes; RPCs without support ignore the flag and
+  return legacy entries. The flag is optional and defaults to omitted/absent, so
+  the request wire shape is unchanged when it is not set.
 
 ### Changed
 - The `com.ionspin.kotlin:bignum` dependency is now exposed via `api` (was
   `implementation`) in `commonMain`. The SDK's public surface and generated bindings return
   `com.ionspin.kotlin.bignum.integer.BigInteger`, so it must be visible transitively to
   consumers.
+- The new optional parameters change the JVM binary signatures of
+  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`, the
+  `SimulateTransactionRequest` and `ClientOptions` constructors, and the
+  `AssembledTransaction` constructor. Precompiled JVM consumers and positional
+  calls that pass arguments after the new parameter fail loudly and need updating.
 
 ## [1.8.1] - 2026-06-29
 

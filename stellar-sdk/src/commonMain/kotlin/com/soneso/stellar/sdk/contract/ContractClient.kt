@@ -645,7 +645,8 @@ class ContractClient private constructor(
             submitTimeout = options.submitTimeout,
             transactionSigner = signer,
             parseResultXdrFn = parseResultXdrFn,
-            transactionBuilder = builder
+            transactionBuilder = builder,
+            useUpgradedAuth = options.useUpgradedAuth
         )
     }
 

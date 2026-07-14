@@ -241,6 +241,7 @@ if (simResponse.error != null) {
 - `transaction: Transaction` -- the transaction to simulate
 - `resourceConfig: SimulateTransactionRequest.ResourceConfig?` -- optional instruction leeway
 - `authMode: SimulateTransactionRequest.AuthMode?` -- optional auth mode (ENFORCE, RECORD, RECORD_ALLOW_NONROOT)
+- `useUpgradedAuth: Boolean?` -- when `true`, a supporting Protocol 27+ RPC returns ADDRESS_V2 (CAP-71) auth entries in recording modes. RPCs without support ignore it and return legacy ADDRESS entries; detect support by inspecting the returned arm, not by error. `prepareTransaction(tx, useUpgradedAuth = true)` forwards the same flag. Legacy ADDRESS is the default.
 
 **Response fields:** `error` (String?), `transactionData` (String?), `events` (List\<String\>?), `minResourceFee` (Long?), `results` (List\<SimulateHostFunctionResult\>?), `restorePreamble` (RestorePreamble?), `stateChanges` (List\<LedgerEntryChange\>?), `latestLedger` (Long?).
 
@@ -823,14 +824,14 @@ try {
 | `getTransactions` | `getTransactions(GetTransactionsRequest)` | `GetTransactionsResponse` |
 | `getLedgers` | `getLedgers(GetLedgersRequest)` | `GetLedgersResponse` |
 | `getEvents` | `getEvents(GetEventsRequest)` | `GetEventsResponse` |
-| `simulateTransaction` | `simulateTransaction(Transaction, ResourceConfig?, AuthMode?)` | `SimulateTransactionResponse` |
+| `simulateTransaction` | `simulateTransaction(Transaction, ResourceConfig?, AuthMode?, Boolean?)` | `SimulateTransactionResponse` |
 | `sendTransaction` | `sendTransaction(Transaction)` | `SendTransactionResponse` |
 
 **Helper methods** (not direct RPC calls):
 - `getAccount(String)` -- returns `TransactionBuilderAccount`, throws `AccountNotFoundException`
 - `getContractData(String, SCValXdr, SorobanServer.Durability)` -- returns `LedgerEntryResult?`
 - `getSACBalance(String, Asset, Network)` -- returns `GetSACBalanceResponse`
-- `prepareTransaction(Transaction)` -- simulates + applies results, throws `PrepareTransactionException`
+- `prepareTransaction(Transaction, Boolean?)` -- simulates (optional `useUpgradedAuth`) + applies results, throws `PrepareTransactionException`
 - `prepareTransaction(Transaction, SimulateTransactionResponse)` -- applies existing simulation results
 - `pollTransaction(String, Int, (Int) -> Long)` -- polls until final state
 - `loadContractCodeForContractId(String)` -- returns `ContractCodeEntryXdr?`

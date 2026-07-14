@@ -2,6 +2,8 @@ package com.soneso.stellar.sdk.unitTests.contract
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.AssembledTransaction
+import com.soneso.stellar.sdk.contract.ClientOptions
+import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
@@ -17,8 +19,8 @@ import kotlin.test.*
 
 /**
  * Unit tests for Protocol 27 / CAP-71 behavior on the contract client surface:
- * the three-arm auth handling in AssembledTransaction.needsNonInvokerSigningBy
- * and signAuthEntries.
+ * the simulateTransaction useUpgradedAuth flag, and the three-arm auth handling in
+ * AssembledTransaction.needsNonInvokerSigningBy and signAuthEntries.
  *
  * A method-dispatching Ktor MockEngine drives a real AssembledTransaction.simulate()
  * so that builtTransaction is populated with crafted auth entries (legacy ADDRESS,
@@ -163,17 +165,22 @@ class AssembledTransactionP27Test {
 
     /**
      * Builds a MockEngine routing on the JSON-RPC method name. The simulate response
-     * carries [authEntries].
+     * carries [authEntries]; [onSimulate] (when set) receives the captured simulate
+     * request body for assertions.
      */
     private fun mockServer(
         authEntries: List<SorobanAuthorizationEntryXdr>,
-        latestLedgerSeq: Long = 20000L
+        latestLedgerSeq: Long = 20000L,
+        onSimulate: ((String) -> Unit)? = null
     ): SorobanServer {
         val engine = MockEngine { request ->
             val body = request.body.toByteArray().decodeToString()
             val resultJson = when {
                 "\"getLedgerEntries\"" in body -> ledgerEntriesResultJson()
-                "\"simulateTransaction\"" in body -> simulateResultJson(authEntries)
+                "\"simulateTransaction\"" in body -> {
+                    onSimulate?.invoke(body)
+                    simulateResultJson(authEntries)
+                }
                 "\"getLatestLedger\"" in body ->
                     """{ "id": "abc", "protocolVersion": 22, "sequence": $latestLedgerSeq, "closeTime": 1700000000, "headerXdr": "AA==", "metadataXdr": "AA==" }"""
                 else -> "{}"
@@ -196,7 +203,8 @@ class AssembledTransactionP27Test {
 
     private fun assembled(
         server: SorobanServer,
-        signer: KeyPair?
+        signer: KeyPair?,
+        useUpgradedAuth: Boolean = false
     ): AssembledTransaction<SCValXdr> {
         val builder = TransactionBuilder(
             sourceAccount = Account(SOURCE_ACCOUNT, SOURCE_SEQ),
@@ -216,13 +224,66 @@ class AssembledTransactionP27Test {
             submitTimeout = 30,
             transactionSigner = signer,
             parseResultXdrFn = null,
-            transactionBuilder = builder
+            transactionBuilder = builder,
+            useUpgradedAuth = useUpgradedAuth
         )
     }
 
     private fun firstEntry(tx: AssembledTransaction<SCValXdr>): SorobanAuthorizationEntryXdr {
         val op = tx.builtTransaction!!.operations.first() as InvokeHostFunctionOperation
         return op.auth.first()
+    }
+
+    // ========================================================================
+    // useUpgradedAuth JSON presence/absence
+    // ========================================================================
+
+    @Test
+    fun testUseUpgradedAuthAbsentFromJsonWhenNull() = runTest {
+        var captured: String? = null
+        mockServer(listOf(legacyEntry()), onSimulate = { captured = it }).use { server ->
+            assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED), useUpgradedAuth = false).simulate(restore = false)
+        }
+        assertNotNull(captured)
+        assertFalse("useUpgradedAuth" in captured!!, "useUpgradedAuth key must be absent when not requested")
+    }
+
+    @Test
+    fun testUseUpgradedAuthPresentAsTrueWhenSet() = runTest {
+        var captured: String? = null
+        mockServer(listOf(v2Entry()), onSimulate = { captured = it }).use { server ->
+            assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED), useUpgradedAuth = true).simulate(restore = false)
+        }
+        assertNotNull(captured)
+        assertTrue("\"useUpgradedAuth\":true" in captured!!.replace(" ", ""), "useUpgradedAuth must serialize as true")
+    }
+
+    @Test
+    fun testClientOptionsUseUpgradedAuthThreadsThroughBuildInvoke() = runTest {
+        var captured: String? = null
+        mockServer(listOf(v2Entry()), onSimulate = { captured = it }).use { server ->
+            val client = ContractClient.forServer(CONTRACT_ID, SERVER_URL, NETWORK, server, contractSpec = null)
+            val options = ClientOptions(
+                sourceAccountKeyPair = KeyPair.fromAccountId(SOURCE_ACCOUNT),
+                contractId = CONTRACT_ID,
+                network = NETWORK,
+                rpcUrl = SERVER_URL,
+                useUpgradedAuth = true
+            )
+            client.buildInvoke(
+                functionName = "hello",
+                parameters = emptyList(),
+                source = SOURCE_ACCOUNT,
+                signer = KeyPair.fromSecretSeed(SIGNER_SEED),
+                parseResultXdrFn = { it },
+                options = options
+            )
+        }
+        assertNotNull(captured)
+        assertTrue(
+            "\"useUpgradedAuth\":true" in captured!!.replace(" ", ""),
+            "ClientOptions.useUpgradedAuth must reach the simulate request through ContractClient"
+        )
     }
 
     // ========================================================================

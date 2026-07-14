@@ -290,10 +290,14 @@ swapTx.signAuthEntries(
 **Protocol 27 auth arms (CAP-71).** Address credentials use one of three arms:
 legacy `Address` (default, every network), `AddressV2`, or `AddressWithDelegates`
 (V2/delegates require Protocol 27+; emitting them pre-27 invalidates the tx).
-Simulation and the high-level `ContractClient`/`AssembledTransaction` only ever
-produce the legacy `Address` arm — build V2/delegate entries client-side with the
-low-level `Auth` helpers and submit via `SorobanServer`. Emit `AddressV2` with
-`Auth.authorizeInvocation(..., authV2 = true)`. Build a delegate tree with
+By default, simulation and the high-level
+`ContractClient`/`AssembledTransaction` produce the legacy `Address` arm.
+Request V2 from a supporting Protocol 27+ RPC (stellar-rpc v27.1.0+) with
+`simulateTransaction(tx, useUpgradedAuth = true)` /
+`ClientOptions(useUpgradedAuth = true)` — RPCs without support silently ignore
+the flag and return legacy entries — or build V2/delegate entries client-side
+with the low-level `Auth` helpers and submit via `SorobanServer`. Emit `AddressV2`
+with `Auth.authorizeInvocation(..., authV2 = true)`. Build a delegate tree with
 `Auth.attachDelegates(entry, validUntilLedgerSeq, listOf(DelegateDescriptor(addr)))`,
 then sign each node via `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`
 (a delegates-only entry keeps a void top-level signature). `needsNonInvokerSigningBy()`
