@@ -5,22 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.0] - 2026-07-14
 
 ### Added
-- **Spec-free contract invocation**: `ContractClient` gains positional
+- `GetHealthResponse` gains `latestLedgerCloseTime` and `oldestLedgerCloseTime` (`Long?`),
+  the unix timestamps (seconds) at which the latest and oldest ledgers closed, returned by
+  stellar-rpc v27.1.0+. On older servers the fields are `null`.
+- **Spec-free contract invocation** (preparation for the upcoming community bindings
+  generator, which is not yet released): `ContractClient` gains positional
   `invoke(functionName, parameters: List<SCValXdr>, ...)` and
   `buildInvoke(functionName, parameters: List<SCValXdr>, ...)` overloads that take
   pre-encoded XDR arguments and require no loaded `ContractSpec`. They replicate the full
   behavior of the Map-based overloads (build, simulate, read/write auto-detection,
   signer-required-for-write check, auto submit) minus the spec-driven argument conversion
   and method-name validation (an unknown function fails at simulation time instead of
-  before the request). These are the entry points for generated contract bindings, which
-  embed all type knowledge and encode arguments themselves.
+  before the request). These are the entry points for generated contract clients, which
+  encode and decode all values themselves.
 - `ContractClient.forContractWithoutSpec(contractId, rpcUrl, network)`: a non-suspend
   factory that constructs a client without the network spec-load round-trip. The Map-based
   overloads and spec-backed helpers remain unavailable on such a client (they throw
   `IllegalStateException`); use the positional overloads instead.
+- **Contract-binding fixtures and tests**: generated binding clients for the hello,
+  auth, atomic-swap, and token demo contracts are checked in and exercised alongside their
+  Map-based variants in the SorobanClient integration test, plus two purpose-built fixtures
+  with unit and testnet integration tests — `BindingsSpecTestContract` (generated from the
+  generator repository's reference contract, covering the entire contract-spec type surface)
+  and `OptionShapesContract` (option values in nested positions and a Kotlin soft-keyword
+  parameter name).
 - `useUpgradedAuth` flag on `SorobanServer.simulateTransaction(...)`,
   `SorobanServer.prepareTransaction(...)`, `SimulateTransactionRequest`, and
   `ClientOptions`. When set, a supporting Protocol 27+ RPC returns `AddressV2`
@@ -34,10 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `com.ionspin.kotlin.bignum.integer.BigInteger`, so it must be visible transitively to
   consumers.
 - The new optional parameters change the JVM binary signatures of
-  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`, the
-  `SimulateTransactionRequest` and `ClientOptions` constructors, and the
-  `AssembledTransaction` constructor. Precompiled JVM consumers and positional
-  calls that pass arguments after the new parameter fail loudly and need updating.
+  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`, and the
+  `SimulateTransactionRequest` and `ClientOptions` constructors. Precompiled JVM
+  consumers and positional calls that pass arguments after the new parameter fail
+  loudly and need updating.
+- Compatibility matrices regenerated; the Soroban RPC baseline moved to v27.1.1.
+- Bumped pinned GitHub Actions via Dependabot: `actions/checkout` to v7.0.0,
+  `actions/setup-java` to v5.4.0, and `codecov/codecov-action` to v7.0.0.
 
 ## [1.8.1] - 2026-06-29
 

@@ -1,9 +1,9 @@
 # Soroban RPC vs KMP Stellar SDK Compatibility Matrix
 
-**RPC Version:** v27.0.0 (released 2026-06-11)  
-**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v27.0.0)  
-**SDK Version:** 1.8.1  
-**Generated:** 2026-06-29 16:37:02
+**RPC Version:** v27.1.1 (released 2026-07-07)  
+**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v27.1.1](https://github.com/stellar/stellar-rpc/releases/tag/v27.1.1)  
+**SDK Version:** 1.9.0  
+**Generated:** 2026-07-14 11:22:40
 
 ## Overall Coverage
 
@@ -19,7 +19,7 @@
 |------------|--------|---------------|-----------------|-----------------|-------|
 | `getEvents` | ✅ Fully Supported | `getEvents` | 1/1 | 6/6 | All parameters and response fields implemented |
 | `getFeeStats` | ✅ Fully Supported | `getFeeStats` | N/A | 3/3 | All parameters and response fields implemented |
-| `getHealth` | ✅ Fully Supported | `getHealth` | N/A | 4/4 | All parameters and response fields implemented |
+| `getHealth` | ✅ Fully Supported | `getHealth` | N/A | 6/6 | All parameters and response fields implemented |
 | `getLatestLedger` | ✅ Fully Supported | `getLatestLedger` | N/A | 6/6 | All parameters and response fields implemented |
 | `getLedgerEntries` | ✅ Fully Supported | `getLedgerEntries` | 1/1 | 2/2 | All parameters and response fields implemented |
 | `getLedgers` | ✅ Fully Supported | `getLedgers` | 1/1 | 6/6 | All parameters and response fields implemented |
@@ -27,8 +27,8 @@
 | `getTransaction` | ✅ Fully Supported | `getTransaction` | 1/1 | 5/5 | All parameters and response fields implemented |
 | `getTransactions` | ✅ Fully Supported | `getTransactions` | 1/1 | 6/6 | All parameters and response fields implemented |
 | `getVersionInfo` | ✅ Fully Supported | `getVersionInfo` | N/A | 5/5 | All parameters and response fields implemented |
-| `sendTransaction` | ✅ Fully Supported | `sendTransaction` | 1/1 | N/A | All parameters and response fields implemented |
-| `simulateTransaction` | ✅ Fully Supported | `simulateTransaction` | 1/1 | N/A | All parameters and response fields implemented |
+| `sendTransaction` | ✅ Fully Supported | `sendTransaction` | 1/1 | 6/6 | All parameters and response fields implemented |
+| `simulateTransaction` | ✅ Fully Supported | `simulateTransaction` | 1/1 | 8/8 | All parameters and response fields implemented |
 
 ## Response Field Coverage
 
@@ -38,7 +38,7 @@ Detailed breakdown of response field support per method.
 |------------|------------|------------|----------------|
 | `getEvents` | 6 | 6 | - |
 | `getFeeStats` | 3 | 3 | - |
-| `getHealth` | 4 | 4 | - |
+| `getHealth` | 6 | 6 | - |
 | `getLatestLedger` | 6 | 6 | - |
 | `getLedgerEntries` | 2 | 2 | - |
 | `getLedgers` | 6 | 6 | - |
@@ -46,4 +46,6 @@ Detailed breakdown of response field support per method.
 | `getTransaction` | 5 | 5 | - |
 | `getTransactions` | 6 | 6 | - |
 | `getVersionInfo` | 5 | 5 | - |
+| `sendTransaction` | 6 | 6 | - |
+| `simulateTransaction` | 8 | 8 | - |
 
