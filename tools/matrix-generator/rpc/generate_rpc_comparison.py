@@ -326,6 +326,17 @@ class RPCComparisonAnalyzer:
     # - xdrFormat: SDK uses XDR exclusively; JSON format is not supported
     IGNORED_OPTIONAL_PARAMS = {"xdrFormat"}
 
+    # Response fields excluded from compatibility checks by design. These are the
+    # JSON-format variants the server returns only when the request sets
+    # xdrFormat=json; the SDK uses XDR exclusively (see IGNORED_OPTIONAL_PARAMS),
+    # so the XDR-variant fields are its supported surface.
+    IGNORED_RESPONSE_FIELDS = {
+        "errorResultJson",
+        "diagnosticEventsJson",
+        "transactionDataJson",
+        "eventsJson",
+    }
+
     def __init__(self, rpc_data: Dict[str, Any], kotlin_data: Dict[str, Any]):
         """
         Initialize with pre-loaded RPC and SDK data.
@@ -470,7 +481,10 @@ class RPCComparisonAnalyzer:
         def _extract_name(f: Any) -> str:
             return f["json_name"] if isinstance(f, dict) else str(f)
 
-        rpc_names = [_extract_name(f) for f in rpc_response_fields]
+        rpc_names = [
+            n for n in (_extract_name(f) for f in rpc_response_fields)
+            if n not in self.IGNORED_RESPONSE_FIELDS
+        ]
         kotlin_names_lower = {
             (_extract_name(f) if isinstance(f, dict) else str(f)).lower()
             for f in kotlin_response_fields

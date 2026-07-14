@@ -249,16 +249,28 @@ class RPCAnalysisPipeline:
             )
             try:
                 extractor.enrich_with_response_fields(rpc_data)
+                # Every method has a response struct in go-stellar-sdk. Zero fields
+                # across all methods means the source resolution is broken (not that
+                # the methods have no responses) — fail loudly instead of emitting a
+                # matrix with an empty Response Field Coverage table.
+                enriched = sum(
+                    1 for m in rpc_data.get("methods", {}).values()
+                    if m.get("response_fields")
+                )
+                if methods and enriched == 0:
+                    raise GitHubFetchError(
+                        "response struct enrichment produced no fields for any of the "
+                        f"{methods_count} RPC methods; refusing to emit a matrix with an "
+                        "empty Response Field Coverage table"
+                    )
                 self.progress.log(
                     "Response fields enriched successfully", force=True
                 )
             except (GitHubFetchError, Exception) as e:
                 self.progress.log(
-                    f"Warning: Could not fetch response files: {e}", force=True
+                    f"Error: Could not fetch response files: {e}", force=True
                 )
-                self.progress.log(
-                    "Continuing without response field analysis", force=True
-                )
+                raise
 
         # Add version metadata
         rpc_data.setdefault("metadata", {}).update({

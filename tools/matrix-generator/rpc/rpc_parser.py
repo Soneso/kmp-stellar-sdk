@@ -471,6 +471,13 @@ class RPCMethodExtractor:
         protocol_source: Optional[str] = None,
     ) -> None:
         self._rpc_version = rpc_version
+        # Read the request structs from the go-stellar-sdk ref that this RPC
+        # release pins in its go.mod, so request params and response fields are
+        # both measured against exactly what the RPC release exposes.
+        if protocol_source is None and rpc_version:
+            from github_fetcher import _resolve_go_stellar_sdk_ref
+            go_sdk_ref = _resolve_go_stellar_sdk_ref(rpc_version)
+            protocol_source = GoProtocolParser.GITHUB_METHODS_BASE_URL_TEMPLATE.format(ref=go_sdk_ref)
         self._parser = GoProtocolParser(protocol_source)
 
     def extract_methods(self) -> Dict[str, Any]:

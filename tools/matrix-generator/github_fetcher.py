@@ -36,6 +36,7 @@ Example usage:
 
 import json
 import os
+import re
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
@@ -439,23 +440,43 @@ def fetch_rpc_jsonrpc_source(tag: str) -> str:
         ) from e
 
 
-_GO_SDK_PROTOCOLS_REF: Optional[str] = None
+_GO_SDK_REF_BY_RPC_TAG: Dict[str, str] = {}
 
 
-def _go_stellar_sdk_protocols_ref() -> str:
-    """Resolve (and cache) the go-stellar-sdk ref for protocol/response struct files.
+def _resolve_go_stellar_sdk_ref(rpc_tag: str) -> str:
+    """Resolve (and cache) the go-stellar-sdk ref that stellar-rpc@<rpc_tag> pins.
 
-    Uses the latest go-stellar-sdk module release so fields not yet in a released
-    RPC are excluded from the comparison; falls back to ``master`` if the release
-    cannot be determined.
+    The RPC request/response structs (protocols/rpc) live in go-stellar-sdk, which
+    versions independently of stellar-rpc. Reading them from the ref that the RPC
+    release actually depends on (per its go.mod) keeps the comparison matched to
+    exactly what that RPC release exposes, rather than to a lagging go-stellar-sdk
+    module tag. Returns a git ref usable on raw.githubusercontent.com: a release
+    tag (e.g. ``v0.6.0``) for a normal version, or the commit hash for a Go
+    pseudo-version. Falls back to ``master`` when the pin cannot be read.
     """
-    global _GO_SDK_PROTOCOLS_REF
-    if _GO_SDK_PROTOCOLS_REF is None:
-        try:
-            _GO_SDK_PROTOCOLS_REF = get_latest_go_stellar_sdk_release().version
-        except GitHubFetchError:
-            _GO_SDK_PROTOCOLS_REF = "master"
-    return _GO_SDK_PROTOCOLS_REF
+    if rpc_tag in _GO_SDK_REF_BY_RPC_TAG:
+        return _GO_SDK_REF_BY_RPC_TAG[rpc_tag]
+
+    ref = "master"
+    try:
+        go_mod = _make_request(
+            f"https://raw.githubusercontent.com/stellar/stellar-rpc/{rpc_tag}/go.mod"
+        ).decode('utf-8')
+        match = re.search(r'github\.com/stellar/go-stellar-sdk\s+(\S+)', go_mod)
+        if match:
+            version = match.group(1)
+            # A Go pseudo-version is not a git tag; its ref is the trailing commit
+            # hash. Both pseudo-version forms carry a 14-digit UTC timestamp directly
+            # before the final 12-hex segment (vX.Y.Z-yyyymmddhhmmss-<hash> and the
+            # base-incremented vX.Y.Z-0.yyyymmddhhmmss-<hash>). A normal release tag
+            # is used as-is.
+            pseudo = re.match(r'^v\S*\d{14}-([0-9a-f]{12})$', version)
+            ref = pseudo.group(1) if pseudo else version
+    except GitHubFetchError:
+        ref = "master"
+
+    _GO_SDK_REF_BY_RPC_TAG[rpc_tag] = ref
+    return ref
 
 
 def fetch_rpc_response_file(tag: str, method_name: str) -> str:
@@ -463,12 +484,14 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
     Fetch response struct source file from go-stellar-sdk for a specific method.
 
     Response structs are defined in the go-stellar-sdk repository:
-    protocols/rpc/get_<method_name>.go
+    protocols/rpc/<method_name>.go
 
     Args:
-        tag: Git tag name (e.g., 'v21.5.0' for RPC). We'll use master/main branch
-             since go-stellar-sdk uses different versioning
-        method_name: Method name in snake_case (e.g., 'latest_ledger' for getLatestLedger)
+        tag: stellar-rpc release tag (e.g. 'v27.1.1'). The go-stellar-sdk ref is
+             resolved from this release's go.mod so the response fields match what
+             the RPC release actually exposes.
+        method_name: Full method file stem in snake_case (e.g. 'get_latest_ledger'
+             for getLatestLedger, 'send_transaction' for sendTransaction)
 
     Returns:
         Content of the response file as string
@@ -480,13 +503,12 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
     if not method_name:
         raise ValueError("method_name parameter cannot be empty")
 
-    # Construct raw GitHub URL for the response file in go-stellar-sdk. Pin to the
-    # latest go-stellar-sdk module release (not master) so response fields not yet
-    # in a released RPC are excluded from the comparison.
-    go_sdk_ref = _go_stellar_sdk_protocols_ref()
+    # Read the response struct from the go-stellar-sdk ref that this RPC release
+    # pins in its go.mod, so the comparison reflects the released RPC's surface.
+    go_sdk_ref = _resolve_go_stellar_sdk_ref(tag)
     source_url = (
         f"https://raw.githubusercontent.com/stellar/go-stellar-sdk/"
-        f"{go_sdk_ref}/protocols/rpc/get_{method_name}.go"
+        f"{go_sdk_ref}/protocols/rpc/{method_name}.go"
     )
 
     try:
@@ -494,7 +516,7 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
         return response_data.decode('utf-8')
     except GitHubFetchError as e:
         raise SourceFileNotFoundError(
-            f"Failed to fetch get_{method_name}.go from go-stellar-sdk {go_sdk_ref}: {e}"
+            f"Failed to fetch {method_name}.go from go-stellar-sdk {go_sdk_ref}: {e}"
         ) from e
 
 
@@ -516,21 +538,16 @@ def fetch_all_rpc_response_files(tag: str, method_names: List[str]) -> Dict[str,
     results = {}
 
     for method_name in method_names:
-        # Convert camelCase to snake_case
-        # getLatestLedger -> latest_ledger
+        # The response file is named after the full method name in snake_case:
+        # getLatestLedger -> get_latest_ledger.go, sendTransaction -> send_transaction.go.
         from common import camel_to_snake
         snake_case = camel_to_snake(method_name)
-
-        # Remove 'get_' prefix if present (we'll add it in the fetch function)
-        if snake_case.startswith('get_'):
-            snake_case = snake_case[4:]
 
         try:
             content = fetch_rpc_response_file(tag, snake_case)
             results[method_name] = content
         except SourceFileNotFoundError:
-            # Skip methods that don't have response files
-            # (e.g., sendTransaction might use a different pattern)
+            # Skip methods that have no response struct file at this ref.
             continue
 
     return results

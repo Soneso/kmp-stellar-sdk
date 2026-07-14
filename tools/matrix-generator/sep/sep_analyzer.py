@@ -928,6 +928,39 @@ class SEPAnalyzer:
 
         return {'service_methods': self._map_service_methods(classes, service_methods)}
 
+    def _nested_data_class_properties(self, content: str, variant_name: str) -> set:
+        """
+        Extract the primary-constructor property names of a `data class` whose
+        declaration may be nested (indented) inside a sealed class.
+
+        The top-level class parser (extract_class_info) intentionally skips nested
+        declarations, so sealed-class variants such as `Success`/`ActionRequired`
+        are not in the parsed class list. Their `val`/`var` primary-constructor
+        parameters are the SDK's response fields, so parse them directly with a
+        balanced-paren scan (avoiding a greedy regex that would run past the
+        variant's constructor).
+        """
+        match = re.search(r'\bdata\s+class\s+' + re.escape(variant_name) + r'\s*\(', content)
+        if not match:
+            return set()
+        depth = 0
+        start = match.end()  # first char inside the '('
+        i = match.end() - 1  # at the opening '('
+        params = None
+        while i < len(content):
+            ch = content[i]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    params = content[start:i]
+                    break
+            i += 1
+        if params is None:
+            return set()
+        return {m.group(1) for m in re.finditer(r'\b(?:val|var)\s+(\w+)\s*:', params)}
+
     def map_sep_08_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
         """
@@ -951,6 +984,28 @@ class SEPAnalyzer:
                 if cls['name'] not in all_properties:
                     all_properties[cls['name']] = set()
                 all_properties[cls['name']].add(prop['name'])
+
+        # The sealed-class response variants (Success/Revised/Pending/ActionRequired/
+        # Rejected and Done/NextUrl) are nested data classes, which the top-level
+        # class parser skips. Parse their constructor properties from the response
+        # files so the section mappings below match the real SDK surface.
+        variant_owners = {
+            'Sep08PostTransactionResponse': ('Success', 'Revised', 'Pending', 'ActionRequired', 'Rejected'),
+            'Sep08PostActionResponse': ('Done', 'NextUrl'),
+        }
+        owner_files = {c['name']: c.get('file') for c in classes if c['name'] in variant_owners}
+        for owner, variants in variant_owners.items():
+            rel_path = owner_files.get(owner)
+            if not rel_path:
+                continue
+            try:
+                owner_content = (self.sdk_path / rel_path).read_text(encoding='utf-8')
+            except OSError:
+                continue
+            for variant in variants:
+                props = self._nested_data_class_properties(owner_content, variant)
+                if props:
+                    all_properties.setdefault(variant, set()).update(props)
 
         # Map sections
         sections = sep_definition.get('sections', [])
