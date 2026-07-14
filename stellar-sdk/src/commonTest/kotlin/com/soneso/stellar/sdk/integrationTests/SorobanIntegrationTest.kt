@@ -150,6 +150,16 @@ class SorobanIntegrationTest {
             healthResponse.ledgerRetentionWindow > 0,
             "Ledger retention window should be positive"
         )
+
+        // Testnet runs stellar-rpc v27.1.0+, which returns the ledger close times.
+        assertNotNull(healthResponse.latestLedgerCloseTime, "Latest ledger close time should not be null")
+        assertNotNull(healthResponse.oldestLedgerCloseTime, "Oldest ledger close time should not be null")
+        assertTrue(healthResponse.latestLedgerCloseTime > 0, "Latest ledger close time should be greater than 0")
+        assertTrue(healthResponse.oldestLedgerCloseTime > 0, "Oldest ledger close time should be greater than 0")
+        assertTrue(
+            healthResponse.latestLedgerCloseTime >= healthResponse.oldestLedgerCloseTime,
+            "Latest ledger close time should be >= oldest ledger close time"
+        )
     }
 
     /**

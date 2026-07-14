@@ -66,7 +66,7 @@ if (health.status == "healthy") {
 }
 ```
 
-**Response fields:** `status` (String), `ledgerRetentionWindow` (Long?), `latestLedger` (Long?), `oldestLedger` (Long?).
+**Response fields:** `status` (String), `ledgerRetentionWindow` (Long?), `latestLedger` (Long?), `oldestLedger` (Long?), `latestLedgerCloseTime` (Long?), `oldestLedgerCloseTime` (Long?). The close times are unix-second timestamps returned by RPC v27.1.0+; null on older servers.
 
 ```kotlin
 // WRONG: health.status == GetHealthResponse.HEALTHY — no constant exists

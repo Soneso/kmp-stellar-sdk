@@ -41,6 +41,20 @@ class SorobanServerTest {
     "status": "healthy",
     "latestLedger": 50000,
     "oldestLedger": 1,
+    "ledgerRetentionWindow": 10000,
+    "latestLedgerCloseTime": "1783951566",
+    "oldestLedgerCloseTime": "1783345758"
+  }
+}"""
+
+        // Pre-v27.1.0 shape: the ledger close-time fields are absent.
+        private const val HEALTH_RESPONSE_NO_CLOSE_TIMES = """{
+  "jsonrpc": "2.0",
+  "id": "198cb1a8-9104-4446-a269-88bf000c2721",
+  "result": {
+    "status": "healthy",
+    "latestLedger": 50000,
+    "oldestLedger": 1,
     "ledgerRetentionWindow": 10000
   }
 }"""
@@ -326,7 +340,8 @@ class SorobanServerTest {
 
     @Test
     fun testGetHealth_successfulResponse_returnsHealthData() = runTest {
-        // Given: Server with mocked health response
+        // Given: Server with a full v27.1.0+ health response (the ledger close times
+        // are int64 values serialized as JSON strings).
         createMockServer(HEALTH_RESPONSE).use { server ->
             // When: Getting health
             val health = server.getHealth()
@@ -336,6 +351,22 @@ class SorobanServerTest {
             assertEquals(50000L, health.latestLedger)
             assertEquals(1L, health.oldestLedger)
             assertEquals(10000L, health.ledgerRetentionWindow)
+            assertEquals(1783951566L, health.latestLedgerCloseTime)
+            assertEquals(1783345758L, health.oldestLedgerCloseTime)
+        }
+    }
+
+    @Test
+    fun testGetHealth_closeTimesAbsent_returnsNull() = runTest {
+        // Given: Server with a pre-v27.1.0 health response that omits the close-time fields
+        createMockServer(HEALTH_RESPONSE_NO_CLOSE_TIMES).use { server ->
+            // When: Getting health
+            val health = server.getHealth()
+
+            // Then: The close-time fields deserialize as null
+            assertEquals("healthy", health.status)
+            assertNull(health.latestLedgerCloseTime)
+            assertNull(health.oldestLedgerCloseTime)
         }
     }
 
