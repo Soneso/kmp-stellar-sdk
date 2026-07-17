@@ -8,6 +8,8 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 
 /**
@@ -51,5 +53,46 @@ internal fun requireStellarAddress(address: String, fieldName: String) {
         throw ValidationException.invalidAddress(
             "$fieldName must be a valid Stellar address (G... or C...), got: $address"
         )
+    }
+}
+
+/**
+ * Validates a context rule name: non-empty and within the OZ contract's
+ * [OZConstants.MAX_NAME_SIZE]-byte (UTF-8) limit. Rejecting oversized names client-side
+ * turns an opaque on-chain failure into a clear error before submission.
+ *
+ * @param name The context rule name to validate.
+ * @throws ValidationException.InvalidInput if the name is empty or exceeds the byte limit.
+ */
+internal fun requireValidContextRuleName(name: String) {
+    if (name.isEmpty()) {
+        throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
+    }
+    val byteLength = name.encodeToByteArray().size
+    if (byteLength > OZConstants.MAX_NAME_SIZE) {
+        throw ValidationException.invalidInput(
+            "name",
+            "Context rule name cannot exceed ${OZConstants.MAX_NAME_SIZE} bytes, got: $byteLength"
+        )
+    }
+}
+
+/**
+ * Validates that no external signer's key data exceeds the OZ contract's
+ * [OZConstants.MAX_EXTERNAL_KEY_SIZE]-byte limit. Delegated signers carry no key data and
+ * are skipped.
+ *
+ * @param signers The signers to validate.
+ * @throws ValidationException.InvalidInput if any external signer's key data is too large.
+ */
+internal fun requireValidSigners(signers: List<SmartAccountSigner>) {
+    for (signer in signers) {
+        if (signer is ExternalSigner && signer.keyData.size > OZConstants.MAX_EXTERNAL_KEY_SIZE) {
+            throw ValidationException.invalidInput(
+                "keyData",
+                "External signer key data cannot exceed ${OZConstants.MAX_EXTERNAL_KEY_SIZE} bytes, " +
+                    "got: ${signer.keyData.size}"
+            )
+        }
     }
 }

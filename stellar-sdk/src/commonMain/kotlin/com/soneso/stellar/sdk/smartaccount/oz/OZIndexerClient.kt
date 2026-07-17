@@ -255,8 +255,8 @@ class OZIndexerClient(
          * when no custom indexer URL is provided.
          */
         val DEFAULT_INDEXER_URLS: Map<String, String> = mapOf(
-            Network.TESTNET.networkPassphrase to "https://smart-account-indexer.sdf-ecosystem.workers.dev",
-            Network.PUBLIC.networkPassphrase to "https://smart-account-indexer-mainnet.sdf-ecosystem.workers.dev"
+            Network.TESTNET.networkPassphrase to "https://testnet.mercurydata.app/rest/smart-account-indexer",
+            Network.PUBLIC.networkPassphrase to "https://mainnet.mercurydata.app/rest/smart-account-indexer"
         )
 
         /**

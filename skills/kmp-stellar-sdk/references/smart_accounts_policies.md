@@ -1179,14 +1179,15 @@ try {
     )
 } catch (e: TransactionException.SimulationFailed) {
     val code = parseContractErrorCode(e)
-    // Full code -> meaning tables: see Contract Error Codes section below.
+    // decode() resolves the code to its contract + variant name (or null if unknown).
+    val decoded = code?.let { ContractErrorCodes.decode(it) }
     // Representative cases and action hints:
     val hint = when (code) {
         3004 -> "NoSignersAndPolicies — rule would have 0 signers and 0 policies; add one first"
         3016 -> "UnauthorizedSigner — signer not on resolved rule; pass resolveContextRuleIds or adjust selectedSigners"
         3221 -> "SpendingLimit exceeded for the current window; wait for reset or raise the limit"
         null -> "No contract code in message: ${e.message}"
-        else -> "Contract error $code — see Contract Error Codes tables below"
+        else -> decoded?.let { "${it.contract}.${it.name} (#${it.code})" } ?: "Unknown contract error $code"
     }
     println("transfer rejected: $hint")
     // Surface SDK-interpreted constants explicitly where they match.
@@ -1196,7 +1197,7 @@ try {
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK, and the SDK does not parse or map contract error codes — `ContractErrorCodes` is a consumer-side reference catalog declaring five constants (`MATH_OVERFLOW = 3012`, `KEY_DATA_TOO_LARGE = 3013`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014`, `NAME_TOO_LONG = 3015`, `UNAUTHORIZED_SIGNER = 3016`). For every code in the 3000-/3100-/3200-ranges you parse the message yourself and map to action. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK, so you extract the numeric code from the message yourself (the regex above). Once you have the code, `ContractErrorCodes.decode(code)` resolves it to an `OZContractError(code, contract, name)` across the full on-chain surface — smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227) — returning null for an unknown code; the smart-account codes are also exposed as named constants for direct branching. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
 // WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class

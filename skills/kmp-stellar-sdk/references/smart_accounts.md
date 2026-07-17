@@ -1562,7 +1562,7 @@ Testnet examples throughout this file assume `Network.TESTNET.networkPassphrase`
 - Set `autoFund = false` on `createWallet(...)`. On testnet, `autoFund` transfers XLM from the deployer into the freshly deployed wallet; on mainnet that is a real XLM transfer from whatever mainnet source pays for the call (via the relayer if configured, else the deployer directly). The SDK does not treat `autoFund` specially for relayer routing — whether a relayer sponsors it is a relayer-operator policy question, not an SDK guarantee. Unless you have explicit mainnet funding plumbed through, leave `autoFund = false` and fund wallets out-of-band.
 - Replace the default deployer with a custom `deployerKeypair` (see Custom deployer above). If you keep the default deployer, fund its G-address with real XLM or configure a relayer.
 - Use a mainnet relayer you operate or contractually trust. Every fee-bump costs real XLM — account for the operational budget.
-- Evaluate the default mainnet indexer. `OZIndexerClient.DEFAULT_INDEXER_URLS` ships with a mainnet entry (an SDF-operated `sdf-ecosystem.workers.dev` endpoint). The default works, but it is a third-party dependency in your data path — for production wallets with privacy or availability requirements, set `indexerUrl` to your own deployment or leave `indexerUrl = null` and rely on deterministic address derivation.
+- Evaluate the default mainnet indexer. `OZIndexerClient.DEFAULT_INDEXER_URLS` ships with a mainnet entry (a Mercury-hosted `mercurydata.app` endpoint). The default works, but it is a third-party dependency in your data path — for production wallets with privacy or availability requirements, set `indexerUrl` to your own deployment or leave `indexerUrl = null` and rely on deterministic address derivation.
 - Replace any testnet-only contract addresses (WASM hash, WebAuthn verifier, policy contracts) with the corresponding mainnet values. Cross-check against the network passphrase before deploying.
 - Shorten `signatureExpirationLedgers` from the default 720 (~1 h) for high-value flows — see the Configuration table.
 - Audit the `storage` adapter — `InMemoryStorageAdapter` will silently lose credentials on process exit, permanently locking users out of mainnet funds.
@@ -1642,7 +1642,7 @@ Wraps a non-SDK throwable into the appropriate `SmartAccountException` subclass.
 
 ### Contract error codes
 
-Contract error codes and their meanings live in [smart_accounts_policies.md — Contract Error Codes](./smart_accounts_policies.md#contract-error-codes). The SDK's `ContractErrorCodes` object (`com.soneso.stellar.sdk.smartaccount.core`) exposes five of them as constants (`MATH_OVERFLOW`, `KEY_DATA_TOO_LARGE`, `CONTEXT_RULE_IDS_LENGTH_MISMATCH`, `NAME_TOO_LONG`, `UNAUTHORIZED_SIGNER`).
+Contract error codes and their meanings live in [smart_accounts_policies.md — Contract Error Codes](./smart_accounts_policies.md#contract-error-codes). The SDK's `ContractErrorCodes` object (`com.soneso.stellar.sdk.smartaccount.core`) exposes the smart-account error enum (3000-3016) as named constants and `decode(code)`, which resolves any known code — smart account, WebAuthn (3110-3119), or a policy contract (3200-3227) — into an `OZContractError(code, contract, name)`, or null if the code is unknown.
 
 ---
 

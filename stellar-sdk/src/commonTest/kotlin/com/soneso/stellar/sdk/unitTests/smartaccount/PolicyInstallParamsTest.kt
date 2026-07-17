@@ -460,24 +460,21 @@ class PolicyInstallParamsTest {
 
     @Test
     fun testSortMapByKeyXdr_symbolKeysOfDifferentLengths() {
-        // XDR encodes symbol length as a 4-byte prefix, so shorter symbols
-        // have a smaller length field and sort before longer symbols.
+        // The host orders symbols by content, byte for byte, with length only a tiebreaker
+        // on a common prefix. So "a" (a prefix of "aaa") sorts before "aaa", and both sort
+        // before "bb" (first byte 0x62 > 0x61) — length does not come first.
         val map = linkedMapOf(
-            Scv.toSymbol("bb") to Scv.toUint32(1u),     // length 2
-            Scv.toSymbol("a") to Scv.toUint32(2u),      // length 1
-            Scv.toSymbol("aaa") to Scv.toUint32(3u)     // length 3
+            Scv.toSymbol("bb") to Scv.toUint32(1u),     // 0x62 0x62
+            Scv.toSymbol("a") to Scv.toUint32(2u),      // 0x61
+            Scv.toSymbol("aaa") to Scv.toUint32(3u)     // 0x61 0x61 0x61
         )
         val sorted = OZPolicyManager.sortMapByKeyXdr(map)
         val keys = sorted.keys.toList()
 
-        // XDR: discriminant (4) + length (4) + padded string
-        // "a"   -> ...00000001 61000000
-        // "bb"  -> ...00000002 62620000
-        // "aaa" -> ...00000003 61616100
-        // Sort: "a" < "bb" < "aaa" (length prefix 1 < 2 < 3)
+        // Host order: "a" < "aaa" (prefix, shorter first) < "bb" (0x62 > 0x61)
         assertEquals("a", extractSymbolName(keys[0]))
-        assertEquals("bb", extractSymbolName(keys[1]))
-        assertEquals("aaa", extractSymbolName(keys[2]))
+        assertEquals("aaa", extractSymbolName(keys[1]))
+        assertEquals("bb", extractSymbolName(keys[2]))
     }
 
     @Test

@@ -258,9 +258,7 @@ class OZContextRuleManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate inputs
-        if (name.isEmpty()) {
-            throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
-        }
+        requireValidContextRuleName(name)
 
         if (signers.isEmpty() && policies.isEmpty()) {
             throw ValidationException.invalidInput(
@@ -275,6 +273,8 @@ class OZContextRuleManager internal constructor(
                 "Context rule cannot have more than ${OZConstants.MAX_SIGNERS} signers, got: ${signers.size}"
             )
         }
+
+        requireValidSigners(signers)
 
         if (policies.size > OZConstants.MAX_POLICIES) {
             throw ValidationException.invalidInput(
@@ -948,9 +948,7 @@ class OZContextRuleManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate input
-        if (name.isEmpty()) {
-            throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
-        }
+        requireValidContextRuleName(name)
 
         // Build invocation (name is Soroban String type, not Symbol)
         val functionArgs: List<SCValXdr> = listOf(

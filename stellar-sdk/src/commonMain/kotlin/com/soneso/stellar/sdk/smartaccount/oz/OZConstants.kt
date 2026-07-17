@@ -70,6 +70,16 @@ object OZConstants {
     const val MAX_POLICIES = 5
 
     /**
+     * Maximum context rule name length in UTF-8 bytes (OZ contract limit).
+     */
+    const val MAX_NAME_SIZE = 20
+
+    /**
+     * Maximum external signer key data length in bytes (OZ contract limit).
+     */
+    const val MAX_EXTERNAL_KEY_SIZE = 256
+
+    /**
      * HTTP header identifying the SDK name sent with indexer and relayer requests.
      */
     const val CLIENT_NAME_HEADER = "X-Client-Name"

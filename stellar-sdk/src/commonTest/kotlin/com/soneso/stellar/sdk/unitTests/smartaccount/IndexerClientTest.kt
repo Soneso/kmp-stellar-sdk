@@ -159,6 +159,11 @@ class IndexerClientTest {
         val url = OZIndexerClient.DEFAULT_INDEXER_URLS[Network.TESTNET.networkPassphrase]
         assertNotNull(url, "Testnet should have a default indexer URL configured")
         assertTrue(url.startsWith("https://"), "Default indexer URL must use HTTPS")
+        assertEquals(
+            "https://testnet.mercurydata.app/rest/smart-account-indexer",
+            url,
+            "Testnet default indexer must point at the Mercury endpoint"
+        )
     }
 
     @Test
@@ -183,12 +188,15 @@ class IndexerClientTest {
     }
 
     @Test
-    fun testGetDefaultUrl_mainnetReturnsNullOrUrl() {
-        // Mainnet may or may not have a default URL depending on configuration
+    fun testGetDefaultUrl_mainnetReturnsMercuryUrl() {
         val url = OZIndexerClient.getDefaultUrl(Network.PUBLIC.networkPassphrase)
-        if (url != null) {
-            assertTrue(url.startsWith("https://"), "If mainnet URL is set, it must use HTTPS")
-        }
+        assertNotNull(url, "Mainnet must have a default indexer URL configured")
+        assertTrue(url.startsWith("https://"), "Mainnet default indexer URL must use HTTPS")
+        assertEquals(
+            "https://mainnet.mercurydata.app/rest/smart-account-indexer",
+            url,
+            "Mainnet default indexer must point at the Mercury endpoint"
+        )
     }
 
     // MARK: - forNetwork

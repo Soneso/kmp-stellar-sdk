@@ -588,6 +588,8 @@ class OZSignerManager internal constructor(
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
+        requireValidSigners(listOf(signer))
+
         // Build contract invocation for add_signer
         val signerScVal = signer.toScVal()
 

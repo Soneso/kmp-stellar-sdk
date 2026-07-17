@@ -2888,7 +2888,7 @@ val indexer = OZIndexerClient.forNetwork("Test SDF Network ; September 2015")
 
 // Or with a custom URL
 val indexer = OZIndexerClient(
-    indexerUrl = "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+    indexerUrl = "https://testnet.mercurydata.app/rest/smart-account-indexer",
     timeoutMs = 10000
 )
 ```
@@ -3569,7 +3569,7 @@ sealed class SmartAccountException(
 > | 3002 | `CREDENTIAL_ALREADY_EXISTS` | `UnvalidatedContext` |
 > | 3003 | `CREDENTIAL_INVALID` | `ExternalVerificationFailed` |
 >
-> When inspecting an error code, first check the exception type to determine which namespace it belongs to. The SDK does not parse or map contract error codes — it surfaces the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer extracts and interprets the code. [`ContractErrorCodes`](#contracterrorcodes) is a consumer-side reference catalog for that interpretation; the full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
+> When inspecting an error code, first check the exception type to determine which namespace it belongs to. For a contract error, the SDK surfaces the raw `Error(Contract, #NNNN)` message inside the exception; extract the numeric code and pass it to [`ContractErrorCodes.decode`](#contracterrorcodes) to resolve it to its defining contract and variant name (or match it against a constant). The full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
 
 ```kotlin
 enum class SmartAccountErrorCode(val code: Int) {
@@ -3769,17 +3769,34 @@ sealed class IndexerException : SmartAccountException {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract, provided as a reference catalog for consumers. The SDK does not parse or map these codes — failed transactions surface the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer matches the extracted code against these constants. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code — smart account, WebAuthn, or a policy contract — into the contract and variant name that defined it. A failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Error code range: 3xxx.
 
-This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
+`decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000–3016; 3001 unused), `WebAuthnError` (3110–3119), and the policy enums `SimpleThresholdError` (3200–3203), `WeightedThresholdError` (3210–3214), and `SpendingLimitError` (3220–3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Note that several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 
 ```kotlin
+data class OZContractError(val code: Int, val contract: String, val name: String)
+
 object ContractErrorCodes {
-    const val MATH_OVERFLOW = 3012                   // Integer arithmetic overflow occurred in the contract
-    const val KEY_DATA_TOO_LARGE = 3013              // The key_data field on a signer exceeds the maximum allowed size
-    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014  // The number of context rule IDs does not match the expected count
-    const val NAME_TOO_LONG = 3015                   // A name field (e.g. context rule name) exceeds the maximum allowed length
-    const val UNAUTHORIZED_SIGNER = 3016             // The signer is not authorized to sign the given context rule
+    // Smart account contract (SmartAccountError, 3000-3016; 3001 unused)
+    const val CONTEXT_RULE_NOT_FOUND = 3000
+    const val UNVALIDATED_CONTEXT = 3002
+    const val EXTERNAL_VERIFICATION_FAILED = 3003
+    const val NO_SIGNERS_AND_POLICIES = 3004
+    const val PAST_VALID_UNTIL = 3005
+    const val SIGNER_NOT_FOUND = 3006
+    const val DUPLICATE_SIGNER = 3007
+    const val POLICY_NOT_FOUND = 3008
+    const val DUPLICATE_POLICY = 3009
+    const val TOO_MANY_SIGNERS = 3010
+    const val TOO_MANY_POLICIES = 3011
+    const val MATH_OVERFLOW = 3012
+    const val KEY_DATA_TOO_LARGE = 3013
+    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014
+    const val NAME_TOO_LONG = 3015
+    const val UNAUTHORIZED_SIGNER = 3016
+
+    /** Resolves any known contract error code into its contract and variant, or null. */
+    fun decode(code: Int): OZContractError?
 }
 ```
 

@@ -22,63 +22,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Tests that ScMap keys are sorted lexicographically by XDR byte representation
- * when building policy parameters.
+ * Tests that ScMap keys are sorted into the Soroban host's key order when building
+ * policy parameters.
  *
- * sortMapByKeyXdr() sorts by the raw XDR-encoded bytes of each key. For symbol
- * keys, XDR encoding is: [4-byte discriminant][4-byte length][string bytes][padding].
- * This means symbols of different lengths sort by length first, not alphabetically.
- * For same-length symbols, the sort is alphabetical.
+ * sortMapByKeyXdr() orders keys the way the host does: by content, element-wise, with
+ * length only a tiebreaker on a common prefix — not by the length-major XDR encoding. For
+ * symbols and other variable-length keys this differs from a raw XDR-byte sort whenever two
+ * keys diverge in content before the shorter one ends.
  *
- * Struct-like maps (e.g., WeightedThreshold outer keys) use alphabetical field
- * ordering as mandated by the Soroban Rust SDK's #[contracttype] derive macro.
+ * Struct-like maps (e.g., WeightedThreshold outer keys) use alphabetical field ordering as
+ * mandated by the Soroban Rust SDK's #[contracttype] derive macro.
  */
 class ScMapKeySortingTest {
 
-    // MARK: - Utility Function Tests
-
-    @Test
-    fun testCompareByteArraysLexicographically() {
-        // Verify the utility function correctly compares byte arrays
-
-        // Same bytes
-        val a = byteArrayOf(0x01, 0x02, 0x03)
-        val b = byteArrayOf(0x01, 0x02, 0x03)
-        val sortedAB = listOf(a, b).sortedWith { x, y ->
-            compareByteArraysForTest(x, y)
-        }
-        assertEquals(0, compareByteArraysForTest(a, b))
-
-        // First < Second (differs at index 1)
-        val c = byteArrayOf(0x01, 0x02, 0x03)
-        val d = byteArrayOf(0x01, 0x03, 0x03)
-        assertTrue(compareByteArraysForTest(c, d) < 0)
-        assertTrue(compareByteArraysForTest(d, c) > 0)
-
-        // Shorter array < longer array when prefix matches
-        val e = byteArrayOf(0x01, 0x02)
-        val f = byteArrayOf(0x01, 0x02, 0x03)
-        assertTrue(compareByteArraysForTest(e, f) < 0)
-        assertTrue(compareByteArraysForTest(f, e) > 0)
-
-        // Unsigned byte comparison (0xFF > 0x01)
-        val g = byteArrayOf(0x01)
-        val h = byteArrayOf(0xFF.toByte())
-        assertTrue(compareByteArraysForTest(g, h) < 0)
-    }
-
     @Test
     fun testSortMapByKeyXdrWithSymbolKeys() {
-        // Symbol keys are sorted by their XDR byte encoding. XDR encodes symbols as:
-        //   [4-byte discriminant (0x0000000f)] [4-byte length] [string bytes] [padding]
-        // So symbols sort by length first (shorter length prefix = smaller XDR bytes),
-        // then alphabetically within the same length.
+        // Symbol keys are sorted in the Soroban host's order: by content, byte for byte,
+        // with length only a tiebreaker on a common prefix — not by the length-major XDR
+        // encoding. So "middle" sorts between "alpha" and "zebra" on its first byte (0x6d),
+        // regardless of being longer.
         //
-        // "alpha"  (5 chars) -> XDR: 0000000f 00000005 616c7068 61000000
-        // "zebra"  (5 chars) -> XDR: 0000000f 00000005 7a656272 61000000
-        // "middle" (6 chars) -> XDR: 0000000f 00000006 6d696464 6c650000
+        // "alpha"  -> 0x61 6c 70 68 61
+        // "middle" -> 0x6d 69 64 64 6c 65
+        // "zebra"  -> 0x7a 65 62 72 61
         //
-        // XDR sort order: alpha (5) < zebra (5) < middle (6)
+        // Host sort order: alpha (0x61) < middle (0x6d) < zebra (0x7a)
         val unsorted = linkedMapOf(
             Scv.toSymbol("zebra") to Scv.toUint32(1u),
             Scv.toSymbol("alpha") to Scv.toUint32(2u),
@@ -90,8 +58,8 @@ class ScMapKeySortingTest {
 
         assertEquals(3, keys.size)
         assertEquals("alpha", extractSymbolName(keys[0]))
-        assertEquals("zebra", extractSymbolName(keys[1]))
-        assertEquals("middle", extractSymbolName(keys[2]))
+        assertEquals("middle", extractSymbolName(keys[1]))
+        assertEquals("zebra", extractSymbolName(keys[2]))
     }
 
     @Test
@@ -515,22 +483,6 @@ class ScMapKeySortingTest {
                 "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
             )
         }
-    }
-
-    /**
-     * Compares two byte arrays lexicographically with unsigned byte comparison.
-     * Mirrors the logic in OZPolicyManager.compareByteArraysLexicographically.
-     */
-    private fun compareByteArraysForTest(a: ByteArray, b: ByteArray): Int {
-        val minLength = minOf(a.size, b.size)
-        for (i in 0 until minLength) {
-            val aByte = a[i].toInt() and 0xFF
-            val bByte = b[i].toInt() and 0xFF
-            if (aByte != bByte) {
-                return aByte - bByte
-            }
-        }
-        return a.size - b.size
     }
 
     /**
