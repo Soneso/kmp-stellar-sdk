@@ -273,7 +273,8 @@ data class OZSmartAccountConfig(
     val storage: StorageAdapter = InMemoryStorageAdapter(),
     val externalWallet: ExternalWalletAdapter? = null,
     val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
-    val maxContextRuleScanId: UInt = 50u
+    val maxContextRuleScanId: UInt = 50u,
+    val defaultPolicies: Map<String, SCValXdr> = emptyMap()
 )
 ```
 
@@ -295,6 +296,7 @@ data class OZSmartAccountConfig(
 - `externalWallet`: Optional wallet adapter (`ExternalWalletAdapter`) backing the adapter custody model for `SelectedSigner.Wallet` (G-address) signers. The kit injects it into `kit.externalSigners`.
 - `externalEd25519Adapter`: Optional Ed25519 adapter (`OZExternalEd25519SignerAdapter`) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into `kit.externalSigners`. See [External Signer Management](#external-signer-management).
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
+- `defaultPolicies`: Policies installed on a new wallet's Default context rule at deploy time, keyed by policy contract address (C...) with the policy's install parameters as the value (see `PolicyInstallParams.toScVal()`). Applied through the contract constructor by `createWallet` and `deployPendingCredential`; a per-call `policies` argument overrides it. Defaults to no policies. Maximum 5. See the `createWallet` `policies` parameter for the built-in policies' install constraints at deploy time.
 
 ### Platform-Specific Providers
 
@@ -411,7 +413,8 @@ suspend fun createWallet(
     autoSubmit: Boolean = false,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): CreateWalletResult
 ```
 
@@ -423,6 +426,7 @@ Creates a new smart account wallet with WebAuthn passkey authentication.
 - `autoFund`: Whether to automatically fund the wallet after deployment (testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
+- `policies`: Policies to install on the new wallet's Default context rule at deploy time (via the contract constructor), keyed by policy contract address (C...) with the policy's install parameters as the value (see `PolicyInstallParams.toScVal()`). When null (default), `OZSmartAccountConfig.defaultPolicies` is used; pass a map (including an empty one) to override that default. Validated before the passkey ceremony, so an invalid policy config fails without creating an orphaned credential. Maximum 5 policies. Note the built-in policies' own install rules apply against this Default rule and its single initial signer: a spending-limit policy installs only on CallContract rules and cannot be installed here, and a threshold must not exceed the signer count — constructor policies are primarily useful for custom policies.
 
 **Returns**: `CreateWalletResult` containing credential ID, contract address, signed transaction XDR, optional transaction hash, and nickname
 
@@ -623,7 +627,8 @@ suspend fun deployPendingCredential(
     autoSubmit: Boolean = true,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): DeployPendingResult
 ```
 
@@ -637,6 +642,7 @@ The kit's connected state and session are set before the deploy transaction is s
 - `autoFund`: Whether to fund the wallet after deployment via Friendbot (default: false, testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
+- `policies`: Policies to install on the Default context rule at deploy time, keyed by policy contract address (C...). When null (default), `OZSmartAccountConfig.defaultPolicies` is used; pass a map (including an empty one) to override it. Constructor args are not part of the contract-address preimage, so the derived address is unchanged. Maximum 5 policies.
 
 **Returns**: `DeployPendingResult` containing contract address, signed transaction XDR, and optional transaction hash
 

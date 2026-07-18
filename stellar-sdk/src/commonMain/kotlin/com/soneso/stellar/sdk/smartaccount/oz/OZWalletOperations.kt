@@ -27,6 +27,7 @@ import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsV2Xdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import kotlinx.coroutines.delay
@@ -289,6 +290,10 @@ class OZWalletOperations internal constructor(
      * @param autoFund Whether to automatically fund the wallet after deployment (default: false)
      * @param nativeTokenContract Contract address for the native token (required if autoFund is true)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @param policies Policies to install on the new wallet's Default context rule at deploy time,
+     *   keyed by policy contract address with the install-param ScVal as the value. Null (default)
+     *   uses [OZSmartAccountConfig.defaultPolicies]; a non-null map overrides it. Validated before
+     *   the passkey ceremony. Maximum 5.
      * @return CreateWalletResult containing credential ID, contract address, signed transaction XDR, and optional transaction hash
      * @throws WebAuthnException if WebAuthn registration fails or no provider configured
      * @throws ValidationException if public key extraction fails or nativeTokenContract is missing when autoFund is true
@@ -325,7 +330,8 @@ class OZWalletOperations internal constructor(
         autoSubmit: Boolean = false,
         autoFund: Boolean = false,
         nativeTokenContract: String? = null,
-        forceMethod: SubmissionMethod? = null
+        forceMethod: SubmissionMethod? = null,
+        policies: Map<String, SCValXdr>? = null
     ): CreateWalletResult {
         // STEP 1: Check for WebAuthn provider
         val webauthnProvider = kit.config.webauthnProvider
@@ -339,6 +345,11 @@ class OZWalletOperations internal constructor(
                 "nativeTokenContract is required when autoFund is true"
             )
         }
+
+        // STEP 1c: Resolve and validate constructor policies before the passkey ceremony,
+        // so an invalid policy config never orphans a freshly created credential.
+        val effectivePolicies = policies ?: kit.config.defaultPolicies
+        requireValidPolicies(effectivePolicies)
 
         // STEP 2: Generate random challenge (32 bytes) and user ID (32 bytes)
         val challengeData = secureRandomBytes(32)
@@ -440,6 +451,7 @@ class OZWalletOperations internal constructor(
             buildDeployTransaction(
                 publicKey = publicKey,
                 credentialId = registrationResult.credentialId,
+                policies = effectivePolicies,
                 forceMethod = forceMethod
             )
         } catch (e: Exception) {
@@ -1514,6 +1526,9 @@ class OZWalletOperations internal constructor(
      * @param autoFund Whether to automatically fund the wallet after deployment (default: false)
      * @param nativeTokenContract Contract address for the native token (required if autoFund is true)
      * @param forceMethod Optional override to force relayer or RPC submission (default: auto-detect)
+     * @param policies Policies to install on the Default context rule at deploy time, keyed by
+     *   policy contract address with the install-param ScVal as the value. Null (default) uses
+     *   [OZSmartAccountConfig.defaultPolicies]; a non-null map overrides it. Maximum 5.
      * @return DeployPendingResult with contractId, signedTransactionXdr, and optional transactionHash
      * @throws CredentialException if the credential is not found or missing required fields
      * @throws ValidationException if autoFund is true but nativeTokenContract is null
@@ -1545,7 +1560,8 @@ class OZWalletOperations internal constructor(
         autoSubmit: Boolean = true,
         autoFund: Boolean = false,
         nativeTokenContract: String? = null,
-        forceMethod: SubmissionMethod? = null
+        forceMethod: SubmissionMethod? = null,
+        policies: Map<String, SCValXdr>? = null
     ): DeployPendingResult {
         // Validate autoFund requirements early (before any network calls)
         if (autoFund && nativeTokenContract == null) {
@@ -1553,6 +1569,10 @@ class OZWalletOperations internal constructor(
                 "nativeTokenContract is required when autoFund is true"
             )
         }
+
+        // Resolve and validate constructor policies early (before any network calls).
+        val effectivePolicies = policies ?: kit.config.defaultPolicies
+        requireValidPolicies(effectivePolicies)
 
         // Look up credential from storage
         val credential = credentialManager.getCredential(credentialId = credentialId)
@@ -1602,6 +1622,7 @@ class OZWalletOperations internal constructor(
             buildDeployTransaction(
                 publicKey = publicKey,
                 credentialId = credentialIdBytes,
+                policies = effectivePolicies,
                 forceMethod = forceMethod
             )
         } catch (e: Exception) {
@@ -1680,6 +1701,7 @@ class OZWalletOperations internal constructor(
     private suspend fun buildDeployTransaction(
         publicKey: ByteArray,
         credentialId: ByteArray,
+        policies: Map<String, SCValXdr>,
         forceMethod: SubmissionMethod? = null
     ): Transaction {
         // Build key_data = publicKey (65 bytes) + credentialId
@@ -1710,8 +1732,20 @@ class OZWalletOperations internal constructor(
             )
         }
 
-        // Empty policies map
-        val policiesScVal = Scv.toMap(linkedMapOf())
+        // Policies installed on the default context rule, keyed by policy contract address
+        // and sorted into the host's ScMap key order.
+        val policiesScVal = try {
+            val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
+            for ((address, installParam) in policies) {
+                policiesMap[Scv.toAddress(Address(address).toSCAddress())] = installParam
+            }
+            Scv.toMap(OZPolicyManager.sortMapByKeyXdr(policiesMap))
+        } catch (e: Exception) {
+            throw TransactionException.signingFailed(
+                "Failed to encode constructor policies: ${e.message}",
+                e
+            )
+        }
 
         val constructorArgs = listOf(signersScVal, policiesScVal)
 

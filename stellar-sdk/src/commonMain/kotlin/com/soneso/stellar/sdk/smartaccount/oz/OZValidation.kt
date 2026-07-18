@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
  * Validates that the given string is a valid Stellar contract address (C...).
@@ -94,5 +95,26 @@ internal fun requireValidSigners(signers: List<SmartAccountSigner>) {
                     "got: ${signer.keyData.size}"
             )
         }
+    }
+}
+
+/**
+ * Validates constructor / context-rule policies: at most [OZConstants.MAX_POLICIES] entries,
+ * each keyed by a valid contract address (C...). The values are pre-encoded install-param
+ * ScVals and are not inspected here.
+ *
+ * @param policies Policy install params keyed by policy contract address.
+ * @throws ValidationException.InvalidInput if too many policies are supplied.
+ * @throws ValidationException.InvalidAddress if a policy key is not a valid contract address.
+ */
+internal fun requireValidPolicies(policies: Map<String, SCValXdr>) {
+    if (policies.size > OZConstants.MAX_POLICIES) {
+        throw ValidationException.invalidInput(
+            "policies",
+            "Cannot install more than ${OZConstants.MAX_POLICIES} policies, got: ${policies.size}"
+        )
+    }
+    for ((address, _) in policies) {
+        requireContractAddress(address, "policyAddress")
     }
 }
