@@ -7,12 +7,19 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount
 
+import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
+import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
+import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.requireValidContextRuleName
 import com.soneso.stellar.sdk.smartaccount.oz.requireValidSigners
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -98,6 +105,94 @@ class OZValidationLimitsTest {
         val oversized = ExternalSigner(verifier, ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE + 1) { 0x02 })
         assertFailsWith<ValidationException.InvalidInput> {
             requireValidSigners(listOf(delegated, oversized))
+        }
+    }
+
+    // MARK: - Wiring through the manager entry points
+    //
+    // The failure paths below fire during pre-network validation, so a connected kit with no
+    // network access exercises the wiring: removing a requireValid* call from the manager
+    // would turn these tests red.
+
+    private val contractId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+
+    private suspend fun connectedKit(): OZSmartAccountKit {
+        val kit = OZSmartAccountKit.create(
+            OZSmartAccountConfig(
+                rpcUrl = "https://soroban-testnet.stellar.org",
+                networkPassphrase = Network.TESTNET.networkPassphrase,
+                accountWasmHash = "a" + "0".repeat(63),
+                webauthnVerifierAddress = verifier
+            )
+        )
+        kit.setConnectedState("test-credential-id", contractId)
+        return kit
+    }
+
+    private fun policyAddress(seed: Int): String = StrKey.encodeContract(ByteArray(32) { (it + seed).toByte() })
+
+    @Test
+    fun testAddContextRule_nameOverByteLimit_throws() = runTest {
+        val kit = connectedKit()
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.contextRuleManager.addContextRule(
+                contextType = ContextRuleType.Default,
+                name = "a".repeat(OZConstants.MAX_NAME_SIZE + 1),
+                signers = listOf(DelegatedSigner(account))
+            )
+        }
+    }
+
+    @Test
+    fun testAddContextRule_oversizedExternalSigner_throws() = runTest {
+        val kit = connectedKit()
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.contextRuleManager.addContextRule(
+                contextType = ContextRuleType.Default,
+                name = "rule",
+                signers = listOf(ExternalSigner(verifier, ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE + 1) { 0x01 }))
+            )
+        }
+    }
+
+    @Test
+    fun testAddContextRule_tooManyPolicies_throws() = runTest {
+        val kit = connectedKit()
+        val installParam = PolicyInstallParams.SimpleThreshold(threshold = 1u).toScVal()
+        val policies = (0 until OZConstants.MAX_POLICIES + 1).associate { policyAddress(it) to installParam }
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.contextRuleManager.addContextRule(
+                contextType = ContextRuleType.Default,
+                name = "rule",
+                signers = listOf(DelegatedSigner(account)),
+                policies = policies
+            )
+        }
+    }
+
+    @Test
+    fun testUpdateName_nameOverByteLimit_throws() = runTest {
+        val kit = connectedKit()
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.contextRuleManager.updateName(
+                id = 0u,
+                name = "ä".repeat(11) // 22 UTF-8 bytes with a character count below the limit
+            )
+        }
+    }
+
+    @Test
+    fun testAddPasskey_oversizedCredentialId_throws() = runTest {
+        val kit = connectedKit()
+        val publicKey = ByteArray(65) { if (it == 0) 0x04 else 0x01 }
+        // keyData = publicKey (65) + credentialId (192) = 257 bytes, one over the limit.
+        val credentialId = ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE + 1 - 65) { 0x02 }
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.signerManager.addPasskey(
+                contextRuleId = 0u,
+                publicKey = publicKey,
+                credentialId = credentialId
+            )
         }
     }
 }

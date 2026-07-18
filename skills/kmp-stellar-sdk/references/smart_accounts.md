@@ -1655,6 +1655,8 @@ defaults not stated elsewhere in this page:
 |----------|-------|
 | `OZConstants.MAX_SIGNERS` (per context rule) | 15 |
 | `OZConstants.MAX_POLICIES` (per context rule) | 5 |
+| `OZConstants.MAX_NAME_SIZE` (context rule name, UTF-8 bytes) | 20 |
+| `OZConstants.MAX_EXTERNAL_KEY_SIZE` (external signer key data, bytes) | 256 |
 | `OZConstants.WEBAUTHN_TIMEOUT_MS` | 60_000 |
 | `OZConstants.DEFAULT_RELAYER_TIMEOUT_MS` | 360_000 (6 min) |
 

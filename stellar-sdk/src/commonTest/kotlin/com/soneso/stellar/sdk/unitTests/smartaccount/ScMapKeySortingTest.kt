@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -64,7 +65,7 @@ class ScMapKeySortingTest {
 
     @Test
     fun testSortMapByKeyXdrWithAddressKeys() {
-        // Address keys sorted by their XDR byte representation
+        // Address keys sorted in the host's ScMap key order (fixed-width, so content order)
         // Contract addresses (C...) encode as SC_ADDRESS_TYPE_CONTRACT
         val addr1 = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
         val addr2 = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
@@ -79,15 +80,11 @@ class ScMapKeySortingTest {
         val sorted = OZPolicyManager.sortMapByKeyXdr(unsorted)
         val sortedKeys = sorted.keys.toList()
 
-        // Verify entries are sorted by XDR bytes
+        // Verify entries are in the host's ScMap key order
         for (i in 0 until sortedKeys.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
-            val nextXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i + 1])
-            val hexCurrent = currentXdr.toHexString()
-            val hexNext = nextXdr.toHexString()
             assertTrue(
-                hexCurrent < hexNext,
-                "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
+                compareScValHostOrder(sortedKeys[i], sortedKeys[i + 1]) < 0,
+                "Key at index $i must precede key at index ${i + 1} in host order"
             )
         }
     }
@@ -146,7 +143,7 @@ class ScMapKeySortingTest {
     }
 
     @Test
-    fun testWeightedThresholdSignerWeightsMapIsSortedByXdrHex() {
+    fun testWeightedThresholdSignerWeightsMapIsSortedInHostOrder() {
         // Create multiple signers that would be in wrong order without sorting.
         // DelegatedSigners use G-addresses; their XDR encoding includes the address bytes.
         // All three G-addresses are valid StrKey-encoded Ed25519 public keys.
@@ -178,14 +175,14 @@ class ScMapKeySortingTest {
 
         assertEquals(3, innerEntries.size)
 
-        // Verify inner map keys are sorted by XDR hex
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify inner map keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
     fun testWeightedThresholdWithExternalSignersIsSorted() {
         // ExternalSigner keys have different structure (Vec with verifier address + key data)
-        // These should also be sorted by XDR hex
+        // These are also sorted in the host's ScMap key order
         val signer1 = ExternalSigner(
             verifierAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
             keyData = byteArrayOf(0x01, 0x02, 0x03)
@@ -211,8 +208,8 @@ class ScMapKeySortingTest {
 
         assertEquals(2, innerEntries.size)
 
-        // Verify inner map keys are sorted by XDR hex
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify inner map keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
@@ -248,7 +245,8 @@ class ScMapKeySortingTest {
     @Test
     fun testSpendingLimitKeysAreSorted() {
         // SpendingLimit has keys "period_ledgers" and "spending_limit"
-        // Both are 14 chars, so XDR byte ordering and alphabetical ordering are equivalent
+        // The contract is the host's ScMap key order; both keys are 14 chars, so that
+        // coincides with alphabetical (and XDR-byte) ordering
         val params = PolicyInstallParams.SpendingLimit(
             spendingLimit = BigInteger.fromLong(10_000_000L), // 1 XLM in stroops
             periodLedgers = 17280u        // ~1 day
@@ -260,8 +258,8 @@ class ScMapKeySortingTest {
         assertEquals("period_ledgers", extractSymbolName(entries[0].key))
         assertEquals("spending_limit", extractSymbolName(entries[1].key))
 
-        // Verify XDR hex ordering (same as alphabetical for same-length keys)
-        assertKeysAreSortedByXdrHex(entries)
+        // Verify host key order (same as alphabetical for same-length keys)
+        assertKeysAreInHostOrder(entries)
     }
 
     @Test
@@ -285,7 +283,7 @@ class ScMapKeySortingTest {
     // MARK: - Policies Map Sorting (Address Keys)
 
     @Test
-    fun testPoliciesMapAddressKeysAreSortedByXdrHex() {
+    fun testPoliciesMapAddressKeysAreInHostOrder() {
         // Simulate the policies map construction from OZContextRuleManager.addContextRule()
         // with multiple policy addresses in unsorted order.
         // All C-addresses are valid StrKey-encoded contract IDs.
@@ -306,7 +304,8 @@ class ScMapKeySortingTest {
         // Verify all entries are present
         assertEquals(3, sortedMap.size)
 
-        // Verify keys are sorted by XDR hex
+        // Verify keys are in the host's ScMap key order (fixed-width address keys, so
+        // XDR-byte comparison is order-equivalent)
         val sortedKeys = sortedMap.keys.toList()
         for (i in 0 until sortedKeys.size - 1) {
             val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
@@ -364,7 +363,7 @@ class ScMapKeySortingTest {
 
         assertEquals(3, sortedKeys.size)
 
-        // Verify all keys are sorted by their XDR hex representation
+        // Verify all keys are in the host key order (different-type keys sort discriminant-major in both the host and XDR-byte orders, so hex comparison is order-equivalent here)
         for (i in 0 until sortedKeys.size - 1) {
             val currentHex = encodeToXdrHex(sortedKeys[i])
             val nextHex = encodeToXdrHex(sortedKeys[i + 1])
@@ -396,8 +395,8 @@ class ScMapKeySortingTest {
 
     @Test
     fun testSortAlreadySortedMap() {
-        // Map that is already in correct XDR order should remain the same.
-        // All keys have same length (3 chars), so XDR order = alphabetical.
+        // Map that is already in host key order should remain the same.
+        // All keys have same length (3 chars), so host order = alphabetical.
         val alreadySorted = linkedMapOf(
             Scv.toSymbol("aaa") to Scv.toUint32(1u),
             Scv.toSymbol("bbb") to Scv.toUint32(2u),
@@ -414,7 +413,7 @@ class ScMapKeySortingTest {
     @Test
     fun testSortPreservesValues() {
         // Verify that sorting does not lose or swap values.
-        // All keys have same length (1 char), so XDR order = alphabetical.
+        // All keys have same length (1 char), so host order = alphabetical.
         val map = linkedMapOf(
             Scv.toSymbol("z") to Scv.toUint32(100u),
             Scv.toSymbol("a") to Scv.toUint32(200u),
@@ -469,18 +468,14 @@ class ScMapKeySortingTest {
     }
 
     /**
-     * Asserts that the keys of the given map entries are sorted
-     * lexicographically by their XDR hex representation.
+     * Asserts that the keys of the given map entries are in strictly ascending
+     * host ScMap key order, as defined by [compareScValHostOrder].
      */
-    private fun assertKeysAreSortedByXdrHex(entries: List<SCMapEntryXdr>) {
+    private fun assertKeysAreInHostOrder(entries: List<SCMapEntryXdr>) {
         for (i in 0 until entries.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(entries[i].key)
-            val nextXdr = OZPolicyManager.scValToXdrBytes(entries[i + 1].key)
-            val hexCurrent = currentXdr.toHexString()
-            val hexNext = nextXdr.toHexString()
             assertTrue(
-                hexCurrent < hexNext,
-                "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
+                compareScValHostOrder(entries[i].key, entries[i + 1].key) < 0,
+                "Key at index $i must precede key at index ${i + 1} in host order"
             )
         }
     }

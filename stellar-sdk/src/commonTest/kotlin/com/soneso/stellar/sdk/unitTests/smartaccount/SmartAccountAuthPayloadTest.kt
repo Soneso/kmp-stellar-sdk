@@ -780,7 +780,7 @@ class SmartAccountAuthPayloadTest {
     }
 
     // ========================================================================
-    // Write: signer sorting by XDR-encoded key bytes
+    // Write: signer sorting in the host's ScMap key order
     // ========================================================================
 
     @Test

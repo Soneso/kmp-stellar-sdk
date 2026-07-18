@@ -1352,6 +1352,8 @@ Low-level method that adds a pre-registered WebAuthn passkey signer to a context
 - `selectedSigners`: Optional multi-signer authorization (default: single-signer with the connected passkey).
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config).
 
+**Contract limit**: Signer key data (`publicKey` + `credentialId` combined) max 256 bytes.
+
 **Returns**: `TransactionResult` indicating success or failure
 
 **Throws**:
@@ -1896,6 +1898,8 @@ suspend fun addContextRule(
 **Contract limits**:
 - Max 15 signers per rule
 - Max 5 policies per rule
+- Name max 20 UTF-8 bytes
+- External signer key data max 256 bytes
 
 **Returns**: `TransactionResult`
 
@@ -2009,7 +2013,7 @@ Updates the name of a context rule.
 
 **Parameters**:
 - `id`: Context rule ID
-- `name`: New rule name (must not be empty)
+- `name`: New rule name (must not be empty; max 20 UTF-8 bytes)
 - `selectedSigners`: Optional multi-signer authorization (default: single-signer with the connected passkey).
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config).
 
@@ -3349,7 +3353,7 @@ object SmartAccountAuthPayloadCodec {
 }
 ```
 
-Codec for reading and writing `SmartAccountAuthPayload` to and from `SCValXdr`. Inner signer entries are sorted by lowercase-hex of their XDR-encoded keys for deterministic encoding. Signature bytes are verifier-dependent: WebAuthn and Policy entries are XDR-encoded `SCValXdr`; Ed25519 entries carry the raw 64-byte signature (no XDR wrapper).
+Codec for reading and writing `SmartAccountAuthPayload` to and from `SCValXdr`. Inner signer entries are sorted in the Soroban host's ScMap key order (content order, length as tiebreaker), matching how the contract materializes the map. Signature bytes are verifier-dependent: WebAuthn and Policy entries are XDR-encoded `SCValXdr`; Ed25519 entries carry the raw 64-byte signature (no XDR wrapper).
 
 - `read(signatureScVal)` — accepts `SCValXdr.Void` (returns an empty payload) or `SCValXdr.Map` (the full payload).
 - `write(payload)` — builds the outer map (`context_rule_ids` then `signers`) and sorts the inner signer entries deterministically.
@@ -3775,7 +3779,7 @@ sealed class IndexerException : SmartAccountException {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code — smart account, WebAuthn, or a policy contract — into the contract and variant name that defined it. A failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code — smart account, WebAuthn, or a policy contract — into the contract and variant name that defined it. A failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Alternatively, pass a thrown `TransactionException`'s message directly to `decodeFromMessage`, which extracts and decodes the first known marker in one step. Error code range: 3xxx.
 
 `decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000–3016; 3001 unused), `WebAuthnError` (3110–3119), and the policy enums `SimpleThresholdError` (3200–3203), `WeightedThresholdError` (3210–3214), and `SpendingLimitError` (3220–3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Note that several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 
@@ -3803,6 +3807,9 @@ object ContractErrorCodes {
 
     /** Resolves any known contract error code into its contract and variant, or null. */
     fun decode(code: Int): OZContractError?
+
+    /** Extracts and decodes the first known Error(Contract, #NNNN) marker from an error message, or null. */
+    fun decodeFromMessage(message: String?): OZContractError?
 }
 ```
 

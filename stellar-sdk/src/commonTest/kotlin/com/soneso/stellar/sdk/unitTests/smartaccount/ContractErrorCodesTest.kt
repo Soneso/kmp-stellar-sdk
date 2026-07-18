@@ -79,18 +79,89 @@ class ContractErrorCodesTest {
     }
 
     @Test
-    fun testDecode_allKnownCodesResolve() {
-        val known = buildList {
-            addAll((3000..3016).filter { it != 3001 })
-            addAll(3110..3119)
-            addAll(3200..3203)
-            addAll(3210..3214)
-            addAll(3220..3227)
-        }
-        assertEquals(43, known.size)
-        for (code in known) {
+    fun testDecode_fullTableMatchesContractEnums() {
+        // Independent transcription of the contract enums; a transposed name or wrong
+        // contract in the production table fails here.
+        val expected = mapOf(
+            3000 to ("SmartAccountError" to "ContextRuleNotFound"),
+            3002 to ("SmartAccountError" to "UnvalidatedContext"),
+            3003 to ("SmartAccountError" to "ExternalVerificationFailed"),
+            3004 to ("SmartAccountError" to "NoSignersAndPolicies"),
+            3005 to ("SmartAccountError" to "PastValidUntil"),
+            3006 to ("SmartAccountError" to "SignerNotFound"),
+            3007 to ("SmartAccountError" to "DuplicateSigner"),
+            3008 to ("SmartAccountError" to "PolicyNotFound"),
+            3009 to ("SmartAccountError" to "DuplicatePolicy"),
+            3010 to ("SmartAccountError" to "TooManySigners"),
+            3011 to ("SmartAccountError" to "TooManyPolicies"),
+            3012 to ("SmartAccountError" to "MathOverflow"),
+            3013 to ("SmartAccountError" to "KeyDataTooLarge"),
+            3014 to ("SmartAccountError" to "ContextRuleIdsLengthMismatch"),
+            3015 to ("SmartAccountError" to "NameTooLong"),
+            3016 to ("SmartAccountError" to "UnauthorizedSigner"),
+            3110 to ("WebAuthnError" to "SignaturePayloadInvalid"),
+            3111 to ("WebAuthnError" to "ClientDataTooLong"),
+            3112 to ("WebAuthnError" to "JsonParseError"),
+            3113 to ("WebAuthnError" to "TypeFieldInvalid"),
+            3114 to ("WebAuthnError" to "ChallengeInvalid"),
+            3115 to ("WebAuthnError" to "AuthDataFormatInvalid"),
+            3116 to ("WebAuthnError" to "PresentBitNotSet"),
+            3117 to ("WebAuthnError" to "VerifiedBitNotSet"),
+            3118 to ("WebAuthnError" to "BackupEligibilityAndStateNotSet"),
+            3119 to ("WebAuthnError" to "KeyDataInvalid"),
+            3200 to ("SimpleThresholdError" to "SmartAccountNotInstalled"),
+            3201 to ("SimpleThresholdError" to "InvalidThreshold"),
+            3202 to ("SimpleThresholdError" to "NotAllowed"),
+            3203 to ("SimpleThresholdError" to "AlreadyInstalled"),
+            3210 to ("WeightedThresholdError" to "SmartAccountNotInstalled"),
+            3211 to ("WeightedThresholdError" to "InvalidThreshold"),
+            3212 to ("WeightedThresholdError" to "MathOverflow"),
+            3213 to ("WeightedThresholdError" to "NotAllowed"),
+            3214 to ("WeightedThresholdError" to "AlreadyInstalled"),
+            3220 to ("SpendingLimitError" to "SmartAccountNotInstalled"),
+            3221 to ("SpendingLimitError" to "SpendingLimitExceeded"),
+            3222 to ("SpendingLimitError" to "InvalidLimitOrPeriod"),
+            3223 to ("SpendingLimitError" to "NotAllowed"),
+            3224 to ("SpendingLimitError" to "HistoryCapacityExceeded"),
+            3225 to ("SpendingLimitError" to "AlreadyInstalled"),
+            3226 to ("SpendingLimitError" to "LessThanZero"),
+            3227 to ("SpendingLimitError" to "OnlyCallContractAllowed")
+        )
+        assertEquals(43, expected.size)
+        for ((code, contractAndName) in expected) {
             val decoded = ContractErrorCodes.decode(code)
-            assertEquals(code, decoded?.code, "code $code must decode to a known error")
+            assertEquals(OZContractError(code, contractAndName.first, contractAndName.second), decoded)
         }
+    }
+
+    // MARK: - decodeFromMessage
+
+    @Test
+    fun testDecodeFromMessage_simulationErrorString() {
+        val message = "Transaction simulation failed: Simulation error: HostError: Error(Context, InvalidAction) " +
+            "Event log: [Diagnostic Event] topics:[error, Error(Context, InvalidAction)], " +
+            "data:[\"constructor invocation has failed with error\", Error(Contract, #3201)]"
+        assertEquals(OZContractError(3201, "SimpleThresholdError", "InvalidThreshold"), ContractErrorCodes.decodeFromMessage(message))
+    }
+
+    @Test
+    fun testDecodeFromMessage_whitespaceVariants() {
+        assertEquals(3227, ContractErrorCodes.decodeFromMessage("Error(Contract, #3227)")?.code)
+        assertEquals(3227, ContractErrorCodes.decodeFromMessage("Error( Contract , #3227 )")?.code)
+    }
+
+    @Test
+    fun testDecodeFromMessage_skipsUnknownCodeAndReturnsFirstKnown() {
+        // 3001 is unused in the contract enums; the scan continues to the next marker.
+        val message = "Error(Contract, #3001) then Error(Contract, #3114)"
+        assertEquals(OZContractError(3114, "WebAuthnError", "ChallengeInvalid"), ContractErrorCodes.decodeFromMessage(message))
+    }
+
+    @Test
+    fun testDecodeFromMessage_noMatchReturnsNull() {
+        assertNull(ContractErrorCodes.decodeFromMessage(null))
+        assertNull(ContractErrorCodes.decodeFromMessage("no contract error here"))
+        assertNull(ContractErrorCodes.decodeFromMessage("Error(Contract, #3001)"))
+        assertNull(ContractErrorCodes.decodeFromMessage("Error(WasmVm, InternalError)"))
     }
 }

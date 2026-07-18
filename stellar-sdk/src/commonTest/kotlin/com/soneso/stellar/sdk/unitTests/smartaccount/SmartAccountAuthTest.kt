@@ -373,7 +373,7 @@ class SmartAccountAuthTest {
     }
 
     @Test
-    fun testAddRawSignatureMapEntry_mapEntriesAreSortedByXdrEncodedKey() {
+    fun testAddRawSignatureMapEntry_mapEntriesAreSortedInHostOrder() {
         val entry = createAddressAuthEntry()
         val voidValue = Scv.toBytes(ByteArray(0))
 
@@ -399,7 +399,8 @@ class SmartAccountAuthTest {
         val signersMap = (signersEntry.`val` as SCValXdr.Map).value!!.value
         assertEquals(2, signersMap.size)
 
-        // Compute XDR hex keys for both entries and verify ascending order
+        // Verify ascending host ScMap key order via XDR hex; both keys encode to the same
+        // length, so hex comparison is order-equivalent to the host order
         fun xdrHex(scVal: SCValXdr): String {
             val w = XdrWriter()
             scVal.encode(w)
@@ -407,7 +408,7 @@ class SmartAccountAuthTest {
         }
         val firstKeyHex = xdrHex(signersMap[0].key)
         val secondKeyHex = xdrHex(signersMap[1].key)
-        assertTrue(firstKeyHex < secondKeyHex, "Signers map entries must be sorted by XDR-encoded key hex in strictly ascending order (distinct entries)")
+        assertTrue(firstKeyHex < secondKeyHex, "Signers map entries must be in the host's ScMap key order, strictly ascending (same-length keys, so hex comparison is order-equivalent)")
     }
 
     @Test
@@ -536,7 +537,7 @@ class SmartAccountAuthTest {
     }
 
     @Test
-    fun testSignAuthEntry_twoSignersResultIsSortedByXdrEncodedKey() = runTest {
+    fun testSignAuthEntry_twoSignersResultIsSortedInHostOrder() = runTest {
         val keypair1 = KeyPair.random()
         val keypair2 = KeyPair.random()
         val expirationLedger = 5000000u
@@ -581,7 +582,7 @@ class SmartAccountAuthTest {
         }
         val firstKeyHex = xdrHex(signersMap[0].key)
         val secondKeyHex = xdrHex(signersMap[1].key)
-        assertTrue(firstKeyHex < secondKeyHex, "Two-signer map must be sorted by XDR-encoded key hex in strictly ascending order (distinct entries)")
+        assertTrue(firstKeyHex < secondKeyHex, "Two-signer map must be in the host's ScMap key order, strictly ascending (same-length keys, so hex comparison is order-equivalent)")
     }
 
     @Test
@@ -1038,7 +1039,7 @@ class SmartAccountAuthTest {
     }
 
     @Test
-    fun testCodecWrite_signersSortedByXdrKey() {
+    fun testCodecWrite_signersSortedInHostOrder() {
         val signer1 = DelegatedSigner("GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW")
         val signer2 = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
 
@@ -1063,7 +1064,7 @@ class SmartAccountAuthTest {
         }
         val firstHex = xdrHex(signersMap[0].key)
         val secondHex = xdrHex(signersMap[1].key)
-        assertTrue(firstHex < secondHex, "Signers must be sorted by XDR key hex")
+        assertTrue(firstHex < secondHex, "Signers must be in the host's ScMap key order (same-length keys, so hex comparison is order-equivalent)")
     }
 
     // MARK: - SmartAccountAuth Additional Edge Case Tests

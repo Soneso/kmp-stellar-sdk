@@ -10,10 +10,13 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayload
+import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -31,14 +34,18 @@ class ScValHostOrderTest {
 
     private fun bytes(vararg v: Int): SCValXdr = Scv.toBytes(ByteArray(v.size) { v[it].toByte() })
 
-    /** Builds an external signer's ScVal key: keyData = pub(65, first byte varied) + credId(len, zeros). */
-    private fun signer(pubFirstByte: Int, credIdLen: Int, verifierAddress: String = verifier): SCValXdr {
+    /** Builds an external signer: keyData = pub(65, first byte varied) + credId(len, zeros). */
+    private fun externalSigner(pubFirstByte: Int, credIdLen: Int, verifierAddress: String = verifier): ExternalSigner {
         val pub = ByteArray(65) { if (it == 0) pubFirstByte.toByte() else 0x01 }
         val credId = ByteArray(credIdLen) { 0x00 }
-        return ExternalSigner(verifierAddress, pub + credId).toScVal()
+        return ExternalSigner(verifierAddress, pub + credId)
     }
 
-    /** Length-major raw-byte comparison (the old, buggy order). */
+    /** Builds an external signer's ScVal key. */
+    private fun signer(pubFirstByte: Int, credIdLen: Int, verifierAddress: String = verifier): SCValXdr =
+        externalSigner(pubFirstByte, credIdLen, verifierAddress).toScVal()
+
+    /** Length-major comparison of raw XDR encodings, used to pin where the two orders diverge. */
     private fun compareRawBytes(a: ByteArray, b: ByteArray): Int {
         val shared = minOf(a.size, b.size)
         for (i in 0 until shared) {
@@ -48,7 +55,7 @@ class ScValHostOrderTest {
         return a.size.compareTo(b.size)
     }
 
-    // V1 — Bytes compare by content, not length: [0x01,0x02] < [0xFF].
+    // Bytes compare by content, not length: [0x01,0x02] < [0xFF].
     @Test
     fun testBytes_contentBeforeLength() {
         val a = bytes(0xFF)
@@ -57,7 +64,7 @@ class ScValHostOrderTest {
         assertTrue(compareScValHostOrder(a, b) > 0)
     }
 
-    // V2 — prefix tiebreaker: the shorter value sorts first.
+    // Prefix tiebreaker: the shorter value sorts first.
     @Test
     fun testBytes_prefixShorterFirst() {
         val a = bytes(0x01)
@@ -66,8 +73,8 @@ class ScValHostOrderTest {
         assertTrue(compareScValHostOrder(b, a) > 0)
     }
 
-    // V3 — two same-verifier signers with different-length keyData: host order is by content
-    // and is the OPPOSITE of the length-major XDR-byte order (the divergence the fix targets).
+    // Two same-verifier signers with different-length keyData: host order is by content
+    // and is the opposite of the length-major XDR-byte order.
     @Test
     fun testSameVerifierSigners_hostOrderDivergesFromLengthMajor() {
         val signerA = signer(pubFirstByte = 0x02, credIdLen = 16) // keyData 81 bytes, pub greater
@@ -77,17 +84,17 @@ class ScValHostOrderTest {
         assertTrue(compareScValHostOrder(signerB, signerA) < 0)
         assertTrue(compareScValHostOrder(signerA, signerB) > 0)
 
-        // Length-major XDR-byte order (the old bug) puts the shorter signerA first — the
-        // opposite of the host. Asserting the disagreement proves the fix changes behavior
-        // exactly where it must.
+        // Length-major XDR-byte order puts the shorter signerA first — the opposite of
+        // the host. Asserting the disagreement pins the divergence at exactly the inputs
+        // where the two orders differ.
         val xdrA = OZPolicyManager.scValToXdrBytes(signerA)
         val xdrB = OZPolicyManager.scValToXdrBytes(signerB)
         assertTrue(xdrA.size < xdrB.size)
-        assertTrue(compareRawBytes(xdrA, xdrB) < 0, "length-major order puts signerA first")
+        assertTrue(compareRawBytes(xdrA, xdrB) < 0, "length-major XDR-byte order puts signerA first")
         assertTrue(compareScValHostOrder(signerA, signerB) > 0, "host order puts signerA last")
     }
 
-    // V4 — the weighted-threshold signer_weights map sorts the two signers in host order [B, A].
+    // The weighted-threshold signer_weights map sorts the two signers in host order [B, A].
     @Test
     fun testSignerWeightsMap_hostOrder() {
         val signerA = signer(0x02, 16)
@@ -102,7 +109,7 @@ class ScValHostOrderTest {
         assertEquals(signerA, sorted[1])
     }
 
-    // V6 — same-length, different content: ordered by content, not spuriously reordered.
+    // Same-length, different content: ordered by content, not spuriously reordered.
     @Test
     fun testSameLengthSigners_contentOrder() {
         val low = signer(0x01, 16)
@@ -116,7 +123,7 @@ class ScValHostOrderTest {
         assertEquals(high, sorted[1])
     }
 
-    // V7 — 3+ signers with mixed lengths: the full sort is a strict total order in host order.
+    // 3+ signers with mixed lengths: the full sort is a strict total order in host order.
     @Test
     fun testManySigners_strictTotalOrder() {
         val s1 = signer(0x01, 16)
@@ -141,7 +148,7 @@ class ScValHostOrderTest {
         }
     }
 
-    // V8 — two signers on different verifiers with identical keyData: order is decided by the
+    // Two signers on different verifiers with identical keyData: order is decided by the
     // Address element of the Vec key, not the trailing Bytes.
     @Test
     fun testDifferentVerifiers_addressDecides() {
@@ -156,6 +163,55 @@ class ScValHostOrderTest {
         assertTrue(
             (signerCmp < 0) == (addrCmp < 0),
             "signer order must follow the verifier Address element, not the identical keyData"
+        )
+    }
+
+    // Map comparands compare entry-wise (first differing key/value decides), not by entry count.
+    @Test
+    fun testMapComparands_entryWiseNotEntryCount() {
+        val oneEntry = Scv.toMap(linkedMapOf(Scv.toSymbol("b") to Scv.toUint32(1u)))
+        val twoEntries = Scv.toMap(
+            linkedMapOf(
+                Scv.toSymbol("a") to Scv.toUint32(1u),
+                Scv.toSymbol("c") to Scv.toUint32(2u)
+            )
+        )
+        // Entry-wise: the two-entry map's first key "a" sorts before "b", so it comes first
+        // despite having more entries (entry count is only the tiebreaker on a shared prefix).
+        assertTrue(compareScValHostOrder(twoEntries, oneEntry) < 0)
+        assertTrue(compareScValHostOrder(oneEntry, twoEntries) > 0)
+    }
+
+    // The auth-payload write path emits the signers map in host order for two same-verifier
+    // signers with different-length key data.
+    @Test
+    fun testAuthPayloadWrite_signersMapInHostOrder() {
+        val signerA = externalSigner(pubFirstByte = 0x02, credIdLen = 16) // shorter keyData, greater pub
+        val signerB = externalSigner(pubFirstByte = 0x01, credIdLen = 20) // longer keyData, smaller pub
+        val payload = SmartAccountAuthPayload(
+            signers = mutableMapOf(
+                signerA to ByteArray(64) { 0x07 },
+                signerB to ByteArray(64) { 0x08 }
+            ),
+            contextRuleIds = listOf(0u)
+        )
+
+        val written = SmartAccountAuthPayloadCodec.write(payload)
+        val outerEntries = (written as SCValXdr.Map).value?.value ?: emptyList()
+        val signersEntry = outerEntries.first { (it.key as? SCValXdr.Sym)?.value?.value == "signers" }
+        val signerKeys = ((signersEntry.`val` as SCValXdr.Map).value?.value ?: emptyList()).map { it.key }
+
+        assertEquals(2, signerKeys.size)
+        // SCVal equality is reference-based for ByteArray-carrying leaves, so compare the
+        // XDR encodings instead of the instances.
+        assertContentEquals(
+            OZPolicyManager.scValToXdrBytes(signerB.toScVal()),
+            OZPolicyManager.scValToXdrBytes(signerKeys[0]),
+            "smaller pubkey content must sort first despite longer keyData"
+        )
+        assertContentEquals(
+            OZPolicyManager.scValToXdrBytes(signerA.toScVal()),
+            OZPolicyManager.scValToXdrBytes(signerKeys[1])
         )
     }
 }

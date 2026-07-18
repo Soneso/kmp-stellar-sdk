@@ -150,7 +150,7 @@ sealed class PolicyInstallParams {
                 weightsMap[signerScVal] = Scv.toUint32(weight)
             }
 
-            // Sort signer weights map keys by XDR bytes (Soroban requirement)
+            // Sort signer weights map keys into the host's ScMap key order
             val sortedWeightsMap = OZPolicyManager.sortMapByKeyXdr(weightsMap)
 
             // Map with alphabetically sorted keys: ["signer_weights", "threshold"]
@@ -851,8 +851,23 @@ class OZPolicyManager internal constructor(
         }
 
         /**
+         * Encodes a policies map (policy contract address -> install-param ScVal) into the
+         * ScMap ScVal the smart-account contract expects: keys become contract Addresses and
+         * entries are sorted into the host's ScMap key order.
+         *
+         * @param policies Policy install params keyed by policy contract address (C...)
+         * @return The policies ScMap ScVal
+         */
+        internal fun policiesToScVal(policies: Map<String, SCValXdr>): SCValXdr {
+            val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
+            for ((address, installParam) in policies) {
+                policiesMap[Scv.toAddress(Address(address).toSCAddress())] = installParam
+            }
+            return Scv.toMap(sortMapByKeyXdr(policiesMap))
+        }
+
+        /**
          * Encodes an SCValXdr to its XDR byte representation.
-         * Used for deterministic key comparison when sorting ScMap entries.
          */
         internal fun scValToXdrBytes(scVal: SCValXdr): ByteArray {
             val writer = XdrWriter()

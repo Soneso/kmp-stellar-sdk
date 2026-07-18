@@ -1735,11 +1735,7 @@ class OZWalletOperations internal constructor(
         // Policies installed on the default context rule, keyed by policy contract address
         // and sorted into the host's ScMap key order.
         val policiesScVal = try {
-            val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
-            for ((address, installParam) in policies) {
-                policiesMap[Scv.toAddress(Address(address).toSCAddress())] = installParam
-            }
-            Scv.toMap(OZPolicyManager.sortMapByKeyXdr(policiesMap))
+            OZPolicyManager.policiesToScVal(policies)
         } catch (e: Exception) {
             throw TransactionException.signingFailed(
                 "Failed to encode constructor policies: ${e.message}",

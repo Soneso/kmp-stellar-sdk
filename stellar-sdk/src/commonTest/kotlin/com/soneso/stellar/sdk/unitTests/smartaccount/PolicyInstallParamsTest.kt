@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
+import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.core.WalletException
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
@@ -21,7 +22,6 @@ import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.XdrWriter
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -175,7 +175,7 @@ class PolicyInstallParamsTest {
     // ========================================================================
 
     @Test
-    fun testWeightedThreshold_fiveSigners_allSortedByXdr() {
+    fun testWeightedThreshold_fiveSigners_allSortedInHostOrder() {
         // Mix of DelegatedSigners and ExternalSigners to get 5 signers
         val signers: List<SmartAccountSigner> = listOf(
             DelegatedSigner("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7"),
@@ -212,13 +212,11 @@ class PolicyInstallParamsTest {
 
         assertEquals(5, innerEntries.size, "All 5 signers must be present")
 
-        // Verify strict XDR byte ordering
+        // Verify strict host ScMap key ordering
         for (i in 0 until innerEntries.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(innerEntries[i].key)
-            val nextXdr = OZPolicyManager.scValToXdrBytes(innerEntries[i + 1].key)
             assertTrue(
-                compareBytesLexicographic(currentXdr, nextXdr) < 0,
-                "Signer key at index $i must precede key at index ${i + 1} in XDR byte order"
+                compareScValHostOrder(innerEntries[i].key, innerEntries[i + 1].key) < 0,
+                "Signer key at index $i must precede key at index ${i + 1} in host order"
             )
         }
 
@@ -444,7 +442,7 @@ class PolicyInstallParamsTest {
 
     @Test
     fun testSortMapByKeyXdr_reversedSymbolKeysOfSameLength() {
-        // Keys of same length: XDR ordering is by string content (after common prefix)
+        // Keys of same length: host order is by string content (after common prefix)
         val map = linkedMapOf(
             Scv.toSymbol("zzz") to Scv.toUint32(1u),
             Scv.toSymbol("aaa") to Scv.toUint32(2u),
@@ -650,15 +648,5 @@ class PolicyInstallParamsTest {
     private fun extractSymbolName(scVal: SCValXdr): String {
         assertIs<SCValXdr.Sym>(scVal)
         return (scVal as SCValXdr.Sym).value.value
-    }
-
-    private fun compareBytesLexicographic(a: ByteArray, b: ByteArray): Int {
-        val minLength = minOf(a.size, b.size)
-        for (i in 0 until minLength) {
-            val aByte = a[i].toInt() and 0xFF
-            val bByte = b[i].toInt() and 0xFF
-            if (aByte != bByte) return aByte - bByte
-        }
-        return a.size - b.size
     }
 }

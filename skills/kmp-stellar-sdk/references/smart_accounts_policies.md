@@ -668,7 +668,7 @@ kit.policyManager.addPolicy(
 )
 ```
 
-Map keys must be symbols in **lexicographic (alphabetical) order** by XDR bytes — the SDK sorts the top-level policies map internally, but the install-params map inside each entry is your responsibility.
+Map keys must be in the **host's ScMap key order** — for lowercase snake_case field names that is plain alphabetical (content) order, not the XDR-byte order, whose length prefix would sort shorter names first. The SDK sorts the top-level policies map internally, but the install-params map inside each entry is your responsibility.
 
 ### PolicyInstallParams (typed install parameters)
 
@@ -1159,20 +1159,9 @@ kit.signerManager.removeSigner(
 
 **Preconditions.** A call like `kit.transactionOperations.transfer(...)`, `kit.signerManager.removeSigner(...)`, or any other kit method throws `TransactionException.SimulationFailed`. The contract rejected the auth check (`__check_auth`) or an enforcement hook on a policy.
 
-**Flow.** The simulation error message contains the host error surfaced by RPC — typically of the form `...Error(Contract, #3004)...` for a smart-account error or `...Error(Contract, #3221)...` for a policy error. Extract the numeric code, match it against the contract's enum, and act on it.
+**Flow.** The simulation error message contains the host error surfaced by RPC — typically of the form `...Error(Contract, #3004)...` for a smart-account error or `...Error(Contract, #3221)...` for a policy error. Pass the exception's message to `ContractErrorCodes.decodeFromMessage`, which extracts and decodes the first known marker in one step, and act on the result.
 
 ```kotlin
-// Regex works across platforms; Soroban RPC surfaces contract errors in the
-// form "Error(Contract, #<code>)". Fall back to scanning any 3-4 digit number
-// in the message for edge cases.
-private val contractErrorRegex = Regex("""Error\s*\(\s*Contract\s*,\s*#(\d+)\s*\)""")
-
-fun parseContractErrorCode(e: Throwable): Int? {
-    val msg = e.message ?: return null
-    return contractErrorRegex.find(msg)?.groupValues?.get(1)?.toIntOrNull()
-        ?: Regex("""#(\d{4})""").find(msg)?.groupValues?.get(1)?.toIntOrNull()
-}
-
 try {
     kit.transactionOperations.transfer(
         tokenContract = nativeSac,
@@ -1180,34 +1169,35 @@ try {
         amount        = "10"
     )
 } catch (e: TransactionException.SimulationFailed) {
-    val code = parseContractErrorCode(e)
-    // decode() resolves the code to its contract + variant name (or null if unknown).
-    val decoded = code?.let { ContractErrorCodes.decode(it) }
+    // decodeFromMessage scans the message for "Error(Contract, #NNNN)" markers and
+    // resolves the first known code to its contract + variant name (or null).
+    val decoded = ContractErrorCodes.decodeFromMessage(e.message)
     // Representative cases and action hints:
-    val hint = when (code) {
+    val hint = if (decoded == null) {
+        "No known contract code in message: ${e.message}"
+    } else when (decoded.code) {
         3004 -> "NoSignersAndPolicies — rule would have 0 signers and 0 policies; add one first"
         3016 -> "UnauthorizedSigner — signer not on resolved rule; pass resolveContextRuleIds or adjust selectedSigners"
         3221 -> "SpendingLimit exceeded for the current window; wait for reset or raise the limit"
-        null -> "No contract code in message: ${e.message}"
-        else -> decoded?.let { "${it.contract}.${it.name} (#${it.code})" } ?: "Unknown contract error $code"
+        else -> "${decoded.contract}.${decoded.name} (#${decoded.code})"
     }
     println("transfer rejected: $hint")
     // Surface SDK-interpreted constants explicitly where they match.
-    if (code == ContractErrorCodes.UNAUTHORIZED_SIGNER) {
+    if (decoded?.code == ContractErrorCodes.UNAUTHORIZED_SIGNER) {
         // Recovery: re-resolve rule IDs or adjust the selected-signer set.
     }
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK, so you extract the numeric code from the message yourself (the regex above). Once you have the code, `ContractErrorCodes.decode(code)` resolves it to an `OZContractError(code, contract, name)` across the full on-chain surface — smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227) — returning null for an unknown code; the smart-account codes are also exposed as named constants for direct branching. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK; `ContractErrorCodes.decodeFromMessage(e.message)` extracts and decodes the code in one step — no hand-rolled message parsing is needed. It resolves to an `OZContractError(code, contract, name)` across the full on-chain surface — smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227) — returning null when the message is null, carries no marker, or carries only unknown codes; the smart-account codes are also exposed as named constants for direct branching (and `ContractErrorCodes.decode(code)` resolves a code you already hold). The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
 // WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class
-// CORRECT: catch TransactionException.SimulationFailed and parse the message
+// CORRECT: catch TransactionException.SimulationFailed and decode its message
 
 // WRONG: matching on e.code (which is SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED)
 //        — that is the SDK error kind, not the on-chain contract code
-// CORRECT: extract the contract code from e.message with a regex on "Error(Contract, #NNNN)"
+// CORRECT: pass e.message to ContractErrorCodes.decodeFromMessage
 ```
 
 ---

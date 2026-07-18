@@ -23,13 +23,15 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * Ordering:
  * - Values of different types compare by their `SCValType` discriminant.
  * - `Vec` compares element-wise (recursively); the shorter vec sorts first on a prefix tie.
+ * - `Map` compares entry-wise (key, then value, recursively); the map with fewer entries
+ *   sorts first on a prefix tie.
  * - `Bytes`, `String`, and `Symbol` compare by content, byte for byte (unsigned); the
  *   shorter value sorts first on a prefix tie (length is the tiebreaker, never the primary
  *   key).
- * - All other (fixed-width) values compare by their XDR encoding, which for a fixed-width
- *   payload is equivalent to a content comparison. Among the smart-account map keys only
- *   addresses reach this path; the scalar arms are unreachable here and are handled for
- *   completeness.
+ * - All remaining values compare by their XDR encoding. For the fixed-width types that can
+ *   appear in smart-account map keys (addresses, unsigned scalars) this equals a content
+ *   comparison. Signed integer scalars would compare by their two's-complement bytes rather
+ *   than numerically; they cannot appear as smart-account map keys.
  */
 internal fun compareScValHostOrder(a: SCValXdr, b: SCValXdr): Int {
     val typeA = a.discriminant.value
@@ -46,6 +48,18 @@ internal fun compareScValHostOrder(a: SCValXdr, b: SCValXdr): Int {
                 if (cmp != 0) return cmp
             }
             elementsA.size.compareTo(elementsB.size)
+        }
+        is SCValXdr.Map -> {
+            val entriesA = a.value?.value ?: emptyList()
+            val entriesB = (b as SCValXdr.Map).value?.value ?: emptyList()
+            val shared = minOf(entriesA.size, entriesB.size)
+            for (i in 0 until shared) {
+                val keyCmp = compareScValHostOrder(entriesA[i].key, entriesB[i].key)
+                if (keyCmp != 0) return keyCmp
+                val valCmp = compareScValHostOrder(entriesA[i].`val`, entriesB[i].`val`)
+                if (valCmp != 0) return valCmp
+            }
+            entriesA.size.compareTo(entriesB.size)
         }
         is SCValXdr.Bytes ->
             compareBytesUnsigned(a.value.value, (b as SCValXdr.Bytes).value.value)

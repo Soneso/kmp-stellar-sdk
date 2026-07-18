@@ -951,6 +951,24 @@ object ContractErrorCodes {
      */
     fun decode(code: Int): OZContractError? = CODE_TABLE[code]
 
+    /**
+     * Extracts and decodes the first known contract error code from an error [message].
+     *
+     * Soroban RPC surfaces contract failures as `Error(Contract, #NNNN)` inside simulation
+     * and submission error strings (typically the message of a thrown
+     * `TransactionException`). This scans the message for such markers and returns the
+     * first one whose code is a known OZ smart-account contract error, or null when the
+     * message is null, carries no marker, or carries only unknown codes.
+     */
+    fun decodeFromMessage(message: String?): OZContractError? {
+        if (message == null) return null
+        return CONTRACT_ERROR_REGEX.findAll(message)
+            .mapNotNull { match -> match.groupValues[1].toIntOrNull()?.let { decode(it) } }
+            .firstOrNull()
+    }
+
+    private val CONTRACT_ERROR_REGEX = Regex("""Error\s*\(\s*Contract\s*,\s*#(\d+)\s*\)""")
+
     private val CODE_TABLE: Map<Int, OZContractError> = listOf(
         // SmartAccountError (3000-3016; 3001 unused)
         OZContractError(3000, "SmartAccountError", "ContextRuleNotFound"),
