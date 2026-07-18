@@ -131,7 +131,7 @@ class ApprovalInboxScreen : Screen {
                 DemoState.setPendingRequestCount(result.size)
             } catch (e: CoordinationException) {
                 loadError = "Could not reach the coordination server: ${e.message}"
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 loadError = "Could not load pending approvals: ${e.message ?: "Unknown error"}"
             } finally {
                 isLoading = false

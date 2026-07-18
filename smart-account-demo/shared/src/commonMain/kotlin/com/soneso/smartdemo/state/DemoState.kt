@@ -92,6 +92,15 @@ object DemoState {
         private set
 
     /**
+     * Whether the coordination server is reachable: null until the first poll answers,
+     * true after a successful poll, false after a failed one. When false, the inbox bell
+     * is disabled so the agent-approval feature reads as unavailable instead of broken.
+     * Reset to null on disconnect.
+     */
+    var coordinationAvailable: Boolean? by mutableStateOf(null)
+        private set
+
+    /**
      * Lazily-created coordination client used by the approval inbox and the
      * pending-count poller. Configured from [DemoConfig.COORDINATION_URL] and
      * [DemoConfig.COORDINATION_TOKEN]. Created once, thread-safely, and reused across screens.
@@ -118,6 +127,10 @@ object DemoState {
 
     fun setPendingRequestCount(count: Int) {
         pendingRequestCount = count
+    }
+
+    fun setCoordinationAvailable(available: Boolean?) {
+        coordinationAvailable = available
     }
 
     /** Records the confirmed on-chain hash (or a sentinel) for an approval request. */
@@ -196,6 +209,7 @@ object DemoState {
         demoTokenContractId = null
         demoTokenBalance = null
         pendingRequestCount = 0
+        coordinationAvailable = null
         confirmedApprovalHashes.clear()
         // coordinationClient is NOT reset — it is a lazily-initialised, stateless HTTP client
         // reused across wallet sessions and configured from static DemoConfig values.
