@@ -573,12 +573,21 @@ class SorobanServer(
      * )
      * ```
      *
+     * Failed attempts (network errors, RPC errors) are retried until [maxAttempts]
+     * is reached; only coroutine cancellation and fatal platform errors abort the
+     * poll early. When at least one attempt returned a response, the last response
+     * is returned even if later attempts failed. When every attempt failed, the
+     * last per-attempt failure is thrown.
+     *
      * @param hash Transaction hash as hex string
      * @param maxAttempts Maximum number of polling attempts (default: 30)
      * @param sleepStrategy Function mapping attempt number to sleep duration in milliseconds
      * @return Final transaction response (may still be NOT_FOUND if max attempts reached)
      * @throws IllegalArgumentException If maxAttempts is less than or equal to 0
-     * @throws SorobanRpcException If any RPC request fails
+     * @throws Exception The last per-attempt failure when every polling attempt failed —
+     *   e.g. [SorobanRpcException] for RPC errors or
+     *   [com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException] for
+     *   connectivity failures
      */
     suspend fun pollTransaction(
         hash: String,
@@ -589,6 +598,7 @@ class SorobanServer(
 
         var attempts = 0
         var lastResponse: GetTransactionResponse? = null
+        var lastFailure: Throwable? = null
 
         while (attempts < maxAttempts) {
             try {
@@ -606,6 +616,7 @@ class SorobanServer(
                 // engine reports connectivity failures as kotlin.Error, and a transient
                 // glitch must not abort the poll on the web target either.
                 if (isFatal(e)) throw e
+                lastFailure = e
             }
 
             attempts++
@@ -619,7 +630,9 @@ class SorobanServer(
             }
         }
 
-        return lastResponse!!
+        // The loop ran at least once (maxAttempts > 0), so a null response here
+        // means every attempt threw; surface the last failure.
+        return lastResponse ?: throw lastFailure!!
     }
 
     /**

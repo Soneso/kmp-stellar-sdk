@@ -707,6 +707,83 @@ class SorobanServerTest {
     }
 
     @Test
+    fun testPollTransaction_allAttemptsFail_throwsLastFailure() = runTest {
+        // Given: Every attempt fails with a network error
+        val client = createThrowingMockClient(Exception("Connection refused"))
+        SorobanServer(TEST_SERVER_URL, client).use { server ->
+            val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+            // When/Then: The last per-attempt failure surfaces instead of a
+            // null-response error
+            val exception = assertFailsWith<Exception> {
+                server.pollTransaction(hash = txHash, maxAttempts = 3, sleepStrategy = { 1L })
+            }
+            assertEquals(Exception::class, exception::class)
+            assertEquals("Connection refused", exception.message)
+        }
+    }
+
+    @Test
+    fun testPollTransaction_rpcErrorEveryAttempt_throwsSorobanRpcException() = runTest {
+        // Given: The server returns a JSON-RPC error on every attempt
+        createMockServer(ERROR_RESPONSE).use { server ->
+            val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+            // When/Then: The typed RPC exception surfaces after the attempts run out
+            assertFailsWith<SorobanRpcException> {
+                server.pollTransaction(hash = txHash, maxAttempts = 2, sleepStrategy = { 1L })
+            }
+        }
+    }
+
+    @Test
+    fun testPollTransaction_responseThenFailures_returnsLastResponse() = runTest {
+        // Given: First attempt returns NOT_FOUND, remaining attempts fail
+        val notFoundResponse = """{
+  "jsonrpc": "2.0",
+  "id": "test-id",
+  "result": {
+    "status": "NOT_FOUND",
+    "latestLedger": 14245,
+    "latestLedgerCloseTime": 1690594566,
+    "oldestLedger": 1000,
+    "oldestLedgerCloseTime": 1690500000
+  }
+}"""
+        var attempts = 0
+        val mockEngine = MockEngine {
+            attempts++
+            if (attempts == 1) {
+                respond(
+                    content = ByteReadChannel(notFoundResponse),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                throw Exception("Connection refused")
+            }
+        }
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        SorobanServer(TEST_SERVER_URL, client).use { server ->
+            val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+            // When: Polling across the later failures
+            val response = server.pollTransaction(hash = txHash, maxAttempts = 3, sleepStrategy = { 1L })
+
+            // Then: The received response is preferred over the later failures
+            assertEquals(GetTransactionStatus.NOT_FOUND, response.status)
+            assertEquals(3, attempts)
+        }
+    }
+
+    @Test
     fun testPollTransaction_zeroMaxAttempts_throwsException() = runTest {
         // Given: Server instance
         createMockServer("{}").use { server ->
