@@ -166,6 +166,52 @@ class ScValHostOrderTest {
         )
     }
 
+    // String comparands compare by content, byte for byte, with the shorter value first on
+    // a prefix tie.
+    @Test
+    fun testStringComparands_contentOrder() {
+        val a = Scv.toString("apple")
+        val b = Scv.toString("banana")
+        assertTrue(compareScValHostOrder(a, b) < 0)
+        assertTrue(compareScValHostOrder(b, a) > 0)
+
+        val prefix = Scv.toString("app")
+        assertTrue(compareScValHostOrder(prefix, a) < 0, "a prefix sorts before its extension")
+        assertEquals(0, compareScValHostOrder(a, Scv.toString("apple")))
+    }
+
+    // Vec comparands: on a shared prefix, the shorter vec sorts first.
+    @Test
+    fun testVecComparands_prefixShorterFirst() {
+        val short = Scv.toVec(listOf(Scv.toSymbol("a")))
+        val long = Scv.toVec(listOf(Scv.toSymbol("a"), Scv.toSymbol("b")))
+        assertTrue(compareScValHostOrder(short, long) < 0)
+        assertTrue(compareScValHostOrder(long, short) > 0)
+    }
+
+    // Map comparands with identical keys: the first differing value decides.
+    @Test
+    fun testMapComparands_valueDecidesOnEqualKeys() {
+        val lower = Scv.toMap(linkedMapOf(Scv.toSymbol("k") to Scv.toUint32(1u)))
+        val higher = Scv.toMap(linkedMapOf(Scv.toSymbol("k") to Scv.toUint32(2u)))
+        assertTrue(compareScValHostOrder(lower, higher) < 0)
+        assertTrue(compareScValHostOrder(higher, lower) > 0)
+    }
+
+    // Map comparands on a shared entry prefix: the map with fewer entries sorts first.
+    @Test
+    fun testMapComparands_entryCountTiebreakerOnSharedPrefix() {
+        val oneEntry = Scv.toMap(linkedMapOf(Scv.toSymbol("a") to Scv.toUint32(1u)))
+        val twoEntries = Scv.toMap(
+            linkedMapOf(
+                Scv.toSymbol("a") to Scv.toUint32(1u),
+                Scv.toSymbol("b") to Scv.toUint32(2u)
+            )
+        )
+        assertTrue(compareScValHostOrder(oneEntry, twoEntries) < 0)
+        assertTrue(compareScValHostOrder(twoEntries, oneEntry) > 0)
+    }
+
     // Map comparands compare entry-wise (first differing key/value decides), not by entry count.
     @Test
     fun testMapComparands_entryWiseNotEntryCount() {

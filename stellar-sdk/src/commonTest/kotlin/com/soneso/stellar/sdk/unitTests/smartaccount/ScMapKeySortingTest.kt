@@ -20,6 +20,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -85,6 +86,42 @@ class ScMapKeySortingTest {
             assertTrue(
                 compareScValHostOrder(sortedKeys[i], sortedKeys[i + 1]) < 0,
                 "Key at index $i must precede key at index ${i + 1} in host order"
+            )
+        }
+    }
+
+    @Test
+    fun testPoliciesToScValBuildsSortedAddressKeyedMap() {
+        // policiesToScVal turns an address-keyed policies map into the ScMap the contract
+        // expects: Address keys in the host's ScMap key order, install params preserved
+        // per address.
+        val addr1 = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+        val addr2 = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
+        val addr3 = "CCK4LNH73QFN6KSRCP7ZBF4ISLXHZDMZGCMC3ETCMMUPNGQJZCPHVZQ3"
+        val policies = linkedMapOf(
+            addr1 to Scv.toUint32(1u),
+            addr2 to Scv.toUint32(2u),
+            addr3 to Scv.toUint32(3u)
+        )
+
+        val scVal = OZPolicyManager.policiesToScVal(policies)
+        val entries = extractMapEntries(scVal)
+
+        assertEquals(3, entries.size)
+        assertKeysAreInHostOrder(entries)
+
+        // Every entry's key encodes one of the input addresses and carries that
+        // address's install param.
+        val expectedByKeyHex = policies.entries.associate { (address, param) ->
+            encodeToXdrHex(Scv.toAddress(Address(address).toSCAddress())) to param
+        }
+        for (entry in entries) {
+            val expectedParam = expectedByKeyHex[encodeToXdrHex(entry.key)]
+            assertNotNull(expectedParam, "entry key must encode one of the input policy addresses")
+            assertEquals(
+                (expectedParam as SCValXdr.U32).value.value,
+                (entry.`val` as SCValXdr.U32).value.value,
+                "install param must stay attached to its address"
             )
         }
     }

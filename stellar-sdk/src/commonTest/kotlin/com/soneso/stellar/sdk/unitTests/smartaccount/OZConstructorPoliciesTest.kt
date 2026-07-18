@@ -125,6 +125,19 @@ class OZConstructorPoliciesTest {
     }
 
     @Test
+    fun testDeployPendingCredential_invalidPolicies_throwsBeforeCredentialLookup() = runTest {
+        // Policy validation runs before the stored-credential lookup: an unknown credential
+        // with an invalid policies map fails with the validation error, not NotFound.
+        val kit = OZSmartAccountKit.create(config())
+        assertFailsWith<ValidationException.InvalidInput> {
+            kit.walletOperations.deployPendingCredential(
+                credentialId = "unknown-credential",
+                policies = policies(6)
+            )
+        }
+    }
+
+    @Test
     fun testCreateWallet_perCallOverridesInvalidConfigDefault() = runTest {
         // A valid per-call override supersedes an invalid config default: validation passes and
         // the ceremony proceeds (a later network step then fails, which is irrelevant here).
