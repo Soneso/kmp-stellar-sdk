@@ -301,10 +301,9 @@ class OZIndexerClient(
      * @return Configured HttpClient instance
      */
     private fun createHttpClient(timeoutMs: Long): HttpClient = HttpClient {
-        defaultRequest {
-            header(OZConstants.CLIENT_NAME_HEADER, OZConstants.CLIENT_NAME)
-            header(OZConstants.CLIENT_VERSION_HEADER, Util.getSdkVersion())
-        }
+        // No client-identification headers here: custom headers force a CORS preflight in
+        // browsers, and indexer providers (including the default Mercury endpoints) only
+        // allowlist standard headers, which would block every request from the web target.
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true

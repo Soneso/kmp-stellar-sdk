@@ -80,12 +80,14 @@ object OZConstants {
     const val MAX_EXTERNAL_KEY_SIZE = 256
 
     /**
-     * HTTP header identifying the SDK name sent with indexer and relayer requests.
+     * HTTP header identifying the SDK name sent with relayer requests. Not sent to the
+     * indexer: custom headers force a CORS preflight in browsers, and indexer providers
+     * only allowlist standard headers.
      */
     const val CLIENT_NAME_HEADER = "X-Client-Name"
 
     /**
-     * HTTP header identifying the SDK version sent with indexer and relayer requests.
+     * HTTP header identifying the SDK version sent with relayer requests.
      */
     const val CLIENT_VERSION_HEADER = "X-Client-Version"
 
