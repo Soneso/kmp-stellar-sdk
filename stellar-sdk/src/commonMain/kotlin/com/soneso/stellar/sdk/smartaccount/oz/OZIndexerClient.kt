@@ -10,6 +10,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.isFatal
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -402,8 +403,10 @@ class OZIndexerClient(
      * Performs a lightweight health check by calling the root endpoint and verifying
      * the service returns a successful status.
      *
-     * This method does not throw exceptions - it returns false for any error condition
-     * (network failure, timeout, unhealthy response).
+     * This method does not throw exceptions for request failures - it returns false
+     * for any error condition (network failure, timeout, unhealthy response).
+     * Coroutine cancellation and fatal platform errors propagate instead of being
+     * reported as false.
      *
      * Note: Uses Throwable instead of Exception because on Kotlin/JS, Ktor network
      * failures throw JavaScript Error objects that map to Throwable, not Exception.
@@ -424,9 +427,10 @@ class OZIndexerClient(
 
             val healthCheck: HealthCheckResponse = response.body()
             healthCheck.status == HEALTH_STATUS_OK
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
             // Catches all errors including JS Error ("Fail to fetch") which is
             // a Throwable but not an Exception on Kotlin/JS.
+            if (isFatal(e)) throw e
             false
         }
     }
@@ -464,7 +468,8 @@ class OZIndexerClient(
             if (!response.status.isSuccess()) {
                 val errorBody = try {
                     response.bodyAsText()
-                } catch (_: Exception) {
+                } catch (e: Throwable) {
+                    if (isFatal(e)) throw e
                     "(unable to decode response body)"
                 }
                 val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
@@ -479,7 +484,11 @@ class OZIndexerClient(
         } catch (e: SmartAccountException) {
             // Re-throw SDK exceptions as-is (includes IndexerException, ValidationException)
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented IndexerException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             val errorMessage = e.message ?: e.toString()
             throw IndexerException.requestFailed(errorMessage, e)
         }

@@ -57,3 +57,11 @@ internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
         nativeLock.compareAndSet(true, false)
     }
 }
+
+/**
+ * Native implementation of isFatalPlatformError.
+ *
+ * Kotlin/Native has no error category that reliably indicates an unrecoverable
+ * runtime condition, so no throwable is classified as fatal here.
+ */
+internal actual fun isFatalPlatformError(throwable: Throwable): Boolean = false

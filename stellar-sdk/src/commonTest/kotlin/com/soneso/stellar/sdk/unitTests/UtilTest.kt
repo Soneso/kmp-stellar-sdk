@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.unitTests
 
 import com.soneso.stellar.sdk.*
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 class UtilTest {
@@ -170,5 +171,27 @@ class UtilTest {
         val padded12 = Util.paddedByteArray(code12, 12)
         assertEquals(12, padded12.size)
         assertEquals("TESTASSET", Util.paddedByteArrayToString(padded12))
+    }
+
+    @Test
+    fun testIsFatal_cancellationException_isFatal() {
+        assertTrue(isFatal(CancellationException("cancelled")))
+    }
+
+    @Test
+    fun testIsFatal_plainThrowable_isNotFatal() {
+        assertFalse(isFatal(Throwable("boom")))
+    }
+
+    @Test
+    fun testIsFatal_error_isNotFatal() {
+        // kotlin.Error is how the Kotlin/JS HTTP engine reports connectivity
+        // failures; it must be handled, not rethrown
+        assertFalse(isFatal(Error("Fail to fetch")))
+    }
+
+    @Test
+    fun testIsFatal_exception_isNotFatal() {
+        assertFalse(isFatal(Exception("boom")))
     }
 }

@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -376,6 +377,48 @@ class RelayerClientTest {
 
             assertFalse(response.success)
             assertNotNull(response.error)
+
+            relayer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
+    @Test
+    fun testSend_engineThrowable_returnsError() = runTest {
+        // Non-Exception Throwable simulates the Kotlin/JS HTTP engine reporting
+        // a connectivity failure as kotlin.Error; the no-throw contract must
+        // capture it in the response
+        val mockClient = createThrowingMockClient(Error("Fail to fetch"))
+        try {
+            val relayer = OZRelayerClient(
+                relayerUrl = "https://relayer.example.com",
+                injectedClient = mockClient
+            )
+
+            val response = relayer.send(createTestHostFunction(), listOf(createTestAuthEntry()))
+
+            assertFalse(response.success)
+            assertEquals("Fail to fetch", response.error)
+
+            relayer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
+    @Test
+    fun testSend_cancellation_propagates() = runTest {
+        val mockClient = createThrowingMockClient(CancellationException("cancelled"))
+        try {
+            val relayer = OZRelayerClient(
+                relayerUrl = "https://relayer.example.com",
+                injectedClient = mockClient
+            )
+
+            assertFailsWith<CancellationException> {
+                relayer.send(createTestHostFunction(), listOf(createTestAuthEntry()))
+            }
 
             relayer.close()
         } finally {

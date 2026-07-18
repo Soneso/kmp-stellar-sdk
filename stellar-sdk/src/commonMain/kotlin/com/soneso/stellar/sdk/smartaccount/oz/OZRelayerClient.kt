@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
@@ -163,8 +164,9 @@ class OZRelayerClient(
      * The relayer will construct a full transaction from these components,
      * wrap it with a fee bump, and submit it to the Stellar network.
      *
-     * This method does not throw exceptions; all errors are captured in the
-     * returned [RelayerResponse].
+     * This method does not throw exceptions for request failures; all errors are
+     * captured in the returned [RelayerResponse]. Coroutine cancellation and fatal
+     * platform errors propagate instead of being captured.
      *
      * @param hostFunction The host function to execute
      * @param authEntries Authorization entries for the transaction
@@ -214,8 +216,9 @@ class OZRelayerClient(
      * Use this for transactions that require source_account auth (e.g., deployment).
      * The relayer will fee-bump the signed transaction, preserving the inner signature.
      *
-     * This method does not throw exceptions; all errors are captured in the
-     * returned [RelayerResponse].
+     * This method does not throw exceptions for request failures; all errors are
+     * captured in the returned [RelayerResponse]. Coroutine cancellation and fatal
+     * platform errors propagate instead of being captured.
      *
      * @param transactionEnvelope TransactionEnvelope XDR to submit
      * @param perRequestTimeoutMs Optional per-request timeout override in milliseconds
@@ -252,6 +255,7 @@ class OZRelayerClient(
      * - On error (including non-2xx): parses error code from multiple locations
      * - On timeout: returns a response with TIMEOUT error code
      * - On network failure: returns a response with the error message
+     * - On coroutine cancellation or fatal platform error: propagates
      *
      * Returns a RelayerResponse for all cases. Only XDR encoding failures
      * (before the request) return early responses.
@@ -282,7 +286,11 @@ class OZRelayerClient(
                 error = "Relayer request timed out",
                 errorCode = RelayerErrorCodes.TIMEOUT
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which would otherwise escape and
+            // break this method's no-throw contract.
+            if (isFatal(e)) throw e
             return RelayerResponse(
                 success = false,
                 error = e.message ?: "Relayer request failed"
@@ -292,7 +300,8 @@ class OZRelayerClient(
         // Parse the response body as JSON
         val responseBody = try {
             response.bodyAsText()
-        } catch (_: Exception) {
+        } catch (e: Throwable) {
+            if (isFatal(e)) throw e
             return RelayerResponse(
                 success = false,
                 error = "Failed to read relayer response body"

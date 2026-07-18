@@ -12,6 +12,8 @@ import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.contract.SorobanContractParser
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
+import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
@@ -205,6 +207,9 @@ class SorobanServer(
      * @param params The method parameters (null for parameter-less methods)
      * @return The result object from the response
      * @throws SorobanRpcException If the server returns an error
+     * @throws ConnectionErrorException If the HTTP engine reports a connectivity
+     *   failure that is not already an [Exception] (Kotlin/JS reports these as
+     *   [kotlin.Error])
      * @throws Exception If network/connection errors occur
      */
     private suspend inline fun <reified T, reified R> sendRequest(
@@ -257,6 +262,13 @@ class SorobanServer(
         } catch (e: SerializationException) {
             // JSON parsing failed
             throw IllegalArgumentException("Failed to parse response for method $method", e)
+        } catch (e: Throwable) {
+            // Exceptions (including platform network exceptions) propagate unchanged.
+            // A non-Exception Throwable is treated as a connectivity failure (the
+            // Kotlin/JS HTTP engine reports these as kotlin.Error) and is wrapped so
+            // callers receive the same Exception-typed failure surface on every platform.
+            if (e is Exception || isFatal(e)) throw e
+            throw ConnectionErrorException(e)
         }
     }
 
@@ -587,10 +599,13 @@ class SorobanServer(
                 if (response.status != GetTransactionStatus.NOT_FOUND) {
                     return response
                 }
-            } catch (e: Exception) {
-                // Ignore temporary RPC errors and keep polling (matches Flutter SDK behavior)
-                // This handles network glitches, rate limiting, and other transient issues
-                // without stopping the polling loop
+            } catch (e: Throwable) {
+                // Ignore temporary RPC errors and keep polling. This handles network
+                // glitches, rate limiting, and other transient issues without stopping
+                // the polling loop. Throwable rather than Exception: the Kotlin/JS HTTP
+                // engine reports connectivity failures as kotlin.Error, and a transient
+                // glitch must not abort the poll on the web target either.
+                if (isFatal(e)) throw e
             }
 
             attempts++
