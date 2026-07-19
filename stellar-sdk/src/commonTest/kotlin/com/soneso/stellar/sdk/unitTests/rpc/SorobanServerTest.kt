@@ -707,6 +707,20 @@ class SorobanServerTest {
     }
 
     @Test
+    fun testPollTransaction_engineCancellation_propagates() = runTest {
+        // Given: a poll attempt is cancelled rather than failing with a transient glitch
+        val client = createThrowingMockClient(CancellationException("cancelled"))
+        SorobanServer(TEST_SERVER_URL, client).use { server ->
+            val txHash = "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+
+            // When/Then: cancellation propagates instead of being swallowed and retried
+            assertFailsWith<CancellationException> {
+                server.pollTransaction(hash = txHash, maxAttempts = 3, sleepStrategy = { 1L })
+            }
+        }
+    }
+
+    @Test
     fun testPollTransaction_allAttemptsFail_throwsLastFailure() = runTest {
         // Given: Every attempt fails with a network error
         val client = createThrowingMockClient(Exception("Connection refused"))

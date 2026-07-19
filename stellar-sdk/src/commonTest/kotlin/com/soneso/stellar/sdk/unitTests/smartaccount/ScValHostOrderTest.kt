@@ -228,6 +228,28 @@ class ScValHostOrderTest {
         assertTrue(compareScValHostOrder(oneEntry, twoEntries) > 0)
     }
 
+    // A Vec whose backing list is null behaves as an empty Vec: it sorts before a non-empty
+    // Vec on either side of the comparison, and two null-backed Vecs are equal.
+    @Test
+    fun testVecComparands_nullBackingListTreatedAsEmpty() {
+        val nullBacked = SCValXdr.Vec(null)
+        val oneElement = Scv.toVec(listOf(Scv.toSymbol("a")))
+        assertTrue(compareScValHostOrder(nullBacked, oneElement) < 0)
+        assertTrue(compareScValHostOrder(oneElement, nullBacked) > 0)
+        assertEquals(0, compareScValHostOrder(nullBacked, SCValXdr.Vec(null)))
+    }
+
+    // A Map whose backing list is null behaves as an empty Map: it sorts before a non-empty
+    // Map on either side of the comparison, and two null-backed Maps are equal.
+    @Test
+    fun testMapComparands_nullBackingListTreatedAsEmpty() {
+        val nullBacked = SCValXdr.Map(null)
+        val oneEntry = Scv.toMap(linkedMapOf(Scv.toSymbol("a") to Scv.toUint32(1u)))
+        assertTrue(compareScValHostOrder(nullBacked, oneEntry) < 0)
+        assertTrue(compareScValHostOrder(oneEntry, nullBacked) > 0)
+        assertEquals(0, compareScValHostOrder(nullBacked, SCValXdr.Map(null)))
+    }
+
     // The auth-payload write path emits the signers map in host order for two same-verifier
     // signers with different-length key data.
     @Test

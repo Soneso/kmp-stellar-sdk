@@ -377,6 +377,105 @@ class WebAuthForContractsTest {
     }
 
     @Test
+    fun testGetChallenge_forbidden403_throwsSep45ChallengeRequestException() = runTest {
+        val mockClient = createMockClient(challengeResponse = "forbidden detail", challengeStatusCode = HttpStatusCode.Forbidden)
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient
+        )
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuth.getChallenge(CLIENT_CONTRACT_ID)
+        }
+        assertEquals(403, exception.statusCode)
+    }
+
+    @Test
+    fun testGetChallenge_unknownStatus_throwsSep45UnknownResponseException() = runTest {
+        val mockClient = createMockClient(challengeResponse = "weird", challengeStatusCode = HttpStatusCode(600, "Weird"))
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient
+        )
+        assertFailsWith<Sep45UnknownResponseException> {
+            webAuth.getChallenge(CLIENT_CONTRACT_ID)
+        }
+    }
+
+    @Test
+    fun testJwtToken_tokenUnauthorized401_throwsSep45TokenSubmissionException() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = "unauthorized detail",
+            tokenStatusCode = HttpStatusCode.Unauthorized
+        )
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient
+        )
+        assertFailsWith<Sep45TokenSubmissionException> {
+            webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+    }
+
+    @Test
+    fun testJwtToken_tokenForbidden403_throwsSep45TokenSubmissionException() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = "forbidden detail",
+            tokenStatusCode = HttpStatusCode.Forbidden
+        )
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient
+        )
+        assertFailsWith<Sep45TokenSubmissionException> {
+            webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+    }
+
+    @Test
     fun testDefaultHomeDomainSuccess() = runTest {
         val nonce = "test_nonce_${nonceCounter++}"
         val challengeXdr = buildValidChallenge(
@@ -815,6 +914,133 @@ class WebAuthForContractsTest {
         // When/Then: cancellation propagates instead of being wrapped
         assertFailsWith<CancellationException> {
             webAuth.getChallenge(CLIENT_CONTRACT_ID)
+        }
+    }
+
+    @Test
+    fun testFromDomain_tomlFetchThrowable_wrappedAsSep45ChallengeRequestException() = runTest {
+        // Given: fromDomain fetches the domain's stellar.toml with the supplied client, which
+        // reports a connectivity failure as a non-Exception Throwable (Kotlin/JS reports these
+        // as kotlin.Error)
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            WebAuthForContracts.fromDomain(
+                domain = DOMAIN,
+                network = Network.TESTNET,
+                httpClient = createThrowingMockClient(Error("Fail to fetch"))
+            )
+        }
+        // The failure is wrapped as Sep45ChallengeRequestException, preserving the message.
+        assertEquals("Fail to fetch", exception.errorMessage)
+    }
+
+    @Test
+    fun testFromDomain_tomlFetchCancellation_propagates() = runTest {
+        // Given: fromDomain's stellar.toml fetch is cancelled
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            WebAuthForContracts.fromDomain(
+                domain = DOMAIN,
+                network = Network.TESTNET,
+                httpClient = createThrowingMockClient(CancellationException("cancelled"))
+            )
+        }
+    }
+
+    // Routes the challenge request to a valid response but fails the client-domain
+    // stellar.toml fetch, so jwtToken's client-domain resolution takes its failure arm.
+    private fun clientDomainTomlThrowingClient(challengeXdr: String, tomlFailure: Throwable): HttpClient {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains(".well-known/stellar.toml") -> throw tomlFailure
+                request.method == HttpMethod.Get -> respond(
+                    content = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+        }
+    }
+
+    @Test
+    fun testJwtToken_clientDomainTomlThrowable_wrappedAsSep45ChallengeRequestException() = runTest {
+        // Given: the challenge is fetched successfully, but resolving the client domain's
+        // SIGNING_KEY fails because the stellar.toml fetch reports a connectivity failure as a
+        // non-Exception Throwable (Kotlin/JS reports these as kotlin.Error)
+        val nonce = "test_nonce_${nonceCounter++}"
+        val clientDomain = "client.example.com"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce,
+            clientDomain = clientDomain,
+            clientDomainAccount = KeyPair.random().getAccountId()
+        )
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = clientDomainTomlThrowingClient(challengeXdr, Error("Fail to fetch"))
+        )
+
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                clientDomain = clientDomain,
+                clientDomainSigningDelegate = Sep45ClientDomainSigningDelegate { entryXdr -> entryXdr },
+                signatureExpirationLedger = 1000000L
+            )
+        }
+        assertTrue(exception.message?.contains(clientDomain) == true)
+    }
+
+    @Test
+    fun testJwtToken_clientDomainTomlCancellation_propagates() = runTest {
+        // Given: the client-domain stellar.toml fetch is cancelled
+        val nonce = "test_nonce_${nonceCounter++}"
+        val clientDomain = "client.example.com"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce,
+            clientDomain = clientDomain,
+            clientDomainAccount = KeyPair.random().getAccountId()
+        )
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = clientDomainTomlThrowingClient(challengeXdr, CancellationException("cancelled"))
+        )
+
+        assertFailsWith<CancellationException> {
+            webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                clientDomain = clientDomain,
+                clientDomainSigningDelegate = Sep45ClientDomainSigningDelegate { entryXdr -> entryXdr },
+                signatureExpirationLedger = 1000000L
+            )
         }
     }
 

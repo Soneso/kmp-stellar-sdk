@@ -164,4 +164,18 @@ class ContractErrorCodesTest {
         assertNull(ContractErrorCodes.decodeFromMessage("Error(Contract, #3001)"))
         assertNull(ContractErrorCodes.decodeFromMessage("Error(WasmVm, InternalError)"))
     }
+
+    @Test
+    fun testDecodeFromMessage_numericCodeOverflowingIntIsSkipped() {
+        // The (\d+) marker matches, but a value that overflows Int makes toIntOrNull() null,
+        // so the marker is skipped instead of being misdecoded.
+        assertNull(ContractErrorCodes.decodeFromMessage("Error(Contract, #99999999999999999)"))
+        // A known marker following an overflowing one is still found.
+        assertEquals(
+            3114,
+            ContractErrorCodes.decodeFromMessage(
+                "Error(Contract, #99999999999999999) then Error(Contract, #3114)"
+            )?.code
+        )
+    }
 }

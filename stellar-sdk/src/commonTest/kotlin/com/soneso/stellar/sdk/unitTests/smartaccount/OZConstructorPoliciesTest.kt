@@ -9,10 +9,13 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
+import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult
 import com.soneso.stellar.sdk.smartaccount.oz.requireValidPolicies
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlinx.coroutines.test.runTest
@@ -35,6 +38,16 @@ class OZConstructorPoliciesTest {
     private fun policyAddress(seed: Int): String = StrKey.encodeContract(ByteArray(32) { (it + seed).toByte() })
     private fun installParam(): SCValXdr = PolicyInstallParams.SimpleThreshold(threshold = 1u).toScVal()
     private fun policies(n: Int): Map<String, SCValXdr> = (0 until n).associate { policyAddress(it) to installParam() }
+
+    private fun hexToBytes(hex: String): ByteArray =
+        ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+
+    // Uncompressed secp256r1 public key formed from the curve's generator point: a valid
+    // on-curve point that registration public-key extraction accepts.
+    private fun onCurvePublicKey(): ByteArray =
+        byteArrayOf(0x04) +
+            hexToBytes("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296") +
+            hexToBytes("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5")
 
     private fun config(
         provider: MockWebAuthnProvider? = null,
@@ -134,6 +147,57 @@ class OZConstructorPoliciesTest {
                 credentialId = "unknown-credential",
                 policies = policies(6)
             )
+        }
+    }
+
+    @Test
+    fun testCreateWallet_validPolicies_encodedIntoDeployBuildThenRpcFails() = runTest {
+        // A valid per-call policies map passes validation, the passkey ceremony runs, and the
+        // deploy transaction is built (encoding the constructor policies) up to the deployer
+        // account fetch. The RPC-less mock server fails that fetch, which surfaces as a
+        // TransactionException — proving the build reaches the network step rather than
+        // short-circuiting earlier.
+        val provider = MockWebAuthnProvider().apply {
+            registrationResult = WebAuthnRegistrationResult(
+                credentialId = ByteArray(16) { it.toByte() },
+                publicKey = onCurvePublicKey(),
+                attestationObject = ByteArray(0),
+                transports = listOf("internal"),
+                deviceType = "singleDevice",
+                backedUp = false
+            )
+        }
+        val kit = OZSmartAccountKit.createWithServer(config(provider), buildNoRpcMockServer())
+        assertFailsWith<TransactionException> {
+            kit.walletOperations.createWallet(policies = policies(2), autoSubmit = false)
+        }
+        assertEquals(1, provider.registerCallCount)
+    }
+
+    @Test
+    fun testDeployPendingCredential_validPolicies_encodedIntoRetryDeployBuild() = runTest {
+        // A createWallet whose deploy build fails at the RPC leaves the credential stored as
+        // pending. deployPendingCredential re-encodes the constructor policies and rebuilds the
+        // deploy up to the same deployer-account fetch, which the RPC-less mock again fails.
+        val credentialIdBytes = ByteArray(16) { it.toByte() }
+        val provider = MockWebAuthnProvider().apply {
+            registrationResult = WebAuthnRegistrationResult(
+                credentialId = credentialIdBytes,
+                publicKey = onCurvePublicKey(),
+                attestationObject = ByteArray(0),
+                transports = listOf("internal"),
+                deviceType = "singleDevice",
+                backedUp = false
+            )
+        }
+        val kit = OZSmartAccountKit.createWithServer(config(provider), buildNoRpcMockServer())
+        assertFailsWith<TransactionException> {
+            kit.walletOperations.createWallet(autoSubmit = false)
+        }
+
+        val credentialId = Util.base64urlEncode(credentialIdBytes)
+        assertFailsWith<TransactionException> {
+            kit.walletOperations.deployPendingCredential(credentialId = credentialId, policies = policies(2))
         }
     }
 

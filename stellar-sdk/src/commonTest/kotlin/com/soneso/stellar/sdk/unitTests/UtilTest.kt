@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.unitTests
 
 import com.soneso.stellar.sdk.*
+import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
@@ -193,5 +194,29 @@ class UtilTest {
     @Test
     fun testIsFatal_exception_isNotFatal() {
         assertFalse(isFatal(Exception("boom")))
+    }
+
+    @Test
+    fun testReadErrorBodyOrFallback_readSucceeds_returnsBodyText() = runTest {
+        assertEquals("error detail", readErrorBodyOrFallback("fallback") { "error detail" })
+    }
+
+    @Test
+    fun testReadErrorBodyOrFallback_readThrowsError_returnsFallback() = runTest {
+        // kotlin.Error is how the Kotlin/JS HTTP engine reports connectivity failures:
+        // non-fatal, so the read falls back instead of propagating.
+        assertEquals("fallback", readErrorBodyOrFallback("fallback") { throw Error("Fail to fetch") })
+    }
+
+    @Test
+    fun testReadErrorBodyOrFallback_readThrowsException_returnsFallback() = runTest {
+        assertEquals("fallback", readErrorBodyOrFallback("fallback") { throw RuntimeException("boom") })
+    }
+
+    @Test
+    fun testReadErrorBodyOrFallback_readCancelled_propagates() = runTest {
+        assertFailsWith<CancellationException> {
+            readErrorBodyOrFallback("fallback") { throw CancellationException("cancelled") }
+        }
     }
 }
