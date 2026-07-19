@@ -15,6 +15,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 /**
@@ -50,6 +51,57 @@ class WebAuthChallengeTest {
                     isLenient = true
                 })
             }
+        }
+    }
+
+    private fun createThrowingMockClient(failure: Throwable): HttpClient {
+        val mockEngine = MockEngine { throw failure }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    @Test
+    fun testGetChallenge_engineThrowable_wrappedAsChallengeRequestException() = runTest {
+        // Given: an engine that reports a connectivity failure as a non-Exception
+        // Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = createThrowingMockClient(Error("Fail to fetch"))
+        )
+
+        // When/Then: the failure surfaces as the documented ChallengeRequestException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ChallengeRequestException> {
+            webAuth.getChallenge(clientAccountId = validAccountId)
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+    }
+
+    @Test
+    fun testGetChallenge_engineCancellation_propagates() = runTest {
+        // Given: an engine that throws a cancellation
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = createThrowingMockClient(CancellationException("cancelled"))
+        )
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            webAuth.getChallenge(clientAccountId = validAccountId)
         }
     }
 

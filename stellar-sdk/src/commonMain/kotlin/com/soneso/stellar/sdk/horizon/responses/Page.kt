@@ -7,6 +7,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import com.soneso.stellar.sdk.horizon.exceptions.*
+import com.soneso.stellar.sdk.isFatal
 
 /**
  * Represents a page of objects in a paginated response.
@@ -100,7 +101,11 @@ data class Page<T>(
             }
         } catch (e: NetworkException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented ConnectionErrorException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw ConnectionErrorException(e)
         }
     }

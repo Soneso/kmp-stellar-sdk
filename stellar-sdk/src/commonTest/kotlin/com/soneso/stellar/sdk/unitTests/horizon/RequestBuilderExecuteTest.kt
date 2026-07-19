@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.unitTests.horizon
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -8,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 /**
@@ -503,6 +505,66 @@ class RequestBuilderExecuteTest {
                 })
             }
         }
+    }
+
+    private fun createThrowingMockClient(failure: Throwable): HttpClient {
+        val mockEngine = MockEngine { throw failure }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    // ===== Connectivity-failure classification =====
+
+    @Test
+    fun testExecuteGet_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: an engine that reports a connectivity failure as a non-Exception
+        // Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(Error("Fail to fetch")))
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.accounts().execute()
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testExecuteGet_engineException_wrappedAsConnectionErrorException() = runTest {
+        // Given: an engine that throws a plain Exception (JVM/native network error)
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(Exception("Connection refused")))
+
+        // When/Then: the failure is wrapped into ConnectionErrorException, unchanged
+        // on every platform
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.accounts().execute()
+        }
+        assertEquals("Connection refused", exception.cause?.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testExecuteGet_engineCancellation_propagates() = runTest {
+        // Given: an engine that throws a cancellation
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(CancellationException("cancelled")))
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.accounts().execute()
+        }
+
+        server.close()
     }
 
     // ===== AccountsRequestBuilder Tests =====

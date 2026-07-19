@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.DecoratedSignature
+import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep10.exceptions.*
 import com.soneso.stellar.sdk.xdr.*
@@ -406,7 +407,11 @@ class WebAuth(
             } catch (e: ChallengeRequestException) {
                 // Re-throw our own exceptions
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                // connectivity failures as kotlin.Error, which must surface as the
+                // documented ChallengeRequestException instead of escaping unwrapped.
+                if (isFatal(e)) throw e
                 // Wrap other exceptions
                 throw ChallengeRequestException(
                     "Failed to initialize WebAuth from domain $domain: ${e.message}",
@@ -549,7 +554,11 @@ class WebAuth(
                     ?: throw GenericChallengeValidationException(
                         "SIGNING_KEY not found in stellar.toml for client domain: $clientDomain"
                     )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                // connectivity failures as kotlin.Error, which must surface as the
+                // documented GenericChallengeValidationException instead of escaping unwrapped.
+                if (isFatal(e)) throw e
                 throw GenericChallengeValidationException(
                     "Failed to load stellar.toml for client domain $clientDomain: ${e.message}"
                 )
@@ -652,7 +661,11 @@ class WebAuth(
                     header(key, value)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented ChallengeRequestException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw ChallengeRequestException(
                 statusCode = 0,
                 errorMessage = "Network error: ${e.message}",
@@ -666,7 +679,8 @@ class WebAuth(
                 // Parse successful response
                 val bodyText = try {
                     response.bodyAsText()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    if (isFatal(e)) throw e
                     throw ChallengeRequestException(
                         statusCode = 200,
                         errorMessage = "Failed to read response body",
@@ -695,21 +709,21 @@ class WebAuth(
                 challengeResponse
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Unable to read error" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unable to read error" }
                 throw ChallengeRequestException(
                     statusCode = 400,
                     errorMessage = "Bad request: $errorBody"
                 )
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Unauthorized" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unauthorized" }
                 throw ChallengeRequestException(
                     statusCode = 401,
                     errorMessage = errorBody
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Forbidden" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
                 throw ChallengeRequestException(
                     statusCode = 403,
                     errorMessage = errorBody
@@ -722,7 +736,7 @@ class WebAuth(
                 )
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
                 throw ChallengeRequestException(
                     statusCode = response.status.value,
                     errorMessage = "Server error (${response.status.value}): ${response.status.description}" +
@@ -1311,7 +1325,11 @@ class WebAuth(
                 }
                 setBody(requestBody)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented TokenSubmissionException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw TokenSubmissionException(
                 message = "Network error during token submission: ${e.message}",
                 cause = e
@@ -1324,7 +1342,8 @@ class WebAuth(
                 // Parse successful response
                 val bodyText = try {
                     response.bodyAsText()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    if (isFatal(e)) throw e
                     throw TokenSubmissionException(
                         message = "Failed to read response body: ${e.message}",
                         cause = e
@@ -1358,19 +1377,19 @@ class WebAuth(
                 }
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Bad Request" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Bad Request" }
                 throw TokenSubmissionException(
                     message = "Bad request (400): Invalid transaction format - $errorBody"
                 )
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Unauthorized" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unauthorized" }
                 throw TokenSubmissionException(
                     message = "Unauthorized (401): Signature verification failed - $errorBody"
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Forbidden" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
                 throw TokenSubmissionException(
                     message = "Forbidden (403): Not authorized - $errorBody"
                 )
@@ -1381,14 +1400,14 @@ class WebAuth(
                 )
             }
             in 500..599 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
                 throw TokenSubmissionException(
                     message = "Server error (${response.status.value}): ${response.status.description}" +
                         if (errorBody.isNotEmpty()) " - $errorBody" else ""
                 )
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "" }
+                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
                 throw TokenSubmissionException(
                     message = "Unexpected response (${response.status.value}): ${response.status.description}" +
                         if (errorBody.isNotEmpty()) " - $errorBody" else ""

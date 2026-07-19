@@ -4,6 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
+import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.sep.common.jsonElementToAny
 import com.soneso.stellar.sdk.sep.common.mapToJsonString
 import com.soneso.stellar.sdk.sep.common.sanitizeAnchorString
@@ -409,7 +410,11 @@ public class Sep31Service(
                     httpClient = httpClient,
                     httpRequestHeaders = httpRequestHeaders,
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                // connectivity failures as kotlin.Error, which must surface as the
+                // documented Sep31ConfigurationException instead of escaping unwrapped.
+                if (isFatal(e)) throw e
                 throw Sep31ConfigurationException(
                     "Failed to load stellar.toml for SEP-31 domain configuration",
                     cause = e,

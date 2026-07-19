@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Horizon and SEP network boundaries no longer leak Kotlin/JS connectivity
+  errors. On Kotlin/JS the HTTP engine reports a failed connection as a
+  `kotlin.Error` ("Fail to fetch"), which is a `Throwable` but not an
+  `Exception`, so it escaped the `catch (Exception)` blocks in the Horizon
+  request builders, `HorizonServer` submit/POST paths, `Page.getNextPage`, the
+  SSE stream loop, the SEP-10 (`WebAuth`) and SEP-45 (`WebAuthForContracts`)
+  challenge and token calls, and `Sep31Service.fromDomain`. These boundaries now
+  catch `Throwable` and surface the connectivity failure as the documented
+  exception type (`ConnectionErrorException`, `ChallengeRequestException`,
+  `TokenSubmissionException`, `Sep45ChallengeRequestException`,
+  `Sep45TokenSubmissionException`, `Sep31ConfigurationException`, ...) on every
+  platform. Coroutine cancellation and platform-fatal errors now propagate
+  instead of being wrapped or swallowed. Behavior for `Exception`-typed failures
+  on JVM and native is unchanged.
+
 ## [1.9.0] - 2026-07-14
 
 ### Added

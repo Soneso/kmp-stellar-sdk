@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.unitTests.horizon
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -8,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 /**
@@ -51,6 +53,63 @@ class HorizonServerMethodsTest {
                 })
             }
         }
+    }
+
+    private fun createThrowingMockClient(failure: Throwable): HttpClient {
+        val mockEngine = MockEngine { throw failure }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    private val VALID_ENVELOPE_XDR = "AAAAAGL8HQvQkbK2HA3WVjRrKmjX00fG8sLI7m0ERwJW/AX3AAAAZAAiII0AAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAArqN6LeOagjxMaUP96Bzfs9e0corNZXzBWJkFoK7kvkwAAAAAO5rKAAAAAAAAAAABVvwF9wAAAECUSFLCrnOz"
+
+    // ========== Connectivity-failure classification (POST/submit boundary) ==========
+
+    @Test
+    fun testSubmitTransaction_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: a submit client that reports a connectivity failure as a non-Exception
+        // Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val throwingClient = createThrowingMockClient(Error("Fail to fetch"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransaction_engineCancellation_propagates() = runTest {
+        // Given: a submit client that throws a cancellation
+        val throwingClient = createThrowingMockClient(CancellationException("cancelled"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+
+        server.close()
     }
 
     // ========== Individual Resource Methods ==========

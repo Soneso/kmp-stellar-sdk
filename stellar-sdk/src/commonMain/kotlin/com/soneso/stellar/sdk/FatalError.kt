@@ -19,9 +19,14 @@ import kotlin.coroutines.cancellation.CancellationException
  * block rethrows failures for which this function returns true and handles
  * everything else.
  *
+ * The annotation exposes this helper to public and protected inline functions in
+ * the module (for example the Horizon request builders) while keeping it out of
+ * the public API surface.
+ *
  * @param throwable The caught failure to classify
  * @return true if the failure must be rethrown instead of handled
  */
+@PublishedApi
 internal fun isFatal(throwable: Throwable): Boolean =
     throwable is CancellationException || isFatalPlatformError(throwable)
 

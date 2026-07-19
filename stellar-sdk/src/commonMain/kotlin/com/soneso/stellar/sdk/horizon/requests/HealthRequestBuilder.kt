@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import com.soneso.stellar.sdk.horizon.exceptions.*
 import com.soneso.stellar.sdk.horizon.responses.HealthResponse
+import com.soneso.stellar.sdk.isFatal
 import kotlinx.serialization.json.Json
 
 /**
@@ -89,7 +90,8 @@ class HealthRequestBuilder(
                 in 400..499 -> {
                     val body = try {
                         response.body<String>()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
+                        if (isFatal(e)) throw e
                         ""
                     }
                     when (response.status.value) {
@@ -100,7 +102,8 @@ class HealthRequestBuilder(
                 in 500..599 -> {
                     val body = try {
                         response.body<String>()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
+                        if (isFatal(e)) throw e
                         ""
                     }
                     throw BadResponseException(response.status.value, body)
@@ -108,7 +111,8 @@ class HealthRequestBuilder(
                 else -> {
                     val body = try {
                         response.body<String>()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
+                        if (isFatal(e)) throw e
                         ""
                     }
                     throw UnknownResponseException(response.status.value, body)
@@ -116,7 +120,11 @@ class HealthRequestBuilder(
             }
         } catch (e: NetworkException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented ConnectionErrorException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw ConnectionErrorException(e)
         }
     }
