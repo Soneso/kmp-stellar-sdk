@@ -1251,27 +1251,14 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             throw SubmissionError.operationFailed("No changes to apply")
         }
 
-        // Check if multi-signer auth is needed, based on the original (on-chain) signers.
-        // Single-signer when exactly one on-chain signer AND it is the connected passkey.
-        // The picker opens only when the rule additionally has more than one on-chain
-        // signer: zero-signer (policy-only) rules and single-non-connected-signer rules
-        // submit directly through the single-signer path with an empty selection.
-        let connectedCredId = bridge.getCredentialId()
-        let isSinglePasskey = originalSigners.count == 1
-            && originalSigners[0].type == "passkey"
-            && connectedCredId != nil
-            && originalSigners[0].identifier == connectedCredId
+        // A context-rule edit is an admin operation authorized by the wallet's signer set
+        // (the default rule governs it), not by the signers of the rule being edited. Gate
+        // multi-signer routing on the same all-rules signer list the picker offers, matching
+        // the create path.
+        let isSinglePasskey = !(signersForPickerLoaded && availableSignersForPicker.count > 1)
 
-        if !isSinglePasskey && originalSigners.count > 1 {
+        if !isSinglePasskey {
             // Multi-signer: show signer picker. Submission happens via submitEditWithSigners().
-            // An empty picker pool after a failed signer load would present a sheet whose
-            // Confirm can never be enabled; surface an error instead.
-            if availableSignersForPicker.isEmpty {
-                errorMessage = "Could not load signers for multi-signer authorization. " +
-                    "Close and reopen this screen to retry."
-                isSubmitting = false
-                return
-            }
             showSignerPicker = true
             isSubmitting = false
             return

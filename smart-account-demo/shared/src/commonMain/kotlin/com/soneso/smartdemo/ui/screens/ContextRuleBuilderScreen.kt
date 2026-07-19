@@ -1093,11 +1093,15 @@ class ContextRuleBuilderScreen(
                                 errorMessage = null
                                 editResult = null
 
-                                // Multi-signer detection: check on-chain signers (original state)
-                                val onChainSigners = originalSignerEntries.map { it.signer }
-                                val singlePasskey = isSinglePasskeyTransfer(onChainSigners)
+                                // A context-rule edit is an admin operation authorized by the
+                                // wallet's signer set (the default rule governs it), not by the
+                                // signers of the rule being edited. Gate on the same all-rules
+                                // signer list create mode uses; the edit picker offers that list.
+                                val needsMultiSigner = createSignersLoaded &&
+                                    createAvailableSigners.size > 1 &&
+                                    !isSinglePasskeyTransfer(createAvailableSigners)
 
-                                if (!singlePasskey && onChainSigners.size > 1) {
+                                if (needsMultiSigner) {
                                     // Show signer picker for multi-signer rules
                                     showEditSignerPicker = true
                                 } else {
