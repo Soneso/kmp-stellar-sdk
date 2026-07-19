@@ -7,6 +7,7 @@ import io.ktor.http.*
 import com.soneso.stellar.sdk.horizon.exceptions.*
 import com.soneso.stellar.sdk.horizon.responses.HealthResponse
 import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import kotlinx.serialization.json.Json
 
 /**
@@ -88,33 +89,18 @@ class HealthRequestBuilder(
                     json.decodeFromString<HealthResponse>(bodyText)
                 }
                 in 400..499 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Throwable) {
-                        if (isFatal(e)) throw e
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     when (response.status.value) {
                         429 -> throw TooManyRequestsException(response.status.value, body)
                         else -> throw BadRequestException(response.status.value, body)
                     }
                 }
                 in 500..599 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Throwable) {
-                        if (isFatal(e)) throw e
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw BadResponseException(response.status.value, body)
                 }
                 else -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Throwable) {
-                        if (isFatal(e)) throw e
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw UnknownResponseException(response.status.value, body)
                 }
             }

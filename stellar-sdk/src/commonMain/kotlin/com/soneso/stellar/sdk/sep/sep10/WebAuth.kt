@@ -12,6 +12,7 @@ import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.DecoratedSignature
 import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep10.exceptions.*
 import com.soneso.stellar.sdk.xdr.*
@@ -709,21 +710,21 @@ class WebAuth(
                 challengeResponse
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unable to read error" }
+                val errorBody = readErrorBodyOrFallback("Unable to read error") { response.bodyAsText() }
                 throw ChallengeRequestException(
                     statusCode = 400,
                     errorMessage = "Bad request: $errorBody"
                 )
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unauthorized" }
+                val errorBody = readErrorBodyOrFallback("Unauthorized") { response.bodyAsText() }
                 throw ChallengeRequestException(
                     statusCode = 401,
                     errorMessage = errorBody
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw ChallengeRequestException(
                     statusCode = 403,
                     errorMessage = errorBody
@@ -736,7 +737,7 @@ class WebAuth(
                 )
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw ChallengeRequestException(
                     statusCode = response.status.value,
                     errorMessage = "Server error (${response.status.value}): ${response.status.description}" +
@@ -1377,19 +1378,19 @@ class WebAuth(
                 }
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Bad Request" }
+                val errorBody = readErrorBodyOrFallback("Bad Request") { response.bodyAsText() }
                 throw TokenSubmissionException(
                     message = "Bad request (400): Invalid transaction format - $errorBody"
                 )
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unauthorized" }
+                val errorBody = readErrorBodyOrFallback("Unauthorized") { response.bodyAsText() }
                 throw TokenSubmissionException(
                     message = "Unauthorized (401): Signature verification failed - $errorBody"
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw TokenSubmissionException(
                     message = "Forbidden (403): Not authorized - $errorBody"
                 )
@@ -1400,14 +1401,14 @@ class WebAuth(
                 )
             }
             in 500..599 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw TokenSubmissionException(
                     message = "Server error (${response.status.value}): ${response.status.description}" +
                         if (errorBody.isNotEmpty()) " - $errorBody" else ""
                 )
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw TokenSubmissionException(
                     message = "Unexpected response (${response.status.value}): ${response.status.description}" +
                         if (errorBody.isNotEmpty()) " - $errorBody" else ""

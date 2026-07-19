@@ -31,6 +31,32 @@ internal fun isFatal(throwable: Throwable): Boolean =
     throwable is CancellationException || isFatalPlatformError(throwable)
 
 /**
+ * Reads an error response body as text for inclusion in an exception message, returning
+ * [fallback] when the read fails for a non-fatal reason. Failures for which [isFatal] is
+ * true — coroutine cancellation and platform-fatal errors — are rethrown so they are never
+ * masked by the fallback.
+ *
+ * The body read is supplied as [read] (for example `{ response.bodyAsText() }` or
+ * `{ response.body<String>() }`) so the network-boundary error handlers share one
+ * implementation of this read-or-fallback contract.
+ *
+ * The annotation exposes this helper to public and protected inline functions in the module
+ * (for example the Horizon request builders) while keeping it out of the public API surface.
+ *
+ * @param fallback The text to return when the read fails for a non-fatal reason
+ * @param read The suspending body read to attempt
+ * @return The read text, or [fallback] when the read fails for a non-fatal reason
+ */
+@PublishedApi
+internal suspend fun readErrorBodyOrFallback(fallback: String, read: suspend () -> String): String =
+    try {
+        read()
+    } catch (e: Throwable) {
+        if (isFatal(e)) throw e
+        fallback
+    }
+
+/**
  * Returns true for platform-specific errors that indicate an unrecoverable
  * runtime condition rather than a failed operation.
  *

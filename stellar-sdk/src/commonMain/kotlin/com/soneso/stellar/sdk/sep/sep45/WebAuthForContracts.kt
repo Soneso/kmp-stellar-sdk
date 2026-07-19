@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.addressCredentials
 import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
@@ -499,7 +500,7 @@ class WebAuthForContracts(
                 }
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Bad Request" }
+                val errorBody = readErrorBodyOrFallback("Bad Request") { response.bodyAsText() }
                 throw Sep45ChallengeRequestException(
                     "Bad request",
                     statusCode = 400,
@@ -507,7 +508,7 @@ class WebAuthForContracts(
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw Sep45ChallengeRequestException(
                     "Forbidden",
                     statusCode = 403,
@@ -525,7 +526,7 @@ class WebAuthForContracts(
                 throw Sep45TimeoutException("Challenge request timed out (HTTP 504)")
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw Sep45UnknownResponseException(
                     message = "Unexpected response during challenge request",
                     code = response.status.value,
@@ -913,7 +914,7 @@ class WebAuthForContracts(
                 Sep45AuthToken.parse(token)
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Unauthorized" }
+                val errorBody = readErrorBodyOrFallback("Unauthorized") { response.bodyAsText() }
                 throw Sep45TokenSubmissionException(
                     "Signature verification failed",
                     statusCode = 401,
@@ -921,7 +922,7 @@ class WebAuthForContracts(
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw Sep45TokenSubmissionException(
                     "Forbidden",
                     statusCode = 403,
@@ -932,7 +933,7 @@ class WebAuthForContracts(
                 throw Sep45TimeoutException("Token submission timed out (HTTP 504)")
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Throwable) { if (isFatal(e)) throw e; "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw Sep45UnknownResponseException(
                     message = "Unexpected response during token submission",
                     code = response.status.value,

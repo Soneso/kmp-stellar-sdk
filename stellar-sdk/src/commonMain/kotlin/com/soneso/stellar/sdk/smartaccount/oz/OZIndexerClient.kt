@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -466,12 +467,7 @@ class OZIndexerClient(
 
             // Handle non-200 status codes
             if (!response.status.isSuccess()) {
-                val errorBody = try {
-                    response.bodyAsText()
-                } catch (e: Throwable) {
-                    if (isFatal(e)) throw e
-                    "(unable to decode response body)"
-                }
+                val errorBody = readErrorBodyOrFallback("(unable to decode response body)") { response.bodyAsText() }
                 val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
                 throw IndexerException.requestFailed(
                     "HTTP ${response.status.value}: $truncatedBody"
