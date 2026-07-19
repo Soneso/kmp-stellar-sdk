@@ -102,7 +102,8 @@ fun PolicyManagementSection(
     isSubmitting: Boolean,
     isEditing: Boolean = false,
     editPolicyEntries: List<EditPolicyEntry> = emptyList(),
-    onEditPolicyEntriesChanged: ((List<EditPolicyEntry>) -> Unit)? = null
+    onEditPolicyEntriesChanged: ((List<EditPolicyEntry>) -> Unit)? = null,
+    captionModifier: Modifier = Modifier
 ) {
     // --- Policy Header Card ---
     Card(
@@ -170,7 +171,8 @@ fun PolicyManagementSection(
             Text(
                 text = "${editPolicyEntries.size} ${if (editPolicyEntries.size == 1) "policy" else "policies"} attached",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = captionModifier
             )
         }
 
@@ -224,7 +226,8 @@ fun PolicyManagementSection(
             Text(
                 text = "${policies.size} ${if (policies.size == 1) "policy" else "policies"} attached",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = captionModifier
             )
         }
     }
@@ -232,7 +235,7 @@ fun PolicyManagementSection(
     // --- Add Policy Section ---
     val currentPolicyCount = if (isEditing) editPolicyEntries.size else policies.size
     val currentPolicyAddresses = if (isEditing) editPolicyEntries.map { it.address } else policies.map { it.address }
-    if (!isSubmitting && currentPolicyCount < OZConstants.MAX_POLICIES) {
+    if (currentPolicyCount < OZConstants.MAX_POLICIES) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -267,7 +270,8 @@ fun PolicyManagementSection(
                     },
                     availablePolicies = KNOWN_POLICIES.filter { known ->
                         currentPolicyAddresses.none { it == known.address }
-                    }
+                    },
+                    enabled = !isSubmitting
                 )
 
                 // Policy-specific fields
@@ -290,6 +294,7 @@ fun PolicyManagementSection(
                             placeholder = { Text("e.g., 2") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            enabled = !isSubmitting,
                             isError = fieldErrors.containsKey("threshold"),
                             supportingText = if (fieldErrors.containsKey("threshold")) {
                                 { Text(fieldErrors["threshold"]!!) }
@@ -337,7 +342,7 @@ fun PolicyManagementSection(
                                 onFieldErrorsChanged(fieldErrors - "threshold" + errors)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = thresholdValue.isNotBlank()
+                            enabled = thresholdValue.isNotBlank() && !isSubmitting
                         ) {
                             Text("Add Threshold Policy")
                         }
@@ -365,6 +370,7 @@ fun PolicyManagementSection(
                             placeholder = { Text("e.g., 100.0") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            enabled = !isSubmitting,
                             isError = fieldErrors.containsKey("spendingAmount"),
                             supportingText = if (fieldErrors.containsKey("spendingAmount")) {
                                 { Text(fieldErrors["spendingAmount"]!!) }
@@ -382,6 +388,7 @@ fun PolicyManagementSection(
                             placeholder = { Text("e.g., 1") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            enabled = !isSubmitting,
                             isError = fieldErrors.containsKey("spendingPeriod"),
                             supportingText = if (fieldErrors.containsKey("spendingPeriod")) {
                                 { Text(fieldErrors["spendingPeriod"]!!) }
@@ -446,7 +453,7 @@ fun PolicyManagementSection(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = spendingLimitAmount.isNotBlank() &&
-                                    spendingLimitPeriodDays.isNotBlank()
+                                    spendingLimitPeriodDays.isNotBlank() && !isSubmitting
                         ) {
                             Text("Add Spending Limit Policy")
                         }
@@ -470,6 +477,7 @@ fun PolicyManagementSection(
                             placeholder = { Text("e.g., 100") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            enabled = !isSubmitting,
                             isError = fieldErrors.containsKey("weightedThreshold"),
                             supportingText = if (fieldErrors.containsKey("weightedThreshold")) {
                                 { Text(fieldErrors["weightedThreshold"]!!) }
@@ -510,7 +518,8 @@ fun PolicyManagementSection(
                                         },
                                         label = { Text("Weight") },
                                         modifier = Modifier.width(100.dp),
-                                        singleLine = true
+                                        singleLine = true,
+                                        enabled = !isSubmitting
                                     )
                                 }
                             }
@@ -590,7 +599,7 @@ fun PolicyManagementSection(
                                 onFieldErrorsChanged(fieldErrors - "weightedThreshold" - "signerWeights" + errors)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = weightedThresholdValue.isNotBlank() && signers.isNotEmpty()
+                            enabled = weightedThresholdValue.isNotBlank() && signers.isNotEmpty() && !isSubmitting
                         ) {
                             Text("Add Weighted Threshold Policy")
                         }
@@ -927,18 +936,20 @@ private fun updateWeightedThresholdEntry(
 internal fun PolicyTypeSelector(
     selectedPolicy: PolicyInfo?,
     onPolicySelected: (PolicyInfo?) -> Unit,
-    availablePolicies: List<PolicyInfo>
+    availablePolicies: List<PolicyInfo>,
+    enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it }
+        onExpandedChange = { if (enabled) expanded = it }
     ) {
         OutlinedTextField(
             value = selectedPolicy?.name ?: "Select policy type...",
             onValueChange = {},
             readOnly = true,
+            enabled = enabled,
             label = { Text("Policy Type") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier

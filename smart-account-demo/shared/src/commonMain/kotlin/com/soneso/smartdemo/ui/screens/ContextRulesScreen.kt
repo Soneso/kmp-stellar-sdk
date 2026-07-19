@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -91,6 +93,7 @@ class ContextRulesScreen : Screen {
         var rules by remember { mutableStateOf<List<ParsedContextRule>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val errorBannerRequester = remember { BringIntoViewRequester() }
 
         // UI expand/confirm state
         var expandedRuleId by remember { mutableStateOf<UInt?>(null) }
@@ -130,6 +133,14 @@ class ContextRulesScreen : Screen {
                 } catch (_: Exception) {
                     signersLoaded = true
                 }
+            }
+        }
+
+        // Scroll the error card into view when a removal or load surfaces an error, which
+        // can be triggered from a rule card deep in the scrolled list.
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) {
+                errorBannerRequester.bringIntoView()
             }
         }
 
@@ -365,7 +376,7 @@ class ContextRulesScreen : Screen {
                 // Error card
                 if (errorMessage != null) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(errorBannerRequester),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
