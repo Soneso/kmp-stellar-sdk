@@ -89,7 +89,6 @@ object DemoState {
      * poller and the inbox screen; reset to 0 on disconnect.
      */
     var pendingRequestCount: Int by mutableStateOf(0)
-        private set
 
     /**
      * Whether the coordination server is reachable: null until the first poll answers,
@@ -98,7 +97,6 @@ object DemoState {
      * Reset to null on disconnect.
      */
     var coordinationAvailable: Boolean? by mutableStateOf(null)
-        private set
 
     /**
      * Lazily-created coordination client used by the approval inbox and the
@@ -123,14 +121,6 @@ object DemoState {
 
     fun setKitInstance(newKit: OZSmartAccountKit) {
         kit = newKit
-    }
-
-    fun setPendingRequestCount(count: Int) {
-        pendingRequestCount = count
-    }
-
-    fun setCoordinationAvailable(available: Boolean?) {
-        coordinationAvailable = available
     }
 
     /** Records the confirmed on-chain hash (or a sentinel) for an approval request. */

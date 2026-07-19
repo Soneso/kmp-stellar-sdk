@@ -39,8 +39,8 @@ fun App() {
         val flow = createApprovalInboxFlow()
         while (true) {
             try {
-                DemoState.setPendingRequestCount(flow.pendingCount())
-                DemoState.setCoordinationAvailable(true)
+                DemoState.pendingRequestCount = flow.pendingCount()
+                DemoState.coordinationAvailable = true
             } catch (e: CancellationException) {
                 // Cancellation must propagate so the poll loop stops instead of looping
                 // on a cancelled coroutine.
@@ -52,8 +52,8 @@ fun App() {
                 // Throwable, not Exception: on Kotlin/JS a failed fetch surfaces as a
                 // kotlin.Error, and an uncaught throwable here cancels the composition
                 // scope and freezes the whole UI.
-                DemoState.setCoordinationAvailable(false)
-                DemoState.setPendingRequestCount(0)
+                DemoState.coordinationAvailable = false
+                DemoState.pendingRequestCount = 0
             }
             delay(
                 if (DemoState.coordinationAvailable == false) INBOX_UNAVAILABLE_POLL_INTERVAL_MS
