@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated XDR definitions to stellar-xdr `df0c200` (declaration reordering
+  only; generated types unchanged apart from doc comments).
+- Migrated the demo web apps to Vite 8 (Rolldown bundler) and removed the
+  unused terser dependency.
+
 ### Fixed
 - Horizon and SEP network boundaries no longer leak Kotlin/JS connectivity
   errors. On Kotlin/JS the HTTP engine reports a failed connection as a
@@ -22,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   platform. Coroutine cancellation and platform-fatal errors now propagate
   instead of being wrapped or swallowed. Behavior for `Exception`-typed failures
   on JVM and native is unchanged.
+
+### Security
+- XDR generator: xdrgen is consumed from the Soneso fork so concurrent-ruby
+  resolves to >= 1.3.7 (GHSA-h8w8-99g7-qmvj and two further advisories);
+  temporary until stellar/xdrgen#231 is merged.
+- Demo web apps: updated vite past GHSA-fx2h-pf6j-xcff and
+  GHSA-v6wh-96g9-6wx3; esbuild is no longer in the dependency tree
+  (GHSA-g7r4-m6w7-qqqr). Development-only dependencies.
 
 ## [1.9.0] - 2026-07-14
 
