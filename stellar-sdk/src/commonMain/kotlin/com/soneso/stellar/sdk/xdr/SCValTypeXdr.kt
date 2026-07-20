@@ -58,6 +58,7 @@ package com.soneso.stellar.sdk.xdr
  *     // instance and an address' nonce, respectively.
  *     SCV_LEDGER_KEY_CONTRACT_INSTANCE = 20,
  *     SCV_LEDGER_KEY_NONCE = 21
+ * 
  * };
  */
 enum class SCValTypeXdr(val value: Int) {

@@ -64,6 +64,7 @@ package com.soneso.stellar.sdk.xdr
  *     void;
  * case SCV_LEDGER_KEY_NONCE:
  *     SCNonceKey nonce_key;
+ * 
  * };
  */
 sealed class SCValXdr {
