@@ -1,6 +1,10 @@
 package com.soneso.stellar.sdk.unitTests.horizon
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.exceptions.BadRequestException
+import com.soneso.stellar.sdk.horizon.exceptions.BadResponseException
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
+import com.soneso.stellar.sdk.horizon.exceptions.UnknownResponseException
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -8,6 +12,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 /**
@@ -503,6 +508,130 @@ class RequestBuilderExecuteTest {
                 })
             }
         }
+    }
+
+    private fun createThrowingMockClient(failure: Throwable): HttpClient {
+        val mockEngine = MockEngine { throw failure }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    private fun createStatusMockClient(content: String, status: HttpStatusCode): HttpClient {
+        val mockEngine = MockEngine {
+            respond(
+                content = content,
+                status = status,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain")
+            )
+        }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    // ===== Error-status handling (error body included in the exception) =====
+
+    @Test
+    fun testExecuteGet_unknownStatus_throwsUnknownResponseWithBody() = runTest {
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createStatusMockClient("weird", HttpStatusCode(600, "Weird")))
+        val exception = assertFailsWith<UnknownResponseException> {
+            server.accounts().execute()
+        }
+        assertEquals(600, exception.code)
+        assertEquals("weird", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testHealthExecute_badRequest400_throwsBadRequestWithBody() = runTest {
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createStatusMockClient("bad health request", HttpStatusCode.BadRequest))
+        val exception = assertFailsWith<BadRequestException> {
+            server.health().execute()
+        }
+        assertEquals(400, exception.code)
+        assertEquals("bad health request", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testHealthExecute_serverError500_throwsBadResponseWithBody() = runTest {
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createStatusMockClient("health server error", HttpStatusCode.InternalServerError))
+        val exception = assertFailsWith<BadResponseException> {
+            server.health().execute()
+        }
+        assertEquals(500, exception.code)
+        assertEquals("health server error", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testHealthExecute_unknownStatus_throwsUnknownResponseWithBody() = runTest {
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createStatusMockClient("weird health", HttpStatusCode(600, "Weird")))
+        val exception = assertFailsWith<UnknownResponseException> {
+            server.health().execute()
+        }
+        assertEquals(600, exception.code)
+        assertEquals("weird health", exception.body)
+        server.close()
+    }
+
+    // ===== Connectivity-failure classification =====
+
+    @Test
+    fun testExecuteGet_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: an engine that reports a connectivity failure as a non-Exception
+        // Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(Error("Fail to fetch")))
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.accounts().execute()
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testExecuteGet_engineException_wrappedAsConnectionErrorException() = runTest {
+        // Given: an engine that throws a plain Exception (JVM/native network error)
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(Exception("Connection refused")))
+
+        // When/Then: the failure is wrapped into ConnectionErrorException, unchanged
+        // on every platform
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.accounts().execute()
+        }
+        assertEquals("Connection refused", exception.cause?.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testExecuteGet_engineCancellation_propagates() = runTest {
+        // Given: an engine that throws a cancellation
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(CancellationException("cancelled")))
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.accounts().execute()
+        }
+
+        server.close()
     }
 
     // ===== AccountsRequestBuilder Tests =====
@@ -1385,6 +1514,37 @@ class RequestBuilderExecuteTest {
         assertTrue(health.databaseConnected)
         assertTrue(health.coreUp)
         assertTrue(health.coreSynced)
+
+        server.close()
+    }
+
+    @Test
+    fun testHealthExecute_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: the health endpoint with a client reporting a connectivity failure as a
+        // non-Exception Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(Error("Fail to fetch")))
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException, with
+        // the original Throwable preserved as the cause (asserted by type and message rather
+        // than instance identity, since the JVM coroutine machinery copies exceptions).
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.health().execute()
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testHealthExecute_engineCancellation_propagates() = runTest {
+        // Given: the health endpoint with a client that throws a cancellation
+        val server = HorizonServer(TEST_SERVER_URL, httpClient = createThrowingMockClient(CancellationException("cancelled")))
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.health().execute()
+        }
 
         server.close()
     }

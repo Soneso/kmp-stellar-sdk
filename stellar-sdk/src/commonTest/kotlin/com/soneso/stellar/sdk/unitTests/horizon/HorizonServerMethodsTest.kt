@@ -1,6 +1,10 @@
 package com.soneso.stellar.sdk.unitTests.horizon
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.exceptions.BadRequestException
+import com.soneso.stellar.sdk.horizon.exceptions.BadResponseException
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
+import com.soneso.stellar.sdk.horizon.exceptions.UnknownResponseException
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -8,6 +12,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 /**
@@ -51,6 +56,190 @@ class HorizonServerMethodsTest {
                 })
             }
         }
+    }
+
+    private fun createThrowingMockClient(failure: Throwable): HttpClient {
+        val mockEngine = MockEngine { throw failure }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    private val VALID_ENVELOPE_XDR = "AAAAAGL8HQvQkbK2HA3WVjRrKmjX00fG8sLI7m0ERwJW/AX3AAAAZAAiII0AAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAArqN6LeOagjxMaUP96Bzfs9e0corNZXzBWJkFoK7kvkwAAAAAO5rKAAAAAAAAAAABVvwF9wAAAECUSFLCrnOz"
+
+    // ========== Connectivity-failure classification (POST/submit boundary) ==========
+
+    @Test
+    fun testSubmitTransaction_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: a submit client that reports a connectivity failure as a non-Exception
+        // Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val throwingClient = createThrowingMockClient(Error("Fail to fetch"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransaction_engineCancellation_propagates() = runTest {
+        // Given: a submit client that throws a cancellation
+        val throwingClient = createThrowingMockClient(CancellationException("cancelled"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_engineThrowable_wrappedAsConnectionErrorException() = runTest {
+        // Given: the async submit path with a client reporting a connectivity failure as a
+        // non-Exception Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val throwingClient = createThrowingMockClient(Error("Fail to fetch"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: the failure surfaces as the documented ConnectionErrorException.
+        // Type and message are asserted instead of instance identity because the JVM
+        // coroutine machinery copies exceptions for stack-trace recovery.
+        val exception = assertFailsWith<ConnectionErrorException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        val cause = assertIs<Error>(exception.cause)
+        assertEquals("Fail to fetch", cause.message)
+
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_engineCancellation_propagates() = runTest {
+        // Given: the async submit path with a client that throws a cancellation
+        val throwingClient = createThrowingMockClient(CancellationException("cancelled"))
+        val server = HorizonServer(
+            "https://horizon-testnet.stellar.org",
+            httpClient = throwingClient,
+            submitHttpClient = throwingClient
+        )
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+
+        server.close()
+    }
+
+    // ========== Submit error-status handling (error body included in the exception) ==========
+
+    @Test
+    fun testSubmitTransaction_forbidden403_throwsBadRequestWithBody() = runTest {
+        val mockClient = createMockClient("forbidden detail", statusCode = HttpStatusCode.Forbidden, contentType = "text/plain", expectedPath = "/transactions")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<BadRequestException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(403, exception.code)
+        assertEquals("forbidden detail", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransaction_serverError500_throwsBadResponseWithBody() = runTest {
+        val mockClient = createMockClient("server exploded", statusCode = HttpStatusCode.InternalServerError, contentType = "text/plain", expectedPath = "/transactions")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<BadResponseException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(500, exception.code)
+        assertEquals("server exploded", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransaction_unknownStatus_throwsUnknownResponseWithBody() = runTest {
+        val mockClient = createMockClient("weird", statusCode = HttpStatusCode(600, "Weird"), contentType = "text/plain", expectedPath = "/transactions")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<UnknownResponseException> {
+            server.submitTransaction(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(600, exception.code)
+        assertEquals("weird", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_malformed400_throwsBadRequestWithBody() = runTest {
+        val mockClient = createMockClient("not a valid async response", statusCode = HttpStatusCode.BadRequest, contentType = "text/plain", expectedPath = "/transactions_async")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<BadRequestException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(400, exception.code)
+        assertEquals("not a valid async response", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_forbidden403_throwsBadRequestWithBody() = runTest {
+        val mockClient = createMockClient("forbidden detail", statusCode = HttpStatusCode.Forbidden, contentType = "text/plain", expectedPath = "/transactions_async")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<BadRequestException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(403, exception.code)
+        assertEquals("forbidden detail", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_serverError500_throwsBadResponseWithBody() = runTest {
+        val mockClient = createMockClient("server exploded", statusCode = HttpStatusCode.InternalServerError, contentType = "text/plain", expectedPath = "/transactions_async")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<BadResponseException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(500, exception.code)
+        assertEquals("server exploded", exception.body)
+        server.close()
+    }
+
+    @Test
+    fun testSubmitTransactionAsync_unknownStatus_throwsUnknownResponseWithBody() = runTest {
+        val mockClient = createMockClient("weird", statusCode = HttpStatusCode(600, "Weird"), contentType = "text/plain", expectedPath = "/transactions_async")
+        val server = HorizonServer("https://horizon-testnet.stellar.org", httpClient = mockClient, submitHttpClient = mockClient)
+        val exception = assertFailsWith<UnknownResponseException> {
+            server.submitTransactionAsync(VALID_ENVELOPE_XDR, skipMemoRequiredCheck = true)
+        }
+        assertEquals(600, exception.code)
+        assertEquals("weird", exception.body)
+        server.close()
     }
 
     // ========== Individual Resource Methods ==========

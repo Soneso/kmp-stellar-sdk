@@ -27,10 +27,9 @@ struct SignerManagementSection: View {
         VStack(spacing: 12) {
             sectionHeader
             signerList
-            if !viewModel.isSubmitting {
-                addSignerCard
-            }
+            addSignerCard
         }
+        .disabled(viewModel.isSubmitting)
     }
 
     // MARK: - Section Header
@@ -77,6 +76,7 @@ struct SignerManagementSection: View {
                     .font(.caption)
                     .foregroundColor(Material3Colors.onSurfaceVariant)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(ContextRuleBuilderViewModel.scrollAnchorStagedSigners)
             }
         }
     }

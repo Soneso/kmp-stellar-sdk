@@ -50,6 +50,9 @@ struct ContextRulesScreen: View {
     @State private var showRemoveSignerPicker = false
     @State private var ruleToRemoveWithSigners: ParsedContextRule? = nil
 
+    /// Scroll-into-view id for the error card.
+    private let errorScrollAnchor = "contextRules.error"
+
     // MARK: - Init
 
     init(toastManager: ToastManager) {
@@ -59,101 +62,110 @@ struct ContextRulesScreen: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                descriptionCard
-                actionButtonsRow
-                if signerLoadFailed {
-                    signerLoadWarning
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    descriptionCard
+                    actionButtonsRow
+                    if signerLoadFailed {
+                        signerLoadWarning
+                    }
+                    if let message = errorMessage {
+                        ErrorCard(message: message, font: .callout)
+                            .id(errorScrollAnchor)
+                    }
+                    if !appState.isConnected {
+                        notConnectedCard
+                    }
+                    if isLoading && rules.isEmpty {
+                        loadingIndicator
+                    }
+                    if isRemoving {
+                        removingIndicator
+                    }
+                    if !isLoading && rules.isEmpty && appState.isConnected && errorMessage == nil {
+                        emptyStateCard
+                    }
+                    ForEach(Array(rules.enumerated()), id: \.offset) { _, rule in
+                        contextRuleCard(rule: rule)
+                    }
+                    if !rules.isEmpty {
+                        Text("\(rules.count) context rule(s) loaded")
+                            .font(.caption)
+                            .foregroundColor(Material3Colors.onSurfaceVariant)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Spacer(minLength: 16)
                 }
-                if let message = errorMessage {
-                    ErrorCard(message: message, font: .callout)
-                }
-                if !appState.isConnected {
-                    notConnectedCard
-                }
-                if isLoading && rules.isEmpty {
-                    loadingIndicator
-                }
-                if isRemoving {
-                    removingIndicator
-                }
-                if !isLoading && rules.isEmpty && appState.isConnected && errorMessage == nil {
-                    emptyStateCard
-                }
-                ForEach(Array(rules.enumerated()), id: \.offset) { _, rule in
-                    contextRuleCard(rule: rule)
-                }
-                if !rules.isEmpty {
-                    Text("\(rules.count) context rule(s) loaded")
-                        .font(.caption)
-                        .foregroundColor(Material3Colors.onSurfaceVariant)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Spacer(minLength: 16)
+                .padding(16)
             }
-            .padding(16)
-        }
-        .background(Material3Colors.background)
-        .frame(minWidth: 550, minHeight: 700)
-        .navigationToolbar(title: "Context Rules")
-        .task {
-            await loadRules()
-            await loadSigners()
-        }
-        .confirmationDialog(
-            removeDialogTitle,
-            isPresented: Binding(
-                get: { ruleToRemove != nil },
-                set: { if !$0 { ruleToRemove = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) {
-                if let rule = ruleToRemove {
+            .background(Material3Colors.background)
+            .frame(minWidth: 550, minHeight: 700)
+            .navigationToolbar(title: "Context Rules")
+            .task {
+                await loadRules()
+                await loadSigners()
+            }
+            .onChange(of: errorMessage) { newValue in
+                guard newValue != nil else { return }
+                Task { @MainActor in
+                    withAnimation { proxy.scrollTo(errorScrollAnchor, anchor: .top) }
+                }
+            }
+            .confirmationDialog(
+                removeDialogTitle,
+                isPresented: Binding(
+                    get: { ruleToRemove != nil },
+                    set: { if !$0 { ruleToRemove = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove", role: .destructive) {
+                    if let rule = ruleToRemove {
+                        ruleToRemove = nil
+                        Task { await performRemove(rule: rule) }
+                    }
+                }
+                Button("Cancel", role: .cancel) {
                     ruleToRemove = nil
-                    Task { await performRemove(rule: rule) }
+                }
+            } message: {
+                if let rule = ruleToRemove {
+                    Text(
+                        "Remove rule #\(rule.id) \"\(rule.name)\"? " +
+                        "This action requires smart account authorization and cannot be undone."
+                    )
                 }
             }
-            Button("Cancel", role: .cancel) {
-                ruleToRemove = nil
-            }
-        } message: {
-            if let rule = ruleToRemove {
-                Text(
-                    "Remove rule #\(rule.id) \"\(rule.name)\"? " +
-                    "This action requires smart account authorization and cannot be undone."
-                )
-            }
-        }
-        .sheet(isPresented: $showRemoveSignerPicker) {
-            if let rule = ruleToRemoveWithSigners {
-                SignerPickerSheet(
-                    signers: availableSigners,
-                    activeCredentialId: appState.credentialId,
-                    description: "Choose which signers co-authorize removing this context rule. " +
-                        "For Stellar account signers, enter the secret key to enable signing.",
-                    onConfirm: { selected, secretKeys, ed25519Secrets in
-                        showRemoveSignerPicker = false
-                        // Auth signers are existing on-chain signers, so isPending is always false here.
-                        let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier, isPending: false) }
-                        let capturedRule = rule
-                        ruleToRemoveWithSigners = nil
-                        Task {
-                            await performRemoveWithSigners(
-                                rule: capturedRule,
-                                signerDescs: signerDescs,
-                                secretKeys: secretKeys,
-                                ed25519Secrets: ed25519Secrets
-                            )
-                        }
-                    },
-                    onDismiss: {
-                        showRemoveSignerPicker = false
-                        ruleToRemoveWithSigners = nil
-                    },
-                    bridge: bridgeWrapper.bridge
-                )
+            .sheet(isPresented: $showRemoveSignerPicker) {
+                if let rule = ruleToRemoveWithSigners {
+                    SignerPickerSheet(
+                        signers: availableSigners,
+                        activeCredentialId: appState.credentialId,
+                        description: "Choose which signers co-authorize removing this context rule. " +
+                            "For Stellar account signers, enter the secret key to enable signing.",
+                        onConfirm: { selected, secretKeys, ed25519Secrets in
+                            showRemoveSignerPicker = false
+                            // Auth signers are existing on-chain signers, so isPending is always false here.
+                            let signerDescs = selected.map { SignerDescriptor(type: $0.type, value: $0.identifier, isPending: false) }
+                            let capturedRule = rule
+                            ruleToRemoveWithSigners = nil
+                            Task {
+                                await performRemoveWithSigners(
+                                    rule: capturedRule,
+                                    signerDescs: signerDescs,
+                                    secretKeys: secretKeys,
+                                    ed25519Secrets: ed25519Secrets
+                                )
+                            }
+                        },
+                        onDismiss: {
+                            showRemoveSignerPicker = false
+                            ruleToRemoveWithSigners = nil
+                        },
+                        bridge: bridgeWrapper.bridge
+                    )
+                }
             }
         }
     }

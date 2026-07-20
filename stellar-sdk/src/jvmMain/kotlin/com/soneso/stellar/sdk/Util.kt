@@ -28,3 +28,13 @@ internal actual suspend fun platformDelay(timeMillis: Long) {
 internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
     return kotlin.synchronized(lock, block)
 }
+
+/**
+ * JVM implementation of isFatalPlatformError.
+ *
+ * Matches [VirtualMachineError] (OutOfMemoryError, StackOverflowError, etc.),
+ * which indicates an unrecoverable JVM condition that must never be wrapped
+ * into an SDK exception or converted into an error response.
+ */
+internal actual fun isFatalPlatformError(throwable: Throwable): Boolean =
+    throwable is VirtualMachineError

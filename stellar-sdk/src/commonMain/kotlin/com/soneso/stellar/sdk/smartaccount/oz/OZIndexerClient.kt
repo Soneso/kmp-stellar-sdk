@@ -10,6 +10,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -255,8 +257,8 @@ class OZIndexerClient(
          * when no custom indexer URL is provided.
          */
         val DEFAULT_INDEXER_URLS: Map<String, String> = mapOf(
-            Network.TESTNET.networkPassphrase to "https://smart-account-indexer.sdf-ecosystem.workers.dev",
-            Network.PUBLIC.networkPassphrase to "https://smart-account-indexer-mainnet.sdf-ecosystem.workers.dev"
+            Network.TESTNET.networkPassphrase to "https://testnet.mercurydata.app/rest/smart-account-indexer",
+            Network.PUBLIC.networkPassphrase to "https://mainnet.mercurydata.app/rest/smart-account-indexer"
         )
 
         /**
@@ -301,10 +303,9 @@ class OZIndexerClient(
      * @return Configured HttpClient instance
      */
     private fun createHttpClient(timeoutMs: Long): HttpClient = HttpClient {
-        defaultRequest {
-            header(OZConstants.CLIENT_NAME_HEADER, OZConstants.CLIENT_NAME)
-            header(OZConstants.CLIENT_VERSION_HEADER, Util.getSdkVersion())
-        }
+        // No client-identification headers here: custom headers force a CORS preflight in
+        // browsers, and indexer providers (including the default Mercury endpoints) only
+        // allowlist standard headers, which would block every request from the web target.
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -403,8 +404,10 @@ class OZIndexerClient(
      * Performs a lightweight health check by calling the root endpoint and verifying
      * the service returns a successful status.
      *
-     * This method does not throw exceptions - it returns false for any error condition
-     * (network failure, timeout, unhealthy response).
+     * This method does not throw exceptions for request failures - it returns false
+     * for any error condition (network failure, timeout, unhealthy response).
+     * Coroutine cancellation and fatal platform errors propagate instead of being
+     * reported as false.
      *
      * Note: Uses Throwable instead of Exception because on Kotlin/JS, Ktor network
      * failures throw JavaScript Error objects that map to Throwable, not Exception.
@@ -425,9 +428,10 @@ class OZIndexerClient(
 
             val healthCheck: HealthCheckResponse = response.body()
             healthCheck.status == HEALTH_STATUS_OK
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
             // Catches all errors including JS Error ("Fail to fetch") which is
             // a Throwable but not an Exception on Kotlin/JS.
+            if (isFatal(e)) throw e
             false
         }
     }
@@ -463,11 +467,7 @@ class OZIndexerClient(
 
             // Handle non-200 status codes
             if (!response.status.isSuccess()) {
-                val errorBody = try {
-                    response.bodyAsText()
-                } catch (_: Exception) {
-                    "(unable to decode response body)"
-                }
+                val errorBody = readErrorBodyOrFallback("(unable to decode response body)") { response.bodyAsText() }
                 val truncatedBody = if (errorBody.length > 200) errorBody.take(200) + "..." else errorBody
                 throw IndexerException.requestFailed(
                     "HTTP ${response.status.value}: $truncatedBody"
@@ -480,7 +480,11 @@ class OZIndexerClient(
         } catch (e: SmartAccountException) {
             // Re-throw SDK exceptions as-is (includes IndexerException, ValidationException)
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented IndexerException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             val errorMessage = e.message ?: e.toString()
             throw IndexerException.requestFailed(errorMessage, e)
         }

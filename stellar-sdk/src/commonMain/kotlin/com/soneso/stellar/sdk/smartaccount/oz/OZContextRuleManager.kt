@@ -258,9 +258,7 @@ class OZContextRuleManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate inputs
-        if (name.isEmpty()) {
-            throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
-        }
+        requireValidContextRuleName(name)
 
         if (signers.isEmpty() && policies.isEmpty()) {
             throw ValidationException.invalidInput(
@@ -276,17 +274,9 @@ class OZContextRuleManager internal constructor(
             )
         }
 
-        if (policies.size > OZConstants.MAX_POLICIES) {
-            throw ValidationException.invalidInput(
-                "policies",
-                "Context rule cannot have more than ${OZConstants.MAX_POLICIES} policies, got: ${policies.size}"
-            )
-        }
+        requireValidSigners(signers)
 
-        // Validate policy addresses
-        for ((address, _) in policies) {
-            requireContractAddress(address, "contractAddress")
-        }
+        requireValidPolicies(policies)
 
         // Build function arguments
         // arg 0: context_type (ScVal from contextType.toScVal())
@@ -306,15 +296,9 @@ class OZContextRuleManager internal constructor(
         val signersVec = signers.map { it.toScVal() }
         val signersScVal = Scv.toVec(signersVec)
 
-        // arg 4: policies (Map<Address, ScVal> for policy address -> install param)
-        // Keys must be sorted by XDR bytes (Soroban requirement for ScMap)
-        val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
-        for ((address, installParam) in policies) {
-            val policyAddress = Address(address).toSCAddress()
-            policiesMap[Scv.toAddress(policyAddress)] = installParam
-        }
-        val sortedPoliciesMap = OZPolicyManager.sortMapByKeyXdr(policiesMap)
-        val policiesScVal = Scv.toMap(sortedPoliciesMap)
+        // arg 4: policies (Map<Address, ScVal> for policy address -> install param),
+        // sorted into the host's ScMap key order
+        val policiesScVal = OZPolicyManager.policiesToScVal(policies)
 
         // Build invocation
         val functionArgs: List<SCValXdr> = listOf(
@@ -948,9 +932,7 @@ class OZContextRuleManager internal constructor(
         val (_, contractId) = kit.requireConnected()
 
         // Validate input
-        if (name.isEmpty()) {
-            throw ValidationException.invalidInput("name", "Context rule name cannot be empty")
-        }
+        requireValidContextRuleName(name)
 
         // Build invocation (name is Soroban String type, not Symbol)
         val functionArgs: List<SCValXdr> = listOf(

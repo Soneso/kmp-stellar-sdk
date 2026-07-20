@@ -150,7 +150,7 @@ sealed class PolicyInstallParams {
                 weightsMap[signerScVal] = Scv.toUint32(weight)
             }
 
-            // Sort signer weights map keys by XDR bytes (Soroban requirement)
+            // Sort signer weights map keys into the host's ScMap key order
             val sortedWeightsMap = OZPolicyManager.sortMapByKeyXdr(weightsMap)
 
             // Map with alphabetically sorted keys: ["signer_weights", "threshold"]
@@ -828,22 +828,21 @@ class OZPolicyManager internal constructor(
 
     companion object {
         /**
-         * Sorts ScMap entries by lexicographic comparison of their keys' XDR byte representation.
+         * Sorts ScMap entries into the Soroban host's key order.
          *
-         * Soroban mandates that ScMap keys are sorted lexicographically by their XDR-encoded
-         * bytes. This function takes a LinkedHashMap of ScVal entries and returns a new
-         * LinkedHashMap with entries sorted by their key's XDR encoding.
+         * The host stores and validates ScMap keys in a semantic order (see
+         * [compareScValHostOrder]) and rejects a map materialized from an out-of-order
+         * `SCVal` argument. This takes a LinkedHashMap of ScVal entries and returns a new
+         * LinkedHashMap whose entries are in that order.
          *
          * @param map The unsorted map of ScVal key-value pairs
-         * @return A new LinkedHashMap with entries sorted by XDR-encoded key bytes
+         * @return A new LinkedHashMap with entries in the host's ScMap key order
          */
         fun sortMapByKeyXdr(map: LinkedHashMap<SCValXdr, SCValXdr>): LinkedHashMap<SCValXdr, SCValXdr> {
             val sorted = LinkedHashMap<SCValXdr, SCValXdr>()
             map.entries
                 .sortedWith(Comparator { a, b ->
-                    val aBytes = scValToXdrBytes(a.key)
-                    val bBytes = scValToXdrBytes(b.key)
-                    compareByteArraysLexicographically(aBytes, bBytes)
+                    compareScValHostOrder(a.key, b.key)
                 })
                 .forEach { (key, value) ->
                     sorted[key] = value
@@ -852,25 +851,28 @@ class OZPolicyManager internal constructor(
         }
 
         /**
+         * Encodes a policies map (policy contract address -> install-param ScVal) into the
+         * ScMap ScVal the smart-account contract expects: keys become contract Addresses and
+         * entries are sorted into the host's ScMap key order.
+         *
+         * @param policies Policy install params keyed by policy contract address (C...)
+         * @return The policies ScMap ScVal
+         */
+        internal fun policiesToScVal(policies: Map<String, SCValXdr>): SCValXdr {
+            val policiesMap = LinkedHashMap<SCValXdr, SCValXdr>()
+            for ((address, installParam) in policies) {
+                policiesMap[Scv.toAddress(Address(address).toSCAddress())] = installParam
+            }
+            return Scv.toMap(sortMapByKeyXdr(policiesMap))
+        }
+
+        /**
          * Encodes an SCValXdr to its XDR byte representation.
-         * Used for deterministic key comparison when sorting ScMap entries.
          */
         internal fun scValToXdrBytes(scVal: SCValXdr): ByteArray {
             val writer = XdrWriter()
             scVal.encode(writer)
             return writer.toByteArray()
-        }
-
-        private fun compareByteArraysLexicographically(a: ByteArray, b: ByteArray): Int {
-            val minLength = minOf(a.size, b.size)
-            for (i in 0 until minLength) {
-                val aByte = a[i].toInt() and 0xFF
-                val bByte = b[i].toInt() and 0xFF
-                if (aByte != bByte) {
-                    return aByte - bByte
-                }
-            }
-            return a.size - b.size
         }
     }
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
 class PageGetNextPageTest {
@@ -324,6 +325,36 @@ class PageGetNextPageTest {
         assertNotNull(exception.cause)
         assertTrue(exception.cause is RuntimeException)
         assertEquals("Network connection failed", exception.cause!!.message)
+
+        client.close()
+    }
+
+    @Test
+    fun testGetNextPageCancellationPropagates() = runTest {
+        // A cancellation raised while fetching the next page must propagate unchanged rather
+        // than being wrapped as a ConnectionErrorException.
+        val mockEngine = MockEngine {
+            throw CancellationException("cancelled")
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val page = Page<TestRecord>(
+            embedded = null,
+            links = Page.Links(
+                self = Link("https://horizon.stellar.org/accounts"),
+                next = Link("https://horizon.stellar.org/accounts?cursor=cancelled"),
+                prev = null
+            )
+        )
+
+        assertFailsWith<CancellationException> {
+            page.getNextPage<TestRecord>(client)
+        }
 
         client.close()
     }

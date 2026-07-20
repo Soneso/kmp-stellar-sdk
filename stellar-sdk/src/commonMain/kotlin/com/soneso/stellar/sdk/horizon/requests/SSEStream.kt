@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.horizon.requests
 
 import com.soneso.stellar.sdk.horizon.responses.Pageable
 import com.soneso.stellar.sdk.horizon.responses.Response
+import com.soneso.stellar.sdk.isFatal
 import io.ktor.client.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
@@ -114,7 +115,11 @@ class SSEStream<T : Response> internal constructor(
                 doStreamRequest(newListenerId)
             } catch (e: CancellationException) {
                 // Expected when closing
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                // connectivity failures as kotlin.Error, which would otherwise escape the
+                // stream coroutine instead of being reported and triggering a reconnect.
+                if (isFatal(e)) throw e
                 if (!isStopped && newListenerId == currentListenerId) {
                     listener.onFailure(e, null)
                     // Mark as closed to trigger reconnect
@@ -203,6 +208,11 @@ class SSEStream<T : Response> internal constructor(
         if (isStopped || listenerId != currentListenerId) {
             return
         }
+
+        // A fatal failure (coroutine cancellation, platform-fatal error) must never be
+        // reclassified as a reconnectable network error or delivered as a stream failure;
+        // let it propagate.
+        if (isFatal(error)) throw error
 
         // Network errors should trigger reconnect, not failure callback
         if (isNetworkError(error)) {

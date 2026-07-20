@@ -12,6 +12,8 @@ import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.contract.SorobanContractParser
+import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
+import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
@@ -205,6 +207,9 @@ class SorobanServer(
      * @param params The method parameters (null for parameter-less methods)
      * @return The result object from the response
      * @throws SorobanRpcException If the server returns an error
+     * @throws ConnectionErrorException If the HTTP engine reports a connectivity
+     *   failure that is not already an [Exception] (Kotlin/JS reports these as
+     *   [kotlin.Error])
      * @throws Exception If network/connection errors occur
      */
     private suspend inline fun <reified T, reified R> sendRequest(
@@ -257,6 +262,13 @@ class SorobanServer(
         } catch (e: SerializationException) {
             // JSON parsing failed
             throw IllegalArgumentException("Failed to parse response for method $method", e)
+        } catch (e: Throwable) {
+            // Exceptions (including platform network exceptions) propagate unchanged.
+            // A non-Exception Throwable is treated as a connectivity failure (the
+            // Kotlin/JS HTTP engine reports these as kotlin.Error) and is wrapped so
+            // callers receive the same Exception-typed failure surface on every platform.
+            if (e is Exception || isFatal(e)) throw e
+            throw ConnectionErrorException(e)
         }
     }
 
@@ -561,12 +573,21 @@ class SorobanServer(
      * )
      * ```
      *
+     * Failed attempts (network errors, RPC errors) are retried until [maxAttempts]
+     * is reached; only coroutine cancellation and fatal platform errors abort the
+     * poll early. When at least one attempt returned a response, the last response
+     * is returned even if later attempts failed. When every attempt failed, the
+     * last per-attempt failure is thrown.
+     *
      * @param hash Transaction hash as hex string
      * @param maxAttempts Maximum number of polling attempts (default: 30)
      * @param sleepStrategy Function mapping attempt number to sleep duration in milliseconds
      * @return Final transaction response (may still be NOT_FOUND if max attempts reached)
      * @throws IllegalArgumentException If maxAttempts is less than or equal to 0
-     * @throws SorobanRpcException If any RPC request fails
+     * @throws Exception The last per-attempt failure when every polling attempt failed —
+     *   e.g. [SorobanRpcException] for RPC errors or
+     *   [com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException] for
+     *   connectivity failures
      */
     suspend fun pollTransaction(
         hash: String,
@@ -577,6 +598,7 @@ class SorobanServer(
 
         var attempts = 0
         var lastResponse: GetTransactionResponse? = null
+        var lastFailure: Throwable? = null
 
         while (attempts < maxAttempts) {
             try {
@@ -587,10 +609,14 @@ class SorobanServer(
                 if (response.status != GetTransactionStatus.NOT_FOUND) {
                     return response
                 }
-            } catch (e: Exception) {
-                // Ignore temporary RPC errors and keep polling (matches Flutter SDK behavior)
-                // This handles network glitches, rate limiting, and other transient issues
-                // without stopping the polling loop
+            } catch (e: Throwable) {
+                // Ignore temporary RPC errors and keep polling. This handles network
+                // glitches, rate limiting, and other transient issues without stopping
+                // the polling loop. Throwable rather than Exception: the Kotlin/JS HTTP
+                // engine reports connectivity failures as kotlin.Error, and a transient
+                // glitch must not abort the poll on the web target either.
+                if (isFatal(e)) throw e
+                lastFailure = e
             }
 
             attempts++
@@ -604,7 +630,9 @@ class SorobanServer(
             }
         }
 
-        return lastResponse!!
+        // The loop ran at least once (maxAttempts > 0), so a null response here
+        // means every attempt threw; surface the last failure.
+        return lastResponse ?: throw lastFailure!!
     }
 
     /**

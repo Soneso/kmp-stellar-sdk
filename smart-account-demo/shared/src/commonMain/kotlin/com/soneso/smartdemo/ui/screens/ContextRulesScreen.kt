@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -74,6 +76,7 @@ import com.soneso.smartdemo.ui.components.signerChipColor
 import com.soneso.smartdemo.util.formatContextType
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.truncateAddress
+import com.soneso.smartdemo.ui.pushOnce
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
 import kotlinx.coroutines.launch
@@ -90,6 +93,7 @@ class ContextRulesScreen : Screen {
         var rules by remember { mutableStateOf<List<ParsedContextRule>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val errorBannerRequester = remember { BringIntoViewRequester() }
 
         // UI expand/confirm state
         var expandedRuleId by remember { mutableStateOf<UInt?>(null) }
@@ -129,6 +133,14 @@ class ContextRulesScreen : Screen {
                 } catch (_: Exception) {
                     signersLoaded = true
                 }
+            }
+        }
+
+        // Scroll the error card into view when a removal or load surfaces an error, which
+        // can be triggered from a rule card deep in the scrolled list.
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) {
+                errorBannerRequester.bringIntoView()
             }
         }
 
@@ -340,7 +352,7 @@ class ContextRulesScreen : Screen {
                     }
                     Button(
                         onClick = {
-                            navigator.push(ContextRuleBuilderScreen())
+                            navigator.pushOnce(ContextRuleBuilderScreen())
                         },
                         enabled = !isLoading && !isRemoving && DemoState.isConnected,
                         modifier = Modifier.weight(1f)
@@ -353,7 +365,7 @@ class ContextRulesScreen : Screen {
                 // rule with the agent's Ed25519 signer and a spending-limit policy.
                 OutlinedButton(
                     onClick = {
-                        navigator.push(DelegateToAgentScreen())
+                        navigator.pushOnce(DelegateToAgentScreen())
                     },
                     enabled = !isLoading && !isRemoving && DemoState.isConnected,
                     modifier = Modifier.fillMaxWidth()
@@ -364,7 +376,7 @@ class ContextRulesScreen : Screen {
                 // Error card
                 if (errorMessage != null) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(errorBannerRequester),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
@@ -490,7 +502,7 @@ class ContextRulesScreen : Screen {
                             expandedRuleId = if (expandedRuleId == rule.id) null else rule.id
                         },
                         onEdit = {
-                            navigator.push(ContextRuleBuilderScreen(editRuleId = rule.id))
+                            navigator.pushOnce(ContextRuleBuilderScreen(editRuleId = rule.id))
                         },
                         onRemove = { ruleToRemove = rule },
                         isRemoving = isRemoving,

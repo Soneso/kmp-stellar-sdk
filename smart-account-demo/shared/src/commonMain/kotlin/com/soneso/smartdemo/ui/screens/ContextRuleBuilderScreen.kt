@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -189,8 +191,17 @@ class ContextRuleBuilderScreen(
 
         // --- UI state ---
         var isLoadingRule by remember { mutableStateOf(false) }
+        var isReloadingRule by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var fieldErrors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+        // --- Scroll-into-view requesters ---
+        val errorBannerRequester = remember { BringIntoViewRequester() }
+        val createResultRequester = remember { BringIntoViewRequester() }
+        val editResultRequester = remember { BringIntoViewRequester() }
+        val stagedSignersRequester = remember { BringIntoViewRequester() }
+        val stagedPoliciesRequester = remember { BringIntoViewRequester() }
+        var errorScrollRequests by remember { mutableStateOf(0) }
 
         // Shared function to populate edit state from a parsed rule.
         // Called both on initial load and on reload after partial failure.
@@ -302,6 +313,56 @@ class ContextRuleBuilderScreen(
                     createSignersLoaded = true
                 }
             }
+        }
+
+        // Scroll the error banner into view whenever a validation attempt reports errors.
+        // A monotonic counter keys the effect so a repeated tap with unchanged errors re-scrolls.
+        LaunchedEffect(errorScrollRequests) {
+            if (errorScrollRequests > 0) {
+                errorBannerRequester.bringIntoView()
+            }
+        }
+
+        // Scroll a create-mode failure result into view (a success collapses the form).
+        LaunchedEffect(submissionResult) {
+            val result = submissionResult
+            if (result != null && !result.success) {
+                createResultRequester.bringIntoView()
+            }
+        }
+
+        // Scroll an edit-mode result into view unless it is a full success (which collapses
+        // the form). Partial success and failure both keep the form and scroll to the card.
+        LaunchedEffect(editResult) {
+            val result = editResult
+            if (result != null && !(result.success && !result.partialDueToAuthGuard)) {
+                editResultRequester.bringIntoView()
+            }
+        }
+
+        // Scroll a newly staged signer or policy into view. The staged lists render above
+        // the add forms, so a user-added entry can land off-screen; a user-initiated add
+        // scrolls to it. Wholesale rewrites by the initial rule load and the post-failure
+        // reload must not move the viewport.
+        val stagedSignerCount = if (isEditing) signerEntries.size else signers.size
+        val stagedPolicyCount = if (isEditing) policyEntries.size else policies.size
+        var prevStagedSignerCount by remember { mutableStateOf(stagedSignerCount) }
+        var prevStagedPolicyCount by remember { mutableStateOf(stagedPolicyCount) }
+        LaunchedEffect(stagedSignerCount) {
+            if (stagedSignerCount > prevStagedSignerCount &&
+                !isSubmitting && !isLoadingRule && !isReloadingRule
+            ) {
+                stagedSignersRequester.bringIntoView()
+            }
+            prevStagedSignerCount = stagedSignerCount
+        }
+        LaunchedEffect(stagedPolicyCount) {
+            if (stagedPolicyCount > prevStagedPolicyCount &&
+                !isSubmitting && !isLoadingRule && !isReloadingRule
+            ) {
+                stagedPoliciesRequester.bringIntoView()
+            }
+            prevStagedPolicyCount = stagedPolicyCount
         }
 
         // Compute the edit diff for operation summary and submission.
@@ -431,7 +492,7 @@ class ContextRuleBuilderScreen(
                 // --- Error message ---
                 if (errorMessage != null) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(errorBannerRequester),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
@@ -451,7 +512,7 @@ class ContextRuleBuilderScreen(
                 if (!isEditing && submissionResult != null) {
                     val result = submissionResult!!
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(createResultRequester),
                         colors = CardDefaults.cardColors(
                             containerColor = if (result.success)
                                 Color(0xFF4CAF50).copy(alpha = 0.12f)
@@ -537,7 +598,7 @@ class ContextRuleBuilderScreen(
                         else -> MaterialTheme.colorScheme.onErrorContainer
                     }
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(editResultRequester),
                         colors = CardDefaults.cardColors(
                             containerColor = cardContainerColor
                         )
@@ -865,7 +926,8 @@ class ContextRuleBuilderScreen(
                             signers = updated.map { it.signer }
                         },
                         existingSigners = allOnChainSigners,
-                        connectedCredentialId = DemoState.credentialId
+                        connectedCredentialId = DemoState.credentialId,
+                        captionModifier = Modifier.bringIntoViewRequester(stagedSignersRequester)
                     )
 
                     HorizontalDivider(
@@ -903,7 +965,8 @@ class ContextRuleBuilderScreen(
                             policies = updated.map { e ->
                                 PolicyEntry(info = e.info, label = e.label, address = e.address, scVal = e.scVal)
                             }
-                        }
+                        },
+                        captionModifier = Modifier.bringIntoViewRequester(stagedPoliciesRequester)
                     )
 
                     HorizontalDivider(
@@ -1016,11 +1079,13 @@ class ContextRuleBuilderScreen(
                                 if (errors.isNotEmpty()) {
                                     fieldErrors = errors
                                     errorMessage = "Please fix the validation errors above."
+                                    errorScrollRequests++
                                     return@Button
                                 }
 
                                 if (editDiff == null || editDiff.isEmpty) {
                                     errorMessage = "No changes to apply."
+                                    errorScrollRequests++
                                     return@Button
                                 }
 
@@ -1028,11 +1093,15 @@ class ContextRuleBuilderScreen(
                                 errorMessage = null
                                 editResult = null
 
-                                // Multi-signer detection: check on-chain signers (original state)
-                                val onChainSigners = originalSignerEntries.map { it.signer }
-                                val singlePasskey = isSinglePasskeyTransfer(onChainSigners)
+                                // A context-rule edit is an admin operation authorized by the
+                                // wallet's signer set (the default rule governs it), not by the
+                                // signers of the rule being edited. Gate on the same all-rules
+                                // signer list create mode uses; the edit picker offers that list.
+                                val needsMultiSigner = createSignersLoaded &&
+                                    createAvailableSigners.size > 1 &&
+                                    !isSinglePasskeyTransfer(createAvailableSigners)
 
-                                if (!singlePasskey && onChainSigners.size > 1) {
+                                if (needsMultiSigner) {
                                     // Show signer picker for multi-signer rules
                                     showEditSignerPicker = true
                                 } else {
@@ -1059,10 +1128,13 @@ class ContextRuleBuilderScreen(
                                                 onEditResult = { editResult = it },
                                                 onReload = {
                                                     scope.launch {
+                                                        isReloadingRule = true
                                                         try {
                                                             populateEditState(editRuleId!!)
                                                         } catch (e: Exception) {
                                                             errorMessage = "Failed to reload rule: ${e.message}"
+                                                        } finally {
+                                                            isReloadingRule = false
                                                         }
                                                     }
                                                 },
@@ -1104,6 +1176,7 @@ class ContextRuleBuilderScreen(
                                 if (errors.isNotEmpty()) {
                                     fieldErrors = errors
                                     errorMessage = "Please fix the validation errors above."
+                                    errorScrollRequests++
                                     return@Button
                                 }
 
@@ -1310,10 +1383,13 @@ class ContextRuleBuilderScreen(
                                 onEditResult = { editResult = it },
                                 onReload = {
                                     scope.launch {
+                                        isReloadingRule = true
                                         try {
                                             populateEditState(editRuleId!!)
                                         } catch (e: Exception) {
                                             errorMessage = "Failed to reload rule: ${e.message}"
+                                        } finally {
+                                            isReloadingRule = false
                                         }
                                     }
                                 },

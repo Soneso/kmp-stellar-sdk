@@ -18,10 +18,12 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -159,6 +161,11 @@ class IndexerClientTest {
         val url = OZIndexerClient.DEFAULT_INDEXER_URLS[Network.TESTNET.networkPassphrase]
         assertNotNull(url, "Testnet should have a default indexer URL configured")
         assertTrue(url.startsWith("https://"), "Default indexer URL must use HTTPS")
+        assertEquals(
+            "https://testnet.mercurydata.app/rest/smart-account-indexer",
+            url,
+            "Testnet default indexer must point at the Mercury endpoint"
+        )
     }
 
     @Test
@@ -183,12 +190,15 @@ class IndexerClientTest {
     }
 
     @Test
-    fun testGetDefaultUrl_mainnetReturnsNullOrUrl() {
-        // Mainnet may or may not have a default URL depending on configuration
+    fun testGetDefaultUrl_mainnetReturnsMercuryUrl() {
         val url = OZIndexerClient.getDefaultUrl(Network.PUBLIC.networkPassphrase)
-        if (url != null) {
-            assertTrue(url.startsWith("https://"), "If mainnet URL is set, it must use HTTPS")
-        }
+        assertNotNull(url, "Mainnet must have a default indexer URL configured")
+        assertTrue(url.startsWith("https://"), "Mainnet default indexer URL must use HTTPS")
+        assertEquals(
+            "https://mainnet.mercurydata.app/rest/smart-account-indexer",
+            url,
+            "Mainnet default indexer must point at the Mercury endpoint"
+        )
     }
 
     // MARK: - forNetwork
@@ -795,6 +805,52 @@ class IndexerClientTest {
         }
     }
 
+    @Test
+    fun testGetStats_engineThrowable_throwsIndexerException() = runTest {
+        // Non-Exception Throwable simulates the Kotlin/JS HTTP engine reporting
+        // a connectivity failure as kotlin.Error
+        val failure = Error("Fail to fetch")
+        val mockClient = createThrowingMockClient(failure)
+        try {
+            val indexer = OZIndexerClient(
+                indexerUrl = "https://indexer.example.com",
+                injectedClient = mockClient
+            )
+
+            val exception = assertFailsWith<IndexerException.RequestFailed> {
+                indexer.getStats()
+            }
+            assertTrue(exception.message!!.contains("Fail to fetch"))
+            // Type and message are asserted instead of instance identity because the
+            // JVM coroutine machinery copies exceptions for stack-trace recovery
+            val cause = assertIs<Error>(exception.cause)
+            assertEquals(failure.message, cause.message)
+
+            indexer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
+    @Test
+    fun testGetStats_cancellation_propagates() = runTest {
+        val mockClient = createThrowingMockClient(CancellationException("cancelled"))
+        try {
+            val indexer = OZIndexerClient(
+                indexerUrl = "https://indexer.example.com",
+                injectedClient = mockClient
+            )
+
+            assertFailsWith<CancellationException> {
+                indexer.getStats()
+            }
+
+            indexer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
     // MARK: - performRequest: error body truncation
 
     @Test
@@ -955,6 +1011,44 @@ class IndexerClientTest {
             )
 
             assertFalse(indexer.isHealthy())
+
+            indexer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
+    @Test
+    fun testIsHealthy_returnsFalse_whenEngineThrowable() = runTest {
+        // Non-Exception Throwable simulates the Kotlin/JS HTTP engine reporting
+        // a connectivity failure as kotlin.Error
+        val mockClient = createThrowingMockClient(Error("Fail to fetch"))
+        try {
+            val indexer = OZIndexerClient(
+                indexerUrl = "https://indexer.example.com",
+                injectedClient = mockClient
+            )
+
+            assertFalse(indexer.isHealthy())
+
+            indexer.close()
+        } finally {
+            mockClient.close()
+        }
+    }
+
+    @Test
+    fun testIsHealthy_cancellation_propagates() = runTest {
+        val mockClient = createThrowingMockClient(CancellationException("cancelled"))
+        try {
+            val indexer = OZIndexerClient(
+                indexerUrl = "https://indexer.example.com",
+                injectedClient = mockClient
+            )
+
+            assertFailsWith<CancellationException> {
+                indexer.isHealthy()
+            }
 
             indexer.close()
         } finally {

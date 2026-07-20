@@ -871,38 +871,152 @@ object SmartAccountConstants {
 // ============================================================================
 
 /**
- * Contract-level error codes from the OZ smart account contract.
+ * A decoded OpenZeppelin smart-account contract error: its numeric [code], the contract
+ * error enum it belongs to ([contract]), and the [name] of the variant, exactly as
+ * declared by the deployed contracts. Variant names repeat across the policy enums (for
+ * example `NotAllowed`), so [contract] is required to disambiguate; [code] is globally
+ * unique.
+ */
+data class OZContractError(
+    val code: Int,
+    val contract: String,
+    val name: String
+)
+
+/**
+ * Contract-level error codes from the OpenZeppelin smart account, WebAuthn verifier, and
+ * policy contracts.
  *
- * A reference catalog for consumers. The SDK does not parse or map these codes —
- * a failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the
- * thrown exception, and the consumer extracts the code and matches it against these
- * constants.
- *
- * Error code range: 3xxx (credential errors, aligned with the contract's Error enum).
+ * The named constants below cover the smart account contract's own error enum — the codes
+ * a caller is most likely to branch on. [decode] resolves any known code (smart account,
+ * WebAuthn, or a policy contract) into its contract and variant name. A failed transaction
+ * surfaces the raw `Error(Contract, #NNNN)` message inside the thrown exception; extract
+ * the code and pass it to [decode], or match it against a constant.
  */
 object ContractErrorCodes {
-    /**
-     * Integer arithmetic overflow occurred in the contract.
-     */
+
+    // Smart account contract (SmartAccountError, codes 3000-3016; 3001 is unused).
+
+    /** The referenced context rule does not exist on the account. */
+    const val CONTEXT_RULE_NOT_FOUND = 3000
+
+    /** The invocation context could not be validated against the account's context rules. */
+    const val UNVALIDATED_CONTEXT = 3002
+
+    /** An external signer's verifier contract rejected the signature. */
+    const val EXTERNAL_VERIFICATION_FAILED = 3003
+
+    /** A context rule must have at least one signer or one policy. */
+    const val NO_SIGNERS_AND_POLICIES = 3004
+
+    /** The context rule's valid_until ledger has already passed. */
+    const val PAST_VALID_UNTIL = 3005
+
+    /** The referenced signer is not present on the context rule. */
+    const val SIGNER_NOT_FOUND = 3006
+
+    /** The signer is already present on the context rule. */
+    const val DUPLICATE_SIGNER = 3007
+
+    /** The referenced policy is not installed on the context rule. */
+    const val POLICY_NOT_FOUND = 3008
+
+    /** The policy is already installed on the context rule. */
+    const val DUPLICATE_POLICY = 3009
+
+    /** The context rule exceeds the maximum number of signers. */
+    const val TOO_MANY_SIGNERS = 3010
+
+    /** The context rule exceeds the maximum number of policies. */
+    const val TOO_MANY_POLICIES = 3011
+
+    /** Integer arithmetic overflow occurred in the contract. */
     const val MATH_OVERFLOW = 3012
 
-    /**
-     * The key_data field on a signer exceeds the maximum allowed size.
-     */
+    /** The key_data field on a signer exceeds the maximum allowed size. */
     const val KEY_DATA_TOO_LARGE = 3013
 
-    /**
-     * The number of context rule IDs in the auth payload does not match the expected count.
-     */
+    /** The number of context rule IDs in the auth payload does not match the expected count. */
     const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014
 
-    /**
-     * A name field (e.g. context rule name) exceeds the maximum allowed length.
-     */
+    /** A name field (e.g. context rule name) exceeds the maximum allowed length. */
     const val NAME_TOO_LONG = 3015
 
-    /**
-     * The signer is not authorized to sign the given context rule.
-     */
+    /** The signer is not authorized to sign the given context rule. */
     const val UNAUTHORIZED_SIGNER = 3016
+
+    /**
+     * Decodes a raw contract error [code] into the OZ contract and variant name that
+     * defined it, or null if [code] is not a known OZ smart-account contract error.
+     */
+    fun decode(code: Int): OZContractError? = CODE_TABLE[code]
+
+    /**
+     * Extracts and decodes the first known contract error code from an error [message].
+     *
+     * Soroban RPC surfaces contract failures as `Error(Contract, #NNNN)` inside simulation
+     * and submission error strings (typically the message of a thrown
+     * `TransactionException`). This scans the message for such markers and returns the
+     * first one whose code is a known OZ smart-account contract error, or null when the
+     * message is null, carries no marker, or carries only unknown codes.
+     */
+    fun decodeFromMessage(message: String?): OZContractError? {
+        if (message == null) return null
+        return CONTRACT_ERROR_REGEX.findAll(message)
+            .mapNotNull { match -> match.groupValues[1].toIntOrNull()?.let { decode(it) } }
+            .firstOrNull()
+    }
+
+    private val CONTRACT_ERROR_REGEX = Regex("""Error\s*\(\s*Contract\s*,\s*#(\d+)\s*\)""")
+
+    private val CODE_TABLE: Map<Int, OZContractError> = listOf(
+        // SmartAccountError (3000-3016; 3001 unused)
+        OZContractError(3000, "SmartAccountError", "ContextRuleNotFound"),
+        OZContractError(3002, "SmartAccountError", "UnvalidatedContext"),
+        OZContractError(3003, "SmartAccountError", "ExternalVerificationFailed"),
+        OZContractError(3004, "SmartAccountError", "NoSignersAndPolicies"),
+        OZContractError(3005, "SmartAccountError", "PastValidUntil"),
+        OZContractError(3006, "SmartAccountError", "SignerNotFound"),
+        OZContractError(3007, "SmartAccountError", "DuplicateSigner"),
+        OZContractError(3008, "SmartAccountError", "PolicyNotFound"),
+        OZContractError(3009, "SmartAccountError", "DuplicatePolicy"),
+        OZContractError(3010, "SmartAccountError", "TooManySigners"),
+        OZContractError(3011, "SmartAccountError", "TooManyPolicies"),
+        OZContractError(3012, "SmartAccountError", "MathOverflow"),
+        OZContractError(3013, "SmartAccountError", "KeyDataTooLarge"),
+        OZContractError(3014, "SmartAccountError", "ContextRuleIdsLengthMismatch"),
+        OZContractError(3015, "SmartAccountError", "NameTooLong"),
+        OZContractError(3016, "SmartAccountError", "UnauthorizedSigner"),
+        // WebAuthnError (3110-3119)
+        OZContractError(3110, "WebAuthnError", "SignaturePayloadInvalid"),
+        OZContractError(3111, "WebAuthnError", "ClientDataTooLong"),
+        OZContractError(3112, "WebAuthnError", "JsonParseError"),
+        OZContractError(3113, "WebAuthnError", "TypeFieldInvalid"),
+        OZContractError(3114, "WebAuthnError", "ChallengeInvalid"),
+        OZContractError(3115, "WebAuthnError", "AuthDataFormatInvalid"),
+        OZContractError(3116, "WebAuthnError", "PresentBitNotSet"),
+        OZContractError(3117, "WebAuthnError", "VerifiedBitNotSet"),
+        OZContractError(3118, "WebAuthnError", "BackupEligibilityAndStateNotSet"),
+        OZContractError(3119, "WebAuthnError", "KeyDataInvalid"),
+        // SimpleThresholdError (3200-3203)
+        OZContractError(3200, "SimpleThresholdError", "SmartAccountNotInstalled"),
+        OZContractError(3201, "SimpleThresholdError", "InvalidThreshold"),
+        OZContractError(3202, "SimpleThresholdError", "NotAllowed"),
+        OZContractError(3203, "SimpleThresholdError", "AlreadyInstalled"),
+        // WeightedThresholdError (3210-3214)
+        OZContractError(3210, "WeightedThresholdError", "SmartAccountNotInstalled"),
+        OZContractError(3211, "WeightedThresholdError", "InvalidThreshold"),
+        OZContractError(3212, "WeightedThresholdError", "MathOverflow"),
+        OZContractError(3213, "WeightedThresholdError", "NotAllowed"),
+        OZContractError(3214, "WeightedThresholdError", "AlreadyInstalled"),
+        // SpendingLimitError (3220-3227)
+        OZContractError(3220, "SpendingLimitError", "SmartAccountNotInstalled"),
+        OZContractError(3221, "SpendingLimitError", "SpendingLimitExceeded"),
+        OZContractError(3222, "SpendingLimitError", "InvalidLimitOrPeriod"),
+        OZContractError(3223, "SpendingLimitError", "NotAllowed"),
+        OZContractError(3224, "SpendingLimitError", "HistoryCapacityExceeded"),
+        OZContractError(3225, "SpendingLimitError", "AlreadyInstalled"),
+        OZContractError(3226, "SpendingLimitError", "LessThanZero"),
+        OZContractError(3227, "SpendingLimitError", "OnlyCallContractAllowed")
+    ).associateBy { it.code }
 }

@@ -186,6 +186,22 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     @Published var isLoadingRule: Bool = false
     @Published var errorMessage: String? = nil
     @Published var fieldErrors: [String: String] = [:]
+    /// Anchor id the screen should scroll into view. Set at validation, result, and
+    /// staged-list mutation sites; the screen clears it back to nil after scrolling.
+    @Published var scrollTarget: String? = nil
+
+    // MARK: - Scroll Anchors
+
+    /// Scroll-into-view target for the validation/error banner.
+    static let scrollAnchorError = "builder.error"
+    /// Scroll-into-view target for the edit-mode result card.
+    static let scrollAnchorEditResult = "builder.editResult"
+    /// Scroll-into-view target for the create-mode result card.
+    static let scrollAnchorCreateResult = "builder.createResult"
+    /// Scroll-into-view target for the staged-signers list.
+    static let scrollAnchorStagedSigners = "builder.stagedSigners"
+    /// Scroll-into-view target for the staged-policies list.
+    static let scrollAnchorStagedPolicies = "builder.stagedPolicies"
 
     // MARK: - Config values
 
@@ -539,6 +555,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         ))
         delegatedAddress = ""
         signerWeights.removeAll()
+        requestScrollToStagedSigners()
     }
 
     func addEd25519Signer() {
@@ -559,6 +576,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         ))
         ed25519PubKeyHex = ""
         signerWeights.removeAll()
+        requestScrollToStagedSigners()
     }
 
     func registerPasskey(bridge: MacOSBridge) async {
@@ -599,6 +617,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                 passkeysLoaded = true
                 newPasskeyName = ""
                 signerWeights.removeAll()
+                requestScrollToStagedSigners()
             }
         } catch {
             let msg = error.localizedDescription
@@ -638,6 +657,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             : signer.displayName
         signers.append(SignerItem(type: "passkey", displayName: display, identifier: credId))
         signerWeights.removeAll()
+        requestScrollToStagedSigners()
     }
 
     /// Adds a signer chosen from the cross-rule reuse list (edit mode).
@@ -661,6 +681,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             isPending: false
         ))
         signerWeights.removeAll()
+        requestScrollToStagedSigners()
         return true
     }
 
@@ -734,6 +755,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         thresholdValue = ""
         selectedPolicyIndex = -1
         fieldErrors.removeValue(forKey: "threshold")
+        requestScrollToStagedPolicies()
     }
 
     func addSpendingLimitPolicy() {
@@ -766,6 +788,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         selectedPolicyIndex = -1
         fieldErrors.removeValue(forKey: "spendingAmount")
         fieldErrors.removeValue(forKey: "spendingPeriod")
+        requestScrollToStagedPolicies()
     }
 
     func addWeightedThresholdPolicy() {
@@ -816,6 +839,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         selectedPolicyIndex = -1
         fieldErrors.removeValue(forKey: "weightedThreshold")
         fieldErrors.removeValue(forKey: "signerWeights")
+        requestScrollToStagedPolicies()
     }
 
     func removePolicy(at index: Int) {
@@ -1029,6 +1053,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         fieldErrors = errors
         if !errors.isEmpty {
             errorMessage = "Please fix the validation errors above."
+            scrollTarget = Self.scrollAnchorError
         }
         return errors.isEmpty
     }
@@ -1064,6 +1089,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         submissionTxHash = nil
         submissionError = message
         hasSubmitted = true
+        scrollTarget = Self.scrollAnchorCreateResult
     }
 
     // MARK: - Edit Submission (multi-signer aware)
@@ -1105,6 +1131,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                             failedStep: nil,
                             transactionHashes: []
                         )
+                        scrollTarget = Self.scrollAnchorEditResult
                         isSubmitting = false
                         return
                     }
@@ -1182,7 +1209,8 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             if result.success && !result.partialDueToAuthGuard {
                 // Full success -- view will dismiss.
             } else {
-                // Partial or failure -- reload from chain.
+                // Partial or failure -- surface the result card and reload from chain.
+                scrollTarget = Self.scrollAnchorEditResult
                 await reloadRuleFromChain(bridge: bridge)
             }
 
@@ -1203,9 +1231,11 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                     failedStep: nil,
                     transactionHashes: []
                 )
+                scrollTarget = Self.scrollAnchorEditResult
                 ActivityLogState.shared.info(message: "Edit cancelled by user")
             } else {
                 errorMessage = msg
+                scrollTarget = Self.scrollAnchorError
                 ActivityLogState.shared.error(message: "Edit failed: \(msg)")
             }
         }
@@ -1221,27 +1251,14 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             throw SubmissionError.operationFailed("No changes to apply")
         }
 
-        // Check if multi-signer auth is needed, based on the original (on-chain) signers.
-        // Single-signer when exactly one on-chain signer AND it is the connected passkey.
-        // The picker opens only when the rule additionally has more than one on-chain
-        // signer: zero-signer (policy-only) rules and single-non-connected-signer rules
-        // submit directly through the single-signer path with an empty selection.
-        let connectedCredId = bridge.getCredentialId()
-        let isSinglePasskey = originalSigners.count == 1
-            && originalSigners[0].type == "passkey"
-            && connectedCredId != nil
-            && originalSigners[0].identifier == connectedCredId
+        // A context-rule edit is an admin operation authorized by the wallet's signer set
+        // (the default rule governs it), not by the signers of the rule being edited. Gate
+        // multi-signer routing on the same all-rules signer list the picker offers, matching
+        // the create path.
+        let isSinglePasskey = !(signersForPickerLoaded && availableSignersForPicker.count > 1)
 
-        if !isSinglePasskey && originalSigners.count > 1 {
+        if !isSinglePasskey {
             // Multi-signer: show signer picker. Submission happens via submitEditWithSigners().
-            // An empty picker pool after a failed signer load would present a sheet whose
-            // Confirm can never be enabled; surface an error instead.
-            if availableSignersForPicker.isEmpty {
-                errorMessage = "Could not load signers for multi-signer authorization. " +
-                    "Close and reopen this screen to retry."
-                isSubmitting = false
-                return
-            }
             showSignerPicker = true
             isSubmitting = false
             return
@@ -1366,6 +1383,21 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     }
 
     // MARK: - Private Helpers
+
+    /// Requests a scroll to the staged-signers list after a user-driven add. Suppressed
+    /// while a rule load or submission is rewriting the arrays, so those bulk updates do
+    /// not move the scroll position.
+    private func requestScrollToStagedSigners() {
+        guard !isLoadingRule && !isSubmitting else { return }
+        scrollTarget = Self.scrollAnchorStagedSigners
+    }
+
+    /// Requests a scroll to the staged-policies list after a user-driven add. Suppressed
+    /// while a rule load or submission is rewriting the arrays.
+    private func requestScrollToStagedPolicies() {
+        guard !isLoadingRule && !isSubmitting else { return }
+        scrollTarget = Self.scrollAnchorStagedPolicies
+    }
 
     private func validateNewSigner(identifier: String) -> String? {
         if signers.count >= maxSigners {

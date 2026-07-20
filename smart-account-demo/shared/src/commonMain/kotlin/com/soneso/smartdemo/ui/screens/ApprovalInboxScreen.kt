@@ -128,10 +128,10 @@ class ApprovalInboxScreen : Screen {
                 result.forEach { decodedById[it.id] = flow.decodeCall(it) }
                 reportPending.clear()
                 reportPending.addAll(result.map { it.id }.filter { flow.isAwaitingReport(it) })
-                DemoState.setPendingRequestCount(result.size)
+                DemoState.pendingRequestCount = result.size
             } catch (e: CoordinationException) {
                 loadError = "Could not reach the coordination server: ${e.message}"
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 loadError = "Could not load pending approvals: ${e.message ?: "Unknown error"}"
             } finally {
                 isLoading = false
@@ -143,7 +143,7 @@ class ApprovalInboxScreen : Screen {
             pending.removeAll { it.id == id }
             reportPending.remove(id)
             decodedById.remove(id)
-            DemoState.setPendingRequestCount(pending.size)
+            DemoState.pendingRequestCount = pending.size
         }
 
         fun showSnack(message: String) {

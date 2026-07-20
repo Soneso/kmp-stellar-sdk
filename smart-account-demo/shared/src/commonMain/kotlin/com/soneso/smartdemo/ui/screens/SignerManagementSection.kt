@@ -117,7 +117,8 @@ fun SignerManagementSection(
     editSignerEntries: List<EditSignerEntry> = emptyList(),
     onEditSignerEntriesChanged: ((List<EditSignerEntry>) -> Unit)? = null,
     existingSigners: List<SmartAccountSigner> = emptyList(),
-    connectedCredentialId: String? = null
+    connectedCredentialId: String? = null,
+    captionModifier: Modifier = Modifier
 ) {
     // --- Signer Header Card ---
     Card(
@@ -196,7 +197,8 @@ fun SignerManagementSection(
             Text(
                 text = "${editSignerEntries.size} signer(s) added",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = captionModifier
             )
         }
     } else {
@@ -232,270 +234,352 @@ fun SignerManagementSection(
             Text(
                 text = "${signers.size} signer(s) added",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = captionModifier
             )
         }
     }
 
     // --- Add Signer Section ---
-    if (!isSubmitting) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Add Signer",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+            Text(
+                text = "Add Signer",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
 
-                // Signer mode selector
-                SignerModeSelector(
-                    selectedMode = signerAddMode,
-                    onModeSelected = onSignerAddModeChanged
-                )
+            // Signer mode selector
+            SignerModeSelector(
+                selectedMode = signerAddMode,
+                onModeSelected = onSignerAddModeChanged,
+                enabled = !isSubmitting
+            )
 
-                // Helper to add a signer in either mode
-                val effectiveSigners = if (isEditing) editSignerEntries.map { it.signer } else signers
+            // Helper to add a signer in either mode
+            val effectiveSigners = if (isEditing) editSignerEntries.map { it.signer } else signers
 
-                when (signerAddMode) {
-                    SignerAddMode.DELEGATED -> {
-                        OutlinedTextField(
-                            value = delegatedAddress,
-                            onValueChange = {
-                                onDelegatedAddressChanged(it)
-                                onFieldErrorsChanged(fieldErrors - "delegatedAddress")
-                            },
-                            label = { Text("Stellar Address (G-address)") },
-                            placeholder = { Text("GABC...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            isError = fieldErrors.containsKey("delegatedAddress"),
-                            supportingText = if (fieldErrors.containsKey("delegatedAddress")) {
-                                { Text(fieldErrors["delegatedAddress"]!!) }
-                            } else null
-                        )
+            when (signerAddMode) {
+                SignerAddMode.DELEGATED -> {
+                    OutlinedTextField(
+                        value = delegatedAddress,
+                        onValueChange = {
+                            onDelegatedAddressChanged(it)
+                            onFieldErrorsChanged(fieldErrors - "delegatedAddress")
+                        },
+                        label = { Text("Stellar Address (G-address)") },
+                        placeholder = { Text("GABC...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isSubmitting,
+                        isError = fieldErrors.containsKey("delegatedAddress"),
+                        supportingText = if (fieldErrors.containsKey("delegatedAddress")) {
+                            { Text(fieldErrors["delegatedAddress"]!!) }
+                        } else null
+                    )
 
-                        if (DemoState.walletConnector != null) {
-                            var isGettingAddress by remember { mutableStateOf(false) }
+                    if (DemoState.walletConnector != null) {
+                        var isGettingAddress by remember { mutableStateOf(false) }
 
-                            OutlinedButton(
-                                onClick = {
-                                    scope.launch {
-                                        isGettingAddress = true
-                                        try {
-                                            val connection = DemoState.walletConnector?.connect()
-                                            if (connection != null) {
-                                                onDelegatedAddressChanged(connection.address)
-                                                onFieldErrorsChanged(fieldErrors - "delegatedAddress")
-                                                // Ephemeral connection — fetch address only, then clean up
-                                                try {
-                                                    DemoState.walletConnector?.disconnect(connection.address)
-                                                } catch (_: Exception) { }
-                                            }
-                                        } catch (e: Exception) {
-                                            onFieldErrorsChanged(
-                                                fieldErrors + ("delegatedAddress" to
-                                                        "Failed to get address from wallet: ${e.message}")
-                                            )
-                                        } finally {
-                                            isGettingAddress = false
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    isGettingAddress = true
+                                    try {
+                                        val connection = DemoState.walletConnector?.connect()
+                                        if (connection != null) {
+                                            onDelegatedAddressChanged(connection.address)
+                                            onFieldErrorsChanged(fieldErrors - "delegatedAddress")
+                                            // Ephemeral connection — fetch address only, then clean up
+                                            try {
+                                                DemoState.walletConnector?.disconnect(connection.address)
+                                            } catch (_: Exception) { }
                                         }
+                                    } catch (e: Exception) {
+                                        onFieldErrorsChanged(
+                                            fieldErrors + ("delegatedAddress" to
+                                                    "Failed to get address from wallet: ${e.message}")
+                                        )
+                                    } finally {
+                                        isGettingAddress = false
                                     }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !isGettingAddress && !isSubmitting
-                            ) {
-                                if (isGettingAddress) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                Text("Import from Freighter")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isGettingAddress && !isSubmitting
+                        ) {
+                            if (isGettingAddress) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                             }
-                        }
-                        Button(
-                            onClick = {
-                                val errors = mutableMapOf<String, String>()
-                                val addr = delegatedAddress.trim()
-                                if (addr.isEmpty()) {
-                                    errors["delegatedAddress"] = "Address is required"
-                                } else if (!addr.startsWith("G") || addr.length != 56) {
-                                    errors["delegatedAddress"] = "Must be a valid G-address (56 characters)"
-                                } else {
-                                    val newSigner = try {
-                                        buildDelegatedSigner(addr)
-                                    } catch (e: Exception) {
-                                        errors["delegatedAddress"] = "Invalid address: ${e.message}"
-                                        null
-                                    }
-                                    if (newSigner != null) {
-                                        val signerError = validateNewSigner(newSigner, effectiveSigners)
-                                        if (signerError != null) {
-                                            errors["delegatedAddress"] = signerError
-                                        } else {
-                                            if (isEditing) {
-                                                val newEntry = EditSignerEntry(
-                                                    signer = newSigner,
-                                                    onChainId = null,
-                                                    isOriginal = false
-                                                )
-                                                onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
-                                                onSignersChanged((editSignerEntries + newEntry).map { it.signer })
-                                            } else {
-                                                onSignersChanged(signers + newSigner)
-                                            }
-                                            onDelegatedAddressChanged("")
-                                            ActivityLogState.info(
-                                                "Added delegated signer: ${truncateAddress(addr, 6)}"
-                                            )
-                                        }
-                                    }
-                                }
-                                onFieldErrorsChanged(fieldErrors - "delegatedAddress" + errors)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = delegatedAddress.isNotBlank()
-                        ) {
-                            Text("Add Delegated Signer")
+                            Text("Import from Freighter")
                         }
                     }
-
-                    SignerAddMode.ED25519 -> {
-                        OutlinedTextField(
-                            value = ed25519PubKeyHex,
-                            onValueChange = {
-                                onEd25519PubKeyHexChanged(it)
-                                onFieldErrorsChanged(fieldErrors - "ed25519PublicKey")
-                            },
-                            label = { Text("Ed25519 Public Key (hex)") },
-                            placeholder = { Text("64 hex characters") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            isError = fieldErrors.containsKey("ed25519PublicKey"),
-                            supportingText = if (fieldErrors.containsKey("ed25519PublicKey")) {
-                                { Text(fieldErrors["ed25519PublicKey"]!!) }
-                            } else null
-                        )
-                        Text(
-                            text = "Uses verifier: ${truncateAddress(DemoConfig.ED25519_VERIFIER_ADDRESS, 6)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button(
-                            onClick = {
-                                val errors = mutableMapOf<String, String>()
-                                val hex = ed25519PubKeyHex.trim().lowercase()
-                                if (hex.isEmpty()) {
-                                    errors["ed25519PublicKey"] = "Public key is required"
-                                } else if (hex.length != 64) {
-                                    errors["ed25519PublicKey"] =
-                                        "Must be 64 hex characters (32 bytes), got ${hex.length}"
-                                } else if (!hex.all { it in '0'..'9' || it in 'a'..'f' }) {
-                                    errors["ed25519PublicKey"] = "Invalid hex characters"
-                                } else {
-                                    val pubKeyBytes = hexToByteArray(hex)
-                                    val newSigner = try {
-                                        buildEd25519Signer(pubKeyBytes)
-                                    } catch (e: Exception) {
-                                        errors["ed25519PublicKey"] = "Invalid key: ${e.message}"
-                                        null
-                                    }
-                                    if (newSigner != null) {
-                                        val signerError = validateNewSigner(newSigner, effectiveSigners)
-                                        if (signerError != null) {
-                                            errors["ed25519PublicKey"] = signerError
-                                        } else {
-                                            if (isEditing) {
-                                                val newEntry = EditSignerEntry(
-                                                    signer = newSigner,
-                                                    onChainId = null,
-                                                    isOriginal = false
-                                                )
-                                                onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
-                                                onSignersChanged((editSignerEntries + newEntry).map { it.signer })
-                                            } else {
-                                                onSignersChanged(signers + newSigner)
-                                            }
-                                            onEd25519PubKeyHexChanged("")
-                                            ActivityLogState.info(
-                                                "Added Ed25519 signer: ${hex.take(8)}..."
+                    Button(
+                        onClick = {
+                            val errors = mutableMapOf<String, String>()
+                            val addr = delegatedAddress.trim()
+                            if (addr.isEmpty()) {
+                                errors["delegatedAddress"] = "Address is required"
+                            } else if (!addr.startsWith("G") || addr.length != 56) {
+                                errors["delegatedAddress"] = "Must be a valid G-address (56 characters)"
+                            } else {
+                                val newSigner = try {
+                                    buildDelegatedSigner(addr)
+                                } catch (e: Exception) {
+                                    errors["delegatedAddress"] = "Invalid address: ${e.message}"
+                                    null
+                                }
+                                if (newSigner != null) {
+                                    val signerError = validateNewSigner(newSigner, effectiveSigners)
+                                    if (signerError != null) {
+                                        errors["delegatedAddress"] = signerError
+                                    } else {
+                                        if (isEditing) {
+                                            val newEntry = EditSignerEntry(
+                                                signer = newSigner,
+                                                onChainId = null,
+                                                isOriginal = false
                                             )
+                                            onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
+                                            onSignersChanged((editSignerEntries + newEntry).map { it.signer })
+                                        } else {
+                                            onSignersChanged(signers + newSigner)
                                         }
+                                        onDelegatedAddressChanged("")
+                                        ActivityLogState.info(
+                                            "Added delegated signer: ${truncateAddress(addr, 6)}"
+                                        )
                                     }
                                 }
-                                onFieldErrorsChanged(fieldErrors - "ed25519PublicKey" + errors)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = ed25519PubKeyHex.isNotBlank()
-                        ) {
-                            Text("Add Ed25519 Signer")
-                        }
+                            }
+                            onFieldErrorsChanged(fieldErrors - "delegatedAddress" + errors)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = delegatedAddress.isNotBlank() && !isSubmitting
+                    ) {
+                        Text("Add Delegated Signer")
                     }
+                }
 
-                    SignerAddMode.PASSKEY -> {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF9C27B0).copy(alpha = 0.08f)
+                SignerAddMode.ED25519 -> {
+                    OutlinedTextField(
+                        value = ed25519PubKeyHex,
+                        onValueChange = {
+                            onEd25519PubKeyHexChanged(it)
+                            onFieldErrorsChanged(fieldErrors - "ed25519PublicKey")
+                        },
+                        label = { Text("Ed25519 Public Key (hex)") },
+                        placeholder = { Text("64 hex characters") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isSubmitting,
+                        isError = fieldErrors.containsKey("ed25519PublicKey"),
+                        supportingText = if (fieldErrors.containsKey("ed25519PublicKey")) {
+                            { Text(fieldErrors["ed25519PublicKey"]!!) }
+                        } else null
+                    )
+                    Text(
+                        text = "Uses verifier: ${truncateAddress(DemoConfig.ED25519_VERIFIER_ADDRESS, 6)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = {
+                            val errors = mutableMapOf<String, String>()
+                            val hex = ed25519PubKeyHex.trim().lowercase()
+                            if (hex.isEmpty()) {
+                                errors["ed25519PublicKey"] = "Public key is required"
+                            } else if (hex.length != 64) {
+                                errors["ed25519PublicKey"] =
+                                    "Must be 64 hex characters (32 bytes), got ${hex.length}"
+                            } else if (!hex.all { it in '0'..'9' || it in 'a'..'f' }) {
+                                errors["ed25519PublicKey"] = "Invalid hex characters"
+                            } else {
+                                val pubKeyBytes = hexToByteArray(hex)
+                                val newSigner = try {
+                                    buildEd25519Signer(pubKeyBytes)
+                                } catch (e: Exception) {
+                                    errors["ed25519PublicKey"] = "Invalid key: ${e.message}"
+                                    null
+                                }
+                                if (newSigner != null) {
+                                    val signerError = validateNewSigner(newSigner, effectiveSigners)
+                                    if (signerError != null) {
+                                        errors["ed25519PublicKey"] = signerError
+                                    } else {
+                                        if (isEditing) {
+                                            val newEntry = EditSignerEntry(
+                                                signer = newSigner,
+                                                onChainId = null,
+                                                isOriginal = false
+                                            )
+                                            onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
+                                            onSignersChanged((editSignerEntries + newEntry).map { it.signer })
+                                        } else {
+                                            onSignersChanged(signers + newSigner)
+                                        }
+                                        onEd25519PubKeyHexChanged("")
+                                        ActivityLogState.info(
+                                            "Added Ed25519 signer: ${hex.take(8)}..."
+                                        )
+                                    }
+                                }
+                            }
+                            onFieldErrorsChanged(fieldErrors - "ed25519PublicKey" + errors)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = ed25519PubKeyHex.isNotBlank() && !isSubmitting
+                    ) {
+                        Text("Add Ed25519 Signer")
+                    }
+                }
+
+                SignerAddMode.PASSKEY -> {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF9C27B0).copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Passkey (WebAuthn) Signer",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7B1FA2)
                             )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "Passkey (WebAuthn) Signer",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF7B1FA2)
-                                )
-                                Text(
-                                    text = if (isEditing)
-                                        "You can reuse a signer from any existing context rule, " +
-                                                "or register a new passkey signer for this context rule."
-                                    else
-                                        "You can reuse an account signer that is already stored in an existing " +
-                                                "context rule, or register a new passkey signer for this context rule.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            Text(
+                                text = if (isEditing)
+                                    "You can reuse a signer from any existing context rule, " +
+                                            "or register a new passkey signer for this context rule."
+                                else
+                                    "You can reuse an account signer that is already stored in an existing " +
+                                            "context rule, or register a new passkey signer for this context rule.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                                // In edit mode with existingSigners available, show them directly
-                                // without requiring a "Load" button click.
-                                if (isEditing && existingSigners.isNotEmpty()) {
+                            // In edit mode with existingSigners available, show them directly
+                            // without requiring a "Load" button click.
+                            if (isEditing && existingSigners.isNotEmpty()) {
+                                Text(
+                                    text = "Available signers from existing context rules:",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                existingSigners.forEach { existingSigner ->
+                                    val displayInfo = formatSignerForDisplay(existingSigner)
+                                    val alreadyAdded = isDuplicateSigner(effectiveSigners, existingSigner)
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (!alreadyAdded) {
+                                                val signerError = validateNewSigner(existingSigner, effectiveSigners)
+                                                if (signerError != null) {
+                                                    onFieldErrorsChanged(fieldErrors + ("signers" to signerError))
+                                                } else {
+                                                    val newEntry = EditSignerEntry(
+                                                        signer = existingSigner,
+                                                        onChainId = null,
+                                                        isOriginal = false
+                                                    )
+                                                    onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
+                                                    onSignersChanged((editSignerEntries + newEntry).map { it.signer })
+                                                    onFieldErrorsChanged(fieldErrors - "signers")
+                                                    ActivityLogState.success("Added signer: ${displayInfo.display}")
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !alreadyAdded && !isSubmitting
+                                    ) {
+                                        Text(
+                                            if (alreadyAdded) "${displayInfo.display} (already added)"
+                                            else "Add: ${displayInfo.display}"
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                )
+                            }
+
+                            // Load passkey signers from on-chain context rules, excluding
+                            // the wallet owner's passkey (it's on the Default rule and adding
+                            // it to another rule has no effect — Default already authorizes it).
+                            // In edit mode, existingSigners are already displayed above, so
+                            // this button loads passkey signers not already covered.
+                            if (!isEditing) {
+                                val connectedCredentialIdForLoad = DemoState.credentialId
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            onIsLoadingPasskeysChanged(true)
+                                            try {
+                                                val loaded = loadAvailablePasskeySigners(
+                                                    excludeCredentialId = connectedCredentialIdForLoad
+                                                )
+                                                onAvailablePasskeysChanged(loaded)
+                                                onPasskeysLoadedChanged(true)
+                                                if (loaded.isEmpty()) {
+                                                    ActivityLogState.info("No additional passkey signers found")
+                                                }
+                                            } catch (e: Throwable) {
+                                                ActivityLogState.error("Failed to load passkeys: ${e.message}")
+                                            } finally {
+                                                onIsLoadingPasskeysChanged(false)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isLoadingPasskeys && !isRegistering && !isSubmitting && !passkeysLoaded
+                                ) {
+                                    if (isLoadingPasskeys) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text(if (isLoadingPasskeys) "Loading..." else "Reuse Signer")
+                                }
+
+                                // Show available passkeys (excluding wallet owner's) as selectable items
+                                if (passkeysLoaded && availablePasskeys.isNotEmpty()) {
                                     Text(
                                         text = "Available signers from existing context rules:",
                                         style = MaterialTheme.typography.labelMedium
                                     )
-                                    existingSigners.forEach { existingSigner ->
-                                        val displayInfo = formatSignerForDisplay(existingSigner)
-                                        val alreadyAdded = isDuplicateSigner(effectiveSigners, existingSigner)
+                                    availablePasskeys.forEach { passkey ->
+                                        val displayInfo = formatSignerForDisplay(passkey)
+                                        val alreadyAdded = isDuplicateSigner(signers, passkey)
                                         OutlinedButton(
                                             onClick = {
                                                 if (!alreadyAdded) {
-                                                    val signerError = validateNewSigner(existingSigner, effectiveSigners)
+                                                    val signerError = validateNewSigner(passkey, signers)
                                                     if (signerError != null) {
                                                         onFieldErrorsChanged(fieldErrors + ("signers" to signerError))
                                                     } else {
-                                                        val newEntry = EditSignerEntry(
-                                                            signer = existingSigner,
-                                                            onChainId = null,
-                                                            isOriginal = false
-                                                        )
-                                                        onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
-                                                        onSignersChanged((editSignerEntries + newEntry).map { it.signer })
+                                                        onSignersChanged(signers + passkey)
                                                         onFieldErrorsChanged(fieldErrors - "signers")
-                                                        ActivityLogState.success("Added signer: ${displayInfo.display}")
+                                                        ActivityLogState.success("Added passkey signer: ${displayInfo.display}")
                                                     }
                                                 }
                                             },
@@ -508,171 +592,91 @@ fun SignerManagementSection(
                                             )
                                         }
                                     }
+                                }
 
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(vertical = 4.dp),
-                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                if (passkeysLoaded && availablePasskeys.isEmpty()) {
+                                    Text(
+                                        text = "No existing passkey signers found on this account.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            }
 
-                                // Load passkey signers from on-chain context rules, excluding
-                                // the wallet owner's passkey (it's on the Default rule and adding
-                                // it to another rule has no effect — Default already authorizes it).
-                                // In edit mode, existingSigners are already displayed above, so
-                                // this button loads passkey signers not already covered.
-                                if (!isEditing) {
-                                    val connectedCredentialIdForLoad = DemoState.credentialId
-                                    Button(
-                                        onClick = {
-                                            scope.launch {
-                                                onIsLoadingPasskeysChanged(true)
-                                                try {
-                                                    val loaded = loadAvailablePasskeySigners(
-                                                        excludeCredentialId = connectedCredentialIdForLoad
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
+
+                            // Register a new passkey signer via WebAuthn ceremony
+                            Text(
+                                text = "Register a new passkey signer for this context rule:",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            OutlinedTextField(
+                                value = newPasskeyName,
+                                onValueChange = onNewPasskeyNameChanged,
+                                label = { Text("Passkey Name") },
+                                placeholder = { Text("e.g., Recovery Key") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = !isRegistering && !isSubmitting
+                            )
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        onIsRegisteringChanged(true)
+                                        try {
+                                            val newSigner = registerPasskeySigner(newPasskeyName)
+
+                                            val signerError = validateNewSigner(newSigner, effectiveSigners)
+                                            if (signerError != null) {
+                                                onFieldErrorsChanged(fieldErrors + ("signers" to signerError))
+                                                ActivityLogState.info(signerError)
+                                            } else {
+                                                if (isEditing) {
+                                                    val newEntry = EditSignerEntry(
+                                                        signer = newSigner,
+                                                        onChainId = null,
+                                                        isOriginal = false,
+                                                        isPending = true
                                                     )
-                                                    onAvailablePasskeysChanged(loaded)
-                                                    onPasskeysLoadedChanged(true)
-                                                    if (loaded.isEmpty()) {
-                                                        ActivityLogState.info("No additional passkey signers found")
-                                                    }
-                                                } catch (e: Throwable) {
-                                                    ActivityLogState.error("Failed to load passkeys: ${e.message}")
-                                                } finally {
-                                                    onIsLoadingPasskeysChanged(false)
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = !isLoadingPasskeys && !isRegistering && !isSubmitting && !passkeysLoaded
-                                    ) {
-                                        if (isLoadingPasskeys) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        }
-                                        Text(if (isLoadingPasskeys) "Loading..." else "Reuse Signer")
-                                    }
-
-                                    // Show available passkeys (excluding wallet owner's) as selectable items
-                                    if (passkeysLoaded && availablePasskeys.isNotEmpty()) {
-                                        Text(
-                                            text = "Available signers from existing context rules:",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        availablePasskeys.forEach { passkey ->
-                                            val displayInfo = formatSignerForDisplay(passkey)
-                                            val alreadyAdded = isDuplicateSigner(signers, passkey)
-                                            OutlinedButton(
-                                                onClick = {
-                                                    if (!alreadyAdded) {
-                                                        val signerError = validateNewSigner(passkey, signers)
-                                                        if (signerError != null) {
-                                                            onFieldErrorsChanged(fieldErrors + ("signers" to signerError))
-                                                        } else {
-                                                            onSignersChanged(signers + passkey)
-                                                            onFieldErrorsChanged(fieldErrors - "signers")
-                                                            ActivityLogState.success("Added passkey signer: ${displayInfo.display}")
-                                                        }
-                                                    }
-                                                },
-                                                modifier = Modifier.fillMaxWidth(),
-                                                enabled = !alreadyAdded && !isSubmitting
-                                            ) {
-                                                Text(
-                                                    if (alreadyAdded) "${displayInfo.display} (already added)"
-                                                    else "Add: ${displayInfo.display}"
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (passkeysLoaded && availablePasskeys.isEmpty()) {
-                                        Text(
-                                            text = "No existing passkey signers found on this account.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                )
-
-                                // Register a new passkey signer via WebAuthn ceremony
-                                Text(
-                                    text = "Register a new passkey signer for this context rule:",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                                OutlinedTextField(
-                                    value = newPasskeyName,
-                                    onValueChange = onNewPasskeyNameChanged,
-                                    label = { Text("Passkey Name") },
-                                    placeholder = { Text("e.g., Recovery Key") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    enabled = !isRegistering && !isSubmitting
-                                )
-                                Button(
-                                    onClick = {
-                                        scope.launch {
-                                            onIsRegisteringChanged(true)
-                                            try {
-                                                val newSigner = registerPasskeySigner(newPasskeyName)
-
-                                                val signerError = validateNewSigner(newSigner, effectiveSigners)
-                                                if (signerError != null) {
-                                                    onFieldErrorsChanged(fieldErrors + ("signers" to signerError))
-                                                    ActivityLogState.info(signerError)
+                                                    onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
+                                                    onSignersChanged((editSignerEntries + newEntry).map { it.signer })
                                                 } else {
-                                                    if (isEditing) {
-                                                        val newEntry = EditSignerEntry(
-                                                            signer = newSigner,
-                                                            onChainId = null,
-                                                            isOriginal = false,
-                                                            isPending = true
-                                                        )
-                                                        onEditSignerEntriesChanged?.invoke(editSignerEntries + newEntry)
-                                                        onSignersChanged((editSignerEntries + newEntry).map { it.signer })
-                                                    } else {
-                                                        onSignersChanged(signers + newSigner)
-                                                    }
-                                                    onFieldErrorsChanged(fieldErrors - "signers")
-                                                    // Also add to available list so it shows as "already added"
-                                                    onAvailablePasskeysChanged(availablePasskeys + newSigner)
-                                                    onPasskeysLoadedChanged(true)
-                                                    onNewPasskeyNameChanged("")
-                                                    ActivityLogState.success("Registered and added new passkey signer")
+                                                    onSignersChanged(signers + newSigner)
                                                 }
-                                            } catch (e: Throwable) {
-                                                val message = e.message ?: "Unknown error"
-                                                if (isUserCancellation(message)) {
-                                                    ActivityLogState.info("Passkey registration cancelled")
-                                                } else {
-                                                    ActivityLogState.error("Failed to register passkey: $message")
-                                                }
-                                            } finally {
-                                                onIsRegisteringChanged(false)
+                                                onFieldErrorsChanged(fieldErrors - "signers")
+                                                // Also add to available list so it shows as "already added"
+                                                onAvailablePasskeysChanged(availablePasskeys + newSigner)
+                                                onPasskeysLoadedChanged(true)
+                                                onNewPasskeyNameChanged("")
+                                                ActivityLogState.success("Registered and added new passkey signer")
                                             }
+                                        } catch (e: Throwable) {
+                                            val message = e.message ?: "Unknown error"
+                                            if (isUserCancellation(message)) {
+                                                ActivityLogState.info("Passkey registration cancelled")
+                                            } else {
+                                                ActivityLogState.error("Failed to register passkey: $message")
+                                            }
+                                        } finally {
+                                            onIsRegisteringChanged(false)
                                         }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isRegistering && !isLoadingPasskeys && !isSubmitting && newPasskeyName.isNotBlank()
-                                ) {
-                                    if (isRegistering) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
                                     }
-                                    Text(if (isRegistering) "Registering..." else "Register New")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isRegistering && !isLoadingPasskeys && !isSubmitting && newPasskeyName.isNotBlank()
+                            ) {
+                                if (isRegistering) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
+                                Text(if (isRegistering) "Registering..." else "Register New")
                             }
                         }
                     }
@@ -693,18 +697,20 @@ fun SignerManagementSection(
 @Composable
 internal fun SignerModeSelector(
     selectedMode: SignerAddMode,
-    onModeSelected: (SignerAddMode) -> Unit
+    onModeSelected: (SignerAddMode) -> Unit,
+    enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it }
+        onExpandedChange = { if (enabled) expanded = it }
     ) {
         OutlinedTextField(
             value = selectedMode.displayName,
             onValueChange = {},
             readOnly = true,
+            enabled = enabled,
             label = { Text("Signer Type") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier

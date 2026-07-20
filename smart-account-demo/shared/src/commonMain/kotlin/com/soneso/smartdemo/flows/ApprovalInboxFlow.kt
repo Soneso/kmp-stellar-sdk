@@ -331,7 +331,7 @@ class ApprovalInboxFlow(
     suspend fun decodeCall(request: CoordinationRequest): DecodedCall {
         val args: List<SCValXdr> = try {
             decodeArgs(request.args)
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             return DecodedCall(
                 kind = DecodedCallKind.UNDECODABLE,
                 error = "Cannot decode the stored call arguments. Do not approve.",
@@ -372,7 +372,7 @@ class ApprovalInboxFlow(
             resolveDecimals(tokenContract).also { decimalsCache[tokenContract] = it }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             null
         }
     }
@@ -441,7 +441,7 @@ class ApprovalInboxFlow(
 
             val targetArgs: List<SCValXdr> = try {
                 decodeArgs(request.args)
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
                 val message = "Cannot decode the stored call arguments. Do not approve."
                 ActivityLogState.error(message)
                 return ApprovalResult(success = false, error = message)
@@ -459,7 +459,7 @@ class ApprovalInboxFlow(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 val message = "Could not re-check the escalation before submitting: ${e.message ?: "Unknown error"}"
                 ActivityLogState.error(message)
                 return ApprovalResult(success = false, error = message)
@@ -558,7 +558,7 @@ class ApprovalInboxFlow(
             return ApprovalResult(success = false, hash = hash, error = message, confirmedOnChain = true)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val message = "Reporting the approval failed: ${e.message ?: "Unknown error"} " +
                 "(transaction confirmed on-chain: $hash)"
             ActivityLogState.error(message)
@@ -594,7 +594,7 @@ class ApprovalInboxFlow(
             return ApprovalResult(success = false, error = message, confirmedOnChain = true)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val message = "$base Reporting it to the agent failed: ${e.message ?: "Unknown error"}. " +
                 "A later approval retries the report."
             ActivityLogState.error(message)
@@ -633,7 +633,7 @@ class ApprovalInboxFlow(
             RejectionResult(success = true)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val message = "Rejection failed: ${e.message ?: "Unknown error"}"
             ActivityLogState.error(message)
             RejectionResult(success = false, error = message)
@@ -662,7 +662,7 @@ class ApprovalInboxFlow(
         if (value.discriminant != SCValTypeXdr.SCV_ADDRESS) return null
         return try {
             Address.fromSCVal(value).toString()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             null
         }
     }
@@ -681,7 +681,7 @@ class ApprovalInboxFlow(
             SCValTypeXdr.SCV_U32 -> BigInteger.fromLong(Scv.fromUint32(value).toLong())
             else -> null
         }
-    } catch (_: Exception) {
+    } catch (_: Throwable) {
         null
     }
 
@@ -698,9 +698,9 @@ class ApprovalInboxFlow(
         decodeAddress(value)?.let { return it }
         decodeInteger(value)?.let { return it.toString() }
         when (value.discriminant) {
-            SCValTypeXdr.SCV_BOOL -> return try { Scv.fromBoolean(value).toString() } catch (_: Exception) { fallbackBase64 }
-            SCValTypeXdr.SCV_SYMBOL -> return try { Scv.fromSymbol(value) } catch (_: Exception) { fallbackBase64 }
-            SCValTypeXdr.SCV_STRING -> return try { Scv.fromString(value) } catch (_: Exception) { fallbackBase64 }
+            SCValTypeXdr.SCV_BOOL -> return try { Scv.fromBoolean(value).toString() } catch (_: Throwable) { fallbackBase64 }
+            SCValTypeXdr.SCV_SYMBOL -> return try { Scv.fromSymbol(value) } catch (_: Throwable) { fallbackBase64 }
+            SCValTypeXdr.SCV_STRING -> return try { Scv.fromString(value) } catch (_: Throwable) { fallbackBase64 }
             else -> {}
         }
         // Exotic types: show the verbatim base64 that re-submits rather than hide it.

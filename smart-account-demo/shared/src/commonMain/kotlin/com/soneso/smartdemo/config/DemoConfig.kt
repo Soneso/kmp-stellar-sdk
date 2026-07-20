@@ -76,7 +76,7 @@ object DemoConfig {
 
     /** Indexer for credential-to-contract address lookup. Maps a passkey credential ID
      *  to its deployed smart account contract address. */
-    const val DEFAULT_INDEXER_URL = "https://smart-account-indexer.sdf-ecosystem.workers.dev"
+    const val DEFAULT_INDEXER_URL = "https://testnet.mercurydata.app/rest/smart-account-indexer"
 
     // -- WebAuthn --
 

@@ -50,115 +50,127 @@ struct ContextRuleBuilderScreen: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if !appState.isConnected {
-                    notConnectedCard
-                }
-
-                if viewModel.isLoadingRule {
-                    loadingRuleIndicator
-                }
-
-                if let msg = viewModel.errorMessage {
-                    ErrorCard(message: msg, font: .callout)
-                }
-
-                if viewModel.signersForPickerLoadFailed {
-                    signerLoadWarning
-                }
-
-                // Edit mode result card.
-                if viewModel.isEditing, let result = viewModel.editResult {
-                    editResultCard(result)
-                }
-
-                // Edit mode progress card.
-                if let progress = viewModel.submissionProgress, progress.isActive {
-                    editProgressCard(progress)
-                }
-
-                // Create mode result card.
-                if !viewModel.isEditing && viewModel.hasSubmitted {
-                    submissionResultCard
-                }
-
-                if appState.isConnected && !viewModel.isLoadingRule && !isFormHidden {
-                    formContent
-                }
-
-                Spacer(minLength: 24)
-            }
-            .padding(16)
-        }
-        .background(Material3Colors.background)
-        .frame(minWidth: 580, minHeight: 700)
-        .navigationToolbar(title: viewModel.isEditing ? "Edit Context Rule" : "Add Context Rule")
-        .task {
-            let bridge = bridgeWrapper.bridge
-            viewModel.loadConfig(bridge: bridge)
-            viewModel.updateDemoTokenContractId(appState.demoTokenContractId)
-            if viewModel.isEditing {
-                await viewModel.loadRuleForEdit(bridge: bridge)
-            } else {
-                // Load available signers for create mode multi-signer authorization.
-                // On failure, single-signer creation stays usable; the load-failed
-                // flag drives the multi-signer-unavailable warning.
-                let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridge)
-                if !result.loadFailed {
-                    viewModel.availableSignersForPicker = result.signers
-                }
-                viewModel.signersForPickerLoaded = true
-                viewModel.signersForPickerLoadFailed = result.loadFailed
-            }
-        }
-        .sheet(isPresented: $viewModel.showSignerPicker) {
-            SignerPickerSheet(
-                signers: viewModel.availableSignersForPicker,
-                activeCredentialId: appState.credentialId,
-                description: "Choose which signers co-authorize editing this context rule. " +
-                    "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm: { selected, secretKeys, ed25519Secrets in
-                    viewModel.showSignerPicker = false
-                    Task {
-                        await viewModel.submitEditWithSigners(
-                            bridge: bridgeWrapper.bridge,
-                            selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys,
-                            ed25519SecretKeys: ed25519Secrets
-                        )
-                        appState.sync(from: bridgeWrapper.bridge)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    if !appState.isConnected {
+                        notConnectedCard
                     }
-                },
-                onDismiss: {
-                    viewModel.showSignerPicker = false
-                },
-                bridge: bridgeWrapper.bridge
-            )
-        }
-        .sheet(isPresented: $viewModel.showCreateSignerPicker) {
-            SignerPickerSheet(
-                signers: viewModel.availableSignersForPicker,
-                activeCredentialId: appState.credentialId,
-                description: "Choose which signers co-authorize creating this context rule. " +
-                    "For Stellar account signers, enter the secret key to enable signing.",
-                onConfirm: { selected, secretKeys, ed25519Secrets in
-                    viewModel.showCreateSignerPicker = false
-                    Task {
-                        await viewModel.submitCreateWithSigners(
-                            bridge: bridgeWrapper.bridge,
-                            selectedSigners: selected,
-                            delegatedSecretKeys: secretKeys,
-                            ed25519SecretKeys: ed25519Secrets
-                        )
-                        appState.sync(from: bridgeWrapper.bridge)
+
+                    if viewModel.isLoadingRule {
+                        loadingRuleIndicator
                     }
-                },
-                onDismiss: {
-                    viewModel.showCreateSignerPicker = false
-                },
-                bridge: bridgeWrapper.bridge
-            )
+
+                    if let msg = viewModel.errorMessage {
+                        ErrorCard(message: msg, font: .callout)
+                            .id(ContextRuleBuilderViewModel.scrollAnchorError)
+                    }
+
+                    if viewModel.signersForPickerLoadFailed {
+                        signerLoadWarning
+                    }
+
+                    // Edit mode result card.
+                    if viewModel.isEditing, let result = viewModel.editResult {
+                        editResultCard(result)
+                            .id(ContextRuleBuilderViewModel.scrollAnchorEditResult)
+                    }
+
+                    // Edit mode progress card.
+                    if let progress = viewModel.submissionProgress, progress.isActive {
+                        editProgressCard(progress)
+                    }
+
+                    // Create mode result card.
+                    if !viewModel.isEditing && viewModel.hasSubmitted {
+                        submissionResultCard
+                            .id(ContextRuleBuilderViewModel.scrollAnchorCreateResult)
+                    }
+
+                    if appState.isConnected && !viewModel.isLoadingRule && !isFormHidden {
+                        formContent
+                    }
+
+                    Spacer(minLength: 24)
+                }
+                .padding(16)
+            }
+            .background(Material3Colors.background)
+            .frame(minWidth: 580, minHeight: 700)
+            .navigationToolbar(title: viewModel.isEditing ? "Edit Context Rule" : "Add Context Rule")
+            .task {
+                let bridge = bridgeWrapper.bridge
+                viewModel.loadConfig(bridge: bridge)
+                viewModel.updateDemoTokenContractId(appState.demoTokenContractId)
+                if viewModel.isEditing {
+                    await viewModel.loadRuleForEdit(bridge: bridge)
+                } else {
+                    // Load available signers for create mode multi-signer authorization.
+                    // On failure, single-signer creation stays usable; the load-failed
+                    // flag drives the multi-signer-unavailable warning.
+                    let result = await SignerSelectionSupport.loadAvailableSigners(bridge: bridge)
+                    if !result.loadFailed {
+                        viewModel.availableSignersForPicker = result.signers
+                    }
+                    viewModel.signersForPickerLoaded = true
+                    viewModel.signersForPickerLoadFailed = result.loadFailed
+                }
+            }
+            .sheet(isPresented: $viewModel.showSignerPicker) {
+                SignerPickerSheet(
+                    signers: viewModel.availableSignersForPicker,
+                    activeCredentialId: appState.credentialId,
+                    description: "Choose which signers co-authorize editing this context rule. " +
+                        "For Stellar account signers, enter the secret key to enable signing.",
+                    onConfirm: { selected, secretKeys, ed25519Secrets in
+                        viewModel.showSignerPicker = false
+                        Task {
+                            await viewModel.submitEditWithSigners(
+                                bridge: bridgeWrapper.bridge,
+                                selectedSigners: selected,
+                                delegatedSecretKeys: secretKeys,
+                                ed25519SecretKeys: ed25519Secrets
+                            )
+                            appState.sync(from: bridgeWrapper.bridge)
+                        }
+                    },
+                    onDismiss: {
+                        viewModel.showSignerPicker = false
+                    },
+                    bridge: bridgeWrapper.bridge
+                )
+            }
+            .sheet(isPresented: $viewModel.showCreateSignerPicker) {
+                SignerPickerSheet(
+                    signers: viewModel.availableSignersForPicker,
+                    activeCredentialId: appState.credentialId,
+                    description: "Choose which signers co-authorize creating this context rule. " +
+                        "For Stellar account signers, enter the secret key to enable signing.",
+                    onConfirm: { selected, secretKeys, ed25519Secrets in
+                        viewModel.showCreateSignerPicker = false
+                        Task {
+                            await viewModel.submitCreateWithSigners(
+                                bridge: bridgeWrapper.bridge,
+                                selectedSigners: selected,
+                                delegatedSecretKeys: secretKeys,
+                                ed25519SecretKeys: ed25519Secrets
+                            )
+                            appState.sync(from: bridgeWrapper.bridge)
+                        }
+                    },
+                    onDismiss: {
+                        viewModel.showCreateSignerPicker = false
+                    },
+                    bridge: bridgeWrapper.bridge
+                )
+            }
+            .onChange(of: viewModel.scrollTarget) { target in
+                guard let target else { return }
+                Task { @MainActor in
+                    withAnimation { proxy.scrollTo(target, anchor: .center) }
+                    viewModel.scrollTarget = nil
+                }
+            }
         }
     }
 
@@ -497,6 +509,7 @@ struct ContextRuleBuilderScreen: View {
                         let diff = viewModel.computeEditDiff()
                         if diff == nil || diff!.isEmpty {
                             viewModel.errorMessage = "No changes to apply"
+                            viewModel.scrollTarget = ContextRuleBuilderViewModel.scrollAnchorError
                             return
                         }
                     }

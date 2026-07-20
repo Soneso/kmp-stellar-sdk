@@ -33,6 +33,7 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -287,6 +288,33 @@ class Sep31ServiceTest {
             Sep31Service.fromDomain("anchor.example.org", tomlClient)
         }
         assertNotNull(ex.message)
+    }
+
+    @Test
+    fun fromDomain_engineThrowable_wrappedAsSep31ConfigurationException() = runTest {
+        // Given: a toml client whose engine reports a connectivity failure as a
+        // non-Exception Throwable (the Kotlin/JS HTTP engine reports these as kotlin.Error)
+        val throwingClient = HttpClient(MockEngine { throw Error("Fail to fetch") })
+
+        // When/Then: the failure surfaces as the documented Sep31ConfigurationException.
+        // The type and cause message are asserted instead of instance identity because the
+        // JVM coroutine machinery copies exceptions for stack-trace recovery.
+        val ex = assertFailsWith<Sep31ConfigurationException> {
+            Sep31Service.fromDomain("anchor.example.org", throwingClient)
+        }
+        val cause = assertIs<Error>(ex.cause)
+        assertEquals("Fail to fetch", cause.message)
+    }
+
+    @Test
+    fun fromDomain_engineCancellation_propagates() = runTest {
+        // Given: a toml client whose engine throws a cancellation
+        val throwingClient = HttpClient(MockEngine { throw CancellationException("cancelled") })
+
+        // When/Then: cancellation propagates instead of being wrapped
+        assertFailsWith<CancellationException> {
+            Sep31Service.fromDomain("anchor.example.org", throwingClient)
+        }
     }
 
     @Test

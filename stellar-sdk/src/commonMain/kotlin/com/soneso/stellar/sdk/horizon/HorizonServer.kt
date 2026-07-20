@@ -10,6 +10,8 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import com.soneso.stellar.sdk.horizon.requests.AccountsRequestBuilder
+import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 
 /**
  * Main class used to connect to Horizon server.
@@ -506,13 +508,10 @@ class HorizonServer(
                         val result = response.body<com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse>()
                         result.httpResponseCode = statusCode
                         result
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
+                        if (isFatal(e)) throw e
                         // If parsing fails, it's truly malformed - throw exception
-                        val body = try {
-                            response.body<String>()
-                        } catch (ex: Exception) {
-                            ""
-                        }
+                        val body = readErrorBodyOrFallback("") { response.body<String>() }
                         throw com.soneso.stellar.sdk.horizon.exceptions.BadRequestException(
                             code = statusCode,
                             body = body
@@ -521,11 +520,7 @@ class HorizonServer(
                 }
                 // Other 4xx errors
                 in 400..499 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     when (statusCode) {
                         429 -> throw com.soneso.stellar.sdk.horizon.exceptions.TooManyRequestsException(
                             code = statusCode,
@@ -543,11 +538,7 @@ class HorizonServer(
                 }
                 // 5xx errors
                 in 500..599 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw com.soneso.stellar.sdk.horizon.exceptions.BadResponseException(
                         code = statusCode,
                         body = body
@@ -555,11 +546,7 @@ class HorizonServer(
                 }
                 // Unknown status codes
                 else -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw com.soneso.stellar.sdk.horizon.exceptions.UnknownResponseException(
                         code = statusCode,
                         body = body
@@ -570,7 +557,11 @@ class HorizonServer(
             throw e
         } catch (e: com.soneso.stellar.sdk.horizon.exceptions.SdkException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented ConnectionErrorException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException(e)
         }
     }
@@ -604,11 +595,7 @@ class HorizonServer(
             when (response.status.value) {
                 in 200..299 -> response.body<T>()
                 in 400..499 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     when (response.status.value) {
                         429 -> throw com.soneso.stellar.sdk.horizon.exceptions.TooManyRequestsException(
                             code = response.status.value,
@@ -625,22 +612,14 @@ class HorizonServer(
                     }
                 }
                 in 500..599 -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw com.soneso.stellar.sdk.horizon.exceptions.BadResponseException(
                         code = response.status.value,
                         body = body
                     )
                 }
                 else -> {
-                    val body = try {
-                        response.body<String>()
-                    } catch (e: Exception) {
-                        ""
-                    }
+                    val body = readErrorBodyOrFallback("") { response.body<String>() }
                     throw com.soneso.stellar.sdk.horizon.exceptions.UnknownResponseException(
                         code = response.status.value,
                         body = body
@@ -651,7 +630,11 @@ class HorizonServer(
             throw e
         } catch (e: com.soneso.stellar.sdk.horizon.exceptions.SdkException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented ConnectionErrorException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException(e)
         }
     }

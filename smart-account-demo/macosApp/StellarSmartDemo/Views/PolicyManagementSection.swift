@@ -25,10 +25,11 @@ struct PolicyManagementSection: View {
             if viewModel.isEditing {
                 editPolicyParamsForms
             }
-            if !viewModel.isSubmitting && viewModel.policies.count < viewModel.maxPolicies {
+            if viewModel.policies.count < viewModel.maxPolicies {
                 addPolicyCard
             }
         }
+        .disabled(viewModel.isSubmitting)
     }
 
     // MARK: - Section Header
@@ -99,6 +100,7 @@ struct PolicyManagementSection: View {
                 .font(.caption)
                 .foregroundColor(Material3Colors.onSurfaceVariant)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .id(ContextRuleBuilderViewModel.scrollAnchorStagedPolicies)
             }
         }
     }

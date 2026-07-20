@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
+import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -19,66 +20,35 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Tests that ScMap keys are sorted lexicographically by XDR byte representation
- * when building policy parameters.
+ * Tests that ScMap keys are sorted into the Soroban host's key order when building
+ * policy parameters.
  *
- * sortMapByKeyXdr() sorts by the raw XDR-encoded bytes of each key. For symbol
- * keys, XDR encoding is: [4-byte discriminant][4-byte length][string bytes][padding].
- * This means symbols of different lengths sort by length first, not alphabetically.
- * For same-length symbols, the sort is alphabetical.
+ * sortMapByKeyXdr() orders keys the way the host does: by content, element-wise, with
+ * length only a tiebreaker on a common prefix — not by the length-major XDR encoding. For
+ * symbols and other variable-length keys this differs from a raw XDR-byte sort whenever two
+ * keys diverge in content before the shorter one ends.
  *
- * Struct-like maps (e.g., WeightedThreshold outer keys) use alphabetical field
- * ordering as mandated by the Soroban Rust SDK's #[contracttype] derive macro.
+ * Struct-like maps (e.g., WeightedThreshold outer keys) use alphabetical field ordering as
+ * mandated by the Soroban Rust SDK's #[contracttype] derive macro.
  */
 class ScMapKeySortingTest {
 
-    // MARK: - Utility Function Tests
-
-    @Test
-    fun testCompareByteArraysLexicographically() {
-        // Verify the utility function correctly compares byte arrays
-
-        // Same bytes
-        val a = byteArrayOf(0x01, 0x02, 0x03)
-        val b = byteArrayOf(0x01, 0x02, 0x03)
-        val sortedAB = listOf(a, b).sortedWith { x, y ->
-            compareByteArraysForTest(x, y)
-        }
-        assertEquals(0, compareByteArraysForTest(a, b))
-
-        // First < Second (differs at index 1)
-        val c = byteArrayOf(0x01, 0x02, 0x03)
-        val d = byteArrayOf(0x01, 0x03, 0x03)
-        assertTrue(compareByteArraysForTest(c, d) < 0)
-        assertTrue(compareByteArraysForTest(d, c) > 0)
-
-        // Shorter array < longer array when prefix matches
-        val e = byteArrayOf(0x01, 0x02)
-        val f = byteArrayOf(0x01, 0x02, 0x03)
-        assertTrue(compareByteArraysForTest(e, f) < 0)
-        assertTrue(compareByteArraysForTest(f, e) > 0)
-
-        // Unsigned byte comparison (0xFF > 0x01)
-        val g = byteArrayOf(0x01)
-        val h = byteArrayOf(0xFF.toByte())
-        assertTrue(compareByteArraysForTest(g, h) < 0)
-    }
-
     @Test
     fun testSortMapByKeyXdrWithSymbolKeys() {
-        // Symbol keys are sorted by their XDR byte encoding. XDR encodes symbols as:
-        //   [4-byte discriminant (0x0000000f)] [4-byte length] [string bytes] [padding]
-        // So symbols sort by length first (shorter length prefix = smaller XDR bytes),
-        // then alphabetically within the same length.
+        // Symbol keys are sorted in the Soroban host's order: by content, byte for byte,
+        // with length only a tiebreaker on a common prefix — not by the length-major XDR
+        // encoding. So "middle" sorts between "alpha" and "zebra" on its first byte (0x6d),
+        // regardless of being longer.
         //
-        // "alpha"  (5 chars) -> XDR: 0000000f 00000005 616c7068 61000000
-        // "zebra"  (5 chars) -> XDR: 0000000f 00000005 7a656272 61000000
-        // "middle" (6 chars) -> XDR: 0000000f 00000006 6d696464 6c650000
+        // "alpha"  -> 0x61 6c 70 68 61
+        // "middle" -> 0x6d 69 64 64 6c 65
+        // "zebra"  -> 0x7a 65 62 72 61
         //
-        // XDR sort order: alpha (5) < zebra (5) < middle (6)
+        // Host sort order: alpha (0x61) < middle (0x6d) < zebra (0x7a)
         val unsorted = linkedMapOf(
             Scv.toSymbol("zebra") to Scv.toUint32(1u),
             Scv.toSymbol("alpha") to Scv.toUint32(2u),
@@ -90,13 +60,13 @@ class ScMapKeySortingTest {
 
         assertEquals(3, keys.size)
         assertEquals("alpha", extractSymbolName(keys[0]))
-        assertEquals("zebra", extractSymbolName(keys[1]))
-        assertEquals("middle", extractSymbolName(keys[2]))
+        assertEquals("middle", extractSymbolName(keys[1]))
+        assertEquals("zebra", extractSymbolName(keys[2]))
     }
 
     @Test
     fun testSortMapByKeyXdrWithAddressKeys() {
-        // Address keys sorted by their XDR byte representation
+        // Address keys sorted in the host's ScMap key order (fixed-width, so content order)
         // Contract addresses (C...) encode as SC_ADDRESS_TYPE_CONTRACT
         val addr1 = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
         val addr2 = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
@@ -111,15 +81,47 @@ class ScMapKeySortingTest {
         val sorted = OZPolicyManager.sortMapByKeyXdr(unsorted)
         val sortedKeys = sorted.keys.toList()
 
-        // Verify entries are sorted by XDR bytes
+        // Verify entries are in the host's ScMap key order
         for (i in 0 until sortedKeys.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
-            val nextXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i + 1])
-            val hexCurrent = currentXdr.toHexString()
-            val hexNext = nextXdr.toHexString()
             assertTrue(
-                hexCurrent < hexNext,
-                "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
+                compareScValHostOrder(sortedKeys[i], sortedKeys[i + 1]) < 0,
+                "Key at index $i must precede key at index ${i + 1} in host order"
+            )
+        }
+    }
+
+    @Test
+    fun testPoliciesToScValBuildsSortedAddressKeyedMap() {
+        // policiesToScVal turns an address-keyed policies map into the ScMap the contract
+        // expects: Address keys in the host's ScMap key order, install params preserved
+        // per address.
+        val addr1 = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+        val addr2 = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
+        val addr3 = "CCK4LNH73QFN6KSRCP7ZBF4ISLXHZDMZGCMC3ETCMMUPNGQJZCPHVZQ3"
+        val policies = linkedMapOf(
+            addr1 to Scv.toUint32(1u),
+            addr2 to Scv.toUint32(2u),
+            addr3 to Scv.toUint32(3u)
+        )
+
+        val scVal = OZPolicyManager.policiesToScVal(policies)
+        val entries = extractMapEntries(scVal)
+
+        assertEquals(3, entries.size)
+        assertKeysAreInHostOrder(entries)
+
+        // Every entry's key encodes one of the input addresses and carries that
+        // address's install param.
+        val expectedByKeyHex = policies.entries.associate { (address, param) ->
+            encodeToXdrHex(Scv.toAddress(Address(address).toSCAddress())) to param
+        }
+        for (entry in entries) {
+            val expectedParam = expectedByKeyHex[encodeToXdrHex(entry.key)]
+            assertNotNull(expectedParam, "entry key must encode one of the input policy addresses")
+            assertEquals(
+                (expectedParam as SCValXdr.U32).value.value,
+                (entry.`val` as SCValXdr.U32).value.value,
+                "install param must stay attached to its address"
             )
         }
     }
@@ -178,7 +180,7 @@ class ScMapKeySortingTest {
     }
 
     @Test
-    fun testWeightedThresholdSignerWeightsMapIsSortedByXdrHex() {
+    fun testWeightedThresholdSignerWeightsMapIsSortedInHostOrder() {
         // Create multiple signers that would be in wrong order without sorting.
         // DelegatedSigners use G-addresses; their XDR encoding includes the address bytes.
         // All three G-addresses are valid StrKey-encoded Ed25519 public keys.
@@ -210,14 +212,14 @@ class ScMapKeySortingTest {
 
         assertEquals(3, innerEntries.size)
 
-        // Verify inner map keys are sorted by XDR hex
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify inner map keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
     fun testWeightedThresholdWithExternalSignersIsSorted() {
         // ExternalSigner keys have different structure (Vec with verifier address + key data)
-        // These should also be sorted by XDR hex
+        // These are also sorted in the host's ScMap key order
         val signer1 = ExternalSigner(
             verifierAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
             keyData = byteArrayOf(0x01, 0x02, 0x03)
@@ -243,8 +245,8 @@ class ScMapKeySortingTest {
 
         assertEquals(2, innerEntries.size)
 
-        // Verify inner map keys are sorted by XDR hex
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify inner map keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
@@ -280,7 +282,8 @@ class ScMapKeySortingTest {
     @Test
     fun testSpendingLimitKeysAreSorted() {
         // SpendingLimit has keys "period_ledgers" and "spending_limit"
-        // Both are 14 chars, so XDR byte ordering and alphabetical ordering are equivalent
+        // The contract is the host's ScMap key order; both keys are 14 chars, so that
+        // coincides with alphabetical (and XDR-byte) ordering
         val params = PolicyInstallParams.SpendingLimit(
             spendingLimit = BigInteger.fromLong(10_000_000L), // 1 XLM in stroops
             periodLedgers = 17280u        // ~1 day
@@ -292,8 +295,8 @@ class ScMapKeySortingTest {
         assertEquals("period_ledgers", extractSymbolName(entries[0].key))
         assertEquals("spending_limit", extractSymbolName(entries[1].key))
 
-        // Verify XDR hex ordering (same as alphabetical for same-length keys)
-        assertKeysAreSortedByXdrHex(entries)
+        // Verify host key order (same as alphabetical for same-length keys)
+        assertKeysAreInHostOrder(entries)
     }
 
     @Test
@@ -317,7 +320,7 @@ class ScMapKeySortingTest {
     // MARK: - Policies Map Sorting (Address Keys)
 
     @Test
-    fun testPoliciesMapAddressKeysAreSortedByXdrHex() {
+    fun testPoliciesMapAddressKeysAreInHostOrder() {
         // Simulate the policies map construction from OZContextRuleManager.addContextRule()
         // with multiple policy addresses in unsorted order.
         // All C-addresses are valid StrKey-encoded contract IDs.
@@ -338,7 +341,8 @@ class ScMapKeySortingTest {
         // Verify all entries are present
         assertEquals(3, sortedMap.size)
 
-        // Verify keys are sorted by XDR hex
+        // Verify keys are in the host's ScMap key order (fixed-width address keys, so
+        // XDR-byte comparison is order-equivalent)
         val sortedKeys = sortedMap.keys.toList()
         for (i in 0 until sortedKeys.size - 1) {
             val currentXdr = OZPolicyManager.scValToXdrBytes(sortedKeys[i])
@@ -396,7 +400,7 @@ class ScMapKeySortingTest {
 
         assertEquals(3, sortedKeys.size)
 
-        // Verify all keys are sorted by their XDR hex representation
+        // Verify all keys are in the host key order (different-type keys sort discriminant-major in both the host and XDR-byte orders, so hex comparison is order-equivalent here)
         for (i in 0 until sortedKeys.size - 1) {
             val currentHex = encodeToXdrHex(sortedKeys[i])
             val nextHex = encodeToXdrHex(sortedKeys[i + 1])
@@ -428,8 +432,8 @@ class ScMapKeySortingTest {
 
     @Test
     fun testSortAlreadySortedMap() {
-        // Map that is already in correct XDR order should remain the same.
-        // All keys have same length (3 chars), so XDR order = alphabetical.
+        // Map that is already in host key order should remain the same.
+        // All keys have same length (3 chars), so host order = alphabetical.
         val alreadySorted = linkedMapOf(
             Scv.toSymbol("aaa") to Scv.toUint32(1u),
             Scv.toSymbol("bbb") to Scv.toUint32(2u),
@@ -446,7 +450,7 @@ class ScMapKeySortingTest {
     @Test
     fun testSortPreservesValues() {
         // Verify that sorting does not lose or swap values.
-        // All keys have same length (1 char), so XDR order = alphabetical.
+        // All keys have same length (1 char), so host order = alphabetical.
         val map = linkedMapOf(
             Scv.toSymbol("z") to Scv.toUint32(100u),
             Scv.toSymbol("a") to Scv.toUint32(200u),
@@ -501,36 +505,16 @@ class ScMapKeySortingTest {
     }
 
     /**
-     * Asserts that the keys of the given map entries are sorted
-     * lexicographically by their XDR hex representation.
+     * Asserts that the keys of the given map entries are in strictly ascending
+     * host ScMap key order, as defined by [compareScValHostOrder].
      */
-    private fun assertKeysAreSortedByXdrHex(entries: List<SCMapEntryXdr>) {
+    private fun assertKeysAreInHostOrder(entries: List<SCMapEntryXdr>) {
         for (i in 0 until entries.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(entries[i].key)
-            val nextXdr = OZPolicyManager.scValToXdrBytes(entries[i + 1].key)
-            val hexCurrent = currentXdr.toHexString()
-            val hexNext = nextXdr.toHexString()
             assertTrue(
-                hexCurrent < hexNext,
-                "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
+                compareScValHostOrder(entries[i].key, entries[i + 1].key) < 0,
+                "Key at index $i must precede key at index ${i + 1} in host order"
             )
         }
-    }
-
-    /**
-     * Compares two byte arrays lexicographically with unsigned byte comparison.
-     * Mirrors the logic in OZPolicyManager.compareByteArraysLexicographically.
-     */
-    private fun compareByteArraysForTest(a: ByteArray, b: ByteArray): Int {
-        val minLength = minOf(a.size, b.size)
-        for (i in 0 until minLength) {
-            val aByte = a[i].toInt() and 0xFF
-            val bByte = b[i].toInt() and 0xFF
-            if (aByte != bByte) {
-                return aByte - bByte
-            }
-        }
-        return a.size - b.size
     }
 
     /**

@@ -1674,7 +1674,7 @@ class SmartAccountKitTest {
     fun testIndexerClient_defaultUrls_testnet() = runTest {
         val url = OZIndexerClient.getDefaultUrl("Test SDF Network ; September 2015")
         assertNotNull(url)
-        assertTrue(url.contains("indexer") || url.contains("testnet") || url.contains("workers.dev"))
+        assertTrue(url.contains("indexer") || url.contains("mercurydata"))
     }
 
     @Test

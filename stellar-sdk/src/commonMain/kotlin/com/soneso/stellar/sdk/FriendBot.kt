@@ -166,7 +166,11 @@ object FriendBot {
             }
 
             response.status.isSuccess()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented Exception instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw Exception("Failed to fund account $accountId via FriendBot: ${e.message}", e)
         }
     }

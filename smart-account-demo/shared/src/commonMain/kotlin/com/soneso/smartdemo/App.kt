@@ -18,29 +18,47 @@ import com.soneso.smartdemo.ui.theme.SmartAccountTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-/** Interval between approval-inbox pending-count polls while a wallet is connected. */
+/** Interval between approval-inbox pending-count polls while the coordination server responds. */
 private const val INBOX_POLL_INTERVAL_MS = 8_000L
+
+/**
+ * Interval between reachability probes while the coordination server is unavailable. Slower
+ * than the healthy-poll interval: the only goal while down is to notice recovery, and each
+ * failed probe logs a browser-level network error that cannot be suppressed.
+ */
+private const val INBOX_UNAVAILABLE_POLL_INTERVAL_MS = 60_000L
 
 @Composable
 fun App() {
-    // Poll the coordination server for pending agent escalations while connected, keeping
-    // the top-bar bell badge current regardless of which screen is on top. The effect is
-    // keyed on the connection state so it starts on connect and cancels on disconnect.
-    LaunchedEffect(DemoState.isConnected) {
-        if (!DemoState.isConnected) return@LaunchedEffect
+    // Poll the coordination server for pending agent escalations, keeping the top-bar
+    // bell badge and the server-availability state current regardless of which screen is
+    // on top. The poll runs from app start: while disconnected the count is always 0 (the
+    // flow scopes requests to the connected account), but the probe still tracks whether
+    // the server is reachable so the bell reflects availability before connecting.
+    LaunchedEffect(Unit) {
         val flow = createApprovalInboxFlow()
         while (true) {
             try {
-                DemoState.setPendingRequestCount(flow.pendingCount())
+                DemoState.pendingRequestCount = flow.pendingCount()
+                DemoState.coordinationAvailable = true
             } catch (e: CancellationException) {
-                // Cancellation (disconnect re-keys the effect) must propagate so the
-                // poll loop stops instead of looping on a cancelled coroutine.
+                // Cancellation must propagate so the poll loop stops instead of looping
+                // on a cancelled coroutine.
                 throw e
-            } catch (_: Exception) {
-                // Transient failure (server down, offline): keep the last known count and
-                // try again on the next tick.
+            } catch (_: Throwable) {
+                // Coordination server unreachable (not started, offline): mark the
+                // agent-approval feature unavailable so the bell disables, clear the
+                // badge, and keep probing so the bell re-enables when the server is up.
+                // Throwable, not Exception: on Kotlin/JS a failed fetch surfaces as a
+                // kotlin.Error, and an uncaught throwable here cancels the composition
+                // scope and freezes the whole UI.
+                DemoState.coordinationAvailable = false
+                DemoState.pendingRequestCount = 0
             }
-            delay(INBOX_POLL_INTERVAL_MS)
+            delay(
+                if (DemoState.coordinationAvailable == false) INBOX_UNAVAILABLE_POLL_INTERVAL_MS
+                else INBOX_POLL_INTERVAL_MS
+            )
         }
     }
 

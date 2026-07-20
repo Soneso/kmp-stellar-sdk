@@ -8,11 +8,9 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.XdrWriter
 
 /**
  * Represents the v0.7.0 AuthPayload format used by the OZ smart account contract.
@@ -113,8 +111,8 @@ object SmartAccountAuthPayloadCodec {
      * Writes an [SmartAccountAuthPayload] to its [SCValXdr] representation.
      *
      * Builds the Map with exactly two entries (order: `context_rule_ids`, then `signers`).
-     * Signer entries within the signers map are sorted by XDR-encoded key bytes
-     * (lowercase hex, lexicographic).
+     * Signer entries within the signers map are sorted in the Soroban host's ScMap key
+     * order (semantic content order), matching how the contract materializes the map.
      *
      * @param payload The payload to encode.
      * @return The [SCValXdr] representation of the payload.
@@ -125,18 +123,11 @@ object SmartAccountAuthPayloadCodec {
             SCMapEntryXdr(key = signer.toScVal(), `val` = Scv.toBytes(sigBytes))
         }
 
-        // Sort signer entries by XDR-encoded key bytes (lowercase hex, lexicographic)
-        val sortedSignerEntries = signerEntries.sortedBy { entry ->
-            try {
-                val writer = XdrWriter()
-                entry.key.encode(writer)
-                Util.bytesToHex(writer.toByteArray())
-            } catch (e: Exception) {
-                throw TransactionException.signingFailed(
-                    "Failed to XDR-encode signer key for sorting: ${e.message}",
-                    e
-                )
-            }
+        // Sort signer entries in the Soroban host's ScMap key order (semantic content
+        // order, not the length-major XDR-byte order), matching how the contract
+        // materializes the signers map.
+        val sortedSignerEntries = signerEntries.sortedWith { x, y ->
+            compareScValHostOrder(x.key, y.key)
         }
 
         val signersMapScVal = Scv.toMap(linkedMapOf<SCValXdr, SCValXdr>().apply {

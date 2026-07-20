@@ -12,6 +12,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
+import com.soneso.stellar.sdk.xdr.SCValXdr
 
 /**
  * Configuration for OpenZeppelin Smart Account operations.
@@ -197,7 +198,16 @@ data class OZSmartAccountConfig(
      * from ID 0 up to this value to find all active rules. Increase if the account has
      * had many add/remove cycles.
      */
-    val maxContextRuleScanId: UInt = 50u
+    val maxContextRuleScanId: UInt = 50u,
+
+    /**
+     * Policies installed on the new wallet's default context rule at deploy time, keyed by
+     * policy contract address (C...) with the policy's install parameters as the value (see
+     * [PolicyInstallParams.toScVal]). Applied through the account constructor by
+     * [OZWalletOperations.createWallet] and [OZWalletOperations.deployPendingCredential];
+     * a per-call `policies` argument overrides this default. Defaults to no policies.
+     */
+    val defaultPolicies: Map<String, SCValXdr> = emptyMap()
 ) {
     init {
         // Validate required parameters
@@ -334,6 +344,7 @@ data class OZSmartAccountConfig(
         private var externalWallet: ExternalWalletAdapter? = null
         private var externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null
         private var maxContextRuleScanId: UInt = 50u
+        private var defaultPolicies: Map<String, SCValXdr> = emptyMap()
 
         /**
          * Sets the deployer keypair.
@@ -449,6 +460,18 @@ data class OZSmartAccountConfig(
         }
 
         /**
+         * Sets the policies installed on the new wallet's default context rule at deploy time.
+         *
+         * @param value Policy install params keyed by policy contract address (C...); a per-call
+         *   `policies` argument to createWallet/deployPendingCredential overrides this default.
+         * @return This builder for chaining
+         */
+        fun defaultPolicies(value: Map<String, SCValXdr>): Builder {
+            defaultPolicies = value
+            return this
+        }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -470,7 +493,8 @@ data class OZSmartAccountConfig(
                 storage = storage,
                 externalWallet = externalWallet,
                 externalEd25519Adapter = externalEd25519Adapter,
-                maxContextRuleScanId = maxContextRuleScanId
+                maxContextRuleScanId = maxContextRuleScanId,
+                defaultPolicies = defaultPolicies
             )
         }
     }

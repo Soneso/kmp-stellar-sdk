@@ -273,7 +273,8 @@ data class OZSmartAccountConfig(
     val storage: StorageAdapter = InMemoryStorageAdapter(),
     val externalWallet: ExternalWalletAdapter? = null,
     val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
-    val maxContextRuleScanId: UInt = 50u
+    val maxContextRuleScanId: UInt = 50u,
+    val defaultPolicies: Map<String, SCValXdr> = emptyMap()
 )
 ```
 
@@ -295,6 +296,7 @@ data class OZSmartAccountConfig(
 - `externalWallet`: Optional wallet adapter (`ExternalWalletAdapter`) backing the adapter custody model for `SelectedSigner.Wallet` (G-address) signers. The kit injects it into `kit.externalSigners`.
 - `externalEd25519Adapter`: Optional Ed25519 adapter (`OZExternalEd25519SignerAdapter`) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into `kit.externalSigners`. See [External Signer Management](#external-signer-management).
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
+- `defaultPolicies`: Policies installed on a new wallet's Default context rule at deploy time, keyed by policy contract address (C...) with the policy's install parameters as the value (see `PolicyInstallParams.toScVal()`). Applied through the contract constructor by `createWallet` and `deployPendingCredential`; a per-call `policies` argument overrides it. Defaults to no policies. Maximum 5. See the `createWallet` `policies` parameter for the built-in policies' install constraints at deploy time.
 
 ### Platform-Specific Providers
 
@@ -411,7 +413,8 @@ suspend fun createWallet(
     autoSubmit: Boolean = false,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): CreateWalletResult
 ```
 
@@ -423,6 +426,7 @@ Creates a new smart account wallet with WebAuthn passkey authentication.
 - `autoFund`: Whether to automatically fund the wallet after deployment (testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
+- `policies`: Policies to install on the new wallet's Default context rule at deploy time (via the contract constructor), keyed by policy contract address (C...) with the policy's install parameters as the value (see `PolicyInstallParams.toScVal()`). When null (default), `OZSmartAccountConfig.defaultPolicies` is used; pass a map (including an empty one) to override that default. Validated before the passkey ceremony, so an invalid policy config fails without creating an orphaned credential. Maximum 5 policies. Note the built-in policies' own install rules apply against this Default rule and its single initial signer: a spending-limit policy installs only on CallContract rules and cannot be installed here, and a threshold must not exceed the signer count. A threshold of 1 installs and keeps the rule at 1-of-N as more signers are added; beyond that, constructor policies are primarily useful for custom policies.
 
 **Returns**: `CreateWalletResult` containing credential ID, contract address, signed transaction XDR, optional transaction hash, and nickname
 
@@ -623,7 +627,8 @@ suspend fun deployPendingCredential(
     autoSubmit: Boolean = true,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): DeployPendingResult
 ```
 
@@ -637,6 +642,7 @@ The kit's connected state and session are set before the deploy transaction is s
 - `autoFund`: Whether to fund the wallet after deployment via Friendbot (default: false, testnet only)
 - `nativeTokenContract`: Required if `autoFund` is true; the native token contract address
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config)
+- `policies`: Policies to install on the Default context rule at deploy time, keyed by policy contract address (C...). When null (default), `OZSmartAccountConfig.defaultPolicies` is used; pass a map (including an empty one) to override it. Constructor args are not part of the contract-address preimage, so the derived address is unchanged. Maximum 5 policies.
 
 **Returns**: `DeployPendingResult` containing contract address, signed transaction XDR, and optional transaction hash
 
@@ -1346,6 +1352,8 @@ Low-level method that adds a pre-registered WebAuthn passkey signer to a context
 - `selectedSigners`: Optional multi-signer authorization (default: single-signer with the connected passkey).
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config).
 
+**Contract limit**: Signer key data (`publicKey` + `credentialId` combined) max 256 bytes.
+
 **Returns**: `TransactionResult` indicating success or failure
 
 **Throws**:
@@ -1890,6 +1898,8 @@ suspend fun addContextRule(
 **Contract limits**:
 - Max 15 signers per rule
 - Max 5 policies per rule
+- Name max 20 UTF-8 bytes
+- External signer key data max 256 bytes
 
 **Returns**: `TransactionResult`
 
@@ -2003,7 +2013,7 @@ Updates the name of a context rule.
 
 **Parameters**:
 - `id`: Context rule ID
-- `name`: New rule name (must not be empty)
+- `name`: New rule name (must not be empty; max 20 UTF-8 bytes)
 - `selectedSigners`: Optional multi-signer authorization (default: single-signer with the connected passkey).
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config).
 
@@ -2888,7 +2898,7 @@ val indexer = OZIndexerClient.forNetwork("Test SDF Network ; September 2015")
 
 // Or with a custom URL
 val indexer = OZIndexerClient(
-    indexerUrl = "https://smart-account-indexer.sdf-ecosystem.workers.dev",
+    indexerUrl = "https://testnet.mercurydata.app/rest/smart-account-indexer",
     timeoutMs = 10000
 )
 ```
@@ -3343,7 +3353,7 @@ object SmartAccountAuthPayloadCodec {
 }
 ```
 
-Codec for reading and writing `SmartAccountAuthPayload` to and from `SCValXdr`. Inner signer entries are sorted by lowercase-hex of their XDR-encoded keys for deterministic encoding. Signature bytes are verifier-dependent: WebAuthn and Policy entries are XDR-encoded `SCValXdr`; Ed25519 entries carry the raw 64-byte signature (no XDR wrapper).
+Codec for reading and writing `SmartAccountAuthPayload` to and from `SCValXdr`. Inner signer entries are sorted in the Soroban host's ScMap key order (content order, length as tiebreaker), matching how the contract materializes the map. Signature bytes are verifier-dependent: WebAuthn and Policy entries are XDR-encoded `SCValXdr`; Ed25519 entries carry the raw 64-byte signature (no XDR wrapper).
 
 - `read(signatureScVal)` — accepts `SCValXdr.Void` (returns an empty payload) or `SCValXdr.Map` (the full payload).
 - `write(payload)` — builds the outer map (`context_rule_ids` then `signers`) and sorts the inner signer entries deterministically.
@@ -3569,7 +3579,7 @@ sealed class SmartAccountException(
 > | 3002 | `CREDENTIAL_ALREADY_EXISTS` | `UnvalidatedContext` |
 > | 3003 | `CREDENTIAL_INVALID` | `ExternalVerificationFailed` |
 >
-> When inspecting an error code, first check the exception type to determine which namespace it belongs to. The SDK does not parse or map contract error codes — it surfaces the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer extracts and interprets the code. [`ContractErrorCodes`](#contracterrorcodes) is a consumer-side reference catalog for that interpretation; the full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
+> When inspecting an error code, first check the exception type to determine which namespace it belongs to. For a contract error, the SDK surfaces the raw `Error(Contract, #NNNN)` message inside the exception; extract the numeric code and pass it to [`ContractErrorCodes.decode`](#contracterrorcodes) to resolve it to its defining contract and variant name (or match it against a constant). The full on-chain enum is defined by the smart-account contract source (see [`SmartAccountError`, `WebAuthnError`, and policy error enums in `OpenZeppelin/stellar-contracts`](https://github.com/OpenZeppelin/stellar-contracts)).
 
 ```kotlin
 enum class SmartAccountErrorCode(val code: Int) {
@@ -3769,17 +3779,37 @@ sealed class IndexerException : SmartAccountException {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. A **curated subset** of on-chain error codes from the OpenZeppelin smart-account contract, provided as a reference catalog for consumers. The SDK does not parse or map these codes — failed transactions surface the raw `Error(Contract, #NNNN)` message inside the exception, and the consumer matches the extracted code against these constants. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code — smart account, WebAuthn, or a policy contract — into the contract and variant name that defined it. A failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Alternatively, pass a thrown `TransactionException`'s message directly to `decodeFromMessage`, which extracts and decodes the first known marker in one step. Error code range: 3xxx.
 
-This object does not mirror the full on-chain enum. The smart-account contract additionally defines codes for context-rule lookup, auth-payload validation, external verification, WebAuthn parsing (3110–3119), and policy enforcement (3200–3227 across the simple-threshold, weighted-threshold, and spending-limit policies). See the contract source for the full list: [OpenZeppelin/stellar-contracts — `packages/accounts`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/accounts). Note that several values in the 3xxx range also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
+`decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000–3016; 3001 unused), `WebAuthnError` (3110–3119), and the policy enums `SimpleThresholdError` (3200–3203), `WeightedThresholdError` (3210–3214), and `SpendingLimitError` (3220–3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Note that several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 
 ```kotlin
+data class OZContractError(val code: Int, val contract: String, val name: String)
+
 object ContractErrorCodes {
-    const val MATH_OVERFLOW = 3012                   // Integer arithmetic overflow occurred in the contract
-    const val KEY_DATA_TOO_LARGE = 3013              // The key_data field on a signer exceeds the maximum allowed size
-    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014  // The number of context rule IDs does not match the expected count
-    const val NAME_TOO_LONG = 3015                   // A name field (e.g. context rule name) exceeds the maximum allowed length
-    const val UNAUTHORIZED_SIGNER = 3016             // The signer is not authorized to sign the given context rule
+    // Smart account contract (SmartAccountError, 3000-3016; 3001 unused)
+    const val CONTEXT_RULE_NOT_FOUND = 3000
+    const val UNVALIDATED_CONTEXT = 3002
+    const val EXTERNAL_VERIFICATION_FAILED = 3003
+    const val NO_SIGNERS_AND_POLICIES = 3004
+    const val PAST_VALID_UNTIL = 3005
+    const val SIGNER_NOT_FOUND = 3006
+    const val DUPLICATE_SIGNER = 3007
+    const val POLICY_NOT_FOUND = 3008
+    const val DUPLICATE_POLICY = 3009
+    const val TOO_MANY_SIGNERS = 3010
+    const val TOO_MANY_POLICIES = 3011
+    const val MATH_OVERFLOW = 3012
+    const val KEY_DATA_TOO_LARGE = 3013
+    const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014
+    const val NAME_TOO_LONG = 3015
+    const val UNAUTHORIZED_SIGNER = 3016
+
+    /** Resolves any known contract error code into its contract and variant, or null. */
+    fun decode(code: Int): OZContractError?
+
+    /** Extracts and decodes the first known Error(Contract, #NNNN) marker from an error message, or null. */
+    fun decodeFromMessage(message: String?): OZContractError?
 }
 ```
 

@@ -69,6 +69,7 @@ import com.soneso.smartdemo.state.ActivityLogState
 import com.soneso.smartdemo.state.DemoState
 import com.soneso.smartdemo.state.LogEntry
 import com.soneso.smartdemo.state.LogLevel
+import com.soneso.smartdemo.ui.pushOnce
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -120,7 +121,8 @@ class MainScreen : Screen {
                     actions = {
                         InboxBell(
                             pendingCount = DemoState.pendingRequestCount,
-                            onClick = { navigator.push(ApprovalInboxScreen()) }
+                            enabled = DemoState.coordinationAvailable != false,
+                            onClick = { navigator.pushOnce(ApprovalInboxScreen()) }
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -170,13 +172,13 @@ class MainScreen : Screen {
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Button(
-                                    onClick = { navigator.push(WalletCreationScreen()) },
+                                    onClick = { navigator.pushOnce(WalletCreationScreen()) },
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text("Create Wallet")
                                 }
                                 Button(
-                                    onClick = { navigator.push(WalletConnectionScreen()) },
+                                    onClick = { navigator.pushOnce(WalletConnectionScreen()) },
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text("Connect Wallet")
@@ -314,7 +316,7 @@ class MainScreen : Screen {
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Button(
-                                        onClick = { navigator.push(ContextRulesScreen()) },
+                                        onClick = { navigator.pushOnce(ContextRulesScreen()) },
                                         modifier = Modifier.weight(1f),
                                         enabled = DemoState.isDeployed,
                                         colors = if (DemoState.isDeployed) {
@@ -329,7 +331,7 @@ class MainScreen : Screen {
                                         Text("Context Rules")
                                     }
                                     Button(
-                                        onClick = { navigator.push(TransferScreen()) },
+                                        onClick = { navigator.pushOnce(TransferScreen()) },
                                         modifier = Modifier.weight(1f),
                                         enabled = DemoState.isDeployed,
                                         colors = if (DemoState.isDeployed) {
@@ -349,7 +351,7 @@ class MainScreen : Screen {
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Button(
-                                        onClick = { navigator.push(ApproveScreen()) },
+                                        onClick = { navigator.pushOnce(ApproveScreen()) },
                                         modifier = Modifier.weight(1f),
                                         enabled = DemoState.isDeployed,
                                         colors = if (DemoState.isDeployed) {
@@ -364,7 +366,7 @@ class MainScreen : Screen {
                                         Text("Approve")
                                     }
                                     Button(
-                                        onClick = { navigator.push(KnownSignersScreen()) },
+                                        onClick = { navigator.pushOnce(KnownSignersScreen()) },
                                         modifier = Modifier.weight(1f),
                                         enabled = DemoState.isDeployed,
                                         colors = if (DemoState.isDeployed) {
@@ -453,14 +455,16 @@ class MainScreen : Screen {
 
     /**
      * Badged inbox bell shown in the top app bar. The badge displays the number of pending
-     * agent escalations for the connected account; tapping opens the approval inbox.
+     * agent escalations for the connected account; tapping opens the approval inbox. When
+     * the coordination server is unreachable the bell is disabled (dimmed, no badge) so the
+     * agent-approval feature reads as unavailable; it re-enables once a poll succeeds.
      */
     @Composable
-    private fun InboxBell(pendingCount: Int, onClick: () -> Unit) {
-        IconButton(onClick = onClick) {
+    private fun InboxBell(pendingCount: Int, enabled: Boolean, onClick: () -> Unit) {
+        IconButton(onClick = onClick, enabled = enabled) {
             BadgedBox(
                 badge = {
-                    if (pendingCount > 0) {
+                    if (enabled && pendingCount > 0) {
                         Badge {
                             Text(if (pendingCount > 99) "99+" else pendingCount.toString())
                         }
@@ -469,7 +473,11 @@ class MainScreen : Screen {
             ) {
                 Icon(
                     imageVector = Icons.Default.Notifications,
-                    contentDescription = "Approval inbox"
+                    contentDescription = if (enabled) {
+                        "Approval inbox"
+                    } else {
+                        "Approval inbox unavailable: coordination server not reachable"
+                    }
                 )
             }
         }

@@ -10,6 +10,8 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.addressCredentials
+import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.readErrorBodyOrFallback
 import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
@@ -245,7 +247,11 @@ class WebAuthForContracts(
                     httpClient = httpClient,
                     httpRequestHeaders = httpRequestHeaders
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                // connectivity failures as kotlin.Error, which must surface as the
+                // documented Sep45ChallengeRequestException instead of escaping unwrapped.
+                if (isFatal(e)) throw e
                 throw Sep45ChallengeRequestException(
                     "Failed to fetch stellar.toml from domain $domain",
                     errorMessage = e.message
@@ -372,7 +378,11 @@ class WebAuthForContracts(
                         httpClient = httpClient,
                         httpRequestHeaders = httpRequestHeaders
                     )
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+                    // connectivity failures as kotlin.Error, which must surface as the
+                    // documented Sep45ChallengeRequestException instead of escaping unwrapped.
+                    if (isFatal(e)) throw e
                     throw Sep45ChallengeRequestException(
                         "Failed to fetch stellar.toml for client domain $clientDomain",
                         errorMessage = e.message
@@ -455,7 +465,11 @@ class WebAuthForContracts(
                     header(key, headerValue)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented Sep45ChallengeRequestException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw Sep45ChallengeRequestException(
                 "Network error during challenge request",
                 errorMessage = e.message
@@ -466,7 +480,8 @@ class WebAuthForContracts(
             200 -> {
                 val bodyText = try {
                     response.bodyAsText()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    if (isFatal(e)) throw e
                     throw Sep45ChallengeRequestException(
                         "Failed to read response body",
                         statusCode = 200,
@@ -485,7 +500,7 @@ class WebAuthForContracts(
                 }
             }
             400 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Bad Request" }
+                val errorBody = readErrorBodyOrFallback("Bad Request") { response.bodyAsText() }
                 throw Sep45ChallengeRequestException(
                     "Bad request",
                     statusCode = 400,
@@ -493,7 +508,7 @@ class WebAuthForContracts(
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw Sep45ChallengeRequestException(
                     "Forbidden",
                     statusCode = 403,
@@ -511,7 +526,7 @@ class WebAuthForContracts(
                 throw Sep45TimeoutException("Challenge request timed out (HTTP 504)")
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw Sep45UnknownResponseException(
                     message = "Unexpected response during challenge request",
                     code = response.status.value,
@@ -848,7 +863,11 @@ class WebAuthForContracts(
                     setBody("""{"authorization_entries":"$base64Xdr"}""")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
+            // connectivity failures as kotlin.Error, which must surface as the
+            // documented Sep45TokenSubmissionException instead of escaping unwrapped.
+            if (isFatal(e)) throw e
             throw Sep45TokenSubmissionException(
                 "Network error during token submission",
                 errorMessage = e.message
@@ -859,7 +878,8 @@ class WebAuthForContracts(
             200, 400 -> {
                 val bodyText = try {
                     response.bodyAsText()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    if (isFatal(e)) throw e
                     throw Sep45TokenSubmissionException(
                         "Failed to read response body",
                         statusCode = response.status.value,
@@ -894,7 +914,7 @@ class WebAuthForContracts(
                 Sep45AuthToken.parse(token)
             }
             401 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Unauthorized" }
+                val errorBody = readErrorBodyOrFallback("Unauthorized") { response.bodyAsText() }
                 throw Sep45TokenSubmissionException(
                     "Signature verification failed",
                     statusCode = 401,
@@ -902,7 +922,7 @@ class WebAuthForContracts(
                 )
             }
             403 -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "Forbidden" }
+                val errorBody = readErrorBodyOrFallback("Forbidden") { response.bodyAsText() }
                 throw Sep45TokenSubmissionException(
                     "Forbidden",
                     statusCode = 403,
@@ -913,7 +933,7 @@ class WebAuthForContracts(
                 throw Sep45TimeoutException("Token submission timed out (HTTP 504)")
             }
             else -> {
-                val errorBody = try { response.bodyAsText() } catch (e: Exception) { "" }
+                val errorBody = readErrorBodyOrFallback("") { response.bodyAsText() }
                 throw Sep45UnknownResponseException(
                     message = "Unexpected response during token submission",
                     code = response.status.value,

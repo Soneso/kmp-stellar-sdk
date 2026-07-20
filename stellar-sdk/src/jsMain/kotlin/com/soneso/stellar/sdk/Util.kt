@@ -36,3 +36,12 @@ internal actual suspend fun platformDelay(timeMillis: Long) {
 internal actual fun <T> platformSynchronized(lock: Any, block: () -> T): T {
     return block()
 }
+
+/**
+ * JavaScript implementation of isFatalPlatformError.
+ *
+ * JS has no error category that is unrecoverable by definition; in particular,
+ * [kotlin.Error] instances thrown by the HTTP engine for connectivity failures
+ * ("Fail to fetch") must be handled, not rethrown.
+ */
+internal actual fun isFatalPlatformError(throwable: Throwable): Boolean = false

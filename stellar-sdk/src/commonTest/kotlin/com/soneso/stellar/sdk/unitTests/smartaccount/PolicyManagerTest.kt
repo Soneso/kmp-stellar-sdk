@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.unitTests.smartaccount
 
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountBuilders
@@ -188,7 +189,7 @@ class PolicyManagerTest {
     }
 
     @Test
-    fun testWeightedThreshold_signerWeightsAreSortedByXdr() {
+    fun testWeightedThreshold_signerWeightsAreSortedInHostOrder() {
         val signer1 = DelegatedSigner(
             address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7"
         )
@@ -216,8 +217,8 @@ class PolicyManagerTest {
 
         assertEquals(3, innerEntries.size)
 
-        // Verify keys are sorted by XDR bytes
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
@@ -277,8 +278,8 @@ class PolicyManagerTest {
             assertIs<SCValXdr.Vec>(entry.key)
         }
 
-        // Verify keys are sorted by XDR
-        assertKeysAreSortedByXdrHex(innerEntries)
+        // Verify keys are in the host's ScMap key order
+        assertKeysAreInHostOrder(innerEntries)
     }
 
     @Test
@@ -665,18 +666,14 @@ class PolicyManagerTest {
     }
 
     /**
-     * Asserts that the keys of the given map entries are sorted
-     * lexicographically by their XDR hex representation.
+     * Asserts that the keys of the given map entries are in strictly ascending host
+     * ScMap key order, as defined by [compareScValHostOrder].
      */
-    private fun assertKeysAreSortedByXdrHex(entries: List<SCMapEntryXdr>) {
+    private fun assertKeysAreInHostOrder(entries: List<SCMapEntryXdr>) {
         for (i in 0 until entries.size - 1) {
-            val currentXdr = OZPolicyManager.scValToXdrBytes(entries[i].key)
-            val nextXdr = OZPolicyManager.scValToXdrBytes(entries[i + 1].key)
-            val hexCurrent = currentXdr.toHexString()
-            val hexNext = nextXdr.toHexString()
             assertTrue(
-                hexCurrent < hexNext,
-                "Key at index $i (hex=$hexCurrent) must be < key at index ${i + 1} (hex=$hexNext)"
+                compareScValHostOrder(entries[i].key, entries[i + 1].key) < 0,
+                "Key at index $i must precede key at index ${i + 1} in host order"
             )
         }
     }
