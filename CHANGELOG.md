@@ -5,15 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2026-07-20
+
+### Added
+- **Constructor-time policies for smart accounts**: policies can now be
+  installed on the default context rule at wallet creation.
+  `OZSmartAccountConfig` gains `defaultPolicies`, and `createWallet` and
+  `deployPendingCredential` gain an optional `policies` parameter that
+  overrides the config default. The policy map is validated before the passkey
+  ceremony starts, so an invalid configuration fails without leaving an
+  orphaned credential. Constructor arguments are not part of the contract
+  address preimage, so the derived wallet address is unchanged by the
+  policies. Contract constraints are documented: constructor policies land on
+  the default rule, so a spending-limit policy — which installs only on
+  call-contract rules — cannot be installed at deploy time; a threshold must
+  not exceed the signer count; and threshold 1 keeps a rule at 1-of-N as
+  signers are added.
+- **Contract error-code catalog**: `ContractErrorCodes` gains the full set of
+  named constants for the smart-account contract's own error enum
+  (`SmartAccountError`, codes 3000-3016; previously only five were exposed).
+  `decode` resolves any known raw code — smart account, WebAuthn verifier,
+  simple threshold, weighted threshold, or spending limit — into the new
+  `OZContractError` (defining contract enum plus variant name), and
+  `decodeFromMessage` resolves the first known error code inside a transaction
+  failure message.
+- **Client-side contract limits**: context-rule names (20 UTF-8 bytes) and
+  external-signer key data (256 bytes) are validated before submission, and
+  the per-rule policy limit (5) is enforced for constructor policies as well,
+  so violations fail fast instead of on-chain. The limits are exposed as
+  `OZConstants.MAX_NAME_SIZE`, `MAX_EXTERNAL_KEY_SIZE`, and `MAX_POLICIES`.
 
 ### Changed
+- The default smart-account indexer endpoints for testnet and mainnet now
+  point at the Mercury smart-account indexer (previously the SDF ecosystem
+  workers endpoints). Consumers that set a custom indexer URL are unaffected.
+- Smart-account indexer requests no longer send client-identification headers.
+  Custom headers force a CORS preflight in browsers, and indexer providers
+  only allowlist standard headers, which blocked every request from the web
+  target.
+- Coroutine cancellation now propagates out of SDK network calls instead of
+  being swallowed or converted into error results.
+- The new optional parameters change the JVM binary signatures of
+  `createWallet`, `deployPendingCredential`, and the `OZSmartAccountConfig`
+  constructor and its generated `copy()`.
+- `OZPolicyManager.sortMapByKeyXdr` returns entries in the host's ScMap key
+  order instead of XDR-byte order; consumer-built install-param maps sorted
+  with it pick up the corrected ordering automatically.
 - Updated XDR definitions to stellar-xdr `df0c200` (declaration reordering
   only; generated types unchanged apart from doc comments).
 - Migrated the demo web apps to Vite 8 (Rolldown bundler) and removed the
   unused terser dependency.
 
 ### Fixed
+- **Smart-account map-key ordering**: map keys in auth payloads and policy
+  install parameters are now sorted in the Soroban host's content-wise key
+  order. The previous length-major sort over XDR-encoded bytes produced
+  orderings the host rejects, which failed authentication and constructor
+  materialization for affected key sets.
+- Smart-account, RPC, and FriendBot network boundaries no longer leak
+  Kotlin/JS connectivity errors: relayer calls broke their documented no-throw
+  contract, indexer and RPC failures escaped unwrapped, and a transient glitch
+  aborted transaction polling. RPC connectivity errors now surface as
+  `ConnectionErrorException`, indexer errors as `IndexerException`, relayer
+  errors in the returned `RelayerResponse`, FriendBot funding failures as the
+  documented `Exception`, and polling retries them.
+- `SorobanServer.pollTransaction` now throws the last polling failure when
+  every attempt fails; previously it crashed with a null-pointer error. A
+  received response is still returned even if later attempts fail.
+- Smart-account demo: the approval-inbox bell is disabled while the
+  coordination server is unreachable and recovers automatically, an outage no
+  longer freezes the app, and rapid repeated taps no longer corrupt the
+  navigation stack. Editing a context rule offers signer selection based on
+  the wallet's signer set, since a rule edit is authorized by the default rule
+  rather than the edited rule's signers. During submission the add-signer and
+  add-policy forms stay visible but disabled, and newly staged entries,
+  validation errors, and results scroll into view.
 - Horizon and SEP network boundaries no longer leak Kotlin/JS connectivity
   errors. On Kotlin/JS the HTTP engine reports a failed connection as a
   `kotlin.Error` ("Fail to fetch"), which is a `Throwable` but not an
