@@ -21,9 +21,20 @@ import com.soneso.stellar.sdk.smartaccount.oz.OZContextRuleManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountKit
 import com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule
+import com.soneso.stellar.sdk.xdr.ContractExecutableExternalRefXdr
+import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
+import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
+import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
+import com.soneso.stellar.sdk.xdr.CreateContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
+import com.soneso.stellar.sdk.xdr.SCStringXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
+import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
+import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1123,5 +1134,46 @@ class ContextRuleParsingTest {
             manager.parseContextRule(ruleMap)
         }
         assertTrue(ex.message!!.contains("context_type"), "Exception message should mention 'context_type'")
+    }
+
+    // ========================================================================
+    // resolveContextRuleIdsForEntry — executables without a WASM hash
+    // ========================================================================
+
+    @Test
+    fun testResolveContextRuleIds_createContractWithExternalRefExecutable_throwsValidationException() = runTest {
+        val kit = createConnectedKit()
+        val manager = kit.contextRuleManager
+
+        val entry = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Void,
+            rootInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.CreateContractHostFn(
+                    CreateContractArgsXdr(
+                        contractIdPreimage = ContractIDPreimageXdr.FromAddress(
+                            ContractIDPreimageFromAddressXdr(
+                                address = Address(validContractAddress).toSCAddress(),
+                                salt = Uint256Xdr(ByteArray(32))
+                            )
+                        ),
+                        executable = ContractExecutableXdr.ExternalRef(
+                            ContractExecutableExternalRefXdr(
+                                executableOwner = Address(validContractAddress2).toSCAddress(),
+                                tag = SCStringXdr("my-tag")
+                            )
+                        )
+                    )
+                ),
+                subInvocations = emptyList()
+            )
+        )
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            manager.resolveContextRuleIdsForEntry(entry, emptyList(), emptyList())
+        }
+        assertTrue(
+            ex.message!!.contains("external executable"),
+            "Exception message should name the external executable"
+        )
     }
 }
