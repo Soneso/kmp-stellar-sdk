@@ -11,6 +11,14 @@ package com.soneso.stellar.sdk.xdr
  *         void;
  *     case STELLAR_VALUE_SIGNED:
  *         LedgerCloseValueSignature lcValueSignature;
+ *     case STELLAR_VALUE_EMPTY_TX_SET:
+ *         struct
+ *         {
+ *             Hash txSetHash;
+ *             Hash previousLedgerHash;
+ *             uint32 previousLedgerVersion;
+ *             LedgerCloseValueSignature lcValueSignature;
+ *         } proposedValue;
  *     }
  */
 sealed class StellarValueExtXdr {
@@ -20,6 +28,12 @@ sealed class StellarValueExtXdr {
     val value: LedgerCloseValueSignatureXdr
   ) : StellarValueExtXdr() {
     override val discriminant: StellarValueTypeXdr = StellarValueTypeXdr.STELLAR_VALUE_SIGNED
+  }
+
+  data class ProposedValue(
+    val value: StellarValueProposedValueXdr
+  ) : StellarValueExtXdr() {
+    override val discriminant: StellarValueTypeXdr = StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET
   }
 
   data object Void : StellarValueExtXdr() {
@@ -36,6 +50,10 @@ sealed class StellarValueExtXdr {
           val value = LedgerCloseValueSignatureXdr.decode(reader)
           LcValueSignature(value)
         }
+        StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET -> {
+          val value = StellarValueProposedValueXdr.decode(reader)
+          ProposedValue(value)
+        }
         else -> throw IllegalArgumentException("Unknown StellarValueExtXdr discriminant: $discriminant")
       }
     }
@@ -46,6 +64,9 @@ sealed class StellarValueExtXdr {
     when (this) {
       is Void -> {}
       is LcValueSignature -> {
+        value.encode(writer)
+      }
+      is ProposedValue -> {
         value.encode(writer)
       }
     }

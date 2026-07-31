@@ -78,6 +78,20 @@ class XdrLedgerUpgradeTest {
         XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> StellarValueExtXdr.decode(r) })
     }
 
+    @Test fun testStellarValueExtProposedValue() {
+        val sig = LedgerCloseValueSignatureXdr(
+            nodeId = NodeIDXdr(XdrTestHelpers.publicKeyEd25519()),
+            signature = SignatureXdr(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8))
+        )
+        val v = StellarValueExtXdr.ProposedValue(StellarValueProposedValueXdr(
+            txSetHash = XdrTestHelpers.hashXdr(),
+            previousLedgerHash = XdrTestHelpers.hashXdr(),
+            previousLedgerVersion = Uint32Xdr(27u),
+            lcValueSignature = sig
+        ))
+        XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> StellarValueExtXdr.decode(r) })
+    }
+
     // ---- LedgerCloseValueSignature ----
 
     @Test fun testLedgerCloseValueSignature() {

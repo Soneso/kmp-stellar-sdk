@@ -775,6 +775,34 @@ object Scv {
     }
 
     // ============================================================================
+    // Executable Tag
+    // ============================================================================
+
+    /**
+     * Build a [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG].
+     *
+     * @param tag executable tag to convert
+     * @return [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG]
+     */
+    fun toExecutableTag(tag: String): SCValXdr {
+        return SCValXdr.ExecutableTag(SCStringXdr(tag))
+    }
+
+    /**
+     * Convert from [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG] to String.
+     *
+     * @param scVal [SCValXdr] to convert
+     * @return the executable tag
+     * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_EXECUTABLE_TAG]
+     */
+    fun fromExecutableTag(scVal: SCValXdr): String {
+        require(scVal is SCValXdr.ExecutableTag) {
+            "invalid scVal type, expected SCV_EXECUTABLE_TAG, but got ${scVal.discriminant}"
+        }
+        return scVal.value.value
+    }
+
+    // ============================================================================
     // Internal utility functions for byte conversions
     // ============================================================================
 

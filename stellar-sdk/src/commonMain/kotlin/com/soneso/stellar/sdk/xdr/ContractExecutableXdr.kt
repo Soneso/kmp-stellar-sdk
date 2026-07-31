@@ -11,6 +11,8 @@ package com.soneso.stellar.sdk.xdr
  *     Hash wasm_hash;
  * case CONTRACT_EXECUTABLE_STELLAR_ASSET:
  *     void;
+ * case CONTRACT_EXECUTABLE_EXTERNAL_REF:
+ *     ContractExecutableExternalRef external_ref;
  * };
  */
 sealed class ContractExecutableXdr {
@@ -20,6 +22,12 @@ sealed class ContractExecutableXdr {
     val value: HashXdr
   ) : ContractExecutableXdr() {
     override val discriminant: ContractExecutableTypeXdr = ContractExecutableTypeXdr.CONTRACT_EXECUTABLE_WASM
+  }
+
+  data class ExternalRef(
+    val value: ContractExecutableExternalRefXdr
+  ) : ContractExecutableXdr() {
+    override val discriminant: ContractExecutableTypeXdr = ContractExecutableTypeXdr.CONTRACT_EXECUTABLE_EXTERNAL_REF
   }
 
   data object Void : ContractExecutableXdr() {
@@ -36,6 +44,10 @@ sealed class ContractExecutableXdr {
           WasmHash(value)
         }
         ContractExecutableTypeXdr.CONTRACT_EXECUTABLE_STELLAR_ASSET -> Void
+        ContractExecutableTypeXdr.CONTRACT_EXECUTABLE_EXTERNAL_REF -> {
+          val value = ContractExecutableExternalRefXdr.decode(reader)
+          ExternalRef(value)
+        }
         else -> throw IllegalArgumentException("Unknown ContractExecutableXdr discriminant: $discriminant")
       }
     }
@@ -48,6 +60,9 @@ sealed class ContractExecutableXdr {
         value.encode(writer)
       }
       is Void -> {}
+      is ExternalRef -> {
+        value.encode(writer)
+      }
     }
   }
 }

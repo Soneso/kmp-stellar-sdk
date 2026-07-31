@@ -8,12 +8,14 @@ package com.soneso.stellar.sdk.xdr
  * enum ContractExecutableType
  * {
  *     CONTRACT_EXECUTABLE_WASM = 0,
- *     CONTRACT_EXECUTABLE_STELLAR_ASSET = 1
+ *     CONTRACT_EXECUTABLE_STELLAR_ASSET = 1,
+ *     CONTRACT_EXECUTABLE_EXTERNAL_REF = 2
  * };
  */
 enum class ContractExecutableTypeXdr(val value: Int) {
   CONTRACT_EXECUTABLE_WASM(0),
-  CONTRACT_EXECUTABLE_STELLAR_ASSET(1);
+  CONTRACT_EXECUTABLE_STELLAR_ASSET(1),
+  CONTRACT_EXECUTABLE_EXTERNAL_REF(2);
 
   companion object {
 

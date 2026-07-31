@@ -80,6 +80,25 @@ class XdrSCValAllTest {
 
     @Test fun testNonceKey() = rt(SCValXdr.NonceKey(SCNonceKeyXdr(nonce = Int64Xdr(9876543210L))))
 
+    @Test fun testExecutableTag() = rt(SCValXdr.ExecutableTag(SCStringXdr("my-tag")))
+    @Test fun testExecutableTagEmpty() = rt(SCValXdr.ExecutableTag(SCStringXdr("")))
+
+    @Test fun testSCValTypeEnum() {
+        for (e in SCValTypeXdr.entries) {
+            XdrTestHelpers.assertXdrRoundTrip(e, { a, w -> a.encode(w) }, { r -> SCValTypeXdr.decode(r) })
+        }
+    }
+
+    @Test fun testInstanceExternalRef() = rt(SCValXdr.Instance(
+        SCContractInstanceXdr(
+            executable = ContractExecutableXdr.ExternalRef(ContractExecutableExternalRefXdr(
+                executableOwner = SCAddressXdr.ContractId(XdrTestHelpers.contractId()),
+                tag = SCStringXdr("tag")
+            )),
+            storage = null
+        )
+    ))
+
     @Test fun testNestedVec() {
         val inner = SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.U32(Uint32Xdr(1u)))))
         rt(SCValXdr.Vec(SCVecXdr(listOf(inner, SCValXdr.B(false)))))

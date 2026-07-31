@@ -57,8 +57,9 @@ package com.soneso.stellar.sdk.xdr
  *     // symbolic SCVals used as the key for ledger entries for a contract's
  *     // instance and an address' nonce, respectively.
  *     SCV_LEDGER_KEY_CONTRACT_INSTANCE = 20,
- *     SCV_LEDGER_KEY_NONCE = 21
+ *     SCV_LEDGER_KEY_NONCE = 21,
  * 
+ *     SCV_EXECUTABLE_TAG = 22
  * };
  */
 enum class SCValTypeXdr(val value: Int) {
@@ -114,7 +115,8 @@ enum class SCValTypeXdr(val value: Int) {
    * instance and an address' nonce, respectively.
    */
   SCV_LEDGER_KEY_CONTRACT_INSTANCE(20),
-  SCV_LEDGER_KEY_NONCE(21);
+  SCV_LEDGER_KEY_NONCE(21),
+  SCV_EXECUTABLE_TAG(22);
 
   companion object {
 

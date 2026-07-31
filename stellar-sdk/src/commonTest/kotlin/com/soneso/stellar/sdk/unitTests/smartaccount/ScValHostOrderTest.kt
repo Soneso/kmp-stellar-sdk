@@ -180,6 +180,20 @@ class ScValHostOrderTest {
         assertEquals(0, compareScValHostOrder(a, Scv.toString("apple")))
     }
 
+    // ExecutableTag comparands carry an SCString and compare by content, byte for byte,
+    // with the shorter value first on a prefix tie.
+    @Test
+    fun testExecutableTagComparands_contentOrder() {
+        val a = Scv.toExecutableTag("aa")
+        val b = Scv.toExecutableTag("b")
+        assertTrue(compareScValHostOrder(a, b) < 0, "content order, not length-major order")
+        assertTrue(compareScValHostOrder(b, a) > 0)
+
+        val prefix = Scv.toExecutableTag("a")
+        assertTrue(compareScValHostOrder(prefix, a) < 0, "a prefix sorts before its extension")
+        assertEquals(0, compareScValHostOrder(a, Scv.toExecutableTag("aa")))
+    }
+
     // Vec comparands: on a shared prefix, the shorter vec sorts first.
     @Test
     fun testVecComparands_prefixShorterFirst() {

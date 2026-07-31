@@ -108,6 +108,16 @@ class XdrSorobanDataTest {
     }
 
     @Test
+    fun testContractExecutableExternalRef() {
+        XdrTestHelpers.assertXdrRoundTrip(
+            ContractExecutableXdr.ExternalRef(ContractExecutableExternalRefXdr(
+                executableOwner = SCAddressXdr.ContractId(XdrTestHelpers.contractId()),
+                tag = SCStringXdr("my-tag")
+            )),
+            { v, w -> v.encode(w) }, { r -> ContractExecutableXdr.decode(r) })
+    }
+
+    @Test
     fun testHostFunctionWasm() {
         XdrTestHelpers.assertXdrRoundTrip(
             HostFunctionXdr.Wasm(byteArrayOf(0, 0x61, 0x73, 0x6D)),
