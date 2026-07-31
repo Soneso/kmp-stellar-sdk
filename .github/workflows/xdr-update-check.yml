@@ -195,12 +195,74 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          count=$(gh issue list \
+          issues=$(gh issue list \
             --label "xdr-update" \
             --state open \
-            --json number \
-            --jq 'length')
+            --json number)
+          count=$(jq 'length' <<< "$issues")
+          number=$(jq -r '.[0].number // empty' <<< "$issues")
           echo "open_issues=$count" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on existing issue if upstream advanced
+        if: >-
+          steps.diff.outputs.any_x_changed == 'true'
+          && steps.existing.outputs.open_issues != '0'
+          && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.existing.outputs.issue_number }}
+          PINNED: ${{ steps.pinned.outputs.commit }}
+          PINNED_SHORT: ${{ steps.pinned.outputs.commit_short }}
+          UPSTREAM: ${{ steps.upstream.outputs.commit }}
+          UPSTREAM_SHORT: ${{ steps.upstream.outputs.commit_short }}
+          COMMIT_COUNT: ${{ steps.diff.outputs.commit_count }}
+        run: |
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "::warning::Open xdr-update issue detected but its number could not be determined — skipping comment"
+            exit 0
+          fi
+
+          # Skip when the issue body or an earlier comment already covers this
+          # upstream commit. Only workflow-authored comments count as the dedup
+          # key so a third-party comment cannot suppress the notification (gh
+          # reports the Actions bot login as either github-actions or
+          # app/github-actions depending on version).
+          thread=$(gh issue view "$ISSUE_NUMBER" --json body,comments \
+            --jq '.body + "\n" + ([.comments[] | select(.author.login == "github-actions" or .author.login == "app/github-actions") | .body] | join("\n"))')
+          if grep -qF "$UPSTREAM" <<< "$thread"; then
+            echo "Issue #$ISSUE_NUMBER already references $UPSTREAM_SHORT — nothing to do"
+            exit 0
+          fi
+
+          {
+            printf 'Upstream `curr` has advanced since this issue was last updated. Sync to the commit below instead of the one referenced above.\n'
+            printf '\n'
+            printf '**Latest upstream:** [`%s`](https://github.com/stellar/stellar-xdr/commit/%s)\n' "$UPSTREAM_SHORT" "$UPSTREAM"
+            printf '**Commits behind:** %s\n' "$COMMIT_COUNT"
+            printf '**Compare:** [%s...%s](https://github.com/stellar/stellar-xdr/compare/%s...%s)\n' "$PINNED_SHORT" "$UPSTREAM_SHORT" "$PINNED" "$UPSTREAM"
+          } > /tmp/comment_body.md
+
+          if [ -s /tmp/changes_summary.txt ]; then
+            printf '\n## Changed .x files\n\n' >> /tmp/comment_body.md
+            cat /tmp/changes_summary.txt >> /tmp/comment_body.md
+          fi
+
+          if [ -s /tmp/full_diff.txt ]; then
+            printf '\n## Diffs\n' >> /tmp/comment_body.md
+            # Truncate diffs to stay under GitHub's 65536-char comment body limit
+            max_diff_size=50000
+            diff_size=$(wc -c < /tmp/full_diff.txt)
+            if [ "$diff_size" -gt "$max_diff_size" ]; then
+              head -c "$max_diff_size" /tmp/full_diff.txt >> /tmp/comment_body.md
+              printf '\n```\n\n</details>\n\n' >> /tmp/comment_body.md
+              printf '> **Note:** Diffs truncated (%s bytes total). See the [compare view](https://github.com/stellar/stellar-xdr/compare/%s...%s) for the full changeset.\n' "$diff_size" "$PINNED" "$UPSTREAM" >> /tmp/comment_body.md
+            else
+              cat /tmp/full_diff.txt >> /tmp/comment_body.md
+            fi
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/comment_body.md
 
       - name: Ensure xdr-update label exists
         if: steps.diff.outputs.any_x_changed == 'true' && steps.existing.outputs.open_issues == '0'
