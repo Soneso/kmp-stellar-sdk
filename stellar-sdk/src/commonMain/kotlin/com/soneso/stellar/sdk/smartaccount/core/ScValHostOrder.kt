@@ -25,9 +25,9 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * - `Vec` compares element-wise (recursively); the shorter vec sorts first on a prefix tie.
  * - `Map` compares entry-wise (key, then value, recursively); the map with fewer entries
  *   sorts first on a prefix tie.
- * - `Bytes`, `String`, and `Symbol` compare by content, byte for byte (unsigned); the
- *   shorter value sorts first on a prefix tie (length is the tiebreaker, never the primary
- *   key).
+ * - `Bytes`, `String`, `Symbol`, and `ExecutableTag` compare by content, byte for byte
+ *   (unsigned); the shorter value sorts first on a prefix tie (length is the tiebreaker,
+ *   never the primary key).
  * - All remaining values compare by their XDR encoding. For the fixed-width types that can
  *   appear in smart-account map keys (addresses, unsigned scalars) this equals a content
  *   comparison. Signed integer scalars would compare by their two's-complement bytes rather
@@ -72,6 +72,11 @@ internal fun compareScValHostOrder(a: SCValXdr, b: SCValXdr): Int {
             compareBytesUnsigned(
                 a.value.value.encodeToByteArray(),
                 (b as SCValXdr.Sym).value.value.encodeToByteArray()
+            )
+        is SCValXdr.ExecutableTag ->
+            compareBytesUnsigned(
+                a.value.value.encodeToByteArray(),
+                (b as SCValXdr.ExecutableTag).value.value.encodeToByteArray()
             )
         else ->
             compareBytesUnsigned(scValToXdrBytesForOrder(a), scValToXdrBytesForOrder(b))

@@ -862,6 +862,10 @@ class OZContextRuleManager internal constructor(
                 "executable",
                 "CreateContract invocation references a Stellar Asset Contract, not a WASM contract"
             )
+            is ContractExecutableXdr.ExternalRef -> throw ValidationException.invalidInput(
+                "executable",
+                "CreateContract invocation references an external executable, not a WASM contract"
+            )
         }
     }
 

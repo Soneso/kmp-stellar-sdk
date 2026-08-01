@@ -376,6 +376,15 @@ class ScvTest {
     }
 
     @Test
+    fun testExecutableTag() {
+        val scVal = Scv.toExecutableTag("my-tag")
+
+        assertTrue(scVal is SCValXdr.ExecutableTag)
+        assertEquals(SCValTypeXdr.SCV_EXECUTABLE_TAG, scVal.discriminant)
+        assertEquals("my-tag", Scv.fromExecutableTag(scVal))
+    }
+
+    @Test
     fun testNestedStructures() {
         // Create nested vec of maps
         val innerMap1 = linkedMapOf(
@@ -418,6 +427,7 @@ class ScvTest {
             Scv.toDuration(3600uL),
             Scv.toString("test"),
             Scv.toSymbol("test"),
+            Scv.toExecutableTag("test"),
             Scv.toBytes(byteArrayOf(1, 2, 3)),
             Scv.toVec(listOf(Scv.toInt32(1))),
             Scv.toMap(linkedMapOf(Scv.toInt32(1) to Scv.toInt32(2)))
@@ -439,6 +449,7 @@ class ScvTest {
         assertFailsWith<IllegalArgumentException> { Scv.fromUint32(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromString(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromSymbol(intVal) }
+        assertFailsWith<IllegalArgumentException> { Scv.fromExecutableTag(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromBytes(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromVec(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromMap(intVal) }

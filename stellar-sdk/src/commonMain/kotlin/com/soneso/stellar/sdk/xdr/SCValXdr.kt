@@ -65,6 +65,8 @@ package com.soneso.stellar.sdk.xdr
  * case SCV_LEDGER_KEY_NONCE:
  *     SCNonceKey nonce_key;
  * 
+ * case SCV_EXECUTABLE_TAG:
+ *     SCString executable_tag;
  * };
  */
 sealed class SCValXdr {
@@ -198,6 +200,12 @@ sealed class SCValXdr {
     override val discriminant: SCValTypeXdr = SCValTypeXdr.SCV_LEDGER_KEY_NONCE
   }
 
+  data class ExecutableTag(
+    val value: SCStringXdr
+  ) : SCValXdr() {
+    override val discriminant: SCValTypeXdr = SCValTypeXdr.SCV_EXECUTABLE_TAG
+  }
+
   data class Void(
     override val discriminant: SCValTypeXdr
   ) : SCValXdr()
@@ -289,6 +297,10 @@ sealed class SCValXdr {
           val value = SCNonceKeyXdr.decode(reader)
           NonceKey(value)
         }
+        SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
+          val value = SCStringXdr.decode(reader)
+          ExecutableTag(value)
+        }
         else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
       }
     }
@@ -366,6 +378,9 @@ sealed class SCValXdr {
         value.encode(writer)
       }
       is NonceKey -> {
+        value.encode(writer)
+      }
+      is ExecutableTag -> {
         value.encode(writer)
       }
     }
