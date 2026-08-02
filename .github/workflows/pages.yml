@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main  # Deploy on every push to main
+    tags:
+      - 'v*'  # Deploy and persist a versioned docs copy on release tags
   workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
 
 permissions:
-  contents: read
+  contents: write  # Tag runs commit the versioned docs copy back to main
   pages: write
   id-token: write
 
@@ -53,24 +55,38 @@ jobs:
             echo "Using version: latest (manual trigger or non-tag push)"
           fi
 
-      - name: Copy generated docs to versioned directory
+      - name: Persist versioned docs copy on release tags
+        if: steps.version.outputs.version != 'latest'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          echo "Copying Dokka output to docs/api/$VERSION"
 
-          # Remove existing version directory if it exists
-          rm -rf docs/api/$VERSION
+          # The checkout is at the tag; build the docs commit on top of current main
+          # so the versioned directory is served by every later deployment.
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c publish-docs origin/main
 
-          # Copy generated Dokka HTML to versioned directory
-          mkdir -p docs/api/$VERSION
-          cp -r stellar-sdk/build/dokka/html/* docs/api/$VERSION/
+          rm -rf "docs/api/$VERSION"
+          mkdir -p "docs/api/$VERSION"
+          cp -r stellar-sdk/build/dokka/html/* "docs/api/$VERSION/"
 
-          # Always update 'latest' symlink/directory
+          git add "docs/api/$VERSION"
+          if git diff --cached --quiet; then
+            echo "docs/api/$VERSION is unchanged, nothing to commit"
+          else
+            git commit -m "Publish API docs for $VERSION [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Copy generated docs to latest
+        run: |
+          # 'latest' exists only in this workspace (gitignored); each deployment
+          # rebuilds it from the current Dokka output.
           rm -rf docs/api/latest
           mkdir -p docs/api/latest
           cp -r stellar-sdk/build/dokka/html/* docs/api/latest/
-
-          echo "Documentation copied to docs/api/$VERSION and docs/api/latest"
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

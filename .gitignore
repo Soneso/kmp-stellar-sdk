@@ -152,3 +152,6 @@ plans/
 
 # Downloaded XDR definition files (fetched by download-xdr.sh)
 tools/xdrgen-kt/xdr/
+
+# Generated API docs staging area used by the pages workflow (rebuilt every deploy)
+docs/api/latest/
