@@ -6,7 +6,10 @@ package com.soneso.stellar.sdk.unitTests.sep.sep06
 
 import com.soneso.stellar.sdk.sep.sep06.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.*
 
 /**
@@ -906,5 +909,335 @@ class Sep06ResponseParsingTest {
         assertEquals("tx-unknown-fields", tx.id)
         assertEquals("deposit", tx.kind)
         assertEquals("completed", tx.status)
+    }
+
+    // ========== Serial Form of Directly Constructed Responses ==========
+    //
+    // The tests below build each response model through its primary constructor,
+    // serialize it, verify the wire field names required by SEP-6, and decode the
+    // result back. A mismatch between a Kotlin property and its @SerialName would
+    // break either the key assertion or the round trip.
+
+    private fun encodedKeys(encoded: String): Set<String> =
+        json.parseToJsonElement(encoded).jsonObject.keys
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun testInfoResponseSerialForm() = runTest {
+        val field = Sep06Field(
+            description = "Bank account number",
+            optional = false,
+            choices = listOf("checking", "savings")
+        )
+        val withdrawType = Sep06WithdrawType(fields = mapOf("dest" to field))
+        val original = Sep06InfoResponse(
+            deposit = mapOf(
+                "USD" to Sep06DepositAsset(
+                    enabled = true,
+                    authenticationRequired = true,
+                    minAmount = "0.1",
+                    maxAmount = "1000",
+                    feeFixed = "5",
+                    feePercent = "1",
+                    fields = mapOf("email_address" to field)
+                )
+            ),
+            depositExchange = mapOf(
+                "USDC" to Sep06DepositExchangeAsset(
+                    enabled = true,
+                    authenticationRequired = false,
+                    fields = mapOf("email_address" to field)
+                )
+            ),
+            withdraw = mapOf(
+                "USD" to Sep06WithdrawAsset(
+                    enabled = true,
+                    authenticationRequired = true,
+                    minAmount = "0.1",
+                    maxAmount = "1000",
+                    feeFixed = "5",
+                    feePercent = "0.5",
+                    types = mapOf("bank_account" to withdrawType)
+                )
+            ),
+            withdrawExchange = mapOf(
+                "USDC" to Sep06WithdrawExchangeAsset(
+                    enabled = false,
+                    authenticationRequired = true,
+                    types = mapOf("bank_account" to withdrawType)
+                )
+            ),
+            fee = Sep06FeeEndpointInfo(
+                enabled = true,
+                authenticationRequired = true,
+                description = "Fees vary by asset"
+            ),
+            transaction = Sep06TransactionEndpointInfo(
+                enabled = true,
+                authenticationRequired = false
+            ),
+            transactions = Sep06TransactionsEndpointInfo(
+                enabled = false,
+                authenticationRequired = true
+            ),
+            features = Sep06FeatureFlags(
+                accountCreation = false,
+                claimableBalances = true
+            )
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(
+            setOf(
+                "deposit", "deposit-exchange", "withdraw", "withdraw-exchange",
+                "fee", "transaction", "transactions", "features"
+            ),
+            encodedKeys(encoded)
+        )
+
+        val decoded = json.decodeFromString<Sep06InfoResponse>(encoded)
+        assertEquals(original, decoded)
+
+        // Nested serial names of the asset descriptors.
+        val depositKeys = json.parseToJsonElement(encoded)
+            .jsonObject["deposit"]!!.jsonObject["USD"]!!.jsonObject.keys
+        assertEquals(
+            setOf(
+                "enabled", "authentication_required", "min_amount",
+                "max_amount", "fee_fixed", "fee_percent", "fields"
+            ),
+            depositKeys
+        )
+
+        val withdrawKeys = json.parseToJsonElement(encoded)
+            .jsonObject["withdraw"]!!.jsonObject["USD"]!!.jsonObject.keys
+        assertTrue(withdrawKeys.contains("types"))
+
+        val featureKeys = json.parseToJsonElement(encoded).jsonObject["features"]!!.jsonObject.keys
+        assertEquals(setOf("account_creation", "claimable_balances"), featureKeys)
+    }
+
+    @Test
+    fun testFieldSerialForm() = runTest {
+        val original = Sep06Field(
+            description = "Routing number",
+            optional = true,
+            choices = listOf("a", "b", "c")
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(setOf("description", "optional", "choices"), encodedKeys(encoded))
+        assertEquals(original, json.decodeFromString<Sep06Field>(encoded))
+
+        val defaults = Sep06Field()
+        assertNull(defaults.description)
+        assertNull(defaults.optional)
+        assertNull(defaults.choices)
+        assertEquals(defaults, json.decodeFromString<Sep06Field>("{}"))
+    }
+
+    @Test
+    fun testEndpointInfoSerialForms() = runTest {
+        val feeInfo = Sep06FeeEndpointInfo(
+            enabled = true,
+            authenticationRequired = false,
+            description = "Flat fee"
+        )
+        val feeEncoded = json.encodeToString(feeInfo)
+        assertEquals(
+            setOf("enabled", "authentication_required", "description"),
+            encodedKeys(feeEncoded)
+        )
+        assertEquals(feeInfo, json.decodeFromString<Sep06FeeEndpointInfo>(feeEncoded))
+
+        val transactionInfo = Sep06TransactionEndpointInfo(
+            enabled = true,
+            authenticationRequired = true
+        )
+        val transactionEncoded = json.encodeToString(transactionInfo)
+        assertEquals(setOf("enabled", "authentication_required"), encodedKeys(transactionEncoded))
+        assertEquals(
+            transactionInfo,
+            json.decodeFromString<Sep06TransactionEndpointInfo>(transactionEncoded)
+        )
+
+        val transactionsInfo = Sep06TransactionsEndpointInfo(
+            enabled = false,
+            authenticationRequired = false
+        )
+        val transactionsEncoded = json.encodeToString(transactionsInfo)
+        assertEquals(setOf("enabled", "authentication_required"), encodedKeys(transactionsEncoded))
+        assertEquals(
+            transactionsInfo,
+            json.decodeFromString<Sep06TransactionsEndpointInfo>(transactionsEncoded)
+        )
+    }
+
+    @Test
+    fun testFeatureFlagsDefaults() = runTest {
+        val defaults = json.decodeFromString<Sep06FeatureFlags>("{}")
+        assertTrue(defaults.accountCreation)
+        assertFalse(defaults.claimableBalances)
+        assertEquals(Sep06FeatureFlags(), defaults)
+
+        val explicit = Sep06FeatureFlags(accountCreation = false, claimableBalances = true)
+        assertEquals(
+            explicit,
+            json.decodeFromString<Sep06FeatureFlags>(
+                """{"account_creation": false, "claimable_balances": true}"""
+            )
+        )
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun testDepositResponseSerialForm() = runTest {
+        val original = Sep06DepositResponse(
+            how = "Make a bank transfer",
+            id = "9421871e-0623-4356-b7b5-5996da122f3e",
+            eta = 3600,
+            minAmount = "0.1",
+            maxAmount = "1000",
+            feeFixed = "5",
+            feePercent = "1",
+            extraInfo = Sep06ExtraInfo(message = "Deposits take 3 business days"),
+            instructions = mapOf(
+                "organization.bank_number" to Sep06DepositInstruction(
+                    value = "121122676",
+                    description = "US bank routing number"
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(
+            setOf(
+                "how", "id", "eta", "min_amount", "max_amount",
+                "fee_fixed", "fee_percent", "extra_info", "instructions"
+            ),
+            encodedKeys(encoded)
+        )
+        assertEquals(original, json.decodeFromString<Sep06DepositResponse>(encoded))
+
+        val instructionKeys = json.parseToJsonElement(encoded)
+            .jsonObject["instructions"]!!
+            .jsonObject["organization.bank_number"]!!
+            .jsonObject.keys
+        assertEquals(setOf("value", "description"), instructionKeys)
+
+        val extraInfoKeys = json.parseToJsonElement(encoded).jsonObject["extra_info"]!!.jsonObject.keys
+        assertEquals(setOf("message"), extraInfoKeys)
+    }
+
+    @Test
+    fun testWithdrawResponseSerialForm() = runTest {
+        val original = Sep06WithdrawResponse(
+            accountId = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            memoType = "id",
+            memo = "123456",
+            id = "9421871e-0623-4356-b7b5-5996da122f3e",
+            eta = 1800,
+            minAmount = "1",
+            maxAmount = "5000",
+            feeFixed = "3",
+            feePercent = "0.5",
+            extraInfo = Sep06ExtraInfo(message = "Funds arrive within 24 hours")
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(
+            setOf(
+                "account_id", "memo_type", "memo", "id", "eta",
+                "min_amount", "max_amount", "fee_fixed", "fee_percent", "extra_info"
+            ),
+            encodedKeys(encoded)
+        )
+        assertEquals(original, json.decodeFromString<Sep06WithdrawResponse>(encoded))
+    }
+
+    @Test
+    fun testFeeResponseSerialForm() = runTest {
+        val original = Sep06FeeResponse(fee = "0.013")
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(setOf("fee"), encodedKeys(encoded))
+        assertEquals(original, json.decodeFromString<Sep06FeeResponse>(encoded))
+    }
+
+    @Test
+    fun testTransactionWrapperSerialForms() = runTest {
+        val transaction = Sep06Transaction(
+            id = "tx-wrapper",
+            kind = "deposit",
+            status = "completed"
+        )
+
+        val single = Sep06TransactionResponse(transaction = transaction)
+        val singleEncoded = json.encodeToString(single)
+        assertEquals(setOf("transaction"), encodedKeys(singleEncoded))
+        assertEquals(single, json.decodeFromString<Sep06TransactionResponse>(singleEncoded))
+
+        val list = Sep06TransactionsResponse(transactions = listOf(transaction))
+        val listEncoded = json.encodeToString(list)
+        assertEquals(setOf("transactions"), encodedKeys(listEncoded))
+        assertEquals(list, json.decodeFromString<Sep06TransactionsResponse>(listEncoded))
+    }
+
+    @Test
+    fun testFeeDetailsSerialForm() = runTest {
+        val original = Sep06FeeDetails(
+            total = "8.40",
+            asset = "iso4217:USD",
+            details = listOf(
+                Sep06FeeDetail(
+                    name = "Service fee",
+                    description = "Charged by the anchor",
+                    amount = "8.40"
+                ),
+                Sep06FeeDetail(name = "Network fee", amount = "0.00")
+            )
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(setOf("total", "asset", "details"), encodedKeys(encoded))
+
+        val decoded = json.decodeFromString<Sep06FeeDetails>(encoded)
+        assertEquals(original, decoded)
+        assertNull(decoded.details!![1].description)
+
+        val detailKeys = json.parseToJsonElement(encoded)
+            .jsonObject["details"]!!.jsonArray[0].jsonObject.keys
+        assertEquals(setOf("name", "description", "amount"), detailKeys)
+    }
+
+    @Test
+    fun testRefundsSerialForm() = runTest {
+        val original = Sep06Refunds(
+            amountRefunded = "10",
+            amountFee = "5",
+            payments = listOf(
+                Sep06RefundPayment(
+                    id = "104201",
+                    idType = "external",
+                    amount = "10",
+                    fee = "5"
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(original)
+
+        assertEquals(setOf("amount_refunded", "amount_fee", "payments"), encodedKeys(encoded))
+        assertEquals(original, json.decodeFromString<Sep06Refunds>(encoded))
+
+        val paymentKeys = json.parseToJsonElement(encoded)
+            .jsonObject["payments"]!!.jsonArray[0].jsonObject.keys
+        assertEquals(setOf("id", "id_type", "amount", "fee"), paymentKeys)
     }
 }

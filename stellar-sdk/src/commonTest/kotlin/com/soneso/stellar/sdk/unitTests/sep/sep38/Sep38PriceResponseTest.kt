@@ -5,7 +5,9 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep38
 
 import com.soneso.stellar.sdk.sep.sep38.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -196,5 +198,47 @@ class Sep38PriceResponseTest {
         assertEquals("0.0015", response.sellAmount)
         assertEquals("100", response.buyAmount)
         assertEquals("0.0001", response.fee.total)
+    }
+
+    @Test
+    fun testSerializePriceBuiltFromConstructor() {
+        val price = Sep38PriceResponse(
+            totalPrice = "5.42",
+            price = "5.00",
+            sellAmount = "542",
+            buyAmount = "100",
+            fee = Sep38Fee(
+                total = "42.00",
+                asset = "iso4217:BRL",
+                details = listOf(Sep38FeeDetail(name = "PIX fee", amount = "42.00"))
+            )
+        )
+
+        val encoded = json.encodeToString(price)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf("total_price", "price", "sell_amount", "buy_amount", "fee"),
+            encodedObject.keys
+        )
+        assertEquals(setOf("total", "asset", "details"), encodedObject["fee"]!!.jsonObject.keys)
+
+        val decoded = json.decodeFromString<Sep38PriceResponse>(encoded)
+        assertEquals(price, decoded)
+        assertNotNull(decoded.fee.details)
+        assertEquals("PIX fee", decoded.fee.details!![0].name)
+    }
+
+    @Test
+    fun testFeeRoundTripWithoutDetails() {
+        val fee = Sep38Fee(total = "1.00", asset = "iso4217:USD")
+
+        val encoded = json.encodeToString(fee)
+
+        assertEquals(setOf("total", "asset"), json.parseToJsonElement(encoded).jsonObject.keys)
+
+        val decoded = json.decodeFromString<Sep38Fee>(encoded)
+        assertEquals(fee, decoded)
+        assertNull(decoded.details)
     }
 }

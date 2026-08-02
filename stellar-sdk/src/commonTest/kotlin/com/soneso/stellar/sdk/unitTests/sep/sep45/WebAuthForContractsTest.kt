@@ -2396,4 +2396,368 @@ class WebAuthForContractsTest {
         assertEquals(SUCCESS_JWT_TOKEN, token.token)
         assertTrue(customHeaderReceived, "Custom header should have been sent")
     }
+
+    private fun webAuthWith(mockClient: HttpClient? = null): WebAuthForContracts =
+        WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient
+        )
+
+    @Test
+    fun testChallengeResponseWithoutAuthorizationEntriesRejected() = runTest {
+        // A 200 response that omits authorization_entries entirely
+        val mockClient = createMockClient(
+            challengeResponse = """{"network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = """{"token": "$SUCCESS_JWT_TOKEN"}"""
+        )
+
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuthWith(mockClient).jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+
+        assertTrue(exception.message?.contains("authorization_entries") == true)
+    }
+
+    @Test
+    fun testChallengeResponseWithMalformedJsonRejected() = runTest {
+        val mockClient = createMockClient(challengeResponse = "{ not valid json")
+
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuthWith(mockClient).getChallenge(CLIENT_CONTRACT_ID)
+        }
+
+        assertEquals(200, exception.statusCode)
+        assertTrue(exception.message?.contains("Failed to parse challenge response") == true)
+    }
+
+    @Test
+    fun testGetChallengeNotFoundReportsEndpoint() = runTest {
+        val mockClient = createMockClient(
+            challengeResponse = "",
+            challengeStatusCode = HttpStatusCode.NotFound
+        )
+
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuthWith(mockClient).getChallenge(CLIENT_CONTRACT_ID)
+        }
+
+        assertEquals(404, exception.statusCode)
+        assertTrue(exception.errorMessage?.contains(AUTH_SERVER) == true)
+    }
+
+    @Test
+    fun testGetChallengeBadRequestReportsServerDetail() = runTest {
+        val mockClient = createMockClient(
+            challengeResponse = """{"error": "account is required"}""",
+            challengeStatusCode = HttpStatusCode.BadRequest
+        )
+
+        val exception = assertFailsWith<Sep45ChallengeRequestException> {
+            webAuthWith(mockClient).getChallenge(CLIENT_CONTRACT_ID)
+        }
+
+        assertEquals(400, exception.statusCode)
+        assertTrue(exception.errorMessage?.contains("account is required") == true)
+    }
+
+    @Test
+    fun testClientDomainTomlWithoutSigningKeyRejected() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val clientDomainKeyPair = KeyPair.random()
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce,
+            clientDomain = "client.example.com",
+            clientDomainAccount = clientDomainKeyPair.getAccountId()
+        )
+
+        // The client domain's stellar.toml is reachable but publishes no SIGNING_KEY
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = """{"token": "$SUCCESS_JWT_TOKEN"}""",
+            stellarTomlResponse = """WEB_AUTH_ENDPOINT="https://client.example.com/auth""""
+        )
+
+        val delegate = Sep45ClientDomainSigningDelegate { it }
+
+        val exception = assertFailsWith<Sep45NoSigningKeyException> {
+            webAuthWith(mockClient).jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                clientDomain = "client.example.com",
+                clientDomainSigningDelegate = delegate,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+
+        assertTrue(exception.message?.contains("client.example.com") == true)
+    }
+
+    @Test
+    fun testTokenResponseWithMalformedJsonRejected() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = "{ not valid json"
+        )
+
+        val exception = assertFailsWith<Sep45TokenSubmissionException> {
+            webAuthWith(mockClient).jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+
+        assertEquals(200, exception.statusCode)
+        assertTrue(exception.message?.contains("Failed to parse token response") == true)
+    }
+
+    @Test
+    fun testTokenResponseWithoutTokenFieldRejected() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        // Neither token nor error is present in the 200 body
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = """{"status": "ok"}"""
+        )
+
+        val exception = assertFailsWith<Sep45TokenSubmissionException> {
+            webAuthWith(mockClient).jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+
+        assertEquals(200, exception.statusCode)
+        assertTrue(exception.message?.contains("Response missing token field") == true)
+    }
+
+    @Test
+    fun testJsonSubmissionIncludesCustomHeaders() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        var postHeaderValue: String? = null
+        val mockEngine = MockEngine { request ->
+            when {
+                request.method == HttpMethod.Get -> respond(
+                    content = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> {
+                    postHeaderValue = request.headers["X-Custom-Header"]
+                    respond(
+                        content = """{"token": "$SUCCESS_JWT_TOKEN"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+        }
+
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Custom-Header" to "json-submission")
+        )
+        webAuth.useFormUrlEncoded = false
+
+        val token = webAuth.jwtToken(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            signers = listOf(KeyPair.random()),
+            homeDomain = DOMAIN,
+            signatureExpirationLedger = 1000000L
+        )
+
+        assertEquals(SUCCESS_JWT_TOKEN, token.token)
+        assertEquals("json-submission", postHeaderValue)
+    }
+
+    @Test
+    fun testJwtTokenDefaultsToNoSigners() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = """{"token": "$SUCCESS_JWT_TOKEN"}"""
+        )
+
+        // signers is omitted entirely, so no signature expiration ledger lookup is needed
+        val token = webAuthWith(mockClient).jwtToken(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN
+        )
+
+        assertEquals(SUCCESS_JWT_TOKEN, token.token)
+    }
+
+    // ============================================================================
+    // Authorization Entry Signing Tests
+    // ============================================================================
+
+    private fun clientEntryFor(nonce: String, credentialsAddress: String): SorobanAuthorizationEntryXdr =
+        buildAuthEntry(
+            credentialsAddress = credentialsAddress,
+            contractId = WEB_AUTH_CONTRACT_ID,
+            functionName = "web_auth_verify",
+            argsMap = buildArgsMap(
+                account = CLIENT_CONTRACT_ID,
+                homeDomain = DOMAIN,
+                webAuthDomain = "auth.example.stellar.org",
+                webAuthDomainAccount = SERVER_ACCOUNT_ID,
+                nonce = nonce
+            ),
+            nonce = 12346L,
+            expirationLedger = 1000000L
+        )
+
+    private fun addressCredentialsOf(entry: SorobanAuthorizationEntryXdr): SorobanAddressCredentialsXdr =
+        assertIs<SorobanCredentialsXdr.Address>(entry.credentials).value
+
+    private fun signatureCountOf(entry: SorobanAuthorizationEntryXdr): Int =
+        assertIs<SCValXdr.Vec>(addressCredentialsOf(entry).signature).value?.value?.size ?: 0
+
+    @Test
+    fun testSignClientEntryWithoutExpirationLedgerUsesZero() = runTest {
+        val entry = clientEntryFor("test_nonce_${nonceCounter++}", CLIENT_CONTRACT_ID)
+
+        val signed = webAuthWith().signAuthorizationEntries(
+            authEntries = listOf(entry),
+            clientAccountId = CLIENT_CONTRACT_ID,
+            signers = listOf(KeyPair.random()),
+            signatureExpirationLedger = null
+        )
+
+        assertEquals(0u, addressCredentialsOf(signed[0]).signatureExpirationLedger.value)
+        assertEquals(1, signatureCountOf(signed[0]))
+    }
+
+    @Test
+    fun testSignClientDomainEntryWithKeyPairWithoutExpirationLedgerUsesZero() = runTest {
+        val clientDomainKeyPair = KeyPair.random()
+        val entry = clientEntryFor("test_nonce_${nonceCounter++}", clientDomainKeyPair.getAccountId())
+
+        val signed = webAuthWith().signAuthorizationEntries(
+            authEntries = listOf(entry),
+            clientAccountId = CLIENT_CONTRACT_ID,
+            signers = emptyList(),
+            signatureExpirationLedger = null,
+            clientDomainKeyPair = clientDomainKeyPair
+        )
+
+        assertEquals(0u, addressCredentialsOf(signed[0]).signatureExpirationLedger.value)
+        assertEquals(1, signatureCountOf(signed[0]))
+    }
+
+    @Test
+    fun testDelegateReceivesUnchangedEntryWhenNoExpirationLedgerGiven() = runTest {
+        val clientDomainKeyPair = KeyPair.random()
+        val entry = clientEntryFor("test_nonce_${nonceCounter++}", clientDomainKeyPair.getAccountId())
+
+        var receivedExpirationLedger: UInt? = null
+        val delegate = Sep45ClientDomainSigningDelegate { entryXdr ->
+            val received = SorobanAuthorizationEntryXdr.fromXdrBase64(entryXdr)
+            receivedExpirationLedger = addressCredentialsOf(received).signatureExpirationLedger.value
+            Auth.authorizeEntry(
+                entry = received,
+                signer = clientDomainKeyPair,
+                validUntilLedgerSeq = 1000000L,
+                network = Network.TESTNET
+            ).toXdrBase64()
+        }
+
+        val signed = webAuthWith().signAuthorizationEntries(
+            authEntries = listOf(entry),
+            clientAccountId = CLIENT_CONTRACT_ID,
+            signers = emptyList(),
+            signatureExpirationLedger = null,
+            clientDomainAccountId = clientDomainKeyPair.getAccountId(),
+            clientDomainSigningDelegate = delegate
+        )
+
+        // Without an expiration ledger the entry is handed to the delegate untouched
+        assertEquals(1000000u, receivedExpirationLedger)
+        assertEquals(1, signatureCountOf(signed[0]))
+    }
+
+    @Test
+    fun testDelegateNotUsedWithoutResolvedClientDomainAccount() = runTest {
+        val clientDomainKeyPair = KeyPair.random()
+        val entry = clientEntryFor("test_nonce_${nonceCounter++}", clientDomainKeyPair.getAccountId())
+
+        var delegateInvoked = false
+        val delegate = Sep45ClientDomainSigningDelegate { entryXdr ->
+            delegateInvoked = true
+            entryXdr
+        }
+
+        val signed = webAuthWith().signAuthorizationEntries(
+            authEntries = listOf(entry),
+            clientAccountId = CLIENT_CONTRACT_ID,
+            signers = emptyList(),
+            signatureExpirationLedger = 1000L,
+            clientDomainSigningDelegate = delegate
+        )
+
+        // Without a resolved client domain account the entry is passed through unsigned
+        assertFalse(delegateInvoked)
+        assertEquals(entry, signed[0])
+    }
 }

@@ -3,9 +3,12 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.AssetResponse
 import com.soneso.stellar.sdk.horizon.responses.Link
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -120,7 +123,7 @@ class AssetResponseTest {
     }
 
     @Test
-    fun testComprehensiveAssetResponseDeserialization() {
+    fun testAssetResponseDeserializationWithAllFields() {
         val comprehensiveAssetJson = """
         {
             "asset_type": "credit_alphanum4",
@@ -296,5 +299,129 @@ class AssetResponseTest {
         )
         assertEquals("https://direct.test/toml", links.toml.href)
         assertEquals(true, links.toml.templated)
+    }
+
+    private fun directAsset() = AssetResponse(
+        assetType = "credit_alphanum4",
+        assetCode = "USD",
+        assetIssuer = "GISSUERUSD",
+        pagingToken = "USD_GISSUERUSD_credit_alphanum4",
+        contractId = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        numClaimableBalances = 7,
+        numLiquidityPools = 3,
+        numContracts = 2,
+        accounts = AssetResponse.Accounts(
+            authorized = 50,
+            authorizedToMaintainLiabilities = 30,
+            unauthorized = 10
+        ),
+        claimableBalancesAmount = "120.0000000",
+        liquidityPoolsAmount = "340.0000000",
+        contractsAmount = "560.0000000",
+        balances = AssetResponse.Balances(
+            authorized = "1000000.0000000",
+            authorizedToMaintainLiabilities = "500000.0000000",
+            unauthorized = "50000.0000000"
+        ),
+        flags = AssetResponse.Flags(
+            authRequired = true,
+            authRevocable = true,
+            authImmutable = false,
+            authClawbackEnabled = true
+        ),
+        links = AssetResponse.Links(toml = Link("https://example.com/.well-known/stellar.toml"))
+    )
+
+    private fun minimalAsset() = AssetResponse(
+        assetType = "credit_alphanum12",
+        assetCode = "LONGASSET",
+        assetIssuer = "GISSUERLONG",
+        pagingToken = "LONGASSET_GISSUERLONG_credit_alphanum12",
+        accounts = AssetResponse.Accounts(
+            authorized = 1,
+            authorizedToMaintainLiabilities = 0,
+            unauthorized = 0
+        ),
+        balances = AssetResponse.Balances(
+            authorized = "1.0000000",
+            authorizedToMaintainLiabilities = "0.0000000",
+            unauthorized = "0.0000000"
+        ),
+        flags = AssetResponse.Flags(
+            authRequired = false,
+            authRevocable = false,
+            authImmutable = false,
+            authClawbackEnabled = false
+        ),
+        links = AssetResponse.Links(toml = Link("https://example.com/.well-known/stellar.toml"))
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val asset = directAsset()
+
+        val encoded = json.encodeToString(AssetResponse.serializer(), asset)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "asset_type", "asset_code", "asset_issuer", "paging_token", "contract_id",
+                "num_claimable_balances", "num_liquidity_pools", "num_contracts", "accounts",
+                "claimable_balances_amount", "liquidity_pools_amount", "contracts_amount",
+                "balances", "flags", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("USD", encodedObject["asset_code"]!!.jsonPrimitive.content)
+        assertEquals("GISSUERUSD", encodedObject["asset_issuer"]!!.jsonPrimitive.content)
+        assertEquals("7", encodedObject["num_claimable_balances"]!!.jsonPrimitive.content)
+        assertEquals("3", encodedObject["num_liquidity_pools"]!!.jsonPrimitive.content)
+        assertEquals("2", encodedObject["num_contracts"]!!.jsonPrimitive.content)
+        assertEquals("120.0000000", encodedObject["claimable_balances_amount"]!!.jsonPrimitive.content)
+        assertEquals("340.0000000", encodedObject["liquidity_pools_amount"]!!.jsonPrimitive.content)
+        assertEquals("560.0000000", encodedObject["contracts_amount"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(AssetResponse.serializer(), encoded)
+        assertEquals(asset, decoded)
+        assertEquals("CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ", decoded.contractId)
+        assertEquals(50, decoded.accounts.authorized)
+        assertEquals(30, decoded.accounts.authorizedToMaintainLiabilities)
+        assertEquals("1000000.0000000", decoded.balances.authorized)
+        assertTrue(decoded.flags.authClawbackEnabled)
+        assertFalse(decoded.flags.authImmutable)
+        assertEquals("https://example.com/.well-known/stellar.toml", decoded.links.toml.href)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val asset = minimalAsset()
+
+        assertNull(asset.contractId)
+        assertNull(asset.numClaimableBalances)
+        assertNull(asset.numLiquidityPools)
+        assertNull(asset.numContracts)
+        assertNull(asset.claimableBalancesAmount)
+        assertNull(asset.liquidityPoolsAmount)
+        assertNull(asset.contractsAmount)
+
+        val encoded = json.encodeToString(AssetResponse.serializer(), asset)
+        assertEquals(
+            setOf(
+                "asset_type", "asset_code", "asset_issuer", "paging_token",
+                "accounts", "balances", "flags", "_links"
+            ),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+        assertEquals(asset, json.decodeFromString(AssetResponse.serializer(), encoded))
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val asset = directAsset()
+        assertNotEquals(asset, minimalAsset())
+        assertNotEquals(asset, asset.copy(contractId = null))
+        assertNotEquals(asset, asset.copy(numContracts = 99))
+        assertEquals(asset, directAsset())
+        assertEquals(asset.hashCode(), directAsset().hashCode())
     }
 }

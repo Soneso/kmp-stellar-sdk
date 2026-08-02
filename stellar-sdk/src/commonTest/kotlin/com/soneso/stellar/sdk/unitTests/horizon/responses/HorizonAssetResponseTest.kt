@@ -63,6 +63,22 @@ class HorizonAssetResponseTest {
     }
 
     @Test
+    fun testToCanonicalFormWithMissingIssuer() {
+        val asset = Asset("credit_alphanum4", "USD", null)
+        assertFailsWith<IllegalStateException> {
+            asset.toCanonicalForm()
+        }
+    }
+
+    @Test
+    fun testToCanonicalFormWithMissingCode() {
+        val asset = Asset("credit_alphanum4", null, "GTEST")
+        assertFailsWith<IllegalStateException> {
+            asset.toCanonicalForm()
+        }
+    }
+
+    @Test
     fun testFromCanonicalFormNative() {
         val asset = Asset.fromCanonicalForm("native")
         assertEquals("native", asset.assetType)
@@ -107,6 +123,14 @@ class HorizonAssetResponseTest {
     }
 
     @Test
+    fun testFromCanonicalFormEmptyCode() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Asset.fromCanonicalForm(":GTEST")
+        }
+        assertEquals("Invalid asset code length: 0", exception.message)
+    }
+
+    @Test
     fun testNativeFactory() {
         val asset = Asset.native()
         assertEquals("native", asset.assetType)
@@ -134,6 +158,14 @@ class HorizonAssetResponseTest {
         assertFailsWith<IllegalArgumentException> {
             Asset.create("TOOLONGASSETCODE", "GTEST")
         }
+    }
+
+    @Test
+    fun testCreateFactoryEmptyCode() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Asset.create("", "GTEST")
+        }
+        assertTrue(exception.message!!.contains("Must be 1-12 characters"))
     }
 
     @Test

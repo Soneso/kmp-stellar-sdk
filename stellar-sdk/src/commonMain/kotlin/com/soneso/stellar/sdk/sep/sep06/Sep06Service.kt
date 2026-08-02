@@ -15,6 +15,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -643,7 +644,9 @@ class Sep06Service private constructor(
      * requested after a transaction was initiated. The transaction must be in the
      * "pending_transaction_info_update" status for this request to succeed.
      *
-     * Note: The PATCH endpoint uses `/transaction/:id` (singular), not `/transactions/:id`.
+     * The request targets `PATCH TRANSFER_SERVER/transactions/:id` and sends the supplied
+     * fields wrapped in a `transaction` object, as SEP-6 specifies:
+     * `{"transaction": {"dest": "...", "dest_extra": "..."}}`.
      *
      * @param request Patch transaction request with transaction ID and fields to update
      * @return HttpResponse indicating success or failure
@@ -670,7 +673,7 @@ class Sep06Service private constructor(
      */
     suspend fun patchTransaction(request: Sep06PatchTransactionRequest): HttpResponse {
         return httpPatch(
-            endpoint = "transaction/${request.id}",
+            endpoint = "transactions/${request.id}",
             fields = request.fields,
             jwt = request.jwt
         )
@@ -747,7 +750,10 @@ class Sep06Service private constructor(
     }
 
     /**
-     * Performs a PATCH request with JSON body and returns the raw response.
+     * Performs a PATCH request and returns the raw response.
+     *
+     * SEP-6 requires the updated fields to be nested under a `transaction` key, so [fields]
+     * is wrapped rather than sent at the top level.
      */
     private suspend fun httpPatch(
         endpoint: String,
@@ -756,11 +762,14 @@ class Sep06Service private constructor(
     ): HttpResponse = withHttpClient { client ->
         val url = buildUrl(endpoint)
         val headers = buildHeaders(jwt)
+        val requestBody = JsonObject(
+            mapOf("transaction" to JsonObject(fields.mapValues { (_, value) -> JsonPrimitive(value) }))
+        )
 
         val response = client.patch(url) {
             headers.forEach { (key, value) -> header(key, value) }
             contentType(ContentType.Application.Json)
-            setBody(fields)
+            setBody(requestBody)
         }
 
         // For PATCH, check for errors but return raw response

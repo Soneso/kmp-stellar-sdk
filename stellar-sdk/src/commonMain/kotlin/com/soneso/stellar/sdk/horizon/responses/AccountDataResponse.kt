@@ -53,14 +53,15 @@ data class AccountDataResponse(
     /**
      * Decodes the base64-encoded value to a UTF-8 string.
      *
-     * **Warning**: This property throws an exception if the decoded bytes are not valid UTF-8.
-     * Use [decodedStringOrNull] if you're unsure whether the data is text or binary.
+     * **Warning**: This property throws if the decoded bytes are not valid UTF-8. Use
+     * [decodedStringOrNull] if you're unsure whether the data is text or binary.
      *
      * @return The decoded UTF-8 string
-     * @throws IllegalArgumentException if the decoded bytes are not valid UTF-8
+     * @throws CharacterCodingException if the decoded bytes are not valid UTF-8
+     * @throws IllegalArgumentException if the value is not valid base64
      */
     val decodedString: String
-        get() = decodedValue.decodeToString()
+        get() = decodedValue.decodeToString(throwOnInvalidSequence = true)
 
     /**
      * Decodes the base64-encoded value to a UTF-8 string, or returns null if not valid UTF-8.
@@ -68,11 +69,14 @@ data class AccountDataResponse(
      * This is the safe version of [decodedString] that handles binary data gracefully.
      * Use this when the data entry might contain binary (non-text) data.
      *
-     * @return The decoded UTF-8 string, or null if the bytes are not valid UTF-8
+     * Null is returned both for a value that is not valid base64 and for bytes that are not
+     * valid UTF-8, so this accessor never raises and is safe to call from [toString].
+     *
+     * @return The decoded UTF-8 string, or null if the value cannot be decoded to one
      */
     val decodedStringOrNull: String?
         get() = try {
-            decodedValue.decodeToString()
+            decodedValue.decodeToString(throwOnInvalidSequence = true)
         } catch (e: Exception) {
             null
         }

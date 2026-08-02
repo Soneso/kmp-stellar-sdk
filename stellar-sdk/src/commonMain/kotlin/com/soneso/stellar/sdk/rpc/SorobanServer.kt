@@ -27,6 +27,7 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.ContentConvertException
 import io.ktor.serialization.kotlinx.json.*
 import com.soneso.stellar.sdk.platformDelay
 import kotlinx.serialization.json.Json
@@ -207,6 +208,8 @@ class SorobanServer(
      * @param params The method parameters (null for parameter-less methods)
      * @return The result object from the response
      * @throws SorobanRpcException If the server returns an error
+     * @throws IllegalArgumentException If the response body cannot be deserialized into the
+     *   expected JSON-RPC shape
      * @throws ConnectionErrorException If the HTTP engine reports a connectivity
      *   failure that is not already an [Exception] (Kotlin/JS reports these as
      *   [kotlin.Error])
@@ -259,9 +262,12 @@ class SorobanServer(
         } catch (e: SorobanRpcException) {
             // Re-throw Soroban RPC exceptions as-is
             throw e
+        } catch (e: ContentConvertException) {
+            // Ktor reports a response body it cannot deserialize as a content conversion failure
+            throw IllegalArgumentException("Failed to parse response for method $method: ${e.message}", e)
         } catch (e: SerializationException) {
-            // JSON parsing failed
-            throw IllegalArgumentException("Failed to parse response for method $method", e)
+            // A deserialization failure that reaches this frame without a content conversion wrapper
+            throw IllegalArgumentException("Failed to parse response for method $method: ${e.message}", e)
         } catch (e: Throwable) {
             // Exceptions (including platform network exceptions) propagate unchanged.
             // A non-Exception Throwable is treated as a connectivity failure (the

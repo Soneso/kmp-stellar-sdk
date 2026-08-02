@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_3
@@ -29,6 +30,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals("native", effect.asset)
         assertEquals("100.0000000", effect.amount)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -51,6 +55,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
         assertEquals("500.0000000", effect.amount)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -76,6 +83,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals("100.0000000", effect.amount)
         assertEquals(testBalanceId, effect.balanceId)
         assertEquals("""{"unconditional":true}""", effect.predicate)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -109,6 +119,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals("native", effect.asset)
         assertEquals("100.0000000", effect.amount)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -132,6 +145,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals("native", effect.asset)
         assertEquals("100.0000000", effect.amount)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -152,6 +168,9 @@ class ClaimableBalanceEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<ClaimableBalanceClaimedEffectResponse>(effect)
         assertEquals("native", effect.asset)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -173,6 +192,9 @@ class ClaimableBalanceEffectsTest {
             balanceId = testBalanceId
         )
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -191,6 +213,9 @@ class ClaimableBalanceEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<ClaimableBalanceClawedBackEffectResponse>(effect)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -213,6 +238,9 @@ class ClaimableBalanceEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -233,6 +261,9 @@ class ClaimableBalanceEffectsTest {
         assertIs<ClaimableBalanceSponsorshipCreatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -256,6 +287,9 @@ class ClaimableBalanceEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -277,6 +311,10 @@ class ClaimableBalanceEffectsTest {
         assertIs<ClaimableBalanceSponsorshipUpdatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
+        assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -299,6 +337,9 @@ class ClaimableBalanceEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -318,6 +359,10 @@ class ClaimableBalanceEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<ClaimableBalanceSponsorshipRemovedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
+        assertEquals(testBalanceId, effect.balanceId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

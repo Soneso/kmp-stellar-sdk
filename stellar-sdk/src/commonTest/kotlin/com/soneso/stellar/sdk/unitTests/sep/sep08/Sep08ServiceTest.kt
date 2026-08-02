@@ -10,6 +10,7 @@ import com.soneso.stellar.sdk.sep.sep08.exceptions.*
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.HttpRequestData
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
@@ -350,6 +351,205 @@ class Sep08ServiceTest {
 
         assertNotNull(service)
         assertEquals(1, service.regulatedAssets.size)
+    }
+
+    @Test
+    fun testFromDomainTestnetPassphraseResolvesDefaultHorizon() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "goat.io",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertEquals(1, service.regulatedAssets.size)
+        assertEquals(
+            "Test SDF Network ; September 2015",
+            service.tomlData.generalInformation.networkPassphrase
+        )
+    }
+
+    @Test
+    fun testFromDomainFuturenetPassphraseResolvesDefaultHorizon() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="Test SDF Future Network ; October 2022"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "goat.io",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertEquals(1, service.regulatedAssets.size)
+        assertEquals(
+            "Test SDF Future Network ; October 2022",
+            service.tomlData.generalInformation.networkPassphrase
+        )
+    }
+
+    @Test
+    fun testFromDomainStandaloneNetworkWithoutHorizonUrlFails() = runTest {
+        // The standalone network has no publicly known Horizon instance, so the URL
+        // cannot be derived and must be supplied by the caller or the toml.
+        val toml = """
+            NETWORK_PASSPHRASE="Standalone Network ; February 2017"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val exception = assertFailsWith<Sep08IncompleteInitDataException> {
+            Sep08Service.fromDomain(
+                domain = "goat.io",
+                httpClient = createTomlMockClient(toml)
+            )
+        }
+        assertTrue(
+            exception.message!!.contains("Horizon URL could not be determined for domain: goat.io"),
+            "Exception should name the failing domain, was: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testFromDomainCustomNetworkWithoutHorizonUrlFails() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="My Private Stellar Network ; January 2026"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val exception = assertFailsWith<Sep08IncompleteInitDataException> {
+            Sep08Service.fromDomain(
+                domain = "private.example.com",
+                httpClient = createTomlMockClient(toml)
+            )
+        }
+        assertTrue(
+            exception.message!!.contains("Horizon URL could not be determined"),
+            "Exception should report the missing Horizon URL, was: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testFromDomainSandboxNetworkWithHorizonUrlFromToml() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="Local Sandbox Stellar Network ; September 2022"
+            HORIZON_URL="http://localhost:8000"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "goat.io",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertEquals(1, service.regulatedAssets.size)
+        assertEquals("http://localhost:8000", service.tomlData.generalInformation.horizonUrl)
+    }
+
+    @Test
+    fun testFromDomainCustomNetworkWithExplicitHorizonUrl() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="My Private Stellar Network ; January 2026"
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "private.example.com",
+            horizonUrl = "https://horizon.private.example.com",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertEquals(1, service.regulatedAssets.size)
+        assertEquals(
+            "My Private Stellar Network ; January 2026",
+            service.tomlData.generalInformation.networkPassphrase
+        )
+    }
+
+    @Test
+    fun testFromDomainTomlWithoutCurrencies() = runTest {
+        val toml = """
+            NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+            HORIZON_URL="https://horizon-testnet.stellar.org"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "example.com",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertTrue(service.regulatedAssets.isEmpty())
+    }
+
+    @Test
+    fun testFromDomainSkipsRegulatedCurrenciesWithIncompleteData() = runTest {
+        // A currency only qualifies as a regulated asset when code, issuer and
+        // approval_server are all present.
+        val toml = """
+            NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+            HORIZON_URL="https://horizon-testnet.stellar.org"
+
+            [[CURRENCIES]]
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://nocode.io/tx_approve"
+
+            [[CURRENCIES]]
+            code="NOISSUER"
+            regulated=true
+            approval_server="https://noissuer.io/tx_approve"
+
+            [[CURRENCIES]]
+            code="NOSERVER"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+
+            [[CURRENCIES]]
+            code="GOAT"
+            issuer="GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+            regulated=true
+            approval_server="https://goat.io/tx_approve"
+        """.trimIndent()
+
+        val service = Sep08Service.fromDomain(
+            domain = "example.com",
+            httpClient = createTomlMockClient(toml)
+        )
+
+        assertEquals(1, service.regulatedAssets.size)
+        assertEquals("GOAT", service.regulatedAssets[0].code)
     }
 
     @Test
@@ -912,6 +1112,139 @@ class Sep08ServiceTest {
         }
     }
 
+    // ========== authorizationRequired() Tests ==========
+
+    private val issuerAccountId = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+
+    private fun issuerAccountJson(authRequired: Boolean, authRevocable: Boolean): String = """
+        {
+            "id": "$issuerAccountId",
+            "account_id": "$issuerAccountId",
+            "sequence": "3298702387052545",
+            "subentry_count": 0,
+            "last_modified_ledger": 7654321,
+            "paging_token": "$issuerAccountId",
+            "thresholds": {
+                "low_threshold": 0,
+                "med_threshold": 0,
+                "high_threshold": 0
+            },
+            "flags": {
+                "auth_required": $authRequired,
+                "auth_revocable": $authRevocable,
+                "auth_immutable": false,
+                "auth_clawback_enabled": false
+            },
+            "balances": [
+                {
+                    "asset_type": "native",
+                    "balance": "10.0000000",
+                    "buying_liabilities": "0.0000000",
+                    "selling_liabilities": "0.0000000"
+                }
+            ],
+            "signers": [
+                {
+                    "weight": 1,
+                    "key": "$issuerAccountId",
+                    "type": "ed25519_public_key"
+                }
+            ],
+            "data": {},
+            "_links": {
+                "self": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId"},
+                "transactions": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/transactions"},
+                "operations": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/operations"},
+                "payments": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/payments"},
+                "effects": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/effects"},
+                "offers": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/offers"},
+                "trades": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/trades"},
+                "data": {"href": "https://horizon-testnet.stellar.org/accounts/$issuerAccountId/data/{key}", "templated": true}
+            }
+        }
+    """.trimIndent()
+
+    private fun createHorizonMockClient(
+        accountJson: String,
+        onRequest: ((HttpRequestData) -> Unit)? = null
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            onRequest?.invoke(request)
+            respond(
+                content = accountJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    private fun createSep08ServiceWithHorizon(horizonClient: HttpClient): Sep08Service {
+        return Sep08Service(
+            tomlData = com.soneso.stellar.sdk.sep.sep01.StellarToml.parse(regulatedToml),
+            regulatedAssets = emptyList(),
+            network = Network.TESTNET,
+            horizonServer = com.soneso.stellar.sdk.horizon.HorizonServer(
+                "https://horizon-testnet.stellar.org",
+                httpClient = horizonClient
+            )
+        )
+    }
+
+    @Test
+    fun testAuthorizationRequiredWithBothIssuerFlagsSet() = runTest {
+        var requestedPath: String? = null
+        val service = createSep08ServiceWithHorizon(
+            createHorizonMockClient(
+                issuerAccountJson(authRequired = true, authRevocable = true),
+                onRequest = { requestedPath = it.url.encodedPath }
+            )
+        )
+        val asset = RegulatedAsset(
+            code = "GOAT",
+            issuer = issuerAccountId,
+            approvalServer = "https://goat.io/tx_approve"
+        )
+
+        assertTrue(service.authorizationRequired(asset))
+        assertEquals("/accounts/$issuerAccountId", requestedPath)
+    }
+
+    @Test
+    fun testAuthorizationRequiredWithoutRevocableFlag() = runTest {
+        val service = createSep08ServiceWithHorizon(
+            createHorizonMockClient(issuerAccountJson(authRequired = true, authRevocable = false))
+        )
+        val asset = RegulatedAsset(
+            code = "GOAT",
+            issuer = issuerAccountId,
+            approvalServer = "https://goat.io/tx_approve"
+        )
+
+        assertFalse(service.authorizationRequired(asset))
+    }
+
+    @Test
+    fun testAuthorizationRequiredWithoutAuthRequiredFlag() = runTest {
+        val service = createSep08ServiceWithHorizon(
+            createHorizonMockClient(issuerAccountJson(authRequired = false, authRevocable = true))
+        )
+        val asset = RegulatedAsset(
+            code = "GOAT",
+            issuer = issuerAccountId,
+            approvalServer = "https://goat.io/tx_approve"
+        )
+
+        assertFalse(service.authorizationRequired(asset))
+    }
+
     // ========== RegulatedAsset Tests ==========
 
     @Test
@@ -1069,5 +1402,86 @@ class Sep08ServiceTest {
         )
 
         assertTrue(asset.equals(asset))
+    }
+
+    @Test
+    fun testRegulatedAssetType() = runTest {
+        val alphaNum4 = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve"
+        )
+        val alphaNum12 = RegulatedAsset(
+            code = "LONGASSETCD",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve"
+        )
+
+        assertEquals(
+            com.soneso.stellar.sdk.xdr.AssetTypeXdr.ASSET_TYPE_CREDIT_ALPHANUM4,
+            alphaNum4.type
+        )
+        assertEquals(
+            com.soneso.stellar.sdk.xdr.AssetTypeXdr.ASSET_TYPE_CREDIT_ALPHANUM12,
+            alphaNum12.type
+        )
+    }
+
+    @Test
+    fun testRegulatedAssetInequalityPerField() = runTest {
+        val base = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve",
+            approvalCriteria = "criteria"
+        )
+        val differentIssuer = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GD5T6IPRNCKFOHQWT264YPKOZAWUMMZOLZBJ6BNQMUGPWGRLBK3U7ZNP",
+            approvalServer = "https://goat.io/tx_approve",
+            approvalCriteria = "criteria"
+        )
+        val differentServer = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://other.io/tx_approve",
+            approvalCriteria = "criteria"
+        )
+        val differentCriteria = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve",
+            approvalCriteria = "other criteria"
+        )
+
+        assertNotEquals(base, differentIssuer)
+        assertNotEquals(base, differentServer)
+        assertNotEquals(base, differentCriteria)
+        assertNotEquals(base.hashCode(), differentServer.hashCode())
+    }
+
+    @Test
+    fun testRegulatedAssetHashCodeWithAndWithoutCriteria() = runTest {
+        val withCriteria = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve",
+            approvalCriteria = "criteria"
+        )
+        val withoutCriteria = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve"
+        )
+        val alsoWithoutCriteria = RegulatedAsset(
+            code = "GOAT",
+            issuer = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            approvalServer = "https://goat.io/tx_approve"
+        )
+
+        assertNotEquals(withCriteria, withoutCriteria)
+        assertNotEquals(withCriteria.hashCode(), withoutCriteria.hashCode())
+        assertEquals(withoutCriteria, alsoWithoutCriteria)
+        assertEquals(withoutCriteria.hashCode(), alsoWithoutCriteria.hashCode())
     }
 }

@@ -393,4 +393,100 @@ class PageGetNextPageTest {
 
         client.close()
     }
+
+    @Test
+    fun testGetNextPageWithoutLinksReturnsNull() = runTest {
+        // A page carrying no _links section at all has no next page to fetch.
+        val page = Page<TestRecord>(
+            embedded = Page.Embedded(records = listOf(TestRecord("1", "test1"))),
+            links = null
+        )
+
+        val mockEngine = MockEngine {
+            error("Should not make any request when the page has no links")
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        assertNull(page.getNextPage<TestRecord>(client))
+
+        client.close()
+    }
+
+    @Test
+    fun testGetNextPageInformationalStatusIsUnknownResponse() = runTest {
+        // Statuses below the 2xx success range are not handled by any branch and must be
+        // reported as an unknown response rather than parsed as a page.
+        val mockEngine = MockEngine {
+            respond(
+                content = "Informational",
+                status = HttpStatusCode(199, "Informational"),
+                headers = headersOf(HttpHeaders.ContentType, "text/plain")
+            )
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val page = Page<TestRecord>(
+            embedded = null,
+            links = Page.Links(
+                self = Link("https://horizon.stellar.org/accounts"),
+                next = Link("https://horizon.stellar.org/accounts?cursor=informational"),
+                prev = null
+            )
+        )
+
+        val exception = assertFailsWith<UnknownResponseException> {
+            page.getNextPage<TestRecord>(client)
+        }
+
+        assertEquals(199, exception.code)
+        assertEquals("Informational", exception.body)
+
+        client.close()
+    }
+
+    @Test
+    fun testGetNextPageMultipleChoicesStatusIsUnknownResponse() = runTest {
+        // 3xx sits between the handled 2xx and 4xx ranges and must surface as an unknown response.
+        val mockEngine = MockEngine {
+            respond(
+                content = "Multiple Choices",
+                status = HttpStatusCode.MultipleChoices,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain")
+            )
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val page = Page<TestRecord>(
+            embedded = null,
+            links = Page.Links(
+                self = Link("https://horizon.stellar.org/accounts"),
+                next = Link("https://horizon.stellar.org/accounts?cursor=multiple_choices"),
+                prev = null
+            )
+        )
+
+        val exception = assertFailsWith<UnknownResponseException> {
+            page.getNextPage<TestRecord>(client)
+        }
+
+        assertEquals(300, exception.code)
+        assertEquals("Multiple Choices", exception.body)
+
+        client.close()
+    }
 }

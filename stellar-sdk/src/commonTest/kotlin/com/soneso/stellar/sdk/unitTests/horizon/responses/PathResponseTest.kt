@@ -1,9 +1,13 @@
 package com.soneso.stellar.sdk.unitTests.horizon.responses
 
+import com.soneso.stellar.sdk.horizon.responses.Asset
 import com.soneso.stellar.sdk.horizon.responses.PathResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -94,7 +98,7 @@ class PathResponseTest {
     }
 
     @Test
-    fun testComprehensivePathResponseDeserialization() {
+    fun testPathResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "destination_amount": "1000.0000000",
@@ -291,5 +295,101 @@ class PathResponseTest {
         val sourceAsset = pathResponse.getSourceAsset()
         assertEquals("credit_alphanum12", sourceAsset.assetType)
         assertEquals("MAXLENGTHCODE", sourceAsset.assetCode)
+    }
+
+    private fun directPath() = PathResponse(
+        destinationAmount = "20.0000000",
+        destinationAssetType = "credit_alphanum12",
+        destinationAssetCode = "LONGASSET",
+        destinationAssetIssuer = "GISSUERLONG",
+        sourceAmount = "10.0000000",
+        sourceAssetType = "credit_alphanum4",
+        sourceAssetCode = "USD",
+        sourceAssetIssuer = "GISSUERUSD",
+        path = listOf(
+            Asset("native"),
+            Asset("credit_alphanum4", "EUR", "GISSUEREUR")
+        )
+    )
+
+    private fun nativeToNativePath() = PathResponse(
+        destinationAmount = "5.0000000",
+        destinationAssetType = "native",
+        sourceAmount = "5.0000000",
+        sourceAssetType = "native",
+        path = emptyList()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val path = directPath()
+
+        val encoded = json.encodeToString(PathResponse.serializer(), path)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "destination_amount", "destination_asset_type", "destination_asset_code",
+                "destination_asset_issuer", "source_amount", "source_asset_type",
+                "source_asset_code", "source_asset_issuer", "path"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("20.0000000", encodedObject["destination_amount"]!!.jsonPrimitive.content)
+        assertEquals("10.0000000", encodedObject["source_amount"]!!.jsonPrimitive.content)
+        assertEquals("LONGASSET", encodedObject["destination_asset_code"]!!.jsonPrimitive.content)
+        assertEquals("USD", encodedObject["source_asset_code"]!!.jsonPrimitive.content)
+        assertEquals("GISSUERLONG", encodedObject["destination_asset_issuer"]!!.jsonPrimitive.content)
+        assertEquals("GISSUERUSD", encodedObject["source_asset_issuer"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(PathResponse.serializer(), encoded)
+        assertEquals(path, decoded)
+
+        val destinationAsset = decoded.getDestinationAsset()
+        assertEquals("credit_alphanum12", destinationAsset.assetType)
+        assertEquals("LONGASSET:GISSUERLONG", destinationAsset.toCanonicalForm())
+
+        val sourceAsset = decoded.getSourceAsset()
+        assertEquals("credit_alphanum4", sourceAsset.assetType)
+        assertEquals("USD:GISSUERUSD", sourceAsset.toCanonicalForm())
+
+        assertEquals(2, decoded.path.size)
+        assertTrue(decoded.path[0].isNative())
+        assertEquals("EUR", decoded.path[1].assetCode)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val path = nativeToNativePath()
+
+        assertNull(path.destinationAssetCode)
+        assertNull(path.destinationAssetIssuer)
+        assertNull(path.sourceAssetCode)
+        assertNull(path.sourceAssetIssuer)
+
+        val encoded = json.encodeToString(PathResponse.serializer(), path)
+        assertEquals(
+            setOf(
+                "destination_amount", "destination_asset_type",
+                "source_amount", "source_asset_type", "path"
+            ),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(PathResponse.serializer(), encoded)
+        assertEquals(path, decoded)
+        assertEquals("native", decoded.getDestinationAsset().toCanonicalForm())
+        assertEquals("native", decoded.getSourceAsset().toCanonicalForm())
+        assertTrue(decoded.path.isEmpty())
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val path = directPath()
+        assertNotEquals(path, nativeToNativePath())
+        assertNotEquals(path, path.copy(path = emptyList()))
+        assertNotEquals(path, path.copy(sourceAssetIssuer = null))
+        assertEquals(path, directPath())
+        assertEquals(path.hashCode(), directPath().hashCode())
     }
 }

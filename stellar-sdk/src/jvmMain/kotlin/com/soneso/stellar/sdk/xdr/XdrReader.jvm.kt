@@ -1,48 +1,85 @@
 // JVM implementation of XDR Reader
 package com.soneso.stellar.sdk.xdr
 
-import java.io.ByteArrayInputStream
-import java.io.DataInputStream
-
 actual class XdrReader actual constructor(input: ByteArray) {
-    private val stream = DataInputStream(ByteArrayInputStream(input))
+    private val data = input
+    private var offset = 0
     private var recursionDepth: Int = 0
 
-    actual fun readInt(): Int = stream.readInt()
+    /**
+     * Fails unless [count] more bytes can be read at the current [offset].
+     *
+     * XDR carries no stream-level length prefix, so a truncated or malformed buffer is only
+     * detectable at the read that would run past the end. Length prefixes are checked here
+     * before any allocation, so a hostile prefix cannot trigger a large one.
+     *
+     * @param count Number of bytes the caller is about to consume.
+     * @throws IllegalArgumentException if [count] is negative or exceeds the remaining bytes.
+     */
+    private fun requireAvailable(count: Int) {
+        if (count < 0) {
+            throw IllegalArgumentException("XDR decode length cannot be negative, got $count")
+        }
+        // Subtraction rather than offset + count: the sum overflows for a hostile length.
+        if (count > data.size - offset) {
+            val remaining = if (offset >= data.size) 0 else data.size - offset
+            throw IllegalArgumentException(
+                "XDR decode requires $count byte(s) at offset $offset " +
+                    "but only $remaining remain in a ${data.size}-byte buffer"
+            )
+        }
+    }
 
-    actual fun readUnsignedInt(): UInt = stream.readInt().toUInt()
+    actual fun readInt(): Int {
+        requireAvailable(4)
+        val value = ((data[offset].toInt() and 0xFF) shl 24) or
+                    ((data[offset + 1].toInt() and 0xFF) shl 16) or
+                    ((data[offset + 2].toInt() and 0xFF) shl 8) or
+                    (data[offset + 3].toInt() and 0xFF)
+        offset += 4
+        return value
+    }
 
-    actual fun readLong(): Long = stream.readLong()
+    actual fun readUnsignedInt(): UInt = readInt().toUInt()
 
-    actual fun readUnsignedLong(): ULong = stream.readLong().toULong()
+    actual fun readLong(): Long {
+        val high = readInt().toLong()
+        val low = readInt().toLong() and 0xFFFFFFFFL
+        return (high shl 32) or low
+    }
 
-    actual fun readFloat(): Float = stream.readFloat()
+    actual fun readUnsignedLong(): ULong = readLong().toULong()
 
-    actual fun readDouble(): Double = stream.readDouble()
+    actual fun readFloat(): Float = Float.fromBits(readInt())
 
-    actual fun readBoolean(): Boolean = stream.readInt() != 0
+    actual fun readDouble(): Double = Double.fromBits(readLong())
+
+    actual fun readBoolean(): Boolean = readInt() != 0
 
     actual fun readString(): String {
-        val length = stream.readInt()
-        val bytes = ByteArray(length)
-        stream.readFully(bytes)
-        // Skip padding to 4-byte boundary
+        val length = readInt()
+        requireAvailable(length)
+        val bytes = data.copyOfRange(offset, offset + length)
+        offset += length
+        // Trailing padding is skipped but not required to be present; a buffer ending on the
+        // last data byte then fails at the next read instead of here.
         val padding = (4 - (length % 4)) % 4
-        stream.skipBytes(padding)
+        offset += padding
         return bytes.decodeToString()
     }
 
     actual fun readFixedOpaque(length: Int): ByteArray {
-        val bytes = ByteArray(length)
-        stream.readFully(bytes)
-        // Skip padding to 4-byte boundary
+        requireAvailable(length)
+        val bytes = data.copyOfRange(offset, offset + length)
+        offset += length
+        // Trailing padding is skipped but not required to be present.
         val padding = (4 - (length % 4)) % 4
-        stream.skipBytes(padding)
+        offset += padding
         return bytes
     }
 
     actual fun readVariableOpaque(): ByteArray {
-        val length = stream.readInt()
+        val length = readInt()
         return readFixedOpaque(length)
     }
 

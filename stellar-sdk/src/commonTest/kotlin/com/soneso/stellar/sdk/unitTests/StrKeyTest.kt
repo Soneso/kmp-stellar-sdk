@@ -673,4 +673,96 @@ class StrKeyTest {
             byte.toInt().and(0xFF).toString(16).padStart(2, '0')
         }
     }
+
+    // ========== Encode: raw payload length validation ==========
+
+    @Test
+    fun testEncodeMed25519PublicKeyInvalidLengthThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeMed25519PublicKey(ByteArray(39))
+        }
+    }
+
+    @Test
+    fun testEncodePreAuthTxInvalidLengthThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodePreAuthTx(ByteArray(31))
+        }
+    }
+
+    @Test
+    fun testEncodeSha256HashInvalidLengthThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeSha256Hash(ByteArray(33))
+        }
+    }
+
+    @Test
+    fun testEncodeLiquidityPoolInvalidLengthThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeLiquidityPool(ByteArray(31))
+        }
+    }
+
+    // ========== Decode: payload-length validation ==========
+    //
+    // These length constraints cannot be reached through the SDK's own encoders, which
+    // validate the raw payload before base32-encoding it. The strkeys below are hand-crafted
+    // with a correct CRC16-XModem checksum but an out-of-range payload, standing in for a
+    // malicious or corrupted strkey that a decoder must still reject.
+
+    // CLAIM_PREDICATE and other version byte constants are internal implementation
+    // detail of StrKey; the raw version byte values below are the public strkey
+    // protocol constants (see SEP-0023 / CAP-0027), not implementation-specific.
+    private val claimableBalanceVersionByte: Byte = (1 shl 3).toByte()
+    private val signedPayloadVersionByte: Byte = (15 shl 3).toByte()
+
+    private fun crc16XModem(bytes: ByteArray): ByteArray {
+        var crc = 0x0000
+        for (byte in bytes) {
+            var code = (crc ushr 8) and 0xFF
+            code = code xor (byte.toInt() and 0xFF)
+            code = code xor (code ushr 4)
+            crc = (crc shl 8) and 0xFFFF
+            crc = crc xor code
+            code = (code shl 5) and 0xFFFF
+            crc = crc xor code
+            code = (code shl 7) and 0xFFFF
+            crc = crc xor code
+        }
+        return byteArrayOf(crc.toByte(), (crc ushr 8).toByte())
+    }
+
+    private fun craftStrKey(versionByte: Byte, data: ByteArray): String {
+        val payload = byteArrayOf(versionByte) + data
+        val checksum = crc16XModem(payload)
+        val unencoded = payload + checksum
+        val encoded = Base32Codec.encode(unencoded)
+        val unpaddedLength = encoded.indexOfFirst { it == '='.code.toByte() }.let {
+            if (it == -1) encoded.size else it
+        }
+        return encoded.copyOfRange(0, unpaddedLength).map { it.toInt().toChar() }.joinToString("")
+    }
+
+    @Test
+    fun testDecodeClaimableBalanceWrongDataLengthThrows() {
+        // A validly checksummed B... strkey whose payload is neither 32 nor 33 bytes
+        // must still be rejected on decode, not just on encode.
+        val badKey = craftStrKey(claimableBalanceVersionByte, ByteArray(20))
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.decodeClaimableBalance(badKey)
+        }
+        assertFalse(StrKey.isValidClaimableBalance(badKey))
+    }
+
+    @Test
+    fun testDecodeSignedPayloadWrongDataLengthThrows() {
+        // A validly checksummed P... strkey whose payload is outside [40, 100] bytes
+        // must still be rejected on decode.
+        val badKey = craftStrKey(signedPayloadVersionByte, ByteArray(30))
+        assertFailsWith<IllegalArgumentException> {
+            StrKey.decodeSignedPayload(badKey)
+        }
+        assertFalse(StrKey.isValidSignedPayload(badKey))
+    }
 }

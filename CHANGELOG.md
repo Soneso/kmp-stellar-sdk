@@ -17,6 +17,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key ordering compares `SCV_EXECUTABLE_TAG` values by content like `String`
   and `Symbol`.
 
+### Fixed
+- The SEP-29 memo-required check now runs on transaction submission.
+  `HorizonServer.submitTransaction` and `submitTransactionAsync` decode
+  envelopes with the SDK's XDR types; the previous parser misread real
+  envelopes and the check never fired. Muxed destinations remain exempt and
+  fee-bump envelopes are inspected through their inner transaction. With the
+  check active, submitting a memo-less transaction performs one Horizon
+  account lookup per distinct destination unless `skipMemoRequiredCheck` is
+  set.
+- XDR decoding now rejects truncated and malformed input uniformly on every
+  target. `XdrReader` performed no bounds checking on JavaScript and Native;
+  on JavaScript, reads past the end of the buffer yielded undefined values, so
+  malformed XDR (RPC responses, transaction envelopes, SEP-10 challenges,
+  Soroban authorization entries) decoded into a bogus object instead of
+  raising an error. The JVM reader failed, but with target-specific
+  exceptions: `EOFException` on a truncated buffer, `NegativeArraySizeException`
+  on a negative length prefix and `OutOfMemoryError` on a hostile one, because
+  the length was used to allocate before being validated. All three targets now
+  validate the remaining byte count before allocating and throw
+  `IllegalArgumentException`, and reject negative length prefixes. On
+  JavaScript this is a behavior change: code that previously received a
+  silently decoded object from malformed XDR now sees an exception. On the JVM
+  the exception type for malformed XDR changes.
+- `RequestBuilder.buildUrl()` is idempotent. Repeated calls previously
+  appended the path segments again, so every Horizon SSE reconnect targeted a
+  duplicated path (`/transactions` became `/transactions/transactions`) and
+  streams never recovered from a disconnect.
+- `OZMultiSignerManager.multiSignerTransfer` validates the token contract
+  address and the signer list before resolving token decimals, so invalid
+  input fails fast instead of after a network round-trip.
+- Soroban RPC responses that cannot be deserialized now raise
+  `IllegalArgumentException` with the underlying cause, as documented. Ktor
+  reports these failures as `ContentConvertException`, which was not being
+  caught.
+- SEP-10 reports a client-domain `stellar.toml` that lacks a `SIGNING_KEY` as
+  such, instead of re-wrapping it as a stellar.toml load failure. The
+  exception type is unchanged.
+- SEP-10 `validateChallenge` verifies that the challenge transaction's source
+  account is the server account, as SEP-10 requires. The check was missing, so
+  a challenge sourced by any other account passed validation. A mismatch now
+  raises the new `InvalidTransactionSourceAccountException`. A muxed source is
+  rejected by the same comparison, since the server account is an ed25519
+  account id.
+- SEP-6 `patchTransaction` matches the specification. It targets
+  `PATCH TRANSFER_SERVER/transactions/:id` rather than the singular
+  `/transaction/:id`, and sends the updated fields nested under a
+  `transaction` key rather than at the top level. A spec-conforming anchor
+  does not serve the previous request shape.
+- `AccountDataResponse.decodedString` raises `CharacterCodingException` on a
+  data entry that is not valid UTF-8, and `decodedStringOrNull` returns null
+  for one, as both were documented to do. Decoding accepted invalid sequences
+  and substituted the Unicode replacement character, so binary data surfaced
+  as mojibake instead of a detectable failure.
+- The OpenZeppelin smart account kit reports a transaction as signed only when
+  it produced a signature. Auth entries that are passed through unchanged
+  (source-account credentials, or entries belonging to another contract) no
+  longer cause the `TransactionSigned` event to name a credential, and no
+  longer bump that credential's last-used timestamp.
+- `OZRelayerClient` tolerates relayer responses whose fields carry an
+  unexpected JSON shape. A non-primitive `success`, `error`, `hash`,
+  `transactionId` or `status` raised `IllegalArgumentException` out of the
+  response parser; such fields are now treated as absent and the call returns
+  a failed `RelayerResponse` like every other malformed-response case.
+
 ## [1.10.0] - 2026-07-20
 
 ### Added

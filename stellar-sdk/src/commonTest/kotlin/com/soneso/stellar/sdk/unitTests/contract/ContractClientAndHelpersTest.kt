@@ -1,7 +1,12 @@
 package com.soneso.stellar.sdk.unitTests.contract
 
+import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.contract.exception.ContractSpecException
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 /**
@@ -190,5 +195,270 @@ class ContractClientAndHelpersTest {
         assertFalse(opts.simulate)
         assertFalse(opts.restore)
         assertFalse(opts.autoSubmit)
+    }
+
+    // ==================== Spec-Required Methods: no spec loaded ====================
+
+    @Test
+    fun testFuncArgsToXdrSCValuesThrowsIllegalStateWithoutSpec() {
+        val client = ContractClient.forContractWithoutSpec(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        val ex = assertFailsWith<IllegalStateException> {
+            client.funcArgsToXdrSCValues("hello", mapOf("to" to "Alice"))
+        }
+        assertTrue(ex.message!!.contains("funcArgsToXdrSCValues requires ContractSpec"))
+        client.close()
+    }
+
+    @Test
+    fun testNativeToXdrSCValThrowsIllegalStateWithoutSpec() {
+        val client = ContractClient.forContractWithoutSpec(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        val ex = assertFailsWith<IllegalStateException> {
+            client.nativeToXdrSCVal("Alice", symbolTypeDef())
+        }
+        assertTrue(ex.message!!.contains("nativeToXdrSCVal requires ContractSpec"))
+        client.close()
+    }
+
+    @Test
+    fun testFuncResToNativeScValThrowsIllegalStateWithoutSpec() {
+        val client = ContractClient.forContractWithoutSpec(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        val ex = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("hello", SCValXdr.Sym(SCSymbolXdr("Alice")))
+        }
+        assertTrue(ex.message!!.contains("funcResToNative requires ContractSpec"))
+        client.close()
+    }
+
+    @Test
+    fun testFuncResToNativeBase64ThrowsIllegalStateWithoutSpec() {
+        val client = ContractClient.forContractWithoutSpec(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        val ex = assertFailsWith<IllegalStateException> {
+            client.funcResToNative("hello", SCValXdr.Sym(SCSymbolXdr("Alice")).toXdrBase64())
+        }
+        assertTrue(ex.message!!.contains("funcResToNative requires ContractSpec"))
+        client.close()
+    }
+
+    // ==================== Spec-Required Methods: spec loaded ====================
+    //
+    // Companions to the "without spec" guard tests above: these exercise the same
+    // methods' success path, where the spec is present and the call delegates to it
+    // rather than throwing. No network call is made by any of these methods.
+
+    @Test
+    fun testGetMethodNamesReturnsFunctionNamesWhenSpecLoaded() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            assertEquals(setOf("hello"), client.getMethodNames())
+        }
+    }
+
+    @Test
+    fun testFuncArgsToXdrSCValuesConvertsArgumentsWhenSpecLoaded() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val args = client.funcArgsToXdrSCValues("hello", mapOf("to" to "Alice"))
+            assertEquals(1, args.size)
+            assertTrue(args[0] is SCValXdr.Sym)
+            assertEquals("Alice", (args[0] as SCValXdr.Sym).value.value)
+        }
+    }
+
+    @Test
+    fun testNativeToXdrSCValConvertsValueWhenSpecLoaded() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val scVal = client.nativeToXdrSCVal("Alice", symbolTypeDef())
+            assertTrue(scVal is SCValXdr.Sym)
+            assertEquals("Alice", (scVal as SCValXdr.Sym).value.value)
+        }
+    }
+
+    @Test
+    fun testFuncResToNativeScValConvertsResultWhenSpecLoaded() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val native = client.funcResToNative("hello", SCValXdr.Sym(SCSymbolXdr("Hello Alice")))
+            assertEquals("Hello Alice", native)
+        }
+    }
+
+    @Test
+    fun testFuncResToNativeBase64ConvertsResultWhenSpecLoaded() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val native = client.funcResToNative("hello", SCValXdr.Sym(SCSymbolXdr("Hello Alice")).toXdrBase64())
+            assertEquals("Hello Alice", native)
+        }
+    }
+
+    // ==================== Map-based invoke/buildInvoke: method validation ====================
+
+    @Test
+    fun testInvokeMapUnknownMethodThrows() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val ex = assertFailsWith<IllegalArgumentException> {
+                client.invoke<SCValXdr>(
+                    functionName = "missing",
+                    arguments = emptyMap(),
+                    source = MOCK_RPC_SOURCE_ACCOUNT,
+                    signer = null
+                )
+            }
+            assertTrue(ex.message!!.contains("Method 'missing' not found in contract spec"))
+            assertTrue(ex.message!!.contains("hello"))
+        }
+    }
+
+    @Test
+    fun testBuildInvokeMapUnknownMethodThrows() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val ex = assertFailsWith<IllegalArgumentException> {
+                client.buildInvoke<SCValXdr>(
+                    functionName = "missing",
+                    arguments = emptyMap(),
+                    source = MOCK_RPC_SOURCE_ACCOUNT,
+                    signer = null
+                )
+            }
+            assertTrue(ex.message!!.contains("Method 'missing' not found in contract spec"))
+            assertTrue(ex.message!!.contains("hello"))
+        }
+    }
+
+    // ==================== Map-based invoke/buildInvoke: argument conversion failure ====================
+
+    @Test
+    fun testInvokeMapArgumentConversionFailureWraps() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val ex = assertFailsWith<IllegalArgumentException> {
+                client.invoke<SCValXdr>(
+                    functionName = "hello",
+                    arguments = emptyMap(), // missing required "to" argument
+                    source = MOCK_RPC_SOURCE_ACCOUNT,
+                    signer = null
+                )
+            }
+            assertTrue(ex.message!!.contains("Failed to convert arguments for 'hello'"))
+            assertNotNull(ex.cause)
+            assertTrue(ex.cause is ContractSpecException)
+        }
+    }
+
+    @Test
+    fun testBuildInvokeMapArgumentConversionFailureWraps() = runTest {
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val ex = assertFailsWith<IllegalArgumentException> {
+                client.buildInvoke<SCValXdr>(
+                    functionName = "hello",
+                    arguments = emptyMap(), // missing required "to" argument
+                    source = MOCK_RPC_SOURCE_ACCOUNT,
+                    signer = null
+                )
+            }
+            assertTrue(ex.message!!.contains("Failed to convert arguments for 'hello'"))
+            assertNotNull(ex.cause)
+            assertTrue(ex.cause is ContractSpecException)
+        }
+    }
+
+    // ==================== Map-based invoke/buildInvoke: successful delegation ====================
+
+    @Test
+    fun testInvokeMapDelegatesToPositionalOnSuccess() = runTest {
+        mockRpcServer(simulateReturnValue = SCValXdr.Sym(SCSymbolXdr("Hello Alice"))).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val result: String = client.invoke(
+                functionName = "hello",
+                arguments = mapOf("to" to "Alice"),
+                source = MOCK_RPC_SOURCE_ACCOUNT,
+                signer = null,
+                parseResultXdrFn = { (it as SCValXdr.Sym).value.value }
+            )
+            assertEquals("Hello Alice", result)
+        }
+    }
+
+    @Test
+    fun testBuildInvokeMapDelegatesToPositionalOnSuccess() = runTest {
+        mockRpcServer(simulateReturnValue = SCValXdr.Sym(SCSymbolXdr("Hello Alice"))).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val tx = client.buildInvoke<String>(
+                functionName = "hello",
+                arguments = mapOf("to" to "Alice"),
+                source = MOCK_RPC_SOURCE_ACCOUNT,
+                signer = null,
+                parseResultXdrFn = { (it as SCValXdr.Sym).value.value }
+            )
+            assertNotNull(tx.simulation)
+            assertEquals("Hello Alice", tx.result())
+        }
+    }
+
+    @Test
+    fun testInvokeMapWriteCallSignsAndSubmits() = runTest {
+        val signer = KeyPair.random()
+        val source = signer.getAccountId()
+        mockRpcServer(
+            simulateReturnValue = Scv.toVoid(),
+            authEntries = listOf(writeAuthEntry()),
+            sourceAccount = source,
+            submittedReturnValue = SCValXdr.Sym(SCSymbolXdr("Hello Bob"))
+        ).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec())
+            val result: String = client.invoke(
+                functionName = "hello",
+                arguments = mapOf("to" to "Bob"),
+                source = source,
+                signer = signer,
+                parseResultXdrFn = { (it as SCValXdr.Sym).value.value }
+            )
+            assertEquals("Hello Bob", result, "write call must return the value parsed from the submitted transaction meta")
+        }
+    }
+
+    // ==================== Positional buildInvoke: default result parser ====================
+
+    @Test
+    fun testPositionalBuildInvokeDefaultParserReturnsRawScVal() = runTest {
+        mockRpcServer(simulateReturnValue = SCValXdr.Sym(SCSymbolXdr("Hello Alice"))).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, contractSpec = null)
+            val tx = client.buildInvoke<SCValXdr>(
+                functionName = "hello",
+                parameters = listOf(Scv.toSymbol("Alice")),
+                source = MOCK_RPC_SOURCE_ACCOUNT,
+                signer = null
+            )
+            val result = tx.result()
+            assertTrue(result is SCValXdr.Sym)
+            assertEquals("Hello Alice", (result as SCValXdr.Sym).value.value)
+        }
+    }
+
+    // ==================== Test fixtures ====================
+
+    private fun symbolTypeDef(): SCSpecTypeDefXdr {
+        val writer = XdrWriter()
+        SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL.encode(writer)
+        return SCSpecTypeDefXdr.decode(XdrReader(writer.toByteArray()))
+    }
+
+    /** A minimal contract spec with a single "hello(to: symbol) -> symbol" function. */
+    private fun helloSpec(): ContractSpec {
+        val entry = SCSpecEntryXdr.FunctionV0(
+            SCSpecFunctionV0Xdr(
+                doc = "",
+                name = SCSymbolXdr("hello"),
+                inputs = listOf(
+                    SCSpecFunctionInputV0Xdr(doc = "", name = "to", type = symbolTypeDef())
+                ),
+                outputs = listOf(symbolTypeDef())
+            )
+        )
+        return ContractSpec(listOf(entry))
     }
 }

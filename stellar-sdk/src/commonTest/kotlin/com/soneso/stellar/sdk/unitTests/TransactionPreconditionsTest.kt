@@ -219,6 +219,18 @@ class TransactionPreconditionsTest {
     }
 
     @Test
+    fun testXdrRoundTripV2WithoutLedgerBounds() {
+        // V2 preconditions triggered by minSequenceNumber alone, with no ledger bounds set,
+        // exercises the null branch of the ledgerBounds mapping on both encode and decode.
+        val original = TransactionPreconditions(minSequenceNumber = 5000L)
+        val xdr = original.toXdr()
+        val restored = TransactionPreconditions.fromXdr(xdr)
+
+        assertNull(restored.ledgerBounds)
+        assertEquals(5000L, restored.minSequenceNumber)
+    }
+
+    @Test
     fun testXdrRoundTripV2WithoutTimeBounds() {
         // V2 can have no time bounds
         val ledgerBounds = LedgerBounds(1000, 2000)

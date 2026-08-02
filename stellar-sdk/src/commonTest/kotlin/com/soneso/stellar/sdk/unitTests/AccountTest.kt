@@ -104,6 +104,14 @@ class AccountTest {
     }
 
     @Test
+    fun testEqualsReflexiveNullAndDifferentType() {
+        val account = Account(accountId, sequenceNumber)
+        assertEquals(account, account)
+        assertFalse(account.equals(null))
+        assertFalse(account.equals("not an account"))
+    }
+
+    @Test
     fun testToString() {
         val account = Account(accountId, sequenceNumber)
         val str = account.toString()

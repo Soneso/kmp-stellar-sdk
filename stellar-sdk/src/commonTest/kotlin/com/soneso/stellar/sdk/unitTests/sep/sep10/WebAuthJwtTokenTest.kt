@@ -7,6 +7,7 @@ package com.soneso.stellar.sdk.unitTests.sep.sep10
 import com.soneso.stellar.sdk.sep.sep10.*
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.sep.sep10.exceptions.ChallengeRequestException
+import com.soneso.stellar.sdk.sep.sep10.exceptions.GenericChallengeValidationException
 import com.soneso.stellar.sdk.sep.sep10.exceptions.InvalidSignatureException
 import com.soneso.stellar.sdk.sep.sep10.exceptions.TokenSubmissionException
 import io.ktor.client.*
@@ -46,12 +47,16 @@ class WebAuthJwtTokenTest {
         homeDomain: String,
         memo: Long? = null,
         includeClientDomain: Boolean = false,
-        includeWebAuthDomain: Boolean = false
+        includeWebAuthDomain: Boolean = false,
+        clientDomainOpSource: String? = null,
+        txSourceAccountId: String? = null
     ): String {
         // Create server keypair from secret seed
         val serverKeyPair = KeyPair.fromSecretSeed(serverSecretSeed)
-        // Create a SEP-10 challenge transaction
-        val sourceAccount = Account(serverKeyPair.getAccountId(), -1L)
+        // Create a SEP-10 challenge transaction. The transaction source defaults to the signing
+        // server; txSourceAccountId sets it independently so a test can vary source and
+        // signature separately.
+        val sourceAccount = Account(txSourceAccountId ?: serverKeyPair.getAccountId(), -1L)
 
         val builder = TransactionBuilder(sourceAccount, network)
             .setBaseFee(100)
@@ -81,7 +86,7 @@ class WebAuthJwtTokenTest {
                 name = "client_domain",
                 value = "wallet.example.com".encodeToByteArray()
             )
-            clientDomainOp.sourceAccount = serverKeyPair.getAccountId()
+            clientDomainOp.sourceAccount = clientDomainOpSource ?: serverKeyPair.getAccountId()
             builder.addOperation(clientDomainOp)
         }
 
@@ -388,12 +393,14 @@ class WebAuthJwtTokenTest {
         val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
         val wrongServerKeyPair = KeyPair.random()  // Different server keypair
 
-        // Create challenge signed by wrong server
+        // Challenge sourced by the expected server but signed by a different key, so the
+        // signature check is what rejects it
         val wrongServerSeed = wrongServerKeyPair.getSecretSeed()?.concatToString() ?: ""
         val challengeXdr = createValidChallengeXdr(
             clientKeyPair = clientKeyPair,
             serverSecretSeed = wrongServerSeed,  // Wrong signature
-            homeDomain = testHomeDomain
+            homeDomain = testHomeDomain,
+            txSourceAccountId = serverKeyPair.getAccountId()
         )
 
         val mockClient = createMockClientForJwtToken(
@@ -601,5 +608,184 @@ class WebAuthJwtTokenTest {
         assertNotNull(authToken.iat)
         assertEquals(1709602200L, authToken.exp)
         assertEquals(1709598600L, authToken.iat)
+    }
+
+    /**
+     * Creates a mock HTTP client that additionally serves a client domain stellar.toml.
+     */
+    private fun createMockClientWithClientDomainToml(
+        challengeXdr: String,
+        clientDomainToml: String,
+        clientDomainTomlStatus: HttpStatusCode = HttpStatusCode.OK
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains(".well-known/stellar.toml") -> respond(
+                    content = clientDomainToml,
+                    status = clientDomainTomlStatus,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+                request.method == HttpMethod.Get -> respond(
+                    content = """{"transaction": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> respond(
+                    content = """{"token": "$sampleJwt"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    @Test
+    fun testJwtTokenClientDomainSigningKeyResolvedFromToml() = runTest {
+        val clientKeyPair = KeyPair.random()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientDomainKeyPair = KeyPair.random()
+
+        // The client_domain operation is sourced by the account published as the
+        // client domain's SIGNING_KEY, which the SDK fetches from its stellar.toml
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            serverSecretSeed = testServerSecretSeed,
+            homeDomain = testHomeDomain,
+            includeClientDomain = true,
+            clientDomainOpSource = clientDomainKeyPair.getAccountId()
+        )
+
+        var delegateReceivedXdr: String? = null
+        val delegate = ClientDomainSigningDelegate { transactionXdr ->
+            delegateReceivedXdr = transactionXdr
+            val tx = AbstractTransaction.fromEnvelopeXdr(transactionXdr, network) as Transaction
+            tx.sign(clientDomainKeyPair)
+            tx.toEnvelopeXdrBase64()
+        }
+
+        val mockClient = createMockClientWithClientDomainToml(
+            challengeXdr = challengeXdr,
+            clientDomainToml = """SIGNING_KEY="${clientDomainKeyPair.getAccountId()}""""
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val authToken = webAuth.jwtToken(
+            clientAccountId = clientKeyPair.getAccountId(),
+            signers = listOf(clientKeyPair),
+            clientDomain = "wallet.example.com",
+            clientDomainSigningDelegate = delegate
+        )
+
+        assertEquals(sampleJwt, authToken.token)
+        assertNotNull(delegateReceivedXdr)
+    }
+
+    @Test
+    fun testJwtTokenClientDomainTomlWithoutSigningKeyRejected() = runTest {
+        val clientKeyPair = KeyPair.random()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientDomainKeyPair = KeyPair.random()
+
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            serverSecretSeed = testServerSecretSeed,
+            homeDomain = testHomeDomain,
+            includeClientDomain = true,
+            clientDomainOpSource = clientDomainKeyPair.getAccountId()
+        )
+
+        // stellar.toml exists but publishes no SIGNING_KEY, so the client_domain
+        // operation source cannot be verified
+        val mockClient = createMockClientWithClientDomainToml(
+            challengeXdr = challengeXdr,
+            clientDomainToml = """WEB_AUTH_ENDPOINT="https://wallet.example.com/auth""""
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<GenericChallengeValidationException> {
+            webAuth.jwtToken(
+                clientAccountId = clientKeyPair.getAccountId(),
+                signers = listOf(clientKeyPair),
+                clientDomain = "wallet.example.com",
+                clientDomainKeyPair = clientDomainKeyPair
+            )
+        }
+
+        assertEquals(
+            "SIGNING_KEY not found in stellar.toml for client domain: wallet.example.com",
+            exception.message,
+            "A readable stellar.toml without SIGNING_KEY must report the missing key, not a load failure"
+        )
+    }
+
+    @Test
+    fun testJwtTokenClientDomainTomlLoadFailureRejected() = runTest {
+        val clientKeyPair = KeyPair.random()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientDomainKeyPair = KeyPair.random()
+
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            serverSecretSeed = testServerSecretSeed,
+            homeDomain = testHomeDomain,
+            includeClientDomain = true,
+            clientDomainOpSource = clientDomainKeyPair.getAccountId()
+        )
+
+        // The client domain publishes no stellar.toml at all
+        val mockClient = createMockClientWithClientDomainToml(
+            challengeXdr = challengeXdr,
+            clientDomainToml = "Not Found",
+            clientDomainTomlStatus = HttpStatusCode.NotFound
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<GenericChallengeValidationException> {
+            webAuth.jwtToken(
+                clientAccountId = clientKeyPair.getAccountId(),
+                signers = listOf(clientKeyPair),
+                clientDomain = "wallet.example.com",
+                clientDomainKeyPair = clientDomainKeyPair
+            )
+        }
+
+        assertTrue(
+            exception.message?.startsWith("Failed to load stellar.toml for client domain wallet.example.com") == true,
+            "An unreachable stellar.toml must report the load failure, got: ${exception.message}"
+        )
+        assertTrue(
+            exception.message?.contains("SIGNING_KEY") != true,
+            "A load failure must not be described as a missing SIGNING_KEY, got: ${exception.message}"
+        )
     }
 }

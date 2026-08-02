@@ -320,6 +320,44 @@ class Sep31ResponseParsingTest {
     }
 
     @Test
+    fun transactionResponse_onlyIdAndStatusSupplied_everyOtherFieldDefaultsToNull() = runTest {
+        // id and status are the only required members of the SEP-31 transaction object;
+        // every other member is optional and must default to null when not supplied.
+        val response = Sep31TransactionResponse(
+            id = "82fhs729f63dh0v4",
+            status = "pending_sender",
+        )
+
+        assertEquals("82fhs729f63dh0v4", response.id)
+        assertEquals("pending_sender", response.status)
+        assertNull(response.statusEta)
+        assertNull(response.statusMessage)
+        assertNull(response.amountIn)
+        assertNull(response.amountInAsset)
+        assertNull(response.amountOut)
+        assertNull(response.amountOutAsset)
+        @Suppress("DEPRECATION")
+        assertNull(response.amountFee)
+        @Suppress("DEPRECATION")
+        assertNull(response.amountFeeAsset)
+        assertNull(response.feeDetails)
+        assertNull(response.quoteId)
+        assertNull(response.stellarAccountId)
+        assertNull(response.stellarMemoType)
+        assertNull(response.stellarMemo)
+        assertNull(response.startedAt)
+        assertNull(response.updatedAt)
+        assertNull(response.completedAt)
+        assertNull(response.stellarTransactionId)
+        assertNull(response.externalTransactionId)
+        @Suppress("DEPRECATION")
+        assertNull(response.refunded)
+        assertNull(response.refunds)
+        assertNull(response.requiredInfoMessage)
+        assertNull(response.requiredInfoUpdates)
+    }
+
+    @Test
     fun transactionResponse_flatShape_throwsSep31InvalidResponseException() = runTest {
         // A flat object without the "transaction" wrapper must be rejected per SEP-31 §"GET Transaction".
         val flatJson = """

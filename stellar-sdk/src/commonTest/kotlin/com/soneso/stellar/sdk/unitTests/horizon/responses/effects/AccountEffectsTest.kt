@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_MUXED
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_MUXED_ID
@@ -38,7 +39,7 @@ class AccountEffectsTest {
         assertEquals(TEST_CREATED_AT, effect.createdAt)
         assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
         assertEquals("10000.0000000", effect.startingBalance)
-        assertNotNull(effect.links)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -63,6 +64,9 @@ class AccountEffectsTest {
         assertEquals(TEST_ACCOUNT_MUXED, effect.accountMuxed)
         assertEquals(TEST_ACCOUNT_MUXED_ID, effect.accountMuxedId)
         assertEquals("account_created", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
         assertEquals("10000.0000000", effect.startingBalance)
     }
 
@@ -85,6 +89,9 @@ class AccountEffectsTest {
         )
         assertEquals("2", effect.id)
         assertEquals("account_removed", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -102,6 +109,9 @@ class AccountEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<AccountRemovedEffectResponse>(effect)
         assertEquals("account_removed", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -127,6 +137,9 @@ class AccountEffectsTest {
         assertEquals("credit_alphanum4", effect.assetType)
         assertEquals("USD", effect.assetCode)
         assertEquals(TEST_ACCOUNT, effect.assetIssuer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -161,6 +174,9 @@ class AccountEffectsTest {
         assertIs<AccountCreditedEffectResponse>(effect)
         assertEquals("100.0000000", effect.amount)
         assertEquals("USD", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -185,6 +201,9 @@ class AccountEffectsTest {
         assertEquals("200.0000000", effect.amount)
         assertEquals("credit_alphanum12", effect.assetType)
         assertEquals("LONGASSETCODE", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -207,6 +226,9 @@ class AccountEffectsTest {
         assertEquals("native", effect.assetType)
         assertNull(effect.assetCode)
         assertNull(effect.assetIssuer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -230,6 +252,9 @@ class AccountEffectsTest {
         assertEquals(1, effect.lowThreshold)
         assertEquals(2, effect.medThreshold)
         assertEquals(3, effect.highThreshold)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -252,6 +277,9 @@ class AccountEffectsTest {
         assertEquals(1, effect.lowThreshold)
         assertEquals(5, effect.medThreshold)
         assertEquals(10, effect.highThreshold)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -273,6 +301,9 @@ class AccountEffectsTest {
             homeDomain = "stellar.org"
         )
         assertEquals("stellar.org", effect.homeDomain)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -291,6 +322,9 @@ class AccountEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<AccountHomeDomainUpdatedEffectResponse>(effect)
         assertEquals("example.com", effect.homeDomain)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -313,6 +347,9 @@ class AccountEffectsTest {
         )
         assertEquals(true, effect.authRequiredFlag)
         assertEquals(false, effect.authRevokableFlag)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -344,6 +381,9 @@ class AccountEffectsTest {
         assertIs<AccountFlagsUpdatedEffectResponse>(effect)
         assertEquals(true, effect.authRequiredFlag)
         assertEquals(true, effect.authRevokableFlag)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -365,6 +405,9 @@ class AccountEffectsTest {
         )
         assertEquals("8", effect.id)
         assertEquals("account_inflation_destination_updated", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -382,6 +425,9 @@ class AccountEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<AccountInflationDestinationUpdatedEffectResponse>(effect)
         assertEquals("account_inflation_destination_updated", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

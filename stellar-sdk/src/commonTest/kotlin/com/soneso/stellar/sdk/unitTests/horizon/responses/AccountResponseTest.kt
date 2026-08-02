@@ -3,9 +3,12 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.AccountResponse
 import com.soneso.stellar.sdk.horizon.responses.Link
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -283,7 +286,7 @@ class AccountResponseTest {
     }
 
     @Test
-    fun testAccountResponseAllInnerClassesFullCoverage() {
+    fun testAccountResponseInnerClassProperties() {
         val accountResponseJson = """
         {
             "id": "GAIRISXKPLOWZBMFRPU5XJJMTOYEOAOHXGPXFC3BNR3TGIEYG3Q6VCDK",
@@ -860,5 +863,158 @@ class AccountResponseTest {
 
         assertEquals(1, account.data.size)
         assertEquals("TXVsdGktc2lnIEFjY291bnQ=", account.data["name"])
+    }
+
+    private fun directLinks() = AccountResponse.Links(
+        self = Link("https://horizon.stellar.org/accounts/GDIRECT"),
+        transactions = Link("https://horizon.stellar.org/accounts/GDIRECT/transactions{?cursor}", true),
+        operations = Link("https://horizon.stellar.org/accounts/GDIRECT/operations"),
+        payments = Link("https://horizon.stellar.org/accounts/GDIRECT/payments"),
+        effects = Link("https://horizon.stellar.org/accounts/GDIRECT/effects"),
+        offers = Link("https://horizon.stellar.org/accounts/GDIRECT/offers"),
+        trades = Link("https://horizon.stellar.org/accounts/GDIRECT/trades"),
+        data = Link("https://horizon.stellar.org/accounts/GDIRECT/data/{key}", true)
+    )
+
+    private fun directAccount() = AccountResponse(
+        id = "GDIRECT",
+        accountId = "GDIRECT",
+        sequenceNumber = 4294967297L,
+        sequenceLedger = 51000L,
+        sequenceTime = 1700000000L,
+        subentryCount = 4,
+        inflationDestination = "GINFLATION",
+        homeDomain = "example.com",
+        lastModifiedLedger = 51001,
+        lastModifiedTime = "2024-03-04T05:06:07Z",
+        thresholds = AccountResponse.Thresholds(lowThreshold = 1, medThreshold = 2, highThreshold = 3),
+        flags = AccountResponse.Flags(
+            authRequired = true,
+            authRevocable = false,
+            authImmutable = true,
+            authClawbackEnabled = false
+        ),
+        balances = listOf(
+            AccountResponse.Balance(
+                assetType = "credit_alphanum4",
+                assetCode = "USD",
+                assetIssuer = "GISSUER",
+                liquidityPoolId = null,
+                limit = "1000.0000000",
+                balance = "250.0000000",
+                buyingLiabilities = "1.0000000",
+                sellingLiabilities = "2.0000000",
+                isAuthorized = true,
+                isAuthorizedToMaintainLiabilities = true,
+                isClawbackEnabled = false,
+                lastModifiedLedger = 50999,
+                sponsor = "GSPONSOR"
+            ),
+            AccountResponse.Balance(assetType = "native", balance = "99.5000000")
+        ),
+        signers = listOf(
+            AccountResponse.Signer(key = "GDIRECT", type = "ed25519_public_key", weight = 1),
+            AccountResponse.Signer(key = "GEXTRA", type = "ed25519_public_key", weight = 2, sponsor = "GSPONSOR")
+        ),
+        data = mapOf("config" to "dGVzdA=="),
+        numSponsoring = 2,
+        numSponsored = 1,
+        sponsor = "GSPONSOR",
+        pagingToken = "GDIRECT",
+        links = directLinks()
+    )
+
+    private fun minimalAccount() = AccountResponse(
+        id = "GMINIMAL",
+        accountId = "GMINIMAL",
+        sequenceNumber = 7L,
+        subentryCount = 0,
+        lastModifiedLedger = 10,
+        thresholds = AccountResponse.Thresholds(lowThreshold = 0, medThreshold = 0, highThreshold = 0),
+        flags = AccountResponse.Flags(
+            authRequired = false,
+            authRevocable = false,
+            authImmutable = false,
+            authClawbackEnabled = false
+        ),
+        balances = listOf(AccountResponse.Balance(assetType = "native", balance = "0.0000000")),
+        signers = listOf(AccountResponse.Signer(key = "GMINIMAL", type = "ed25519_public_key", weight = 1)),
+        pagingToken = "GMINIMAL",
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val account = directAccount()
+
+        val encoded = json.encodeToString(AccountResponse.serializer(), account)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "account_id", "sequence", "sequence_ledger", "sequence_time",
+                "subentry_count", "inflation_destination", "home_domain", "last_modified_ledger",
+                "last_modified_time", "thresholds", "flags", "balances", "signers", "data",
+                "num_sponsoring", "num_sponsored", "sponsor", "paging_token", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("4294967297", encodedObject["sequence"]!!.jsonPrimitive.content)
+        assertEquals("51000", encodedObject["sequence_ledger"]!!.jsonPrimitive.content)
+        assertEquals("1700000000", encodedObject["sequence_time"]!!.jsonPrimitive.content)
+        assertEquals("2", encodedObject["num_sponsoring"]!!.jsonPrimitive.content)
+        assertEquals("1", encodedObject["num_sponsored"]!!.jsonPrimitive.content)
+        assertEquals("example.com", encodedObject["home_domain"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(AccountResponse.serializer(), encoded)
+        assertEquals(account, decoded)
+        assertEquals(4294967298L, decoded.getIncrementedSequenceNumber())
+        assertEquals("GINFLATION", decoded.inflationDestination)
+        assertEquals(3, decoded.thresholds.highThreshold)
+        assertTrue(decoded.flags.authImmutable)
+        assertEquals(2, decoded.balances.size)
+        assertEquals("250.0000000", decoded.balances[0].balance)
+        assertEquals("native", decoded.balances[1].assetType)
+        assertEquals(2, decoded.signers[1].weight)
+        assertEquals("dGVzdA==", decoded.data["config"])
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val account = minimalAccount()
+
+        assertNull(account.sequenceLedger)
+        assertNull(account.sequenceTime)
+        assertNull(account.inflationDestination)
+        assertNull(account.homeDomain)
+        assertNull(account.lastModifiedTime)
+        assertNull(account.numSponsoring)
+        assertNull(account.numSponsored)
+        assertNull(account.sponsor)
+        assertTrue(account.data.isEmpty())
+
+        val encoded = json.encodeToString(AccountResponse.serializer(), account)
+        assertEquals(
+            setOf(
+                "id", "account_id", "sequence", "subentry_count", "last_modified_ledger",
+                "thresholds", "flags", "balances", "signers", "paging_token", "_links"
+            ),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(AccountResponse.serializer(), encoded)
+        assertEquals(account, decoded)
+        assertTrue(decoded.data.isEmpty())
+        assertEquals(8L, decoded.getIncrementedSequenceNumber())
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val account = directAccount()
+        assertNotEquals(account, minimalAccount())
+        assertNotEquals(account, account.copy(homeDomain = null))
+        assertNotEquals(account, account.copy(sequenceNumber = account.sequenceNumber + 1))
+        assertEquals(account, directAccount())
+        assertEquals(account.hashCode(), directAccount().hashCode())
     }
 }

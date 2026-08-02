@@ -946,6 +946,492 @@ class KYCServiceTest {
         }
     }
 
+    // ========== Request Recording Helpers ==========
+
+    private class RecordedRequest {
+        var method: HttpMethod? = null
+        var encodedPath: String = ""
+        var queryParameters: Parameters = Parameters.Empty
+        var headers: Headers = Headers.Empty
+        var body: String = ""
+
+        val authorization: String?
+            get() = headers["Authorization"]
+    }
+
+    /**
+     * Mock client that records the outgoing request and always answers with the given payload.
+     */
+    private fun recordingMockClient(
+        recorded: RecordedRequest,
+        responseContent: String,
+        statusCode: HttpStatusCode = HttpStatusCode.OK
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            recorded.method = request.method
+            recorded.encodedPath = request.url.encodedPath
+            recorded.queryParameters = request.url.parameters
+            recorded.headers = request.headers
+            recorded.body = request.body.toByteArray().decodeToString()
+
+            respond(
+                content = responseContent,
+                status = statusCode,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    // ========== Request Construction Tests ==========
+
+    @Test
+    fun testCustomHeadersAreAppliedToRequests() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, """{"status": "ACCEPTED"}""")
+        val kycService = KYCService(
+            serviceAddress,
+            mockClient,
+            mapOf(
+                "X-Client-Name" to "kmp-stellar-sdk",
+                "X-Client-Version" to "1.2.3"
+            )
+        )
+
+        val response = kycService.getCustomerInfo(GetCustomerInfoRequest(jwt = jwtToken))
+
+        assertEquals(CustomerStatus.ACCEPTED, response.status)
+        assertEquals("kmp-stellar-sdk", recorded.headers["X-Client-Name"])
+        assertEquals("1.2.3", recorded.headers["X-Client-Version"])
+        assertEquals("Bearer $jwtToken", recorded.authorization)
+    }
+
+    @Test
+    fun testPutCustomerInfoSendsAccountMemoAndTransactionId() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, """{"id": "$customerId"}""")
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerInfo(
+            PutCustomerInfoRequest(
+                jwt = jwtToken,
+                account = accountId,
+                memo = "1234567890",
+                memoType = "id",
+                type = "sep6-deposit",
+                transactionId = "82fhs729f63dh0v4"
+            )
+        )
+
+        assertEquals(customerId, response.id)
+        assertEquals(HttpMethod.Put, recorded.method)
+        assertEquals("/kyc/customer", recorded.encodedPath)
+        assertTrue(recorded.body.contains("account"), "account key missing from body")
+        assertTrue(recorded.body.contains(accountId), "account value missing from body")
+        assertTrue(recorded.body.contains("memo_type"), "memo_type key missing from body")
+        assertTrue(recorded.body.contains("1234567890"), "memo value missing from body")
+        assertTrue(recorded.body.contains("sep6-deposit"), "type value missing from body")
+        assertTrue(recorded.body.contains("82fhs729f63dh0v4"), "transaction id missing from body")
+    }
+
+    @Test
+    fun testPutCustomerInfoOmitsUnsetOptionalFields() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, """{"id": "$customerId"}""")
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerInfo(
+            PutCustomerInfoRequest(
+                jwt = jwtToken,
+                kycFields = StandardKYCFields(
+                    naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                )
+            )
+        )
+
+        assertEquals(customerId, response.id)
+        assertTrue(recorded.body.contains("first_name"), "SEP-09 field missing from body")
+        assertFalse(recorded.body.contains(accountId), "account must not be sent when unset")
+        assertFalse(recorded.body.contains("memo_type"), "memo_type must not be sent when unset")
+    }
+
+    @Test
+    fun testPutCustomerCallbackSendsAllIdentifiers() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, "")
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerCallback(
+            PutCustomerCallbackRequest(
+                jwt = jwtToken,
+                url = "https://myapp.com/webhook",
+                id = customerId,
+                account = accountId,
+                memo = "1234567890"
+            )
+        )
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpMethod.Put, recorded.method)
+        assertEquals("/kyc/customer/callback", recorded.encodedPath)
+        assertTrue(recorded.body.contains("https://myapp.com/webhook"), "url missing from body")
+        assertTrue(recorded.body.contains(customerId), "id missing from body")
+        assertTrue(recorded.body.contains(accountId), "account missing from body")
+        assertTrue(recorded.body.contains("1234567890"), "memo missing from body")
+    }
+
+    @Test
+    fun testPutCustomerCallbackWithUrlOnly() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, "")
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerCallback(
+            PutCustomerCallbackRequest(
+                jwt = jwtToken,
+                url = "https://myapp.com/webhook"
+            )
+        )
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(recorded.body.contains("https://myapp.com/webhook"), "url missing from body")
+        assertFalse(recorded.body.contains(customerId), "id must not be sent when unset")
+        assertFalse(recorded.body.contains(accountId), "account must not be sent when unset")
+    }
+
+    @Test
+    fun testGetCustomerFilesByFileId() = runTest {
+        val recorded = RecordedRequest()
+        val responseJson = """
+            {
+                "files": [
+                    {
+                        "file_id": "file_d3d54529-6683-4341-9b66-4ac7d7504238",
+                        "content_type": "image/jpeg",
+                        "size": 4089371
+                    }
+                ]
+            }
+        """.trimIndent()
+        val mockClient = recordingMockClient(recorded, responseJson)
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.getCustomerFiles(
+            jwt = jwtToken,
+            fileId = "file_d3d54529-6683-4341-9b66-4ac7d7504238"
+        )
+
+        assertEquals(1, response.files.size)
+        assertEquals("/kyc/customer/files", recorded.encodedPath)
+        assertEquals(
+            "file_d3d54529-6683-4341-9b66-4ac7d7504238",
+            recorded.queryParameters["file_id"]
+        )
+        assertNull(recorded.queryParameters["customer_id"])
+    }
+
+    @Test
+    fun testDeleteCustomerSendsMemoQueryParameters() = runTest {
+        val recorded = RecordedRequest()
+        val mockClient = recordingMockClient(recorded, "")
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.deleteCustomer(
+            account = accountId,
+            memo = "1234567890",
+            memoType = "id",
+            jwt = jwtToken
+        )
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpMethod.Delete, recorded.method)
+        assertEquals("/kyc/customer/$accountId", recorded.encodedPath)
+        assertEquals("1234567890", recorded.queryParameters["memo"])
+        assertEquals("id", recorded.queryParameters["memo_type"])
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun testPutCustomerVerificationSubmitsCodes() = runTest {
+        val recorded = RecordedRequest()
+        val responseJson = """
+            {
+                "id": "$customerId",
+                "status": "ACCEPTED"
+            }
+        """.trimIndent()
+        val mockClient = recordingMockClient(recorded, responseJson)
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerVerification(
+            PutCustomerVerificationRequest(
+                jwt = jwtToken,
+                id = customerId,
+                verificationFields = mapOf(
+                    "email_address_verification" to "123456",
+                    "mobile_number_verification" to "654321"
+                )
+            )
+        )
+
+        assertEquals(customerId, response.id)
+        assertEquals(CustomerStatus.ACCEPTED, response.status)
+        assertEquals(HttpMethod.Put, recorded.method)
+        assertEquals("/kyc/customer/verification", recorded.encodedPath)
+        assertEquals("Bearer $jwtToken", recorded.authorization)
+        assertTrue(recorded.body.contains(customerId), "customer id missing from body")
+        assertTrue(
+            recorded.body.contains("email_address_verification"),
+            "email verification key missing from body"
+        )
+        assertTrue(recorded.body.contains("123456"), "email verification code missing from body")
+        assertTrue(
+            recorded.body.contains("mobile_number_verification"),
+            "mobile verification key missing from body"
+        )
+        assertTrue(recorded.body.contains("654321"), "mobile verification code missing from body")
+    }
+
+    // ========== Response Status Handling Tests ==========
+
+    @Test
+    fun testAcceptedStatusIsParsedAsSuccess() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"id": "$customerId"}""",
+            statusCode = HttpStatusCode.Accepted,
+            expectedMethod = HttpMethod.Put
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val response = kycService.putCustomerInfo(
+            PutCustomerInfoRequest(
+                jwt = jwtToken,
+                kycFields = StandardKYCFields(
+                    naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                )
+            )
+        )
+
+        assertEquals(customerId, response.id)
+    }
+
+    @Test
+    fun test409ErrorThrowsCustomerAlreadyExistsExceptionWithId() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "customer already registered with id: $customerId"}""",
+            statusCode = HttpStatusCode.Conflict,
+            expectedMethod = HttpMethod.Put
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<CustomerAlreadyExistsException> {
+            kycService.putCustomerInfo(
+                PutCustomerInfoRequest(
+                    jwt = jwtToken,
+                    kycFields = StandardKYCFields(
+                        naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                    )
+                )
+            )
+        }
+
+        assertEquals(customerId, exception.existingCustomerId)
+        assertTrue(exception.message!!.contains(customerId))
+    }
+
+    @Test
+    fun test409ErrorWithoutCustomerIdInBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "conflict"}""",
+            statusCode = HttpStatusCode.Conflict,
+            expectedMethod = HttpMethod.Put
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<CustomerAlreadyExistsException> {
+            kycService.putCustomerInfo(
+                PutCustomerInfoRequest(
+                    jwt = jwtToken,
+                    kycFields = StandardKYCFields(
+                        naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                    )
+                )
+            )
+        }
+
+        assertNull(exception.existingCustomerId)
+    }
+
+    @Test
+    fun testUnmappedStatusThrowsKYCExceptionWithStatusAndBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "anchor database unavailable"}""",
+            statusCode = HttpStatusCode.InternalServerError
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<KYCException> {
+            kycService.getCustomerInfo(GetCustomerInfoRequest(jwt = jwtToken))
+        }
+
+        val message = exception.message
+        assertNotNull(message)
+        assertTrue(message.contains("HTTP 500"), "status code missing from message: $message")
+        assertTrue(
+            message.contains("anchor database unavailable"),
+            "response body missing from message: $message"
+        )
+    }
+
+    @Test
+    fun test400ErrorExtractsFieldNameFromMessage() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "field: last_name is required"}""",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedMethod = HttpMethod.Put
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<InvalidFieldException> {
+            kycService.putCustomerInfo(
+                PutCustomerInfoRequest(
+                    jwt = jwtToken,
+                    kycFields = StandardKYCFields(
+                        naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                    )
+                )
+            )
+        }
+
+        assertEquals("last_name", exception.fieldName)
+        assertEquals("field: last_name is required", exception.fieldError)
+    }
+
+    @Test
+    fun test400ErrorWithoutErrorKeyUsesRawBody() = runTest {
+        val body = """{"detail": "the submitted data was rejected"}"""
+        val mockClient = createMockClient(
+            responseContent = body,
+            statusCode = HttpStatusCode.BadRequest,
+            expectedMethod = HttpMethod.Put
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<InvalidFieldException> {
+            kycService.putCustomerInfo(
+                PutCustomerInfoRequest(
+                    jwt = jwtToken,
+                    kycFields = StandardKYCFields(
+                        naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                    )
+                )
+            )
+        }
+
+        assertEquals(body, exception.fieldError)
+        assertNull(exception.fieldName)
+    }
+
+    @Test
+    fun test400ErrorWithNonJsonBodyUsesRawBody() = runTest {
+        val body = "Bad Request - the anchor could not parse the submission"
+        val mockClient = createMockClient(
+            responseContent = body,
+            statusCode = HttpStatusCode.BadRequest,
+            expectedMethod = HttpMethod.Put,
+            contentType = "text/plain"
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<InvalidFieldException> {
+            kycService.putCustomerInfo(
+                PutCustomerInfoRequest(
+                    jwt = jwtToken,
+                    kycFields = StandardKYCFields(
+                        naturalPersonKYCFields = NaturalPersonKYCFields(firstName = "John")
+                    )
+                )
+            )
+        }
+
+        assertEquals(body, exception.fieldError)
+    }
+
+    @Test
+    fun test404ErrorExtractsAccountIdFromBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "no customer registered for $accountId"}""",
+            statusCode = HttpStatusCode.NotFound
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<CustomerNotFoundException> {
+            kycService.getCustomerInfo(GetCustomerInfoRequest(jwt = jwtToken, account = accountId))
+        }
+
+        assertEquals(accountId, exception.accountId)
+        assertTrue(exception.message!!.contains(accountId))
+    }
+
+    @Test
+    fun testFileTooLargeErrorReportsSizeInBytes() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "file exceeds the limit, received 4194304 bytes"}""",
+            statusCode = HttpStatusCode.PayloadTooLarge,
+            expectedPath = "/customer/files",
+            expectedMethod = HttpMethod.Post
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<FileTooLargeException> {
+            kycService.postCustomerFile(byteArrayOf(1, 2, 3), jwtToken)
+        }
+
+        assertEquals(4194304L, exception.fileSize)
+    }
+
+    @Test
+    fun testFileTooLargeErrorConvertsMegabytesToBytes() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "maximum upload size is 5 MB"}""",
+            statusCode = HttpStatusCode.PayloadTooLarge,
+            expectedPath = "/customer/files",
+            expectedMethod = HttpMethod.Post
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<FileTooLargeException> {
+            kycService.postCustomerFile(byteArrayOf(1, 2, 3), jwtToken)
+        }
+
+        assertEquals(5L * 1024 * 1024, exception.fileSize)
+    }
+
+    @Test
+    fun testFileTooLargeErrorWithUnrepresentableSize() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "received 99999999999999999999999 bytes"}""",
+            statusCode = HttpStatusCode.PayloadTooLarge,
+            expectedPath = "/customer/files",
+            expectedMethod = HttpMethod.Post
+        )
+        val kycService = KYCService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<FileTooLargeException> {
+            kycService.postCustomerFile(byteArrayOf(1, 2, 3), jwtToken)
+        }
+
+        assertNull(exception.fileSize)
+    }
+
     @Test
     fun testPutCustomerInfoWithOrganizationFields() = runTest {
         val responseJson = """{"id": "$customerId"}"""

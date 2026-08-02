@@ -4,10 +4,13 @@ import com.soneso.stellar.sdk.horizon.responses.ClaimableBalanceResponse
 import com.soneso.stellar.sdk.horizon.responses.Claimant
 import com.soneso.stellar.sdk.horizon.responses.Predicate
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.soneso.stellar.sdk.horizon.responses.Link
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -123,7 +126,7 @@ class ClaimableBalanceResponseTest {
     }
 
     @Test
-    fun testComprehensiveClaimableBalanceResponseDeserialization() {
+    fun testClaimableBalanceResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "id": "00000000929b20b72e5890ab51c24f1cc46fa01c4f318d8d33367d24dd614cfdf5491072",
@@ -371,5 +374,102 @@ class ClaimableBalanceResponseTest {
         assertEquals(false, linksWithNulls.self.templated)
         assertNull(linksWithNulls.transactions)
         assertNull(linksWithNulls.operations)
+    }
+
+    private fun directLinks() = ClaimableBalanceResponse.Links(
+        self = Link("https://horizon.stellar.org/claimable_balances/direct"),
+        transactions = Link("https://horizon.stellar.org/claimable_balances/direct/transactions"),
+        operations = Link("https://horizon.stellar.org/claimable_balances/direct/operations")
+    )
+
+    private fun directClaimableBalance() = ClaimableBalanceResponse(
+        id = "00000000direct",
+        assetString = "USD:GISSUERUSD",
+        amount = "75.5000000",
+        sponsor = "GSPONSOR",
+        lastModifiedLedger = 51003L,
+        lastModifiedTime = "2024-08-09T10:11:12Z",
+        claimants = listOf(
+            Claimant(destination = "GCLAIMANT1", predicate = Predicate(unconditional = true)),
+            Claimant(destination = "GCLAIMANT2", predicate = Predicate(absBefore = "2025-01-01T00:00:00Z"))
+        ),
+        flags = ClaimableBalanceResponse.Flags(clawbackEnabled = true),
+        pagingToken = "51003-00000000direct",
+        links = directLinks()
+    )
+
+    private fun minimalClaimableBalance() = ClaimableBalanceResponse(
+        id = "00000000minimal",
+        assetString = "native",
+        amount = "1.0000000",
+        pagingToken = "51004-00000000minimal",
+        links = ClaimableBalanceResponse.Links(self = Link("https://horizon.stellar.org/claimable_balances/minimal"))
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val balance = directClaimableBalance()
+
+        val encoded = json.encodeToString(ClaimableBalanceResponse.serializer(), balance)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "asset", "amount", "sponsor", "last_modified_ledger", "last_modified_time",
+                "claimants", "flags", "paging_token", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("USD:GISSUERUSD", encodedObject["asset"]!!.jsonPrimitive.content)
+        assertEquals("75.5000000", encodedObject["amount"]!!.jsonPrimitive.content)
+        assertEquals("GSPONSOR", encodedObject["sponsor"]!!.jsonPrimitive.content)
+        assertEquals("51003", encodedObject["last_modified_ledger"]!!.jsonPrimitive.content)
+        assertEquals("51003-00000000direct", encodedObject["paging_token"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(ClaimableBalanceResponse.serializer(), encoded)
+        assertEquals(balance, decoded)
+        assertEquals(2, decoded.claimants.size)
+        assertEquals("GCLAIMANT1", decoded.claimants[0].destination)
+        assertTrue(decoded.claimants[0].predicate.unconditional == true)
+        assertEquals("2025-01-01T00:00:00Z", decoded.claimants[1].predicate.absBefore)
+        assertEquals(true, decoded.flags?.clawbackEnabled)
+        assertEquals("2024-08-09T10:11:12Z", decoded.lastModifiedTime)
+        assertEquals(
+            "https://horizon.stellar.org/claimable_balances/direct/operations",
+            decoded.links.operations?.href
+        )
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val balance = minimalClaimableBalance()
+
+        assertNull(balance.sponsor)
+        assertNull(balance.lastModifiedLedger)
+        assertNull(balance.lastModifiedTime)
+        assertNull(balance.flags)
+        assertTrue(balance.claimants.isEmpty())
+        assertNull(balance.links.transactions)
+        assertNull(balance.links.operations)
+
+        val encoded = json.encodeToString(ClaimableBalanceResponse.serializer(), balance)
+        assertEquals(
+            setOf("id", "asset", "amount", "paging_token", "_links"),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(ClaimableBalanceResponse.serializer(), encoded)
+        assertEquals(balance, decoded)
+        assertTrue(decoded.claimants.isEmpty())
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val balance = directClaimableBalance()
+        assertNotEquals(balance, minimalClaimableBalance())
+        assertNotEquals(balance, balance.copy(claimants = emptyList()))
+        assertNotEquals(balance, balance.copy(flags = ClaimableBalanceResponse.Flags(clawbackEnabled = false)))
+        assertEquals(balance, directClaimableBalance())
+        assertEquals(balance.hashCode(), directClaimableBalance().hashCode())
     }
 }

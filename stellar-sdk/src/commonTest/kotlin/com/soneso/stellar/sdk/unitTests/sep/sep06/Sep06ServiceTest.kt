@@ -13,6 +13,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 
 class Sep06ServiceTest {
@@ -1261,11 +1264,15 @@ class Sep06ServiceTest {
         var pathVerified = false
         var methodVerified = false
         var authHeaderVerified = false
+        var capturedPath: String? = null
+        var capturedBody: String? = null
         val mockEngine = MockEngine { request ->
-            if (request.url.encodedPath.contains("/transaction/82fhs729f63dh0v4")) {
+            if (request.url.encodedPath.contains("/transactions/82fhs729f63dh0v4")) {
                 pathVerified = true
                 methodVerified = request.method == HttpMethod.Patch
                 authHeaderVerified = request.headers["Authorization"]?.contains("Bearer $jwtToken") == true
+                capturedPath = request.url.encodedPath
+                capturedBody = request.body.toByteArray().decodeToString()
 
                 respond(
                     content = "",
@@ -1301,6 +1308,23 @@ class Sep06ServiceTest {
         assertTrue(pathVerified, "Path should include transaction ID")
         assertTrue(methodVerified, "PATCH method should be used")
         assertTrue(authHeaderVerified, "Authorization header should be present")
+
+        // SEP-6 defines the endpoint as PATCH TRANSFER_SERVER/transactions/:id
+        assertTrue(
+            capturedPath?.endsWith("/transactions/82fhs729f63dh0v4") == true,
+            "Expected the plural transactions path, got: $capturedPath"
+        )
+
+        // SEP-6 requires the updated fields nested under a "transaction" key
+        val sentBody = Json.parseToJsonElement(assertNotNull(capturedBody)).jsonObject
+        val sentTransaction = assertNotNull(
+            sentBody["transaction"] as? JsonObject,
+            "Body must nest the fields under a transaction object, got: $capturedBody"
+        )
+        assertEquals(setOf("transaction"), sentBody.keys, "Only the transaction wrapper is sent")
+        assertEquals("12345678901234", sentTransaction["dest"]?.jsonPrimitive?.content)
+        assertEquals("021000021", sentTransaction["dest_extra"]?.jsonPrimitive?.content)
+        assertEquals(2, sentTransaction.size, "Exactly the supplied fields are sent")
     }
 
     // ========== Error Handling Tests ==========
@@ -1456,7 +1480,7 @@ class Sep06ServiceTest {
         val mockClient = createMockClient(
             responseContent = """{"error": "Transaction not found"}""",
             statusCode = HttpStatusCode.NotFound,
-            expectedPath = "/transaction/nonexistent",
+            expectedPath = "/transactions/nonexistent",
             expectedMethod = HttpMethod.Patch
         )
         val service = Sep06Service.fromUrl(serviceAddress, mockClient)
@@ -1564,5 +1588,564 @@ class Sep06ServiceTest {
         ))
 
         assertEquals(transactionId, response.id)
+    }
+
+    // ========== fromDomain() Tests ==========
+
+    private val tomlWithTransferServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        TRANSFER_SERVER="https://anchor.example.com/sep6"
+        TRANSFER_SERVER_SEP0024="https://anchor.example.com/sep24"
+    """.trimIndent()
+
+    private val tomlWithoutTransferServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        TRANSFER_SERVER_SEP0024="https://anchor.example.com/sep24"
+    """.trimIndent()
+
+    private fun createTomlAndInfoMockClient(
+        tomlContent: String,
+        onInfoRequest: (Url) -> Unit = {}
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains("/.well-known/stellar.toml") -> respond(
+                    content = tomlContent,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+
+                request.url.encodedPath.endsWith("/info") -> {
+                    onInfoRequest(request.url)
+                    respond(
+                        content = infoResponseJson,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+
+                else -> respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+    }
+
+    @Test
+    fun testFromDomainUsesTransferServer() = runTest {
+        var infoUrl: Url? = null
+        val mockClient = createTomlAndInfoMockClient(tomlWithTransferServer) { infoUrl = it }
+
+        val service = Sep06Service.fromDomain("anchor.example.com", mockClient)
+        val response = service.info()
+
+        assertNotNull(response.deposit)
+        assertNotNull(infoUrl)
+        assertEquals("anchor.example.com", infoUrl!!.host)
+        assertEquals("/sep6/info", infoUrl!!.encodedPath)
+    }
+
+    @Test
+    fun testFromDomainWithoutTransferServer() = runTest {
+        val mockClient = createTomlAndInfoMockClient(tomlWithoutTransferServer)
+
+        val exception = assertFailsWith<Sep06Exception> {
+            Sep06Service.fromDomain("anchor.example.com", mockClient)
+        }
+        assertEquals(
+            "TRANSFER_SERVER not found in stellar.toml for domain: anchor.example.com",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testFromDomainForwardsCustomHeadersToTomlFetch() = runTest {
+        var tomlHeaderValue: String? = null
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/.well-known/stellar.toml")) {
+                tomlHeaderValue = request.headers["X-Client-Name"]
+                respond(
+                    content = tomlWithTransferServer,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        val mockClient = HttpClient(mockEngine)
+
+        Sep06Service.fromDomain(
+            domain = "anchor.example.com",
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        assertEquals("kmp-stellar-sdk", tomlHeaderValue)
+    }
+
+    // ========== Custom Request Header Tests ==========
+
+    @Test
+    fun testCustomRequestHeadersAreSent() = runTest {
+        var customHeader: String? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            customHeader = request.headers["X-Client-Name"]
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = infoResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep06Service.fromUrl(
+            serviceAddress = serviceAddress,
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        service.info()
+
+        assertEquals("kmp-stellar-sdk", customHeader)
+        assertNull(authorizationHeader)
+    }
+
+    // ========== Extra Field Tests ==========
+
+    @Test
+    fun testDepositExchangeWithExtraFieldsAndClaimableBalanceSupport() = runTest {
+        var parameters: Parameters? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            respond(
+                content = depositResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val response = service.depositExchange(Sep06DepositExchangeRequest(
+            destinationAsset = "USDC",
+            sourceAsset = "iso4217:BRL",
+            amount = "542",
+            account = accountId,
+            jwt = jwtToken,
+            claimableBalanceSupported = true,
+            extraFields = mapOf(
+                "bank_number" to "121122676",
+                "bank_account_number" to "13719713158835300"
+            )
+        ))
+
+        assertEquals(transactionId, response.id)
+        assertEquals("true", parameters!!["claimable_balance_supported"])
+        assertEquals("121122676", parameters!!["bank_number"])
+        assertEquals("13719713158835300", parameters!!["bank_account_number"])
+    }
+
+    @Test
+    fun testDepositExchangeWithoutClaimableBalanceSupport() = runTest {
+        var parameters: Parameters? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            respond(
+                content = depositResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        service.depositExchange(Sep06DepositExchangeRequest(
+            destinationAsset = "USDC",
+            sourceAsset = "iso4217:BRL",
+            amount = "542",
+            account = accountId,
+            jwt = jwtToken
+        ))
+
+        assertNull(parameters!!["claimable_balance_supported"])
+        assertEquals("USDC", parameters!!["destination_asset"])
+        assertEquals("iso4217:BRL", parameters!!["source_asset"])
+    }
+
+    @Test
+    fun testWithdrawWithExtraFields() = runTest {
+        var parameters: Parameters? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            respond(
+                content = withdrawResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        @Suppress("DEPRECATION")
+        service.withdraw(Sep06WithdrawRequest(
+            assetCode = "USD",
+            type = "bank_account",
+            jwt = jwtToken,
+            extraFields = mapOf(
+                "bank_branch_number" to "0001",
+                "clabe_number" to "032180000118359719"
+            )
+        ))
+
+        assertEquals("bank_account", parameters!!["type"])
+        assertEquals("0001", parameters!!["bank_branch_number"])
+        assertEquals("032180000118359719", parameters!!["clabe_number"])
+    }
+
+    @Test
+    fun testWithdrawExchangeWithExtraFields() = runTest {
+        var parameters: Parameters? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            respond(
+                content = withdrawResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        @Suppress("DEPRECATION")
+        service.withdrawExchange(Sep06WithdrawExchangeRequest(
+            sourceAsset = "USDC",
+            destinationAsset = "iso4217:BRL",
+            amount = "100",
+            type = "bank_account",
+            jwt = jwtToken,
+            quoteId = "de762cda-a193-4961-861e-57b31fed6eb3",
+            extraFields = mapOf("pix_key" to "user@example.com")
+        ))
+
+        assertEquals("USDC", parameters!!["source_asset"])
+        assertEquals("iso4217:BRL", parameters!!["destination_asset"])
+        assertEquals("de762cda-a193-4961-861e-57b31fed6eb3", parameters!!["quote_id"])
+        assertEquals("user@example.com", parameters!!["pix_key"])
+    }
+
+    // ========== Non-200 Success Statuses and Error Body Shapes ==========
+
+    @Test
+    fun testDepositAcceptsCreatedStatus() = runTest {
+        val mockClient = createMockClient(
+            responseContent = depositResponseJson,
+            statusCode = HttpStatusCode.Created,
+            expectedPath = "/deposit"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val response = service.deposit(Sep06DepositRequest(
+            assetCode = "USD",
+            account = accountId,
+            jwt = jwtToken
+        ))
+
+        assertEquals(transactionId, response.id)
+    }
+
+    @Test
+    fun testForbiddenWithUnrecognizedTypeIsServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"type": "rate_limited", "error": "Too many requests"}""",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/info"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.info()
+        }
+        assertEquals(403, exception.statusCode)
+        assertEquals("Too many requests", exception.errorMessage)
+    }
+
+    @Test
+    fun testForbiddenWithNonJsonBodyIsServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "Forbidden",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/info"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.info()
+        }
+        assertEquals(403, exception.statusCode)
+        assertEquals("Forbidden", exception.errorMessage)
+    }
+
+    @Test
+    fun testCustomerInformationNeededWithoutFieldsList() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"type": "non_interactive_customer_info_needed"}""",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/deposit"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06CustomerInformationNeededException> {
+            service.deposit(Sep06DepositRequest(
+                assetCode = "USD",
+                account = accountId,
+                jwt = jwtToken
+            ))
+        }
+
+        assertTrue(exception.fields.isEmpty())
+    }
+
+    @Test
+    fun testCustomerInformationStatusWithoutOptionalDetails() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"type": "customer_info_status"}""",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/deposit"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06CustomerInformationStatusException> {
+            service.deposit(Sep06DepositRequest(
+                assetCode = "USD",
+                account = accountId,
+                jwt = jwtToken
+            ))
+        }
+
+        assertEquals("unknown", exception.status)
+        assertNull(exception.moreInfoUrl)
+        assertNull(exception.eta)
+    }
+
+    @Test
+    fun testErrorBodyWithoutErrorKey() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"detail": "asset_code is required"}""",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/info"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06InvalidRequestException> {
+            service.info()
+        }
+        assertEquals("Unknown error", exception.errorMessage)
+    }
+
+    @Test
+    fun testEmptyErrorBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/info"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06InvalidRequestException> {
+            service.info()
+        }
+        assertEquals("Unknown error", exception.errorMessage)
+    }
+
+    @Test
+    fun testUnmappedStatusCodeIsServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "I am a teapot"}""",
+            statusCode = HttpStatusCode(418, "I'm a teapot"),
+            expectedPath = "/info"
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.info()
+        }
+        assertEquals(418, exception.statusCode)
+        assertEquals("I am a teapot", exception.errorMessage)
+    }
+
+    // ========== patchTransaction() Error Handling Tests ==========
+
+    @Test
+    fun testPatchTransactionAcceptsNoContent() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "",
+            statusCode = HttpStatusCode.NoContent,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val response = service.patchTransaction(Sep06PatchTransactionRequest(
+            id = transactionId,
+            fields = mapOf("dest" to "12345678901234"),
+            jwt = jwtToken
+        ))
+
+        assertEquals(204, response.status.value)
+    }
+
+    @Test
+    fun testPatchTransactionAcceptsCreated() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "",
+            statusCode = HttpStatusCode.Created,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val response = service.patchTransaction(Sep06PatchTransactionRequest(
+            id = transactionId,
+            fields = mapOf("dest" to "12345678901234"),
+            jwt = jwtToken
+        ))
+
+        assertEquals(201, response.status.value)
+    }
+
+    @Test
+    fun testPatchTransactionInvalidRequest() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "dest is not editable"}""",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06InvalidRequestException> {
+            service.patchTransaction(Sep06PatchTransactionRequest(
+                id = transactionId,
+                fields = mapOf("dest" to "12345678901234"),
+                jwt = jwtToken
+            ))
+        }
+        assertEquals("dest is not editable", exception.errorMessage)
+    }
+
+    @Test
+    fun testPatchTransactionAuthenticationRequired() = runTest {
+        val mockClient = createMockClient(
+            responseContent = authenticationRequiredJson,
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        assertFailsWith<Sep06AuthenticationRequiredException> {
+            service.patchTransaction(Sep06PatchTransactionRequest(
+                id = transactionId,
+                fields = mapOf("dest" to "12345678901234"),
+                jwt = "expired_token"
+            ))
+        }
+    }
+
+    @Test
+    fun testPatchTransactionForbiddenWithUnrecognizedType() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"type": "rate_limited", "error": "Too many requests"}""",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.patchTransaction(Sep06PatchTransactionRequest(
+                id = transactionId,
+                fields = mapOf("dest" to "12345678901234"),
+                jwt = jwtToken
+            ))
+        }
+        assertEquals(403, exception.statusCode)
+        assertEquals("Too many requests", exception.errorMessage)
+    }
+
+    @Test
+    fun testPatchTransactionServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "Service temporarily unavailable"}""",
+            statusCode = HttpStatusCode.ServiceUnavailable,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.patchTransaction(Sep06PatchTransactionRequest(
+                id = transactionId,
+                fields = mapOf("dest" to "12345678901234"),
+                jwt = jwtToken
+            ))
+        }
+        assertEquals(503, exception.statusCode)
+        assertEquals("Service temporarily unavailable", exception.errorMessage)
+    }
+
+    @Test
+    fun testPatchTransactionUnmappedStatusCode() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "Conflicting update in progress"}""",
+            statusCode = HttpStatusCode.Conflict,
+            expectedPath = "/transactions/$transactionId",
+            expectedMethod = HttpMethod.Patch
+        )
+        val service = Sep06Service.fromUrl(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep06ServerErrorException> {
+            service.patchTransaction(Sep06PatchTransactionRequest(
+                id = transactionId,
+                fields = mapOf("dest" to "12345678901234"),
+                jwt = jwtToken
+            ))
+        }
+        assertEquals(409, exception.statusCode)
+        assertEquals("Conflicting update in progress", exception.errorMessage)
     }
 }

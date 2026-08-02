@@ -164,6 +164,25 @@ class Sep06ExceptionsTest {
     }
 
     @Test
+    fun testSep06CustomerInformationStatusException_toStringWithMoreInfoUrlAndNoEta() {
+        val exception = Sep06CustomerInformationStatusException(
+            status = "denied",
+            moreInfoUrl = "https://example.com/kyc-status"
+        )
+        assertEquals(
+            "SEP-06 customer information status: denied (more info: https://example.com/kyc-status)",
+            exception.toString()
+        )
+    }
+
+    @Test
+    fun testSep06CustomerInformationStatusException_toStringWithoutOptionalDetails() {
+        val exception = Sep06CustomerInformationStatusException(status = "pending")
+        assertEquals("SEP-06 customer information status: pending", exception.toString())
+        assertEquals("Customer information status: pending", exception.message)
+    }
+
+    @Test
     fun testSep06CustomerInformationStatusException_inheritance() {
         val exception = Sep06CustomerInformationStatusException(status = "pending")
         assertTrue(exception is Sep06Exception)
@@ -221,6 +240,13 @@ class Sep06ExceptionsTest {
     }
 
     @Test
+    fun testSep06TransactionNotFoundException_toStringWithoutId() {
+        val exception = Sep06TransactionNotFoundException()
+        assertEquals("SEP-06 transaction not found", exception.toString())
+        assertEquals("Transaction not found", exception.message)
+    }
+
+    @Test
     fun testSep06TransactionNotFoundException_inheritance() {
         val exception = Sep06TransactionNotFoundException()
         assertTrue(exception is Sep06Exception)
@@ -251,6 +277,13 @@ class Sep06ExceptionsTest {
         assertTrue(exception.toString().contains("SEP-06 server error"))
         assertTrue(exception.toString().contains("502"))
         assertTrue(exception.toString().contains("Bad Gateway"))
+    }
+
+    @Test
+    fun testSep06ServerErrorException_toStringWithoutMessage() {
+        val exception = Sep06ServerErrorException(503)
+        assertEquals("SEP-06 server error (503)", exception.toString())
+        assertEquals("Server error (503)", exception.message)
     }
 
     @Test

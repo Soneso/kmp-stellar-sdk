@@ -387,4 +387,70 @@ class MemoTest {
 
         assertEquals("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", memo.hexValue)
     }
+
+    // ========== MemoText(ByteArray) length validation ==========
+
+    @Test
+    fun testMemoTextFromBytesTooLongThrows() {
+        val bytes29 = ByteArray(29)
+        val exception = assertFailsWith<IllegalArgumentException> {
+            MemoText(bytes29)
+        }
+        assertTrue(exception.message!!.contains("28 bytes"))
+    }
+
+    @Test
+    fun testMemoTextFromBytesMaxLength() {
+        val bytes28 = ByteArray(28) { it.toByte() }
+        val memo = MemoText(bytes28)
+        assertTrue(memo.bytes.contentEquals(bytes28))
+    }
+
+    // ========== MemoText equals: reflexive, null, different type ==========
+
+    @Test
+    fun testMemoTextEqualsReflexiveNullAndDifferentType() {
+        val memo = MemoText("test")
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(memo.equals(memo))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(memo.equals(null))
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(memo.equals(MemoId(1UL)))
+    }
+
+    // ========== MemoHash equals: reflexive, null, different type ==========
+
+    @Test
+    fun testMemoHashEqualsReflexiveNullAndDifferentType() {
+        val memo = MemoHash(ByteArray(32) { it.toByte() })
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(memo.equals(memo))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(memo.equals(null))
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(memo.equals(MemoReturn(ByteArray(32) { it.toByte() })))
+    }
+
+    // ========== MemoReturn equals: reflexive, null, different type ==========
+
+    @Test
+    fun testMemoReturnEqualsReflexiveNullAndDifferentType() {
+        val memo = MemoReturn(ByteArray(32) { it.toByte() })
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(memo.equals(memo))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(memo.equals(null))
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(memo.equals(MemoHash(ByteArray(32) { it.toByte() })))
+    }
 }

@@ -246,12 +246,22 @@ class OZMultiSignerManager internal constructor(
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
+        requireContractAddress(tokenContract, "tokenContract")
         requireStellarAddress(recipient, "recipient")
 
         if (recipient == contractId) {
             throw ValidationException.invalidInput(
                 "recipient",
                 "Cannot transfer to self"
+            )
+        }
+
+        // Signer validation mirrors validateContractCallArgs and runs here so that a caller
+        // error is reported before the decimals resolution round-trip.
+        if (selectedSigners.isEmpty()) {
+            throw ValidationException.invalidInput(
+                "selectedSigners",
+                "At least one signer must be provided"
             )
         }
 

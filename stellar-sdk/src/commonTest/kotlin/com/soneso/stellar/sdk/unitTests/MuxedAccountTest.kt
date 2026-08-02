@@ -9,15 +9,6 @@ class MuxedAccountTest {
     private val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 
     @Test
-    fun testCreateFromAccountId() {
-        val muxed = MuxedAccount(accountId)
-
-        assertEquals(accountId, muxed.accountId)
-        assertNull(muxed.id)
-        assertEquals(accountId, muxed.address)
-    }
-
-    @Test
     fun testCreateFromAccountIdWithMuxedId() {
         val muxedId = 123456789UL
         val muxed = MuxedAccount(accountId, muxedId)
@@ -221,5 +212,22 @@ class MuxedAccountTest {
         assertNull(muxed2.id)
         assertEquals(accountId, muxed1.address)
         assertEquals(accountId, muxed2.address)
+    }
+
+    @Test
+    fun testInvalidAccountIdWithMuxedIdConstructorThrows() {
+        // Calling the two-argument constructor(accountId, id) directly (rather than the
+        // single-argument address-parsing constructor) exercises its own validation.
+        assertFailsWith<IllegalArgumentException> {
+            MuxedAccount("INVALID", 123UL)
+        }
+    }
+
+    @Test
+    fun testEqualsReflexiveNullAndDifferentType() {
+        val muxed = MuxedAccount(accountId)
+        assertEquals(muxed, muxed)
+        assertFalse(muxed.equals(null))
+        assertFalse(muxed.equals("not a muxed account"))
     }
 }

@@ -44,6 +44,10 @@ jobs:
         if: matrix.java == '25'
         run: ./gradlew :stellar-sdk:koverHtmlReportJvmOnly :stellar-sdk:koverXmlReportJvmOnly -PexcludeIntegrationTests --no-daemon
 
+      - name: Enforce coverage minimum
+        if: matrix.java == '25'
+        run: python3 tools/coverage/coverage_summary.py --min 90
+
       - name: Print coverage summary
         if: always() && matrix.java == '25'
         run: |
@@ -77,7 +81,7 @@ jobs:
               fi
             fi
           else
-            echo "⚠️ Coverage report not found at $XML_REPORT" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage report not found at $XML_REPORT" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload coverage to Codecov

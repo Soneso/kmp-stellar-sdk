@@ -14,7 +14,7 @@ import kotlin.time.ExperimentalTime
 
 /**
  * Tests for validateChallenge() security validation checks.
- * Covers all 13 required SEP-10 validation requirements.
+ * Covers all 14 required SEP-10 validation requirements.
  */
 class WebAuthValidationTest {
 
@@ -47,16 +47,29 @@ class WebAuthValidationTest {
         customMinTime: Long? = null,
         customMaxTime: Long? = null,
         signWithWrongKey: Boolean = false,
-        addExtraSignature: Boolean = false
+        addExtraSignature: Boolean = false,
+        omitFirstOpSourceAccount: Boolean = false,
+        omitWebAuthDomainValue: Boolean = false,
+        extraOpDataName: String? = null,
+        extraOpSource: String? = null,
+        v2PreconditionsWithoutTimeBounds: Boolean = false,
+        truncateServerSignature: Boolean = false,
+        useV0Envelope: Boolean = false,
+        txSourceAccountId: String? = null
     ): String {
         val serverKeyPair = KeyPair.fromSecretSeed(serverSecretSeed)
-        val sourceAccount = Account(serverKeyPair.getAccountId(), sequenceNumber)
+        // The transaction source defaults to the signing server; txSourceAccountId sets it
+        // independently so a test can vary source and signature separately.
+        val sourceAccount = Account(txSourceAccountId ?: serverKeyPair.getAccountId(), sequenceNumber)
 
         val builder = TransactionBuilder(sourceAccount, network)
             .setBaseFee(100)
 
         // Configure time bounds
-        if (useValidTimeBounds) {
+        if (v2PreconditionsWithoutTimeBounds) {
+            // A non-zero minSequenceAge forces PRECOND_V2 while leaving timeBounds unset
+            builder.addPreconditions(TransactionPreconditions(minSequenceAge = 1L))
+        } else if (useValidTimeBounds) {
             val currentTime = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
             builder.addTimeBounds(
                 TimeBounds(
@@ -93,14 +106,16 @@ class WebAuthValidationTest {
         }
 
         // Set operation source
-        val opSource = firstOpSourceAccount ?:
-            (if (useMuxedAccount) {
-                val muxed = MuxedAccount(clientKeyPair.getAccountId(), 12345UL)
-                muxed.address
-            } else {
-                clientKeyPair.getAccountId()
-            })
-        firstOp.sourceAccount = opSource
+        if (!omitFirstOpSourceAccount) {
+            val opSource = firstOpSourceAccount ?:
+                (if (useMuxedAccount) {
+                    val muxed = MuxedAccount(clientKeyPair.getAccountId(), 12345UL)
+                    muxed.address
+                } else {
+                    clientKeyPair.getAccountId()
+                })
+            firstOp.sourceAccount = opSource
+        }
         builder.addOperation(firstOp)
 
         // Optional: client_domain operation
@@ -118,10 +133,20 @@ class WebAuthValidationTest {
             val webAuthValue = webAuthDomainValue ?: "testanchor.stellar.org"
             val webAuthDomainOp = ManageDataOperation(
                 name = "web_auth_domain",
-                value = webAuthValue.encodeToByteArray()
+                value = if (omitWebAuthDomainValue) null else webAuthValue.encodeToByteArray()
             )
             webAuthDomainOp.sourceAccount = serverKeyPair.getAccountId()
             builder.addOperation(webAuthDomainOp)
+        }
+
+        // Optional: additional operation with an unrecognised data name
+        if (extraOpDataName != null) {
+            val extraOp = ManageDataOperation(
+                name = extraOpDataName,
+                value = "extra_value".encodeToByteArray()
+            )
+            extraOp.sourceAccount = extraOpSource ?: serverKeyPair.getAccountId()
+            builder.addOperation(extraOp)
         }
 
         val transaction = builder.build()
@@ -138,6 +163,19 @@ class WebAuthValidationTest {
         if (addExtraSignature) {
             val extraSigner = KeyPair.random()
             transaction.sign(extraSigner)
+        }
+
+        // Optionally shorten the server signature so it is no longer a valid Ed25519 signature
+        if (truncateServerSignature) {
+            val original = transaction.signatures[0]
+            transaction.signatures[0] = DecoratedSignature(
+                hint = original.hint,
+                signature = original.signature.copyOfRange(0, 32)
+            )
+        }
+
+        if (useV0Envelope) {
+            transaction.envelopeType = EnvelopeTypeXdr.ENVELOPE_TYPE_TX_V0
         }
 
         return transaction.toEnvelopeXdrBase64()
@@ -160,6 +198,65 @@ class WebAuthValidationTest {
         )
 
         // Should not throw any exception
+        webAuth.validateChallenge(
+            challengeXdr = challengeXdr,
+            clientAccountId = clientKeyPair.getAccountId()
+        )
+    }
+
+    @Test
+    fun testValidationTransactionSourceAccountMustBeServerAccount() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+        val otherAccount = KeyPair.random()
+
+        // Signed by the server, but sourced by a different account
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            txSourceAccountId = otherAccount.getAccountId()
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidTransactionSourceAccountException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(
+            exception.message?.contains(serverKeyPair.getAccountId()) == true,
+            "The expected server account is named, got: ${exception.message}"
+        )
+        assertTrue(
+            exception.message?.contains(otherAccount.getAccountId()) == true,
+            "The offending source account is named, got: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testValidationAcceptsChallengeSourcedByServerAccount() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            txSourceAccountId = serverKeyPair.getAccountId()
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
         webAuth.validateChallenge(
             challengeXdr = challengeXdr,
             clientAccountId = clientKeyPair.getAccountId()
@@ -623,6 +720,277 @@ class WebAuthValidationTest {
             challengeXdr = challengeXdr,
             clientAccountId = muxedAccount.address
         )
+    }
+
+    @Test
+    fun testValidationMalformedXdrRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<GenericChallengeValidationException> {
+            webAuth.validateChallenge(
+                challengeXdr = "not-a-transaction-envelope",
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains("Invalid transaction XDR") == true)
+    }
+
+    @Test
+    fun testValidationV0EnvelopeRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // SEP-10 requires ENVELOPE_TYPE_TX; the legacy V0 envelope must be refused
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            useV0Envelope = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<GenericChallengeValidationException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains("envelope type") == true)
+        assertTrue(exception.message?.contains("ENVELOPE_TYPE_TX") == true)
+    }
+
+    @Test
+    fun testValidationExpectedMemoMissingFromChallenge() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // Challenge carries no memo at all while the caller expects one
+        val challengeXdr = createValidChallengeXdr(clientKeyPair = clientKeyPair)
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidMemoValueException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId(),
+                expectedMemo = 4242L
+            )
+        }
+
+        assertTrue(exception.message?.contains("4242") == true)
+    }
+
+    @Test
+    fun testValidationOperationWithoutSourceAccountRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // Without an explicit operation source the operation would inherit the
+        // transaction source, so the challenge would not be bound to the client
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            omitFirstOpSourceAccount = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidSourceAccountException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains("Expected source account") == true)
+    }
+
+    @Test
+    fun testValidationWebAuthDomainOperationWithoutValueRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // A web_auth_domain entry with no value cannot be matched against the endpoint host
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            includeWebAuthDomain = true,
+            omitWebAuthDomainValue = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidWebAuthDomainException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains(testAuthEndpoint) == true)
+    }
+
+    @Test
+    fun testValidationAdditionalOperationNotSourcedByServerRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+        val strangerKeyPair = KeyPair.random()
+
+        // Operations beyond the first that are neither client_domain nor web_auth_domain
+        // must be sourced by the server signing key
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            extraOpDataName = "unexpected_entry",
+            extraOpSource = strangerKeyPair.getAccountId()
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidSourceAccountException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains(serverKeyPair.getAccountId()) == true)
+        assertTrue(exception.message?.contains(strangerKeyPair.getAccountId()) == true)
+    }
+
+    @Test
+    fun testValidationAdditionalOperationSourcedByServerAccepted() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            extraOpDataName = "unexpected_entry"
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        // Server-sourced extra operations are permitted
+        webAuth.validateChallenge(
+            challengeXdr = challengeXdr,
+            clientAccountId = clientKeyPair.getAccountId()
+        )
+    }
+
+    @Test
+    fun testValidationV2PreconditionsWithoutTimeBoundsRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // PRECOND_V2 without a timeBounds member leaves the challenge valid forever
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            v2PreconditionsWithoutTimeBounds = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidTimeBoundsException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains("must have time bounds set") == true)
+    }
+
+    @Test
+    fun testValidationUnparsableServerSigningKeyRejected() = runTest {
+        val clientKeyPair = KeyPair.random()
+
+        val challengeXdr = createValidChallengeXdr(clientKeyPair = clientKeyPair)
+
+        // Configured signing key is not a decodable account address
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = "GNOTAVALIDACCOUNTID",
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidSignatureException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains("GNOTAVALIDACCOUNTID") == true)
+    }
+
+    @Test
+    fun testValidationMalformedSignatureRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // Signature blob is not 64 bytes, so verification cannot even be attempted
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            truncateServerSignature = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidSignatureException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        assertTrue(exception.message?.contains(serverKeyPair.getAccountId()) == true)
     }
 
     @Test

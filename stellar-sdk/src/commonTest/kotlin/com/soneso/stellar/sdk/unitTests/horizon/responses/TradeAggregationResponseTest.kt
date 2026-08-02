@@ -1,9 +1,13 @@
 package com.soneso.stellar.sdk.unitTests.horizon.responses
 
+import com.soneso.stellar.sdk.horizon.responses.Price
 import com.soneso.stellar.sdk.horizon.responses.TradeAggregationResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class TradeAggregationResponseTest {
 
@@ -65,7 +69,7 @@ class TradeAggregationResponseTest {
     }
 
     @Test
-    fun testComprehensiveTradeAggregationResponseDeserialization() {
+    fun testTradeAggregationResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "timestamp": 1609459200000,
@@ -211,5 +215,63 @@ class TradeAggregationResponseTest {
         assertEquals(1L, tradeAggregation.openR.denominator)
         assertEquals(1L, tradeAggregation.closeR.numerator)
         assertEquals(1L, tradeAggregation.closeR.denominator)
+    }
+
+    private fun directAggregation() = TradeAggregationResponse(
+        timestamp = 1704067200000L,
+        tradeCount = 42,
+        baseVolume = "1250.0000000",
+        counterVolume = "2500.0000000",
+        avg = "2.0000000",
+        high = "2.5000000",
+        highR = Price(numerator = 5, denominator = 2),
+        low = "1.5000000",
+        lowR = Price(numerator = 3, denominator = 2),
+        open = "1.7500000",
+        openR = Price(numerator = 7, denominator = 4),
+        close = "2.2500000",
+        closeR = Price(numerator = 9, denominator = 4)
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val aggregation = directAggregation()
+
+        val encoded = json.encodeToString(TradeAggregationResponse.serializer(), aggregation)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "timestamp", "trade_count", "base_volume", "counter_volume", "avg",
+                "high", "high_r", "low", "low_r", "open", "open_r", "close", "close_r"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("1704067200000", encodedObject["timestamp"]!!.jsonPrimitive.content)
+        assertEquals("42", encodedObject["trade_count"]!!.jsonPrimitive.content)
+        assertEquals("1250.0000000", encodedObject["base_volume"]!!.jsonPrimitive.content)
+        assertEquals("2500.0000000", encodedObject["counter_volume"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(TradeAggregationResponse.serializer(), encoded)
+        assertEquals(aggregation, decoded)
+        assertEquals("2.5000000", decoded.high)
+        assertEquals("1.5000000", decoded.low)
+        assertEquals("1.7500000", decoded.open)
+        assertEquals("2.2500000", decoded.close)
+        assertEquals(5L, decoded.highR.numerator)
+        assertEquals(2L, decoded.highR.denominator)
+        assertEquals(3L, decoded.lowR.numerator)
+        assertEquals(7L, decoded.openR.numerator)
+        assertEquals(4L, decoded.openR.denominator)
+        assertEquals(9L, decoded.closeR.numerator)
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val aggregation = directAggregation()
+        assertNotEquals(aggregation, aggregation.copy(tradeCount = 43))
+        assertNotEquals(aggregation, aggregation.copy(closeR = Price(1, 1)))
+        assertEquals(aggregation, directAggregation())
+        assertEquals(aggregation.hashCode(), directAggregation().hashCode())
     }
 }

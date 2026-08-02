@@ -73,6 +73,18 @@ object FriendBot {
     private val httpClient = createHttpClient()
 
     /**
+     * Replaces the client used by the fund calls and by [close].
+     *
+     * Exists so tests can drive the FriendBot endpoints through a mock engine. Production code
+     * never sets it; when null the shared [httpClient] is used.
+     */
+    internal var httpClientOverride: HttpClient? = null
+
+    /** The client backing the current call: the test override when set, otherwise the shared one. */
+    private val activeClient: HttpClient
+        get() = httpClientOverride ?: httpClient
+
+    /**
      * Creates an HTTP client with the same configuration as HorizonServer.
      *
      * Uses ContentNegotiation, timeouts, and retry logic matching the main SDK's
@@ -161,7 +173,7 @@ object FriendBot {
      */
     private suspend fun fundAccount(friendbotUrl: String, accountId: String): Boolean {
         return try {
-            val response = httpClient.get("$friendbotUrl/") {
+            val response = activeClient.get("$friendbotUrl/") {
                 parameter("addr", accountId)
             }
 
@@ -176,15 +188,18 @@ object FriendBot {
     }
 
     /**
-     * Closes the HTTP client and releases resources.
+     * Closes the HTTP client backing the fund calls and releases its resources.
      *
      * **Note**: Typically not needed in application code. FriendBot maintains a persistent
      * HTTP client for better performance. Only call this if you need to explicitly release
      * resources (e.g., when shutting down your application).
      *
-     * After calling [close], FriendBot cannot be used again until the application restarts.
+     * Closing the shared client is permanent for the lifetime of the process: [FriendBot] is an
+     * object with no way to rebuild it, so subsequent fund calls fail. When
+     * [httpClientOverride] is set the override is closed instead, leaving the shared client
+     * untouched and still usable.
      */
     fun close() {
-        httpClient.close()
+        activeClient.close()
     }
 }

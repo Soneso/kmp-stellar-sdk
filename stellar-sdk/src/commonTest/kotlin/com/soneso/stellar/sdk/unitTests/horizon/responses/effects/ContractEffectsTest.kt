@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_CREATED_AT
@@ -31,6 +32,9 @@ class ContractEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.assetIssuer)
         assertEquals(testContractId, effect.contract)
         assertEquals("500.0000000", effect.amount)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -68,6 +72,9 @@ class ContractEffectsTest {
         assertEquals("USDC", effect.assetCode)
         assertEquals(testContractId, effect.contract)
         assertEquals("500.0000000", effect.amount)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -94,6 +101,9 @@ class ContractEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.assetIssuer)
         assertEquals(testContractId, effect.contract)
         assertEquals("250.0000000", effect.amount)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -130,6 +140,9 @@ class ContractEffectsTest {
         assertEquals("USDC", effect.assetCode)
         assertEquals(testContractId, effect.contract)
         assertEquals("250.0000000", effect.amount)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

@@ -749,6 +749,28 @@ Sample app tests:
 - macOS tests: `./gradlew :stellarSample:shared:macosArm64Test`
 - **Note**: Sample app demonstrates async KeyPair API usage with coroutines
 
+## Test Placement Conventions
+
+All tests in the stellar-sdk module follow one placement scheme, enforced by the `verifyTestNamespaces` Gradle task (part of `check`). Allowed namespaces in test source sets:
+
+- `com.soneso.stellar.sdk.unitTests.*` — unit tests, mirroring the commonMain package tree (e.g. code in `smartaccount/oz/` is tested in `unitTests/smartaccount/oz/`)
+- `com.soneso.stellar.sdk.integrationTests.*` — testnet integration tests, class names suffixed `*IntegrationTest`
+- `com.soneso.stellar.sdk.util` — cross-tree expect/actual test helpers (`TestResourceUtil` only)
+- `com.soneso.stellar.sdk.contract.bindings` — generated contract binding fixtures (`@generated`; the production-namespace package is required for regeneration parity)
+
+Rules for writing tests:
+
+- Extend an existing test class first; if the topic does not fit, add to an existing topic-matching file; create a new file only when no matching file exists.
+- Name tests for the topic under test. Never name a test file, class, or method after the act of covering ("coverage", "boost", "extended", "enhanced", "gap").
+- Unit test classes are suffixed `Test`; one subject per test class.
+- No unit test may perform live network I/O. All HTTP goes through Ktor MockEngine; if production code prevents injecting a mock, raise the missing seam for discussion instead of calling a live endpoint.
+- Coverage is measured with the Codecov formula (a line counts only when all its branches are covered). Check locally with:
+  ```bash
+  ./gradlew :stellar-sdk:jvmTest :stellar-sdk:koverXmlReportJvmOnly -PexcludeIntegrationTests
+  python3 tools/coverage/coverage_summary.py --min 90
+  ```
+  CI enforces the 90% minimum on the JDK 25 job; the Codecov project status requires 90% as well.
+
 ## Reference Implementation
 
 When implementing features, use the Java Stellar SDK as a reference:

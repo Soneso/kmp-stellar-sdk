@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_CREATED_AT
@@ -40,6 +41,9 @@ class TradeAndOfferEffectsTest {
         assertEquals("credit_alphanum4", effect.boughtAssetType)
         assertEquals("USD", effect.boughtAssetCode)
         assertEquals(TEST_ACCOUNT_2, effect.boughtAssetIssuer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -87,6 +91,9 @@ class TradeAndOfferEffectsTest {
         assertEquals("100.0000000", effect.soldAmount)
         assertEquals("50.0000000", effect.boughtAmount)
         assertEquals("USD", effect.boughtAssetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -108,6 +115,9 @@ class TradeAndOfferEffectsTest {
         )
         assertEquals("31", effect.id)
         assertEquals("offer_created", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -125,6 +135,9 @@ class TradeAndOfferEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<OfferCreatedEffectResponse>(effect)
         assertEquals("offer_created", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -146,6 +159,9 @@ class TradeAndOfferEffectsTest {
         )
         assertEquals("32", effect.id)
         assertEquals("offer_removed", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -162,6 +178,10 @@ class TradeAndOfferEffectsTest {
         """
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<OfferRemovedEffectResponse>(effect)
+        assertEquals("offer_removed", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -183,6 +203,9 @@ class TradeAndOfferEffectsTest {
         )
         assertEquals("33", effect.id)
         assertEquals("offer_updated", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -199,6 +222,10 @@ class TradeAndOfferEffectsTest {
         """
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<OfferUpdatedEffectResponse>(effect)
+        assertEquals("offer_updated", effect.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

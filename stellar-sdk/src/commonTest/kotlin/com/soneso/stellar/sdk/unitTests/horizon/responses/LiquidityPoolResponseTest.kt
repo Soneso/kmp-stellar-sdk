@@ -3,8 +3,11 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.Link
 import com.soneso.stellar.sdk.horizon.responses.LiquidityPoolResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -103,7 +106,7 @@ class LiquidityPoolResponseTest {
     }
 
     @Test
-    fun testComprehensiveLiquidityPoolResponseDeserialization() {
+    fun testLiquidityPoolResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "id": "67260c4c1807b262ff851b0a3fe141194936bb0215b2f77447f1df11998eabb9",
@@ -301,5 +304,101 @@ class LiquidityPoolResponseTest {
         assertEquals("https://test.only.self", linksWithNulls.self.href)
         assertNull(linksWithNulls.operations)
         assertNull(linksWithNulls.transactions)
+    }
+
+    private fun directLinks() = LiquidityPoolResponse.Links(
+        self = Link("https://horizon.stellar.org/liquidity_pools/direct"),
+        operations = Link("https://horizon.stellar.org/liquidity_pools/direct/operations"),
+        transactions = Link("https://horizon.stellar.org/liquidity_pools/direct/transactions")
+    )
+
+    private fun directPool() = LiquidityPoolResponse(
+        id = "direct-pool-id",
+        pagingToken = "direct-pool-id",
+        feeBp = 30,
+        type = "constant_product",
+        totalTrustlines = 120L,
+        totalShares = "5000.0000000",
+        reserves = listOf(
+            LiquidityPoolResponse.Reserve(amount = "1000.0000000", asset = "native"),
+            LiquidityPoolResponse.Reserve(amount = "2000.0000000", asset = "USD:GISSUERUSD")
+        ),
+        lastModifiedLedger = 51005L,
+        lastModifiedTime = "2024-09-10T11:12:13Z",
+        links = directLinks()
+    )
+
+    private fun minimalPool() = LiquidityPoolResponse(
+        id = "minimal-pool-id",
+        pagingToken = "minimal-pool-id",
+        type = "constant_product",
+        totalShares = "0.0000000",
+        links = LiquidityPoolResponse.Links(self = Link("https://horizon.stellar.org/liquidity_pools/minimal"))
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val pool = directPool()
+
+        val encoded = json.encodeToString(LiquidityPoolResponse.serializer(), pool)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "paging_token", "fee_bp", "type", "total_trustlines", "total_shares",
+                "reserves", "last_modified_ledger", "last_modified_time", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("30", encodedObject["fee_bp"]!!.jsonPrimitive.content)
+        assertEquals("120", encodedObject["total_trustlines"]!!.jsonPrimitive.content)
+        assertEquals("5000.0000000", encodedObject["total_shares"]!!.jsonPrimitive.content)
+        assertEquals("51005", encodedObject["last_modified_ledger"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(LiquidityPoolResponse.serializer(), encoded)
+        assertEquals(pool, decoded)
+        assertEquals("constant_product", decoded.type)
+        assertEquals(2, decoded.reserves.size)
+        assertEquals("native", decoded.reserves[0].asset)
+        assertEquals("1000.0000000", decoded.reserves[0].amount)
+        assertEquals("USD:GISSUERUSD", decoded.reserves[1].asset)
+        assertEquals("2024-09-10T11:12:13Z", decoded.lastModifiedTime)
+        assertEquals(
+            "https://horizon.stellar.org/liquidity_pools/direct/transactions",
+            decoded.links.transactions?.href
+        )
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val pool = minimalPool()
+
+        assertNull(pool.feeBp)
+        assertNull(pool.totalTrustlines)
+        assertNull(pool.lastModifiedLedger)
+        assertNull(pool.lastModifiedTime)
+        assertTrue(pool.reserves.isEmpty())
+        assertNull(pool.links.operations)
+        assertNull(pool.links.transactions)
+
+        val encoded = json.encodeToString(LiquidityPoolResponse.serializer(), pool)
+        assertEquals(
+            setOf("id", "paging_token", "type", "total_shares", "_links"),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(LiquidityPoolResponse.serializer(), encoded)
+        assertEquals(pool, decoded)
+        assertTrue(decoded.reserves.isEmpty())
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val pool = directPool()
+        assertNotEquals(pool, minimalPool())
+        assertNotEquals(pool, pool.copy(feeBp = 20))
+        assertNotEquals(pool, pool.copy(reserves = emptyList()))
+        assertEquals(pool, directPool())
+        assertEquals(pool.hashCode(), directPool().hashCode())
     }
 }

@@ -3,12 +3,16 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4
 import com.soneso.stellar.sdk.AssetTypeCreditAlphaNum12
 import com.soneso.stellar.sdk.AssetTypeNative
+import com.soneso.stellar.sdk.horizon.responses.Asset
 import com.soneso.stellar.sdk.horizon.responses.Link
 import com.soneso.stellar.sdk.horizon.responses.OfferResponse
+import com.soneso.stellar.sdk.horizon.responses.Price
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -113,7 +117,7 @@ class OfferResponseTest {
     }
 
     @Test
-    fun testComprehensiveOfferResponseDeserialization() {
+    fun testOfferResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "id": "4611686018427387905",
@@ -298,5 +302,102 @@ class OfferResponseTest {
             assertEquals("USD", buyingSdkAsset.code)
             assertEquals("GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B", buyingSdkAsset.issuer)
         }
+    }
+
+    private fun directLinks() = OfferResponse.Links(
+        self = Link("https://horizon.stellar.org/offers/8001"),
+        offerMaker = Link("https://horizon.stellar.org/accounts/GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7")
+    )
+
+    private fun directOffer() = OfferResponse(
+        id = "8001",
+        pagingToken = "8001",
+        seller = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+        sellingAsset = Asset("credit_alphanum4", "USD", "GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B"),
+        buyingAsset = Asset("native"),
+        amount = "500.0000000",
+        priceR = Price(numerator = 11, denominator = 10),
+        price = "1.1000000",
+        lastModifiedLedger = 51002L,
+        lastModifiedTime = "2024-06-07T08:09:10Z",
+        sponsor = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX",
+        links = directLinks()
+    )
+
+    private fun minimalOffer() = OfferResponse(
+        id = "8002",
+        pagingToken = "8002",
+        seller = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7",
+        sellingAsset = Asset("native"),
+        buyingAsset = Asset("credit_alphanum12", "LONGASSET", "GBVFTZL5HIPT4PFQVTZVIWR77V7LWYCXU4CLYWWHHOEXB64XPG5LDMTU"),
+        amount = "1.0000000",
+        priceR = Price(numerator = 1, denominator = 1),
+        price = "1.0000000",
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val offer = directOffer()
+
+        val encoded = json.encodeToString(OfferResponse.serializer(), offer)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "paging_token", "seller", "selling", "buying", "amount",
+                "price_r", "price", "last_modified_ledger", "last_modified_time", "sponsor", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7", encodedObject["seller"]!!.jsonPrimitive.content)
+        assertEquals("500.0000000", encodedObject["amount"]!!.jsonPrimitive.content)
+        assertEquals("1.1000000", encodedObject["price"]!!.jsonPrimitive.content)
+        assertEquals("51002", encodedObject["last_modified_ledger"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(OfferResponse.serializer(), encoded)
+        assertEquals(offer, decoded)
+        assertEquals(11L, decoded.priceR.numerator)
+        assertEquals(10L, decoded.priceR.denominator)
+        assertEquals("GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX", decoded.sponsor)
+        assertEquals("2024-06-07T08:09:10Z", decoded.lastModifiedTime)
+
+        val selling = decoded.selling
+        assertTrue(selling is AssetTypeCreditAlphaNum4)
+        assertEquals("USD", (selling as AssetTypeCreditAlphaNum4).code)
+        assertEquals("GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B", selling.issuer)
+        assertTrue(decoded.buying is AssetTypeNative)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val offer = minimalOffer()
+
+        assertNull(offer.lastModifiedLedger)
+        assertNull(offer.lastModifiedTime)
+        assertNull(offer.sponsor)
+
+        val encoded = json.encodeToString(OfferResponse.serializer(), offer)
+        assertEquals(
+            setOf("id", "paging_token", "seller", "selling", "buying", "amount", "price_r", "price", "_links"),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(OfferResponse.serializer(), encoded)
+        assertEquals(offer, decoded)
+        assertTrue(decoded.selling is AssetTypeNative)
+        val buying = decoded.buying
+        assertTrue(buying is AssetTypeCreditAlphaNum12)
+        assertEquals("LONGASSET", (buying as AssetTypeCreditAlphaNum12).code)
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val offer = directOffer()
+        assertNotEquals(offer, minimalOffer())
+        assertNotEquals(offer, offer.copy(sponsor = null))
+        assertNotEquals(offer, offer.copy(priceR = Price(1, 2)))
+        assertEquals(offer, directOffer())
+        assertEquals(offer.hashCode(), directOffer().hashCode())
     }
 }

@@ -464,17 +464,20 @@ class OZSmartAccountKit private constructor(
         }
 
         /**
-         * Creates a kit with a pre-built [SorobanServer], used in tests to inject a
-         * mock HTTP engine. Not intended for production use.
+         * Creates a kit with a pre-built [SorobanServer] and optional pre-built relayer and
+         * indexer clients, used in tests to inject mock HTTP engines. Not intended for
+         * production use.
          */
         internal fun createWithServer(
             config: OZSmartAccountConfig,
-            sorobanServer: SorobanServer
+            sorobanServer: SorobanServer,
+            relayerClient: OZRelayerClient? = null,
+            indexerClient: OZIndexerClient? = null
         ): OZSmartAccountKit = OZSmartAccountKit(
             config = config,
             storage = config.storage,
-            relayerClient = null,
-            indexerClient = null,
+            relayerClient = relayerClient,
+            indexerClient = indexerClient,
             externalSigners = OZExternalSignerManager(
                 networkPassphrase = config.networkPassphrase,
                 walletAdapter = config.externalWallet,

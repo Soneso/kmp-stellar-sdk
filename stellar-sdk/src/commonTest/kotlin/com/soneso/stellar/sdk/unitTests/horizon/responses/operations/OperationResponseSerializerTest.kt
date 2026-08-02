@@ -384,11 +384,11 @@ class OperationResponseSerializerTest {
     }
 
     // =====================================================================
-    // Base-property coverage tests (merged from OperationBasePropertiesCoverageTest)
+    // Base properties shared by every operation response type
     // =====================================================================
 
     @Test
-    fun testAccountMergeOperationCoverage() {
+    fun testAccountMergeOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("account_merge")},
@@ -417,7 +417,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testAllowTrustOperationCoverage() {
+    fun testAllowTrustOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("allow_trust")},
@@ -452,7 +452,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testBeginSponsoringFutureReservesOperationCoverage() {
+    fun testBeginSponsoringFutureReservesOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("begin_sponsoring_future_reserves")},
@@ -471,7 +471,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testBumpSequenceOperationCoverage() {
+    fun testBumpSequenceOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("bump_sequence")},
@@ -490,7 +490,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testChangeTrustOperationCoverage() {
+    fun testChangeTrustOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("change_trust")},
@@ -525,7 +525,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testClaimClaimableBalanceOperationCoverage() {
+    fun testClaimClaimableBalanceOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("claim_claimable_balance")},
@@ -550,7 +550,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testClawbackClaimableBalanceOperationCoverage() {
+    fun testClawbackClaimableBalanceOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("clawback_claimable_balance")},
@@ -569,7 +569,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testClawbackOperationCoverage() {
+    fun testClawbackOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("clawback")},
@@ -600,7 +600,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testCreateAccountOperationCoverage() {
+    fun testCreateAccountOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("create_account")},
@@ -627,7 +627,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testCreateClaimableBalanceOperationCoverage() {
+    fun testCreateClaimableBalanceOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("create_claimable_balance")},
@@ -662,7 +662,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testCreatePassiveSellOfferOperationCoverage() {
+    fun testCreatePassiveSellOfferOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("create_passive_sell_offer")},
@@ -702,7 +702,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testEndSponsoringFutureReservesOperationCoverage() {
+    fun testEndSponsoringFutureReservesOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("end_sponsoring_future_reserves")},
@@ -725,7 +725,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testExtendFootprintTTLOperationCoverage() {
+    fun testExtendFootprintTTLOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("extend_footprint_ttl")},
@@ -744,7 +744,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testInflationOperationCoverage() {
+    fun testInflationOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("inflation")},
@@ -761,7 +761,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testInvokeHostFunctionOperationCoverage() {
+    fun testInvokeHostFunctionOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("invoke_host_function")},
@@ -818,7 +818,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testLiquidityPoolDepositOperationCoverage() {
+    fun testLiquidityPoolDepositOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("liquidity_pool_deposit")},
@@ -888,7 +888,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testLiquidityPoolWithdrawOperationCoverage() {
+    fun testLiquidityPoolWithdrawOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("liquidity_pool_withdraw")},
@@ -937,7 +937,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testManageBuyOfferOperationCoverage() {
+    fun testManageBuyOfferOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("manage_buy_offer")},
@@ -977,7 +977,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testManageDataOperationCoverage() {
+    fun testManageDataOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("manage_data")},
@@ -998,7 +998,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testManageSellOfferOperationCoverage() {
+    fun testManageSellOfferOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("manage_sell_offer")},
@@ -1038,7 +1038,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testPathPaymentStrictReceiveOperationCoverage() {
+    fun testPathPaymentStrictReceiveOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("path_payment_strict_receive")},
@@ -1079,7 +1079,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testPathPaymentStrictSendOperationCoverage() {
+    fun testPathPaymentStrictSendOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("path_payment_strict_send")},
@@ -1120,7 +1120,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testPaymentOperationCoverage() {
+    fun testPaymentOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("payment")},
@@ -1157,7 +1157,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testRestoreFootprintOperationCoverage() {
+    fun testRestoreFootprintOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("restore_footprint")},
@@ -1174,7 +1174,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testRevokeSponsorshipOperationCoverage() {
+    fun testRevokeSponsorshipOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("revoke_sponsorship")},
@@ -1209,7 +1209,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testSetOptionsOperationCoverage() {
+    fun testSetOptionsOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("set_options")},
@@ -1254,7 +1254,7 @@ class OperationResponseSerializerTest {
     }
 
     @Test
-    fun testSetTrustLineFlagsOperationCoverage() {
+    fun testSetTrustLineFlagsOperationDeserialization() {
         val jsonString = """
         {
             ${OperationTestHelpers.baseFieldsJson("set_trust_line_flags")},
@@ -1291,12 +1291,12 @@ class OperationResponseSerializerTest {
     }
 
     // =====================================================================
-    // Private helpers (merged from OperationBasePropertiesCoverageTest)
+    // Private helpers
     // =====================================================================
 
     /**
-     * Helper method to assert all base properties common to all OperationResponse classes.
-     * This ensures that all base property getters are executed for code coverage.
+     * Asserts every base property common to all OperationResponse classes, so a property
+     * that fails to deserialize is caught whichever operation type carries it.
      */
     private fun assertBaseProperties(r: OperationResponse, expectedType: String) {
         // Base properties from OperationResponse
@@ -1310,7 +1310,7 @@ class OperationResponseSerializerTest {
         assertTrue(r.transactionSuccessful)
         assertEquals(expectedType, r.type)
         
-        // Links properties (accessing all 5 links to ensure Links class coverage)
+        // Links: each of the five roles is present and carries its own href
         assertNotNull(r.links)
         assertNotNull(r.links.self)
         assertNotNull(r.links.effects)

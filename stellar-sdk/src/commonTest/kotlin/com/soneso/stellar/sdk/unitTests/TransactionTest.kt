@@ -3,6 +3,8 @@ package com.soneso.stellar.sdk.unitTests
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 /**
@@ -147,6 +149,30 @@ class TransactionTest {
         assertFalse(tx.isSorobanTransaction())
     }
 
+    @Test
+    fun testIsSorobanTransactionViaSorobanDataOnNonSorobanOperation() {
+        // A single non-Soroban operation is still treated as a Soroban transaction when
+        // Soroban transaction data is attached (e.g. after simulation attaches resource data).
+        val sorobanData = SorobanTransactionDataXdr(
+            ext = SorobanTransactionDataExtXdr.Void,
+            resources = SorobanResourcesXdr(
+                footprint = LedgerFootprintXdr(readOnly = emptyList(), readWrite = emptyList()),
+                instructions = Uint32Xdr(1000u),
+                diskReadBytes = Uint32Xdr(0u),
+                writeBytes = Uint32Xdr(0u)
+            ),
+            resourceFee = Int64Xdr(100L)
+        )
+        val tx = buildSimpleTransaction(sorobanData = sorobanData)
+        assertTrue(tx.isSorobanTransaction())
+    }
+
+    @Test
+    fun testIsNotSorobanTransactionWithoutSorobanData() {
+        val tx = buildSimpleTransaction(sorobanData = null)
+        assertFalse(tx.isSorobanTransaction())
+    }
+
     // ========== XDR Envelope Roundtrip ==========
     @Test
     fun testEnvelopeXdrBase64Roundtrip() = runTest {
@@ -273,6 +299,53 @@ class TransactionTest {
         val tx1 = buildSimpleTransaction(fee = 100)
         val tx2 = buildSimpleTransaction(fee = 200)
         assertNotEquals(tx1, tx2)
+    }
+
+    @Test
+    fun testTransactionInequalityPerField() {
+        val base = buildSimpleTransaction()
+
+        val differentSeqNum = buildSimpleTransaction(seqNum = 999)
+        assertNotEquals(base, differentSeqNum)
+
+        val differentOps = buildSimpleTransaction(
+            operations = listOf(PaymentOperation(ACCOUNT_ID, AssetTypeNative, "1.0000000"))
+        )
+        assertNotEquals(base, differentOps)
+
+        val differentMemo = buildSimpleTransaction(memo = MemoText("different"))
+        assertNotEquals(base, differentMemo)
+
+        val differentPreconditions = buildSimpleTransaction(
+            preconditions = TransactionPreconditions(timeBounds = TimeBounds(1, 2))
+        )
+        assertNotEquals(base, differentPreconditions)
+
+        val differentSourceAccount = Account(ACCOUNT_B, 100).let { account ->
+            TransactionBuilder(account, NETWORK)
+                .setBaseFee(100)
+                .addPreconditions(TransactionPreconditions(timeBounds = TimeBounds(0, 0)))
+                .addOperation(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000"))
+                .build()
+        }
+        assertNotEquals(base, differentSourceAccount)
+
+        val differentNetwork = Account(ACCOUNT_ID, 100).let { account ->
+            TransactionBuilder(account, Network.PUBLIC)
+                .setBaseFee(100)
+                .addPreconditions(TransactionPreconditions(timeBounds = TimeBounds(0, 0)))
+                .addOperation(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000"))
+                .build()
+        }
+        assertNotEquals(base, differentNetwork)
+    }
+
+    @Test
+    fun testTransactionEqualsReflexiveNullAndDifferentType() {
+        val tx = buildSimpleTransaction()
+        assertEquals(tx, tx)
+        assertFalse(tx.equals(null))
+        assertFalse(tx.equals("not a transaction"))
     }
 
     @Test
@@ -449,5 +522,171 @@ class TransactionTest {
             TransactionBuilder(account, NETWORK)
                 .setTimeout(-1)
         }
+    }
+
+    // ========== Constructor validation (internal constructor, friend access) ==========
+
+    @Test
+    fun testNegativeFeeThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Transaction(
+                sourceAccount = ACCOUNT_ID,
+                fee = -1L,
+                sequenceNumber = 100L,
+                operations = listOf(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000")),
+                memo = MemoNone,
+                preconditions = TransactionPreconditions(),
+                sorobanData = null,
+                network = NETWORK
+            )
+        }
+        assertTrue(exception.message!!.contains("Fee must be non-negative"))
+    }
+
+    @Test
+    fun testNegativeSequenceNumberThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Transaction(
+                sourceAccount = ACCOUNT_ID,
+                fee = 100L,
+                sequenceNumber = -1L,
+                operations = listOf(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000")),
+                memo = MemoNone,
+                preconditions = TransactionPreconditions(),
+                sorobanData = null,
+                network = NETWORK
+            )
+        }
+        assertTrue(exception.message!!.contains("Sequence number must be non-negative"))
+    }
+
+    // ========== V0 envelope round trip ==========
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun testFromEnvelopeXdrV0AndBackPreservesV0Envelope() = runTest {
+        val keypair = KeyPair.fromSecretSeed(SECRET)
+
+        val v0Tx = TransactionV0Xdr(
+            sourceAccountEd25519 = Uint256Xdr(keypair.getPublicKey()),
+            fee = Uint32Xdr(100u),
+            seqNum = SequenceNumberXdr(Int64Xdr(101L)),
+            timeBounds = TimeBoundsXdr(TimePointXdr(Uint64Xdr(0UL)), TimePointXdr(Uint64Xdr(0UL))),
+            memo = MemoXdr.Void,
+            operations = listOf(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000").toXdr()),
+            ext = TransactionV0ExtXdr.Void
+        )
+        val v0Envelope = TransactionEnvelopeXdr.V0(
+            TransactionV0EnvelopeXdr(tx = v0Tx, signatures = emptyList())
+        )
+        val writer = XdrWriter()
+        v0Envelope.encode(writer)
+        val base64 = Base64.encode(writer.toByteArray())
+
+        val restored = Transaction.fromEnvelopeXdr(base64, NETWORK)
+
+        assertEquals(keypair.getAccountId(), restored.sourceAccount)
+        assertEquals(100L, restored.fee)
+        assertEquals(101L, restored.sequenceNumber)
+
+        // Re-serializing must keep the V0 envelope shape (exercises Transaction.toV0Xdr()).
+        val restoredEnvelopeXdr = restored.toEnvelopeXdr()
+        assertTrue(restoredEnvelopeXdr is TransactionEnvelopeXdr.V0)
+        val roundTrippedV0 = (restoredEnvelopeXdr as TransactionEnvelopeXdr.V0).value.tx
+        assertEquals(v0Tx.fee.value, roundTrippedV0.fee.value)
+        assertEquals(v0Tx.seqNum.value.value, roundTrippedV0.seqNum.value.value)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun testFromEnvelopeXdrV0WithoutTimeBoundsCarriesExistingSignatures() = runTest {
+        val keypair = KeyPair.fromSecretSeed(SECRET)
+        val decoratedSig = keypair.signDecorated("arbitrary payload".encodeToByteArray())
+
+        val v0Tx = TransactionV0Xdr(
+            sourceAccountEd25519 = Uint256Xdr(keypair.getPublicKey()),
+            fee = Uint32Xdr(100u),
+            seqNum = SequenceNumberXdr(Int64Xdr(101L)),
+            timeBounds = null,
+            memo = MemoXdr.Void,
+            operations = listOf(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000").toXdr()),
+            ext = TransactionV0ExtXdr.Void
+        )
+        val v0Envelope = TransactionEnvelopeXdr.V0(
+            TransactionV0EnvelopeXdr(tx = v0Tx, signatures = listOf(decoratedSig.toXdr()))
+        )
+        val writer = XdrWriter()
+        v0Envelope.encode(writer)
+        val base64 = Base64.encode(writer.toByteArray())
+
+        val restored = Transaction.fromEnvelopeXdr(base64, NETWORK)
+
+        assertNull(restored.getTimeBounds())
+        assertEquals(1, restored.signatures.size)
+        assertEquals(decoratedSig, restored.signatures[0])
+    }
+
+    @Test
+    fun testToEnvelopeXdrInvalidEnvelopeTypeThrows() {
+        val tx = buildSimpleTransaction()
+        tx.envelopeType = EnvelopeTypeXdr.ENVELOPE_TYPE_TX_FEE_BUMP
+
+        val exception = assertFailsWith<IllegalStateException> {
+            tx.toEnvelopeXdr()
+        }
+        assertTrue(exception.message!!.contains("Invalid envelope type"))
+    }
+
+    // ========== fromEnvelopeXdr type mismatch ==========
+
+    @Test
+    fun testFromEnvelopeXdrStringNotATransactionThrows() = runTest {
+        val keypair = KeyPair.fromSecretSeed(SECRET)
+        val account = Account(keypair.getAccountId(), 100L)
+        val inner = TransactionBuilder(account, NETWORK)
+            .setBaseFee(100)
+            .addOperation(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000"))
+            .addPreconditions(TransactionPreconditions(timeBounds = TimeBounds(0, 0)))
+            .build()
+        inner.sign(keypair)
+
+        val feeBump = FeeBumpTransaction.createWithBaseFee(
+            feeSource = keypair.getAccountId(),
+            baseFee = 200,
+            innerTransaction = inner
+        )
+        val base64 = feeBump.toEnvelopeXdrBase64()
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Transaction.fromEnvelopeXdr(base64, NETWORK)
+        }
+        assertTrue(exception.message!!.contains("does not contain a Transaction"))
+    }
+
+    @Test
+    fun testFromEnvelopeXdrBytesNotATransactionThrows() = runTest {
+        val keypair = KeyPair.fromSecretSeed(SECRET)
+        val account = Account(keypair.getAccountId(), 100L)
+        val inner = TransactionBuilder(account, NETWORK)
+            .setBaseFee(100)
+            .addOperation(PaymentOperation(ACCOUNT_B, AssetTypeNative, "10.0000000"))
+            .addPreconditions(TransactionPreconditions(timeBounds = TimeBounds(0, 0)))
+            .build()
+        inner.sign(keypair)
+
+        val feeBump = FeeBumpTransaction.createWithBaseFee(
+            feeSource = keypair.getAccountId(),
+            baseFee = 200,
+            innerTransaction = inner
+        )
+        val envelopeXdr = feeBump.toEnvelopeXdr()
+        val writer = XdrWriter()
+        envelopeXdr.encode(writer)
+        val bytes = writer.toByteArray()
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Transaction.fromEnvelopeXdr(bytes, NETWORK)
+        }
+        assertTrue(exception.message!!.contains("does not contain a Transaction"))
     }
 }

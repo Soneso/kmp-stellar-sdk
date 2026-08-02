@@ -334,4 +334,48 @@ class AddressTest {
         assertEquals(original.addressType, reconstructed.addressType)
         assertContentEquals(original.getBytes(), reconstructed.getBytes())
     }
+
+    // ========== toSCAddress: claimable balance type validation ==========
+
+    @Test
+    fun testClaimableBalanceToSCAddressInvalidTypeThrows() {
+        // StrKey.encodeClaimableBalance accepts any 33-byte payload as-is; only the SDK-level
+        // toSCAddress() check enforces that the leading type byte is CLAIMABLE_BALANCE_ID_TYPE_V0.
+        val nonV0Bytes = ByteArray(33)
+        nonV0Bytes[0] = 1
+        val address = Address.fromClaimableBalance(nonV0Bytes)
+
+        assertEquals(Address.AddressType.CLAIMABLE_BALANCE, address.addressType)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            address.toSCAddress()
+        }
+        assertTrue(exception.message!!.contains("CLAIMABLE_BALANCE_ID_TYPE_V0"))
+    }
+
+    // ========== equals: reflexive, null, different runtime type, same type different key ==========
+
+    @Test
+    fun testEqualsReflexiveNullAndDifferentRuntimeType() {
+        val address = Address(accountId)
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(address.equals(address))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(address.equals(null))
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(address.equals(accountId))
+    }
+
+    @Test
+    fun testEqualsSameTypeDifferentKey() {
+        val address1 = Address(accountId)
+        val otherAccountId = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"
+        val address2 = Address(otherAccountId)
+
+        assertEquals(address1.addressType, address2.addressType)
+        assertNotEquals(address1, address2)
+    }
 }

@@ -3,6 +3,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 import com.soneso.stellar.sdk.horizon.responses.AssetAmount
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_CREATED_AT
@@ -85,6 +86,9 @@ class LiquidityPoolEffectsTest {
         )
         assertEquals(testPoolId, effect.liquidityPool.id)
         assertEquals(30, effect.liquidityPool.feeBP)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -117,6 +121,9 @@ class LiquidityPoolEffectsTest {
         assertEquals("constant_product", effect.liquidityPool.type)
         assertEquals(100L, effect.liquidityPool.totalTrustlines)
         assertEquals(2, effect.liquidityPool.reserves.size)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -138,6 +145,9 @@ class LiquidityPoolEffectsTest {
             liquidityPoolId = testPoolId
         )
         assertEquals(testPoolId, effect.liquidityPoolId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -156,6 +166,9 @@ class LiquidityPoolEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<LiquidityPoolRemovedEffectResponse>(effect)
         assertEquals(testPoolId, effect.liquidityPoolId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -185,6 +198,11 @@ class LiquidityPoolEffectsTest {
         assertEquals(2, effect.reservesDeposited.size)
         assertEquals("100.0000000", effect.reservesDeposited[0].amount)
         assertEquals("70.7106781", effect.sharesReceived)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals("1000.0000000", effect.liquidityPool.totalShares)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -219,6 +237,10 @@ class LiquidityPoolEffectsTest {
         assertIs<LiquidityPoolDepositedEffectResponse>(effect)
         assertEquals(2, effect.reservesDeposited.size)
         assertEquals("70.7106781", effect.sharesReceived)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -248,6 +270,11 @@ class LiquidityPoolEffectsTest {
         )
         assertEquals(2, effect.reservesReceived.size)
         assertEquals("35.3553390", effect.sharesRedeemed)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals("1000.0000000", effect.liquidityPool.totalShares)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -282,6 +309,10 @@ class LiquidityPoolEffectsTest {
         assertIs<LiquidityPoolWithdrewEffectResponse>(effect)
         assertEquals(2, effect.reservesReceived.size)
         assertEquals("35.3553390", effect.sharesRedeemed)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -309,6 +340,11 @@ class LiquidityPoolEffectsTest {
         assertEquals("10.0000000", effect.sold.amount)
         assertEquals("USD:$TEST_ACCOUNT_2", effect.bought.asset)
         assertEquals("5.0000000", effect.bought.amount)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals("constant_product", effect.liquidityPool.type)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -341,6 +377,10 @@ class LiquidityPoolEffectsTest {
         assertEquals("native", effect.sold.asset)
         assertEquals("10.0000000", effect.sold.amount)
         assertEquals("USD:$TEST_ACCOUNT_2", effect.bought.asset)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -374,6 +414,11 @@ class LiquidityPoolEffectsTest {
         assertEquals("50.0", effect.reservesRevoked[0].amount)
         assertEquals("cb1", effect.reservesRevoked[0].claimableBalanceId)
         assertEquals("35.0", effect.sharesRevoked)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals(30, effect.liquidityPool.feeBP)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -409,6 +454,10 @@ class LiquidityPoolEffectsTest {
         assertEquals(2, effect.reservesRevoked.size)
         assertEquals("cb1", effect.reservesRevoked[0].claimableBalanceId)
         assertEquals("35.0", effect.sharesRevoked)
+        assertEquals(testPoolId, effect.liquidityPool.id)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
