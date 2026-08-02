@@ -1149,7 +1149,7 @@ func formatSCVal(_ scVal: SCValXdr, indentLevel: Int = 0) -> String {
     }
 
     if let symVal = scVal as? SCValXdr.Sym {
-        return "Symbol: \(symVal.value)\""
+        return "Symbol: \(symVal.value)"
     }
 
     if let vecVal = scVal as? SCValXdr.Vec {
@@ -1195,6 +1195,10 @@ func formatSCVal(_ scVal: SCValXdr, indentLevel: Int = 0) -> String {
 
     if let nonceVal = scVal as? SCValXdr.NonceKey {
         return "LedgerKeyNonce: \(nonceVal.value.nonce)"
+    }
+
+    if let executableTagVal = scVal as? SCValXdr.ExecutableTag {
+        return "ExecutableTag: \"\(executableTagVal.value)\""
     }
 
     return description

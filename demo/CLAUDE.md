@@ -460,17 +460,14 @@ Button(onClick = {
 
 ```kotlin
 // Good: Shows developers the actual SDK pattern
+val asset = Asset.createNonNativeAsset(assetCode, assetIssuer)
+
 val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
-    .addOperation(
-        ChangeTrustOperation.Builder(
-            ChangeTrustAsset.create(assetCode, issuer),
-            limit
-        ).build()
-    )
+    .addOperation(ChangeTrustOperation(asset, limit))
     .build()
 
 transaction.sign(keypair)
-server.submitTransaction(transaction)
+server.submitTransaction(transaction.toEnvelopeXdrBase64())
 ```
 
 ### 5. Educational Comments
