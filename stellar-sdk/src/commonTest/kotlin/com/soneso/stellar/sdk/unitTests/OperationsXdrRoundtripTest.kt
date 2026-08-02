@@ -1663,7 +1663,17 @@ class OperationsXdrRoundtripTest {
         val salt1 = (preimage1 as ContractIDPreimageXdr.FromAddress).value.salt.value
         val salt2 = (preimage2 as ContractIDPreimageXdr.FromAddress).value.salt.value
         assertEquals(32, salt1.size)
+        assertEquals(32, salt2.size)
         assertFalse(salt1.contentEquals(salt2))
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateContractDefaultSaltVariesInEveryByte() {
+        val samples = (1..16).map { defaultCreateContractSalt() }
+        for (index in 0 until 32) {
+            val values = samples.map { it[index] }.toSet()
+            assertTrue(values.size > 1, "Salt byte $index was identical across all samples")
+        }
     }
 
     @Test
@@ -1675,6 +1685,15 @@ class OperationsXdrRoundtripTest {
             salt = ByteArray(32) { 0 }
         )
         assertTrue(op.hostFunction is HostFunctionXdr.CreateContract)
+    }
+
+    private fun defaultCreateContractSalt(): ByteArray {
+        val op = InvokeHostFunctionOperation.createContract(
+            wasmId = "a".repeat(64),
+            address = Address(ACCOUNT_A)
+        )
+        val preimage = (op.hostFunction as HostFunctionXdr.CreateContract).value.contractIdPreimage
+        return (preimage as ContractIDPreimageXdr.FromAddress).value.salt.value
     }
 
     // ========== ClaimPredicate: decode-only edge cases (manual XDR) ==========

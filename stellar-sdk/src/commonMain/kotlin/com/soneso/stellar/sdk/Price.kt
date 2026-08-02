@@ -85,7 +85,8 @@ data class Price(
          *
          * @param price The decimal price as a string (e.g., "1.5", "0.75")
          * @return A Price object approximating the decimal value
-         * @throws IllegalArgumentException if the price string is invalid
+         * @throws IllegalArgumentException if the price string is invalid, or if the value cannot
+         *   be approximated as a fraction with a 32-bit numerator and denominator
          *
          * ## Example
          * ```kotlin
@@ -152,6 +153,11 @@ data class Price(
             }
 
             val result = fractions.last()
+            // The seed entry (1, 0) is still last when the loop broke before recording any
+            // convergent, which happens when the value itself exceeds the 32-bit range.
+            require(result.second != 0.0) {
+                "Price '$price' cannot be approximated as a fraction with a 32-bit numerator and denominator"
+            }
             return Price(
                 numerator = result.first.toInt(),
                 denominator = result.second.toInt()

@@ -18,6 +18,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `Symbol`.
 
 ### Fixed
+- Contract-deployment salts now come from the platform CSPRNG
+  (`secureRandomBytes`) instead of `kotlin.random.Random`. This covers
+  `InvokeHostFunctionOperation.createContract` and the `ContractClient.deploy`
+  and `ContractClient.deployFromWasmId` entry points, whose `salt` parameters
+  defaulted to a non-cryptographic generator. The salt and the deployer address
+  determine the deployed contract ID, so the address a deployment would claim
+  was predictable.
+- `Price.fromString` now reports values it cannot approximate. A value whose
+  integer part exceeds `Int.MAX_VALUE` produced no fraction at all and surfaced
+  as "Price denominator cannot be zero" from the constructor; it now throws
+  `IllegalArgumentException` naming the value and the 32-bit limit.
+- `Transaction.isSorobanTransaction` classifies by operation type only, matching
+  its documented behavior and the Java, Python and JavaScript SDKs. A single
+  classic operation with Soroban transaction data attached was reported as a
+  Soroban transaction, so it passed the `assembleTransaction` guard whose own
+  error message requires one `InvokeHostFunction`, `ExtendFootprintTTL` or
+  `RestoreFootprint` operation, and the result paired a classic operation with
+  Soroban resource data.
 - The SEP-29 memo-required check now runs on transaction submission.
   `HorizonServer.submitTransaction` and `submitTransactionAsync` decode
   envelopes with the SDK's XDR types; the previous parser misread real

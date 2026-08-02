@@ -4,7 +4,6 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.xdr.*
-import kotlin.random.Random
 
 /**
  * A client to interact with Soroban smart contracts.
@@ -764,7 +763,7 @@ class ContractClient private constructor(
          * @param signer KeyPair for signing
          * @param network Network to deploy to
          * @param rpcUrl RPC server URL
-         * @param salt Salt for contract ID generation (default: random)
+         * @param salt Salt for contract ID generation (default: 32 bytes from the platform CSPRNG)
          * @param loadSpec Whether to load spec after deployment (default: true)
          * @return ContractClient for the deployed contract
          *
@@ -793,7 +792,7 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String,
-            salt: ByteArray = Random.nextBytes(32),
+            salt: ByteArray = secureRandomBytes(32),
             loadSpec: Boolean = true
         ): ContractClient {
             // Step 1: Upload WASM
@@ -880,7 +879,7 @@ class ContractClient private constructor(
          * @param signer KeyPair for signing
          * @param network Network to deploy to
          * @param rpcUrl RPC server URL
-         * @param salt Salt for contract ID generation (default: random)
+         * @param salt Salt for contract ID generation (default: 32 bytes from the platform CSPRNG)
          * @param loadSpec Whether to load spec after deployment (default: true)
          * @return ContractClient for the deployed contract
          *
@@ -908,7 +907,7 @@ class ContractClient private constructor(
             signer: KeyPair,
             network: Network,
             rpcUrl: String,
-            salt: ByteArray = Random.nextBytes(32),
+            salt: ByteArray = secureRandomBytes(32),
             loadSpec: Boolean = true
         ): ContractClient {
             // Validate hex string format

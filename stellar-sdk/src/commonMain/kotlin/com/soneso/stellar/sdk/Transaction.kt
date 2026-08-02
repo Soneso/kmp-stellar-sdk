@@ -121,13 +121,11 @@ class Transaction internal constructor(
         if (operations.size != 1) {
             return false
         }
-        // Check if it's a Soroban operation type or has sorobanData
-        val operation = operations[0]
-        return when (operation) {
+        return when (operations[0]) {
             is InvokeHostFunctionOperation,
             is ExtendFootprintTTLOperation,
             is RestoreFootprintOperation -> true
-            else -> sorobanData != null
+            else -> false
         }
     }
 

@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -99,12 +100,30 @@ class PriceTest {
 
     @Test
     fun testFromStringValueExceedingIntRangeThrows() {
-        // The continued-fraction algorithm cannot represent a value whose integer part already
-        // exceeds Int.MAX_VALUE: it breaks out of the loop before recording a real fraction and
-        // the resulting Price(1, 0) is rejected by the constructor's denominator check.
-        assertFailsWith<IllegalArgumentException> {
+        // A value whose integer part already exceeds Int.MAX_VALUE has no representation as a
+        // fraction of two 32-bit integers, so the approximation must report that explicitly.
+        val exception = assertFailsWith<IllegalArgumentException> {
             Price.fromString("9999999999")
         }
+        val message = exception.message
+        assertNotNull(message)
+        assertTrue(
+            message.contains("9999999999") && message.contains("32-bit"),
+            "Unexpected message: $message"
+        )
+    }
+
+    @Test
+    fun testFromStringJustAboveIntMaxThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Price.fromString("2147483648")
+        }
+        val message = exception.message
+        assertNotNull(message)
+        assertTrue(
+            message.contains("cannot be approximated"),
+            "Unexpected message: $message"
+        )
     }
 
     // ========== fromString: invalid input ==========

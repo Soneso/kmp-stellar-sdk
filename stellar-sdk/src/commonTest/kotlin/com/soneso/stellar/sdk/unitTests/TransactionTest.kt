@@ -150,9 +150,9 @@ class TransactionTest {
     }
 
     @Test
-    fun testIsSorobanTransactionViaSorobanDataOnNonSorobanOperation() {
-        // A single non-Soroban operation is still treated as a Soroban transaction when
-        // Soroban transaction data is attached (e.g. after simulation attaches resource data).
+    fun testIsNotSorobanTransactionWhenSorobanDataAttachedToNonSorobanOperation() {
+        // Classification is by operation type alone. Attaching Soroban transaction data to a
+        // classic operation does not make the transaction a Soroban transaction.
         val sorobanData = SorobanTransactionDataXdr(
             ext = SorobanTransactionDataExtXdr.Void,
             resources = SorobanResourcesXdr(
@@ -164,7 +164,13 @@ class TransactionTest {
             resourceFee = Int64Xdr(100L)
         )
         val tx = buildSimpleTransaction(sorobanData = sorobanData)
-        assertTrue(tx.isSorobanTransaction())
+        assertFalse(tx.isSorobanTransaction())
+
+        val sorobanTx = buildSimpleTransaction(
+            operations = listOf(RestoreFootprintOperation()),
+            sorobanData = sorobanData
+        )
+        assertTrue(sorobanTx.isSorobanTransaction())
     }
 
     @Test

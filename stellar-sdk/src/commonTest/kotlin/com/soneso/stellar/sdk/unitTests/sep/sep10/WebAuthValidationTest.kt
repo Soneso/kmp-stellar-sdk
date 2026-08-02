@@ -48,6 +48,7 @@ class WebAuthValidationTest {
         customMaxTime: Long? = null,
         signWithWrongKey: Boolean = false,
         addExtraSignature: Boolean = false,
+        omitServerSignature: Boolean = false,
         omitFirstOpSourceAccount: Boolean = false,
         omitWebAuthDomainValue: Boolean = false,
         extraOpDataName: String? = null,
@@ -152,12 +153,14 @@ class WebAuthValidationTest {
         val transaction = builder.build()
 
         // Sign with correct or wrong keypair
-        val signingKey = if (signWithWrongKey) {
-            KeyPair.random()
-        } else {
-            serverKeyPair
+        if (!omitServerSignature) {
+            val signingKey = if (signWithWrongKey) {
+                KeyPair.random()
+            } else {
+                serverKeyPair
+            }
+            transaction.sign(signingKey)
         }
-        transaction.sign(signingKey)
 
         // Optionally add extra signature
         if (addExtraSignature) {
@@ -637,6 +640,72 @@ class WebAuthValidationTest {
         }
 
         assertTrue(exception.message?.contains("2") == true || exception.message?.contains("exactly 1") == true)
+    }
+
+    @Test
+    fun testValidationUnsignedChallengeRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // A challenge that carries no signature at all must be rejected before any signature
+        // verification takes place.
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            omitServerSignature = true
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidSignatureCountException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        val message = exception.message
+        assertNotNull(message)
+        assertTrue(message.contains("found 0 signature(s)"), "Unexpected message: $message")
+    }
+
+    @Test
+    @OptIn(ExperimentalTime::class)
+    fun testValidationTimeBoundsNotYetValidRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // Lower bound is beyond the grace period in the future, so the challenge is not yet valid.
+        val currentTime = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val minTime = currentTime + 1000
+        val challengeXdr = createValidChallengeXdr(
+            clientKeyPair = clientKeyPair,
+            customMinTime = minTime,
+            customMaxTime = currentTime + 2000
+        )
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<InvalidTimeBoundsException> {
+            webAuth.validateChallenge(
+                challengeXdr = challengeXdr,
+                clientAccountId = clientKeyPair.getAccountId()
+            )
+        }
+
+        val message = exception.message
+        assertNotNull(message)
+        assertTrue(message.contains("not yet valid"), "Unexpected message: $message")
+        assertTrue(message.contains("minTime: $minTime"), "Unexpected message: $message")
     }
 
     @Test

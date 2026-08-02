@@ -10,6 +10,8 @@ import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
 import com.soneso.stellar.sdk.xdr.*
@@ -17,6 +19,7 @@ import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
+import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -336,6 +339,58 @@ class WebAuthForContractsTest {
         }
     }
 
+    /**
+     * Builds a [SorobanServer] backed by a mock engine that answers getLatestLedger with the
+     * given sequence, or with a JSON-RPC error when [errorMessage] is set.
+     */
+    private fun createMockSorobanServer(
+        latestLedgerSequence: Long = 500_000L,
+        errorMessage: String? = null
+    ): SorobanServer {
+        val engine = MockEngine {
+            val body = if (errorMessage != null) {
+                """{"jsonrpc":"2.0","id":"1","error":{"code":-32603,"message":"$errorMessage"}}"""
+            } else {
+                """{"jsonrpc":"2.0","id":"1","result":{"id":"abc123","protocolVersion":23,""" +
+                    """"sequence":$latestLedgerSequence}}"""
+            }
+            respond(
+                content = body,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+        }
+        return SorobanServer("https://soroban-testnet.stellar.org", client)
+    }
+
+    /**
+     * Extracts the base64 authorization entries from a JSON token submission body.
+     */
+    private fun submittedEntriesFromJsonBody(body: String): String {
+        val marker = "\"authorization_entries\":\""
+        val start = body.indexOf(marker)
+        assertTrue(start >= 0, "Token request body has no authorization_entries: $body")
+        val valueStart = start + marker.length
+        val end = body.indexOf('"', valueStart)
+        assertTrue(end > valueStart, "Token request body has no authorization_entries: $body")
+        return body.substring(valueStart, end)
+    }
+
+    /**
+     * Decodes base64 authorization entries as submitted to the auth server.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun decodeAuthEntries(base64Xdr: String): List<SorobanAuthorizationEntryXdr> {
+        val reader = XdrReader(Base64.decode(base64Xdr))
+        val count = reader.readInt()
+        return List(count) { SorobanAuthorizationEntryXdr.decode(reader) }
+    }
+
     // ============================================================================
     // Success Cases
     // ============================================================================
@@ -374,6 +429,125 @@ class WebAuthForContractsTest {
         )
 
         assertEquals(SUCCESS_JWT_TOKEN, token.token)
+    }
+
+    @Test
+    fun testJwtToken_signatureExpirationDerivedFromLatestLedger() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        var submittedBody: String? = null
+        val mockEngine = MockEngine { request ->
+            when (request.method) {
+                HttpMethod.Get -> respond(
+                    content = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> {
+                    submittedBody = (request.body as TextContent).text
+                    respond(
+                        content = """{"token": "$SUCCESS_JWT_TOKEN"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+        }
+
+        val latestLedgerSequence = 500_000L
+        val sorobanServer = createMockSorobanServer(latestLedgerSequence = latestLedgerSequence)
+        val webAuth = WebAuthForContracts.createWithServer(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            sorobanServer = sorobanServer,
+            httpClient = mockClient
+        )
+        webAuth.useFormUrlEncoded = false
+
+        try {
+            val token = webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN
+            )
+
+            assertEquals(SUCCESS_JWT_TOKEN, token.token)
+
+            val body = submittedBody
+            assertNotNull(body, "Token request was never submitted")
+            val entries = decodeAuthEntries(submittedEntriesFromJsonBody(body))
+            val clientEntry = entries.first { entry ->
+                val credentials = entry.credentials
+                credentials is SorobanCredentialsXdr.Address &&
+                    credentials.value.address is SCAddressXdr.ContractId
+            }
+            val clientCredentials = clientEntry.credentials as SorobanCredentialsXdr.Address
+            assertEquals(
+                (latestLedgerSequence + 10).toUInt(),
+                clientCredentials.value.signatureExpirationLedger.value
+            )
+        } finally {
+            sorobanServer.close()
+        }
+    }
+
+    @Test
+    fun testJwtToken_latestLedgerRpcErrorPropagates() = runTest {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        val mockClient = createMockClient(
+            challengeResponse = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+            tokenResponse = """{"token": "$SUCCESS_JWT_TOKEN"}"""
+        )
+
+        val sorobanServer = createMockSorobanServer(errorMessage = "ledger unavailable")
+        val webAuth = WebAuthForContracts.createWithServer(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            sorobanServer = sorobanServer,
+            httpClient = mockClient
+        )
+
+        try {
+            val exception = assertFailsWith<SorobanRpcException> {
+                webAuth.jwtToken(
+                    clientAccountId = CLIENT_CONTRACT_ID,
+                    signers = listOf(KeyPair.random()),
+                    homeDomain = DOMAIN
+                )
+            }
+            assertEquals(-32603, exception.errorCode)
+            val message = exception.message
+            assertNotNull(message)
+            assertTrue(message.contains("ledger unavailable"), "Unexpected message: $message")
+        } finally {
+            sorobanServer.close()
+        }
     }
 
     @Test

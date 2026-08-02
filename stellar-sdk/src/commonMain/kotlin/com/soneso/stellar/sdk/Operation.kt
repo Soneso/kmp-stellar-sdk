@@ -1706,13 +1706,8 @@ data class InvokeHostFunctionOperation(
             constructorArgs: List<SCValXdr>? = null,
             salt: ByteArray? = null
         ): InvokeHostFunctionOperation {
-            // Generate random salt if not provided
-            val actualSalt = salt ?: ByteArray(32).also {
-                // Use kotlin.random for consistent behavior across platforms
-                for (i in it.indices) {
-                    it[i] = kotlin.random.Random.nextBytes(1)[0]
-                }
-            }
+            // The salt determines the deployed contract ID, so it must come from a CSPRNG
+            val actualSalt = salt ?: secureRandomBytes(32)
 
             require(actualSalt.size == 32) { "Salt must be 32 bytes, got ${actualSalt.size}" }
             require(wasmId.length == 64) { "WASM ID must be 64 hex characters, got ${wasmId.length}" }
