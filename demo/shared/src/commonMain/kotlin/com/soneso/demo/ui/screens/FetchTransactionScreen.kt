@@ -1569,6 +1569,7 @@ private fun formatSCVal(scVal: SCValXdr, indentLevel: Int = 0): String {
         is SCValXdr.Address -> "Address: ${formatAddress(scVal.value)}"
         is SCValXdr.Instance -> "ContractInstance"
         is SCValXdr.NonceKey -> "LedgerKeyNonce: ${scVal.value.nonce.value}"
+        is SCValXdr.ExecutableTag -> "ExecutableTag: \"${scVal.value.value}\""
     }
 }
 
