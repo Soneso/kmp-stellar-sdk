@@ -268,4 +268,144 @@ class SignerKeyTest {
         assertNotEquals<SignerKey>(ed25519, hashX)
         assertNotEquals<SignerKey>(preAuthTx, hashX)
     }
+
+    // ========== Ed25519PublicKey equals(null) ==========
+
+    @Test
+    fun testEd25519PublicKeyEqualsNull() {
+        val signer = SignerKey.ed25519PublicKey(testPublicKey)
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(signer.equals(null))
+    }
+
+    // ========== PreAuthTx equals/hashCode/toString ==========
+
+    @Test
+    fun testPreAuthTxEqualsAndHashCode() {
+        val signer1 = SignerKey.preAuthTx(testHash)
+        val signer2 = SignerKey.preAuthTx(testHash.copyOf())
+        val signer3 = SignerKey.preAuthTx(ByteArray(32) { 99.toByte() })
+
+        assertEquals(signer1, signer2)
+        assertEquals(signer1.hashCode(), signer2.hashCode())
+        assertNotEquals(signer1, signer3)
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(signer1.equals(signer1))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(signer1.equals(null))
+    }
+
+    @Test
+    fun testPreAuthTxToString() {
+        val signer = SignerKey.preAuthTx(testHash)
+        val str = signer.toString()
+
+        assertTrue(str.contains("SignerKey.PreAuthTx"))
+        assertTrue(str.contains(signer.encodeSignerKey()))
+    }
+
+    // ========== HashX equals/hashCode/toString ==========
+
+    @Test
+    fun testHashXEqualsAndHashCode() {
+        val signer1 = SignerKey.hashX(testHash)
+        val signer2 = SignerKey.hashX(testHash.copyOf())
+        val signer3 = SignerKey.hashX(ByteArray(32) { 99.toByte() })
+
+        assertEquals(signer1, signer2)
+        assertEquals(signer1.hashCode(), signer2.hashCode())
+        assertNotEquals(signer1, signer3)
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(signer1.equals(signer1))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(signer1.equals(null))
+    }
+
+    @Test
+    fun testHashXToString() {
+        val signer = SignerKey.hashX(testHash)
+        val str = signer.toString()
+
+        assertTrue(str.contains("SignerKey.HashX"))
+        assertTrue(str.contains(signer.encodeSignerKey()))
+    }
+
+    // ========== Ed25519SignedPayload equals/hashCode/toString ==========
+
+    @Test
+    fun testEd25519SignedPayloadEqualsAndHashCode() {
+        val signer1 = SignerKey.ed25519SignedPayload(testPublicKey, testPayload)
+        val signer2 = SignerKey.ed25519SignedPayload(testPublicKey.copyOf(), testPayload.copyOf())
+        val signerDifferentKey = SignerKey.ed25519SignedPayload(ByteArray(32) { 99.toByte() }, testPayload)
+        val signerDifferentPayload = SignerKey.ed25519SignedPayload(testPublicKey, "other payload".encodeToByteArray())
+
+        assertEquals(signer1, signer2)
+        assertEquals(signer1.hashCode(), signer2.hashCode())
+        assertNotEquals(signer1, signerDifferentKey)
+        assertNotEquals(signer1, signerDifferentPayload)
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(signer1.equals(signer1))
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(signer1.equals(null))
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(signer1.equals(SignerKey.hashX(testHash)))
+    }
+
+    @Test
+    fun testEd25519SignedPayloadToString() {
+        val signer = SignerKey.ed25519SignedPayload(testPublicKey, testPayload)
+        val str = signer.toString()
+
+        assertTrue(str.contains("SignerKey.Ed25519SignedPayload"))
+        assertTrue(str.contains(signer.encodeSignerKey()))
+    }
+
+    // ========== fromEncodedSignerKey: invalid embedded payload length ==========
+
+    @Test
+    fun testFromEncodedSignerKeyInvalidPayloadLengthThrows() {
+        // Craft a signed-payload strkey whose embedded length field (bytes 32-35) does not
+        // describe a valid payload size (must be 1..64), while the overall byte count still
+        // satisfies StrKey's own 40-100 byte range so decoding succeeds up to that point.
+        val raw = ByteArray(40)
+        testPublicKey.copyInto(raw, 0)
+        // Length field = 0, which is outside the valid 1..64 range.
+        raw[32] = 0
+        raw[33] = 0
+        raw[34] = 0
+        raw[35] = 0
+
+        val encoded = StrKey.encodeSignedPayload(raw)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            SignerKey.fromEncodedSignerKey(encoded)
+        }
+        assertTrue(exception.message!!.contains("Invalid payload length"))
+    }
+
+    @Test
+    fun testFromEncodedSignerKeyPayloadLengthExceedsMaxThrows() {
+        val raw = ByteArray(40)
+        testPublicKey.copyInto(raw, 0)
+        // Length field = 1000, which exceeds SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH (64).
+        raw[32] = 0
+        raw[33] = 0
+        raw[34] = 0x03
+        raw[35] = 0xE8.toByte()
+
+        val encoded = StrKey.encodeSignedPayload(raw)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            SignerKey.fromEncodedSignerKey(encoded)
+        }
+        assertTrue(exception.message!!.contains("Invalid payload length"))
+    }
 }

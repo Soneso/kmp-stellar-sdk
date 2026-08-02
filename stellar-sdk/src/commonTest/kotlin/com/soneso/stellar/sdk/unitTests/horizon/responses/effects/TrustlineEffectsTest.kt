@@ -4,6 +4,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_3
@@ -33,6 +34,9 @@ class TrustlineEffectsTest {
         assertEquals("USD", effect.assetCode)
         assertEquals(TEST_ACCOUNT_2, effect.assetIssuer)
         assertNull(effect.liquidityPoolId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -71,6 +75,10 @@ class TrustlineEffectsTest {
         assertIs<TrustlineCUDResponse>(effect)
         assertEquals("EUR", effect.assetCode)
         assertEquals("1000.0000000", effect.limit)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -94,6 +102,10 @@ class TrustlineEffectsTest {
         )
         assertEquals("0.0000000", effect.limit)
         assertEquals("USD", effect.assetCode)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -116,6 +128,11 @@ class TrustlineEffectsTest {
         assertIs<TrustlineRemovedEffectResponse>(effect)
         assertIs<TrustlineCUDResponse>(effect)
         assertEquals("LONGASSETCODE", effect.assetCode)
+        assertEquals("credit_alphanum12", effect.assetType)
+        assertEquals("0.0000000", effect.limit)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -138,6 +155,10 @@ class TrustlineEffectsTest {
             assetCode = "USD", assetIssuer = TEST_ACCOUNT_2
         )
         assertEquals("5000.0000000", effect.limit)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -160,6 +181,11 @@ class TrustlineEffectsTest {
         assertIs<TrustlineUpdatedEffectResponse>(effect)
         assertIs<TrustlineCUDResponse>(effect)
         assertEquals("5000.0000000", effect.limit)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -183,6 +209,9 @@ class TrustlineEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.trustor)
         assertEquals("credit_alphanum4", effect.assetType)
         assertEquals("USD", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -203,6 +232,12 @@ class TrustlineEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<TrustlineAuthorizedEffectResponse>(effect)
         assertIs<TrustlineAuthorizationResponse>(effect)
+        assertEquals(TEST_ACCOUNT_2, effect.trustor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -225,6 +260,10 @@ class TrustlineEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.trustor)
         assertEquals("EUR", effect.assetCode)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -245,6 +284,12 @@ class TrustlineEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<TrustlineDeauthorizedEffectResponse>(effect)
         assertIs<TrustlineAuthorizationResponse>(effect)
+        assertEquals(TEST_ACCOUNT_2, effect.trustor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("EUR", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -267,6 +312,10 @@ class TrustlineEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.trustor)
         assertEquals("GBP", effect.assetCode)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -287,6 +336,12 @@ class TrustlineEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<TrustlineAuthorizedToMaintainLiabilitiesEffectResponse>(effect)
         assertIs<TrustlineAuthorizationResponse>(effect)
+        assertEquals(TEST_ACCOUNT_2, effect.trustor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("GBP", effect.assetCode)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -316,6 +371,10 @@ class TrustlineEffectsTest {
         assertEquals(true, effect.authorizedFlag)
         assertEquals(false, effect.authorizedToMaintainLiabilitiesFlag)
         assertEquals(true, effect.clawbackEnabledFlag)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -357,6 +416,11 @@ class TrustlineEffectsTest {
         assertEquals(true, effect.authorizedFlag)
         assertEquals(false, effect.authorizedToMaintainLiabilitiesFlag)
         assertEquals(true, effect.clawbackEnabledFlag)
+        assertEquals(TEST_ACCOUNT_2, effect.trustor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -382,6 +446,9 @@ class TrustlineEffectsTest {
         assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
         assertEquals(TEST_ACCOUNT_3, effect.sponsor)
         assertNull(effect.liquidityPoolId)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -403,6 +470,10 @@ class TrustlineEffectsTest {
         assertIs<TrustlineSponsorshipCreatedEffectResponse>(effect)
         assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
         assertEquals(TEST_ACCOUNT_3, effect.sponsor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -425,6 +496,11 @@ class TrustlineEffectsTest {
             formerSponsor = TEST_ACCOUNT_3
         )
         assertEquals(TEST_ACCOUNT_3, effect.formerSponsor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -445,6 +521,11 @@ class TrustlineEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<TrustlineSponsorshipRemovedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_3, effect.formerSponsor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -468,6 +549,11 @@ class TrustlineEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -490,6 +576,11 @@ class TrustlineEffectsTest {
         assertIs<TrustlineSponsorshipUpdatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
+        assertEquals("credit_alphanum4", effect.assetType)
+        assertEquals("USD:$TEST_ACCOUNT_2", effect.asset)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

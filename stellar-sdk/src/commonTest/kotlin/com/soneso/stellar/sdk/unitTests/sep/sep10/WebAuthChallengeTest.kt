@@ -215,6 +215,158 @@ class WebAuthChallengeTest {
         }
     }
 
+    // Serves a stellar.toml body for the .well-known request and a challenge for anything else.
+    private fun createTomlServingClient(tomlBody: String): HttpClient {
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains(".well-known/stellar.toml")) {
+                respond(
+                    content = tomlBody,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+            } else {
+                respond(
+                    content = """{"transaction": "$sampleChallengeXdr"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    @Test
+    fun testFromDomainReadsEndpointAndSigningKeyFromToml() = runTest {
+        val toml = """
+            WEB_AUTH_ENDPOINT="https://api.example.com/webauth"
+            SIGNING_KEY="$testServerKey"
+        """.trimIndent()
+
+        val webAuth = WebAuth.fromDomain(
+            domain = "example.com",
+            network = Network.TESTNET,
+            httpClient = createTomlServingClient(toml)
+        )
+
+        assertEquals("https://api.example.com/webauth", webAuth.authEndpoint)
+        assertEquals(testServerKey, webAuth.serverSigningKey)
+        assertEquals("example.com", webAuth.serverHomeDomain)
+        assertEquals(Network.TESTNET, webAuth.network)
+        assertNull(webAuth.clientDomainSigningDelegate)
+    }
+
+    @Test
+    fun testFromDomainMissingWebAuthEndpointRejected() = runTest {
+        // stellar.toml publishes a signing key but no SEP-10 endpoint
+        val toml = """SIGNING_KEY="$testServerKey""""
+
+        val exception = assertFailsWith<ChallengeRequestException> {
+            WebAuth.fromDomain(
+                domain = "example.com",
+                network = Network.TESTNET,
+                httpClient = createTomlServingClient(toml)
+            )
+        }
+
+        assertTrue(exception.message?.contains("WEB_AUTH_ENDPOINT") == true)
+        assertTrue(exception.message?.contains("example.com") == true)
+    }
+
+    @Test
+    fun testFromDomainMissingSigningKeyRejected() = runTest {
+        // Without SIGNING_KEY the client cannot verify the server's challenge signature
+        val toml = """WEB_AUTH_ENDPOINT="https://api.example.com/webauth""""
+
+        val exception = assertFailsWith<ChallengeRequestException> {
+            WebAuth.fromDomain(
+                domain = "example.com",
+                network = Network.TESTNET,
+                httpClient = createTomlServingClient(toml)
+            )
+        }
+
+        assertTrue(exception.message?.contains("SIGNING_KEY") == true)
+        assertTrue(exception.message?.contains("example.com") == true)
+    }
+
+    @Test
+    fun testFromDomainKeepsClientDomainSigningDelegate() = runTest {
+        val toml = """
+            WEB_AUTH_ENDPOINT="https://api.example.com/webauth"
+            SIGNING_KEY="$testServerKey"
+        """.trimIndent()
+        val delegate = ClientDomainSigningDelegate { it }
+
+        val webAuth = WebAuth.fromDomain(
+            domain = "example.com",
+            network = Network.PUBLIC,
+            httpClient = createTomlServingClient(toml),
+            httpRequestHeaders = mapOf("X-Custom-Header" to "CustomValue"),
+            clientDomainSigningDelegate = delegate
+        )
+
+        assertSame(delegate, webAuth.clientDomainSigningDelegate)
+        assertEquals(Network.PUBLIC, webAuth.network)
+    }
+
+    @Test
+    fun testGetChallengeServerErrorWithoutBody() = runTest {
+        // A 5xx with an empty body must still report the status without a trailing detail
+        val mockClient = createMockClient("", HttpStatusCode.BadGateway)
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<ChallengeRequestException> {
+            webAuth.getChallenge(clientAccountId = validAccountId)
+        }
+
+        assertEquals(502, exception.statusCode)
+        assertEquals("Server error (502): Bad Gateway", exception.errorMessage)
+    }
+
+    @Test
+    fun testChallengeResponseSerializesSepFieldNames() = runTest {
+        val response = ChallengeResponse(
+            transaction = sampleChallengeXdr,
+            networkPassphrase = "Test SDF Network ; September 2015"
+        )
+
+        assertEquals(sampleChallengeXdr, response.transaction)
+        assertEquals("Test SDF Network ; September 2015", response.networkPassphrase)
+
+        val encoded = Json.encodeToString(ChallengeResponse.serializer(), response)
+        assertTrue(encoded.contains("\"transaction\""))
+        assertTrue(encoded.contains("\"network_passphrase\""))
+
+        val decoded = Json.decodeFromString(ChallengeResponse.serializer(), encoded)
+        assertEquals(response, decoded)
+    }
+
+    @Test
+    fun testChallengeResponseOmittedNetworkPassphraseDefaultsToNull() = runTest {
+        val response = ChallengeResponse(transaction = sampleChallengeXdr)
+
+        assertNull(response.networkPassphrase)
+
+        val decoded = Json.decodeFromString(
+            ChallengeResponse.serializer(),
+            """{"transaction":"$sampleChallengeXdr"}"""
+        )
+        assertEquals(response, decoded)
+    }
+
     @Test
     fun testGetChallengeSuccess() = runTest {
         val responseJson = """

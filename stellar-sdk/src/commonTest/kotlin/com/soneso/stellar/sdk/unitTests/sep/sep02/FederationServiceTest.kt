@@ -6,6 +6,7 @@ package com.soneso.stellar.sdk.unitTests.sep.sep02
 
 import com.soneso.stellar.sdk.sep.sep02.FederationResponse
 import com.soneso.stellar.sdk.sep.sep02.FederationService
+import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02Exception
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02FederationNotFoundException
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02InvalidAddressException
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02InvalidResponseException
@@ -522,6 +523,96 @@ class FederationServiceTest {
         assertTrue(exception.message!!.contains("access denied"))
     }
 
+    @Test
+    fun testHttpErrorWithNonJsonBody() = runTest {
+        val mockClient = createFederationMockClient(
+            responseContent = "<html><body>Bad Gateway</body></html>",
+            statusCode = HttpStatusCode.BadGateway
+        )
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<Sep02InvalidResponseException> {
+            service.resolveStellarAddress("bob*stellar.org")
+        }
+
+        // No parsable "error" field, so the HTTP status description is used instead.
+        assertEquals(
+            "Federation request failed (HTTP 502): ${HttpStatusCode.BadGateway.description}",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testHttpErrorWithJsonBodyWithoutErrorField() = runTest {
+        val mockClient = createFederationMockClient(
+            responseContent = """{"detail":"quota exceeded"}""",
+            statusCode = HttpStatusCode.ServiceUnavailable
+        )
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<Sep02InvalidResponseException> {
+            service.resolveStellarAddress("bob*stellar.org")
+        }
+
+        assertEquals(
+            "Federation request failed (HTTP 503): ${HttpStatusCode.ServiceUnavailable.description}",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testInformationalStatusTreatedAsError() = runTest {
+        // Only 2xx is a success. A 1xx status must surface as an invalid response.
+        val mockClient = createFederationMockClient(
+            responseContent = basicResponse,
+            statusCode = HttpStatusCode(199, "Informational")
+        )
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<Sep02InvalidResponseException> {
+            service.resolveStellarAddress("bob*stellar.org")
+        }
+
+        assertTrue(exception.message!!.contains("HTTP 199"))
+    }
+
+    @Test
+    fun testCustomHeadersForwarded() = runTest {
+        var apiKey: String? = null
+        var trace: String? = null
+        val mockEngine = MockEngine { request ->
+            apiKey = request.headers["X-Api-Key"]
+            trace = request.headers["X-Custom-Trace"]
+            respond(
+                content = basicResponse,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = HttpClient(mockEngine),
+            httpRequestHeaders = mapOf(
+                "X-Api-Key" to "my-api-key-123",
+                "X-Custom-Trace" to "trace-abc"
+            )
+        )
+
+        service.resolveStellarAddress("bob*stellar.org")
+
+        assertEquals("my-api-key-123", apiKey)
+        assertEquals("trace-abc", trace)
+    }
+
     // ========== H. FederationResponse parsing — 4 tests ==========
 
     @Test
@@ -625,5 +716,73 @@ class FederationServiceTest {
 
         assertEquals("bob", user)
         assertEquals("stellar.org", domain)
+    }
+
+    // ========== K. Exception string representation — 4 tests ==========
+
+    @Test
+    fun testInvalidAddressExceptionToString() = runTest {
+        val mockClient = createFederationMockClient(basicResponse)
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<Sep02InvalidAddressException> {
+            service.resolveStellarAddress("nope")
+        }
+
+        assertEquals(
+            "SEP-02 invalid address: Invalid Stellar address: 'nope'. " +
+                "Expected format: username*domain",
+            exception.toString()
+        )
+    }
+
+    @Test
+    fun testFederationNotFoundExceptionToString() = runTest {
+        val mockClient = createTomlAndFederationMockClient(noFederationServerToml, "{}")
+
+        val exception = assertFailsWith<Sep02FederationNotFoundException> {
+            FederationService.fromDomain(domain = "stellar.org", httpClient = mockClient)
+        }
+
+        assertEquals(
+            "SEP-02 federation server not found: No federation server found in " +
+                "stellar.toml for domain: stellar.org",
+            exception.toString()
+        )
+    }
+
+    @Test
+    fun testInvalidResponseExceptionToString() = runTest {
+        val mockClient = createFederationMockClient(
+            responseContent = """{"error":"record not found"}""",
+            statusCode = HttpStatusCode.NotFound
+        )
+        val service = FederationService(
+            federationServerUrl = "https://federation.example.com/federation",
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<Sep02InvalidResponseException> {
+            service.resolveStellarAddress("bob*stellar.org")
+        }
+
+        assertEquals(
+            "SEP-02 invalid response: Federation request failed (HTTP 404): record not found",
+            exception.toString()
+        )
+    }
+
+    @Test
+    fun testBaseExceptionToString() = runTest {
+        // The base type is never thrown by the SDK itself; it exists so callers can catch
+        // every SEP-2 failure with a single clause.
+        val exception = Sep02Exception("something went wrong")
+
+        assertEquals("SEP-02 error: something went wrong", exception.toString())
+        assertEquals("something went wrong", exception.message)
+        assertNull(exception.cause)
     }
 }

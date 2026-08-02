@@ -294,6 +294,47 @@ class WebAuthSigningTest {
     }
 
     @Test
+    @OptIn(ExperimentalTime::class)
+    fun testSignTransactionV0EnvelopeRejected() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+
+        // A parseable V0 envelope carrying the usual challenge operation. SEP-10
+        // challenges must use ENVELOPE_TYPE_TX, so signing has to be refused.
+        val sourceAccount = Account(serverKeyPair.getAccountId(), -1L)
+        val currentTime = kotlin.time.Clock.System.now().toEpochMilliseconds() / 1000
+        val authOp = ManageDataOperation(
+            name = "$testHomeDomain auth",
+            value = "test_value".encodeToByteArray()
+        )
+        authOp.sourceAccount = clientKeyPair.getAccountId()
+        val transaction = TransactionBuilder(sourceAccount, network)
+            .setBaseFee(100)
+            .addTimeBounds(TimeBounds(minTime = currentTime - 300, maxTime = currentTime + 600))
+            .addOperation(authOp)
+            .build()
+        transaction.sign(serverKeyPair)
+        transaction.envelopeType = EnvelopeTypeXdr.ENVELOPE_TYPE_TX_V0
+        val v0Xdr = transaction.toEnvelopeXdrBase64()
+
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+
+        val exception = assertFailsWith<GenericChallengeValidationException> {
+            webAuth.signTransaction(
+                challengeXdr = v0Xdr,
+                signers = listOf(clientKeyPair)
+            )
+        }
+
+        assertTrue(exception.message?.contains("ENVELOPE_TYPE_TX") == true)
+    }
+
+    @Test
     fun testSignTransactionEmptySignersList() = runTest {
         val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
         val clientKeyPair = KeyPair.random()

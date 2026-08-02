@@ -12,9 +12,8 @@ import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -25,7 +24,6 @@ import kotlin.test.assertTrue
  * received from a SEP-45 authentication server. Each test targets a specific validation
  * requirement defined in the SEP-45 specification.
  */
-@OptIn(ExperimentalEncodingApi::class)
 class Sep45ChallengeValidationTest {
 
     // Test constants
@@ -171,13 +169,16 @@ class Sep45ChallengeValidationTest {
         argsMap: SCValXdr,
         nonce: Long = 12345L,
         expirationLedger: Long = 1000000L,
-        subInvocations: List<SorobanAuthorizedInvocationXdr> = emptyList()
+        subInvocations: List<SorobanAuthorizedInvocationXdr> = emptyList(),
+        functionArgs: List<SCValXdr>? = null,
+        contractAddressOverride: SCAddressXdr? = null,
+        signature: SCValXdr = SCValXdr.Vec(SCVecXdr(emptyList()))
     ): SorobanAuthorizationEntryXdr {
-        val contractAddress = createContractAddress(contractId)
+        val contractAddress = contractAddressOverride ?: createContractAddress(contractId)
         val invokeArgs = InvokeContractArgsXdr(
             contractAddress = contractAddress,
             functionName = SCSymbolXdr(functionName),
-            args = listOf(argsMap)
+            args = functionArgs ?: listOf(argsMap)
         )
 
         val function = SorobanAuthorizedFunctionXdr.ContractFn(invokeArgs)
@@ -191,7 +192,7 @@ class Sep45ChallengeValidationTest {
                 address = credentialsAddress,
                 nonce = Int64Xdr(nonce),
                 signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt()),
-                signature = SCValXdr.Vec(SCVecXdr(emptyList()))  // Empty signature
+                signature = signature
             )
         )
 
@@ -200,6 +201,19 @@ class Sep45ChallengeValidationTest {
             rootInvocation = invocation
         )
     }
+
+    /**
+     * Builds an args map from raw entries, allowing keys and values of any SCVal type.
+     */
+    private fun buildRawArgsMap(entries: List<SCMapEntryXdr>): SCValXdr =
+        SCValXdr.Map(SCMapXdr(entries))
+
+    /**
+     * Builds a signature vector holding a single map with the supplied entries,
+     * mirroring the shape a server entry signature uses.
+     */
+    private fun buildSignatureVec(entries: List<SCMapEntryXdr>): SCValXdr =
+        SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.Map(SCMapXdr(entries)))))
 
     /**
      * Signs an authorization entry with the server keypair.
@@ -976,41 +990,6 @@ class Sep45ChallengeValidationTest {
     }
 
     @Test
-    fun testSingleEntryOnly() = runTest {
-        val webAuth = createWebAuth()
-        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
-
-        val argsMap = buildArgsMap(
-            account = testClientContractId,
-            homeDomain = testHomeDomain,
-            webAuthDomain = testWebAuthDomain,
-            webAuthDomainAccount = serverKeyPair.getAccountId(),
-            nonce = testNonce
-        )
-
-        // Only one entry (server or client, doesn't matter - missing the other)
-        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
-        var serverEntry = buildAuthEntry(
-            credentialsAddress = serverAddress,
-            contractId = testWebAuthContractId,
-            functionName = "web_auth_verify",
-            argsMap = argsMap
-        )
-        serverEntry = signEntryWithServer(serverEntry)
-
-        val entries = listOf(serverEntry)
-
-        // Should fail because client entry is missing
-        assertFailsWith<Sep45MissingClientEntryException> {
-            webAuth.validateChallenge(
-                authEntries = entries,
-                clientAccountId = testClientContractId,
-                homeDomain = testHomeDomain
-            )
-        }
-    }
-
-    @Test
     fun testDuplicateClientEntries() = runTest {
         val webAuth = createWebAuth()
         val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
@@ -1245,6 +1224,459 @@ class Sep45ChallengeValidationTest {
             clientAccountId = testClientContractId,
             homeDomain = null  // Uses default
         )
+    }
+
+    @Test
+    fun testValidateChallengeWithoutHomeDomainParameterUsesServerHomeDomain() = runTest {
+        val webAuth = createWebAuth()
+        val entries = buildValidChallenge()
+
+        // homeDomain is not supplied at all, so the server home domain applies
+        webAuth.validateChallenge(
+            authEntries = entries,
+            clientAccountId = testClientContractId
+        )
+    }
+
+    @Test
+    fun testEntryWithoutArgumentsRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        // web_auth_verify is invoked without the args map that carries the challenge data
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = SCValXdr.Map(SCMapXdr(emptyList())),
+            functionArgs = emptyList()
+        )
+
+        val exception = assertFailsWith<Sep45InvalidArgsException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertTrue(exception.message?.contains("No arguments found") == true)
+    }
+
+    @Test
+    fun testEntryArgumentThatIsNotAMapRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = SCValXdr.Map(SCMapXdr(emptyList())),
+            functionArgs = listOf(SCValXdr.Str(SCStringXdr("not-a-map")))
+        )
+
+        val exception = assertFailsWith<Sep45InvalidArgsException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertTrue(exception.message?.contains("First argument is not a map") == true)
+    }
+
+    @Test
+    fun testArgumentEntriesWithNonSymbolKeyOrNonStringValueIgnored() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        // A string key is not a symbol and a symbol value is not a string, so neither
+        // entry contributes an argument and "account" ends up unresolved
+        val argsMap = buildRawArgsMap(listOf(
+            SCMapEntryXdr(
+                key = SCValXdr.Str(SCStringXdr("account")),
+                `val` = SCValXdr.Str(SCStringXdr(testClientContractId))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("home_domain")),
+                `val` = SCValXdr.Sym(SCSymbolXdr("symbolvalue"))
+            )
+        ))
+
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap
+        )
+
+        val exception = assertFailsWith<Sep45InvalidAccountException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertEquals("null", exception.actual)
+        assertEquals(testClientContractId, exception.expected)
+    }
+
+    @Test
+    fun testMissingHomeDomainArgumentRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        val argsMap = buildRawArgsMap(listOf(
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("account")),
+                `val` = SCValXdr.Str(SCStringXdr(testClientContractId))
+            )
+        ))
+
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap
+        )
+
+        val exception = assertFailsWith<Sep45InvalidHomeDomainException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertEquals("null", exception.actual)
+        assertEquals(testHomeDomain, exception.expected)
+    }
+
+    @Test
+    fun testMissingWebAuthDomainArgumentRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        val argsMap = buildRawArgsMap(listOf(
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("account")),
+                `val` = SCValXdr.Str(SCStringXdr(testClientContractId))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("home_domain")),
+                `val` = SCValXdr.Str(SCStringXdr(testHomeDomain))
+            )
+        ))
+
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap
+        )
+
+        val exception = assertFailsWith<Sep45InvalidWebAuthDomainException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertEquals("null", exception.actual)
+        assertEquals(testWebAuthDomain, exception.expected)
+    }
+
+    @Test
+    fun testUnsupportedContractAddressTypeRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val serverAddress = createAccountAddress(serverKeyPair.getAccountId())
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        // A muxed SCAddress has no SEP-45 string form and must not be silently accepted
+        val muxedAddress = SCAddressXdr.MuxedAccount(
+            MuxedEd25519AccountXdr(
+                id = Uint64Xdr(1UL),
+                ed25519 = Uint256Xdr(serverKeyPair.getPublicKey())
+            )
+        )
+
+        val entry = buildAuthEntry(
+            credentialsAddress = serverAddress,
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            contractAddressOverride = muxedAddress
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertTrue(exception.message?.contains("Unsupported address type") == true)
+    }
+
+    @Test
+    fun testSourceAccountCredentialsEntryDoesNotSatisfyRequiredEntries() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        // Source-account credentials carry no address, so this entry can neither be
+        // the server entry nor the client entry
+        val invocation = SorobanAuthorizedInvocationXdr(
+            function = SorobanAuthorizedFunctionXdr.ContractFn(
+                InvokeContractArgsXdr(
+                    contractAddress = createContractAddress(testWebAuthContractId),
+                    functionName = SCSymbolXdr("web_auth_verify"),
+                    args = listOf(argsMap)
+                )
+            ),
+            subInvocations = emptyList()
+        )
+        val sourceAccountEntry = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.Void,
+            rootInvocation = invocation
+        )
+
+        assertFailsWith<Sep45MissingServerEntryException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(sourceAccountEntry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+    }
+
+    @Test
+    fun testSourceAccountCredentialsEntryAlongsideServerAndClientAccepted() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val entries = buildValidChallenge().toMutableList()
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        val invocation = SorobanAuthorizedInvocationXdr(
+            function = SorobanAuthorizedFunctionXdr.ContractFn(
+                InvokeContractArgsXdr(
+                    contractAddress = createContractAddress(testWebAuthContractId),
+                    functionName = SCSymbolXdr("web_auth_verify"),
+                    args = listOf(argsMap)
+                )
+            ),
+            subInvocations = emptyList()
+        )
+        entries.add(
+            SorobanAuthorizationEntryXdr(
+                credentials = SorobanCredentialsXdr.Void,
+                rootInvocation = invocation
+            )
+        )
+
+        // Server and client entries are still present, so the extra entry is simply skipped
+        webAuth.validateChallenge(
+            authEntries = entries,
+            clientAccountId = testClientContractId,
+            homeDomain = testHomeDomain
+        )
+    }
+
+    @Test
+    fun testEntryWithUnrelatedCredentialsAddressAccepted() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val strangerKeyPair = KeyPair.random()
+        val entries = buildValidChallenge().toMutableList()
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        entries.add(
+            buildAuthEntry(
+                credentialsAddress = createAccountAddress(strangerKeyPair.getAccountId()),
+                contractId = testWebAuthContractId,
+                functionName = "web_auth_verify",
+                argsMap = argsMap,
+                nonce = 12348L
+            )
+        )
+
+        // An entry whose credentials address matches none of the known roles is ignored
+        webAuth.validateChallenge(
+            authEntries = entries,
+            clientAccountId = testClientContractId,
+            homeDomain = testHomeDomain
+        )
+    }
+
+    @Test
+    fun testServerSignatureThatIsNotAVectorRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        val serverEntry = buildAuthEntry(
+            credentialsAddress = createAccountAddress(serverKeyPair.getAccountId()),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            signature = SCValXdr.Str(SCStringXdr("not-a-signature-vector"))
+        )
+        val clientEntry = buildAuthEntry(
+            credentialsAddress = createContractAddress(testClientContractId),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            nonce = 12346L
+        )
+
+        assertFailsWith<Sep45InvalidServerSignatureException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(serverEntry, clientEntry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+    }
+
+    @Test
+    fun testServerSignatureVectorEntryThatIsNotAMapRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        val serverEntry = buildAuthEntry(
+            credentialsAddress = createAccountAddress(serverKeyPair.getAccountId()),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            signature = SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.Str(SCStringXdr("not-a-map")))))
+        )
+        val clientEntry = buildAuthEntry(
+            credentialsAddress = createContractAddress(testClientContractId),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            nonce = 12346L
+        )
+
+        assertFailsWith<Sep45InvalidServerSignatureException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(serverEntry, clientEntry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+    }
+
+    @Test
+    fun testServerSignatureWithoutPublicKeyAndSignatureBytesRejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+
+        // The signature map has a non-symbol key, an unrelated symbol key, and
+        // public_key / signature members that are not byte values
+        val signature = buildSignatureVec(listOf(
+            SCMapEntryXdr(
+                key = SCValXdr.Str(SCStringXdr("public_key")),
+                `val` = SCValXdr.Bytes(SCBytesXdr(serverKeyPair.getPublicKey()))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("unrelated")),
+                `val` = SCValXdr.Str(SCStringXdr("ignored"))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("public_key")),
+                `val` = SCValXdr.Str(SCStringXdr("not-bytes"))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("signature")),
+                `val` = SCValXdr.Str(SCStringXdr("not-bytes"))
+            )
+        ))
+
+        val serverEntry = buildAuthEntry(
+            credentialsAddress = createAccountAddress(serverKeyPair.getAccountId()),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            signature = signature
+        )
+        val clientEntry = buildAuthEntry(
+            credentialsAddress = createContractAddress(testClientContractId),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            nonce = 12346L
+        )
+
+        assertFailsWith<Sep45InvalidServerSignatureException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(serverEntry, clientEntry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
     }
 
     @Test

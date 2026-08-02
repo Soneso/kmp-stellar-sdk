@@ -1995,6 +1995,518 @@ class ContractSpecTest {
         }
     }
 
+    // ========== scValToNative: U256/I256 ==========
+
+    @Test
+    fun testScValToNativeU256() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U256)
+        val scVal = spec.nativeToXdrSCVal(123456, typeDef)
+        val result = spec.scValToNative(scVal, typeDef)
+        assertTrue(result is BigInteger)
+        assertEquals(BigInteger.fromLong(123456L), result)
+    }
+
+    @Test
+    fun testScValToNativeI256() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I256)
+
+        val positive = spec.nativeToXdrSCVal(123456, typeDef)
+        assertEquals(BigInteger.fromLong(123456L), spec.scValToNative(positive, typeDef))
+
+        val negative = spec.nativeToXdrSCVal(-123456, typeDef)
+        assertEquals(BigInteger.fromLong(-123456L), spec.scValToNative(negative, typeDef))
+    }
+
+    // ========== scValToNative: unsupported discriminant ==========
+
+    @Test
+    fun testScValToNativeUnsupportedDiscriminantThrows() {
+        // SCV_LEDGER_KEY_NONCE has no explicit arm in scValToNative; it must fall
+        // through to the conversion-failed branch rather than silently misparsing.
+        val spec = ContractSpec(emptyList())
+        val nonceVal = SCValXdr.NonceKey(SCNonceKeyXdr(Int64Xdr(42L)))
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(nonceVal, null)
+        }
+        assertTrue(ex.message!!.contains("Failed to convert"))
+    }
+
+    // ========== scValUdtToNative: entry lookup ==========
+
+    @Test
+    fun testScValToNativeUdtEntryNotFoundThrows() {
+        val spec = ContractSpec(emptyList())
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.U32(Uint32Xdr(1u)), createUdtTypeDef("Missing"))
+        }
+        assertTrue(ex.message!!.contains("Missing"))
+    }
+
+    @Test
+    fun testScValToNativeUdtUnsupportedEntryTypeThrows() {
+        // An error-enum spec entry is a valid UDT kind in general, but scValUdtToNative
+        // only knows how to decode struct/union/enum entries.
+        val entries = listOf(
+            SCSpecEntryXdr.UdtErrorEnumV0(SCSpecUDTErrorEnumV0Xdr("", "", "MyErr", emptyList()))
+        )
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.U32(Uint32Xdr(1u)), createUdtTypeDef("MyErr"))
+        }
+        assertTrue(ex.message!!.contains("MyErr"))
+    }
+
+    // ========== enumToNative / structToNative / unionToNative: type mismatches ==========
+
+    @Test
+    fun testEnumToNativeWrongScValTypeThrows() {
+        val entries = listOf(createEnumEntry("Status", listOf("Pending", "Active")))
+        val spec = ContractSpec(entries)
+        assertFailsWith<IllegalArgumentException> {
+            spec.scValToNative(SCValXdr.Str(SCStringXdr("Active")), createUdtTypeDef("Status"))
+        }
+    }
+
+    @Test
+    fun testStructToNativeVectorRepresentation() {
+        // Numeric field names ("0", "1", ...) mean the struct is represented as a Vec.
+        val entries = listOf(
+            createStructEntry(
+                "Point",
+                listOf("0" to SCSpecTypeXdr.SC_SPEC_TYPE_U32, "1" to SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val vecVal = SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.U32(Uint32Xdr(3u)), SCValXdr.U32(Uint32Xdr(4u)))))
+        val result = spec.scValToNative(vecVal, createUdtTypeDef("Point"))
+        assertTrue(result is List<*>)
+        assertEquals(listOf(3u, 4u), result)
+    }
+
+    @Test
+    fun testStructToNativeWrongScValTypeThrows() {
+        val entries = listOf(createStructEntry("Person", listOf("name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL)))
+        val spec = ContractSpec(entries)
+        assertFailsWith<IllegalArgumentException> {
+            spec.scValToNative(SCValXdr.Str(SCStringXdr("bad")), createUdtTypeDef("Person"))
+        }
+    }
+
+    @Test
+    fun testUnionToNativeWrongScValTypeThrows() {
+        val entries = listOf(createUnionEntry("Result", listOf("Success" to 0)))
+        val spec = ContractSpec(entries)
+        assertFailsWith<IllegalArgumentException> {
+            spec.scValToNative(SCValXdr.Str(SCStringXdr("bad")), createUdtTypeDef("Result"))
+        }
+    }
+
+    @Test
+    fun testUnionToNativeEmptyVecWithCasesThrows() {
+        val entries = listOf(createUnionEntry("Result", listOf("Success" to 0)))
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Vec(SCVecXdr(emptyList())), createUdtTypeDef("Result"))
+        }
+        assertTrue(ex.message!!.contains("length 0"))
+    }
+
+    @Test
+    fun testUnionToNativeTagNotSymbolThrows() {
+        val entries = listOf(createUnionEntry("Result", listOf("Success" to 0)))
+        val spec = ContractSpec(entries)
+        assertFailsWith<IllegalArgumentException> {
+            spec.scValToNative(
+                SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.U32(Uint32Xdr(1u))))),
+                createUdtTypeDef("Result")
+            )
+        }
+    }
+
+    @Test
+    fun testUnionToNativeUnknownCaseThrows() {
+        val entries = listOf(createUnionEntry("Result", listOf("Success" to 0)))
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(
+                SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.Sym(SCSymbolXdr("Unknown"))))),
+                createUdtTypeDef("Result")
+            )
+        }
+        assertTrue(ex.message!!.contains("Unknown"))
+    }
+
+    // ========== handleValueType: VOID with a value, and unsupported discriminant ==========
+
+    @Test
+    fun testVoidTypeConversionIgnoresNonNullValue() {
+        // nativeToXdrSCVal's own null short-circuit only fires for a null value; a
+        // non-null value targeting a VOID type def must still resolve to SCV_VOID.
+        val spec = ContractSpec(emptyList())
+        val result = spec.nativeToXdrSCVal("ignored", createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_VOID))
+        // SCValXdr.Void is the shared arm for SCV_VOID and SCV_LEDGER_KEY_CONTRACT_INSTANCE,
+        // so the discriminant is what actually distinguishes them on the wire.
+        assertIs<SCValXdr.Void>(result)
+        assertEquals(SCValTypeXdr.SCV_VOID, result.discriminant)
+    }
+
+    @Test
+    fun testHandleValueTypeUnsupportedDiscriminantThrows() {
+        // A type def wrapping a container-only discriminant (here SC_SPEC_TYPE_VEC) is
+        // internally inconsistent; handleValueType must reject it cleanly.
+        val spec = ContractSpec(emptyList())
+        val malformedTypeDef = SCSpecTypeDefXdr.Void(SCSpecTypeXdr.SC_SPEC_TYPE_VEC)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(42, malformedTypeDef)
+        }
+        assertTrue(ex.message!!.contains("Unsupported value type"))
+    }
+
+    // ========== handleResultType: onFailure with a non-error error type ==========
+
+    @Test
+    fun testResultConversionFailureWithNonErrorTypeConverts() {
+        val spec = ContractSpec(emptyList())
+        val okType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+        val errorType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+        val resultTypeDef = SCSpecTypeDefXdr.Result(SCSpecTypeResultXdr(okType = okType, errorType = errorType))
+
+        val failureResult = kotlin.Result.failure<UInt>(RuntimeException("boom"))
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(failureResult, resultTypeDef)
+        }
+        assertTrue(ex.message!!.contains("Expected String"))
+    }
+
+    // ========== handleUDTType: unsupported entry kind ==========
+
+    @Test
+    fun testHandleUDTTypeUnsupportedEntryThrows() {
+        val entries = listOf(
+            SCSpecEntryXdr.UdtErrorEnumV0(SCSpecUDTErrorEnumV0Xdr("", "", "MyErr", emptyList()))
+        )
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(42, createUdtTypeDef("MyErr"))
+        }
+        assertTrue(ex.message!!.contains("Unsupported UDT type"))
+    }
+
+    // ========== handleStructType: vector representation (numeric field names) ==========
+
+    @Test
+    fun testHandleStructTypeVectorRepresentation() {
+        val entries = listOf(
+            createStructEntry(
+                "Point",
+                listOf("0" to SCSpecTypeXdr.SC_SPEC_TYPE_U32, "1" to SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val result = spec.nativeToXdrSCVal(mapOf("0" to 3, "1" to 4), createUdtTypeDef("Point"))
+        assertTrue(result is SCValXdr.Vec)
+        val vec = result.value
+        assertNotNull(vec)
+        assertEquals(3u, (vec.value[0] as SCValXdr.U32).value.value)
+        assertEquals(4u, (vec.value[1] as SCValXdr.U32).value.value)
+    }
+
+    @Test
+    fun testHandleStructTypeVectorRepresentationMissingFieldThrows() {
+        val entries = listOf(
+            createStructEntry(
+                "Point",
+                listOf("0" to SCSpecTypeXdr.SC_SPEC_TYPE_U32, "1" to SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+        assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(mapOf("0" to 3), createUdtTypeDef("Point"))
+        }
+    }
+
+    // ========== handleUnionType: tuple case ==========
+
+    @Test
+    fun testHandleUnionTypeTupleCaseConversion() {
+        val entries = listOf(
+            createUnionEntryWithTupleCase(
+                "Result",
+                "Error" to listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32, SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val unionVal = NativeUnionVal.TupleCase("Error", listOf(404, "Not Found"))
+        val result = spec.nativeToXdrSCVal(unionVal, createUdtTypeDef("Result"))
+        assertTrue(result is SCValXdr.Vec)
+        val vec = result.value
+        assertNotNull(vec)
+        assertEquals(3, vec.value.size)
+        assertEquals("Error", (vec.value[0] as SCValXdr.Sym).value.value)
+        assertEquals(404u, (vec.value[1] as SCValXdr.U32).value.value)
+        assertEquals("Not Found", (vec.value[2] as SCValXdr.Str).value.value)
+    }
+
+    @Test
+    fun testHandleUnionTypeTupleCaseLengthMismatchThrows() {
+        val entries = listOf(
+            createUnionEntryWithTupleCase(
+                "Result",
+                "Error" to listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32, SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val unionVal = NativeUnionVal.TupleCase("Error", listOf(404))
+        assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(unionVal, createUdtTypeDef("Result"))
+        }
+    }
+
+    // ========== handleBytesNType: List<Byte> and hex-string sources ==========
+
+    @Test
+    fun testBytesNConversionFromListOfByte() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = SCSpecTypeDefXdr.BytesN(SCSpecTypeBytesNXdr(Uint32Xdr(3u)))
+        val result = spec.nativeToXdrSCVal(listOf<Byte>(1, 2, 3), typeDef)
+        assertTrue(result is SCValXdr.Bytes)
+        assertContentEquals(byteArrayOf(1, 2, 3), result.value.value)
+    }
+
+    @Test
+    fun testBytesNConversionFromHexString() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = SCSpecTypeDefXdr.BytesN(SCSpecTypeBytesNXdr(Uint32Xdr(3u)))
+        val result = spec.nativeToXdrSCVal("0x010203", typeDef)
+        assertTrue(result is SCValXdr.Bytes)
+        assertContentEquals(byteArrayOf(1, 2, 3), result.value.value)
+    }
+
+    @Test
+    fun testBytesNConversionFromInvalidHexStringThrows() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = SCSpecTypeDefXdr.BytesN(SCSpecTypeBytesNXdr(Uint32Xdr(1u)))
+        assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal("zz", typeDef)
+        }
+    }
+
+    // ========== scValToNative: optional Vec/Map wire values absent (XDR *vec/*map) ==========
+
+    @Test
+    fun testScValToNativeVecWithNullVecValue() {
+        // SCVal.vec is an optional pointer on the wire; an absent value must resolve
+        // to an empty list rather than a null-pointer failure.
+        val spec = ContractSpec(emptyList())
+        val vecTypeDef = SCSpecTypeDefXdr.Vec(
+            SCSpecTypeVecXdr(createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+        )
+        val result = spec.scValToNative(SCValXdr.Vec(null), vecTypeDef)
+        assertEquals(emptyList<Any?>(), result)
+    }
+
+    @Test
+    fun testScValToNativeMapWithNullMapValue() {
+        val spec = ContractSpec(emptyList())
+        val mapTypeDef = SCSpecTypeDefXdr.Map(
+            SCSpecTypeMapXdr(
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL),
+                createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val result = spec.scValToNative(SCValXdr.Map(null), mapTypeDef)
+        assertEquals(emptyList<Any?>(), result)
+    }
+
+    // ========== scValToNative: null typeDef reaching the vec/map mismatch branches ==========
+
+    @Test
+    fun testScValToNativeVecWithNullTypeDefThrows() {
+        val spec = ContractSpec(emptyList())
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Vec(SCVecXdr(emptyList())), null)
+        }
+        assertTrue(ex.message!!.contains("null"))
+    }
+
+    @Test
+    fun testScValToNativeMapWithNullTypeDefThrows() {
+        val spec = ContractSpec(emptyList())
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Map(SCMapXdr(emptyList())), null)
+        }
+        assertTrue(ex.message!!.contains("null"))
+    }
+
+    @Test
+    fun testScValToNativeUnsupportedDiscriminantWithNonNullTypeDefThrows() {
+        // Companion to testScValToNativeUnsupportedDiscriminantThrows, which uses a null
+        // typeDef; here a concrete, non-Udt typeDef reaches the same conversion-failed branch.
+        val spec = ContractSpec(emptyList())
+        val nonceVal = SCValXdr.NonceKey(SCNonceKeyXdr(Int64Xdr(42L)))
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(nonceVal, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+        }
+        assertTrue(ex.message!!.contains("Failed to convert"))
+        assertTrue(ex.message!!.contains("SC_SPEC_TYPE_U32"))
+    }
+
+    // ========== structToNative: numeric-field (Vec) representation edge cases ==========
+
+    @Test
+    fun testStructToNativeNumericFieldsWrongScValTypeThrows() {
+        // The struct declares numeric field names (Vec representation), but the actual
+        // wire value is a Map - the inverse mismatch of testStructToNativeWrongScValTypeThrows.
+        val entries = listOf(
+            createStructEntry(
+                "Point",
+                listOf("0" to SCSpecTypeXdr.SC_SPEC_TYPE_U32, "1" to SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+        assertFailsWith<IllegalArgumentException> {
+            spec.scValToNative(SCValXdr.Map(SCMapXdr(emptyList())), createUdtTypeDef("Point"))
+        }
+    }
+
+    @Test
+    fun testStructToNativeVectorRepresentationWithNullVecValue() {
+        val entries = listOf(
+            createStructEntry(
+                "Point",
+                listOf("0" to SCSpecTypeXdr.SC_SPEC_TYPE_U32, "1" to SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val result = spec.scValToNative(SCValXdr.Vec(null), createUdtTypeDef("Point"))
+        assertEquals(emptyList<Any?>(), result)
+    }
+
+    @Test
+    fun testStructConversionAsMapWithNullMapValue() {
+        val entries = listOf(
+            createStructEntry("Person", listOf("name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL))
+        )
+        val spec = ContractSpec(entries)
+        val result = spec.scValToNative(SCValXdr.Map(null), createUdtTypeDef("Person"))
+        assertEquals(emptyMap<String, Any?>(), result)
+    }
+
+    // ========== unionToNative: optional Vec wire value absent ==========
+
+    @Test
+    fun testUnionToNativeNullVecValueWithCasesThrows() {
+        val entries = listOf(createUnionEntry("Result", listOf("Success" to 0)))
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Vec(null), createUdtTypeDef("Result"))
+        }
+        assertTrue(ex.message!!.contains("length 0"))
+    }
+
+    // ========== I32 range validation: both overflow directions ==========
+
+    @Test
+    fun testI32ConversionUnderflow() {
+        val spec = ContractSpec(emptyList())
+        assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(Long.MIN_VALUE, createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I32))
+        }
+    }
+
+    // ========== handleUnionType: void-case value against a tuple-case definition ==========
+
+    @Test
+    fun testHandleUnionTypeVoidCaseValueForTupleCaseDefThrows() {
+        // The union case definition for "Error" expects a tuple payload, but the caller
+        // supplies a NativeUnionVal.VoidCase with a matching tag - a type/def mismatch
+        // distinct from testHandleUnionTypeTupleCaseLengthMismatchThrows (which supplies
+        // the right kind of value with the wrong element count).
+        val entries = listOf(
+            createUnionEntryWithTupleCase(
+                "Result",
+                "Error" to listOf(SCSpecTypeXdr.SC_SPEC_TYPE_U32, SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+            )
+        )
+        val spec = ContractSpec(entries)
+        val ex = assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(NativeUnionVal.VoidCase("Error"), createUdtTypeDef("Result"))
+        }
+        assertTrue(ex.message!!.contains("expects 2 values, got 0"))
+    }
+
+    // ========== handleEnumType: UInt/Long/ULong inputs ==========
+
+    @Test
+    fun testEnumConversionFromUInt() {
+        val entries = listOf(createEnumEntry("Status", listOf("Pending", "Active", "Completed")))
+        val spec = ContractSpec(entries)
+        val result = spec.nativeToXdrSCVal(1u, createUdtTypeDef("Status"))
+        assertTrue(result is SCValXdr.U32)
+        assertEquals(1u, result.value.value)
+    }
+
+    @Test
+    fun testEnumConversionFromLong() {
+        val entries = listOf(createEnumEntry("Status", listOf("Pending", "Active", "Completed")))
+        val spec = ContractSpec(entries)
+        val result = spec.nativeToXdrSCVal(1L, createUdtTypeDef("Status"))
+        assertTrue(result is SCValXdr.U32)
+        assertEquals(1u, result.value.value)
+    }
+
+    @Test
+    fun testEnumConversionFromULong() {
+        val entries = listOf(createEnumEntry("Status", listOf("Pending", "Active", "Completed")))
+        val spec = ContractSpec(entries)
+        val result = spec.nativeToXdrSCVal(1UL, createUdtTypeDef("Status"))
+        assertTrue(result is SCValXdr.U32)
+        assertEquals(1u, result.value.value)
+    }
+
+    // ========== hexToBytes: odd-length hex string ==========
+
+    @Test
+    fun testBytesConversionFromOddLengthHexStringThrows() {
+        val spec = ContractSpec(emptyList())
+        assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal("0x010", createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES))
+        }
+    }
+
+    // ========== handleResultType: non-null "ok" value with a VOID ok type ==========
+
+    @Test
+    fun testResultConversionKotlinResultSuccessWithNonNullUnitAndVoidOkType() {
+        // Companion to testResultConversionWithVoidOk, which supplies a null ok value;
+        // here the ok value is non-null (Unit) but the spec's ok type is still VOID, so
+        // the type-driven side of the disjunction must independently produce SCV_VOID.
+        val spec = ContractSpec(emptyList())
+        val okType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_VOID)
+        val errorType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_ERROR)
+        val resultTypeDef = SCSpecTypeDefXdr.Result(SCSpecTypeResultXdr(okType = okType, errorType = errorType))
+
+        val successResult = kotlin.Result.success(Unit)
+        val scVal = spec.nativeToXdrSCVal(successResult, resultTypeDef)
+        assertIs<SCValXdr.Void>(scVal)
+        assertEquals(SCValTypeXdr.SCV_VOID, scVal.discriminant)
+    }
+
+    @Test
+    fun testResultConversionMapOkNonNullValueWithVoidOkType() {
+        val spec = ContractSpec(emptyList())
+        val okType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_VOID)
+        val errorType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_ERROR)
+        val resultTypeDef = SCSpecTypeDefXdr.Result(SCSpecTypeResultXdr(okType = okType, errorType = errorType))
+
+        val okMap = mapOf("ok" to Unit)
+        val scVal = spec.nativeToXdrSCVal(okMap, resultTypeDef)
+        assertIs<SCValXdr.Void>(scVal)
+        assertEquals(SCValTypeXdr.SCV_VOID, scVal.discriminant)
+    }
+
     // ========== Helper Functions ==========
 
     private fun createFunctionEntry(

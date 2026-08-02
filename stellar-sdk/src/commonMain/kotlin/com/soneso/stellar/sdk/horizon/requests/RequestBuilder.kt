@@ -84,16 +84,21 @@ abstract class RequestBuilder(
     /**
      * Builds the final URL for the request.
      *
+     * The path segments are applied to a copy of the builder state, leaving [uriBuilder]
+     * untouched, so repeated calls on the same request builder yield the same URL. SSE
+     * streams rely on this: [SSEStream] rebuilds the URL on every reconnect.
+     *
      * @return The constructed URL
      */
     internal fun buildUrl(): Url {
-        if (segments.isNotEmpty()) {
-            // Append segments to the path
-            val currentPath = uriBuilder.encodedPath.trimEnd('/')
-            val segmentsPath = segments.joinToString("/")
-            uriBuilder.encodedPath = "$currentPath/$segmentsPath"
+        val base = uriBuilder.build()
+        if (segments.isEmpty()) {
+            return base
         }
-        return uriBuilder.build()
+        val segmentsPath = segments.joinToString("/")
+        return URLBuilder(base).apply {
+            encodedPath = "${base.encodedPath.trimEnd('/')}/$segmentsPath"
+        }.build()
     }
 
     /**

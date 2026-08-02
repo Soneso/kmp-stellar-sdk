@@ -137,7 +137,7 @@ fun interface ClientDomainSigningDelegate {
  * SEP-10 Authentication Flow:
  * 1. Client requests a challenge transaction from the authentication server
  * 2. Server generates a transaction with specific security requirements and signs it
- * 3. Client validates the challenge transaction (13 security checks)
+ * 3. Client validates the challenge transaction (14 security checks)
  * 4. Client signs the validated transaction with their keypair(s)
  * 5. Client submits the signed transaction back to the server
  * 6. Server verifies the signatures and returns a JWT token
@@ -253,7 +253,7 @@ fun interface ClientDomainSigningDelegate {
  * - Always validate the challenge before signing (done automatically in jwtToken())
  * - Verify HTTPS is used for all communication with the authentication endpoint
  * - Verify the server's signing key matches the stellar.toml SIGNING_KEY
- * - Never skip validation checks (all 13 checks are required)
+ * - Never skip validation checks (all 14 checks are required)
  * - Store JWT tokens securely (encrypted storage, not in logs)
  * - Check token expiration before use
  * - Use [fromDomain] to automatically discover and verify server configuration
@@ -427,7 +427,7 @@ class WebAuth(
      *
      * This is the high-level API that handles the entire challenge-response flow:
      * 1. Requests challenge from server
-     * 2. Validates challenge transaction (13 security checks)
+     * 2. Validates challenge transaction (14 security checks)
      * 3. Signs challenge with provided keypairs
      * 4. Submits signed challenge to server
      * 5. Returns JWT authentication token
@@ -542,19 +542,15 @@ class WebAuth(
             clientDomain = clientDomain
         )
 
-        // Step 2: Validate challenge transaction (13 security checks)
+        // Step 2: Validate challenge transaction (14 security checks)
         // Extract clientDomainAccountId from client domain's stellar.toml if provided
         val clientDomainAccountId = if (clientDomain != null && (clientDomainKeyPair != null || effectiveDelegate != null)) {
-            try {
-                val clientToml = StellarToml.fromDomain(
+            val clientToml = try {
+                StellarToml.fromDomain(
                     domain = clientDomain,
                     httpClient = httpClient,
                     httpRequestHeaders = httpRequestHeaders
                 )
-                clientToml.generalInformation.signingKey
-                    ?: throw GenericChallengeValidationException(
-                        "SIGNING_KEY not found in stellar.toml for client domain: $clientDomain"
-                    )
             } catch (e: Throwable) {
                 // Throwable rather than Exception: on Kotlin/JS the HTTP engine reports
                 // connectivity failures as kotlin.Error, which must surface as the
@@ -564,6 +560,11 @@ class WebAuth(
                     "Failed to load stellar.toml for client domain $clientDomain: ${e.message}"
                 )
             }
+            // Raised outside the load, so a missing key reports itself rather than a load failure
+            clientToml.generalInformation.signingKey
+                ?: throw GenericChallengeValidationException(
+                    "SIGNING_KEY not found in stellar.toml for client domain: $clientDomain"
+                )
         } else {
             null
         }
@@ -877,6 +878,16 @@ class WebAuth(
 
         val envelope = envelopeXdr.value
         val tx = envelope.tx
+
+        // Check #14: Transaction source account must be the server account.
+        // A muxed source fails this comparison, which is intended: the server account is an
+        // ed25519 account id. A configured signing key that is not a decodable account id is a
+        // configuration error rather than a source mismatch, and is reported by the signature
+        // check below, so the comparison only applies to a well-formed server account.
+        val txSourceAccount = MuxedAccount.fromXdr(tx.sourceAccount).address
+        if (StrKey.isValidEd25519PublicKey(serverSigningKey) && txSourceAccount != serverSigningKey) {
+            throw InvalidTransactionSourceAccountException(serverSigningKey, txSourceAccount)
+        }
 
         // Check #2: Sequence number must be exactly 0
         if (tx.seqNum.value.value != 0L) {

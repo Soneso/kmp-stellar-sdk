@@ -28,7 +28,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Known error codes returned by the relayer service.
@@ -318,22 +317,24 @@ class OZRelayerClient(
             )
         }
 
-        // Check for success: HTTP 2xx AND success=true in body
-        val bodySuccess = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
+        // Check for success: HTTP 2xx AND success=true in body.
+        // Fields are read through `as? JsonPrimitive` so a relayer answering with an
+        // unexpected shape degrades to an error response instead of raising.
+        val bodySuccess = (responseJson["success"] as? JsonPrimitive)?.booleanOrNull ?: false
         if (response.status.isSuccess() && bodySuccess) {
             // Extract from nested "data" wrapper if present, otherwise use top-level
             val data = (responseJson["data"] as? JsonObject) ?: responseJson
             return RelayerResponse(
                 success = true,
-                transactionId = data["transactionId"]?.jsonPrimitive?.contentOrNull,
-                hash = data["hash"]?.jsonPrimitive?.contentOrNull,
-                status = data["status"]?.jsonPrimitive?.contentOrNull
+                transactionId = (data["transactionId"] as? JsonPrimitive)?.contentOrNull,
+                hash = (data["hash"] as? JsonPrimitive)?.contentOrNull,
+                status = (data["status"] as? JsonPrimitive)?.contentOrNull
             )
         }
 
         // Error response: extract error message and code
-        val errorMessage = responseJson["error"]?.jsonPrimitive?.contentOrNull
-            ?: responseJson["message"]?.jsonPrimitive?.contentOrNull
+        val errorMessage = (responseJson["error"] as? JsonPrimitive)?.contentOrNull
+            ?: (responseJson["message"] as? JsonPrimitive)?.contentOrNull
             ?: "Relayer request failed with status ${response.status.value}"
         val errorCode = extractErrorCode(responseJson)
         val details = responseJson["data"] ?: responseJson

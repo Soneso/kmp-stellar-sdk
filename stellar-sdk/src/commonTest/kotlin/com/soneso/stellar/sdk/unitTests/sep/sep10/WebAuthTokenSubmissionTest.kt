@@ -573,4 +573,87 @@ class WebAuthTokenSubmissionTest {
         assertNull(authToken.iss)
         assertNull(authToken.sub)
     }
+
+    @Test
+    fun testSendSignedChallengeServerErrorWithoutBody() = runTest {
+        val mockClient = createMockClient("", HttpStatusCode.BadGateway)
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<TokenSubmissionException> {
+            webAuth.sendSignedChallenge(signedChallengeXdr)
+        }
+
+        // Empty body means no detail is appended to the status description
+        assertEquals("Server error (502): Bad Gateway", exception.message)
+    }
+
+    @Test
+    fun testSendSignedChallengeUnexpectedStatusWithoutBody() = runTest {
+        val mockClient = createMockClient("", HttpStatusCode(418, "I'm a teapot"))
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<TokenSubmissionException> {
+            webAuth.sendSignedChallenge(signedChallengeXdr)
+        }
+
+        assertEquals("Unexpected response (418): I'm a teapot", exception.message)
+    }
+
+    @Test
+    fun testSendSignedChallengeStatusAboveServerErrorRange() = runTest {
+        // 600 is outside the 500..599 range and must fall through to the unexpected-response arm
+        val mockClient = createMockClient("odd status", HttpStatusCode(600, "Odd"))
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = mockClient
+        )
+
+        val exception = assertFailsWith<TokenSubmissionException> {
+            webAuth.sendSignedChallenge(signedChallengeXdr)
+        }
+
+        assertTrue(exception.message?.contains("Unexpected response (600)") == true)
+        assertTrue(exception.message?.contains("odd status") == true)
+    }
+
+    @Test
+    fun testTokenSubmissionRequestSerializesTransactionField() = runTest {
+        val request = TokenSubmissionRequest(transaction = signedChallengeXdr)
+
+        assertEquals(signedChallengeXdr, request.transaction)
+
+        val encoded = Json.encodeToString(TokenSubmissionRequest.serializer(), request)
+        assertTrue(encoded.contains("\"transaction\""))
+
+        val decoded = Json.decodeFromString(TokenSubmissionRequest.serializer(), encoded)
+        assertEquals(request, decoded)
+    }
+
+    @Test
+    fun testTokenSubmissionResponseSerializesTokenField() = runTest {
+        val response = TokenSubmissionResponse(token = sampleJwt)
+
+        assertEquals(sampleJwt, response.token)
+
+        val encoded = Json.encodeToString(TokenSubmissionResponse.serializer(), response)
+        assertTrue(encoded.contains("\"token\""))
+
+        val decoded = Json.decodeFromString(TokenSubmissionResponse.serializer(), encoded)
+        assertEquals(response, decoded)
+    }
 }

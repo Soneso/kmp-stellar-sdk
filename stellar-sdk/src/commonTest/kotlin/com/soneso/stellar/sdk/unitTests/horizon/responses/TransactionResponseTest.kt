@@ -3,9 +3,12 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.Link
 import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -421,5 +424,160 @@ class TransactionResponseTest {
         assertNotNull(timeBounds)
         assertNull(timeBounds.minTime)
         assertNull(timeBounds.maxTime)
+    }
+
+    private fun directLinks() = TransactionResponse.Links(
+        self = Link("https://horizon.stellar.org/transactions/direct"),
+        account = Link("https://horizon.stellar.org/accounts/GSOURCE"),
+        ledger = Link("https://horizon.stellar.org/ledgers/900"),
+        operations = Link("https://horizon.stellar.org/transactions/direct/operations"),
+        effects = Link("https://horizon.stellar.org/transactions/direct/effects"),
+        precedes = Link("https://horizon.stellar.org/transactions?order=asc&cursor=direct"),
+        succeeds = Link("https://horizon.stellar.org/transactions?order=desc&cursor=direct")
+    )
+
+    private fun directTransaction() = TransactionResponse(
+        id = "direct-id",
+        pagingToken = "direct-token",
+        successful = true,
+        hash = "direct-hash",
+        ledger = 900L,
+        createdAt = "2024-02-03T04:05:06Z",
+        sourceAccount = "GSOURCE",
+        accountMuxed = "MSOURCE",
+        accountMuxedId = "11",
+        sourceAccountSequence = 3298702387052546L,
+        feeAccount = "GFEE",
+        feeAccountMuxed = "MFEE",
+        feeAccountMuxedId = "22",
+        feeCharged = 300L,
+        maxFee = 400L,
+        operationCount = 3,
+        envelopeXdr = "envelope-xdr",
+        resultXdr = "result-xdr",
+        resultMetaXdr = "result-meta-xdr",
+        feeMetaXdr = "fee-meta-xdr",
+        signatures = listOf("sigA", "sigB"),
+        preconditions = TransactionResponse.Preconditions(
+            timeBounds = TransactionResponse.Preconditions.TimeBounds("100", "200"),
+            ledgerBounds = TransactionResponse.Preconditions.LedgerBounds(10L, 20L),
+            minAccountSequence = 30L,
+            minAccountSequenceAge = 40L,
+            minAccountSequenceLedgerGap = 50L,
+            extraSigners = listOf("GEXTRA")
+        ),
+        feeBumpTransaction = TransactionResponse.FeeBumpTransaction("bump-hash", listOf("bump-sig")),
+        innerTransaction = TransactionResponse.InnerTransaction("inner-hash", listOf("inner-sig"), 250L),
+        memoType = "text",
+        memoBytes = "aGk=",
+        memoValue = "hi",
+        links = directLinks()
+    )
+
+    private fun minimalTransaction() = TransactionResponse(
+        id = "minimal-id",
+        pagingToken = "minimal-token",
+        successful = false,
+        hash = "minimal-hash",
+        ledger = 1L,
+        createdAt = "2024-02-03T04:05:06Z",
+        sourceAccount = "GSOURCE",
+        sourceAccountSequence = 2L,
+        feeAccount = "GSOURCE",
+        feeCharged = 100L,
+        maxFee = 100L,
+        operationCount = 0,
+        signatures = emptyList(),
+        memoType = "none",
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val tx = directTransaction()
+
+        val encoded = json.encodeToString(TransactionResponse.serializer(), tx)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "paging_token", "successful", "hash", "ledger", "created_at",
+                "source_account", "account_muxed", "account_muxed_id", "source_account_sequence",
+                "fee_account", "fee_account_muxed", "fee_account_muxed_id", "fee_charged",
+                "max_fee", "operation_count", "envelope_xdr", "result_xdr", "result_meta_xdr",
+                "fee_meta_xdr", "signatures", "preconditions", "fee_bump_transaction",
+                "inner_transaction", "memo_type", "memo_bytes", "memo", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("direct-id", encodedObject["id"]!!.jsonPrimitive.content)
+        assertEquals("direct-token", encodedObject["paging_token"]!!.jsonPrimitive.content)
+        assertEquals("GSOURCE", encodedObject["source_account"]!!.jsonPrimitive.content)
+        assertEquals("GFEE", encodedObject["fee_account"]!!.jsonPrimitive.content)
+        assertEquals("MSOURCE", encodedObject["account_muxed"]!!.jsonPrimitive.content)
+        assertEquals("MFEE", encodedObject["fee_account_muxed"]!!.jsonPrimitive.content)
+        assertEquals("hi", encodedObject["memo"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(TransactionResponse.serializer(), encoded)
+        assertEquals(tx, decoded)
+        assertEquals("direct-hash", decoded.hash)
+        assertEquals(3298702387052546L, decoded.sourceAccountSequence)
+        assertEquals(300L, decoded.feeCharged)
+        assertEquals(400L, decoded.maxFee)
+        assertEquals(listOf("sigA", "sigB"), decoded.signatures)
+        assertEquals(20L, decoded.preconditions?.ledgerBounds?.maxLedger)
+        assertEquals("bump-hash", decoded.feeBumpTransaction?.hash)
+        assertEquals(250L, decoded.innerTransaction?.maxFee)
+        assertEquals("aGk=", decoded.memoBytes)
+        assertEquals("https://horizon.stellar.org/ledgers/900", decoded.links.ledger.href)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val tx = minimalTransaction()
+
+        assertNull(tx.accountMuxed)
+        assertNull(tx.accountMuxedId)
+        assertNull(tx.feeAccountMuxed)
+        assertNull(tx.feeAccountMuxedId)
+        assertNull(tx.envelopeXdr)
+        assertNull(tx.resultXdr)
+        assertNull(tx.resultMetaXdr)
+        assertNull(tx.feeMetaXdr)
+        assertNull(tx.preconditions)
+        assertNull(tx.feeBumpTransaction)
+        assertNull(tx.innerTransaction)
+        assertNull(tx.memoBytes)
+        assertNull(tx.memoValue)
+
+        val encodedObject = json.parseToJsonElement(
+            json.encodeToString(TransactionResponse.serializer(), tx)
+        ).jsonObject
+        assertEquals(
+            setOf(
+                "id", "paging_token", "successful", "hash", "ledger", "created_at",
+                "source_account", "source_account_sequence", "fee_account", "fee_charged",
+                "max_fee", "operation_count", "signatures", "memo_type", "_links"
+            ),
+            encodedObject.keys
+        )
+
+        val decoded = json.decodeFromString(
+            TransactionResponse.serializer(),
+            json.encodeToString(TransactionResponse.serializer(), tx)
+        )
+        assertEquals(tx, decoded)
+        assertFalse(decoded.successful)
+        assertTrue(decoded.signatures.isEmpty())
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val tx = directTransaction()
+        assertNotEquals(tx, minimalTransaction())
+        assertNotEquals(tx, tx.copy(memoValue = null))
+        assertNotEquals(tx, tx.copy(sourceAccountSequence = tx.sourceAccountSequence + 1))
+        assertEquals(tx, directTransaction())
+        assertEquals(tx.hashCode(), directTransaction().hashCode())
     }
 }

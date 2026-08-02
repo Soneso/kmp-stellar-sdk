@@ -5,7 +5,10 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep38
 
 import com.soneso.stellar.sdk.sep.sep38.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -179,5 +182,66 @@ class Sep38PricesResponseTest {
         assertEquals("stellar:BTC:GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH", buyAsset.asset)
         assertEquals("0.000023456789", buyAsset.price)
         assertEquals(12, buyAsset.decimals)
+    }
+
+    @Test
+    fun testSerializeBuyAssetsBuiltFromConstructor() {
+        val response = Sep38PricesResponse(
+            buyAssets = listOf(
+                Sep38BuyAsset(asset = "iso4217:BRL", price = "0.18", decimals = 2),
+                Sep38BuyAsset(
+                    asset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+                    price = "5.42",
+                    decimals = 7
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(response)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(setOf("buy_assets"), encodedObject.keys)
+        assertEquals(
+            setOf("asset", "price", "decimals"),
+            encodedObject["buy_assets"]!!.jsonArray[0].jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString<Sep38PricesResponse>(encoded)
+        assertEquals(response, decoded)
+        assertNull(decoded.sellAssets)
+        assertNotNull(decoded.buyAssets)
+        assertEquals(7, decoded.buyAssets!![1].decimals)
+    }
+
+    @Test
+    fun testSerializeSellAssetsBuiltFromConstructor() {
+        val response = Sep38PricesResponse(
+            sellAssets = listOf(
+                Sep38SellAsset(asset = "iso4217:BRL", price = "5.42", decimals = 2)
+            )
+        )
+
+        val encoded = json.encodeToString(response)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(setOf("sell_assets"), encodedObject.keys)
+        assertEquals(
+            setOf("asset", "price", "decimals"),
+            encodedObject["sell_assets"]!!.jsonArray[0].jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString<Sep38PricesResponse>(encoded)
+        assertEquals(response, decoded)
+        assertNull(decoded.buyAssets)
+        assertEquals("5.42", decoded.sellAssets!![0].price)
+    }
+
+    @Test
+    fun testDeserializeEmptyResponseLeavesBothListsNull() {
+        val response = json.decodeFromString<Sep38PricesResponse>("{}")
+
+        assertNull(response.buyAssets)
+        assertNull(response.sellAssets)
+        assertEquals(Sep38PricesResponse(), response)
     }
 }

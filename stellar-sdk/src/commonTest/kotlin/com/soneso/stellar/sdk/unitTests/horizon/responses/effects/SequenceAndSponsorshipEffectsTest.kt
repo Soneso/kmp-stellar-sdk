@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_3
@@ -26,6 +27,9 @@ class SequenceAndSponsorshipEffectsTest {
             newSequence = 1234567890123L
         )
         assertEquals(1234567890123L, effect.newSequence)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -44,6 +48,9 @@ class SequenceAndSponsorshipEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<SequenceBumpedEffectResponse>(effect)
         assertEquals(9999999999L, effect.newSequence)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -65,6 +72,9 @@ class SequenceAndSponsorshipEffectsTest {
             sponsor = TEST_ACCOUNT_2
         )
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -83,6 +93,9 @@ class SequenceAndSponsorshipEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<AccountSponsorshipCreatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -105,6 +118,9 @@ class SequenceAndSponsorshipEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -125,6 +141,9 @@ class SequenceAndSponsorshipEffectsTest {
         assertIs<AccountSponsorshipUpdatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -146,6 +165,9 @@ class SequenceAndSponsorshipEffectsTest {
             formerSponsor = TEST_ACCOUNT_2
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -164,6 +186,9 @@ class SequenceAndSponsorshipEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<AccountSponsorshipRemovedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

@@ -1,7 +1,10 @@
 package com.soneso.stellar.sdk.unitTests
 
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 class FeeBumpTransactionTest {
@@ -437,5 +440,155 @@ class FeeBumpTransactionTest {
         }
 
         assertTrue(exception.message!!.contains("not a fee bump"))
+    }
+
+    // ========== V0 inner transaction conversion ==========
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun testCreateWithBaseFeeConvertsV0InnerTransactionToV1() = runTest {
+        val source = KeyPair.fromSecretSeed("SCH27VUZZ6UAKB67BDNF6FA42YMBMQCBKXWGMFD5TZ6S5ZZCZFLRXKHS")
+
+        val v0Tx = TransactionV0Xdr(
+            sourceAccountEd25519 = Uint256Xdr(source.getPublicKey()),
+            fee = Uint32Xdr(AbstractTransaction.MIN_BASE_FEE.toUInt()),
+            seqNum = SequenceNumberXdr(Int64Xdr(2908908335136768L)),
+            timeBounds = TimeBoundsXdr(TimePointXdr(Uint64Xdr(10UL)), TimePointXdr(Uint64Xdr(11UL))),
+            memo = MemoXdr.Void,
+            operations = listOf(
+                PaymentOperation(
+                    destination = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+                    asset = AssetTypeNative,
+                    amount = "200.0000000"
+                ).toXdr()
+            ),
+            ext = TransactionV0ExtXdr.Void
+        )
+        val v0Envelope = TransactionEnvelopeXdr.V0(
+            TransactionV0EnvelopeXdr(tx = v0Tx, signatures = emptyList())
+        )
+        val writer = XdrWriter()
+        v0Envelope.encode(writer)
+        val v0Base64 = Base64.encode(writer.toByteArray())
+
+        val v0InnerTransaction = Transaction.fromEnvelopeXdr(v0Base64, Network.TESTNET)
+        v0InnerTransaction.sign(source)
+
+        val feeBump = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = v0InnerTransaction
+        )
+
+        // Fee bump wrapping is only valid over V1 envelopes; the rebuilt inner transaction
+        // must serialize as V1 while keeping the source account's original signature.
+        val innerEnvelope = feeBump.innerTransaction.toEnvelopeXdr()
+        assertTrue(innerEnvelope is TransactionEnvelopeXdr.V1)
+        assertEquals(source.getAccountId(), feeBump.innerTransaction.sourceAccount)
+        assertEquals(1, feeBump.innerTransaction.signatures.size)
+        assertEquals(AbstractTransaction.MIN_BASE_FEE * 4, feeBump.fee)
+    }
+
+    // ========== Soroban resource fee accounted for in base fee calculation ==========
+
+    @Test
+    fun testCreateWithBaseFeeAccountsForSorobanResourceFee() = runTest {
+        val source = KeyPair.fromSecretSeed("SCH27VUZZ6UAKB67BDNF6FA42YMBMQCBKXWGMFD5TZ6S5ZZCZFLRXKHS")
+        val account = Account(source.getAccountId(), 2908908335136768L)
+        val sorobanData = SorobanTransactionDataXdr(
+            ext = SorobanTransactionDataExtXdr.Void,
+            resources = SorobanResourcesXdr(
+                footprint = LedgerFootprintXdr(readOnly = emptyList(), readWrite = emptyList()),
+                instructions = Uint32Xdr(100000u),
+                diskReadBytes = Uint32Xdr(1024u),
+                writeBytes = Uint32Xdr(512u)
+            ),
+            resourceFee = Int64Xdr(5000L)
+        )
+
+        val inner = TransactionBuilder(account, Network.TESTNET)
+            .addOperation(
+                PaymentOperation(
+                    destination = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+                    asset = AssetTypeNative,
+                    amount = "200.0000000"
+                )
+            )
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .setSorobanData(sorobanData)
+            .addPreconditions(TransactionPreconditions(timeBounds = TimeBounds(10, 11)))
+            .build()
+        inner.sign(source)
+
+        val feeBump = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner
+        )
+
+        // inner.fee = baseFee(100) + resourceFee(5000) = 5100.
+        // actualInnerBaseFee = ceil((5100 - 5000) / 1) = 100, satisfied by baseFee=200.
+        // feeBump.fee = baseFee(200) * (1 op + 1) + resourceFee(5000) = 400 + 5000 = 5400.
+        assertEquals(5400L, feeBump.fee)
+    }
+
+    // ========== Equality (all fields) ==========
+
+    @Test
+    fun testEqualsReflexiveAndNullAndDifferentType() = runTest {
+        val inner = createInnerTransaction()
+        val feeBump = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner
+        )
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        val selfEqual = feeBump.equals(feeBump)
+        assertTrue(selfEqual)
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        val equalsNull = feeBump.equals(null)
+        assertFalse(equalsNull)
+
+        @Suppress("EqualsBetweenInconvertibleTypes")
+        assertFalse(feeBump.equals("not a fee bump transaction"))
+    }
+
+    @Test
+    fun testNotEqualsDifferentFeeSource() = runTest {
+        val inner = createInnerTransaction()
+
+        val feeBump1 = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner
+        )
+        val feeBump2 = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner
+        )
+
+        assertNotEquals(feeBump1, feeBump2)
+    }
+
+    @Test
+    fun testNotEqualsDifferentInnerTransaction() = runTest {
+        val inner1 = createInnerTransaction()
+        val inner2 = createInnerTransaction(baseFee = AbstractTransaction.MIN_BASE_FEE + 1)
+
+        val feeBump1 = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner1
+        )
+        val feeBump2 = FeeBumpTransaction.createWithBaseFee(
+            feeSource = "GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3",
+            baseFee = AbstractTransaction.MIN_BASE_FEE * 2,
+            innerTransaction = inner2
+        )
+
+        assertNotEquals(feeBump1, feeBump2)
     }
 }

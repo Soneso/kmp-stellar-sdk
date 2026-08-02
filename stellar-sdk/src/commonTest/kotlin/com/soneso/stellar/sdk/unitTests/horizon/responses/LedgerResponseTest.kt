@@ -3,8 +3,11 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.LedgerResponse
 import com.soneso.stellar.sdk.horizon.responses.Link
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -109,7 +112,7 @@ class LedgerResponseTest {
     }
 
     @Test
-    fun testLedgerResponseLinksInnerClassFullCoverage() {
+    fun testLedgerResponseLinksProperties() {
         val ledgerResponseJson = """
         {
             "id": "e73064774d9ad4de4d0e4e28b5b16f8dcc5169b3b24bc5b5d2c5b52e2b65a144",
@@ -422,5 +425,118 @@ class LedgerResponseTest {
         assertEquals(0, ledger.maxTxSetSize)
         assertEquals(0, ledger.protocolVersion)
         assertEquals("", ledger.headerXdr)
+    }
+
+    private fun directLinks() = LedgerResponse.Links(
+        self = Link("https://horizon.stellar.org/ledgers/51000"),
+        transactions = Link("https://horizon.stellar.org/ledgers/51000/transactions{?cursor}", true),
+        operations = Link("https://horizon.stellar.org/ledgers/51000/operations"),
+        payments = Link("https://horizon.stellar.org/ledgers/51000/payments"),
+        effects = Link("https://horizon.stellar.org/ledgers/51000/effects")
+    )
+
+    private fun directLedger() = LedgerResponse(
+        id = "direct-ledger-id",
+        pagingToken = "219043332096",
+        hash = "direct-ledger-hash",
+        prevHash = "direct-previous-hash",
+        sequence = 51000L,
+        successfulTransactionCount = 12,
+        failedTransactionCount = 3,
+        operationCount = 40,
+        txSetOperationCount = 45,
+        closedAt = "2024-04-05T06:07:08Z",
+        totalCoins = "105443902087.3472865",
+        feePool = "18798243.2374623",
+        baseFeeInStroops = "100",
+        baseReserveInStroops = "5000000",
+        maxTxSetSize = 1000,
+        protocolVersion = 21,
+        headerXdr = "direct-header-xdr",
+        links = directLinks()
+    )
+
+    private fun minimalLedger() = LedgerResponse(
+        id = "minimal-ledger-id",
+        pagingToken = "1",
+        hash = "minimal-ledger-hash",
+        sequence = 1L,
+        closedAt = "2015-09-30T17:15:54Z",
+        totalCoins = "100000000000.0000000",
+        feePool = "0.0000000",
+        baseFeeInStroops = "100",
+        baseReserveInStroops = "100000000",
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val ledger = directLedger()
+
+        val encoded = json.encodeToString(LedgerResponse.serializer(), ledger)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "paging_token", "hash", "prev_hash", "sequence",
+                "successful_transaction_count", "failed_transaction_count", "operation_count",
+                "tx_set_operation_count", "closed_at", "total_coins", "fee_pool",
+                "base_fee_in_stroops", "base_reserve_in_stroops", "max_tx_set_size",
+                "protocol_version", "header_xdr", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("direct-ledger-hash", encodedObject["hash"]!!.jsonPrimitive.content)
+        assertEquals("direct-previous-hash", encodedObject["prev_hash"]!!.jsonPrimitive.content)
+        assertEquals("12", encodedObject["successful_transaction_count"]!!.jsonPrimitive.content)
+        assertEquals("3", encodedObject["failed_transaction_count"]!!.jsonPrimitive.content)
+        assertEquals("40", encodedObject["operation_count"]!!.jsonPrimitive.content)
+        assertEquals("45", encodedObject["tx_set_operation_count"]!!.jsonPrimitive.content)
+        assertEquals("100", encodedObject["base_fee_in_stroops"]!!.jsonPrimitive.content)
+        assertEquals("5000000", encodedObject["base_reserve_in_stroops"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(LedgerResponse.serializer(), encoded)
+        assertEquals(ledger, decoded)
+        assertEquals(51000L, decoded.sequence)
+        assertEquals("219043332096", decoded.pagingToken)
+        assertEquals("2024-04-05T06:07:08Z", decoded.closedAt)
+        assertEquals("105443902087.3472865", decoded.totalCoins)
+        assertEquals(21, decoded.protocolVersion)
+        assertEquals(1000, decoded.maxTxSetSize)
+        assertTrue(decoded.links.transactions.templated == true)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val ledger = minimalLedger()
+
+        assertNull(ledger.prevHash)
+        assertNull(ledger.successfulTransactionCount)
+        assertNull(ledger.failedTransactionCount)
+        assertNull(ledger.operationCount)
+        assertNull(ledger.txSetOperationCount)
+        assertNull(ledger.maxTxSetSize)
+        assertNull(ledger.protocolVersion)
+        assertNull(ledger.headerXdr)
+
+        val encoded = json.encodeToString(LedgerResponse.serializer(), ledger)
+        assertEquals(
+            setOf(
+                "id", "paging_token", "hash", "sequence", "closed_at", "total_coins",
+                "fee_pool", "base_fee_in_stroops", "base_reserve_in_stroops", "_links"
+            ),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+        assertEquals(ledger, json.decodeFromString(LedgerResponse.serializer(), encoded))
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val ledger = directLedger()
+        assertNotEquals(ledger, minimalLedger())
+        assertNotEquals(ledger, ledger.copy(headerXdr = null))
+        assertNotEquals(ledger, ledger.copy(sequence = ledger.sequence + 1))
+        assertEquals(ledger, directLedger())
+        assertEquals(ledger.hashCode(), directLedger().hashCode())
     }
 }

@@ -331,4 +331,111 @@ class GetCustomerInfoResponseTest {
         assertEquals("string", mobileNumber.type)
         assertEquals(FieldStatus.VERIFICATION_REQUIRED, mobileNumber.status)
     }
+
+    @Test
+    fun testResponseRoundTripsThroughJson() {
+        val response = GetCustomerInfoResponse(
+            id = "d1ce2f48-3ff1-495d-9240-7a50d806cfed",
+            status = CustomerStatus.NEEDS_INFO,
+            fields = mapOf(
+                "mobile_number" to GetCustomerInfoField(
+                    type = "string",
+                    description = "phone number of the customer",
+                    choices = listOf("+14155551234", "+493012345678"),
+                    optional = false
+                )
+            ),
+            providedFields = mapOf(
+                "email_address" to GetCustomerInfoProvidedField(
+                    type = "string",
+                    description = "email address of the customer",
+                    choices = listOf("personal", "work"),
+                    optional = true,
+                    status = FieldStatus.REJECTED,
+                    error = "the domain is not accepted"
+                )
+            ),
+            message = "Additional information is required"
+        )
+
+        val encoded = json.encodeToString(GetCustomerInfoResponse.serializer(), response)
+
+        // SEP-12 wire name for providedFields is snake_case
+        assertTrue(encoded.contains("\"provided_fields\""), "provided_fields missing: $encoded")
+        assertTrue(encoded.contains("\"choices\""), "choices missing: $encoded")
+        assertTrue(encoded.contains("\"optional\""), "optional missing: $encoded")
+
+        val decoded = json.decodeFromString<GetCustomerInfoResponse>(encoded)
+
+        assertEquals(response, decoded)
+
+        val mobileNumber = decoded.fields!!["mobile_number"]
+        assertNotNull(mobileNumber)
+        assertEquals("string", mobileNumber.type)
+        assertEquals("phone number of the customer", mobileNumber.description)
+        assertEquals(listOf("+14155551234", "+493012345678"), mobileNumber.choices)
+        assertEquals(false, mobileNumber.optional)
+
+        val emailAddress = decoded.providedFields!!["email_address"]
+        assertNotNull(emailAddress)
+        assertEquals("string", emailAddress.type)
+        assertEquals("email address of the customer", emailAddress.description)
+        assertEquals(listOf("personal", "work"), emailAddress.choices)
+        assertEquals(true, emailAddress.optional)
+        assertEquals(FieldStatus.REJECTED, emailAddress.status)
+        assertEquals("the domain is not accepted", emailAddress.error)
+        assertEquals("Additional information is required", decoded.message)
+    }
+
+    @Test
+    fun testResponseWithStatusOnlyLeavesOtherPropertiesNull() {
+        val response = GetCustomerInfoResponse(status = CustomerStatus.ACCEPTED)
+
+        assertNull(response.id)
+        assertNull(response.fields)
+        assertNull(response.providedFields)
+        assertNull(response.message)
+
+        val encoded = json.encodeToString(GetCustomerInfoResponse.serializer(), response)
+
+        assertEquals("""{"status":"ACCEPTED"}""", encoded)
+        assertEquals(response, json.decodeFromString<GetCustomerInfoResponse>(encoded))
+    }
+
+    @Test
+    fun testFieldDescriptorsWithoutOptionalMetadata() {
+        val field = GetCustomerInfoField(
+            type = "binary",
+            description = "a clear photo of the government issued ID"
+        )
+        val providedField = GetCustomerInfoProvidedField(
+            type = "binary",
+            description = "a clear photo of the government issued ID"
+        )
+
+        assertNull(field.choices)
+        assertNull(field.optional)
+        assertNull(providedField.choices)
+        assertNull(providedField.optional)
+        assertNull(providedField.status)
+        assertNull(providedField.error)
+
+        val encodedField = json.encodeToString(GetCustomerInfoField.serializer(), field)
+        assertEquals(
+            """{"type":"binary","description":"a clear photo of the government issued ID"}""",
+            encodedField
+        )
+        assertEquals(field, json.decodeFromString<GetCustomerInfoField>(encodedField))
+
+        val encodedProvidedField =
+            json.encodeToString(GetCustomerInfoProvidedField.serializer(), providedField)
+        assertEquals(
+            """{"type":"binary","description":"a clear photo of the government issued ID"}""",
+            encodedProvidedField
+        )
+        assertEquals(
+            providedField,
+            json.decodeFromString<GetCustomerInfoProvidedField>(encodedProvidedField)
+        )
+    }
 }

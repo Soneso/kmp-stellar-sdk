@@ -855,4 +855,371 @@ class QuoteServiceTest {
         }
         assertEquals("Invalid token", exception.error)
     }
+
+    // fromDomain() tests
+
+    private val tomlWithQuoteServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        ANCHOR_QUOTE_SERVER="https://quotes.anchor.example.com/sep38"
+    """.trimIndent()
+
+    private val tomlWithoutQuoteServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        TRANSFER_SERVER="https://anchor.example.com/sep6"
+    """.trimIndent()
+
+    private fun createTomlAndInfoMockClient(
+        tomlContent: String,
+        onInfoRequest: (Url) -> Unit = {}
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains("/.well-known/stellar.toml") -> respond(
+                    content = tomlContent,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+
+                request.url.encodedPath.endsWith("/info") -> {
+                    onInfoRequest(request.url)
+                    respond(
+                        content = """{"assets": [{"asset": "iso4217:BRL"}]}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+
+                else -> respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    @Test
+    fun testFromDomainUsesAnchorQuoteServerFromToml() = runTest {
+        var infoUrl: Url? = null
+        val mockClient = createTomlAndInfoMockClient(tomlWithQuoteServer) { infoUrl = it }
+
+        val service = QuoteService.fromDomain("anchor.example.com", mockClient)
+        val response = service.info()
+
+        assertEquals(1, response.assets.size)
+        assertEquals("iso4217:BRL", response.assets[0].asset)
+        assertNotNull(infoUrl)
+        assertEquals("quotes.anchor.example.com", infoUrl!!.host)
+        assertEquals("/sep38/info", infoUrl!!.encodedPath)
+    }
+
+    @Test
+    fun testFromDomainWithoutAnchorQuoteServer() = runTest {
+        val mockClient = createTomlAndInfoMockClient(tomlWithoutQuoteServer)
+
+        val exception = assertFailsWith<IllegalStateException> {
+            QuoteService.fromDomain("anchor.example.com", mockClient)
+        }
+        assertEquals(
+            "ANCHOR_QUOTE_SERVER not found in stellar.toml for domain: anchor.example.com",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testFromDomainForwardsCustomHeadersToTomlFetch() = runTest {
+        var tomlHeaderValue: String? = null
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/.well-known/stellar.toml")) {
+                tomlHeaderValue = request.headers["X-Client-Name"]
+                respond(
+                    content = tomlWithQuoteServer,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        val mockClient = HttpClient(mockEngine)
+
+        QuoteService.fromDomain(
+            domain = "anchor.example.com",
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        assertEquals("kmp-stellar-sdk", tomlHeaderValue)
+    }
+
+    // Custom header and optional parameter handling
+
+    @Test
+    fun testCustomRequestHeadersAreSent() = runTest {
+        var customHeader: String? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            customHeader = request.headers["X-Client-Name"]
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = """{"assets": [{"asset": "iso4217:USD"}]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = QuoteService(
+            serviceAddress = serviceAddress,
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        service.info()
+
+        assertEquals("kmp-stellar-sdk", customHeader)
+        assertNull(authorizationHeader)
+    }
+
+    @Test
+    fun testPricesWithDeliveryMethodsAndCountryCode() = runTest {
+        var parameters: Parameters? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = """{"buy_assets": [{"asset": "iso4217:BRL", "price": "5.42", "decimals": 2}]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val response = service.prices(
+            sellAsset = "stellar:USDC:GA5Z",
+            sellAmount = "100",
+            sellDeliveryMethod = "ACH",
+            buyDeliveryMethod = "PIX",
+            countryCode = "BR",
+            jwtToken = jwtToken
+        )
+
+        assertEquals(1, response.buyAssets!!.size)
+        assertEquals("ACH", parameters!!["sell_delivery_method"])
+        assertEquals("PIX", parameters!!["buy_delivery_method"])
+        assertEquals("BR", parameters!!["country_code"])
+        assertEquals("Bearer $jwtToken", authorizationHeader)
+    }
+
+    @Test
+    fun testPricesOmitsUnsetOptionalParameters() = runTest {
+        var parameters: Parameters? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = """{"sell_assets": [{"asset": "iso4217:BRL", "price": "0.18", "decimals": 2}]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = QuoteService(serviceAddress, mockClient)
+
+        service.prices(buyAsset = "stellar:USDC:GA5Z", buyAmount = "100")
+
+        assertEquals("stellar:USDC:GA5Z", parameters!!["buy_asset"])
+        assertEquals("100", parameters!!["buy_amount"])
+        assertNull(parameters!!["sell_asset"])
+        assertNull(parameters!!["sell_delivery_method"])
+        assertNull(parameters!!["buy_delivery_method"])
+        assertNull(parameters!!["country_code"])
+        assertNull(authorizationHeader)
+    }
+
+    @Test
+    fun testPriceSendsJwtToken() = runTest {
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = """
+                    {
+                        "total_price": "0.20",
+                        "price": "0.18",
+                        "sell_amount": "100",
+                        "buy_amount": "500",
+                        "fee": {"total": "10.00", "asset": "stellar:USDC:GA5Z"}
+                    }
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val response = service.price(
+            context = "sep31",
+            sellAsset = "stellar:USDC:GA5Z",
+            buyAsset = "iso4217:BRL",
+            buyAmount = "500",
+            jwtToken = jwtToken
+        )
+
+        assertEquals("500", response.buyAmount)
+        assertEquals("Bearer $jwtToken", authorizationHeader)
+    }
+
+    @Test
+    fun testPriceOmitsUnsetOptionalParameters() = runTest {
+        var parameters: Parameters? = null
+        val mockEngine = MockEngine { request ->
+            parameters = request.url.parameters
+            respond(
+                content = """
+                    {
+                        "total_price": "5.42",
+                        "price": "5.00",
+                        "sell_amount": "542",
+                        "buy_amount": "100",
+                        "fee": {"total": "42.00", "asset": "iso4217:BRL"}
+                    }
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = QuoteService(serviceAddress, mockClient)
+
+        service.price(
+            context = "sep24",
+            sellAsset = "iso4217:BRL",
+            buyAsset = "stellar:USDC:GA5Z",
+            sellAmount = "542"
+        )
+
+        assertEquals("sep24", parameters!!["context"])
+        assertEquals("542", parameters!!["sell_amount"])
+        assertNull(parameters!!["buy_amount"])
+        assertNull(parameters!!["sell_delivery_method"])
+        assertNull(parameters!!["buy_delivery_method"])
+        assertNull(parameters!!["country_code"])
+    }
+
+    // Unmapped status codes and error message extraction
+
+    @Test
+    fun testInfoServerErrorRaisesUnknownResponse() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "Internal server error"}""",
+            statusCode = HttpStatusCode.InternalServerError,
+            expectedPath = "/info"
+        )
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep38UnknownResponseException> {
+            service.info()
+        }
+        assertEquals(500, exception.statusCode)
+        assertEquals("""{"error": "Internal server error"}""", exception.responseBody)
+    }
+
+    @Test
+    fun testGetQuoteUnauthorizedRaisesUnknownResponse() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "Session expired",
+            statusCode = HttpStatusCode.Unauthorized,
+            expectedPath = "/quote/$quoteId"
+        )
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep38UnknownResponseException> {
+            service.getQuote(quoteId, jwtToken)
+        }
+        assertEquals(401, exception.statusCode)
+        assertEquals("Session expired", exception.responseBody)
+    }
+
+    @Test
+    fun testErrorWithoutErrorKeyUsesRawBody() = runTest {
+        val body = """{"detail": "sell_amount is required"}"""
+        val mockClient = createMockClient(
+            responseContent = body,
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/prices"
+        )
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep38BadRequestException> {
+            service.prices(sellAsset = "stellar:USDC:GA5Z", sellAmount = "100")
+        }
+        assertEquals(body, exception.error)
+    }
+
+    @Test
+    fun testNonJsonErrorBodyUsesRawBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "Quote not available",
+            statusCode = HttpStatusCode.NotFound,
+            expectedPath = "/quote/$quoteId"
+        )
+        val service = QuoteService(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep38NotFoundException> {
+            service.getQuote(quoteId, jwtToken)
+        }
+        assertEquals("Quote not available", exception.error)
+    }
 }

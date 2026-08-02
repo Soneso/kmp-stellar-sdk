@@ -2,21 +2,29 @@ package com.soneso.stellar.sdk.unitTests.rpc
 
 import com.soneso.stellar.sdk.rpc.*
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.SorobanContractParserException
 import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
+import com.soneso.stellar.sdk.rpc.requests.GetLedgersRequest
+import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.TransactionStatus
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import io.ktor.serialization.JsonConvertException
+import io.ktor.serialization.ContentConvertException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 
@@ -264,6 +272,150 @@ class SorobanServerTest {
             transaction.sign(sourceKeypair)
             return transaction
         }
+
+        /** A valid contract strkey used as the subject of contract-scoped calls. */
+        private const val TEST_CONTRACT_ID = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
+
+        /** A valid account strkey used as the subject of account-scoped calls. */
+        private const val TEST_ACCOUNT_ID = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ"
+
+        /** A valid asset issuer distinct from [TEST_ACCOUNT_ID]. */
+        private const val TEST_ISSUER_ID = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+
+        /** Hex-encoded 32-byte WASM hash. */
+        private const val TEST_WASM_ID =
+            "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+
+        /**
+         * Builds WASM bytecode that [com.soneso.stellar.sdk.contract.SorobanContractParser]
+         * accepts: a contract spec section, an environment meta section and a contract meta
+         * section, each tight against the next marker.
+         */
+        private fun parseableContractByteCode(
+            functionName: String = "hello",
+            metaKey: String = "rsdkver",
+            metaValue: String = "22.0.0"
+        ): ByteArray {
+            fun encoded(block: (XdrWriter) -> Unit): ByteArray {
+                val writer = XdrWriter()
+                block(writer)
+                return writer.toByteArray()
+            }
+
+            val specBytes = encoded { writer ->
+                SCSpecEntryXdr.FunctionV0(
+                    SCSpecFunctionV0Xdr(
+                        doc = "",
+                        name = SCSymbolXdr(functionName),
+                        inputs = emptyList(),
+                        outputs = emptyList()
+                    )
+                ).encode(writer)
+            }
+            val envMetaBytes = encoded { writer ->
+                SCEnvMetaEntryXdr.InterfaceVersion(
+                    SCEnvMetaEntryInterfaceVersionXdr(
+                        protocol = Uint32Xdr(22u),
+                        preRelease = Uint32Xdr(0u)
+                    )
+                ).encode(writer)
+            }
+            val metaBytes = encoded { writer ->
+                SCMetaEntryXdr.V0(SCMetaV0Xdr(key = metaKey, `val` = metaValue)).encode(writer)
+            }
+
+            return "contractenvmetav0".encodeToByteArray() + envMetaBytes +
+                "contractmetav0".encodeToByteArray() + metaBytes +
+                "contractspecv0".encodeToByteArray() + specBytes
+        }
+
+        /** Base64 XDR of an account ledger entry carrying [sequence]. */
+        private fun accountEntryXdr(accountId: String, sequence: Long): String {
+            val entry = AccountEntryXdr(
+                accountId = KeyPair.fromAccountId(accountId).getXdrAccountId(),
+                balance = Int64Xdr(100_000_000L),
+                seqNum = SequenceNumberXdr(Int64Xdr(sequence)),
+                numSubEntries = Uint32Xdr(0u),
+                inflationDest = null,
+                flags = Uint32Xdr(0u),
+                homeDomain = String32Xdr(""),
+                thresholds = ThresholdsXdr(byteArrayOf(1, 0, 0, 0)),
+                signers = emptyList(),
+                ext = AccountEntryExtXdr.Void
+            )
+            return LedgerEntryDataXdr.Account(entry).toXdrBase64()
+        }
+
+        /** Base64 XDR of a contract data ledger entry holding [value]. */
+        private fun contractDataEntryXdr(
+            contractAddress: SCAddressXdr,
+            key: SCValXdr,
+            value: SCValXdr,
+            durability: ContractDataDurabilityXdr = ContractDataDurabilityXdr.PERSISTENT
+        ): String {
+            val entry = ContractDataEntryXdr(
+                ext = ExtensionPointXdr.Void,
+                contract = contractAddress,
+                key = key,
+                durability = durability,
+                `val` = value
+            )
+            return LedgerEntryDataXdr.ContractData(entry).toXdrBase64()
+        }
+
+        /** Base64 XDR of a contract code ledger entry holding [code]. */
+        private fun contractCodeEntryXdr(code: ByteArray, wasmIdHex: String = TEST_WASM_ID): String {
+            val entry = ContractCodeEntryXdr(
+                ext = ContractCodeEntryExtXdr.Void,
+                hash = HashXdr(Util.hexToBytes(wasmIdHex)),
+                code = code
+            )
+            return LedgerEntryDataXdr.ContractCode(entry).toXdrBase64()
+        }
+
+        /** SCVal map shaped like a Stellar Asset Contract balance entry. */
+        private fun sacBalanceValue(
+            amount: BigInteger,
+            authorized: Boolean,
+            clawback: Boolean
+        ): SCValXdr = Scv.toMap(
+            linkedMapOf(
+                Scv.toSymbol("amount") to Scv.toInt128(amount),
+                Scv.toSymbol("authorized") to Scv.toBoolean(authorized),
+                Scv.toSymbol("clawback") to Scv.toBoolean(clawback)
+            )
+        )
+
+        /**
+         * Builds a JSON-RPC getLedgerEntries response body carrying a single entry.
+         */
+        private fun ledgerEntriesResult(
+            keyXdr: String,
+            entryXdr: String,
+            lastModifiedLedger: Long = 1234L,
+            liveUntilLedger: Long? = 5678L,
+            latestLedger: Long = 14245L
+        ): String {
+            val liveUntil = if (liveUntilLedger == null) {
+                ""
+            } else {
+                ",\"liveUntilLedgerSeq\":$liveUntilLedger"
+            }
+            return """{
+  "jsonrpc": "2.0",
+  "id": "entries-id",
+  "result": {
+    "entries": [
+      {
+        "key": "$keyXdr",
+        "xdr": "$entryXdr",
+        "lastModifiedLedgerSeq": $lastModifiedLedger$liveUntil
+      }
+    ],
+    "latestLedger": $latestLedger
+  }
+}"""
+        }
     }
 
     // ========== Helper Methods ==========
@@ -301,6 +453,40 @@ class SorobanServerTest {
     }
 
     /**
+     * Creates a mock server that answers consecutive requests with consecutive
+     * [responses]. Once the list is exhausted the last entry is repeated.
+     *
+     * The request bodies seen by the engine are appended to [capturedRequests].
+     */
+    private fun createSequencedMockServer(
+        vararg responses: String,
+        capturedRequests: MutableList<String> = mutableListOf()
+    ): SorobanServer {
+        var index = 0
+        val mockEngine = MockEngine { request ->
+            capturedRequests.add(request.body.toByteArray().decodeToString())
+            val body = responses[minOf(index, responses.size - 1)]
+            index++
+            respond(
+                content = ByteReadChannel(body),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                    prettyPrint = false
+                    encodeDefaults = false
+                })
+            }
+        }
+        return SorobanServer(TEST_SERVER_URL, client)
+    }
+
+    /**
      * Creates a mock HTTP client whose engine throws the given failure.
      */
     private fun createThrowingMockClient(failure: Throwable): HttpClient {
@@ -318,27 +504,48 @@ class SorobanServerTest {
     // ========== Constructor and Basic Tests ==========
 
     @Test
-    fun testConstructor_createsServerWithUrl() {
-        // Given/When: Creating server with URL
-        val server = SorobanServer(TEST_SERVER_URL)
+    fun testConstructor_createsServerWithUrl() = runTest {
+        // Given: A client that records where the request was sent
+        var requestedUrl: Url? = null
+        val client = HttpClient(MockEngine { request ->
+            requestedUrl = request.url
+            respond(
+                content = ByteReadChannel(HEALTH_RESPONSE),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }) {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = true }) }
+        }
 
-        // Then: Server is created successfully
-        assertNotNull(server)
+        // When: Making a call through a server built with the URL
+        val server = SorobanServer(TEST_SERVER_URL, client)
+        server.getHealth()
 
-        // Cleanup
+        // Then: The constructor URL is the one actually used. Compared component-wise because
+        // Url.toString() elides a port that is the protocol default, as :443 is for https.
+        val url = assertNotNull(requestedUrl)
+        assertEquals("https", url.protocol.name)
+        assertEquals("soroban-testnet.stellar.org", url.host)
+        assertEquals(443, url.port)
+
         server.close()
     }
 
     @Test
     fun testClose_closesHttpClient() {
-        // Given: Server instance
-        val server = SorobanServer(TEST_SERVER_URL)
+        // Given: Server built over a client whose lifecycle is observable
+        val client = createThrowingMockClient(Exception("unused"))
+        val server = SorobanServer(TEST_SERVER_URL, client)
 
-        // When: Closing server
+        // When: Closing the server
         server.close()
 
-        // Then: No exception thrown
-        // Subsequent requests would fail if attempted
+        // Then: The underlying client is closed, so its scope is no longer active
+        assertFalse(
+            client.coroutineContext[kotlinx.coroutines.Job]!!.isActive,
+            "close() must close the underlying HTTP client"
+        )
     }
 
     @Test
@@ -346,8 +553,15 @@ class SorobanServerTest {
         // When: Creating default HTTP client
         val client = SorobanServer.defaultHttpClient()
 
-        // Then: Client is configured properly
-        assertNotNull(client)
+        // Then: The plugins the JSON-RPC calls depend on are installed
+        assertNotNull(
+            client.pluginOrNull(ContentNegotiation),
+            "ContentNegotiation is required to (de)serialize JSON-RPC bodies"
+        )
+        assertNotNull(
+            client.pluginOrNull(HttpTimeout),
+            "HttpTimeout is required so a stalled RPC call cannot hang indefinitely"
+        )
 
         // Cleanup
         client.close()
@@ -481,30 +695,38 @@ class SorobanServerTest {
     }
 
     @Test
-    fun testRpcError_preservesErrorDetails() = runTest {
-        // Given: Server that returns detailed error
-        createMockServer(ERROR_RESPONSE).use { server ->
-            // When/Then: Error should preserve code, message, and data
-            val exception = assertFailsWith<SorobanRpcException> {
+    fun testResponseMissingRequiredFields_throwsIllegalArgumentException() = runTest {
+        // Given: Server answering with JSON that does not match the JSON-RPC response shape
+        val errorClient = createMockClient("""{"invalid": "json"}""", HttpStatusCode.OK)
+        SorobanServer(TEST_SERVER_URL, errorClient).use { server ->
+            // When: Making a request
+            val exception = assertFailsWith<IllegalArgumentException> {
                 server.getHealth()
             }
 
-            assertEquals(-32601, exception.code)
-            assertTrue(exception.message?.contains("method not found") ?: false)
-            assertEquals("mockTest", exception.data)
+            // Then: The documented IllegalArgumentException names the method and keeps the cause
+            assertTrue(
+                exception.message?.contains("getHealth") == true,
+                "The failing method is named, got: ${exception.message}"
+            )
+            assertIs<ContentConvertException>(exception.cause)
         }
     }
 
     @Test
-    fun testNetworkError_propagatesException() = runTest {
-        // Given: Server with malformed response (missing required fields)
-        val errorClient = createMockClient("""{"invalid": "json"}""", HttpStatusCode.OK)
+    fun testResponseThatIsNotJson_throwsIllegalArgumentException() = runTest {
+        // Given: Server answering with a body that is not JSON at all
+        val errorClient = createMockClient("<html><body>502 Bad Gateway</body></html>", HttpStatusCode.OK)
         SorobanServer(TEST_SERVER_URL, errorClient).use { server ->
-            // When: Making request with malformed response
-            // Then: JsonConvertException is thrown for missing required fields
-            assertFailsWith<JsonConvertException> {
-                server.getHealth()
+            // When/Then: The deserialization failure surfaces as IllegalArgumentException
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.getLatestLedger()
             }
+            assertTrue(
+                exception.message?.contains("getLatestLedger") == true,
+                "The failing method is named, got: ${exception.message}"
+            )
+            assertIs<ContentConvertException>(exception.cause)
         }
     }
 
@@ -894,6 +1116,656 @@ class SorobanServerTest {
 
             // Then: Returns null (no entries in mock response)
             assertNull(result)
+        }
+    }
+
+    @Test
+    fun testGetAccount_accountEntry_returnsSequenceNumber() = runTest {
+        // Given: A ledger entry holding an account with a known sequence number
+        val ledgerKey = LedgerKeyXdr.Account(
+            LedgerKeyAccountXdr(KeyPair.fromAccountId(TEST_ACCOUNT_ID).getXdrAccountId())
+        )
+        val response = ledgerEntriesResult(
+            keyXdr = ledgerKey.toXdrBase64(),
+            entryXdr = accountEntryXdr(TEST_ACCOUNT_ID, 4_294_967_296L),
+            liveUntilLedger = null
+        )
+        createSequencedMockServer(response).use { server ->
+            // When: Loading the account
+            val account = server.getAccount(TEST_ACCOUNT_ID)
+
+            // Then: The sequence number comes from the decoded account entry
+            assertEquals(TEST_ACCOUNT_ID, account.accountId)
+            assertEquals(4_294_967_296L, account.sequenceNumber)
+            assertEquals(4_294_967_297L, account.getIncrementedSequenceNumber())
+        }
+    }
+
+    @Test
+    fun testGetAccount_nonAccountEntry_throwsIllegalStateException() = runTest {
+        // Given: The requested account key resolves to a contract data entry
+        val entryXdr = contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toSymbol("balance"),
+            value = Scv.toInt32(1)
+        )
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = entryXdr)
+        ).use { server ->
+            // When/Then: The mismatch is reported instead of silently mis-parsed
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getAccount(TEST_ACCOUNT_ID)
+            }
+            assertTrue(
+                exception.message?.contains("Expected Account entry") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("CONTRACT_DATA") ?: false,
+                "Message should name the actual entry type: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetContractData_temporaryDurability_requestsTemporaryKey() = runTest {
+        // Given: A temporary contract data entry
+        val contractAddress = Address(TEST_CONTRACT_ID).toSCAddress()
+        val key = Scv.toSymbol("session")
+        val entryXdr = contractDataEntryXdr(
+            contractAddress = contractAddress,
+            key = key,
+            value = Scv.toInt32(7),
+            durability = ContractDataDurabilityXdr.TEMPORARY
+        )
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = entryXdr),
+            capturedRequests = requests
+        ).use { server ->
+            // When: Reading with TEMPORARY durability
+            val result = server.getContractData(
+                TEST_CONTRACT_ID,
+                key,
+                SorobanServer.Durability.TEMPORARY
+            )
+
+            // Then: The entry is returned and the request asked for a TEMPORARY key
+            assertNotNull(result)
+            assertEquals(entryXdr, result.xdr)
+            assertEquals(1234L, result.lastModifiedLedger)
+            assertEquals(5678L, result.liveUntilLedger)
+
+            val expectedKey = LedgerKeyXdr.ContractData(
+                LedgerKeyContractDataXdr(
+                    contract = contractAddress,
+                    key = key,
+                    durability = ContractDataDurabilityXdr.TEMPORARY
+                )
+            ).toXdrBase64()
+            assertEquals(1, requests.size)
+            assertTrue(
+                requests[0].contains(expectedKey),
+                "Request should carry the TEMPORARY ledger key. Body: ${requests[0]}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetTransactions_returnsPaginatedTransactions() = runTest {
+        // Given: A getTransactions response with a single transaction
+        val response = """{
+  "jsonrpc": "2.0",
+  "id": "tx-list-id",
+  "result": {
+    "transactions": [
+      {
+        "status": "SUCCESS",
+        "txHash": "aabbcc",
+        "applicationOrder": 2,
+        "feeBump": false,
+        "envelopeXdr": "AAAA",
+        "resultXdr": "BBBB",
+        "resultMetaXdr": "CCCC",
+        "ledger": 1500,
+        "createdAt": 1690594566
+      }
+    ],
+    "latestLedger": 1600,
+    "latestLedgerCloseTimestamp": 1690595000,
+    "oldestLedger": 1000,
+    "oldestLedgerCloseTimestamp": 1690500000,
+    "cursor": "1500-2"
+  }
+}"""
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(response, capturedRequests = requests).use { server ->
+            // When: Listing transactions from a start ledger
+            val result = server.getTransactions(
+                GetTransactionsRequest(
+                    startLedger = 1500,
+                    pagination = GetTransactionsRequest.Pagination(limit = 10)
+                )
+            )
+
+            // Then: The paginated payload is deserialized
+            assertEquals(1, result.transactions.size)
+            assertEquals(TransactionStatus.SUCCESS, result.transactions[0].status)
+            assertEquals("aabbcc", result.transactions[0].txHash)
+            assertEquals(2, result.transactions[0].applicationOrder)
+            assertEquals(1500L, result.transactions[0].ledger)
+            assertEquals("1500-2", result.cursor)
+            assertEquals(1600L, result.latestLedger)
+            assertEquals(1000L, result.oldestLedger)
+
+            // And: The request carried the getTransactions method and parameters
+            assertTrue(requests[0].contains("\"method\":\"getTransactions\""), requests[0])
+            assertTrue(requests[0].contains("\"startLedger\":1500"), requests[0])
+            assertTrue(requests[0].contains("\"limit\":10"), requests[0])
+        }
+    }
+
+    @Test
+    fun testGetLedgers_returnsPaginatedLedgers() = runTest {
+        // Given: A getLedgers response with a single ledger
+        val response = """{
+  "jsonrpc": "2.0",
+  "id": "ledger-list-id",
+  "result": {
+    "ledgers": [
+      {
+        "hash": "ddeeff",
+        "sequence": 2000,
+        "ledgerCloseTime": 1690594566,
+        "headerXdr": "AAAA",
+        "metadataXdr": "BBBB"
+      }
+    ],
+    "latestLedger": 2100,
+    "latestLedgerCloseTime": 1690595000,
+    "oldestLedger": 1000,
+    "oldestLedgerCloseTime": 1690500000,
+    "cursor": "2000"
+  }
+}"""
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(response, capturedRequests = requests).use { server ->
+            // When: Listing ledgers with cursor-based pagination
+            val result = server.getLedgers(
+                GetLedgersRequest(
+                    pagination = GetLedgersRequest.Pagination(cursor = "1999", limit = 5)
+                )
+            )
+
+            // Then: The paginated payload is deserialized
+            assertEquals(1, result.ledgers.size)
+            assertEquals("ddeeff", result.ledgers[0].hash)
+            assertEquals(2000L, result.ledgers[0].sequence)
+            assertEquals("2000", result.cursor)
+            assertEquals(2100L, result.latestLedger)
+
+            // And: The request carried the getLedgers method and cursor
+            assertTrue(requests[0].contains("\"method\":\"getLedgers\""), requests[0])
+            assertTrue(requests[0].contains("\"cursor\":\"1999\""), requests[0])
+            assertFalse(requests[0].contains("\"startLedger\""), requests[0])
+        }
+    }
+
+    @Test
+    fun testRpcResponse_withoutResultAndError_throwsIllegalStateException() = runTest {
+        // Given: A JSON-RPC envelope carrying neither result nor error
+        createMockServer("""{"jsonrpc":"2.0","id":"no-result-id"}""").use { server ->
+            // When/Then: The protocol violation is reported with the method name
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getHealth()
+            }
+            assertTrue(
+                exception.message?.contains("Response missing result field") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("getHealth") ?: false,
+                "Message should name the method: ${exception.message}"
+            )
+        }
+    }
+
+    // ========== getSACBalance Tests ==========
+
+    @Test
+    fun testGetSACBalance_invalidContractId_throwsIllegalArgumentException() = runTest {
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.getSACBalance(TEST_ACCOUNT_ID, Asset.createNativeAsset(), Network.TESTNET)
+            }
+            assertTrue(
+                exception.message?.contains("Invalid contract ID") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetSACBalance_noEntries_returnsNullBalanceEntry() = runTest {
+        // Given: The balance ledger key resolves to nothing
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            // When: Reading the balance
+            val response = server.getSACBalance(
+                TEST_CONTRACT_ID,
+                Asset.createNativeAsset(),
+                Network.TESTNET
+            )
+
+            // Then: The latest ledger is still reported and the balance is absent
+            assertEquals(14245L, response.latestLedger)
+            assertNull(response.balanceEntry)
+        }
+    }
+
+    @Test
+    fun testGetSACBalance_balanceEntry_returnsParsedFields() = runTest {
+        // Given: A contract data entry shaped like a SAC balance
+        val asset = Asset.createNonNativeAsset("USDC", TEST_ISSUER_ID)
+        val assetContractAddress = Address(asset.getContractId(Network.TESTNET)).toSCAddress()
+        val balanceKey = Scv.toVec(
+            listOf(Scv.toSymbol("Balance"), Address(TEST_CONTRACT_ID).toSCVal())
+        )
+        val entryXdr = contractDataEntryXdr(
+            contractAddress = assetContractAddress,
+            key = balanceKey,
+            value = sacBalanceValue(
+                amount = BigInteger.parseString("170141183460469231731687303715884105727"),
+                authorized = true,
+                clawback = false
+            )
+        )
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = entryXdr,
+                lastModifiedLedger = 900L,
+                liveUntilLedger = 12_000L
+            ),
+            capturedRequests = requests
+        ).use { server ->
+            // When: Reading the balance
+            val response = server.getSACBalance(TEST_CONTRACT_ID, asset, Network.TESTNET)
+
+            // Then: Amount, flags and TTL metadata come from the decoded entry
+            val balance = assertNotNull(response.balanceEntry)
+            assertEquals("170141183460469231731687303715884105727", balance.amount)
+            assertTrue(balance.authorized)
+            assertFalse(balance.clawback)
+            assertEquals(900L, balance.lastModifiedLedgerSeq)
+            assertEquals(12_000L, balance.liveUntilLedgerSeq)
+            assertEquals(14245L, response.latestLedger)
+
+            // And: The request asked for the asset contract's Balance key
+            val expectedKey = LedgerKeyXdr.ContractData(
+                LedgerKeyContractDataXdr(
+                    contract = assetContractAddress,
+                    key = balanceKey,
+                    durability = ContractDataDurabilityXdr.PERSISTENT
+                )
+            ).toXdrBase64()
+            assertTrue(
+                requests[0].contains(expectedKey),
+                "Request should carry the SAC balance key. Body: ${requests[0]}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetSACBalance_nonContractDataEntry_throwsIllegalStateException() = runTest {
+        // Given: The balance key resolves to an account entry
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = accountEntryXdr(TEST_ACCOUNT_ID, 1L)
+            )
+        ).use { server ->
+            // When/Then: The mismatch is reported
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getSACBalance(TEST_CONTRACT_ID, Asset.createNativeAsset(), Network.TESTNET)
+            }
+            assertTrue(
+                exception.message?.contains("Expected ContractData entry") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("ACCOUNT") ?: false,
+                "Message should name the actual entry type: ${exception.message}"
+            )
+        }
+    }
+
+    // ========== Contract Code Loading Tests ==========
+
+    @Test
+    fun testLoadContractCodeForWasmId_returnsCodeEntry() = runTest {
+        // Given: A contract code entry for the requested WASM hash
+        val code = byteArrayOf(0, 97, 115, 109, 1, 0, 0, 0)
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = contractCodeEntryXdr(code)),
+            capturedRequests = requests
+        ).use { server ->
+            // When: Loading the code
+            val entry = server.loadContractCodeForWasmId(TEST_WASM_ID)
+
+            // Then: The decoded entry carries the bytecode and hash
+            val codeEntry = assertNotNull(entry)
+            assertEquals(code.toList(), codeEntry.code.toList())
+            assertEquals(Util.hexToBytes(TEST_WASM_ID).toList(), codeEntry.hash.value.toList())
+
+            // And: The request asked for the matching contract code key
+            val expectedKey = LedgerKeyXdr.ContractCode(
+                LedgerKeyContractCodeXdr(hash = HashXdr(Util.hexToBytes(TEST_WASM_ID)))
+            ).toXdrBase64()
+            assertTrue(
+                requests[0].contains(expectedKey),
+                "Request should carry the contract code key. Body: ${requests[0]}"
+            )
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForWasmId_noEntries_returnsNull() = runTest {
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            assertNull(server.loadContractCodeForWasmId(TEST_WASM_ID))
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForWasmId_nonContractCodeEntry_throwsIllegalStateException() = runTest {
+        // Given: The contract code key resolves to an account entry
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = accountEntryXdr(TEST_ACCOUNT_ID, 1L)
+            )
+        ).use { server ->
+            val exception = assertFailsWith<IllegalStateException> {
+                server.loadContractCodeForWasmId(TEST_WASM_ID)
+            }
+            assertTrue(
+                exception.message?.contains("Expected ContractCode entry") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForContractId_followsInstanceToCode() = runTest {
+        // Given: The contract instance points at a WASM hash whose code entry exists
+        val code = byteArrayOf(0, 97, 115, 109, 1, 0, 0, 0)
+        val instanceValue = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                executable = ContractExecutableXdr.WasmHash(HashXdr(Util.hexToBytes(TEST_WASM_ID))),
+                storage = null
+            )
+        )
+        val instanceEntry = contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            value = instanceValue
+        )
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = instanceEntry),
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = contractCodeEntryXdr(code)),
+            capturedRequests = requests
+        ).use { server ->
+            // When: Loading the code by contract ID
+            val entry = server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+
+            // Then: The bytecode from the second lookup is returned
+            val codeEntry = assertNotNull(entry)
+            assertEquals(code.toList(), codeEntry.code.toList())
+
+            // And: Two ledger entry lookups were made, the second keyed by the WASM hash
+            assertEquals(2, requests.size)
+            val expectedCodeKey = LedgerKeyXdr.ContractCode(
+                LedgerKeyContractCodeXdr(hash = HashXdr(Util.hexToBytes(TEST_WASM_ID)))
+            ).toXdrBase64()
+            assertTrue(
+                requests[1].contains(expectedCodeKey),
+                "Second request should key on the WASM hash. Body: ${requests[1]}"
+            )
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForContractId_noInstance_returnsNull() = runTest {
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            assertNull(server.loadContractCodeForContractId(TEST_CONTRACT_ID))
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForContractId_nonContractDataEntry_throwsIllegalStateException() =
+        runTest {
+            createSequencedMockServer(
+                ledgerEntriesResult(
+                    keyXdr = "AAAAAA==",
+                    entryXdr = accountEntryXdr(TEST_ACCOUNT_ID, 1L)
+                )
+            ).use { server ->
+                val exception = assertFailsWith<IllegalStateException> {
+                    server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+                }
+                assertTrue(
+                    exception.message?.contains("Expected ContractData entry") ?: false,
+                    "Unexpected message: ${exception.message}"
+                )
+            }
+        }
+
+    @Test
+    fun testLoadContractCodeForContractId_valueNotInstance_throwsIllegalStateException() = runTest {
+        // Given: The contract instance key resolves to a non-instance SCVal
+        val entry = contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            value = Scv.toInt32(5)
+        )
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = entry)
+        ).use { server ->
+            val exception = assertFailsWith<IllegalStateException> {
+                server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+            }
+            assertTrue(
+                exception.message?.contains("Expected Instance SCVal") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForContractId_stellarAssetExecutable_returnsNull() = runTest {
+        // Given: The contract instance is a Stellar Asset Contract, which has no WASM
+        val instanceValue = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                executable = ContractExecutableXdr.Void,
+                storage = null
+            )
+        )
+        val entry = contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            value = instanceValue
+        )
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = entry),
+            capturedRequests = requests
+        ).use { server ->
+            // When/Then: No code is returned and no second lookup is attempted
+            assertNull(server.loadContractCodeForContractId(TEST_CONTRACT_ID))
+            assertEquals(1, requests.size)
+        }
+    }
+
+    // ========== Contract Info Loading Tests ==========
+
+    @Test
+    fun testLoadContractInfoForWasmId_parsesContractMetadata() = runTest {
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = contractCodeEntryXdr(parseableContractByteCode(functionName = "increment"))
+            )
+        ).use { server ->
+            // When: Loading contract info by WASM ID
+            val info = assertNotNull(server.loadContractInfoForWasmId(TEST_WASM_ID))
+
+            // Then: Env meta, spec entries and meta entries come from the bytecode
+            assertEquals(22UL, info.envInterfaceVersion)
+            assertEquals(1, info.funcs.size)
+            assertEquals("increment", info.funcs[0].name.value)
+            assertEquals("22.0.0", info.metaEntries["rsdkver"])
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForWasmId_missingCode_returnsNull() = runTest {
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            assertNull(server.loadContractInfoForWasmId(TEST_WASM_ID))
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForWasmId_unparseableCode_throwsParserException() = runTest {
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = contractCodeEntryXdr(ByteArray(64) { it.toByte() })
+            )
+        ).use { server ->
+            assertFailsWith<SorobanContractParserException> {
+                server.loadContractInfoForWasmId(TEST_WASM_ID)
+            }
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForContractId_parsesContractMetadata() = runTest {
+        val instanceValue = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                executable = ContractExecutableXdr.WasmHash(HashXdr(Util.hexToBytes(TEST_WASM_ID))),
+                storage = null
+            )
+        )
+        val instanceEntry = contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            value = instanceValue
+        )
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = instanceEntry),
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = contractCodeEntryXdr(parseableContractByteCode(functionName = "transfer"))
+            )
+        ).use { server ->
+            // When: Loading contract info by contract ID
+            val info = assertNotNull(server.loadContractInfoForContractId(TEST_CONTRACT_ID))
+
+            // Then: The spec parsed from the referenced WASM is returned
+            assertEquals(22UL, info.envInterfaceVersion)
+            assertEquals(1, info.funcs.size)
+            assertEquals("transfer", info.funcs[0].name.value)
+            assertEquals("22.0.0", info.metaEntries["rsdkver"])
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForContractId_missingContract_returnsNull() = runTest {
+        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
+            assertNull(server.loadContractInfoForContractId(TEST_CONTRACT_ID))
+        }
+    }
+
+    // ========== assembleTransaction Validation Tests ==========
+
+    @Test
+    fun testAssembleTransaction_nonSorobanTransaction_throwsIllegalArgumentException() = runTest {
+        // Given: A classic transaction with no Soroban operation or data
+        val sourceKeypair = KeyPair.random()
+        val transaction = TransactionBuilder(
+            Account(sourceKeypair.getAccountId(), 1L),
+            Network.TESTNET
+        )
+            .addOperation(BumpSequenceOperation(12345678L))
+            .setTimeout(300)
+            .setBaseFee(100)
+            .build()
+
+        // When/Then: Assembly is refused
+        val exception = assertFailsWith<IllegalArgumentException> {
+            assembleTransaction(transaction, SimulateTransactionResponse(minResourceFee = 100L))
+        }
+        assertTrue(
+            exception.message?.contains("unsupported transaction") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testAssembleTransaction_missingResults_throwsIllegalArgumentException() = runTest {
+        // Given: An InvokeHostFunction transaction and a simulation with no results
+        val transaction = createTestTransaction()
+
+        // When/Then: Assembly is refused because auth entries cannot be resolved
+        val exception = assertFailsWith<IllegalArgumentException> {
+            assembleTransaction(transaction, SimulateTransactionResponse(minResourceFee = 100L))
+        }
+        assertTrue(
+            exception.message?.contains("must contain exactly one element") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testAssembleTransaction_multipleResults_throwsIllegalArgumentException() = runTest {
+        // Given: A simulation carrying two host function results for one operation
+        val transaction = createTestTransaction()
+        val simulation = SimulateTransactionResponse(
+            minResourceFee = 100L,
+            results = listOf(
+                SimulateTransactionResponse.SimulateHostFunctionResult(xdr = "AAAAAwAAABQ="),
+                SimulateTransactionResponse.SimulateHostFunctionResult(xdr = "AAAAAwAAABQ=")
+            )
+        )
+
+        // When/Then: Assembly is refused
+        val exception = assertFailsWith<IllegalArgumentException> {
+            assembleTransaction(transaction, simulation)
+        }
+        assertTrue(
+            exception.message?.contains("must contain exactly one element") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testPollTransaction_defaultAttempts_returnsFinalState() = runTest {
+        // Given: The first poll already sees a final state
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            GET_TRANSACTION_RESPONSE,
+            capturedRequests = requests
+        ).use { server ->
+            // When: Polling with the default attempt count and sleep strategy
+            val response = server.pollTransaction(
+                "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+            )
+
+            // Then: The final state is returned after a single request, without sleeping
+            assertEquals(GetTransactionStatus.SUCCESS, response.status)
+            assertEquals(1, requests.size)
         }
     }
 }

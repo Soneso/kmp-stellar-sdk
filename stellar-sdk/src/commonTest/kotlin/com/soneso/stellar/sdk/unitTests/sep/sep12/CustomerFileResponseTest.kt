@@ -10,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class CustomerFileResponseTest {
 
@@ -184,5 +185,80 @@ class CustomerFileResponseTest {
 
         val response2 = json.decodeFromString<CustomerFileResponse>(prefixedFormat)
         assertEquals("file_abc123def456", response2.fileId)
+    }
+
+    @Test
+    fun testDeserializeWithExpiresAt() {
+        val jsonString = """
+            {
+                "file_id": "file_expiring",
+                "content_type": "image/jpeg",
+                "size": 2048,
+                "customer_id": "customer_789",
+                "expires_at": "2026-08-01T12:00:00Z"
+            }
+        """.trimIndent()
+
+        val response = json.decodeFromString<CustomerFileResponse>(jsonString)
+
+        assertEquals("file_expiring", response.fileId)
+        assertEquals("customer_789", response.customerId)
+        assertEquals("2026-08-01T12:00:00Z", response.expiresAt)
+    }
+
+    @Test
+    fun testFileMetadataRoundTripsThroughJson() {
+        val file = CustomerFileResponse(
+            fileId = "file_d3d54529-6683-4341-9b66-4ac7d7504238",
+            contentType = "image/jpeg",
+            size = 4089371L,
+            customerId = "2bf95490-db23-442d-a1bd-c6fd5efb584e",
+            expiresAt = "2026-08-01T12:00:00Z"
+        )
+
+        val encoded = json.encodeToString(CustomerFileResponse.serializer(), file)
+
+        // SEP-12 wire names are snake_case
+        assertTrue(encoded.contains("\"file_id\""), "file_id missing: $encoded")
+        assertTrue(encoded.contains("\"content_type\""), "content_type missing: $encoded")
+        assertTrue(encoded.contains("\"size\""), "size missing: $encoded")
+        assertTrue(encoded.contains("\"customer_id\""), "customer_id missing: $encoded")
+        assertTrue(encoded.contains("\"expires_at\""), "expires_at missing: $encoded")
+
+        val decoded = json.decodeFromString<CustomerFileResponse>(encoded)
+
+        assertEquals(file, decoded)
+        assertEquals(4089371L, decoded.size)
+    }
+
+    @Test
+    fun testFileListRoundTripsThroughJson() {
+        val files = GetCustomerFilesResponse(
+            files = listOf(
+                CustomerFileResponse(
+                    fileId = "file_first",
+                    contentType = "image/png",
+                    size = 6134063L
+                ),
+                CustomerFileResponse(
+                    fileId = "file_second",
+                    contentType = "application/pdf",
+                    size = 9876543L,
+                    customerId = "customer_123"
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(GetCustomerFilesResponse.serializer(), files)
+
+        assertTrue(encoded.contains("\"files\""), "files missing: $encoded")
+
+        val decoded = json.decodeFromString<GetCustomerFilesResponse>(encoded)
+
+        assertEquals(files, decoded)
+        assertEquals(2, decoded.files.size)
+        assertEquals("file_first", decoded.files[0].fileId)
+        assertNull(decoded.files[0].customerId)
+        assertEquals("customer_123", decoded.files[1].customerId)
     }
 }

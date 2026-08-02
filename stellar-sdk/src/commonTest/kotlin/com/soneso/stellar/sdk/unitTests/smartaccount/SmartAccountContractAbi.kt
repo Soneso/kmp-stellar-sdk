@@ -96,16 +96,18 @@ object SmartAccountContractAbi {
         const val REMOVE_CONTEXT_RULE = "remove_context_rule"
 
         /**
-         * `add_signer(context_rule_id: u32, signer: Signer) -> void`
+         * `add_signer(context_rule_id: u32, signer: Signer) -> u32`
          *
-         * State change (requires auth). Adds a signer to the specified context rule.
+         * State change (requires auth). Adds a signer to the specified context rule and
+         * returns its assigned signer id.
          */
         const val ADD_SIGNER = "add_signer"
 
         /**
-         * `remove_signer(context_rule_id: u32, signer: Signer) -> void`
+         * `remove_signer(context_rule_id: u32, signer_id: u32) -> void`
          *
          * State change (requires auth). Removes a signer from the specified context rule.
+         * The signer is identified by its id, not by an encoded Signer value.
          */
         const val REMOVE_SIGNER = "remove_signer"
 

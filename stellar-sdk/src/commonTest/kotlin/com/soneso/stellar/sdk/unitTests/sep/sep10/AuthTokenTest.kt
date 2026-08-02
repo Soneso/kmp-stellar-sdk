@@ -5,6 +5,10 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep10
 
 import com.soneso.stellar.sdk.sep.sep10.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.test.Test
@@ -15,6 +19,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AuthTokenTest {
+
+    /**
+     * Builds a JWT string carrying only the given claims, encoded with unpadded
+     * Base64 URL-safe segments.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun createJwtWithClaims(
+        iss: String? = null,
+        sub: String? = null,
+        iat: Long? = null,
+        exp: Long? = null,
+        jti: String? = null,
+        clientDomain: String? = null
+    ): String {
+        val header = buildJsonObject {
+            put("alg", "HS256")
+            put("typ", "JWT")
+        }
+
+        val payload = buildJsonObject {
+            iss?.let { put("iss", it) }
+            sub?.let { put("sub", it) }
+            iat?.let { put("iat", it) }
+            exp?.let { put("exp", it) }
+            jti?.let { put("jti", it) }
+            clientDomain?.let { put("client_domain", it) }
+        }
+
+        val headerEncoded = Base64.UrlSafe.encode(header.toString().encodeToByteArray()).trimEnd('=')
+        val payloadEncoded = Base64.UrlSafe.encode(payload.toString().encodeToByteArray()).trimEnd('=')
+
+        return "$headerEncoded.$payloadEncoded.signature"
+    }
 
     @Test
     fun testParseValidJWT() {
@@ -98,6 +135,74 @@ class AuthTokenTest {
         assertNull(authToken.iss)
     }
 
+    @Test
+    fun testJtiClaimExtraction() {
+        val jwtToken = createJwtWithClaims(
+            iss = "https://example.com",
+            sub = "GACCOUNT...",
+            jti = "550e8400-e29b-41d4-a716-446655440000"
+        )
+
+        val authToken = AuthToken.parse(jwtToken)
+
+        assertEquals("550e8400-e29b-41d4-a716-446655440000", authToken.jti)
+        assertEquals("https://example.com", authToken.iss)
+        assertEquals("GACCOUNT...", authToken.sub)
+    }
+
+    @Test
+    fun testJtiClaimAbsent() {
+        val jwtToken = createJwtWithClaims(
+            iss = "https://example.com",
+            sub = "GACCOUNT..."
+        )
+
+        val authToken = AuthToken.parse(jwtToken)
+
+        assertNull(authToken.jti)
+        assertEquals("https://example.com", authToken.iss)
+    }
+
+    @Test
+    fun testParseJWTWithAllClaims() {
+        val jwtToken = createJwtWithClaims(
+            iss = "https://auth.stellar.org",
+            sub = "GACCOUNT...:9999",
+            iat = 1700000000L,
+            exp = 1700003600L,
+            jti = "unique-token-id-12345",
+            clientDomain = "wallet.example.com"
+        )
+
+        val authToken = AuthToken.parse(jwtToken)
+
+        assertEquals(jwtToken, authToken.token)
+        assertEquals("https://auth.stellar.org", authToken.iss)
+        assertEquals("GACCOUNT...:9999", authToken.sub)
+        assertEquals(1700000000L, authToken.iat)
+        assertEquals(1700003600L, authToken.exp)
+        assertEquals("unique-token-id-12345", authToken.jti)
+        assertEquals("wallet.example.com", authToken.clientDomain)
+        assertEquals("GACCOUNT...", authToken.account)
+        assertEquals("9999", authToken.memo)
+    }
+
+    @Test
+    fun testParseRealWorldJWTWithJti() {
+        val jwtToken = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9." +
+                "eyJpc3MiOiAiaHR0cHM6Ly9hdXRoLnN0ZWxsYXIub3JnIiwgInN1YiI6ICJHQUNDRU5ULi4uOjEyMzQ1IiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiAxNzAwMDAzNjAwLCAianRpIjogInVuaXF1ZS1pZCIsICJjbGllbnRfZG9tYWluIjogIndhbGxldC5jb20ifQ." +
+                "signature"
+
+        val authToken = AuthToken.parse(jwtToken)
+
+        assertEquals("https://auth.stellar.org", authToken.iss)
+        assertEquals("GACCENT...:12345", authToken.sub)
+        assertEquals("unique-id", authToken.jti)
+        assertEquals("wallet.com", authToken.clientDomain)
+        assertEquals("GACCENT...", authToken.account)
+        assertEquals("12345", authToken.memo)
+    }
+
     @OptIn(ExperimentalTime::class)
     @Test
     fun testIsExpiredWhenExpired() {
@@ -160,10 +265,127 @@ class AuthTokenTest {
     }
 
     @Test
+    fun testAccountPropertyWithMuxedAccountAndMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "MACCOUNT...:67890"
+        )
+
+        assertEquals("MACCOUNT...", authToken.account)
+    }
+
+    @Test
     fun testAccountPropertyWhenNoSub() {
         val authToken = AuthToken(token = "token")
 
         assertNull(authToken.account)
+    }
+
+    @Test
+    fun testMemoPropertyWithMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT...:12345"
+        )
+
+        assertEquals("12345", authToken.memo)
+    }
+
+    @Test
+    fun testMemoPropertyWithoutMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT..."
+        )
+
+        assertNull(authToken.memo)
+    }
+
+    @Test
+    fun testMemoPropertyWithEmptyMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT...:"
+        )
+
+        assertEquals("", authToken.memo)
+    }
+
+    @Test
+    fun testMemoPropertyWithNumericMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT...:9876543210"
+        )
+
+        assertEquals("9876543210", authToken.memo)
+    }
+
+    @Test
+    fun testMemoPropertyWithStringMemo() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT...:session-abc123"
+        )
+
+        assertEquals("session-abc123", authToken.memo)
+    }
+
+    @Test
+    fun testMemoPropertyWhenSubIsNull() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = null
+        )
+
+        assertNull(authToken.memo)
+    }
+
+    @Test
+    fun testAccountAndMemoWithMultipleColons() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = "GACCOUNT...:12345:extra"
+        )
+
+        // The account is the first segment, the memo the second
+        assertEquals("GACCOUNT...", authToken.account)
+        assertEquals("12345", authToken.memo)
+    }
+
+    @Test
+    fun testSubjectWithOnlyColon() {
+        val authToken = AuthToken(
+            token = "token",
+            sub = ":"
+        )
+
+        assertEquals("", authToken.account)
+        assertEquals("", authToken.memo)
+    }
+
+    @Test
+    fun testToString() {
+        val tokenString = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZXN0In0.test"
+        val authToken = AuthToken(token = tokenString)
+
+        assertEquals(tokenString, authToken.toString())
+
+        val authHeader = "Bearer $authToken"
+        assertEquals("Bearer $tokenString", authHeader)
+    }
+
+    @Test
+    fun testToStringInHttpContext() {
+        val authToken = AuthToken(
+            token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZXN0In0.test",
+            iss = "https://anchor.example.com"
+        )
+
+        // Other claims must not leak into the header value
+        val authHeader = "Bearer $authToken"
+        assertTrue(authHeader.startsWith("Bearer eyJ"))
+        assertEquals("Bearer ${authToken.token}", authHeader)
     }
 
     @Test

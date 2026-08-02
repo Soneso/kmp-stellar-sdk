@@ -192,6 +192,12 @@ class WebAuthForContracts(
         }
     }
 
+    /**
+     * RPC client supplied by [createWithServer]. When set, ledger queries use it instead of
+     * creating a client for [effectiveSorobanRpcUrl], and its lifecycle stays with the caller.
+     */
+    private var providedSorobanServer: SorobanServer? = null
+
     init {
         require(webAuthContractId.startsWith("C")) {
             "webAuthContractId must be a contract address starting with 'C', got: ${webAuthContractId.take(10)}..."
@@ -214,6 +220,33 @@ class WebAuthForContracts(
 
     companion object {
         private const val WEB_AUTH_VERIFY_FUNCTION = "web_auth_verify"
+
+        /**
+         * Creates an instance that queries ledger state through the given [sorobanServer] instead
+         * of a client built from the RPC URL, used in tests to inject a mock HTTP engine. The
+         * caller keeps ownership of [sorobanServer] and is responsible for closing it. Not
+         * intended for production use.
+         */
+        internal fun createWithServer(
+            authEndpoint: String,
+            webAuthContractId: String,
+            serverSigningKey: String,
+            serverHomeDomain: String,
+            network: Network,
+            sorobanServer: SorobanServer,
+            httpClient: HttpClient? = null,
+            httpRequestHeaders: Map<String, String>? = null,
+            sorobanRpcUrl: String? = null
+        ): WebAuthForContracts = WebAuthForContracts(
+            authEndpoint = authEndpoint,
+            webAuthContractId = webAuthContractId,
+            serverSigningKey = serverSigningKey,
+            serverHomeDomain = serverHomeDomain,
+            network = network,
+            httpClient = httpClient,
+            httpRequestHeaders = httpRequestHeaders,
+            sorobanRpcUrl = sorobanRpcUrl
+        ).apply { providedSorobanServer = sorobanServer }
 
         /**
          * Creates a WebAuthForContracts instance by discovering configuration from a domain's stellar.toml.
@@ -407,12 +440,16 @@ class WebAuthForContracts(
 
         // Step 6: Get signature expiration ledger if needed
         val effectiveExpirationLedger = if (signers.isNotEmpty() && signatureExpirationLedger == null) {
-            val sorobanServer = SorobanServer(effectiveSorobanRpcUrl)
+            val provided = providedSorobanServer
+            val sorobanServer = provided ?: SorobanServer(effectiveSorobanRpcUrl)
             try {
                 val latestLedger = sorobanServer.getLatestLedger()
                 latestLedger.sequence + 10
             } finally {
-                sorobanServer.close()
+                // Only a client created here is closed here; a provided one is caller-owned.
+                if (provided == null) {
+                    sorobanServer.close()
+                }
             }
         } else {
             signatureExpirationLedger

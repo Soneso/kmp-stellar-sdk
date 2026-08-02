@@ -3,11 +3,15 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4
 import com.soneso.stellar.sdk.AssetTypeCreditAlphaNum12
 import com.soneso.stellar.sdk.AssetTypeNative
+import com.soneso.stellar.sdk.horizon.responses.Asset
 import com.soneso.stellar.sdk.horizon.responses.OrderBookResponse
 import com.soneso.stellar.sdk.horizon.responses.Price
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -108,7 +112,7 @@ class OrderBookResponseTest {
     }
 
     @Test
-    fun testComprehensiveOrderBookResponseDeserialization() {
+    fun testOrderBookResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "base": {
@@ -294,5 +298,68 @@ class OrderBookResponseTest {
         assertEquals("2.5000000", row.price)
         assertEquals(5L, row.priceR.numerator)
         assertEquals(2L, row.priceR.denominator)
+    }
+
+    private fun directOrderBook() = OrderBookResponse(
+        baseAsset = Asset("native"),
+        counterAsset = Asset("credit_alphanum4", "USD", "GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B"),
+        asks = listOf(
+            OrderBookResponse.Row(amount = "100.0000000", price = "2.5000000", priceR = Price(5L, 2L)),
+            OrderBookResponse.Row(amount = "50.0000000", price = "2.6000000", priceR = Price(13L, 5L))
+        ),
+        bids = listOf(
+            OrderBookResponse.Row(amount = "80.0000000", price = "2.4000000", priceR = Price(12L, 5L))
+        )
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val orderBook = directOrderBook()
+
+        val encoded = json.encodeToString(OrderBookResponse.serializer(), orderBook)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(setOf("base", "counter", "asks", "bids"), encodedObject.keys)
+        assertEquals("native", encodedObject["base"]!!.jsonObject["asset_type"]!!.jsonPrimitive.content)
+        assertEquals("USD", encodedObject["counter"]!!.jsonObject["asset_code"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(OrderBookResponse.serializer(), encoded)
+        assertEquals(orderBook, decoded)
+        assertTrue(decoded.base is AssetTypeNative)
+        val counter = decoded.counter
+        assertTrue(counter is AssetTypeCreditAlphaNum4)
+        assertEquals("USD", (counter as AssetTypeCreditAlphaNum4).code)
+        assertEquals("GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B", counter.issuer)
+
+        assertEquals(2, decoded.asks.size)
+        assertEquals("100.0000000", decoded.asks[0].amount)
+        assertEquals("2.5000000", decoded.asks[0].price)
+        assertEquals(5L, decoded.asks[0].priceR.numerator)
+        assertEquals(2L, decoded.asks[0].priceR.denominator)
+        assertEquals(1, decoded.bids.size)
+        assertEquals("80.0000000", decoded.bids[0].amount)
+        assertEquals(12L, decoded.bids[0].priceR.numerator)
+    }
+
+    @Test
+    fun testEmptyOrderBookConstruction() {
+        val orderBook = OrderBookResponse(
+            baseAsset = Asset("credit_alphanum12", "LONGASSET", "GBVFTZL5HIPT4PFQVTZVIWR77V7LWYCXU4CLYWWHHOEXB64XPG5LDMTU"),
+            counterAsset = Asset("native"),
+            asks = emptyList(),
+            bids = emptyList()
+        )
+
+        val encoded = json.encodeToString(OrderBookResponse.serializer(), orderBook)
+        val decoded = json.decodeFromString(OrderBookResponse.serializer(), encoded)
+
+        assertEquals(orderBook, decoded)
+        assertTrue(decoded.asks.isEmpty())
+        assertTrue(decoded.bids.isEmpty())
+        val base = decoded.base
+        assertTrue(base is AssetTypeCreditAlphaNum12)
+        assertEquals("LONGASSET", (base as AssetTypeCreditAlphaNum12).code)
+        assertTrue(decoded.counter is AssetTypeNative)
+        assertNotEquals(orderBook, directOrderBook())
     }
 }

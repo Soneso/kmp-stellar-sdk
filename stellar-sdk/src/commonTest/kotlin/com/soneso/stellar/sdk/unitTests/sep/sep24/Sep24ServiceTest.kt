@@ -1515,4 +1515,414 @@ class Sep24ServiceTest {
         assertEquals(transactionId, response.id)
         assertEquals("interactive_customer_info_needed", response.type)
     }
+
+    // ========== fromDomain() Tests ==========
+
+    private val tomlWithSep24TransferServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        TRANSFER_SERVER="https://anchor.example.com/sep6"
+        TRANSFER_SERVER_SEP0024="https://anchor.example.com/sep24"
+    """.trimIndent()
+
+    private val tomlWithoutSep24TransferServer = """
+        NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+        TRANSFER_SERVER="https://anchor.example.com/sep6"
+    """.trimIndent()
+
+    private fun createTomlAndInfoMockClient(
+        tomlContent: String,
+        onInfoRequest: (Url) -> Unit = {}
+    ): HttpClient {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains("/.well-known/stellar.toml") -> respond(
+                    content = tomlContent,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+
+                request.url.encodedPath.endsWith("/info") -> {
+                    onInfoRequest(request.url)
+                    respond(
+                        content = infoResponseJson,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+
+                else -> respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+
+        return HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+    }
+
+    @Test
+    fun testFromDomainUsesTransferServerSep0024() = runTest {
+        var infoUrl: Url? = null
+        val mockClient = createTomlAndInfoMockClient(tomlWithSep24TransferServer) { infoUrl = it }
+
+        val service = Sep24Service.fromDomain("anchor.example.com", mockClient)
+        val response = service.info()
+
+        assertNotNull(response.depositAssets)
+        assertNotNull(infoUrl)
+        assertEquals("anchor.example.com", infoUrl!!.host)
+        assertEquals("/sep24/info", infoUrl!!.encodedPath)
+    }
+
+    @Test
+    fun testFromDomainWithoutTransferServerSep0024() = runTest {
+        val mockClient = createTomlAndInfoMockClient(tomlWithoutSep24TransferServer)
+
+        val exception = assertFailsWith<Sep24Exception> {
+            Sep24Service.fromDomain("anchor.example.com", mockClient)
+        }
+        assertEquals(
+            "TRANSFER_SERVER_SEP0024 not found in stellar.toml for domain: anchor.example.com",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testFromDomainForwardsCustomHeadersToTomlFetch() = runTest {
+        var tomlHeaderValue: String? = null
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/.well-known/stellar.toml")) {
+                tomlHeaderValue = request.headers["X-Client-Name"]
+                respond(
+                    content = tomlWithSep24TransferServer,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        val mockClient = HttpClient(mockEngine)
+
+        Sep24Service.fromDomain(
+            domain = "anchor.example.com",
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        assertEquals("kmp-stellar-sdk", tomlHeaderValue)
+    }
+
+    // ========== Custom Request Header Tests ==========
+
+    @Test
+    fun testCustomRequestHeadersOnGetRequests() = runTest {
+        var customHeader: String? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            customHeader = request.headers["X-Client-Name"]
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = infoResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = Sep24Service(
+            serviceAddress = serviceAddress,
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        service.info()
+
+        assertEquals("kmp-stellar-sdk", customHeader)
+        assertNull(authorizationHeader)
+    }
+
+    @Test
+    fun testCustomRequestHeadersOnInteractiveRequests() = runTest {
+        var customHeader: String? = null
+        var authorizationHeader: String? = null
+        val mockEngine = MockEngine { request ->
+            customHeader = request.headers["X-Client-Name"]
+            authorizationHeader = request.headers["Authorization"]
+            respond(
+                content = interactiveResponseJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = Sep24Service(
+            serviceAddress = serviceAddress,
+            httpClient = mockClient,
+            httpRequestHeaders = mapOf("X-Client-Name" to "kmp-stellar-sdk")
+        )
+
+        service.deposit(Sep24DepositRequest(assetCode = "USDC", jwt = jwtToken))
+
+        assertEquals("kmp-stellar-sdk", customHeader)
+        assertEquals("Bearer $jwtToken", authorizationHeader)
+    }
+
+    // ========== KYC File Upload Tests ==========
+
+    @Test
+    fun testDepositWithKycFiles() = runTest {
+        var requestBodyContent = ""
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/transactions/deposit/interactive")) {
+                requestBodyContent = request.body.toByteArray().decodeToString()
+                respond(
+                    content = interactiveResponseJson,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val response = service.deposit(Sep24DepositRequest(
+            assetCode = "USDC",
+            jwt = jwtToken,
+            kycFiles = mapOf(
+                "photo_id_front" to "front-image-bytes".encodeToByteArray(),
+                "photo_id_back" to "back-image-bytes".encodeToByteArray()
+            )
+        ))
+
+        assertEquals(transactionId, response.id)
+        assertTrue(
+            requestBodyContent.contains("filename=photo_id_front"),
+            "Multipart part should carry the file name for photo_id_front"
+        )
+        assertTrue(
+            requestBodyContent.contains("filename=photo_id_back"),
+            "Multipart part should carry the file name for photo_id_back"
+        )
+        assertTrue(
+            requestBodyContent.contains("front-image-bytes"),
+            "Multipart body should carry the photo_id_front bytes"
+        )
+        assertTrue(
+            requestBodyContent.contains("back-image-bytes"),
+            "Multipart body should carry the photo_id_back bytes"
+        )
+    }
+
+    @Test
+    fun testWithdrawWithKycFiles() = runTest {
+        var requestBodyContent = ""
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/transactions/withdraw/interactive")) {
+                requestBodyContent = request.body.toByteArray().decodeToString()
+                respond(
+                    content = interactiveResponseJson,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val response = service.withdraw(Sep24WithdrawRequest(
+            assetCode = "USDC",
+            jwt = jwtToken,
+            kycFields = mapOf("first_name" to "Jane"),
+            kycFiles = mapOf("proof_of_address" to "utility-bill".encodeToByteArray())
+        ))
+
+        assertEquals(transactionId, response.id)
+        assertTrue(requestBodyContent.contains("first_name"))
+        assertTrue(requestBodyContent.contains("Jane"))
+        assertTrue(
+            requestBodyContent.contains("filename=proof_of_address"),
+            "Multipart part should carry the file name for proof_of_address"
+        )
+        assertTrue(requestBodyContent.contains("utility-bill"))
+    }
+
+    // ========== Non-200 Success Statuses and Error Body Shapes ==========
+
+    @Test
+    fun testDepositAcceptsCreatedStatus() = runTest {
+        val mockClient = createMockClient(
+            responseContent = interactiveResponseJson,
+            statusCode = HttpStatusCode.Created,
+            expectedPath = "/transactions/deposit/interactive",
+            expectedMethod = HttpMethod.Post
+        )
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val response = service.deposit(Sep24DepositRequest(assetCode = "USDC", jwt = jwtToken))
+
+        assertEquals(transactionId, response.id)
+        assertEquals("interactive_customer_info_needed", response.type)
+    }
+
+    @Test
+    fun testErrorBodyWithoutErrorKey() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"detail": "asset_code is required"}""",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/info"
+        )
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep24InvalidRequestException> {
+            service.info()
+        }
+        assertEquals("Unknown error", exception.message)
+    }
+
+    @Test
+    fun testEmptyErrorBody() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "",
+            statusCode = HttpStatusCode.BadRequest,
+            expectedPath = "/info"
+        )
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep24InvalidRequestException> {
+            service.info()
+        }
+        assertEquals("Unknown error", exception.message)
+    }
+
+    @Test
+    fun testForbiddenWithoutTypeIsServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = """{"error": "Access denied"}""",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/info"
+        )
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep24ServerErrorException> {
+            service.info()
+        }
+        assertEquals(403, exception.statusCode)
+        assertTrue(exception.message!!.contains("Access denied"))
+    }
+
+    @Test
+    fun testForbiddenWithNonJsonBodyIsServerError() = runTest {
+        val mockClient = createMockClient(
+            responseContent = "Forbidden",
+            statusCode = HttpStatusCode.Forbidden,
+            expectedPath = "/info"
+        )
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val exception = assertFailsWith<Sep24ServerErrorException> {
+            service.info()
+        }
+        assertEquals(403, exception.statusCode)
+        assertTrue(exception.message!!.contains("Forbidden"))
+    }
+
+    @Test
+    fun testPollTransactionWithDefaultIntervalAndAttempts() = runTest {
+        var callCount = 0
+        val statusChanges = mutableListOf<String>()
+
+        val mockEngine = MockEngine { request ->
+            if (request.url.encodedPath.contains("/transaction")) {
+                callCount++
+                val txJson = when (callCount) {
+                    1 -> """{"transaction": {"id": "$transactionId", "kind": "withdrawal", "status": "pending_user_transfer_start"}}"""
+                    else -> """{"transaction": {"id": "$transactionId", "kind": "withdrawal", "status": "refunded"}}"""
+                }
+
+                respond(
+                    content = txJson,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respond(
+                    content = """{"error": "Not found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+        }
+        val service = Sep24Service(serviceAddress, mockClient)
+
+        val tx = service.pollTransaction(
+            request = Sep24TransactionRequest(jwt = jwtToken, id = transactionId),
+            onStatusChange = { statusChanges.add(it.status) }
+        )
+
+        assertEquals("refunded", tx.status)
+        assertTrue(tx.isTerminal())
+        assertEquals(2, callCount)
+        assertEquals(listOf("pending_user_transfer_start", "refunded"), statusChanges)
+    }
 }

@@ -177,4 +177,38 @@ class KeyPairTest {
         val publicKey3 = keypair.getPublicKey()
         assertFalse(publicKey1.contentEquals(publicKey3))
     }
+
+    @Test
+    fun testGetCryptoLibraryName() {
+        val name = KeyPair.getCryptoLibraryName()
+        assertTrue(name.isNotBlank())
+    }
+
+    @Test
+    fun testEqualsNullAndDifferentType() = runTest {
+        val keypair = KeyPair.random()
+        assertEquals(keypair, keypair)
+        assertFalse(keypair.equals(null))
+        assertFalse(keypair.equals("not a keypair"))
+    }
+
+    @Test
+    fun testEqualsDiffersWhenOnlyOneSideHasPrivateKey() = runTest {
+        val seed = "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE"
+        val full = KeyPair.fromSecretSeed(seed)
+        val publicOnly = KeyPair.fromAccountId(full.getAccountId())
+
+        assertNotEquals(full, publicOnly)
+        assertNotEquals(publicOnly, full)
+    }
+
+    @Test
+    fun testFromSecretSeedByteArrayDirect() = runTest {
+        val seed = StrKey.decodeEd25519SecretSeed(
+            "SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE".toCharArray()
+        )
+        val keypair = KeyPair.fromSecretSeed(seed)
+        assertEquals("GCZHXL5HXQX5ABDM26LHYRCQZ5OJFHLOPLZX47WEBP3V2PF5AVFK2A5D", keypair.getAccountId())
+        assertTrue(keypair.canSign())
+    }
 }

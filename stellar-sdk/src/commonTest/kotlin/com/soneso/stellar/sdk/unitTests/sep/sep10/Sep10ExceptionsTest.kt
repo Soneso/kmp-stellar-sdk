@@ -42,6 +42,23 @@ class Sep10ExceptionsTest {
     }
 
     @Test
+    fun testChallengeRequestException_defaultMessageWithoutDetails() {
+        val exception = ChallengeRequestException()
+
+        assertEquals(0, exception.statusCode)
+        assertNull(exception.errorMessage)
+        assertEquals("Challenge request failed", exception.message)
+    }
+
+    @Test
+    fun testChallengeRequestException_errorMessageOnly() {
+        val exception = ChallengeRequestException(errorMessage = "Network error: timeout")
+
+        assertEquals(0, exception.statusCode)
+        assertEquals("Challenge request failed: Network error: timeout", exception.message)
+    }
+
+    @Test
     fun testChallengeRequestException_simpleConstructor() {
         val exception = ChallengeRequestException("Network error")
 
@@ -109,6 +126,18 @@ class Sep10ExceptionsTest {
             gracePeriodSeconds = 300
         )
         assertTrue(exception.message!!.contains("must have time bounds set"))
+    }
+
+    @Test
+    fun testInvalidTimeBoundsException_onlyMaxTimeMissing() {
+        val exception = InvalidTimeBoundsException(
+            minTime = 1700000000L,
+            maxTime = null,
+            currentTime = 1700000100L,
+            gracePeriodSeconds = 300
+        )
+        assertTrue(exception.message!!.contains("must have time bounds set"))
+        assertTrue(exception.message!!.contains("maxTime: null"))
     }
 
     @Test

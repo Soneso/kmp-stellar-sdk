@@ -326,6 +326,73 @@ kover {
     }
 }
 
+// Test Namespace Guard
+//
+// Every test source file must declare one of the allowed test packages. A test that
+// lands in the production namespace escapes the `integrationTests` execution filters
+// applied to the JVM/JS/Native test tasks, so it would run in CI regardless of
+// -PexcludeIntegrationTests. The guard also keeps test placement consistent:
+// unitTests/ and integrationTests/ mirror the commonMain package tree, while
+// `util` (TestResourceUtil expect/actual) and `contract.bindings` (generated
+// fixtures, regeneration restores the package) are the two documented exceptions.
+val allowedTestPackagePrefixes = listOf(
+    "com.soneso.stellar.sdk.unitTests",
+    "com.soneso.stellar.sdk.integrationTests",
+    "com.soneso.stellar.sdk.util",
+    "com.soneso.stellar.sdk.contract.bindings"
+)
+
+val testSourceDirs = kotlin.sourceSets
+    .filter { it.name.endsWith("Test") }
+    .flatMap { it.kotlin.srcDirs }
+    .distinct()
+
+val verifyTestNamespaces = tasks.register("verifyTestNamespaces") {
+    group = "verification"
+    description = "Fails when a test source file declares a package outside the allowed test namespaces."
+
+    val sourceDirs = testSourceDirs
+    val allowedPrefixes = allowedTestPackagePrefixes
+    val reportRoot = project.rootDir
+    inputs.files(files(sourceDirs)).withPropertyName("testSources").ignoreEmptyDirectories()
+
+    doLast {
+        val packageRegex = Regex("""^\s*package\s+([\w.]+)""", RegexOption.MULTILINE)
+        val violations = linkedSetOf<String>()
+
+        sourceDirs.filter { it.isDirectory }.forEach { dir ->
+            dir.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .forEach { file ->
+                    val declared = packageRegex.find(file.readText())?.groupValues?.get(1)
+                    val allowed = declared != null && allowedPrefixes.any {
+                        declared == it || declared.startsWith("$it.")
+                    }
+                    if (!allowed) {
+                        val path = file.relativeTo(reportRoot).invariantSeparatorsPath
+                        violations += "$path -> ${declared ?: "no package declaration"}"
+                    }
+                }
+        }
+
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                buildString {
+                    appendLine("Test sources declare packages outside the allowed test namespaces:")
+                    violations.sorted().forEach { appendLine("  $it") }
+                    appendLine()
+                    appendLine("Allowed package prefixes:")
+                    allowedPrefixes.forEach { appendLine("  $it") }
+                }
+            )
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyTestNamespaces)
+}
+
 // Dokka 2.x generates docs from shared source sets without requiring native compilation
 // No special configuration needed for cross-compilation on CI
 

@@ -663,6 +663,243 @@ class Sep30ServiceTest {
     }
 
     @Test
+    fun testSignTransactionBadRequest() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"error": "transaction is not a valid envelope"}""",
+            responseStatus = HttpStatusCode.BadRequest
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30BadRequestException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertEquals("transaction is not a valid envelope", exception.message)
+    }
+
+    @Test
+    fun testSignTransactionUnauthorized() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"error": "identity not authenticated"}""",
+            responseStatus = HttpStatusCode.Unauthorized
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30UnauthorizedException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertEquals("identity not authenticated", exception.message)
+    }
+
+    @Test
+    fun testSignTransactionSigningAddressNotFound() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"error": "signing address not registered for this account"}""",
+            responseStatus = HttpStatusCode.NotFound
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30NotFoundException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertEquals("signing address not registered for this account", exception.message)
+    }
+
+    @Test
+    fun testSignTransactionConflict() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"error": "transaction already signed by this signer"}""",
+            responseStatus = HttpStatusCode.Conflict
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30ConflictException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertEquals("transaction already signed by this signer", exception.message)
+    }
+
+    @Test
+    fun testSignTransactionUnknownError() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"error": "signer temporarily offline"}""",
+            responseStatus = HttpStatusCode.ServiceUnavailable
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30UnknownResponseException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertEquals(503, exception.statusCode)
+        assertEquals("""{"error": "signer temporarily offline"}""", exception.responseBody)
+        assertEquals("Unexpected HTTP status: 503", exception.message)
+    }
+
+    @Test
+    fun testSignTransactionMalformedJsonResponse() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = "<html>gateway error</html>",
+            responseStatus = HttpStatusCode.OK
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30InvalidResponseException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+        assertTrue(
+            exception.message!!.contains("Failed to parse SEP-30 signature response"),
+            "Exception message should identify the signature response parser, was: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testSignTransactionMissingSignatureField() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Post,
+            expectedPath = "/accounts/$testAddress/sign/$testSigningAddress",
+            responseBody = """{"network_passphrase": "$testNetworkPassphrase"}""",
+            responseStatus = HttpStatusCode.OK
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        assertFailsWith<Sep30InvalidResponseException> {
+            service.signTransaction(testAddress, testSigningAddress, testTransactionXdr, testJwt)
+        }
+    }
+
+    @Test
+    fun testAccountsListBadRequest() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = """{"error": "after cursor is not a valid account address"}""",
+            responseStatus = HttpStatusCode.BadRequest
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30BadRequestException> {
+            service.accounts(jwt = testJwt, after = "not-an-address")
+        }
+        assertEquals("after cursor is not a valid account address", exception.message)
+    }
+
+    @Test
+    fun testAccountsListUnauthorized() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = """{"error": "SEP-10 token expired"}""",
+            responseStatus = HttpStatusCode.Unauthorized
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30UnauthorizedException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertEquals("SEP-10 token expired", exception.message)
+    }
+
+    @Test
+    fun testAccountsListNotFound() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = """{"error": "endpoint not implemented"}""",
+            responseStatus = HttpStatusCode.NotFound
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30NotFoundException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertEquals("endpoint not implemented", exception.message)
+    }
+
+    @Test
+    fun testAccountsListConflict() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = """{"error": "account list is being rebuilt"}""",
+            responseStatus = HttpStatusCode.Conflict
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30ConflictException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertEquals("account list is being rebuilt", exception.message)
+    }
+
+    @Test
+    fun testAccountsListUnknownError() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = "upstream timeout",
+            responseStatus = HttpStatusCode.GatewayTimeout
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30UnknownResponseException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertEquals(504, exception.statusCode)
+        assertEquals("upstream timeout", exception.responseBody)
+        assertEquals("Unexpected HTTP status: 504", exception.message)
+    }
+
+    @Test
+    fun testAccountsListMalformedJsonResponse() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = "not json at all",
+            responseStatus = HttpStatusCode.OK
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30InvalidResponseException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertTrue(
+            exception.message!!.contains("Failed to parse SEP-30 accounts response"),
+            "Exception message should identify the accounts response parser, was: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testAccountsListMissingAccountsField() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts",
+            responseBody = """{"next": "cursor"}""",
+            responseStatus = HttpStatusCode.OK
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30InvalidResponseException> {
+            service.accounts(jwt = testJwt)
+        }
+        assertEquals(
+            "Missing required 'accounts' field in SEP-30 accounts response",
+            exception.message
+        )
+    }
+
+    @Test
+    fun testErrorMessageFallsBackToRawBody() = runTest {
+        val mockClient = createMockClient(
+            expectedMethod = HttpMethod.Get,
+            expectedPath = "/accounts/$testAddress",
+            responseBody = "plain text failure",
+            responseStatus = HttpStatusCode.BadRequest
+        )
+        val service = Sep30Service(serviceUrl, httpClient = mockClient)
+        val exception = assertFailsWith<Sep30BadRequestException> {
+            service.accountDetails(testAddress, testJwt)
+        }
+        assertEquals("plain text failure", exception.message)
+    }
+
+    @Test
     fun testMalformedJsonResponse() = runTest {
         val mockClient = createMockClient(
             expectedMethod = HttpMethod.Get,

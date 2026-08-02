@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_3
@@ -27,6 +28,9 @@ class SignerEffectsTest {
         )
         assertEquals(1, effect.weight)
         assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -48,6 +52,9 @@ class SignerEffectsTest {
         assertIs<SignerEffectResponse>(effect)
         assertEquals(5, effect.weight)
         assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -70,6 +77,9 @@ class SignerEffectsTest {
         )
         assertEquals(0, effect.weight)
         assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -90,6 +100,10 @@ class SignerEffectsTest {
         assertIs<SignerRemovedEffectResponse>(effect)
         assertIs<SignerEffectResponse>(effect)
         assertEquals(0, effect.weight)
+        assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -112,6 +126,9 @@ class SignerEffectsTest {
         )
         assertEquals(3, effect.weight)
         assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -132,6 +149,10 @@ class SignerEffectsTest {
         assertIs<SignerUpdatedEffectResponse>(effect)
         assertIs<SignerEffectResponse>(effect)
         assertEquals(3, effect.weight)
+        assertEquals(TEST_ACCOUNT_2, effect.publicKey)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -170,6 +191,9 @@ class SignerEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals(TEST_ACCOUNT_3, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -190,6 +214,9 @@ class SignerEffectsTest {
         assertIs<SignerSponsorshipCreatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals(TEST_ACCOUNT_3, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -212,6 +239,9 @@ class SignerEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -232,6 +262,9 @@ class SignerEffectsTest {
         assertIs<SignerSponsorshipRemovedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -255,6 +288,9 @@ class SignerEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
         assertEquals(TEST_ACCOUNT, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -277,6 +313,9 @@ class SignerEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
         assertEquals(TEST_ACCOUNT, effect.signer)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

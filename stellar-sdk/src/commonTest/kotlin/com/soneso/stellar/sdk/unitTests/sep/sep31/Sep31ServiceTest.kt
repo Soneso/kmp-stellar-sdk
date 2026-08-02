@@ -19,15 +19,12 @@ import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnauthorizedException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnknownResponseException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.engine.mock.respondOk
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
@@ -393,6 +390,24 @@ class Sep31ServiceTest {
     fun fromDomain_invalidDomain_throwsSep31ConfigurationException() = runTest {
         val ex = assertFailsWith<Sep31ConfigurationException> {
             Sep31Service.fromDomain("anchor example.org/path?q=1")
+        }
+        assertNotNull(ex.message)
+    }
+
+    @Test
+    fun fromDomain_domainWithPathSeparator_throwsSep31ConfigurationException() = runTest {
+        // `/`, `?` and `#` are URL-meaningful and must never appear in a bare domain.
+        val ex = assertFailsWith<Sep31ConfigurationException> {
+            Sep31Service.fromDomain("anchor.example.org/.well-known")
+        }
+        assertNotNull(ex.message)
+    }
+
+    @Test
+    fun fromDomain_domainWithControlCharacter_throwsSep31ConfigurationException() = runTest {
+        // A control character (here U+0001) is rejected before any TOML fetch is attempted.
+        val ex = assertFailsWith<Sep31ConfigurationException> {
+            Sep31Service.fromDomain("anchor\u0001example.org")
         }
         assertNotNull(ex.message)
     }
@@ -1511,6 +1526,52 @@ class Sep31ServiceTest {
     }
 
     @Test
+    fun getTransaction_idWithLowercaseHexEscape_decodesAndReachesAnchor() = runTest {
+        // %4a is a valid lower-case percent escape decoding to 'J', an RFC 3986 pchar.
+        // The id passes validation and the request is issued.
+        var requestedPath: String? = null
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(pendingSenderTransactionJson) { requestedPath = it.url.encodedPath },
+        )
+        val response = service.getTransaction("tx%4a", jwt)
+
+        assertEquals("82fhs729f63dh0v4", response.id)
+        assertTrue(
+            requestedPath?.startsWith("/transactions/tx%4") == true,
+            "the escape must reach the anchor still percent-encoded; was: $requestedPath",
+        )
+    }
+
+    @Test
+    fun getTransaction_idWithInvalidSecondHexDigit_throwsIllegalArgumentException() = runTest {
+        // The first hex digit is valid and the second is not, so the decoder rejects the
+        // escape only after reading both digits.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%4Z", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithPunctuationHexDigits_throwsIllegalArgumentException() = runTest {
+        // '!' sorts below every hex-digit range, so none of the three ranges match.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%!!", jwt)
+        }
+    }
+
+    @Test
+    fun getTransaction_idWithLettersAboveHexRange_throwsIllegalArgumentException() = runTest {
+        // 'z' sorts above 'f', so the lower-case hex range rejects it.
+        val service = Sep31Service(serviceUrl, mockClient("{}", statusCode = HttpStatusCode.OK))
+        assertFailsWith<IllegalArgumentException> {
+            service.getTransaction("abc%zz", jwt)
+        }
+    }
+
+    @Test
     fun fromDomain_emptyDomain_throwsSep31ConfigurationException() = runTest {
         // validateDomain rejects empty domain strings before any TOML fetch is attempted.
         val ex = assertFailsWith<Sep31ConfigurationException> {
@@ -1709,6 +1770,51 @@ class Sep31ServiceTest {
         )
         val response = service.info(jwt = jwt)
         assertNotNull(response.receiveAssets["USDC"])
+    }
+
+    @Test
+    fun info_200ApplicationXmlContentType_throwsSep31InvalidResponseException() = runTest {
+        // `application/xml` shares the `application` type but neither accepted subtype,
+        // so it must be refused.
+        val service = Sep31Service(
+            serviceUrl,
+            mockClient(
+                "<info/>",
+                statusCode = HttpStatusCode.OK,
+                contentType = "application/xml",
+            ),
+        )
+        val ex = assertFailsWith<Sep31InvalidResponseException> {
+            service.info(jwt = jwt)
+        }
+        assertTrue(
+            ex.message?.contains("Content-Type") == true,
+            "exception message must mention Content-Type; was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun info_401WithoutContentTypeHeader_returnsDefaultAuthFailureMessage() = runTest {
+        // A 401 with no Content-Type header at all cannot be treated as JSON, so the
+        // body is not captured and the default auth-failure message is used.
+        val engine = MockEngine { _ ->
+            respond(
+                content = """{"error":"unauthorized"}""",
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(),
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val service = Sep31Service(serviceUrl, client)
+        val ex = assertFailsWith<Sep31UnauthorizedException> {
+            service.info(jwt = jwt)
+        }
+        assertEquals(401, ex.statusCode)
+        assertNull(ex.rawResponseBody, "a body without a Content-Type must not be captured")
     }
 
     @Test

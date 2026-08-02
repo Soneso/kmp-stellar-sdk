@@ -438,4 +438,60 @@ class AuthTest {
         val publicKeyBytes = (publicKeyEntry!!.`val` as SCValXdr.Bytes).value.value
         assertContentEquals(signer.getPublicKey(), publicKeyBytes)
     }
+
+    // ========== Auth.Signature: equals/hashCode ==========
+
+    @Test
+    fun testSignatureEqualsReflexiveNullAndDifferentType() {
+        val sig = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { it.toByte() })
+        assertEquals(sig, sig)
+        assertFalse(sig.equals(null))
+        assertFalse(sig.equals("not a signature"))
+    }
+
+    @Test
+    fun testSignatureEqualsAndHashCodeForEqualValues() {
+        val sig1 = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { it.toByte() })
+        val sig2 = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { it.toByte() })
+        assertEquals(sig1, sig2)
+        assertEquals(sig1.hashCode(), sig2.hashCode())
+    }
+
+    @Test
+    fun testSignatureNotEqualForDifferentPublicKey() {
+        val sig1 = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { it.toByte() })
+        val sig2 = Auth.Signature("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ", ByteArray(64) { it.toByte() })
+        assertNotEquals(sig1, sig2)
+    }
+
+    @Test
+    fun testSignatureNotEqualForDifferentSignatureBytes() {
+        val sig1 = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { it.toByte() })
+        val sig2 = Auth.Signature(CREDENTIAL_ADDRESS, ByteArray(64) { (it + 1).toByte() })
+        assertNotEquals(sig1, sig2)
+    }
+
+    // ========== buildSignatureScVal: existing Vec with null inner value ==========
+
+    @Test
+    fun testAuthorizeEntryAppendsToVecWithNullInnerValue() = runTest {
+        val signer = KeyPair.fromSecretSeed(SECRET_SEED)
+        val baseEntry = createUnsignedEntry(signer.getAccountId())
+        val degenerateCredentials = (baseEntry.credentials as SorobanCredentialsXdr.Address).value
+            .copy(signature = SCValXdr.Vec(null))
+        val entryWithDegenerateVec = baseEntry.copy(
+            credentials = SorobanCredentialsXdr.Address(degenerateCredentials)
+        )
+
+        val signedEntry = Auth.authorizeEntry(
+            entry = entryWithDegenerateVec,
+            signer = signer,
+            validUntilLedgerSeq = VALID_UNTIL_LEDGER_SEQ,
+            network = NETWORK
+        )
+
+        // A void-like Vec(null) is treated the same as no prior signatures: exactly one
+        // element is appended, never an NPE from dereferencing the null inner vector.
+        verifySignedEntry(signedEntry, signer, NONCE, VALID_UNTIL_LEDGER_SEQ)
+    }
 }

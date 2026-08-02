@@ -149,7 +149,7 @@ val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Step 1: Request challenge
 val challenge = webAuth.getChallenge(clientAccountId = accountId)
 
-// Step 2: Validate challenge (13 security checks)
+// Step 2: Validate challenge (14 security checks)
 webAuth.validateChallenge(
     challengeXdr = challenge.transaction,
     clientAccountId = accountId

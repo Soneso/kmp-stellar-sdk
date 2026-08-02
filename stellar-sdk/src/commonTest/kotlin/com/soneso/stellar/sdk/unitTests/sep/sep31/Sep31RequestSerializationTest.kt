@@ -135,6 +135,20 @@ class Sep31RequestSerializationTest {
     }
 
     @Test
+    fun toJson_langPresent_serializesLangKey() = runTest {
+        val request = Sep31PostTransactionsRequest(
+            amount = 100.0,
+            assetCode = "USDC",
+            fundingMethod = "SWIFT",
+            lang = "pt-BR",
+        )
+        val map = request.toJson()
+
+        assertTrue(map.containsKey("lang"), "lang key must be present when supplied")
+        assertEquals("pt-BR", map["lang"])
+    }
+
+    @Test
     fun toJson_preservesInsertionOrder_deterministicOutput() = runTest {
         val request = Sep31PostTransactionsRequest(
             amount = 100.0,

@@ -5,7 +5,10 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep38
 
 import com.soneso.stellar.sdk.sep.sep38.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -219,5 +222,47 @@ class Sep38InfoResponseTest {
         assertEquals("iso4217:USD", response.assets[1].asset)
         assertEquals("iso4217:BRL", response.assets[2].asset)
         assertNotNull(response.assets[2].countryCodes)
+    }
+
+    @Test
+    fun testSerializeInfoResponseBuiltFromConstructor() {
+        val info = Sep38InfoResponse(
+            assets = listOf(
+                Sep38Asset(
+                    asset = "iso4217:BRL",
+                    sellDeliveryMethods = listOf(
+                        Sep38DeliveryMethod("PIX", "Send BRL directly via PIX")
+                    ),
+                    buyDeliveryMethods = listOf(
+                        Sep38DeliveryMethod("PIX", "Receive BRL directly via PIX")
+                    ),
+                    countryCodes = listOf("BR")
+                ),
+                Sep38Asset(
+                    asset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(info)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(setOf("assets"), encodedObject.keys)
+
+        val assets = encodedObject["assets"]!!.jsonArray
+        assertEquals(
+            setOf("asset", "sell_delivery_methods", "buy_delivery_methods", "country_codes"),
+            assets[0].jsonObject.keys
+        )
+        assertEquals(setOf("asset"), assets[1].jsonObject.keys)
+        assertEquals(
+            setOf("name", "description"),
+            assets[0].jsonObject["sell_delivery_methods"]!!.jsonArray[0].jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString<Sep38InfoResponse>(encoded)
+        assertEquals(info, decoded)
+        assertNull(decoded.assets[1].sellDeliveryMethods)
+        assertNull(decoded.assets[1].countryCodes)
     }
 }

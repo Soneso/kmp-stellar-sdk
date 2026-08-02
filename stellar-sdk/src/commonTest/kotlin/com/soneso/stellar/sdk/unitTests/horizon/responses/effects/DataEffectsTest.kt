@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
+import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_2
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.TEST_ACCOUNT_3
@@ -27,6 +28,9 @@ class DataEffectsTest {
         )
         assertEquals("myKey", effect.name)
         assertEquals("bXlWYWx1ZQ==", effect.value)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -47,6 +51,9 @@ class DataEffectsTest {
         assertIs<DataCreatedEffectResponse>(effect)
         assertEquals("myKey", effect.name)
         assertEquals("bXlWYWx1ZQ==", effect.value)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -68,6 +75,9 @@ class DataEffectsTest {
             name = "myKey"
         )
         assertEquals("myKey", effect.name)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -86,6 +96,9 @@ class DataEffectsTest {
         val effect = json.decodeFromString<EffectResponse>(jsonStr)
         assertIs<DataRemovedEffectResponse>(effect)
         assertEquals("removedKey", effect.name)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -108,6 +121,9 @@ class DataEffectsTest {
         )
         assertEquals("myKey", effect.name)
         assertEquals("bmV3VmFsdWU=", effect.value)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -128,6 +144,9 @@ class DataEffectsTest {
         assertIs<DataUpdatedEffectResponse>(effect)
         assertEquals("myKey", effect.name)
         assertEquals("bmV3VmFsdWU=", effect.value)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -150,6 +169,9 @@ class DataEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -170,6 +192,9 @@ class DataEffectsTest {
         assertIs<DataSponsorshipCreatedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.sponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -192,6 +217,9 @@ class DataEffectsTest {
         )
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -212,6 +240,9 @@ class DataEffectsTest {
         assertIs<DataSponsorshipRemovedEffectResponse>(effect)
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -235,6 +266,9 @@ class DataEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test
@@ -257,6 +291,9 @@ class DataEffectsTest {
         assertEquals(TEST_ACCOUNT_2, effect.formerSponsor)
         assertEquals(TEST_ACCOUNT_3, effect.newSponsor)
         assertEquals("myKey", effect.dataName)
+        assertEquals(TEST_CREATED_AT, effect.createdAt)
+        assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
+        assertStandardLinks(effect.links)
     }
 
     @Test

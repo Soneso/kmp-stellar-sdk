@@ -9,8 +9,10 @@ import com.soneso.stellar.sdk.sep.sep09.NaturalPersonKYCFields
 import com.soneso.stellar.sdk.sep.sep09.OrganizationKYCFields
 import com.soneso.stellar.sdk.sep.sep09.StandardKYCFields
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -19,6 +21,11 @@ class PutCustomerInfoRequestTest {
     private val jwtToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
     private val customerId = "d1ce2f48-3ff1-495d-9240-7a50d806cfed"
     private val accountId = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP"
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     @Test
     fun testRequestWithSEP09KYCFields() {
@@ -255,5 +262,48 @@ class PutCustomerInfoRequestTest {
         )
 
         assertEquals(jwtToken, request.jwt)
+    }
+
+    @Test
+    fun testResponseCarriesCustomerIdThroughJson() {
+        val response = PutCustomerInfoResponse(id = customerId)
+
+        val encoded = json.encodeToString(PutCustomerInfoResponse.serializer(), response)
+
+        assertEquals("""{"id":"$customerId"}""", encoded)
+
+        val decoded = json.decodeFromString<PutCustomerInfoResponse>(encoded)
+
+        assertEquals(response, decoded)
+        assertEquals(customerId, decoded.id)
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun testVerificationRequestCarriesConfirmationCodes() {
+        val request = PutCustomerVerificationRequest(
+            jwt = jwtToken,
+            id = customerId,
+            verificationFields = mapOf(
+                "email_address_verification" to "123456",
+                "mobile_number_verification" to "654321"
+            )
+        )
+
+        assertEquals(jwtToken, request.jwt)
+        assertEquals(customerId, request.id)
+        assertEquals(2, request.verificationFields.size)
+        assertEquals("123456", request.verificationFields["email_address_verification"])
+        assertEquals("654321", request.verificationFields["mobile_number_verification"])
+
+        val retry = request.copy(
+            verificationFields = mapOf("email_address_verification" to "000000")
+        )
+
+        assertEquals(customerId, retry.id)
+        assertEquals("000000", retry.verificationFields["email_address_verification"])
+        assertNotEquals(request, retry)
+        assertEquals(request, request.copy())
+        assertTrue(request.toString().contains(customerId))
     }
 }

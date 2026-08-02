@@ -55,6 +55,10 @@ class AuthP27Test {
         // whose KeyPair can actually sign. The account is the public key of DELEGATE_B_SEED.
         const val DELEGATE_B_SEED = "SAEZSI6DY7AXJFIYA4PM6SIBNEYYXIEM2MSOTHFGKHDW32MBQ7KVO6EN"
         const val DELEGATE_B_ACCOUNT = "GBMLPRFCZDZJPKUPHUSHCKA737GOZL7ERZLGGMJ6YGHBFJZ6ZKMKCZTM"
+
+        // A valid muxed (M...) address derived deterministically from SIGNER_ACCOUNT
+        // with a fixed multiplexing id.
+        val MUXED_ADDRESS: String = MuxedAccount(SIGNER_ACCOUNT, 42UL).address
     }
 
     // ========================================================================
@@ -84,17 +88,20 @@ class AuthP27Test {
         )
     }
 
+    /** Builds the address credentials shared by the golden-vector entries. */
+    private fun baseCredentials(): SorobanAddressCredentialsXdr {
+        return SorobanAddressCredentialsXdr(
+            address = Address(SIGNER_ACCOUNT).toSCAddress(),
+            nonce = Int64Xdr(NONCE),
+            signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
+            signature = Scv.toVoid()
+        )
+    }
+
     /** Builds a legacy ADDRESS entry with the golden-vector fixed fields. */
     private fun goldenLegacyEntry(): SorobanAuthorizationEntryXdr {
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.Address(
-                SorobanAddressCredentialsXdr(
-                    address = Address(SIGNER_ACCOUNT).toSCAddress(),
-                    nonce = Int64Xdr(NONCE),
-                    signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
-                    signature = Scv.toVoid()
-                )
-            ),
+            credentials = SorobanCredentialsXdr.Address(baseCredentials()),
             rootInvocation = goldenInvocation()
         )
     }
@@ -102,14 +109,7 @@ class AuthP27Test {
     /** Builds an ADDRESS_V2 entry with the golden-vector fixed fields. */
     private fun goldenV2Entry(): SorobanAuthorizationEntryXdr {
         return SorobanAuthorizationEntryXdr(
-            credentials = SorobanCredentialsXdr.AddressV2(
-                SorobanAddressCredentialsXdr(
-                    address = Address(SIGNER_ACCOUNT).toSCAddress(),
-                    nonce = Int64Xdr(NONCE),
-                    signatureExpirationLedger = Uint32Xdr(EXPIRATION.toUInt()),
-                    signature = Scv.toVoid()
-                )
-            ),
+            credentials = SorobanCredentialsXdr.AddressV2(baseCredentials()),
             rootInvocation = goldenInvocation()
         )
     }
@@ -240,6 +240,15 @@ class AuthP27Test {
         assertEquals(99L, updatedWithDel.value.addressCredentials.nonce.value)
         // Delegates are preserved
         assertEquals(1, updatedWithDel.value.delegates.size)
+    }
+
+    @Test
+    fun testWithUpdatedAddressCredentialsRejectsVoid() {
+        val void: SorobanCredentialsXdr = SorobanCredentialsXdr.Void
+        val ex = assertFailsWith<IllegalArgumentException> {
+            void.withUpdatedAddressCredentials(baseCredentials())
+        }
+        assertTrue(ex.message!!.contains("Void"), "message must name Void; got: ${ex.message}")
     }
 
     // ========================================================================
@@ -383,6 +392,52 @@ class AuthP27Test {
         assertFailsWith<IllegalArgumentException> {
             Auth.buildHashIDPreimage(SorobanCredentialsXdr.Void, networkId, goldenInvocation())
         }
+    }
+
+    @Test
+    fun testWithAddressPreimageEncodeDecodeRoundTrip() = runTest {
+        // The encode path is covered by the golden vectors above; this asserts the
+        // decode side reconstructs every field and selects the WITH_ADDRESS arm.
+        val preimage = Auth.buildHashIDPreimage(
+            credentials = SorobanCredentialsXdr.AddressV2(baseCredentials()),
+            networkId = NETWORK.networkId(),
+            invocation = goldenInvocation()
+        )
+        assertIs<HashIDPreimageXdr.SorobanAuthorizationWithAddress>(preimage)
+
+        val decoded = HashIDPreimageXdr.decode(XdrReader(xdrBytes(preimage)))
+        assertIs<HashIDPreimageXdr.SorobanAuthorizationWithAddress>(decoded)
+
+        val original = preimage.value
+        val back = decoded.value
+        assertContentEquals(original.networkId.value, back.networkId.value)
+        assertEquals(original.nonce.value, back.nonce.value)
+        assertEquals(original.signatureExpirationLedger.value, back.signatureExpirationLedger.value)
+        assertContentEquals(original.address.toXdrBytes(), back.address.toXdrBytes())
+        assertEquals(NONCE, back.nonce.value)
+        assertEquals(EXPIRATION.toUInt(), back.signatureExpirationLedger.value)
+    }
+
+    @Test
+    fun testDecodedWithAddressPreimageCarriesTopLevelAddress() = runTest {
+        // The WITH_ADDRESS preimage binds the top-level credential address; a decoded
+        // preimage must carry SIGNER_ACCOUNT, never a delegate address.
+        val withDelegates = Auth.attachDelegates(
+            goldenLegacyEntry(),
+            EXPIRATION,
+            listOf(DelegateDescriptor(address = DELEGATE_ACCOUNT))
+        )
+        val preimage = Auth.buildHashIDPreimage(
+            credentials = withDelegates.credentials,
+            networkId = NETWORK.networkId(),
+            invocation = withDelegates.rootInvocation
+        )
+        val decoded = HashIDPreimageXdr.decode(XdrReader(xdrBytes(preimage)))
+        val back = (decoded as HashIDPreimageXdr.SorobanAuthorizationWithAddress).value
+        assertContentEquals(
+            Address(SIGNER_ACCOUNT).toSCAddress().toXdrBytes(),
+            back.address.toXdrBytes()
+        )
     }
 
     // ========================================================================
@@ -533,6 +588,37 @@ class AuthP27Test {
     }
 
     // ========================================================================
+    // authorizeEntry: base64 overload with a custom Signer
+    // ========================================================================
+
+    @Test
+    fun testAuthorizeEntryBase64WithCustomSignerSignsTopLevel() = runTest {
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val entryB64 = goldenLegacyEntry().toXdrBase64()
+
+        val customSigner = Auth.Signer { preimage ->
+            val payload = Util.hash(xdrBytes(preimage))
+            Auth.Signature(keyPair.getAccountId(), keyPair.sign(payload))
+        }
+
+        val signed = Auth.authorizeEntry(entryB64, customSigner, EXPIRATION, NETWORK)
+
+        val creds = (signed.credentials as SorobanCredentialsXdr.Address).value
+        assertContentEquals(keyPair.getPublicKey(), singleSignaturePublicKey(creds.signature))
+    }
+
+    @Test
+    fun testAuthorizeEntryBase64InvalidThrows() = runTest {
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val customSigner = Auth.Signer { preimage ->
+            Auth.Signature(keyPair.getAccountId(), keyPair.sign(Util.hash(xdrBytes(preimage))))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Auth.authorizeEntry("not-valid-base64-xdr!!!", customSigner, EXPIRATION, NETWORK)
+        }
+    }
+
+    // ========================================================================
     // authorizeEntry: signature append semantics
     // ========================================================================
 
@@ -570,6 +656,13 @@ class AuthP27Test {
         val map = (element as SCValXdr.Map).value!!.value
         val entry = map.find { it.key is SCValXdr.Sym && (it.key as SCValXdr.Sym).value.value == "public_key" }
         return (entry!!.`val` as SCValXdr.Bytes).value.value
+    }
+
+    /** Returns the raw public-key bytes from the single signature element of [signature]. */
+    private fun singleSignaturePublicKey(signature: SCValXdr): ByteArray {
+        val vec = (signature as SCValXdr.Vec).value!!.value
+        assertEquals(1, vec.size, "expected exactly one signature element")
+        return signatureElementPublicKey(vec[0])
     }
 
     @Test
@@ -755,19 +848,60 @@ class AuthP27Test {
 
     @Test
     fun testForAddressMuxedThrows() = runTest {
+        // A structurally valid M... address must be rejected by signForAddress, because
+        // muxed addresses are not valid Soroban auth addresses. Asserting the address type
+        // up front keeps the test from passing on a plain strkey-decoding failure.
+        assertEquals(Address.AddressType.MUXED_ACCOUNT, Address(MUXED_ADDRESS).addressType)
         val signer = KeyPair.fromSecretSeed(SIGNER_SEED)
-        val entry = goldenLegacyEntry()
-        // Muxed M... address — must be rejected
-        val muxedAddress = "MA7QYNF7SOWQ3GLR2BGMZEHXR77REGBTZZG7MWC24SZYZM57DUJLKC52"
-        assertFailsWith<IllegalArgumentException> {
+        val ex = assertFailsWith<IllegalArgumentException> {
             Auth.authorizeEntry(
-                entry,
+                goldenLegacyEntry(),
                 signer,
                 EXPIRATION,
                 NETWORK,
-                Auth.AuthOptions(forAddress = muxedAddress)
+                Auth.AuthOptions(forAddress = MUXED_ADDRESS)
             )
         }
+        assertTrue(ex.message!!.contains("Muxed"), "message must name the muxed rejection; got: ${ex.message}")
+    }
+
+    @Test
+    fun testForAddressMatchingTopLevelLegacyAddressArm() = runTest {
+        // forAddress == the top-level credential address on a legacy ADDRESS entry.
+        // The signature must land on the top-level credentials and the arm is preserved.
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val signed = Auth.authorizeEntry(
+            goldenLegacyEntry(),
+            keyPair,
+            EXPIRATION,
+            NETWORK,
+            Auth.AuthOptions(forAddress = SIGNER_ACCOUNT)
+        )
+
+        assertIs<SorobanCredentialsXdr.Address>(signed.credentials)
+        assertContentEquals(
+            keyPair.getPublicKey(),
+            singleSignaturePublicKey(signed.credentials.value.signature)
+        )
+    }
+
+    @Test
+    fun testForAddressMatchingTopLevelV2Arm() = runTest {
+        // forAddress == the top-level credential address on an ADDRESS_V2 entry.
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val signed = Auth.authorizeEntry(
+            goldenV2Entry(),
+            keyPair,
+            EXPIRATION,
+            NETWORK,
+            Auth.AuthOptions(forAddress = SIGNER_ACCOUNT)
+        )
+
+        assertIs<SorobanCredentialsXdr.AddressV2>(signed.credentials)
+        assertContentEquals(
+            keyPair.getPublicKey(),
+            singleSignaturePublicKey(signed.credentials.value.signature)
+        )
     }
 
     // ========================================================================
@@ -942,6 +1076,28 @@ class AuthP27Test {
     }
 
     @Test
+    fun testSortAndValidateDelegatesRejectsDuplicateAddress() {
+        // Two nodes carrying byte-identical addresses in one array must be rejected.
+        // The address decodes cleanly, so the message names the StrKey form.
+        val addr = Address(DELEGATE_ACCOUNT).toSCAddress()
+        val a = SorobanDelegateSignatureXdr(addr, Scv.toVoid(), emptyList())
+        val b = SorobanDelegateSignatureXdr(addr, Scv.toVoid(), emptyList())
+        val ex = assertFailsWith<IllegalArgumentException> {
+            sortAndValidateDelegates(listOf(a, b))
+        }
+        assertTrue(ex.message!!.contains("Duplicate delegate address"), "got: ${ex.message}")
+        assertTrue(ex.message!!.contains(DELEGATE_ACCOUNT), "message must name the duplicate address; got: ${ex.message}")
+    }
+
+    @Test
+    fun testDelegateDescriptorToXdrRejectsMuxedAddress() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            DelegateDescriptor(address = MUXED_ADDRESS).toXdr()
+        }
+        assertTrue(ex.message!!.contains("Muxed"), "message must name muxed rejection; got: ${ex.message}")
+    }
+
+    @Test
     fun testSameAddressAtDifferentLevelsIsAccepted() {
         // The same address may appear at different nesting levels — only within-array
         // duplicates are forbidden.
@@ -1037,9 +1193,42 @@ class AuthP27Test {
         }
 
         val targetBytes = leafAddress.toXdrBytes()
-        assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<IllegalArgumentException> {
             findDelegateNodes(listOf(deepNode), targetBytes)
         }
+        // Traversal and descriptor conversion raise different messages; pinning the exact one
+        // keeps this test distinguishable from testDelegateDescriptorToXdrRejectsTreeDeeperThanCap
+        assertEquals("Delegate tree traversal depth 129 exceeds cap 128", error.message)
+    }
+
+    @Test
+    fun testMapMatchingDelegatesRejectsTreeDeeperThanCap() {
+        val leafAddress = Address(DELEGATE_ACCOUNT).toSCAddress()
+        var deepNode = SorobanDelegateSignatureXdr(leafAddress, Scv.toVoid(), emptyList())
+        repeat(130) {
+            deepNode = SorobanDelegateSignatureXdr(leafAddress, Scv.toVoid(), listOf(deepNode))
+        }
+        val targetBytes = leafAddress.toXdrBytes()
+        val error = assertFailsWith<IllegalArgumentException> {
+            listOf(deepNode).mapMatchingDelegates(targetBytes) { it }
+        }
+        assertEquals("Delegate tree traversal depth 129 exceeds cap 128", error.message)
+    }
+
+    @Test
+    fun testDelegateDescriptorToXdrRejectsTreeDeeperThanCap() {
+        var descriptor = DelegateDescriptor(address = DELEGATE_ACCOUNT)
+        repeat(130) {
+            descriptor = DelegateDescriptor(
+                address = DELEGATE_ACCOUNT,
+                nestedDelegates = listOf(descriptor)
+            )
+        }
+        val error = assertFailsWith<IllegalArgumentException> {
+            descriptor.toXdr()
+        }
+        // The descriptor path reports itself, not the traversal cap
+        assertEquals("Delegate descriptor depth 129 exceeds cap 128", error.message)
     }
 
     // ========================================================================

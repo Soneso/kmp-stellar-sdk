@@ -1,11 +1,14 @@
 package com.soneso.stellar.sdk.unitTests.horizon.responses
 
 import com.soneso.stellar.sdk.horizon.responses.Link
+import com.soneso.stellar.sdk.horizon.responses.Price
 import com.soneso.stellar.sdk.horizon.responses.TradeResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -119,7 +122,7 @@ class TradeResponseTest {
     }
 
     @Test
-    fun testComprehensiveTradeResponseDeserialization() {
+    fun testTradeResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "id": "107449584845914113-0",
@@ -260,5 +263,127 @@ class TradeResponseTest {
         assertEquals(true, links.base.templated)
         assertEquals(false, links.counter.templated)
         assertNull(links.operation.templated)
+    }
+
+    private fun directLinks() = TradeResponse.Links(
+        base = Link("https://horizon.stellar.org/accounts/GBASE"),
+        counter = Link("https://horizon.stellar.org/accounts/GCOUNTER"),
+        operation = Link("https://horizon.stellar.org/operations/4001")
+    )
+
+    private fun orderbookTrade() = TradeResponse(
+        id = "4001-0",
+        pagingToken = "4001-0",
+        ledgerCloseTime = "2024-05-06T07:08:09Z",
+        tradeType = "orderbook",
+        offerId = 700L,
+        liquidityPoolFeeBP = 30,
+        baseLiquidityPoolId = "pool-base",
+        baseOfferId = 701L,
+        baseAccount = "GBASE",
+        baseAmount = "10.5000000",
+        baseAssetType = "credit_alphanum4",
+        baseAssetCode = "USD",
+        baseAssetIssuer = "GISSUERUSD",
+        counterLiquidityPoolId = "pool-counter",
+        counterOfferId = 702L,
+        counterAccount = "GCOUNTER",
+        counterAmount = "21.0000000",
+        counterAssetType = "credit_alphanum12",
+        counterAssetCode = "LONGASSET",
+        counterAssetIssuer = "GISSUERLONG",
+        baseIsSeller = true,
+        price = Price(numerator = 2, denominator = 1),
+        links = directLinks()
+    )
+
+    private fun minimalTrade() = TradeResponse(
+        id = "4002-0",
+        pagingToken = "4002-0",
+        ledgerCloseTime = "2024-05-06T07:08:09Z",
+        tradeType = "orderbook",
+        baseAmount = "1.0000000",
+        baseAssetType = "native",
+        counterAmount = "2.0000000",
+        counterAssetType = "native",
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val trade = orderbookTrade()
+
+        val encoded = json.encodeToString(TradeResponse.serializer(), trade)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "paging_token", "ledger_close_time", "trade_type", "offer_id",
+                "liquidity_pool_fee_bp", "base_liquidity_pool_id", "base_offer_id",
+                "base_account", "base_amount", "base_asset_type", "base_asset_code",
+                "base_asset_issuer", "counter_liquidity_pool_id", "counter_offer_id",
+                "counter_account", "counter_amount", "counter_asset_type",
+                "counter_asset_code", "counter_asset_issuer", "base_is_seller", "price", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("GBASE", encodedObject["base_account"]!!.jsonPrimitive.content)
+        assertEquals("GCOUNTER", encodedObject["counter_account"]!!.jsonPrimitive.content)
+        assertEquals("10.5000000", encodedObject["base_amount"]!!.jsonPrimitive.content)
+        assertEquals("21.0000000", encodedObject["counter_amount"]!!.jsonPrimitive.content)
+        assertEquals("701", encodedObject["base_offer_id"]!!.jsonPrimitive.content)
+        assertEquals("702", encodedObject["counter_offer_id"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(TradeResponse.serializer(), encoded)
+        assertEquals(trade, decoded)
+        assertEquals("orderbook", decoded.tradeType)
+        assertEquals(700L, decoded.offerId)
+        assertEquals(30, decoded.liquidityPoolFeeBP)
+        assertEquals("USD", decoded.baseAssetCode)
+        assertEquals("LONGASSET", decoded.counterAssetCode)
+        assertEquals(true, decoded.baseIsSeller)
+        assertEquals(2L, decoded.price?.numerator)
+        assertEquals(1L, decoded.price?.denominator)
+        assertEquals("https://horizon.stellar.org/operations/4001", decoded.links.operation.href)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val trade = minimalTrade()
+
+        assertNull(trade.offerId)
+        assertNull(trade.liquidityPoolFeeBP)
+        assertNull(trade.baseLiquidityPoolId)
+        assertNull(trade.baseOfferId)
+        assertNull(trade.baseAccount)
+        assertNull(trade.baseAssetCode)
+        assertNull(trade.baseAssetIssuer)
+        assertNull(trade.counterLiquidityPoolId)
+        assertNull(trade.counterOfferId)
+        assertNull(trade.counterAccount)
+        assertNull(trade.counterAssetCode)
+        assertNull(trade.counterAssetIssuer)
+        assertNull(trade.baseIsSeller)
+        assertNull(trade.price)
+
+        val encoded = json.encodeToString(TradeResponse.serializer(), trade)
+        assertEquals(
+            setOf(
+                "id", "paging_token", "ledger_close_time", "trade_type", "base_amount",
+                "base_asset_type", "counter_amount", "counter_asset_type", "_links"
+            ),
+            json.parseToJsonElement(encoded).jsonObject.keys
+        )
+        assertEquals(trade, json.decodeFromString(TradeResponse.serializer(), encoded))
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val trade = orderbookTrade()
+        assertNotEquals(trade, minimalTrade())
+        assertNotEquals(trade, trade.copy(price = Price(1, 2)))
+        assertNotEquals(trade, trade.copy(baseIsSeller = false))
+        assertEquals(trade, orderbookTrade())
+        assertEquals(trade.hashCode(), orderbookTrade().hashCode())
     }
 }

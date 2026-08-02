@@ -2,8 +2,11 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 
 import com.soneso.stellar.sdk.horizon.responses.FeeStatsResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class FeeStatsResponseTest {
 
@@ -105,7 +108,7 @@ class FeeStatsResponseTest {
     }
 
     @Test
-    fun testComprehensiveFeeStatsResponseDeserialization() {
+    fun testFeeStatsResponseDeserializationWithAllFields() {
         val comprehensiveJson = """
         {
             "last_ledger": 32069474,
@@ -401,5 +404,89 @@ class FeeStatsResponseTest {
         assertEquals(2000L, feeDistribution.p90)
         assertEquals(5000L, feeDistribution.p95)
         assertEquals(10000L, feeDistribution.p99)
+    }
+
+    private fun feeChargedDistribution() = FeeStatsResponse.FeeDistribution(
+        min = 100L,
+        max = 6000L,
+        mode = 100L,
+        p10 = 100L,
+        p20 = 100L,
+        p30 = 150L,
+        p40 = 200L,
+        p50 = 250L,
+        p60 = 300L,
+        p70 = 400L,
+        p80 = 800L,
+        p90 = 1600L,
+        p95 = 3200L,
+        p99 = 6000L
+    )
+
+    private fun maxFeeDistribution() = FeeStatsResponse.FeeDistribution(
+        min = 200L,
+        max = 120000L,
+        mode = 10000L,
+        p10 = 1000L,
+        p20 = 2000L,
+        p30 = 3000L,
+        p40 = 4000L,
+        p50 = 5000L,
+        p60 = 6000L,
+        p70 = 7000L,
+        p80 = 8000L,
+        p90 = 9000L,
+        p95 = 100000L,
+        p99 = 120000L
+    )
+
+    private fun directFeeStats() = FeeStatsResponse(
+        lastLedger = 51006L,
+        lastLedgerBaseFee = 100L,
+        ledgerCapacityUsage = "0.97",
+        feeCharged = feeChargedDistribution(),
+        maxFee = maxFeeDistribution()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val feeStats = directFeeStats()
+
+        val encoded = json.encodeToString(FeeStatsResponse.serializer(), feeStats)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf("last_ledger", "last_ledger_base_fee", "ledger_capacity_usage", "fee_charged", "max_fee"),
+            encodedObject.keys
+        )
+        assertEquals("51006", encodedObject["last_ledger"]!!.jsonPrimitive.content)
+        assertEquals("100", encodedObject["last_ledger_base_fee"]!!.jsonPrimitive.content)
+        assertEquals("0.97", encodedObject["ledger_capacity_usage"]!!.jsonPrimitive.content)
+        assertEquals(
+            setOf("min", "max", "mode", "p10", "p20", "p30", "p40", "p50", "p60", "p70", "p80", "p90", "p95", "p99"),
+            encodedObject["fee_charged"]!!.jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString(FeeStatsResponse.serializer(), encoded)
+        assertEquals(feeStats, decoded)
+        assertEquals(51006L, decoded.lastLedger)
+        assertEquals(100L, decoded.lastLedgerBaseFee)
+        assertEquals("0.97", decoded.ledgerCapacityUsage)
+        assertEquals(100L, decoded.feeCharged.min)
+        assertEquals(6000L, decoded.feeCharged.p99)
+        assertEquals(200L, decoded.maxFee.min)
+        assertEquals(120000L, decoded.maxFee.max)
+        assertEquals(10000L, decoded.maxFee.mode)
+        assertEquals(100000L, decoded.maxFee.p95)
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val feeStats = directFeeStats()
+        assertNotEquals(feeStats, feeStats.copy(lastLedger = 51007L))
+        assertNotEquals(feeStats, feeStats.copy(feeCharged = maxFeeDistribution()))
+        assertNotEquals(feeStats, feeStats.copy(ledgerCapacityUsage = "0.5"))
+        assertEquals(feeStats, directFeeStats())
+        assertEquals(feeStats.hashCode(), directFeeStats().hashCode())
     }
 }

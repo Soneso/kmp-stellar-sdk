@@ -3,8 +3,11 @@ package com.soneso.stellar.sdk.unitTests.horizon.responses
 import com.soneso.stellar.sdk.horizon.responses.Link
 import com.soneso.stellar.sdk.horizon.responses.RootResponse
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -108,7 +111,7 @@ class RootResponseTest {
     }
 
     @Test
-    fun testRootResponseLinksInnerClassFullCoverage() {
+    fun testRootResponseLinksProperties() {
         val fullLinksJson = """
         {
             "horizon_version": "2.18.0",
@@ -372,5 +375,107 @@ class RootResponseTest {
         assertNull(links.assets)
         assertNull(links.effects)
         assertNull(links.ledgers)
+    }
+
+    private fun directLinks() = RootResponse.Links(
+        self = Link("https://horizon.stellar.org/"),
+        accounts = Link("https://horizon.stellar.org/accounts"),
+        friendbot = Link("https://friendbot.stellar.org/{?addr}", true),
+        transactions = Link("https://horizon.stellar.org/transactions")
+    )
+
+    private fun directRoot() = RootResponse(
+        horizonVersion = "2.31.0",
+        stellarCoreVersion = "21.3.1",
+        ingestLatestLedger = 51500L,
+        historyLatestLedger = 51499L,
+        historyLatestLedgerClosedAt = "2024-07-08T09:10:11Z",
+        historyElderLedger = 2L,
+        coreLatestLedger = 51501L,
+        networkPassphrase = "Public Global Stellar Network ; September 2015",
+        currentProtocolVersion = 21,
+        supportedProtocolVersion = 21,
+        coreSupportedProtocolVersion = 22,
+        links = directLinks()
+    )
+
+    @Test
+    fun testConstructionAndSerializationRoundTrip() {
+        val root = directRoot()
+
+        val encoded = json.encodeToString(RootResponse.serializer(), root)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "horizon_version", "core_version", "ingest_latest_ledger", "history_latest_ledger",
+                "history_latest_ledger_closed_at", "history_elder_ledger", "core_latest_ledger",
+                "network_passphrase", "current_protocol_version", "supported_protocol_version",
+                "core_supported_protocol_version", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertEquals("2.31.0", encodedObject["horizon_version"]!!.jsonPrimitive.content)
+        assertEquals("21.3.1", encodedObject["core_version"]!!.jsonPrimitive.content)
+        assertEquals("51500", encodedObject["ingest_latest_ledger"]!!.jsonPrimitive.content)
+        assertEquals("51499", encodedObject["history_latest_ledger"]!!.jsonPrimitive.content)
+        assertEquals("51501", encodedObject["core_latest_ledger"]!!.jsonPrimitive.content)
+        assertEquals("21", encodedObject["supported_protocol_version"]!!.jsonPrimitive.content)
+        assertEquals("22", encodedObject["core_supported_protocol_version"]!!.jsonPrimitive.content)
+
+        val decoded = json.decodeFromString(RootResponse.serializer(), encoded)
+        assertEquals(root, decoded)
+        assertEquals("Public Global Stellar Network ; September 2015", decoded.networkPassphrase)
+        assertEquals(2L, decoded.historyElderLedger)
+        assertEquals(21, decoded.currentProtocolVersion)
+        assertEquals("https://friendbot.stellar.org/{?addr}", decoded.links.friendbot?.href)
+        assertEquals(true, decoded.links.friendbot?.templated)
+        assertNull(decoded.links.assets)
+    }
+
+    @Test
+    fun testMinimalConstructionAppliesDefaults() {
+        val root = RootResponse(
+            horizonVersion = "2.31.0",
+            stellarCoreVersion = "21.3.1",
+            historyLatestLedger = 51499L,
+            historyLatestLedgerClosedAt = "2024-07-08T09:10:11Z",
+            historyElderLedger = 2L,
+            coreLatestLedger = 51501L,
+            networkPassphrase = "Test SDF Network ; September 2015",
+            currentProtocolVersion = 21,
+            supportedProtocolVersion = 21,
+            coreSupportedProtocolVersion = 22,
+            links = RootResponse.Links()
+        )
+
+        assertNull(root.ingestLatestLedger)
+        assertNull(root.links.self)
+        assertNull(root.links.accounts)
+        assertNull(root.links.friendbot)
+
+        val encoded = json.encodeToString(RootResponse.serializer(), root)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+        assertEquals(
+            setOf(
+                "horizon_version", "core_version", "history_latest_ledger",
+                "history_latest_ledger_closed_at", "history_elder_ledger", "core_latest_ledger",
+                "network_passphrase", "current_protocol_version", "supported_protocol_version",
+                "core_supported_protocol_version", "_links"
+            ),
+            encodedObject.keys
+        )
+        assertTrue(encodedObject["_links"]!!.jsonObject.isEmpty())
+        assertEquals(root, json.decodeFromString(RootResponse.serializer(), encoded))
+    }
+
+    @Test
+    fun testInstancesWithDifferentFieldsAreNotEqual() {
+        val root = directRoot()
+        assertNotEquals(root, root.copy(ingestLatestLedger = null))
+        assertNotEquals(root, root.copy(coreSupportedProtocolVersion = 23))
+        assertNotEquals(root, root.copy(links = RootResponse.Links()))
+        assertEquals(root, directRoot())
+        assertEquals(root.hashCode(), directRoot().hashCode())
     }
 }

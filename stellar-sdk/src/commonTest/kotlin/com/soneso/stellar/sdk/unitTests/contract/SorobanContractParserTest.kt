@@ -66,6 +66,68 @@ class SorobanContractParserTest {
         }
     }
 
+    private fun encodedBytes(block: (XdrWriter) -> Unit): ByteArray {
+        val writer = XdrWriter()
+        block(writer)
+        return writer.toByteArray()
+    }
+
+    private fun envMetaBytes(protocol: UInt = 21u): ByteArray = encodedBytes { writer ->
+        SCEnvMetaEntryXdr.InterfaceVersion(
+            SCEnvMetaEntryInterfaceVersionXdr(protocol = Uint32Xdr(protocol), preRelease = Uint32Xdr(0u))
+        ).encode(writer)
+    }
+
+    private fun funcSpecEntryBytes(name: String = "hello"): ByteArray = encodedBytes { writer ->
+        SCSpecEntryXdr.FunctionV0(
+            SCSpecFunctionV0Xdr(doc = "", name = SCSymbolXdr(name), inputs = emptyList(), outputs = emptyList())
+        ).encode(writer)
+    }
+
+    private fun metaEntryBytes(key: String, value: String): ByteArray = encodedBytes { writer ->
+        SCMetaEntryXdr.V0(SCMetaV0Xdr(key = key, `val` = value)).encode(writer)
+    }
+
+    @Test
+    fun testParseContractByteCodeThrowsWhenSpecEntriesMarkerMissing() {
+        // Valid env meta and nothing else: every "contractspecv0" marker-search
+        // fallback in parseContractSpec fails, so parsing must report "spec entries
+        // not found" rather than silently producing an empty spec list.
+        val byteCode = "contractenvmetav0".encodeToByteArray() + envMetaBytes()
+        val ex = assertFailsWith<SorobanContractParserException> {
+            SorobanContractParser.parseContractByteCode(byteCode)
+        }
+        assertTrue(ex.message!!.contains("spec entries not found"))
+    }
+
+    @Test
+    fun testParseContractByteCodeParsesSingleSpecEntryToExhaustion() {
+        // The spec section contains exactly one entry with no trailing bytes before
+        // the next marker: the decode loop must exit by exhausting currentSpecBytes,
+        // not by hitting an unknown discriminant or a decode error.
+        val byteCode = "contractspecv0".encodeToByteArray() + funcSpecEntryBytes() +
+            "contractenvmetav0".encodeToByteArray() + envMetaBytes()
+        val info = SorobanContractParser.parseContractByteCode(byteCode)
+        assertEquals(1, info.specEntries.size)
+        assertEquals(1, info.funcs.size)
+        assertEquals("hello", info.funcs[0].name.value)
+        assertEquals(emptyMap(), info.metaEntries)
+    }
+
+    @Test
+    fun testParseContractByteCodeParsesMetaEntryToExhaustion() {
+        // Layout: env meta, then contract meta, then contract spec, each section
+        // tight against the next marker. parseMeta lands on its second fallback
+        // (metav0 -> specv0) and its decode loop exits by exhaustion.
+        val byteCode = "contractenvmetav0".encodeToByteArray() + envMetaBytes() +
+            "contractmetav0".encodeToByteArray() + metaEntryBytes("rsdk_version", "1.0.0") +
+            "contractspecv0".encodeToByteArray() + funcSpecEntryBytes()
+        val info = SorobanContractParser.parseContractByteCode(byteCode)
+        assertEquals(21UL, info.envInterfaceVersion)
+        assertEquals(1, info.specEntries.size)
+        assertEquals("1.0.0", info.metaEntries["rsdk_version"])
+    }
+
     // ========== SorobanContractInfo Tests ==========
 
     @Test
@@ -223,6 +285,23 @@ class SorobanContractParserTest {
     }
 
     @Test
+    fun testSorobanContractInfoUdtErrorEnums_filtersErrorEnumEntries() {
+        val funcEntry = SCSpecEntryXdr.FunctionV0(
+            SCSpecFunctionV0Xdr(doc = "", name = SCSymbolXdr("hello"), inputs = emptyList(), outputs = emptyList())
+        )
+        val errorEnumEntry = SCSpecEntryXdr.UdtErrorEnumV0(
+            SCSpecUDTErrorEnumV0Xdr(doc = "", lib = "", name = "MyError", cases = emptyList())
+        )
+        val info = SorobanContractInfo(
+            envInterfaceVersion = 21UL,
+            specEntries = listOf(funcEntry, errorEnumEntry),
+            metaEntries = emptyMap()
+        )
+        assertEquals(1, info.udtErrorEnums.size)
+        assertEquals("MyError", info.udtErrorEnums[0].name)
+    }
+
+    @Test
     fun testSorobanContractInfoEvents_empty() {
         val info = SorobanContractInfo(
             envInterfaceVersion = 21UL,
@@ -230,6 +309,30 @@ class SorobanContractParserTest {
             metaEntries = emptyMap()
         )
         assertEquals(emptyList(), info.events)
+    }
+
+    @Test
+    fun testSorobanContractInfoEvents_filtersEventEntries() {
+        val funcEntry = SCSpecEntryXdr.FunctionV0(
+            SCSpecFunctionV0Xdr(doc = "", name = SCSymbolXdr("hello"), inputs = emptyList(), outputs = emptyList())
+        )
+        val eventEntry = SCSpecEntryXdr.EventV0(
+            SCSpecEventV0Xdr(
+                doc = "",
+                lib = "",
+                name = SCSymbolXdr("Transfer"),
+                prefixTopics = emptyList(),
+                params = emptyList(),
+                dataFormat = SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE
+            )
+        )
+        val info = SorobanContractInfo(
+            envInterfaceVersion = 21UL,
+            specEntries = listOf(funcEntry, eventEntry),
+            metaEntries = emptyMap()
+        )
+        assertEquals(1, info.events.size)
+        assertEquals("Transfer", info.events[0].name.value)
     }
 
     @Test

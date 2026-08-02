@@ -9,6 +9,7 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class NaturalPersonKYCFieldsTest {
@@ -572,5 +573,222 @@ class NaturalPersonKYCFieldsTest {
         val fields = person.fields()
 
         assertEquals("123 Main Street\nApartment 4B\nBuilding C", fields["address"])
+    }
+
+    // ========== Equality Contract Tests ==========
+
+    /**
+     * All-null instance used as the comparison base. A variant that sets exactly one
+     * field differs from this base in that field only, so equals() must report the
+     * two as different and hashCode() must take the field into account.
+     */
+    private val unsetPerson = NaturalPersonKYCFields()
+
+    private fun assertFieldParticipatesInEquality(
+        fieldName: String,
+        variant: NaturalPersonKYCFields
+    ) {
+        assertNotEquals(unsetPerson, variant, "equals() ignores $fieldName")
+        assertNotEquals(variant, unsetPerson, "equals() ignores $fieldName when compared in reverse")
+        assertNotEquals(
+            unsetPerson.hashCode(),
+            variant.hashCode(),
+            "hashCode() ignores $fieldName"
+        )
+    }
+
+    @Test
+    fun testEqualsShortCircuitsOnIdentity() {
+        val person = NaturalPersonKYCFields(
+            firstName = "John",
+            photoIdFront = byteArrayOf(1, 2, 3)
+        )
+        val sameInstance: Any = person
+
+        assertTrue(person.equals(sameInstance))
+    }
+
+    @Test
+    fun testEqualsRejectsNullAndOtherTypes() {
+        val person = NaturalPersonKYCFields(firstName = "John")
+
+        assertFalse(person.equals(null))
+        assertFalse(person.equals("John"))
+        assertFalse(person.equals(OrganizationKYCFields(name = "John")))
+    }
+
+    @Test
+    fun testEqualsDistinguishesIdentityFields() {
+        assertFieldParticipatesInEquality("lastName", NaturalPersonKYCFields(lastName = "Doe"))
+        assertFieldParticipatesInEquality("firstName", NaturalPersonKYCFields(firstName = "John"))
+        assertFieldParticipatesInEquality(
+            "additionalName",
+            NaturalPersonKYCFields(additionalName = "Michael")
+        )
+    }
+
+    @Test
+    fun testEqualsDistinguishesAddressFields() {
+        assertFieldParticipatesInEquality(
+            "addressCountryCode",
+            NaturalPersonKYCFields(addressCountryCode = "USA")
+        )
+        assertFieldParticipatesInEquality(
+            "stateOrProvince",
+            NaturalPersonKYCFields(stateOrProvince = "California")
+        )
+        assertFieldParticipatesInEquality("city", NaturalPersonKYCFields(city = "San Francisco"))
+        assertFieldParticipatesInEquality("postalCode", NaturalPersonKYCFields(postalCode = "94102"))
+        assertFieldParticipatesInEquality("address", NaturalPersonKYCFields(address = "123 Main St"))
+    }
+
+    @Test
+    fun testEqualsDistinguishesContactFields() {
+        assertFieldParticipatesInEquality(
+            "mobileNumber",
+            NaturalPersonKYCFields(mobileNumber = "+14155551234")
+        )
+        assertFieldParticipatesInEquality(
+            "mobileNumberFormat",
+            NaturalPersonKYCFields(mobileNumberFormat = "E.164")
+        )
+        assertFieldParticipatesInEquality(
+            "emailAddress",
+            NaturalPersonKYCFields(emailAddress = "john@example.com")
+        )
+    }
+
+    @Test
+    fun testEqualsDistinguishesBirthFields() {
+        assertFieldParticipatesInEquality(
+            "birthDate",
+            NaturalPersonKYCFields(birthDate = LocalDate(1990, 1, 15))
+        )
+        assertFieldParticipatesInEquality(
+            "birthPlace",
+            NaturalPersonKYCFields(birthPlace = "New York, NY, USA")
+        )
+        assertFieldParticipatesInEquality(
+            "birthCountryCode",
+            NaturalPersonKYCFields(birthCountryCode = "USA")
+        )
+    }
+
+    @Test
+    fun testEqualsDistinguishesGovernmentIdFields() {
+        assertFieldParticipatesInEquality("idType", NaturalPersonKYCFields(idType = "passport"))
+        assertFieldParticipatesInEquality(
+            "idCountryCode",
+            NaturalPersonKYCFields(idCountryCode = "USA")
+        )
+        assertFieldParticipatesInEquality("idNumber", NaturalPersonKYCFields(idNumber = "123456789"))
+        assertFieldParticipatesInEquality(
+            "idIssueDate",
+            NaturalPersonKYCFields(idIssueDate = LocalDate(2020, 6, 1))
+        )
+        assertFieldParticipatesInEquality(
+            "idExpirationDate",
+            NaturalPersonKYCFields(idExpirationDate = LocalDate(2030, 6, 1))
+        )
+    }
+
+    @Test
+    fun testEqualsDistinguishesTaxFields() {
+        assertFieldParticipatesInEquality("taxId", NaturalPersonKYCFields(taxId = "123-45-6789"))
+        assertFieldParticipatesInEquality("taxIdName", NaturalPersonKYCFields(taxIdName = "SSN"))
+    }
+
+    @Test
+    fun testEqualsDistinguishesEmploymentFields() {
+        assertFieldParticipatesInEquality("occupation", NaturalPersonKYCFields(occupation = "111"))
+        assertFieldParticipatesInEquality(
+            "employerName",
+            NaturalPersonKYCFields(employerName = "Example Corp")
+        )
+        assertFieldParticipatesInEquality(
+            "employerAddress",
+            NaturalPersonKYCFields(employerAddress = "456 Business Ave")
+        )
+    }
+
+    @Test
+    fun testEqualsDistinguishesRemainingTextFields() {
+        assertFieldParticipatesInEquality("languageCode", NaturalPersonKYCFields(languageCode = "en"))
+        assertFieldParticipatesInEquality(
+            "ipAddress",
+            NaturalPersonKYCFields(ipAddress = "192.168.1.1")
+        )
+        assertFieldParticipatesInEquality("sex", NaturalPersonKYCFields(sex = "male"))
+        assertFieldParticipatesInEquality("referralId", NaturalPersonKYCFields(referralId = "REF123"))
+    }
+
+    @Test
+    fun testEqualsDistinguishesNestedFields() {
+        assertFieldParticipatesInEquality(
+            "financialAccountKYCFields",
+            NaturalPersonKYCFields(
+                financialAccountKYCFields = FinancialAccountKYCFields(bankName = "Example Bank")
+            )
+        )
+        assertFieldParticipatesInEquality(
+            "cardKYCFields",
+            NaturalPersonKYCFields(cardKYCFields = CardKYCFields(token = "tok_visa_123"))
+        )
+    }
+
+    @Test
+    fun testEqualsComparesDocumentContent() {
+        val documents: List<Pair<String, (ByteArray) -> NaturalPersonKYCFields>> = listOf(
+            Pair("photoIdFront", { bytes: ByteArray ->
+                NaturalPersonKYCFields(photoIdFront = bytes)
+            }),
+            Pair("photoIdBack", { bytes: ByteArray ->
+                NaturalPersonKYCFields(photoIdBack = bytes)
+            }),
+            Pair("notaryApprovalOfPhotoId", { bytes: ByteArray ->
+                NaturalPersonKYCFields(notaryApprovalOfPhotoId = bytes)
+            }),
+            Pair("photoProofResidence", { bytes: ByteArray ->
+                NaturalPersonKYCFields(photoProofResidence = bytes)
+            }),
+            Pair("proofOfIncome", { bytes: ByteArray ->
+                NaturalPersonKYCFields(proofOfIncome = bytes)
+            }),
+            Pair("proofOfLiveness", { bytes: ByteArray ->
+                NaturalPersonKYCFields(proofOfLiveness = bytes)
+            })
+        )
+
+        val content = byteArrayOf(10, 20, 30, 40)
+        val otherContent = byteArrayOf(40, 30, 20, 10)
+
+        documents.forEach { (fieldName, build) ->
+            val withDocument = build(content)
+
+            // Document present on one side only, in both comparison directions
+            assertNotEquals(unsetPerson, withDocument, "equals() ignores a present $fieldName")
+            assertNotEquals(withDocument, unsetPerson, "equals() ignores a missing $fieldName")
+
+            // Different content in the same field
+            assertNotEquals(
+                withDocument,
+                build(otherContent),
+                "equals() ignores differing $fieldName content"
+            )
+            assertNotEquals(
+                withDocument.hashCode(),
+                build(otherContent).hashCode(),
+                "hashCode() ignores differing $fieldName content"
+            )
+
+            // Equal content held in a different array instance compares equal
+            val equalContentCopy = build(content.copyOf())
+            assertEquals(withDocument, equalContentCopy, "equals() compares $fieldName by reference")
+            assertEquals(
+                withDocument.hashCode(),
+                equalContentCopy.hashCode(),
+                "hashCode() hashes $fieldName by reference"
+            )
+        }
     }
 }

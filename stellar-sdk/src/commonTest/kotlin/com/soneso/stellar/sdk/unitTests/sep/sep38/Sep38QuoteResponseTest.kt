@@ -5,7 +5,10 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep38
 
 import com.soneso.stellar.sdk.sep.sep38.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -204,5 +207,117 @@ class Sep38QuoteResponseTest {
 
         assertEquals("uuid-test-123", response.id)
         assertEquals("2021-04-30T07:42:23.123Z", response.expiresAt)
+    }
+
+    @Test
+    fun testSerializeQuoteBuiltFromConstructor() {
+        val quote = Sep38QuoteResponse(
+            id = "de762cda-a193-4961-861e-57b31fed6eb3",
+            expiresAt = "2021-04-30T07:42:23Z",
+            totalPrice = "5.42",
+            price = "5.00",
+            sellAsset = "iso4217:BRL",
+            sellAmount = "542",
+            sellDeliveryMethod = "PIX",
+            buyAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+            buyAmount = "100",
+            buyDeliveryMethod = "bank_account",
+            fee = Sep38Fee(
+                total = "42.00",
+                asset = "iso4217:BRL",
+                details = listOf(
+                    Sep38FeeDetail(
+                        name = "PIX fee",
+                        amount = "12.00",
+                        description = "Charged to process the outgoing PIX transaction."
+                    ),
+                    Sep38FeeDetail(name = "Service fee", amount = "30.00")
+                )
+            )
+        )
+
+        val encoded = json.encodeToString(quote)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "expires_at", "total_price", "price",
+                "sell_asset", "sell_amount", "sell_delivery_method",
+                "buy_asset", "buy_amount", "buy_delivery_method", "fee"
+            ),
+            encodedObject.keys
+        )
+        assertEquals(setOf("total", "asset", "details"), encodedObject["fee"]!!.jsonObject.keys)
+        assertEquals(
+            setOf("name", "amount", "description"),
+            encodedObject["fee"]!!.jsonObject["details"]!!.jsonArray[0].jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString<Sep38QuoteResponse>(encoded)
+        assertEquals(quote, decoded)
+        assertNull(decoded.fee.details!![1].description)
+    }
+
+    @Test
+    fun testSerializeQuoteWithoutOptionalFields() {
+        val quote = Sep38QuoteResponse(
+            id = "quote-minimal",
+            expiresAt = "2021-05-01T10:00:00Z",
+            totalPrice = "1.01",
+            price = "1.00",
+            sellAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+            sellAmount = "101",
+            buyAsset = "iso4217:USD",
+            buyAmount = "100",
+            fee = Sep38Fee(total = "1.00", asset = "iso4217:USD")
+        )
+
+        val encoded = json.encodeToString(quote)
+        val encodedObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            setOf(
+                "id", "expires_at", "total_price", "price",
+                "sell_asset", "sell_amount", "buy_asset", "buy_amount", "fee"
+            ),
+            encodedObject.keys
+        )
+        assertEquals(setOf("total", "asset"), encodedObject["fee"]!!.jsonObject.keys)
+
+        val decoded = json.decodeFromString<Sep38QuoteResponse>(encoded)
+        assertEquals(quote, decoded)
+        assertNull(decoded.sellDeliveryMethod)
+        assertNull(decoded.buyDeliveryMethod)
+        assertNull(decoded.fee.details)
+    }
+
+    @Test
+    fun testFeeDetailRoundTrip() {
+        val withDescription = Sep38FeeDetail(
+            name = "Brazilian conciliation fee",
+            amount = "15.00",
+            description = "Covers intermediary bank costs."
+        )
+        val withDescriptionEncoded = json.encodeToString(withDescription)
+        assertEquals(
+            setOf("name", "amount", "description"),
+            json.parseToJsonElement(withDescriptionEncoded).jsonObject.keys
+        )
+        assertEquals(
+            withDescription,
+            json.decodeFromString<Sep38FeeDetail>(withDescriptionEncoded)
+        )
+
+        val withoutDescription = Sep38FeeDetail(name = "Service fee", amount = "15.00")
+        val withoutDescriptionEncoded = json.encodeToString(withoutDescription)
+        assertEquals(
+            setOf("name", "amount"),
+            json.parseToJsonElement(withoutDescriptionEncoded).jsonObject.keys
+        )
+
+        val decoded = json.decodeFromString<Sep38FeeDetail>(withoutDescriptionEncoded)
+        assertEquals(withoutDescription, decoded)
+        assertNull(decoded.description)
+        assertNotNull(decoded.name)
     }
 }

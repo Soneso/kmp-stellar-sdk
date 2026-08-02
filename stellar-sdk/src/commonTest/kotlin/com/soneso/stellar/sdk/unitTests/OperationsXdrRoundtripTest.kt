@@ -18,6 +18,7 @@ class OperationsXdrRoundtripTest {
         val ASSET_USD = AssetTypeCreditAlphaNum4("USD", ACCOUNT_A)
         val ASSET_EUR = AssetTypeCreditAlphaNum4("EUR", ACCOUNT_B)
         val ASSET_LONG = AssetTypeCreditAlphaNum12("LONGASSET", ACCOUNT_A)
+        val MUXED_B: String = MuxedAccount(ACCOUNT_B, 42UL).address
     }
 
     // ========== CreateAccountOperation ==========
@@ -1073,5 +1074,659 @@ class OperationsXdrRoundtripTest {
     fun testClaimantValid() {
         val c = Claimant(ACCOUNT_B, ClaimPredicate.Unconditional)
         assertEquals(ACCOUNT_B, c.destination)
+    }
+
+    // ========== Operation.Companion.toXdrAmount error branches ==========
+
+    @Test
+    fun testAmountWithNonNumericWholePartThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "abc.5000000")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
+    }
+
+    @Test
+    fun testAmountWithTooManyDecimalPlacesThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.12345678")
+        }
+        assertTrue(exception.message!!.contains("more than 7 decimal places"))
+    }
+
+    // ========== Operation.Companion.formatAmountScale ==========
+
+    @Test
+    fun testFormatAmountScaleBlankThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            Operation.formatAmountScale("")
+        }
+    }
+
+    @Test
+    fun testFormatAmountScaleTooManyPartsThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            Operation.formatAmountScale("1.2.3")
+        }
+    }
+
+    @Test
+    fun testFormatAmountScaleFractionTooLongThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Operation.formatAmountScale("1.12345678")
+        }
+        assertTrue(exception.message!!.contains("scale"))
+    }
+
+    @Test
+    fun testFormatAmountScalePadsFraction() {
+        assertEquals("1.5000000", Operation.formatAmountScale("1.5"))
+    }
+
+    @Test
+    fun testFormatAmountScaleWholeNumberGetsZeroFraction() {
+        assertEquals("42.0000000", Operation.formatAmountScale("42"))
+    }
+
+    // ========== Operation.fromXdr dispatch: Soroban void-free operations ==========
+
+    @Test
+    fun testOperationFromXdrDispatchesExtendFootprintTTL() {
+        val op = ExtendFootprintTTLOperation(10000)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ExtendFootprintTTLOperation)
+        assertEquals(10000, (restored as ExtendFootprintTTLOperation).extendTo)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesRestoreFootprint() {
+        val op = RestoreFootprintOperation()
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is RestoreFootprintOperation)
+    }
+
+    // ========== Operation.fromXdr: unknown void operation discriminant ==========
+
+    @Test
+    fun testOperationFromXdrUnknownVoidOperationTypeThrows() {
+        // A well-formed Void body only occurs for INFLATION and END_SPONSORING_FUTURE_RESERVES;
+        // construct one with a different discriminant to reach the defensive else branch.
+        val bogusBody = OperationBodyXdr.Void(OperationTypeXdr.PAYMENT)
+        val xdr = OperationXdr(sourceAccount = null, body = bogusBody)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Operation.fromXdr(xdr)
+        }
+        assertTrue(exception.message!!.contains("Unknown void operation type"))
+    }
+
+    // ========== Operation.fromXdr dispatch: remaining operation types ==========
+    // Each of these round-trips through the top-level Operation.fromXdr(OperationXdr) dispatcher
+    // (not the per-operation fromXdr(opBody)) to exercise the corresponding `is OperationBodyXdr.*`
+    // arm of the when in Operation.Companion.fromXdr.
+
+    @Test
+    fun testOperationFromXdrDispatchesPathPaymentStrictReceive() {
+        val op = PathPaymentStrictReceiveOperation(
+            sendAsset = ASSET_NATIVE,
+            sendMax = "10.0000000",
+            destination = ACCOUNT_B,
+            destAsset = ASSET_USD,
+            destAmount = "5.0000000"
+        )
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is PathPaymentStrictReceiveOperation)
+        assertEquals(ACCOUNT_B, restored.destination)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesPathPaymentStrictSend() {
+        val op = PathPaymentStrictSendOperation(
+            sendAsset = ASSET_USD,
+            sendAmount = "10.0000000",
+            destination = ACCOUNT_B,
+            destAsset = ASSET_NATIVE,
+            destMin = "5.0000000"
+        )
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is PathPaymentStrictSendOperation)
+        assertEquals(ACCOUNT_B, restored.destination)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesManageSellOffer() {
+        val op = ManageSellOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1))
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ManageSellOfferOperation)
+        assertEquals(ASSET_USD, restored.selling)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesCreatePassiveSellOffer() {
+        val op = CreatePassiveSellOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1))
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is CreatePassiveSellOfferOperation)
+        assertEquals(ASSET_USD, restored.selling)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesSetOptions() {
+        val op = SetOptionsOperation(masterKeyWeight = 5)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is SetOptionsOperation)
+        assertEquals(5, restored.masterKeyWeight)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesChangeTrust() {
+        val op = ChangeTrustOperation(ASSET_USD, "500.0000000")
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ChangeTrustOperation)
+        assertEquals(ASSET_USD, restored.asset)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesAllowTrust() {
+        val op = AllowTrustOperation(ACCOUNT_B, "USD", 1)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is AllowTrustOperation)
+        assertEquals("USD", restored.assetCode)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesAccountMerge() {
+        val op = AccountMergeOperation(ACCOUNT_B)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is AccountMergeOperation)
+        assertEquals(ACCOUNT_B, restored.destination)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesBumpSequence() {
+        val op = BumpSequenceOperation(5000L)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is BumpSequenceOperation)
+        assertEquals(5000L, restored.bumpTo)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesManageBuyOffer() {
+        val op = ManageBuyOfferOperation(ASSET_NATIVE, ASSET_USD, "1.0000000", Price(1, 1))
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ManageBuyOfferOperation)
+        assertEquals(ASSET_USD, restored.buying)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesCreateClaimableBalance() {
+        val op = CreateClaimableBalanceOperation(
+            ASSET_NATIVE,
+            "10.0000000",
+            listOf(Claimant(ACCOUNT_B, ClaimPredicate.Unconditional))
+        )
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is CreateClaimableBalanceOperation)
+        assertEquals(1, restored.claimants.size)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesClaimClaimableBalance() {
+        val balanceId = "00000000" + "c".repeat(64)
+        val op = ClaimClaimableBalanceOperation(balanceId)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ClaimClaimableBalanceOperation)
+        assertEquals(balanceId, restored.balanceId)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesBeginSponsoringFutureReserves() {
+        val op = BeginSponsoringFutureReservesOperation(ACCOUNT_B)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is BeginSponsoringFutureReservesOperation)
+        assertEquals(ACCOUNT_B, restored.sponsoredId)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesRevokeSponsorship() {
+        val op = RevokeSponsorshipOperation(Sponsorship.Account(ACCOUNT_B))
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is RevokeSponsorshipOperation)
+        assertTrue(restored.sponsorship is Sponsorship.Account)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesClawback() {
+        val op = ClawbackOperation(ACCOUNT_B, ASSET_USD, "10.0000000")
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ClawbackOperation)
+        assertEquals(ACCOUNT_B, restored.from)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesClawbackClaimableBalance() {
+        val balanceId = "00000000" + "d".repeat(64)
+        val op = ClawbackClaimableBalanceOperation(balanceId)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is ClawbackClaimableBalanceOperation)
+        assertEquals(balanceId, restored.balanceId)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesSetTrustLineFlags() {
+        val op = SetTrustLineFlagsOperation(ACCOUNT_B, ASSET_USD, setFlags = SetTrustLineFlagsOperation.AUTHORIZED_FLAG)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is SetTrustLineFlagsOperation)
+        assertEquals(ACCOUNT_B, restored.trustor)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesLiquidityPoolDeposit() {
+        val op = LiquidityPoolDepositOperation(
+            liquidityPoolId = "e".repeat(64),
+            maxAmountA = "10.0000000",
+            maxAmountB = "20.0000000",
+            minPrice = Price(1, 2),
+            maxPrice = Price(2, 1)
+        )
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is LiquidityPoolDepositOperation)
+        assertEquals("e".repeat(64), restored.liquidityPoolId)
+    }
+
+    @Test
+    fun testOperationFromXdrDispatchesLiquidityPoolWithdraw() {
+        val op = LiquidityPoolWithdrawOperation(
+            liquidityPoolId = "f".repeat(64),
+            amount = "5.0000000",
+            minAmountA = "1.0000000",
+            minAmountB = "2.0000000"
+        )
+        val restored = Operation.fromXdr(op.toXdr())
+        assertTrue(restored is LiquidityPoolWithdrawOperation)
+        assertEquals("f".repeat(64), restored.liquidityPoolId)
+    }
+
+    // ========== Operation.Companion.toXdrAmount: blank, multi-dot and empty whole part ==========
+
+    @Test
+    fun testAmountBlankThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "")
+        }
+        assertTrue(exception.message!!.contains("cannot be blank"))
+    }
+
+    @Test
+    fun testAmountWithTooManyDotsThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.2.3")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
+    }
+
+    @Test
+    fun testAmountWithEmptyWholePartParsesAsZero() {
+        val op = PaymentOperation(ACCOUNT_B, ASSET_NATIVE, ".5000000")
+        val xdr = op.toOperationBody()
+        val restored = when (xdr) {
+            is OperationBodyXdr.PaymentOp -> PaymentOperation.fromXdr(xdr.value)
+            else -> fail("Wrong XDR type")
+        }
+        assertEquals("0.5000000", restored.amount)
+    }
+
+    // ========== Destination validation: muxed addresses and invalid strings ==========
+
+    @Test
+    fun testPaymentDestinationAcceptsMuxedAddress() {
+        val op = PaymentOperation(MUXED_B, ASSET_NATIVE, "1.0000000")
+        assertEquals(MUXED_B, op.destination)
+    }
+
+    @Test
+    fun testPaymentInvalidDestinationThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            PaymentOperation("NOT-AN-ADDRESS", ASSET_NATIVE, "1.0000000")
+        }
+    }
+
+    @Test
+    fun testPathPaymentStrictReceiveDestinationAcceptsMuxedAddress() {
+        val op = PathPaymentStrictReceiveOperation(
+            sendAsset = ASSET_NATIVE,
+            sendMax = "10.0000000",
+            destination = MUXED_B,
+            destAsset = ASSET_USD,
+            destAmount = "5.0000000"
+        )
+        assertEquals(MUXED_B, op.destination)
+    }
+
+    @Test
+    fun testPathPaymentStrictReceiveInvalidDestinationThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            PathPaymentStrictReceiveOperation(
+                sendAsset = ASSET_NATIVE,
+                sendMax = "10.0000000",
+                destination = "NOT-AN-ADDRESS",
+                destAsset = ASSET_USD,
+                destAmount = "5.0000000"
+            )
+        }
+    }
+
+    @Test
+    fun testPathPaymentStrictSendDestinationAcceptsMuxedAddress() {
+        val op = PathPaymentStrictSendOperation(
+            sendAsset = ASSET_USD,
+            sendAmount = "10.0000000",
+            destination = MUXED_B,
+            destAsset = ASSET_NATIVE,
+            destMin = "5.0000000"
+        )
+        assertEquals(MUXED_B, op.destination)
+    }
+
+    @Test
+    fun testPathPaymentStrictSendInvalidDestinationThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            PathPaymentStrictSendOperation(
+                sendAsset = ASSET_USD,
+                sendAmount = "10.0000000",
+                destination = "NOT-AN-ADDRESS",
+                destAsset = ASSET_NATIVE,
+                destMin = "5.0000000"
+            )
+        }
+    }
+
+    @Test
+    fun testPathPaymentStrictSendTooManyPathsThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            PathPaymentStrictSendOperation(
+                sendAsset = ASSET_USD,
+                sendAmount = "10.0000000",
+                destination = ACCOUNT_B,
+                destAsset = ASSET_NATIVE,
+                destMin = "5.0000000",
+                path = listOf(ASSET_USD, ASSET_EUR, ASSET_NATIVE, ASSET_LONG, ASSET_USD, ASSET_EUR)
+            )
+        }
+    }
+
+    // ========== Offer validations: same asset / negative offer id ==========
+
+    @Test
+    fun testManageSellOfferSameAssetThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ManageSellOfferOperation(ASSET_USD, ASSET_USD, "1.0000000", Price(1, 1))
+        }
+        assertTrue(exception.message!!.contains("must be different"))
+    }
+
+    @Test
+    fun testManageSellOfferNegativeOfferIdThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            ManageSellOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = -1)
+        }
+    }
+
+    @Test
+    fun testManageBuyOfferSameAssetThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ManageBuyOfferOperation(ASSET_USD, ASSET_USD, "1.0000000", Price(1, 1))
+        }
+        assertTrue(exception.message!!.contains("must be different"))
+    }
+
+    @Test
+    fun testManageBuyOfferNegativeOfferIdThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            ManageBuyOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = -1)
+        }
+    }
+
+    @Test
+    fun testCreatePassiveSellOfferSameAssetThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            CreatePassiveSellOfferOperation(ASSET_USD, ASSET_USD, "1.0000000", Price(1, 1))
+        }
+        assertTrue(exception.message!!.contains("must be different"))
+    }
+
+    // ========== Balance ID hex / length validation ==========
+
+    @Test
+    fun testClaimClaimableBalanceInvalidHexThrows() {
+        val badHex = "z".repeat(72)
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ClaimClaimableBalanceOperation(badHex)
+        }
+        assertTrue(exception.message!!.contains("valid hex string"))
+    }
+
+    @Test
+    fun testClawbackClaimableBalanceInvalidLengthThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            ClawbackClaimableBalanceOperation("abc")
+        }
+    }
+
+    @Test
+    fun testClawbackClaimableBalanceInvalidHexThrows() {
+        val badHex = "z".repeat(72)
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ClawbackClaimableBalanceOperation(badHex)
+        }
+        assertTrue(exception.message!!.contains("valid hex string"))
+    }
+
+    // ========== Clawback source (from) address validation ==========
+
+    @Test
+    fun testClawbackFromAcceptsMuxedAddress() {
+        val op = ClawbackOperation(MUXED_B, ASSET_USD, "1.0000000")
+        assertEquals(MUXED_B, op.from)
+    }
+
+    @Test
+    fun testClawbackInvalidFromThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ClawbackOperation("NOT-AN-ADDRESS", ASSET_USD, "1.0000000")
+        }
+        assertTrue(exception.message!!.contains("Invalid from account"))
+    }
+
+    // ========== equals() for parameterless void operations ==========
+
+    @Test
+    fun testInflationEqualsReflexiveNullAndDifferentType() {
+        val op = InflationOperation()
+        assertEquals(op, op)
+        assertFalse(op.equals(null))
+        assertFalse(op.equals("not an operation"))
+        assertEquals(op, InflationOperation())
+    }
+
+    @Test
+    fun testEndSponsoringEqualsReflexiveNullAndDifferentType() {
+        val op = EndSponsoringFutureReservesOperation()
+        assertEquals(op, op)
+        assertFalse(op.equals(null))
+        assertFalse(op.equals("not an operation"))
+        assertEquals(op, EndSponsoringFutureReservesOperation())
+    }
+
+    @Test
+    fun testRestoreFootprintEqualsReflexiveNullAndDifferentType() {
+        val op = RestoreFootprintOperation()
+        assertEquals(op, op)
+        assertFalse(op.equals(null))
+        assertFalse(op.equals("not an operation"))
+        assertEquals(op, RestoreFootprintOperation())
+    }
+
+    // ========== SetOptions: opposite range boundary for each threshold field ==========
+
+    @Test
+    fun testSetOptionsValidationOppositeBoundary() {
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(masterKeyWeight = -1) }
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(lowThreshold = 256) }
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(mediumThreshold = -1) }
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(highThreshold = 256) }
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(signerWeight = -1) }
+    }
+
+    // ========== ManageData: equals() edge cases ==========
+
+    @Test
+    fun testManageDataEqualsSameInstance() {
+        val op = ManageDataOperation("key", "value".encodeToByteArray())
+        assertEquals(op, op)
+    }
+
+    @Test
+    fun testManageDataEqualsNullAndDifferentType() {
+        val op = ManageDataOperation("key", "value".encodeToByteArray())
+        assertFalse(op.equals(null))
+        assertFalse(op.equals("not an operation"))
+    }
+
+    @Test
+    fun testManageDataEqualsDifferentValueContent() {
+        val op1 = ManageDataOperation("key", byteArrayOf(1, 2, 3))
+        val op2 = ManageDataOperation("key", byteArrayOf(4, 5, 6))
+        assertNotEquals(op1, op2)
+    }
+
+    @Test
+    fun testManageDataEqualsBothValuesNull() {
+        val op1 = ManageDataOperation("key", null)
+        val op2 = ManageDataOperation("key", null)
+        assertEquals(op1, op2)
+        assertEquals(op1.hashCode(), op2.hashCode())
+    }
+
+    // ========== RevokeSponsorship: decode-only edge cases (manual XDR) ==========
+
+    @Test
+    fun testRevokeSponsorshipTrustLinePoolShareThrows() {
+        val ledgerKey = RevokeSponsorshipOpXdr.LedgerKey(
+            LedgerKeyXdr.TrustLine(
+                LedgerKeyTrustLineXdr(
+                    accountId = KeyPair.fromAccountId(ACCOUNT_B).getXdrAccountId(),
+                    asset = TrustLineAssetXdr.LiquidityPoolID(PoolIDXdr(HashXdr(ByteArray(32))))
+                )
+            )
+        )
+        assertFailsWith<UnsupportedOperationException> {
+            RevokeSponsorshipOperation.fromXdr(ledgerKey)
+        }
+    }
+
+    @Test
+    fun testRevokeSponsorshipUnknownLedgerKeyTypeThrows() {
+        val ledgerKey = RevokeSponsorshipOpXdr.LedgerKey(
+            LedgerKeyXdr.Ttl(LedgerKeyTtlXdr(HashXdr(ByteArray(32))))
+        )
+        val exception = assertFailsWith<IllegalArgumentException> {
+            RevokeSponsorshipOperation.fromXdr(ledgerKey)
+        }
+        assertTrue(exception.message!!.contains("Unknown ledger key type"))
+    }
+
+    // ========== LiquidityPoolWithdraw: pool ID length validation ==========
+
+    @Test
+    fun testLiquidityPoolWithdrawInvalidPoolIdThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            LiquidityPoolWithdrawOperation("short", "1.0", "1.0", "1.0")
+        }
+    }
+
+    // ========== InvokeHostFunction.createContract: salt and constructorArgs branches ==========
+
+    @Test
+    fun testInvokeHostFunctionCreateContractGeneratesRandomSaltWhenNull() {
+        val op1 = InvokeHostFunctionOperation.createContract(
+            wasmId = "a".repeat(64),
+            address = Address(ACCOUNT_A)
+        )
+        val op2 = InvokeHostFunctionOperation.createContract(
+            wasmId = "a".repeat(64),
+            address = Address(ACCOUNT_A)
+        )
+        val preimage1 = (op1.hostFunction as HostFunctionXdr.CreateContract).value.contractIdPreimage
+        val preimage2 = (op2.hostFunction as HostFunctionXdr.CreateContract).value.contractIdPreimage
+        assertTrue(preimage1 is ContractIDPreimageXdr.FromAddress)
+        assertTrue(preimage2 is ContractIDPreimageXdr.FromAddress)
+        val salt1 = (preimage1 as ContractIDPreimageXdr.FromAddress).value.salt.value
+        val salt2 = (preimage2 as ContractIDPreimageXdr.FromAddress).value.salt.value
+        assertEquals(32, salt1.size)
+        assertEquals(32, salt2.size)
+        assertFalse(salt1.contentEquals(salt2))
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateContractDefaultSaltVariesInEveryByte() {
+        val samples = (1..16).map { defaultCreateContractSalt() }
+        for (index in 0 until 32) {
+            val values = samples.map { it[index] }.toSet()
+            assertTrue(values.size > 1, "Salt byte $index was identical across all samples")
+        }
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateContractEmptyConstructorArgsUsesV1() {
+        val op = InvokeHostFunctionOperation.createContract(
+            wasmId = "a".repeat(64),
+            address = Address(ACCOUNT_A),
+            constructorArgs = emptyList(),
+            salt = ByteArray(32) { 0 }
+        )
+        assertTrue(op.hostFunction is HostFunctionXdr.CreateContract)
+    }
+
+    private fun defaultCreateContractSalt(): ByteArray {
+        val op = InvokeHostFunctionOperation.createContract(
+            wasmId = "a".repeat(64),
+            address = Address(ACCOUNT_A)
+        )
+        val preimage = (op.hostFunction as HostFunctionXdr.CreateContract).value.contractIdPreimage
+        return (preimage as ContractIDPreimageXdr.FromAddress).value.salt.value
+    }
+
+    // ========== ClaimPredicate: decode-only edge cases (manual XDR) ==========
+
+    @Test
+    fun testClaimPredicateNotWithNullValueThrows() {
+        val xdr = ClaimPredicateXdr.NotPredicate(null)
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ClaimPredicate.fromXdr(xdr)
+        }
+        assertTrue(exception.message!!.contains("NOT predicate cannot have null value"))
+    }
+
+    @Test
+    fun testClaimPredicateAndWrongSizeThrows() {
+        val single = ClaimPredicateXdr.AndPredicates(listOf(ClaimPredicateXdr.Void))
+        assertFailsWith<IllegalArgumentException> {
+            ClaimPredicate.fromXdr(single)
+        }
+
+        val triple = ClaimPredicateXdr.AndPredicates(
+            listOf(ClaimPredicateXdr.Void, ClaimPredicateXdr.Void, ClaimPredicateXdr.Void)
+        )
+        assertFailsWith<IllegalArgumentException> {
+            ClaimPredicate.fromXdr(triple)
+        }
+    }
+
+    @Test
+    fun testClaimPredicateOrWrongSizeThrows() {
+        val single = ClaimPredicateXdr.OrPredicates(listOf(ClaimPredicateXdr.Void))
+        assertFailsWith<IllegalArgumentException> {
+            ClaimPredicate.fromXdr(single)
+        }
     }
 }

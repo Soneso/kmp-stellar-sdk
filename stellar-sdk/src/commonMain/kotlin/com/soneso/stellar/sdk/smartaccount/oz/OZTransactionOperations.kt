@@ -498,6 +498,11 @@ class OZTransactionOperations internal constructor(
         // STEP 6: Extract auth entries from simulation
         val simulatedAuthEntries = simulation.results?.firstOrNull()?.parseAuth() ?: emptyList()
 
+        // Tracks whether this kit produced a signature. Entries that are passed through
+        // unchanged (source-account credentials, or entries belonging to another contract)
+        // still land in the list below, so its size does not report signing activity.
+        var signedAny = false
+
         // STEP 7-8: Sign auth entries matching our contract
         val signedAuthEntries = if (simulatedAuthEntries.isNotEmpty()) {
             // Get latest ledger ONCE before the signing loop
@@ -613,6 +618,7 @@ class OZTransactionOperations internal constructor(
                 )
 
                 signed.add(signedEntry)
+                signedAny = true
             }
 
             signed
@@ -621,7 +627,7 @@ class OZTransactionOperations internal constructor(
         }
 
         // Update lastUsedAt timestamp after successful signing (once per transaction)
-        if (signedAuthEntries.isNotEmpty()) {
+        if (signedAny) {
             try {
                 kit.credentialManager.updateLastUsed(credentialId)
             } catch (_: Exception) {
@@ -633,7 +639,7 @@ class OZTransactionOperations internal constructor(
         kit.events.emit(
             SmartAccountEvent.TransactionSigned(
                 contractId = contractId,
-                credentialId = if (signedAuthEntries.isNotEmpty()) credentialId else null
+                credentialId = if (signedAny) credentialId else null
             )
         )
 

@@ -8,6 +8,7 @@ import com.soneso.stellar.sdk.sep.sep01.*
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
@@ -15,10 +16,10 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 class StellarTomlTest {
 
@@ -330,6 +331,163 @@ class StellarTomlTest {
         assertNotNull(stellarToml.validators)
         assertEquals(1, stellarToml.validators!!.size)
         assertEquals("domain-au", stellarToml.validators!!.first().alias)
+    }
+
+    @Test
+    fun testOptionalFieldsOfEverySection() {
+        val toml = """
+            VERSION="2.7.0"
+            TRANSFER_SERVER_SEP0024="https://api.domain.com/sep24"
+            KYC_SERVER="https://api.domain.com/kyc"
+            WEB_AUTH_ENDPOINT="https://api.domain.com/auth"
+            URI_REQUEST_SIGNING_KEY="GD5DJQDDBKGAYNEAXU562HYGOOSYAEOO6AS53PZXBOZGCP5M2OPGMZV3"
+
+            [DOCUMENTATION]
+            ORG_LICENSING_AUTHORITY="Financial Services Commission"
+            ORG_LICENSE_TYPE="Money Services Business"
+            ORG_LICENSE_NUMBER="MSB-123456"
+
+            [[PRINCIPALS]]
+            telegram="crypto_jane_tg"
+
+            [[CURRENCIES]]
+            toml="https://domain.com/.well-known/USDC.toml"
+
+            [[CURRENCIES]]
+            code_template="BTC?????"
+            status="test"
+            is_unlimited=true
+            is_asset_anchored=false
+            attestation_of_reserve="https://domain.com/proof-of-reserve.pdf"
+            collateral_addresses=["2C1mCx3ukix1KfegAY5zgQJV7sanAciZpv"]
+            collateral_address_messages=["Proof of collateral ownership"]
+            max_number=500000
+            regulated=true
+            approval_server="https://domain.com/tx_approve"
+            approval_criteria="Payments must stay below the daily limit"
+
+            [[VALIDATORS]]
+            ALIAS="alias-only"
+
+            [[VALIDATORS]]
+            HOST="core-only.domain.com:11625"
+        """.trimIndent()
+
+        val stellarToml = StellarToml.parse(toml)
+
+        val generalInfo = stellarToml.generalInformation
+        assertEquals("https://api.domain.com/sep24", generalInfo.transferServerSep24)
+        assertEquals("https://api.domain.com/kyc", generalInfo.kycServer)
+        assertEquals("https://api.domain.com/auth", generalInfo.webAuthEndpoint)
+        assertEquals(
+            "GD5DJQDDBKGAYNEAXU562HYGOOSYAEOO6AS53PZXBOZGCP5M2OPGMZV3",
+            generalInfo.uriRequestSigningKey
+        )
+        assertTrue(generalInfo.accounts.isEmpty(), "ACCOUNTS is absent, so the list must be empty")
+
+        val documentation = stellarToml.documentation
+        assertNotNull(documentation)
+        assertEquals("Financial Services Commission", documentation.orgLicensingAuthority)
+        assertEquals("Money Services Business", documentation.orgLicenseType)
+        assertEquals("MSB-123456", documentation.orgLicenseNumber)
+        assertNull(documentation.orgName)
+
+        val pointsOfContact = stellarToml.pointsOfContact
+        assertNotNull(pointsOfContact)
+        assertEquals(1, pointsOfContact.size)
+        val poc = pointsOfContact.first()
+        assertEquals("crypto_jane_tg", poc.telegram)
+        assertNull(poc.name)
+        assertNull(poc.email)
+        assertNull(poc.keybase)
+        assertNull(poc.twitter)
+        assertNull(poc.github)
+        assertNull(poc.idPhotoHash)
+        assertNull(poc.verificationPhotoHash)
+
+        val currencies = stellarToml.currencies
+        assertNotNull(currencies)
+        assertEquals(2, currencies.size)
+
+        val linked = currencies[0]
+        assertEquals("https://domain.com/.well-known/USDC.toml", linked.toml)
+        assertNull(linked.code)
+        assertNull(linked.codeTemplate)
+        assertNull(linked.status)
+        assertNull(linked.isUnlimited)
+        assertNull(linked.isAssetAnchored)
+        assertNull(linked.attestationOfReserve)
+        assertNull(linked.collateralAddressMessages)
+
+        val templated = currencies[1]
+        assertNull(templated.toml)
+        assertEquals("BTC?????", templated.codeTemplate)
+        assertEquals("test", templated.status)
+        assertEquals(true, templated.isUnlimited)
+        assertEquals(false, templated.isAssetAnchored)
+        assertEquals("https://domain.com/proof-of-reserve.pdf", templated.attestationOfReserve)
+        assertEquals(listOf("Proof of collateral ownership"), templated.collateralAddressMessages)
+        assertEquals(listOf("2C1mCx3ukix1KfegAY5zgQJV7sanAciZpv"), templated.collateralAddresses)
+        assertEquals(500000L, templated.maxNumber)
+        assertEquals(true, templated.regulated)
+        assertEquals("https://domain.com/tx_approve", templated.approvalServer)
+        assertEquals("Payments must stay below the daily limit", templated.approvalCriteria)
+
+        val validators = stellarToml.validators
+        assertNotNull(validators)
+        assertEquals(2, validators.size)
+
+        val aliasOnly = validators[0]
+        assertEquals("alias-only", aliasOnly.alias)
+        assertNull(aliasOnly.displayName)
+        assertNull(aliasOnly.publicKey)
+        assertNull(aliasOnly.host)
+        assertNull(aliasOnly.history)
+
+        val hostOnly = validators[1]
+        assertNull(hostOnly.alias)
+        assertEquals("core-only.domain.com:11625", hostOnly.host)
+    }
+
+    @Test
+    fun testSectionsDeclaredAsPlainArraysProduceNoEntries() {
+        // PRINCIPALS, CURRENCIES and VALIDATORS must be arrays of tables. When a file
+        // declares them as arrays of scalars instead, the non-table entries are dropped.
+        val toml = """
+            VERSION="2.0.0"
+            PRINCIPALS=["Jane Jedidiah Johnson"]
+            CURRENCIES=["USD"]
+            VALIDATORS=["domain-au"]
+        """.trimIndent()
+
+        val stellarToml = StellarToml.parse(toml)
+
+        assertEquals("2.0.0", stellarToml.generalInformation.version)
+        assertEquals(emptyList(), stellarToml.pointsOfContact)
+        assertEquals(emptyList(), stellarToml.currencies)
+        assertEquals(emptyList(), stellarToml.validators)
+    }
+
+    @Test
+    fun testAccountsTableCorrectedToArrayOfTables() {
+        // `[ACCOUNTS]` is invalid TOML for the SEP-1 ACCOUNTS list. The parser rewrites it
+        // to `[[ACCOUNTS]]` so the keys below it stay scoped to that section instead of
+        // leaking into the root table.
+        val toml = """
+            VERSION="2.0.0"
+
+            [ACCOUNTS]
+            HORIZON_URL="https://leaked.example.com"
+        """.trimIndent()
+
+        val stellarToml = StellarToml.parse(toml)
+
+        assertEquals("2.0.0", stellarToml.generalInformation.version)
+        assertNull(
+            stellarToml.generalInformation.horizonUrl,
+            "Keys inside the ACCOUNTS section must not be read as root-level keys"
+        )
+        assertTrue(stellarToml.generalInformation.accounts.isEmpty())
     }
 
     // ========== Empty/Malformed TOML Tests ==========
@@ -732,5 +890,150 @@ class StellarTomlTest {
         val (client, captured) = captureTomlFetchUrl()
         StellarToml.fromDomain("127.0.0.1.evil.com", client)
         assertEquals(URLProtocol.HTTPS, captured())
+    }
+
+    // ==================== currencyFromUrl ====================
+
+    private val externalCurrencyToml = """
+        code="USDC"
+        issuer="GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
+        display_decimals=2
+        name="US Dollar Coin"
+        desc="Fully reserved US dollar stablecoin"
+        is_asset_anchored=true
+        anchor_asset_type="fiat"
+        anchor_asset="USD"
+        redemption_instructions="Redeem via SEP-6"
+        collateral_addresses=["2C1mCx3ukix1KfegAY5zgQJV7sanAciZpv"]
+        regulated=false
+    """.trimIndent()
+
+    private fun currencyTomlClient(
+        body: String = externalCurrencyToml,
+        status: HttpStatusCode = HttpStatusCode.OK,
+        onRequest: ((HttpRequestData) -> Unit)? = null,
+    ): HttpClient {
+        val engine = MockEngine { request ->
+            onRequest?.invoke(request)
+            respond(
+                content = body,
+                status = status,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain"),
+            )
+        }
+        return HttpClient(engine)
+    }
+
+    @Test
+    fun currencyFromUrl_parsesExternalCurrencyFile() = runTest {
+        var requestedUrl: String? = null
+        val client = currencyTomlClient(onRequest = { requestedUrl = it.url.toString() })
+
+        val currency = StellarToml.currencyFromUrl(
+            "https://domain.com/.well-known/USDC.toml",
+            client,
+        )
+
+        assertEquals("https://domain.com/.well-known/USDC.toml", requestedUrl)
+        assertEquals("USDC", currency.code)
+        assertEquals("GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM", currency.issuer)
+        assertEquals(2, currency.displayDecimals)
+        assertEquals("US Dollar Coin", currency.name)
+        assertEquals("Fully reserved US dollar stablecoin", currency.desc)
+        assertEquals(true, currency.isAssetAnchored)
+        assertEquals("fiat", currency.anchorAssetType)
+        assertEquals("USD", currency.anchorAsset)
+        assertEquals("Redeem via SEP-6", currency.redemptionInstructions)
+        assertEquals(listOf("2C1mCx3ukix1KfegAY5zgQJV7sanAciZpv"), currency.collateralAddresses)
+        assertEquals(false, currency.regulated)
+        assertNull(currency.toml)
+    }
+
+    @Test
+    fun currencyFromUrl_forwardsCustomHeaders() = runTest {
+        var userAgent: String? = null
+        var apiKey: String? = null
+        val client = currencyTomlClient(onRequest = {
+            userAgent = it.headers["X-User-Agent"]
+            apiKey = it.headers["X-Api-Key"]
+        })
+
+        StellarToml.currencyFromUrl(
+            toml = "https://domain.com/.well-known/USDC.toml",
+            httpClient = client,
+            httpRequestHeaders = mapOf("X-User-Agent" to "MyWallet/1.0", "X-Api-Key" to "abc123"),
+        )
+
+        assertEquals("MyWallet/1.0", userAgent)
+        assertEquals("abc123", apiKey)
+    }
+
+    @Test
+    fun currencyFromUrl_nonOkStatus_throwsIllegalStateException() = runTest {
+        val client = currencyTomlClient(body = "Not Found", status = HttpStatusCode.NotFound)
+
+        val exception = assertFailsWith<IllegalStateException> {
+            StellarToml.currencyFromUrl("https://domain.com/.well-known/USDC.toml", client)
+        }
+        assertEquals("Currency toml not found, response status code 404", exception.message)
+    }
+
+    // ==================== TOML value parsing ====================
+
+    @Test
+    fun testEmptyArrayValue() {
+        val stellarToml = StellarToml.parse("ACCOUNTS=[]")
+        assertEquals(emptyList(), stellarToml.generalInformation.accounts)
+    }
+
+    @Test
+    fun testNestedArrayValue() {
+        // Nested arrays parse into nested lists, so only the top-level string entries
+        // remain after the ACCOUNTS list is filtered to strings.
+        val stellarToml = StellarToml.parse(
+            "ACCOUNTS=[[\"GD5DJQDDBKGAYNEAXU562HYGOOSYAEOO6AS53PZXBOZGCP5M2OPGMZV3\"]," +
+                "\"GAENZLGHJGJRCMX5VCHOLHQXU3EMCU5XWDNU4BGGJFNLI2EL354IVBK7\"]"
+        )
+        assertEquals(
+            listOf("GAENZLGHJGJRCMX5VCHOLHQXU3EMCU5XWDNU4BGGJFNLI2EL354IVBK7"),
+            stellarToml.generalInformation.accounts
+        )
+    }
+
+    @Test
+    fun testArraySeparatorsInsideQuotedElements() {
+        // Commas and brackets inside a quoted element are literal content, not separators.
+        val stellarToml = StellarToml.parse("""ACCOUNTS=["one,two","three[four]five"]""")
+        assertEquals(listOf("one,two", "three[four]five"), stellarToml.generalInformation.accounts)
+    }
+
+    @Test
+    fun testArrayWithEmptyElements() {
+        // Consecutive and trailing commas produce empty elements, which are dropped.
+        val stellarToml = StellarToml.parse("""ACCOUNTS=["one",,"two",]""")
+        assertEquals(listOf("one", "two"), stellarToml.generalInformation.accounts)
+    }
+
+    @Test
+    fun testFloatValueForIntegerField() {
+        val toml = """
+            [[CURRENCIES]]
+            code="TEST"
+            display_decimals=2.75
+            fixed_number=42.9
+        """.trimIndent()
+
+        val stellarToml = StellarToml.parse(toml)
+        val currency = stellarToml.currencies!!.first()
+        assertEquals(2, currency.displayDecimals)
+        assertEquals(42L, currency.fixedNumber)
+    }
+
+    @Test
+    fun testUnterminatedQuotedValue() {
+        // A value that opens a quote but never closes it is not a string literal, so the
+        // raw text (including the leading quote) is kept.
+        val stellarToml = StellarToml.parse("VERSION=\"2.0.0")
+        assertEquals("\"2.0.0", stellarToml.generalInformation.version)
     }
 }

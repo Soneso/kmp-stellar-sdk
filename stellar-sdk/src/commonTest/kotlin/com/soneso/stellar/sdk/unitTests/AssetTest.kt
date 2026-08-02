@@ -467,4 +467,45 @@ class AssetTest {
             fail("Expected no exception, but got: ${e.message}")
         }
     }
+
+    // ========== createNonNativeAsset: blank issuer ==========
+
+    @Test
+    fun testCreateNonNativeAssetBlankIssuerThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Asset.createNonNativeAsset("USD", "")
+        }
+        assertTrue(exception.message!!.contains("issuer cannot be blank"))
+    }
+
+    // ========== AssetTypeCreditAlphaNum equals: null and different type ==========
+
+    @Test
+    fun testAlphaNumEqualsNullAndDifferentType() {
+        val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
+
+        @Suppress("ReplaceCallWithBinaryOperator", "EqualsNullCall")
+        assertFalse(usd.equals(null))
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertFalse(usd.equals(AssetTypeNative))
+
+        @Suppress("ReplaceCallWithBinaryOperator")
+        assertTrue(usd.equals(usd))
+    }
+
+    // ========== AssetTypeCreditAlphaNum12 compareTo (as receiver) ==========
+
+    @Test
+    fun testAlphaNum12CompareToAsReceiver() {
+        val longAsset = AssetTypeCreditAlphaNum12("TESTASSET", testIssuer)
+        val native = AssetTypeNative
+        val usd = AssetTypeCreditAlphaNum4("USD", testIssuer)
+        val otherLongAsset = AssetTypeCreditAlphaNum12("ZTESTASSET", testIssuer)
+
+        assertTrue(longAsset.compareTo(native) > 0)
+        assertTrue(longAsset.compareTo(usd) > 0)
+        assertTrue(longAsset.compareTo(otherLongAsset) < 0)
+        assertEquals(0, longAsset.compareTo(AssetTypeCreditAlphaNum12("TESTASSET", testIssuer)))
+    }
 }
