@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ManageOfferSuccessResultOfferXdr"
+
 /**
  * XDR Source:
  * union switch (ManageOfferEffect effect)
@@ -43,6 +49,25 @@ sealed class ManageOfferSuccessResultOfferXdr {
         else -> throw IllegalArgumentException("Unknown ManageOfferSuccessResultOfferXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ManageOfferSuccessResultOfferXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageOfferSuccessResultOfferXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageOfferSuccessResultOfferXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "created" -> Offer(ManageOfferEffectXdr.MANAGE_OFFER_CREATED, OfferEntryXdr.fromXdrJsonTree(value))
+          "updated" -> Offer(ManageOfferEffectXdr.MANAGE_OFFER_UPDATED, OfferEntryXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "deleted" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -54,4 +79,11 @@ sealed class ManageOfferSuccessResultOfferXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Offer -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
+    is Void -> XdrJson.name("deleted")
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

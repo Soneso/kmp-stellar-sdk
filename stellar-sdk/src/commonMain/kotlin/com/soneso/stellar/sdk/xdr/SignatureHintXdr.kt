@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SignatureHintXdr"
+
 /**
  * XDR Source:
  * typedef opaque SignatureHint[4];
@@ -15,9 +19,19 @@ value class SignatureHintXdr(val value: ByteArray) {
       val value = reader.readFixedOpaque(4)
       return SignatureHintXdr(value)
     }
+
+    fun fromXdrJson(json: String): SignatureHintXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SignatureHintXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SignatureHintXdr = SignatureHintXdr(XdrJson.hex(element, XDR_JSON_TYPE, "value", expectedLength = 4))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(value, 4)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

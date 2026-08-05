@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "CreateClaimableBalanceResultXdr"
+
 /**
  * XDR Source:
  * union CreateClaimableBalanceResult switch (
@@ -48,6 +54,28 @@ sealed class CreateClaimableBalanceResultXdr {
         else -> throw IllegalArgumentException("Unknown CreateClaimableBalanceResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): CreateClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateClaimableBalanceResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> BalanceID(ClaimableBalanceIDXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "malformed" -> Void(CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_MALFORMED)
+        "low_reserve" -> Void(CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_LOW_RESERVE)
+        "no_trust" -> Void(CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NO_TRUST)
+        "not_authorized" -> Void(CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_NOT_AUTHORIZED)
+        "underfunded" -> Void(CreateClaimableBalanceResultCodeXdr.CREATE_CLAIMABLE_BALANCE_UNDERFUNDED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -59,4 +87,11 @@ sealed class CreateClaimableBalanceResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is BalanceID -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

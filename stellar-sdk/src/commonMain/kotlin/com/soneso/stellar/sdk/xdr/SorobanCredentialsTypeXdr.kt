@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SorobanCredentialsTypeXdr"
+
 /**
  * XDR Source:
  * enum SorobanCredentialsType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES = 3
  * };
  */
-enum class SorobanCredentialsTypeXdr(val value: Int) {
-  SOROBAN_CREDENTIALS_SOURCE_ACCOUNT(0),
-  SOROBAN_CREDENTIALS_ADDRESS(1),
-  SOROBAN_CREDENTIALS_ADDRESS_V2(2),
-  SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES(3);
+enum class SorobanCredentialsTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SOROBAN_CREDENTIALS_SOURCE_ACCOUNT(0, "source_account"),
+  SOROBAN_CREDENTIALS_ADDRESS(1, "address"),
+  SOROBAN_CREDENTIALS_ADDRESS_V2(2, "address_v2"),
+  SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES(3, "address_with_delegates");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class SorobanCredentialsTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SorobanCredentialsTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SorobanCredentialsTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanCredentialsTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanCredentialsTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SorobanCredentialsTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

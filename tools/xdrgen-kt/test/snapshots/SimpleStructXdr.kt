@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SimpleStructXdr"
+
 /**
  * XDR Source:
  * struct SimpleStruct
@@ -34,6 +39,22 @@ data class SimpleStructXdr(
       val label = reader.readString()
       return SimpleStructXdr(count, flags, bigNumber, unsignedBig, active, label)
     }
+
+    fun fromXdrJson(json: String): SimpleStructXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SimpleStructXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SimpleStructXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SimpleStructXdr(
+        XdrJson.int32(XdrJson.field(json, "count", XDR_JSON_TYPE), XDR_JSON_TYPE, "count"),
+        XdrJson.uint32(XdrJson.field(json, "flags", XDR_JSON_TYPE), XDR_JSON_TYPE, "flags"),
+        XdrJson.int64(XdrJson.field(json, "big_number", XDR_JSON_TYPE), XDR_JSON_TYPE, "big_number"),
+        XdrJson.uint64(XdrJson.field(json, "unsigned_big", XDR_JSON_TYPE), XDR_JSON_TYPE, "unsigned_big"),
+        XdrJson.bool(XdrJson.field(json, "active", XDR_JSON_TYPE), XDR_JSON_TYPE, "active"),
+        XdrJson.unescapeString(XdrJson.field(json, "label", XDR_JSON_TYPE), XDR_JSON_TYPE, "label", maxLength = 64)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +65,15 @@ data class SimpleStructXdr(
     writer.writeBoolean(active)
     writer.writeString(label)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("count", XdrJson.int32(count))
+    put("flags", XdrJson.uint32(flags))
+    put("big_number", XdrJson.int64(bigNumber))
+    put("unsigned_big", XdrJson.uint64(unsignedBig))
+    put("active", XdrJson.bool(active))
+    put("label", XdrJson.escapedString(label))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

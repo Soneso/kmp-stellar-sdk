@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ConfigSettingIDXdr"
+
 /**
  * XDR Source:
  * enum ConfigSettingID
@@ -30,28 +34,28 @@ package com.soneso.stellar.sdk.xdr
  *     CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA = 20
  * };
  */
-enum class ConfigSettingIDXdr(val value: Int) {
-  CONFIG_SETTING_CONTRACT_MAX_SIZE_BYTES(0),
-  CONFIG_SETTING_CONTRACT_COMPUTE_V0(1),
-  CONFIG_SETTING_CONTRACT_LEDGER_COST_V0(2),
-  CONFIG_SETTING_CONTRACT_HISTORICAL_DATA_V0(3),
-  CONFIG_SETTING_CONTRACT_EVENTS_V0(4),
-  CONFIG_SETTING_CONTRACT_BANDWIDTH_V0(5),
-  CONFIG_SETTING_CONTRACT_COST_PARAMS_CPU_INSTRUCTIONS(6),
-  CONFIG_SETTING_CONTRACT_COST_PARAMS_MEMORY_BYTES(7),
-  CONFIG_SETTING_CONTRACT_DATA_KEY_SIZE_BYTES(8),
-  CONFIG_SETTING_CONTRACT_DATA_ENTRY_SIZE_BYTES(9),
-  CONFIG_SETTING_STATE_ARCHIVAL(10),
-  CONFIG_SETTING_CONTRACT_EXECUTION_LANES(11),
-  CONFIG_SETTING_LIVE_SOROBAN_STATE_SIZE_WINDOW(12),
-  CONFIG_SETTING_EVICTION_ITERATOR(13),
-  CONFIG_SETTING_CONTRACT_PARALLEL_COMPUTE_V0(14),
-  CONFIG_SETTING_CONTRACT_LEDGER_COST_EXT_V0(15),
-  CONFIG_SETTING_SCP_TIMING(16),
-  CONFIG_SETTING_FROZEN_LEDGER_KEYS(17),
-  CONFIG_SETTING_FROZEN_LEDGER_KEYS_DELTA(18),
-  CONFIG_SETTING_FREEZE_BYPASS_TXS(19),
-  CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA(20);
+enum class ConfigSettingIDXdr(val value: Int, internal val xdrJsonName: String) {
+  CONFIG_SETTING_CONTRACT_MAX_SIZE_BYTES(0, "contract_max_size_bytes"),
+  CONFIG_SETTING_CONTRACT_COMPUTE_V0(1, "contract_compute_v0"),
+  CONFIG_SETTING_CONTRACT_LEDGER_COST_V0(2, "contract_ledger_cost_v0"),
+  CONFIG_SETTING_CONTRACT_HISTORICAL_DATA_V0(3, "contract_historical_data_v0"),
+  CONFIG_SETTING_CONTRACT_EVENTS_V0(4, "contract_events_v0"),
+  CONFIG_SETTING_CONTRACT_BANDWIDTH_V0(5, "contract_bandwidth_v0"),
+  CONFIG_SETTING_CONTRACT_COST_PARAMS_CPU_INSTRUCTIONS(6, "contract_cost_params_cpu_instructions"),
+  CONFIG_SETTING_CONTRACT_COST_PARAMS_MEMORY_BYTES(7, "contract_cost_params_memory_bytes"),
+  CONFIG_SETTING_CONTRACT_DATA_KEY_SIZE_BYTES(8, "contract_data_key_size_bytes"),
+  CONFIG_SETTING_CONTRACT_DATA_ENTRY_SIZE_BYTES(9, "contract_data_entry_size_bytes"),
+  CONFIG_SETTING_STATE_ARCHIVAL(10, "state_archival"),
+  CONFIG_SETTING_CONTRACT_EXECUTION_LANES(11, "contract_execution_lanes"),
+  CONFIG_SETTING_LIVE_SOROBAN_STATE_SIZE_WINDOW(12, "live_soroban_state_size_window"),
+  CONFIG_SETTING_EVICTION_ITERATOR(13, "eviction_iterator"),
+  CONFIG_SETTING_CONTRACT_PARALLEL_COMPUTE_V0(14, "contract_parallel_compute_v0"),
+  CONFIG_SETTING_CONTRACT_LEDGER_COST_EXT_V0(15, "contract_ledger_cost_ext_v0"),
+  CONFIG_SETTING_SCP_TIMING(16, "scp_timing"),
+  CONFIG_SETTING_FROZEN_LEDGER_KEYS(17, "frozen_ledger_keys"),
+  CONFIG_SETTING_FROZEN_LEDGER_KEYS_DELTA(18, "frozen_ledger_keys_delta"),
+  CONFIG_SETTING_FREEZE_BYPASS_TXS(19, "freeze_bypass_txs"),
+  CONFIG_SETTING_FREEZE_BYPASS_TXS_DELTA(20, "freeze_bypass_txs_delta");
 
   companion object {
 
@@ -60,9 +64,24 @@ enum class ConfigSettingIDXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ConfigSettingIDXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ConfigSettingIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingIDXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ConfigSettingIDXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

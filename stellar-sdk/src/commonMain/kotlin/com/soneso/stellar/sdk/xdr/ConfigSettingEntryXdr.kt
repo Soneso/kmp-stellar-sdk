@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingEntryXdr"
+
 /**
  * XDR Source:
  * union ConfigSettingEntry switch (ConfigSettingID configSettingID)
@@ -272,6 +277,38 @@ sealed class ConfigSettingEntryXdr {
         else -> throw IllegalArgumentException("Unknown ConfigSettingEntryXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ConfigSettingEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingEntryXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "contract_max_size_bytes" -> ContractMaxSizeBytes(Uint32Xdr.fromXdrJsonTree(value))
+        "contract_compute_v0" -> ContractCompute(ConfigSettingContractComputeV0Xdr.fromXdrJsonTree(value))
+        "contract_ledger_cost_v0" -> ContractLedgerCost(ConfigSettingContractLedgerCostV0Xdr.fromXdrJsonTree(value))
+        "contract_historical_data_v0" -> ContractHistoricalData(ConfigSettingContractHistoricalDataV0Xdr.fromXdrJsonTree(value))
+        "contract_events_v0" -> ContractEvents(ConfigSettingContractEventsV0Xdr.fromXdrJsonTree(value))
+        "contract_bandwidth_v0" -> ContractBandwidth(ConfigSettingContractBandwidthV0Xdr.fromXdrJsonTree(value))
+        "contract_cost_params_cpu_instructions" -> ContractCostParamsCpuInsns(ContractCostParamsXdr.fromXdrJsonTree(value))
+        "contract_cost_params_memory_bytes" -> ContractCostParamsMemBytes(ContractCostParamsXdr.fromXdrJsonTree(value))
+        "contract_data_key_size_bytes" -> ContractDataKeySizeBytes(Uint32Xdr.fromXdrJsonTree(value))
+        "contract_data_entry_size_bytes" -> ContractDataEntrySizeBytes(Uint32Xdr.fromXdrJsonTree(value))
+        "state_archival" -> StateArchivalSettings(StateArchivalSettingsXdr.fromXdrJsonTree(value))
+        "contract_execution_lanes" -> ContractExecutionLanes(ConfigSettingContractExecutionLanesV0Xdr.fromXdrJsonTree(value))
+        "live_soroban_state_size_window" -> LiveSorobanStateSizeWindow(XdrJson.array(value, XDR_JSON_TYPE, "live_soroban_state_size_window").map { Uint64Xdr.fromXdrJsonTree(it) })
+        "eviction_iterator" -> EvictionIterator(EvictionIteratorXdr.fromXdrJsonTree(value))
+        "contract_parallel_compute_v0" -> ContractParallelCompute(ConfigSettingContractParallelComputeV0Xdr.fromXdrJsonTree(value))
+        "contract_ledger_cost_ext_v0" -> ContractLedgerCostExt(ConfigSettingContractLedgerCostExtV0Xdr.fromXdrJsonTree(value))
+        "scp_timing" -> ContractSCPTiming(ConfigSettingSCPTimingXdr.fromXdrJsonTree(value))
+        "frozen_ledger_keys" -> FrozenLedgerKeys(FrozenLedgerKeysXdr.fromXdrJsonTree(value))
+        "frozen_ledger_keys_delta" -> FrozenLedgerKeysDelta(FrozenLedgerKeysDeltaXdr.fromXdrJsonTree(value))
+        "freeze_bypass_txs" -> FreezeBypassTxs(FreezeBypassTxsXdr.fromXdrJsonTree(value))
+        "freeze_bypass_txs_delta" -> FreezeBypassTxsDelta(FreezeBypassTxsDeltaXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -345,4 +382,30 @@ sealed class ConfigSettingEntryXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is ContractMaxSizeBytes -> buildJsonObject { put("contract_max_size_bytes", value.toXdrJsonElement()) }
+    is ContractCompute -> buildJsonObject { put("contract_compute_v0", value.toXdrJsonElement()) }
+    is ContractLedgerCost -> buildJsonObject { put("contract_ledger_cost_v0", value.toXdrJsonElement()) }
+    is ContractHistoricalData -> buildJsonObject { put("contract_historical_data_v0", value.toXdrJsonElement()) }
+    is ContractEvents -> buildJsonObject { put("contract_events_v0", value.toXdrJsonElement()) }
+    is ContractBandwidth -> buildJsonObject { put("contract_bandwidth_v0", value.toXdrJsonElement()) }
+    is ContractCostParamsCpuInsns -> buildJsonObject { put("contract_cost_params_cpu_instructions", value.toXdrJsonElement()) }
+    is ContractCostParamsMemBytes -> buildJsonObject { put("contract_cost_params_memory_bytes", value.toXdrJsonElement()) }
+    is ContractDataKeySizeBytes -> buildJsonObject { put("contract_data_key_size_bytes", value.toXdrJsonElement()) }
+    is ContractDataEntrySizeBytes -> buildJsonObject { put("contract_data_entry_size_bytes", value.toXdrJsonElement()) }
+    is StateArchivalSettings -> buildJsonObject { put("state_archival", value.toXdrJsonElement()) }
+    is ContractExecutionLanes -> buildJsonObject { put("contract_execution_lanes", value.toXdrJsonElement()) }
+    is LiveSorobanStateSizeWindow -> buildJsonObject { put("live_soroban_state_size_window", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is EvictionIterator -> buildJsonObject { put("eviction_iterator", value.toXdrJsonElement()) }
+    is ContractParallelCompute -> buildJsonObject { put("contract_parallel_compute_v0", value.toXdrJsonElement()) }
+    is ContractLedgerCostExt -> buildJsonObject { put("contract_ledger_cost_ext_v0", value.toXdrJsonElement()) }
+    is ContractSCPTiming -> buildJsonObject { put("scp_timing", value.toXdrJsonElement()) }
+    is FrozenLedgerKeys -> buildJsonObject { put("frozen_ledger_keys", value.toXdrJsonElement()) }
+    is FrozenLedgerKeysDelta -> buildJsonObject { put("frozen_ledger_keys_delta", value.toXdrJsonElement()) }
+    is FreezeBypassTxs -> buildJsonObject { put("freeze_bypass_txs", value.toXdrJsonElement()) }
+    is FreezeBypassTxsDelta -> buildJsonObject { put("freeze_bypass_txs_delta", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

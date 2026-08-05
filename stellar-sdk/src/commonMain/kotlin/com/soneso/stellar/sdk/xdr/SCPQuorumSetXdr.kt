@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPQuorumSetXdr"
+
 /**
  * XDR Source:
  * struct SCPQuorumSet
@@ -25,6 +30,19 @@ data class SCPQuorumSetXdr(
       val innerSets = List(reader.readInt()) { SCPQuorumSetXdr.decode(reader) }
       return SCPQuorumSetXdr(threshold, validators, innerSets)
     }
+
+    fun fromXdrJson(json: String): SCPQuorumSetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPQuorumSetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPQuorumSetXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCPQuorumSetXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "threshold", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "validators", XDR_JSON_TYPE), XDR_JSON_TYPE, "validators").map { NodeIDXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "inner_sets", XDR_JSON_TYPE), XDR_JSON_TYPE, "inner_sets").map { SCPQuorumSetXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -38,4 +56,12 @@ data class SCPQuorumSetXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("threshold", threshold.toXdrJsonElement())
+    put("validators", XdrJson.array(validators) { it.toXdrJsonElement() })
+    put("inner_sets", XdrJson.array(innerSets) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

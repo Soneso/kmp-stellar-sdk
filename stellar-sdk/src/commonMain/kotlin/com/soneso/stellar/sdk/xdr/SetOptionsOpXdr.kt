@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SetOptionsOpXdr"
+
 /**
  * XDR Source:
  * struct SetOptionsOp
@@ -62,6 +67,25 @@ data class SetOptionsOpXdr(
       val signer = if (reader.readBoolean()) SignerXdr.decode(reader) else null
       return SetOptionsOpXdr(inflationDest, clearFlags, setFlags, masterWeight, lowThreshold, medThreshold, highThreshold, homeDomain, signer)
     }
+
+    fun fromXdrJson(json: String): SetOptionsOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SetOptionsOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SetOptionsOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SetOptionsOpXdr(
+        XdrJson.optional(XdrJson.field(json, "inflation_dest", XDR_JSON_TYPE))?.let { AccountIDXdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "clear_flags", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "set_flags", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "master_weight", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "low_threshold", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "med_threshold", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "high_threshold", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "home_domain", XDR_JSON_TYPE))?.let { String32Xdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "signer", XDR_JSON_TYPE))?.let { SignerXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -120,4 +144,18 @@ data class SetOptionsOpXdr(
       writer.writeBoolean(false)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement() })
+    put("clear_flags", XdrJson.optional(clearFlags) { it.toXdrJsonElement() })
+    put("set_flags", XdrJson.optional(setFlags) { it.toXdrJsonElement() })
+    put("master_weight", XdrJson.optional(masterWeight) { it.toXdrJsonElement() })
+    put("low_threshold", XdrJson.optional(lowThreshold) { it.toXdrJsonElement() })
+    put("med_threshold", XdrJson.optional(medThreshold) { it.toXdrJsonElement() })
+    put("high_threshold", XdrJson.optional(highThreshold) { it.toXdrJsonElement() })
+    put("home_domain", XdrJson.optional(homeDomain) { it.toXdrJsonElement() })
+    put("signer", XdrJson.optional(signer) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

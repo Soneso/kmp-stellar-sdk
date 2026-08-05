@@ -263,7 +263,174 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_includes content, '/** Green color */'
   end
 
+  # -- XDR-JSON (SEP-0051) emission -------------------------------------------
+
+  def test_every_type_carries_the_four_json_members
+    types = Dir.glob(File.join(@output_dir, '*.kt')).map { |f| File.basename(f, '.kt') } -
+            %w[Constants XdrPrimitiveExtensions]
+    types.each do |type|
+      content = File.read(File.join(@output_dir, "#{type}.kt"))
+      assert_includes content, 'fun toXdrJson(): String', "#{type} is missing toXdrJson"
+      assert_includes content, 'fun toXdrJsonElement(): JsonElement', "#{type} is missing toXdrJsonElement"
+      assert_includes content, "fun fromXdrJson(json: String): #{type}", "#{type} is missing fromXdrJson"
+      assert_includes content, "fun fromXdrJsonElement(element: JsonElement): #{type}",
+        "#{type} is missing fromXdrJsonElement"
+    end
+  end
+
+  # The depth limit is applied once, at whichever type the caller entered through. A nested
+  # type is reached via fromXdrJsonTree, which must not re-check: that would rewalk the tree
+  # at every level.
+  def test_the_depth_limit_is_applied_once_per_decode
+    assert_depth_limit_applied_once Dir.glob(File.join(@output_dir, '*.kt'))
+  end
+
+  # The same invariant over the Kotlin actually committed to the SDK, which is the output that
+  # ships; the fixtures exercise only the constructs they happen to declare.
+  def test_the_depth_limit_is_applied_once_per_decode_in_the_committed_output
+    files = generated_sdk_files
+    assert files.length > 400, "expected the generated SDK output, found #{files.length} files"
+    assert_depth_limit_applied_once files
+  end
+
+  def test_every_committed_type_names_itself_in_one_file_private_constant
+    generated_sdk_files.each do |file|
+      content = File.read(file)
+      name = File.basename(file, '.kt')
+      next unless content.include?('fun toXdrJsonElement()')
+
+      assert_includes content, %(private const val XDR_JSON_TYPE = "#{name}"),
+        "#{name} does not declare its own type-name constant"
+      assert_equal 1, content.scan('private const val XDR_JSON_TYPE').length,
+        "#{name} declares the type-name constant more than once"
+      assert_equal 1, content.scan(%("#{name}")).length,
+        "#{name} repeats its own name as a literal outside the constant"
+    end
+  end
+
+  def test_enum_members_carry_their_json_name
+    content = File.read(File.join(@output_dir, 'ColorXdr.kt'))
+    assert_includes content, 'enum class ColorXdr(val value: Int, internal val xdrJsonName: String)'
+    assert_includes content, 'RED(0, "red"),'
+    assert_includes content, 'BLUE(2, "blue");'
+    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)'
+  end
+
+  def test_enum_prefix_is_stripped_in_the_emitted_json_name
+    content = File.read(File.join(@output_dir, 'StatusCodeXdr.kt'))
+    assert_includes content, 'STATUS_OK(0, "ok"),'
+    assert_includes content, 'STATUS_NOT_FOUND(1, "not_found"),'
+    assert_includes content, 'STATUS_UNKNOWN(-1, "unknown");'
+  end
+
+  def test_struct_emits_keys_in_declaration_order
+    content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
+    body = content[/fun toXdrJsonElement\(\): JsonElement = buildJsonObject \{\n(.*?)^  \}$/m, 1]
+    keys = body.scan(/put\("([^"]+)"/).flatten
+    assert_equal %w[count flags big_number unsigned_big active label], keys
+  end
+
+  def test_struct_reads_every_declared_key
+    content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
+    assert_includes content, 'val json = XdrJson.obj(element, XDR_JSON_TYPE)'
+    assert_includes content, 'XdrJson.field(json, "big_number", XDR_JSON_TYPE)'
+  end
+
+  def test_declared_maxima_are_validated_on_input
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, '"items", maxLength = 10'
+    assert_includes content, '"fixed_items", expectedLength = 3'
+    assert_includes content, '"fixed_data", expectedLength = 4'
+  end
+
+  def test_optional_field_round_trips_through_null
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })'
+    assert_includes content, 'XdrJson.optional(XdrJson.field(json, "optional_inner", XDR_JSON_TYPE))?.let'
+  end
+
+  def test_void_union_arm_is_a_bare_string_and_a_value_arm_is_an_object
+    content = File.read(File.join(@output_dir, 'ResultXdr.kt'))
+    assert_includes content, 'is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }'
+    assert_includes content, 'is Void -> XdrJson.name(discriminant.xdrJsonName)'
+    assert_includes content, '"ok" -> Void(ResultTypeXdr.RESULT_OK)'
+    assert_includes content, '"error" -> Error(ErrorDetailXdr.fromXdrJsonTree(value))'
+  end
+
+  def test_union_without_a_default_arm_rejects_an_unknown_key
+    content = File.read(File.join(@output_dir, 'SimpleResultXdr.kt'))
+    assert_includes content, 'else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)'
+  end
+
+  def test_union_default_arm_derives_its_discriminant_from_the_key
+    content = File.read(File.join(@output_dir, 'ResultXdr.kt'))
+    assert_includes content, 'ResultTypeXdr.findXdrJsonName(arm) ?: XdrJson.unknownArm(XDR_JSON_TYPE, arm)'
+  end
+
+  def test_integer_discriminated_union_keys_its_arms_with_v
+    content = File.read(File.join(@output_dir, 'MultiCaseUnionXdr.kt'))
+    assert_includes content, 'is SimpleValue -> buildJsonObject { put("v0", XdrJson.int32(value)) }'
+    assert_includes content, '"v1" -> TextValue(1,'
+    assert_includes content, 'put("v$discriminant"'
+    assert_includes content, 'XdrJson.intArm(XDR_JSON_TYPE, arm)'
+  end
+
+  def test_sixty_four_bit_values_are_strings_and_thirty_two_bit_values_are_numbers
+    content = File.read(File.join(@output_dir, 'Int64Xdr.kt'))
+    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int64(value)'
+    content = File.read(File.join(@output_dir, 'Int32Xdr.kt'))
+    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int32(value)'
+  end
+
+  def test_typedef_delegates_to_the_type_it_wraps
+    content = File.read(File.join(@output_dir, 'MyCounterXdr.kt'))
+    assert_includes content, 'fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()'
+    assert_includes content, 'SignedCountXdr.fromXdrJsonTree(element)'
+  end
+
+  def test_opaque_is_hexadecimal
+    content = File.read(File.join(@output_dir, 'HashXdr.kt'))
+    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)'
+    assert_includes content, 'expectedLength = 32'
+  end
+
+  def test_json_imports_are_emitted_only_where_used
+    element_only = File.read(File.join(@output_dir, 'ColorXdr.kt'))
+    assert_includes element_only, 'import kotlinx.serialization.json.JsonElement'
+    refute_includes element_only, 'import kotlinx.serialization.json.buildJsonObject'
+
+    both_branches = File.read(File.join(@output_dir, 'ResultXdr.kt'))
+    assert_includes both_branches, 'import kotlinx.serialization.json.JsonObject'
+    assert_includes both_branches, 'import kotlinx.serialization.json.buildJsonObject'
+
+    value_arms_only = File.read(File.join(@output_dir, 'SimpleResultXdr.kt'))
+    refute_includes value_arms_only, 'import kotlinx.serialization.json.JsonObject'
+  end
+
   private
+
+  SDK_XDR_DIR = File.expand_path(
+    '../../../stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr', __dir__
+  )
+
+  # The committed generated output, excluding the hand-maintained files that live beside it.
+  def generated_sdk_files
+    Dir.glob(File.join(SDK_XDR_DIR, '*.kt')).select do |file|
+      File.read(file).include?('Automatically generated by xdrgen')
+    end
+  end
+
+  def assert_depth_limit_applied_once(files)
+    files.each do |file|
+      content = File.read(file)
+      name = File.basename(file, '.kt')
+      assert_equal content.scan('XdrJson.checkDepth').length,
+        content.scan('fun fromXdrJsonElement').length,
+        "#{name} checks the depth somewhere other than fromXdrJsonElement"
+      assert_equal content.scan('XdrJson.parse(').length, content.scan('fun fromXdrJson(').length,
+        "#{name} parses text somewhere other than fromXdrJson"
+    end
+  end
 
   def assert_snapshot(filename)
     generated = File.join(@output_dir, filename)

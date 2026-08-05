@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerCloseMetaV1Xdr"
+
 /**
  * XDR Source:
  * struct LedgerCloseMetaV1
@@ -64,6 +69,25 @@ data class LedgerCloseMetaV1Xdr(
       val unused = List(reader.readInt()) { LedgerEntryXdr.decode(reader) }
       return LedgerCloseMetaV1Xdr(ext, ledgerHeader, txSet, txProcessing, upgradesProcessing, scpInfo, totalByteSizeOfLiveSorobanState, evictedKeys, unused)
     }
+
+    fun fromXdrJson(json: String): LedgerCloseMetaV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerCloseMetaV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseMetaV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LedgerCloseMetaV1Xdr(
+        LedgerCloseMetaExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        LedgerHeaderHistoryEntryXdr.fromXdrJsonTree(XdrJson.field(json, "ledger_header", XDR_JSON_TYPE)),
+        GeneralizedTransactionSetXdr.fromXdrJsonTree(XdrJson.field(json, "tx_set", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "tx_processing", XDR_JSON_TYPE), XDR_JSON_TYPE, "tx_processing").map { TransactionResultMetaXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "upgrades_processing", XDR_JSON_TYPE), XDR_JSON_TYPE, "upgrades_processing").map { UpgradeEntryMetaXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "scp_info", XDR_JSON_TYPE), XDR_JSON_TYPE, "scp_info").map { SCPHistoryEntryXdr.fromXdrJsonTree(it) },
+        Uint64Xdr.fromXdrJsonTree(XdrJson.field(json, "total_byte_size_of_live_soroban_state", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "evicted_keys", XDR_JSON_TYPE), XDR_JSON_TYPE, "evicted_keys").map { LedgerKeyXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "unused", XDR_JSON_TYPE), XDR_JSON_TYPE, "unused").map { LedgerEntryXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -92,4 +116,18 @@ data class LedgerCloseMetaV1Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("ledger_header", ledgerHeader.toXdrJsonElement())
+    put("tx_set", txSet.toXdrJsonElement())
+    put("tx_processing", XdrJson.array(txProcessing) { it.toXdrJsonElement() })
+    put("upgrades_processing", XdrJson.array(upgradesProcessing) { it.toXdrJsonElement() })
+    put("scp_info", XdrJson.array(scpInfo) { it.toXdrJsonElement() })
+    put("total_byte_size_of_live_soroban_state", totalByteSizeOfLiveSorobanState.toXdrJsonElement())
+    put("evicted_keys", XdrJson.array(evictedKeys) { it.toXdrJsonElement() })
+    put("unused", XdrJson.array(unused) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

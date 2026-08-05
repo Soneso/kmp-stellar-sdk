@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "RestoreFootprintOpXdr"
+
 /**
  * XDR Source:
  * struct RestoreFootprintOp
@@ -19,9 +24,26 @@ data class RestoreFootprintOpXdr(
       val ext = ExtensionPointXdr.decode(reader)
       return RestoreFootprintOpXdr(ext)
     }
+
+    fun fromXdrJson(json: String): RestoreFootprintOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RestoreFootprintOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RestoreFootprintOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return RestoreFootprintOpXdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

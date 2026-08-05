@@ -30,7 +30,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-53 (Sign and Verify Messages)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-51 (XDR-JSON), SEP-53 (Sign and Verify Messages)
 
 ### Smart Accounts (OpenZeppelin)
 - **Contracts**: [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) v0.7.0
@@ -268,6 +268,40 @@ com.soneso.stellar.sdk.sep.sep31/
     ├── Sep31UnknownResponseException.kt               # Unmapped HTTP status
     └── Sep31ConfigurationException.kt                 # fromDomain configuration failure
 ```
+
+### SEP-51 XDR-JSON
+
+Every generated XDR type carries `toXdrJson()`, `toXdrJsonElement()`,
+`Companion.fromXdrJson(String)` and `Companion.fromXdrJsonElement(JsonElement)`. There is
+deliberately no `sep/sep51` package: the methods are emitted onto the types in
+`com.soneso.stellar.sdk.xdr`, over the hand-written runtime `xdr/XdrJson.kt`, which is where
+every escaping, hex, strkey and validation rule lives. Hand-written conformance tests are in
+`unitTests/sep/sep51/`; the per-type suites in `unitTests/xdr/json/` are emitted.
+
+`kotlinx-serialization-json` is an `api` dependency because `JsonElement` is in the public
+signature.
+
+#### Maintenance contract
+
+The JSON form is derived from the same `.x` files as `encode`/`decode`, so it tracks the XDR
+pin — provided regeneration covers it. After any bump of `tools/xdrgen-kt/xdr-source.cfg`:
+
+```bash
+make -C tools/xdrgen-kt clean-all generate   # regenerates encode/decode and the JSON methods
+make -C tools/xdrgen-kt emit-json-tests      # regenerates unitTests/xdr/json/
+ruby tools/sep-51-oracle/emitted_names.rb    # committed Kotlin vs the frozen name table
+ruby tools/sep-51-oracle/name_map.rb --diff  # the name table vs the reference build
+bash tools/sep-51-corpus/refresh_corpus.sh   # the conformance corpus vs the reference build
+```
+
+The last two need the pinned reference CLI (`cargo install stellar-xdr --features cli --version
+28.0.0 --locked`) and run locally, not in CI. The first three need only Ruby and run in CI as the
+`xdr-generator` job of `tests.yml`. A new enum member or union arm changes the wire surface, so
+review whether any newly added type needs a type-level override in
+`tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_overrides.rb`.
+
+Never hand-edit a generated XDR type or an emitted test: the CI drift guard regenerates both and
+fails on any difference.
 
 ## Documentation Standards
 

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecTypeTupleXdr"
+
 /**
  * XDR Source:
  * struct SCSpecTypeTuple
@@ -19,6 +24,17 @@ data class SCSpecTypeTupleXdr(
       val valueTypes = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecTypeTupleXdr(valueTypes)
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeTupleXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeTupleXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeTupleXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCSpecTypeTupleXdr(
+        XdrJson.array(XdrJson.field(json, "value_types", XDR_JSON_TYPE), XDR_JSON_TYPE, "value_types", maxLength = 12).map { SCSpecTypeDefXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -27,4 +43,10 @@ data class SCSpecTypeTupleXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("value_types", XdrJson.array(valueTypes) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

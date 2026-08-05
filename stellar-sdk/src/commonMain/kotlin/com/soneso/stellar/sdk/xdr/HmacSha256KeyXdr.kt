@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HmacSha256KeyXdr"
+
 /**
  * XDR Source:
  * struct HmacSha256Key
@@ -19,9 +24,26 @@ data class HmacSha256KeyXdr(
       val key = reader.readFixedOpaque(32)
       return HmacSha256KeyXdr(key)
     }
+
+    fun fromXdrJson(json: String): HmacSha256KeyXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HmacSha256KeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HmacSha256KeyXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return HmacSha256KeyXdr(
+        XdrJson.hex(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key", expectedLength = 32)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(key, 32)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("key", XdrJson.hex(key))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCValTypeXdr"
+
 /**
  * XDR Source:
  * enum SCValType
@@ -62,61 +66,61 @@ package com.soneso.stellar.sdk.xdr
  *     SCV_EXECUTABLE_TAG = 22
  * };
  */
-enum class SCValTypeXdr(val value: Int) {
-  SCV_BOOL(0),
-  SCV_VOID(1),
-  SCV_ERROR(2),
+enum class SCValTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SCV_BOOL(0, "bool"),
+  SCV_VOID(1, "void"),
+  SCV_ERROR(2, "error"),
   /** 32 bits is the smallest type in WASM or XDR; no need for u8/u16. */
-  SCV_U32(3),
-  SCV_I32(4),
+  SCV_U32(3, "u32"),
+  SCV_I32(4, "i32"),
   /** 64 bits is naturally supported by both WASM and XDR also. */
-  SCV_U64(5),
-  SCV_I64(6),
+  SCV_U64(5, "u64"),
+  SCV_I64(6, "i64"),
   /** Time-related u64 subtypes with their own functions and formatting. */
-  SCV_TIMEPOINT(7),
-  SCV_DURATION(8),
+  SCV_TIMEPOINT(7, "timepoint"),
+  SCV_DURATION(8, "duration"),
   /**
    * 128 bits is naturally supported by Rust and we use it for Soroban
    * fixed-point arithmetic prices / balances / similar "quantities". These
    * are represented in XDR as a pair of 2 u64s.
    */
-  SCV_U128(9),
-  SCV_I128(10),
+  SCV_U128(9, "u128"),
+  SCV_I128(10, "i128"),
   /**
    * 256 bits is the size of sha256 output, ed25519 keys, and the EVM machine
    * word, so for interop use we include this even though it requires a small
    * amount of Rust guest and/or host library code.
    */
-  SCV_U256(11),
-  SCV_I256(12),
+  SCV_U256(11, "u256"),
+  SCV_I256(12, "i256"),
   /**
    * Bytes come in 3 flavors, 2 of which have meaningfully different
    * formatting and validity-checking / domain-restriction.
    */
-  SCV_BYTES(13),
-  SCV_STRING(14),
-  SCV_SYMBOL(15),
+  SCV_BYTES(13, "bytes"),
+  SCV_STRING(14, "string"),
+  SCV_SYMBOL(15, "symbol"),
   /** Vecs and maps are just polymorphic containers of other ScVals. */
-  SCV_VEC(16),
-  SCV_MAP(17),
+  SCV_VEC(16, "vec"),
+  SCV_MAP(17, "map"),
   /**
    * Address is the universal identifier for contracts and classic
    * accounts.
    */
-  SCV_ADDRESS(18),
+  SCV_ADDRESS(18, "address"),
   /**
    * The following are the internal SCVal variants that are not
    * exposed to the contracts.
    */
-  SCV_CONTRACT_INSTANCE(19),
+  SCV_CONTRACT_INSTANCE(19, "contract_instance"),
   /**
    * SCV_LEDGER_KEY_CONTRACT_INSTANCE and SCV_LEDGER_KEY_NONCE are unique
    * symbolic SCVals used as the key for ledger entries for a contract's
    * instance and an address' nonce, respectively.
    */
-  SCV_LEDGER_KEY_CONTRACT_INSTANCE(20),
-  SCV_LEDGER_KEY_NONCE(21),
-  SCV_EXECUTABLE_TAG(22);
+  SCV_LEDGER_KEY_CONTRACT_INSTANCE(20, "ledger_key_contract_instance"),
+  SCV_LEDGER_KEY_NONCE(21, "ledger_key_nonce"),
+  SCV_EXECUTABLE_TAG(22, "executable_tag");
 
   companion object {
 
@@ -125,9 +129,24 @@ enum class SCValTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCValTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCValTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCValTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCValTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCValTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

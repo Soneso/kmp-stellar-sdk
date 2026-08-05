@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "DataValueXdr"
+
 /**
  * XDR Source:
  * typedef opaque DataValue<64>;
@@ -15,9 +19,19 @@ value class DataValueXdr(val value: ByteArray) {
       val value = reader.readVariableOpaque()
       return DataValueXdr(value)
     }
+
+    fun fromXdrJson(json: String): DataValueXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): DataValueXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): DataValueXdr = DataValueXdr(XdrJson.hex(element, XDR_JSON_TYPE, "value", maxLength = 64))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeVariableOpaque(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

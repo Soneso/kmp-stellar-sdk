@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractIDPreimageFromAddressXdr"
+
 /**
  * XDR Source:
  * struct
@@ -22,10 +27,29 @@ data class ContractIDPreimageFromAddressXdr(
       val salt = Uint256Xdr.decode(reader)
       return ContractIDPreimageFromAddressXdr(address, salt)
     }
+
+    fun fromXdrJson(json: String): ContractIDPreimageFromAddressXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractIDPreimageFromAddressXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractIDPreimageFromAddressXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractIDPreimageFromAddressXdr(
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "address", XDR_JSON_TYPE)),
+        Uint256Xdr.fromXdrJsonTree(XdrJson.field(json, "salt", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     address.encode(writer)
     salt.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("address", address.toXdrJsonElement())
+    put("salt", salt.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

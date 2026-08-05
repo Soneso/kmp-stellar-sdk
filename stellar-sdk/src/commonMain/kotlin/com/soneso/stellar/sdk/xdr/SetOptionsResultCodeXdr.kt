@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SetOptionsResultCodeXdr"
+
 /**
  * XDR Source:
  * enum SetOptionsResultCode
@@ -23,31 +27,31 @@ package com.soneso.stellar.sdk.xdr
  *         -10 // auth revocable is required for clawback
  * };
  */
-enum class SetOptionsResultCodeXdr(val value: Int) {
+enum class SetOptionsResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  SET_OPTIONS_SUCCESS(0),
+  SET_OPTIONS_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * not enough funds to add a signer
    */
-  SET_OPTIONS_LOW_RESERVE(-1),
+  SET_OPTIONS_LOW_RESERVE(-1, "low_reserve"),
   /** max number of signers already reached */
-  SET_OPTIONS_TOO_MANY_SIGNERS(-2),
+  SET_OPTIONS_TOO_MANY_SIGNERS(-2, "too_many_signers"),
   /** invalid combination of clear/set flags */
-  SET_OPTIONS_BAD_FLAGS(-3),
+  SET_OPTIONS_BAD_FLAGS(-3, "bad_flags"),
   /** inflation account does not exist */
-  SET_OPTIONS_INVALID_INFLATION(-4),
+  SET_OPTIONS_INVALID_INFLATION(-4, "invalid_inflation"),
   /** can no longer change this option */
-  SET_OPTIONS_CANT_CHANGE(-5),
+  SET_OPTIONS_CANT_CHANGE(-5, "cant_change"),
   /** can't set an unknown flag */
-  SET_OPTIONS_UNKNOWN_FLAG(-6),
+  SET_OPTIONS_UNKNOWN_FLAG(-6, "unknown_flag"),
   /** bad value for weight/threshold */
-  SET_OPTIONS_THRESHOLD_OUT_OF_RANGE(-7),
+  SET_OPTIONS_THRESHOLD_OUT_OF_RANGE(-7, "threshold_out_of_range"),
   /** signer cannot be masterkey */
-  SET_OPTIONS_BAD_SIGNER(-8),
+  SET_OPTIONS_BAD_SIGNER(-8, "bad_signer"),
   /** malformed home domain */
-  SET_OPTIONS_INVALID_HOME_DOMAIN(-9),
-  SET_OPTIONS_AUTH_REVOCABLE_REQUIRED(-10);
+  SET_OPTIONS_INVALID_HOME_DOMAIN(-9, "invalid_home_domain"),
+  SET_OPTIONS_AUTH_REVOCABLE_REQUIRED(-10, "auth_revocable_required");
 
   companion object {
 
@@ -56,9 +60,24 @@ enum class SetOptionsResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SetOptionsResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SetOptionsResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SetOptionsResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SetOptionsResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SetOptionsResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

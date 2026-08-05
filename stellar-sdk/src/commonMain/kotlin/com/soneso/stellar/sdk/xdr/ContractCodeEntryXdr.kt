@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractCodeEntryXdr"
+
 /**
  * XDR Source:
  * struct ContractCodeEntry {
@@ -35,6 +40,19 @@ data class ContractCodeEntryXdr(
       val code = reader.readVariableOpaque()
       return ContractCodeEntryXdr(ext, hash, code)
     }
+
+    fun fromXdrJson(json: String): ContractCodeEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractCodeEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractCodeEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractCodeEntryXdr(
+        ContractCodeEntryExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "hash", XDR_JSON_TYPE)),
+        XdrJson.hex(XdrJson.field(json, "code", XDR_JSON_TYPE), XDR_JSON_TYPE, "code")
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +60,12 @@ data class ContractCodeEntryXdr(
     hash.encode(writer)
     writer.writeVariableOpaque(code)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("hash", hash.toXdrJsonElement())
+    put("code", XdrJson.hex(code))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

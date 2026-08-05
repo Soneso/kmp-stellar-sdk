@@ -1,0 +1,12 @@
+{
+  "tool": "stellar-xdr",
+  "version": "28.0.0",
+  "tool_commit": "d0f1330e43c3a2c0c616da30698b24140d4eea72",
+  "xdr_commit": "9c9c145953e80990d6ff1ae3a6a973a0ce6d0694",
+  "install": "cargo install stellar-xdr --features cli --version 28.0.0 --locked",
+  "sdk_xdr_commit": "911c9356277468cb588481bd90b5d4b6eda395a7",
+  "notes": [
+    "The reference CLI is pinned by version, not merely by name on PATH: XDR-JSON key spellings changed between releases. Releases before 28.0.0 emit the Rust keyword-escaped key 'type_' where SEP-0051 requires 'type'.",
+    "sdk_xdr_commit is the XDR pin this SDK generates from (tools/xdrgen-kt/xdr-source.cfg). It differs from xdr_commit, so the reference CLI cannot resolve types and enum members added after the commit it vendors. Those are reported as unresolvable rather than as mismatches."
+  ]
+}

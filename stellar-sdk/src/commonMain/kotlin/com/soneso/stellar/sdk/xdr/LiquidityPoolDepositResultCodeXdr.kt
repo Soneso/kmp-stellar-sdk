@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LiquidityPoolDepositResultCodeXdr"
+
 /**
  * XDR Source:
  * enum LiquidityPoolDepositResultCode
@@ -26,40 +30,40 @@ package com.soneso.stellar.sdk.xdr
  *                                                   // assets is frozen
  * };
  */
-enum class LiquidityPoolDepositResultCodeXdr(val value: Int) {
+enum class LiquidityPoolDepositResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  LIQUIDITY_POOL_DEPOSIT_SUCCESS(0),
+  LIQUIDITY_POOL_DEPOSIT_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * bad input
    */
-  LIQUIDITY_POOL_DEPOSIT_MALFORMED(-1),
+  LIQUIDITY_POOL_DEPOSIT_MALFORMED(-1, "malformed"),
   /** no trust line for one of the */
-  LIQUIDITY_POOL_DEPOSIT_NO_TRUST(-2),
+  LIQUIDITY_POOL_DEPOSIT_NO_TRUST(-2, "no_trust"),
   /**
    * assets
    * not authorized for one of the
    */
-  LIQUIDITY_POOL_DEPOSIT_NOT_AUTHORIZED(-3),
+  LIQUIDITY_POOL_DEPOSIT_NOT_AUTHORIZED(-3, "not_authorized"),
   /**
    * assets
    * not enough balance for one of
    */
-  LIQUIDITY_POOL_DEPOSIT_UNDERFUNDED(-4),
+  LIQUIDITY_POOL_DEPOSIT_UNDERFUNDED(-4, "underfunded"),
   /**
    * the assets
    * pool share trust line doesn't
    */
-  LIQUIDITY_POOL_DEPOSIT_LINE_FULL(-5),
+  LIQUIDITY_POOL_DEPOSIT_LINE_FULL(-5, "line_full"),
   /**
    * have sufficient limit
    * deposit price outside bounds
    */
-  LIQUIDITY_POOL_DEPOSIT_BAD_PRICE(-6),
+  LIQUIDITY_POOL_DEPOSIT_BAD_PRICE(-6, "bad_price"),
   /** pool reserves are full */
-  LIQUIDITY_POOL_DEPOSIT_POOL_FULL(-7),
+  LIQUIDITY_POOL_DEPOSIT_POOL_FULL(-7, "pool_full"),
   /** trustline for one of the */
-  LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN(-8);
+  LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN(-8, "trustline_frozen");
 
   companion object {
 
@@ -68,9 +72,24 @@ enum class LiquidityPoolDepositResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown LiquidityPoolDepositResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolDepositResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolDepositResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolDepositResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): LiquidityPoolDepositResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

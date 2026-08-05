@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionResultXdr"
+
 /**
  * XDR Source:
  * struct TransactionResult
@@ -61,6 +66,19 @@ data class TransactionResultXdr(
       val ext = TransactionResultExtXdr.decode(reader)
       return TransactionResultXdr(feeCharged, result, ext)
     }
+
+    fun fromXdrJson(json: String): TransactionResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionResultXdr(
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_charged", XDR_JSON_TYPE)),
+        TransactionResultResultXdr.fromXdrJsonTree(XdrJson.field(json, "result", XDR_JSON_TYPE)),
+        TransactionResultExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -68,4 +86,12 @@ data class TransactionResultXdr(
     result.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("fee_charged", feeCharged.toXdrJsonElement())
+    put("result", result.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

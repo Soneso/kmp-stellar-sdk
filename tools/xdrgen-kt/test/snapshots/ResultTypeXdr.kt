@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ResultTypeXdr"
+
 /**
  * XDR Source:
  * enum ResultType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     RESULT_UNKNOWN = 3
  * };
  */
-enum class ResultTypeXdr(val value: Int) {
-  RESULT_OK(0),
-  RESULT_ERROR(1),
-  RESULT_PENDING(2),
-  RESULT_UNKNOWN(3);
+enum class ResultTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  RESULT_OK(0, "ok"),
+  RESULT_ERROR(1, "error"),
+  RESULT_PENDING(2, "pending"),
+  RESULT_UNKNOWN(3, "unknown");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class ResultTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ResultTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ResultTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ResultTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ResultTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ResultTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

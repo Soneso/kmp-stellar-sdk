@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractCostTypeXdr"
+
 /**
  * XDR Source:
  * enum ContractCostType {
@@ -191,195 +195,195 @@ package com.soneso.stellar.sdk.xdr
  *     Bn254G1Msm = 85
  * };
  */
-enum class ContractCostTypeXdr(val value: Int) {
+enum class ContractCostTypeXdr(val value: Int, internal val xdrJsonName: String) {
   /** Cost of running 1 wasm instruction */
-  WasmInsnExec(0),
+  WasmInsnExec(0, "wasm_insn_exec"),
   /** Cost of allocating a slice of memory (in bytes) */
-  MemAlloc(1),
+  MemAlloc(1, "mem_alloc"),
   /** Cost of copying a slice of bytes into a pre-allocated memory */
-  MemCpy(2),
+  MemCpy(2, "mem_cpy"),
   /** Cost of comparing two slices of memory */
-  MemCmp(3),
+  MemCmp(3, "mem_cmp"),
   /**
    * Cost of a host function dispatch, not including the actual work done by
    * the function nor the cost of VM invocation machinary
    */
-  DispatchHostFunction(4),
+  DispatchHostFunction(4, "dispatch_host_function"),
   /**
    * Cost of visiting a host object from the host object storage. Exists to
    * make sure some baseline cost coverage, i.e. repeatly visiting objects
    * by the guest will always incur some charges.
    */
-  VisitObject(5),
+  VisitObject(5, "visit_object"),
   /** Cost of serializing an xdr object to bytes */
-  ValSer(6),
+  ValSer(6, "val_ser"),
   /** Cost of deserializing an xdr object from bytes */
-  ValDeser(7),
+  ValDeser(7, "val_deser"),
   /** Cost of computing the sha256 hash from bytes */
-  ComputeSha256Hash(8),
+  ComputeSha256Hash(8, "compute_sha256_hash"),
   /** Cost of computing the ed25519 pubkey from bytes */
-  ComputeEd25519PubKey(9),
+  ComputeEd25519PubKey(9, "compute_ed25519_pub_key"),
   /** Cost of verifying ed25519 signature of a payload. */
-  VerifyEd25519Sig(10),
+  VerifyEd25519Sig(10, "verify_ed25519_sig"),
   /** Cost of instantiation a VM from wasm bytes code. */
-  VmInstantiation(11),
+  VmInstantiation(11, "vm_instantiation"),
   /** Cost of instantiation a VM from a cached state. */
-  VmCachedInstantiation(12),
+  VmCachedInstantiation(12, "vm_cached_instantiation"),
   /**
    * Cost of invoking a function on the VM. If the function is a host function,
    * additional cost will be covered by `DispatchHostFunction`.
    */
-  InvokeVmFunction(13),
+  InvokeVmFunction(13, "invoke_vm_function"),
   /** Cost of computing a keccak256 hash from bytes. */
-  ComputeKeccak256Hash(14),
+  ComputeKeccak256Hash(14, "compute_keccak256_hash"),
   /**
    * Cost of decoding an ECDSA signature computed from a 256-bit prime modulus
    * curve (e.g. secp256k1 and secp256r1)
    */
-  DecodeEcdsaCurve256Sig(15),
+  DecodeEcdsaCurve256Sig(15, "decode_ecdsa_curve256_sig"),
   /** Cost of recovering an ECDSA secp256k1 key from a signature. */
-  RecoverEcdsaSecp256k1Key(16),
+  RecoverEcdsaSecp256k1Key(16, "recover_ecdsa_secp256k1_key"),
   /** Cost of int256 addition (`+`) and subtraction (`-`) operations */
-  Int256AddSub(17),
+  Int256AddSub(17, "int256_add_sub"),
   /** Cost of int256 multiplication (`*`) operation */
-  Int256Mul(18),
+  Int256Mul(18, "int256_mul"),
   /** Cost of int256 division (`/`) operation */
-  Int256Div(19),
+  Int256Div(19, "int256_div"),
   /** Cost of int256 power (`exp`) operation */
-  Int256Pow(20),
+  Int256Pow(20, "int256_pow"),
   /** Cost of int256 shift (`shl`, `shr`) operation */
-  Int256Shift(21),
+  Int256Shift(21, "int256_shift"),
   /** Cost of drawing random bytes using a ChaCha20 PRNG */
-  ChaCha20DrawBytes(22),
+  ChaCha20DrawBytes(22, "cha_cha20_draw_bytes"),
   /** Cost of parsing wasm bytes that only encode instructions. */
-  ParseWasmInstructions(23),
+  ParseWasmInstructions(23, "parse_wasm_instructions"),
   /** Cost of parsing a known number of wasm functions. */
-  ParseWasmFunctions(24),
+  ParseWasmFunctions(24, "parse_wasm_functions"),
   /** Cost of parsing a known number of wasm globals. */
-  ParseWasmGlobals(25),
+  ParseWasmGlobals(25, "parse_wasm_globals"),
   /** Cost of parsing a known number of wasm table entries. */
-  ParseWasmTableEntries(26),
+  ParseWasmTableEntries(26, "parse_wasm_table_entries"),
   /** Cost of parsing a known number of wasm types. */
-  ParseWasmTypes(27),
+  ParseWasmTypes(27, "parse_wasm_types"),
   /** Cost of parsing a known number of wasm data segments. */
-  ParseWasmDataSegments(28),
+  ParseWasmDataSegments(28, "parse_wasm_data_segments"),
   /** Cost of parsing a known number of wasm element segments. */
-  ParseWasmElemSegments(29),
+  ParseWasmElemSegments(29, "parse_wasm_elem_segments"),
   /** Cost of parsing a known number of wasm imports. */
-  ParseWasmImports(30),
+  ParseWasmImports(30, "parse_wasm_imports"),
   /** Cost of parsing a known number of wasm exports. */
-  ParseWasmExports(31),
+  ParseWasmExports(31, "parse_wasm_exports"),
   /** Cost of parsing a known number of data segment bytes. */
-  ParseWasmDataSegmentBytes(32),
+  ParseWasmDataSegmentBytes(32, "parse_wasm_data_segment_bytes"),
   /** Cost of instantiating wasm bytes that only encode instructions. */
-  InstantiateWasmInstructions(33),
+  InstantiateWasmInstructions(33, "instantiate_wasm_instructions"),
   /** Cost of instantiating a known number of wasm functions. */
-  InstantiateWasmFunctions(34),
+  InstantiateWasmFunctions(34, "instantiate_wasm_functions"),
   /** Cost of instantiating a known number of wasm globals. */
-  InstantiateWasmGlobals(35),
+  InstantiateWasmGlobals(35, "instantiate_wasm_globals"),
   /** Cost of instantiating a known number of wasm table entries. */
-  InstantiateWasmTableEntries(36),
+  InstantiateWasmTableEntries(36, "instantiate_wasm_table_entries"),
   /** Cost of instantiating a known number of wasm types. */
-  InstantiateWasmTypes(37),
+  InstantiateWasmTypes(37, "instantiate_wasm_types"),
   /** Cost of instantiating a known number of wasm data segments. */
-  InstantiateWasmDataSegments(38),
+  InstantiateWasmDataSegments(38, "instantiate_wasm_data_segments"),
   /** Cost of instantiating a known number of wasm element segments. */
-  InstantiateWasmElemSegments(39),
+  InstantiateWasmElemSegments(39, "instantiate_wasm_elem_segments"),
   /** Cost of instantiating a known number of wasm imports. */
-  InstantiateWasmImports(40),
+  InstantiateWasmImports(40, "instantiate_wasm_imports"),
   /** Cost of instantiating a known number of wasm exports. */
-  InstantiateWasmExports(41),
+  InstantiateWasmExports(41, "instantiate_wasm_exports"),
   /** Cost of instantiating a known number of data segment bytes. */
-  InstantiateWasmDataSegmentBytes(42),
+  InstantiateWasmDataSegmentBytes(42, "instantiate_wasm_data_segment_bytes"),
   /**
    * Cost of decoding a bytes array representing an uncompressed SEC-1 encoded
    * point on a 256-bit elliptic curve
    */
-  Sec1DecodePointUncompressed(43),
+  Sec1DecodePointUncompressed(43, "sec1_decode_point_uncompressed"),
   /** Cost of verifying an ECDSA Secp256r1 signature */
-  VerifyEcdsaSecp256r1Sig(44),
+  VerifyEcdsaSecp256r1Sig(44, "verify_ecdsa_secp256r1_sig"),
   /** Cost of encoding a BLS12-381 Fp (base field element) */
-  Bls12381EncodeFp(45),
+  Bls12381EncodeFp(45, "bls12381_encode_fp"),
   /** Cost of decoding a BLS12-381 Fp (base field element) */
-  Bls12381DecodeFp(46),
+  Bls12381DecodeFp(46, "bls12381_decode_fp"),
   /** Cost of checking a G1 point lies on the curve */
-  Bls12381G1CheckPointOnCurve(47),
+  Bls12381G1CheckPointOnCurve(47, "bls12381_g1_check_point_on_curve"),
   /** Cost of checking a G1 point belongs to the correct subgroup */
-  Bls12381G1CheckPointInSubgroup(48),
+  Bls12381G1CheckPointInSubgroup(48, "bls12381_g1_check_point_in_subgroup"),
   /** Cost of checking a G2 point lies on the curve */
-  Bls12381G2CheckPointOnCurve(49),
+  Bls12381G2CheckPointOnCurve(49, "bls12381_g2_check_point_on_curve"),
   /** Cost of checking a G2 point belongs to the correct subgroup */
-  Bls12381G2CheckPointInSubgroup(50),
+  Bls12381G2CheckPointInSubgroup(50, "bls12381_g2_check_point_in_subgroup"),
   /** Cost of converting a BLS12-381 G1 point from projective to affine coordinates */
-  Bls12381G1ProjectiveToAffine(51),
+  Bls12381G1ProjectiveToAffine(51, "bls12381_g1_projective_to_affine"),
   /** Cost of converting a BLS12-381 G2 point from projective to affine coordinates */
-  Bls12381G2ProjectiveToAffine(52),
+  Bls12381G2ProjectiveToAffine(52, "bls12381_g2_projective_to_affine"),
   /** Cost of performing BLS12-381 G1 point addition */
-  Bls12381G1Add(53),
+  Bls12381G1Add(53, "bls12381_g1_add"),
   /** Cost of performing BLS12-381 G1 scalar multiplication */
-  Bls12381G1Mul(54),
+  Bls12381G1Mul(54, "bls12381_g1_mul"),
   /** Cost of performing BLS12-381 G1 multi-scalar multiplication (MSM) */
-  Bls12381G1Msm(55),
+  Bls12381G1Msm(55, "bls12381_g1_msm"),
   /** Cost of mapping a BLS12-381 Fp field element to a G1 point */
-  Bls12381MapFpToG1(56),
+  Bls12381MapFpToG1(56, "bls12381_map_fp_to_g1"),
   /** Cost of hashing to a BLS12-381 G1 point */
-  Bls12381HashToG1(57),
+  Bls12381HashToG1(57, "bls12381_hash_to_g1"),
   /** Cost of performing BLS12-381 G2 point addition */
-  Bls12381G2Add(58),
+  Bls12381G2Add(58, "bls12381_g2_add"),
   /** Cost of performing BLS12-381 G2 scalar multiplication */
-  Bls12381G2Mul(59),
+  Bls12381G2Mul(59, "bls12381_g2_mul"),
   /** Cost of performing BLS12-381 G2 multi-scalar multiplication (MSM) */
-  Bls12381G2Msm(60),
+  Bls12381G2Msm(60, "bls12381_g2_msm"),
   /** Cost of mapping a BLS12-381 Fp2 field element to a G2 point */
-  Bls12381MapFp2ToG2(61),
+  Bls12381MapFp2ToG2(61, "bls12381_map_fp2_to_g2"),
   /** Cost of hashing to a BLS12-381 G2 point */
-  Bls12381HashToG2(62),
+  Bls12381HashToG2(62, "bls12381_hash_to_g2"),
   /** Cost of performing BLS12-381 pairing operation */
-  Bls12381Pairing(63),
+  Bls12381Pairing(63, "bls12381_pairing"),
   /** Cost of converting a BLS12-381 scalar element from U256 */
-  Bls12381FrFromU256(64),
+  Bls12381FrFromU256(64, "bls12381_fr_from_u256"),
   /** Cost of converting a BLS12-381 scalar element to U256 */
-  Bls12381FrToU256(65),
+  Bls12381FrToU256(65, "bls12381_fr_to_u256"),
   /** Cost of performing BLS12-381 scalar element addition/subtraction */
-  Bls12381FrAddSub(66),
+  Bls12381FrAddSub(66, "bls12381_fr_add_sub"),
   /** Cost of performing BLS12-381 scalar element multiplication */
-  Bls12381FrMul(67),
+  Bls12381FrMul(67, "bls12381_fr_mul"),
   /** Cost of performing BLS12-381 scalar element exponentiation */
-  Bls12381FrPow(68),
+  Bls12381FrPow(68, "bls12381_fr_pow"),
   /** Cost of performing BLS12-381 scalar element inversion */
-  Bls12381FrInv(69),
+  Bls12381FrInv(69, "bls12381_fr_inv"),
   /** Cost of encoding a BN254 Fp (base field element) */
-  Bn254EncodeFp(70),
+  Bn254EncodeFp(70, "bn254_encode_fp"),
   /** Cost of decoding a BN254 Fp (base field element) */
-  Bn254DecodeFp(71),
+  Bn254DecodeFp(71, "bn254_decode_fp"),
   /** Cost of checking a G1 point lies on the curve */
-  Bn254G1CheckPointOnCurve(72),
+  Bn254G1CheckPointOnCurve(72, "bn254_g1_check_point_on_curve"),
   /** Cost of checking a G2 point lies on the curve */
-  Bn254G2CheckPointOnCurve(73),
+  Bn254G2CheckPointOnCurve(73, "bn254_g2_check_point_on_curve"),
   /** Cost of checking a G2 point belongs to the correct subgroup */
-  Bn254G2CheckPointInSubgroup(74),
+  Bn254G2CheckPointInSubgroup(74, "bn254_g2_check_point_in_subgroup"),
   /** Cost of converting a BN254 G1 point from projective to affine coordinates */
-  Bn254G1ProjectiveToAffine(75),
+  Bn254G1ProjectiveToAffine(75, "bn254_g1_projective_to_affine"),
   /** Cost of performing BN254 G1 point addition */
-  Bn254G1Add(76),
+  Bn254G1Add(76, "bn254_g1_add"),
   /** Cost of performing BN254 G1 scalar multiplication */
-  Bn254G1Mul(77),
+  Bn254G1Mul(77, "bn254_g1_mul"),
   /** Cost of performing BN254 pairing operation */
-  Bn254Pairing(78),
+  Bn254Pairing(78, "bn254_pairing"),
   /** Cost of converting a BN254 scalar element from U256 */
-  Bn254FrFromU256(79),
+  Bn254FrFromU256(79, "bn254_fr_from_u256"),
   /** Cost of converting a BN254 scalar element to U256 */
-  Bn254FrToU256(80),
+  Bn254FrToU256(80, "bn254_fr_to_u256"),
   /** // Cost of performing BN254 scalar element addition/subtraction */
-  Bn254FrAddSub(81),
+  Bn254FrAddSub(81, "bn254_fr_add_sub"),
   /** Cost of performing BN254 scalar element multiplication */
-  Bn254FrMul(82),
+  Bn254FrMul(82, "bn254_fr_mul"),
   /** Cost of performing BN254 scalar element exponentiation */
-  Bn254FrPow(83),
+  Bn254FrPow(83, "bn254_fr_pow"),
   /** Cost of performing BN254 scalar element inversion */
-  Bn254FrInv(84),
+  Bn254FrInv(84, "bn254_fr_inv"),
   /** Cost of performing BN254 G1 multi-scalar multiplication (MSM) */
-  Bn254G1Msm(85);
+  Bn254G1Msm(85, "bn254_g1_msm");
 
   companion object {
 
@@ -388,9 +392,24 @@ enum class ContractCostTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ContractCostTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ContractCostTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractCostTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractCostTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ContractCostTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "OperationXdr"
+
 /**
  * XDR Source:
  * struct Operation
@@ -88,6 +93,18 @@ data class OperationXdr(
       val body = OperationBodyXdr.decode(reader)
       return OperationXdr(sourceAccount, body)
     }
+
+    fun fromXdrJson(json: String): OperationXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return OperationXdr(
+        XdrJson.optional(XdrJson.field(json, "source_account", XDR_JSON_TYPE))?.let { MuxedAccountXdr.fromXdrJsonTree(it) },
+        OperationBodyXdr.fromXdrJsonTree(XdrJson.field(json, "body", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -99,4 +116,11 @@ data class OperationXdr(
     }
     body.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("source_account", XdrJson.optional(sourceAccount) { it.toXdrJsonElement() })
+    put("body", body.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

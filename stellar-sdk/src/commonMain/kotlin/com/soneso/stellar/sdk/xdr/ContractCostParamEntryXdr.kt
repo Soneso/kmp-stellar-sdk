@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractCostParamEntryXdr"
+
 /**
  * XDR Source:
  * struct ContractCostParamEntry {
@@ -27,6 +32,19 @@ data class ContractCostParamEntryXdr(
       val linearTerm = Int64Xdr.decode(reader)
       return ContractCostParamEntryXdr(ext, constTerm, linearTerm)
     }
+
+    fun fromXdrJson(json: String): ContractCostParamEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractCostParamEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractCostParamEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractCostParamEntryXdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "const_term", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "linear_term", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -34,4 +52,12 @@ data class ContractCostParamEntryXdr(
     constTerm.encode(writer)
     linearTerm.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("const_term", constTerm.toXdrJsonElement())
+    put("linear_term", linearTerm.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

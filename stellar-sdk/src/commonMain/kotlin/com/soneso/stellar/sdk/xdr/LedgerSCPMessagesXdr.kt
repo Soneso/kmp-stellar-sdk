@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerSCPMessagesXdr"
+
 /**
  * XDR Source:
  * struct LedgerSCPMessages
@@ -22,6 +27,18 @@ data class LedgerSCPMessagesXdr(
       val messages = List(reader.readInt()) { SCPEnvelopeXdr.decode(reader) }
       return LedgerSCPMessagesXdr(ledgerSeq, messages)
     }
+
+    fun fromXdrJson(json: String): LedgerSCPMessagesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerSCPMessagesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerSCPMessagesXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LedgerSCPMessagesXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_seq", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "messages", XDR_JSON_TYPE), XDR_JSON_TYPE, "messages").map { SCPEnvelopeXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +48,11 @@ data class LedgerSCPMessagesXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_seq", ledgerSeq.toXdrJsonElement())
+    put("messages", XdrJson.array(messages) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

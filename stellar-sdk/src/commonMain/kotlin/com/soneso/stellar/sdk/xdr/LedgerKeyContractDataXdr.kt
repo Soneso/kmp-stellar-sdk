@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerKeyContractDataXdr"
+
 /**
  * XDR Source:
  * struct
@@ -25,6 +30,19 @@ data class LedgerKeyContractDataXdr(
       val durability = ContractDataDurabilityXdr.decode(reader)
       return LedgerKeyContractDataXdr(contract, key, durability)
     }
+
+    fun fromXdrJson(json: String): LedgerKeyContractDataXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerKeyContractDataXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerKeyContractDataXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LedgerKeyContractDataXdr(
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "contract", XDR_JSON_TYPE)),
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "key", XDR_JSON_TYPE)),
+        ContractDataDurabilityXdr.fromXdrJsonTree(XdrJson.field(json, "durability", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +50,12 @@ data class LedgerKeyContractDataXdr(
     key.encode(writer)
     durability.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("contract", contract.toXdrJsonElement())
+    put("key", key.toXdrJsonElement())
+    put("durability", durability.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

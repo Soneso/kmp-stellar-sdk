@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecTypeDefXdr"
+
 /**
  * XDR Source:
  * union SCSpecTypeDef switch (SCSpecType type)
@@ -147,6 +153,48 @@ sealed class SCSpecTypeDefXdr {
         else -> throw IllegalArgumentException("Unknown SCSpecTypeDefXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeDefXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeDefXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeDefXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "option" -> Option(SCSpecTypeOptionXdr.fromXdrJsonTree(value))
+          "result" -> Result(SCSpecTypeResultXdr.fromXdrJsonTree(value))
+          "vec" -> Vec(SCSpecTypeVecXdr.fromXdrJsonTree(value))
+          "map" -> Map(SCSpecTypeMapXdr.fromXdrJsonTree(value))
+          "tuple" -> Tuple(SCSpecTypeTupleXdr.fromXdrJsonTree(value))
+          "bytes_n" -> BytesN(SCSpecTypeBytesNXdr.fromXdrJsonTree(value))
+          "udt" -> Udt(SCSpecTypeUDTXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "val" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_VAL)
+        "bool" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_BOOL)
+        "void" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_VOID)
+        "error" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_ERROR)
+        "u32" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+        "i32" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_I32)
+        "u64" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_U64)
+        "i64" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_I64)
+        "timepoint" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT)
+        "duration" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_DURATION)
+        "u128" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_U128)
+        "i128" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_I128)
+        "u256" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_U256)
+        "i256" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_I256)
+        "bytes" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES)
+        "string" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_STRING)
+        "symbol" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL)
+        "address" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS)
+        "muxed_address" -> Void(SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -176,4 +224,17 @@ sealed class SCSpecTypeDefXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+    is Option -> buildJsonObject { put("option", value.toXdrJsonElement()) }
+    is Result -> buildJsonObject { put("result", value.toXdrJsonElement()) }
+    is Vec -> buildJsonObject { put("vec", value.toXdrJsonElement()) }
+    is Map -> buildJsonObject { put("map", value.toXdrJsonElement()) }
+    is Tuple -> buildJsonObject { put("tuple", value.toXdrJsonElement()) }
+    is BytesN -> buildJsonObject { put("bytes_n", value.toXdrJsonElement()) }
+    is Udt -> buildJsonObject { put("udt", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

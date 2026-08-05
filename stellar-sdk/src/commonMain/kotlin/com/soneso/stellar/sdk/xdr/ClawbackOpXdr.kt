@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClawbackOpXdr"
+
 /**
  * XDR Source:
  * struct ClawbackOp
@@ -25,6 +30,19 @@ data class ClawbackOpXdr(
       val amount = Int64Xdr.decode(reader)
       return ClawbackOpXdr(asset, from, amount)
     }
+
+    fun fromXdrJson(json: String): ClawbackOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClawbackOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClawbackOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ClawbackOpXdr(
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
+        MuxedAccountXdr.fromXdrJsonTree(XdrJson.field(json, "from", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +50,12 @@ data class ClawbackOpXdr(
     from.encode(writer)
     amount.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("asset", asset.toXdrJsonElement())
+    put("from", from.toXdrJsonElement())
+    put("amount", amount.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCMapXdr"
+
 /**
  * XDR Source:
  * typedef SCMapEntry SCMap<>;
@@ -15,6 +19,12 @@ value class SCMapXdr(val value: List<SCMapEntryXdr>) {
       val value = List(reader.readInt()) { SCMapEntryXdr.decode(reader) }
       return SCMapXdr(value)
     }
+
+    fun fromXdrJson(json: String): SCMapXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCMapXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCMapXdr = SCMapXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { SCMapEntryXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class SCMapXdr(val value: List<SCMapEntryXdr>) {
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

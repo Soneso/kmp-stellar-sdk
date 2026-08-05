@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiabilitiesXdr"
+
 /**
  * XDR Source:
  * struct Liabilities
@@ -22,10 +27,29 @@ data class LiabilitiesXdr(
       val selling = Int64Xdr.decode(reader)
       return LiabilitiesXdr(buying, selling)
     }
+
+    fun fromXdrJson(json: String): LiabilitiesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiabilitiesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiabilitiesXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LiabilitiesXdr(
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "buying", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "selling", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     buying.encode(writer)
     selling.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("buying", buying.toXdrJsonElement())
+    put("selling", selling.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

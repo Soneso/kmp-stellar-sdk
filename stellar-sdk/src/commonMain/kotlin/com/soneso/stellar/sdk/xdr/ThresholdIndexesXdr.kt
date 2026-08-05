@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ThresholdIndexesXdr"
+
 /**
  * XDR Source:
  * enum ThresholdIndexes
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     THRESHOLD_HIGH = 3
  * };
  */
-enum class ThresholdIndexesXdr(val value: Int) {
-  THRESHOLD_MASTER_WEIGHT(0),
-  THRESHOLD_LOW(1),
-  THRESHOLD_MED(2),
-  THRESHOLD_HIGH(3);
+enum class ThresholdIndexesXdr(val value: Int, internal val xdrJsonName: String) {
+  THRESHOLD_MASTER_WEIGHT(0, "master_weight"),
+  THRESHOLD_LOW(1, "low"),
+  THRESHOLD_MED(2, "med"),
+  THRESHOLD_HIGH(3, "high");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class ThresholdIndexesXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ThresholdIndexesXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ThresholdIndexesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ThresholdIndexesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ThresholdIndexesXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ThresholdIndexesXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

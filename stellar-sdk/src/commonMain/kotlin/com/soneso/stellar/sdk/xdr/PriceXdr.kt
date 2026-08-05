@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PriceXdr"
+
 /**
  * XDR Source:
  * struct Price
@@ -24,10 +29,29 @@ data class PriceXdr(
       val d = Int32Xdr.decode(reader)
       return PriceXdr(n, d)
     }
+
+    fun fromXdrJson(json: String): PriceXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PriceXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PriceXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return PriceXdr(
+        Int32Xdr.fromXdrJsonTree(XdrJson.field(json, "n", XDR_JSON_TYPE)),
+        Int32Xdr.fromXdrJsonTree(XdrJson.field(json, "d", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     n.encode(writer)
     d.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("n", n.toXdrJsonElement())
+    put("d", d.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

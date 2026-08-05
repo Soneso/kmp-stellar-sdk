@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractIDPreimageXdr"
+
 /**
  * XDR Source:
  * union ContractIDPreimage switch (ContractIDPreimageType type)
@@ -48,6 +53,19 @@ sealed class ContractIDPreimageXdr {
         else -> throw IllegalArgumentException("Unknown ContractIDPreimageXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ContractIDPreimageXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractIDPreimageXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractIDPreimageXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "address" -> FromAddress(ContractIDPreimageFromAddressXdr.fromXdrJsonTree(value))
+        "asset" -> FromAsset(AssetXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -61,4 +79,11 @@ sealed class ContractIDPreimageXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is FromAddress -> buildJsonObject { put("address", value.toXdrJsonElement()) }
+    is FromAsset -> buildJsonObject { put("asset", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

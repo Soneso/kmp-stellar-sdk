@@ -167,3 +167,64 @@ jobs:
           name: test-results-native-macos
           path: stellar-sdk/build/reports/tests/
           retention-days: 30
+
+  # The XDR types and the emitted XDR-JSON test suite are generated, never hand-written.
+  # This job runs the generator's own tests, checks the JSON names in the committed Kotlin
+  # against the frozen name table, and regenerates everything to prove the committed output
+  # is what the generator produces. All three checks read committed artefacts and need only
+  # Ruby. The checks that compare against the pinned XDR-JSON reference build live in
+  # sep-51-corpus-drift.yml, because that build has to be compiled first.
+  xdr-generator:
+    name: XDR Generator
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: '3.4'
+
+      - name: Cache generator gems
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/xdrgen-kt/vendor
+          key: xdrgen-gems-${{ runner.os }}-${{ hashFiles('tools/xdrgen-kt/Gemfile.lock') }}
+
+      - name: Run generator tests
+        run: make -C tools/xdrgen-kt test
+
+      - name: Check emitted XDR-JSON names against the frozen name table
+        run: |
+          if ! ruby tools/sep-51-oracle/emitted_names.rb; then
+            echo "::error::The XDR-JSON names in the committed Kotlin disagree with tools/sep-51-oracle/name-map.json."
+            echo "A name in the generated code is not the name the derivation rules produce for it."
+            echo "Fix the generator, not the name table. If the XDR pin moved, rebuild the table first:"
+            echo "  ruby tools/sep-51-oracle/name_map.rb --diff   (needs the pinned reference CLI, see tools/sep-51-oracle/README.md)"
+            exit 1
+          fi
+
+      - name: Regenerate XDR types and the emitted XDR-JSON tests
+        run: |
+          make -C tools/xdrgen-kt generate
+          make -C tools/xdrgen-kt emit-json-tests
+
+      - name: Check the committed output against a fresh generation
+        run: |
+          GENERATED_DIRS="stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/xdr/json"
+          # --porcelain rather than `git diff`, so a file the generator added or dropped
+          # counts as drift too.
+          CHANGED=$(git status --porcelain -- $GENERATED_DIRS)
+          if [ -n "$CHANGED" ]; then
+            echo "::error::Committed generated output does not match a fresh generation."
+            echo "$CHANGED"
+            git diff -- $GENERATED_DIRS
+            echo "Generated files are never edited by hand. Change the generator under"
+            echo "tools/xdrgen-kt/lib/xdrgen/generators/, then run and commit:"
+            echo "  make -C tools/xdrgen-kt generate"
+            echo "  make -C tools/xdrgen-kt emit-json-tests"
+            exit 1
+          fi
+          echo "Committed generated output matches a fresh generation."

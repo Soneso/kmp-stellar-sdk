@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SequenceNumberXdr"
+
 /**
  * XDR Source:
  * typedef int64 SequenceNumber;
@@ -15,9 +19,19 @@ value class SequenceNumberXdr(val value: Int64Xdr) {
       val value = Int64Xdr.decode(reader)
       return SequenceNumberXdr(value)
     }
+
+    fun fromXdrJson(json: String): SequenceNumberXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SequenceNumberXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SequenceNumberXdr = SequenceNumberXdr(Int64Xdr.fromXdrJsonTree(element))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

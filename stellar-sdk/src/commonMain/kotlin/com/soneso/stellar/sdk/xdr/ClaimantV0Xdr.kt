@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimantV0Xdr"
+
 /**
  * XDR Source:
  * struct
@@ -24,10 +29,29 @@ data class ClaimantV0Xdr(
       val predicate = ClaimPredicateXdr.decode(reader)
       return ClaimantV0Xdr(destination, predicate)
     }
+
+    fun fromXdrJson(json: String): ClaimantV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimantV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimantV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ClaimantV0Xdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
+        ClaimPredicateXdr.fromXdrJsonTree(XdrJson.field(json, "predicate", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     destination.encode(writer)
     predicate.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("destination", destination.toXdrJsonElement())
+    put("predicate", predicate.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

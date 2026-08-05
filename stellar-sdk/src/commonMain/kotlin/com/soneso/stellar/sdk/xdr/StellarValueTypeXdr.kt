@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "StellarValueTypeXdr"
+
 /**
  * XDR Source:
  * enum StellarValueType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     STELLAR_VALUE_EMPTY_TX_SET = 2
  * };
  */
-enum class StellarValueTypeXdr(val value: Int) {
-  STELLAR_VALUE_BASIC(0),
-  STELLAR_VALUE_SIGNED(1),
-  STELLAR_VALUE_EMPTY_TX_SET(2);
+enum class StellarValueTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  STELLAR_VALUE_BASIC(0, "basic"),
+  STELLAR_VALUE_SIGNED(1, "signed"),
+  STELLAR_VALUE_EMPTY_TX_SET(2, "empty_tx_set");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class StellarValueTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown StellarValueTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): StellarValueTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): StellarValueTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): StellarValueTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): StellarValueTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClawbackClaimableBalanceResultXdr"
+
 /**
  * XDR Source:
  * union ClawbackClaimableBalanceResult switch (
@@ -35,6 +39,20 @@ sealed class ClawbackClaimableBalanceResultXdr {
         else -> throw IllegalArgumentException("Unknown ClawbackClaimableBalanceResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClawbackClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClawbackClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClawbackClaimableBalanceResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ClawbackClaimableBalanceResultCodeXdr.CLAWBACK_CLAIMABLE_BALANCE_SUCCESS)
+        "does_not_exist" -> Void(ClawbackClaimableBalanceResultCodeXdr.CLAWBACK_CLAIMABLE_BALANCE_DOES_NOT_EXIST)
+        "not_issuer" -> Void(ClawbackClaimableBalanceResultCodeXdr.CLAWBACK_CLAIMABLE_BALANCE_NOT_ISSUER)
+        "not_clawback_enabled" -> Void(ClawbackClaimableBalanceResultCodeXdr.CLAWBACK_CLAIMABLE_BALANCE_NOT_CLAWBACK_ENABLED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -43,4 +61,10 @@ sealed class ClawbackClaimableBalanceResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

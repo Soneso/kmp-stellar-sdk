@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimAtomXdr"
+
 /**
  * XDR Source:
  * union ClaimAtom switch (ClaimAtomType type)
@@ -56,6 +61,20 @@ sealed class ClaimAtomXdr {
         else -> throw IllegalArgumentException("Unknown ClaimAtomXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClaimAtomXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimAtomXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimAtomXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v0" -> V0(ClaimOfferAtomV0Xdr.fromXdrJsonTree(value))
+        "order_book" -> OrderBook(ClaimOfferAtomXdr.fromXdrJsonTree(value))
+        "liquidity_pool" -> LiquidityPool(ClaimLiquidityAtomXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -72,4 +91,12 @@ sealed class ClaimAtomXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> buildJsonObject { put("v0", value.toXdrJsonElement()) }
+    is OrderBook -> buildJsonObject { put("order_book", value.toXdrJsonElement()) }
+    is LiquidityPool -> buildJsonObject { put("liquidity_pool", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AssetXdr"
+
 /**
  * XDR Source:
  * union Asset switch (AssetType type)
@@ -56,6 +62,25 @@ sealed class AssetXdr {
         else -> throw IllegalArgumentException("Unknown AssetXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): AssetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AssetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AssetXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "credit_alphanum4" -> AlphaNum4(AlphaNum4Xdr.fromXdrJsonTree(value))
+          "credit_alphanum12" -> AlphaNum12(AlphaNum12Xdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "native" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -70,4 +95,12 @@ sealed class AssetXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("native")
+    is AlphaNum4 -> buildJsonObject { put("credit_alphanum4", value.toXdrJsonElement()) }
+    is AlphaNum12 -> buildJsonObject { put("credit_alphanum12", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

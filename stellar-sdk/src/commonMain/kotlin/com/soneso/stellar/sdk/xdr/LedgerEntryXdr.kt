@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerEntryXdr"
+
 /**
  * XDR Source:
  * struct LedgerEntry
@@ -59,6 +64,19 @@ data class LedgerEntryXdr(
       val ext = LedgerEntryExtXdr.decode(reader)
       return LedgerEntryXdr(lastModifiedLedgerSeq, data, ext)
     }
+
+    fun fromXdrJson(json: String): LedgerEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LedgerEntryXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "last_modified_ledger_seq", XDR_JSON_TYPE)),
+        LedgerEntryDataXdr.fromXdrJsonTree(XdrJson.field(json, "data", XDR_JSON_TYPE)),
+        LedgerEntryExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -66,4 +84,12 @@ data class LedgerEntryXdr(
     data.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("last_modified_ledger_seq", lastModifiedLedgerSeq.toXdrJsonElement())
+    put("data", data.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

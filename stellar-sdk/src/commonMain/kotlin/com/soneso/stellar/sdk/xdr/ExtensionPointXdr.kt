@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ExtensionPointXdr"
+
 /**
  * XDR Source:
  * union ExtensionPoint switch (int v)
@@ -27,6 +31,17 @@ sealed class ExtensionPointXdr {
         else -> throw IllegalArgumentException("Unknown ExtensionPointXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ExtensionPointXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ExtensionPointXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ExtensionPointXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "v0" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -35,4 +50,10 @@ sealed class ExtensionPointXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("v0")
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

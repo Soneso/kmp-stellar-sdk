@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ExtendFootprintTTLResultXdr"
+
 /**
  * XDR Source:
  * union ExtendFootprintTTLResult switch (ExtendFootprintTTLResultCode code)
@@ -34,6 +38,20 @@ sealed class ExtendFootprintTTLResultXdr {
         else -> throw IllegalArgumentException("Unknown ExtendFootprintTTLResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ExtendFootprintTTLResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ExtendFootprintTTLResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ExtendFootprintTTLResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ExtendFootprintTTLResultCodeXdr.EXTEND_FOOTPRINT_TTL_SUCCESS)
+        "malformed" -> Void(ExtendFootprintTTLResultCodeXdr.EXTEND_FOOTPRINT_TTL_MALFORMED)
+        "resource_limit_exceeded" -> Void(ExtendFootprintTTLResultCodeXdr.EXTEND_FOOTPRINT_TTL_RESOURCE_LIMIT_EXCEEDED)
+        "insufficient_refundable_fee" -> Void(ExtendFootprintTTLResultCodeXdr.EXTEND_FOOTPRINT_TTL_INSUFFICIENT_REFUNDABLE_FEE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +60,10 @@ sealed class ExtendFootprintTTLResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

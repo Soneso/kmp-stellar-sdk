@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ParallelTxExecutionStageXdr"
+
 /**
  * XDR Source:
  * typedef DependentTxCluster ParallelTxExecutionStage<>;
@@ -15,6 +19,12 @@ value class ParallelTxExecutionStageXdr(val value: List<DependentTxClusterXdr>) 
       val value = List(reader.readInt()) { DependentTxClusterXdr.decode(reader) }
       return ParallelTxExecutionStageXdr(value)
     }
+
+    fun fromXdrJson(json: String): ParallelTxExecutionStageXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ParallelTxExecutionStageXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ParallelTxExecutionStageXdr = ParallelTxExecutionStageXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { DependentTxClusterXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class ParallelTxExecutionStageXdr(val value: List<DependentTxClusterXdr>) 
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

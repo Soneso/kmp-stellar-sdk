@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PathPaymentStrictReceiveResultSuccessXdr"
+
 /**
  * XDR Source:
  * struct
@@ -22,6 +27,18 @@ data class PathPaymentStrictReceiveResultSuccessXdr(
       val last = SimplePaymentResultXdr.decode(reader)
       return PathPaymentStrictReceiveResultSuccessXdr(offers, last)
     }
+
+    fun fromXdrJson(json: String): PathPaymentStrictReceiveResultSuccessXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictReceiveResultSuccessXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictReceiveResultSuccessXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return PathPaymentStrictReceiveResultSuccessXdr(
+        XdrJson.array(XdrJson.field(json, "offers", XDR_JSON_TYPE), XDR_JSON_TYPE, "offers").map { ClaimAtomXdr.fromXdrJsonTree(it) },
+        SimplePaymentResultXdr.fromXdrJsonTree(XdrJson.field(json, "last", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +48,11 @@ data class PathPaymentStrictReceiveResultSuccessXdr(
     }
     last.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("offers", XdrJson.array(offers) { it.toXdrJsonElement() })
+    put("last", last.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

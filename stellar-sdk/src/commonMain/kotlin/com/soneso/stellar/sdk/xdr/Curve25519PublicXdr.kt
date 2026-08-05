@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "Curve25519PublicXdr"
+
 /**
  * XDR Source:
  * struct Curve25519Public
@@ -19,9 +24,26 @@ data class Curve25519PublicXdr(
       val key = reader.readFixedOpaque(32)
       return Curve25519PublicXdr(key)
     }
+
+    fun fromXdrJson(json: String): Curve25519PublicXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): Curve25519PublicXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): Curve25519PublicXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return Curve25519PublicXdr(
+        XdrJson.hex(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key", expectedLength = 32)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(key, 32)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("key", XdrJson.hex(key))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

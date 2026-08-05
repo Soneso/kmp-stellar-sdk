@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "RevokeSponsorshipOpXdr"
+
 /**
  * XDR Source:
  * union RevokeSponsorshipOp switch (RevokeSponsorshipType type)
@@ -48,6 +53,19 @@ sealed class RevokeSponsorshipOpXdr {
         else -> throw IllegalArgumentException("Unknown RevokeSponsorshipOpXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): RevokeSponsorshipOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RevokeSponsorshipOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RevokeSponsorshipOpXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "ledger_entry" -> LedgerKey(LedgerKeyXdr.fromXdrJsonTree(value))
+        "signer" -> Signer(RevokeSponsorshipOpSignerXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -61,4 +79,11 @@ sealed class RevokeSponsorshipOpXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is LedgerKey -> buildJsonObject { put("ledger_entry", value.toXdrJsonElement()) }
+    is Signer -> buildJsonObject { put("signer", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

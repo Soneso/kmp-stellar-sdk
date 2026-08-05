@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LedgerHeaderHistoryEntryExtXdr"
+
 /**
  * XDR Source:
  * union switch (int v)
@@ -27,6 +31,17 @@ sealed class LedgerHeaderHistoryEntryExtXdr {
         else -> throw IllegalArgumentException("Unknown LedgerHeaderHistoryEntryExtXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LedgerHeaderHistoryEntryExtXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerHeaderHistoryEntryExtXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerHeaderHistoryEntryExtXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "v0" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -35,4 +50,10 @@ sealed class LedgerHeaderHistoryEntryExtXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("v0")
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

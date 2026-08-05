@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BumpSequenceResultCodeXdr"
+
 /**
  * XDR Source:
  * enum BumpSequenceResultCode
@@ -13,14 +17,14 @@ package com.soneso.stellar.sdk.xdr
  *     BUMP_SEQUENCE_BAD_SEQ = -1 // `bumpTo` is not within bounds
  * };
  */
-enum class BumpSequenceResultCodeXdr(val value: Int) {
+enum class BumpSequenceResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  BUMP_SEQUENCE_SUCCESS(0),
+  BUMP_SEQUENCE_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * `bumpTo` is not within bounds
    */
-  BUMP_SEQUENCE_BAD_SEQ(-1);
+  BUMP_SEQUENCE_BAD_SEQ(-1, "bad_seq");
 
   companion object {
 
@@ -29,9 +33,24 @@ enum class BumpSequenceResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown BumpSequenceResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): BumpSequenceResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BumpSequenceResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BumpSequenceResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): BumpSequenceResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

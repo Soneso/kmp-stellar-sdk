@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "InvokeHostFunctionOpXdr"
+
 /**
  * XDR Source:
  * struct InvokeHostFunctionOp
@@ -25,6 +30,18 @@ data class InvokeHostFunctionOpXdr(
       val auth = List(reader.readInt()) { SorobanAuthorizationEntryXdr.decode(reader) }
       return InvokeHostFunctionOpXdr(hostFunction, auth)
     }
+
+    fun fromXdrJson(json: String): InvokeHostFunctionOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InvokeHostFunctionOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InvokeHostFunctionOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return InvokeHostFunctionOpXdr(
+        HostFunctionXdr.fromXdrJsonTree(XdrJson.field(json, "host_function", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "auth", XDR_JSON_TYPE), XDR_JSON_TYPE, "auth").map { SorobanAuthorizationEntryXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -34,4 +51,11 @@ data class InvokeHostFunctionOpXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("host_function", hostFunction.toXdrJsonElement())
+    put("auth", XdrJson.array(auth) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

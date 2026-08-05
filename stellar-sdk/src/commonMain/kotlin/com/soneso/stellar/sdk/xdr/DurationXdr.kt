@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "DurationXdr"
+
 /**
  * XDR Source:
  * typedef uint64 Duration;
@@ -15,9 +19,19 @@ value class DurationXdr(val value: Uint64Xdr) {
       val value = Uint64Xdr.decode(reader)
       return DurationXdr(value)
     }
+
+    fun fromXdrJson(json: String): DurationXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): DurationXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): DurationXdr = DurationXdr(Uint64Xdr.fromXdrJsonTree(element))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

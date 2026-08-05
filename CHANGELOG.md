@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SEP-51 (XDR-JSON) support on the whole XDR type system. Every generated XDR
+  type gains `toXdrJson(): String`, `toXdrJsonElement(): JsonElement`,
+  `Companion.fromXdrJson(String)` and `Companion.fromXdrJsonElement(JsonElement)`,
+  so any XDR value converts to the canonical JSON rendering SEP-0051 defines and
+  back without loss. Output is compact and in XDR declaration order, so equal
+  values produce byte-identical documents. Decoding raises
+  `IllegalArgumentException` on malformed input, naming the type and the
+  offending key. The methods are emitted by the XDR generator, so they track the
+  XDR pin; see `docs/sep/sep-51.md` for the mapping rules, the documented
+  limitations and the input-strictness choices.
+- `kotlinx-serialization-json` moved from `implementation` to `api` in
+  `stellar-sdk/build.gradle.kts`. `JsonElement` appears in the public signature
+  of `toXdrJsonElement` and `fromXdrJsonElement`, so the library is now part of
+  the SDK's public ABI and is on the consumer compile classpath. It was already a
+  transitive runtime dependency through Ktor, so this changes the compile
+  classpath only.
 - Updated XDR definitions to stellar-xdr `911c935` (CAP-0083 / CAP-0085): new
   `ContractExecutableXdr.ExternalRef` arm with `ContractExecutableExternalRefXdr`
   (`executableOwner`, `tag`), new `SCValXdr.ExecutableTag` arm carrying an

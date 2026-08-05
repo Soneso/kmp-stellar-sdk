@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractExecutableTypeXdr"
+
 /**
  * XDR Source:
  * enum ContractExecutableType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     CONTRACT_EXECUTABLE_EXTERNAL_REF = 2
  * };
  */
-enum class ContractExecutableTypeXdr(val value: Int) {
-  CONTRACT_EXECUTABLE_WASM(0),
-  CONTRACT_EXECUTABLE_STELLAR_ASSET(1),
-  CONTRACT_EXECUTABLE_EXTERNAL_REF(2);
+enum class ContractExecutableTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CONTRACT_EXECUTABLE_WASM(0, "wasm"),
+  CONTRACT_EXECUTABLE_STELLAR_ASSET(1, "stellar_asset"),
+  CONTRACT_EXECUTABLE_EXTERNAL_REF(2, "external_ref");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class ContractExecutableTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ContractExecutableTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ContractExecutableTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractExecutableTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractExecutableTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ContractExecutableTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

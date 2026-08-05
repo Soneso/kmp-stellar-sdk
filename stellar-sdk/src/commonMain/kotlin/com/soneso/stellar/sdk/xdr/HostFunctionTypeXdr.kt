@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "HostFunctionTypeXdr"
+
 /**
  * XDR Source:
  * enum HostFunctionType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     HOST_FUNCTION_TYPE_CREATE_CONTRACT_V2 = 3
  * };
  */
-enum class HostFunctionTypeXdr(val value: Int) {
-  HOST_FUNCTION_TYPE_INVOKE_CONTRACT(0),
-  HOST_FUNCTION_TYPE_CREATE_CONTRACT(1),
-  HOST_FUNCTION_TYPE_UPLOAD_CONTRACT_WASM(2),
-  HOST_FUNCTION_TYPE_CREATE_CONTRACT_V2(3);
+enum class HostFunctionTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  HOST_FUNCTION_TYPE_INVOKE_CONTRACT(0, "invoke_contract"),
+  HOST_FUNCTION_TYPE_CREATE_CONTRACT(1, "create_contract"),
+  HOST_FUNCTION_TYPE_UPLOAD_CONTRACT_WASM(2, "upload_contract_wasm"),
+  HOST_FUNCTION_TYPE_CREATE_CONTRACT_V2(3, "create_contract_v2");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class HostFunctionTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown HostFunctionTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): HostFunctionTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HostFunctionTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HostFunctionTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): HostFunctionTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanAuthorizationEntryXdr"
+
 /**
  * XDR Source:
  * struct SorobanAuthorizationEntry
@@ -22,10 +27,29 @@ data class SorobanAuthorizationEntryXdr(
       val rootInvocation = SorobanAuthorizedInvocationXdr.decode(reader)
       return SorobanAuthorizationEntryXdr(credentials, rootInvocation)
     }
+
+    fun fromXdrJson(json: String): SorobanAuthorizationEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizationEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizationEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SorobanAuthorizationEntryXdr(
+        SorobanCredentialsXdr.fromXdrJsonTree(XdrJson.field(json, "credentials", XDR_JSON_TYPE)),
+        SorobanAuthorizedInvocationXdr.fromXdrJsonTree(XdrJson.field(json, "root_invocation", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     credentials.encode(writer)
     rootInvocation.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("credentials", credentials.toXdrJsonElement())
+    put("root_invocation", rootInvocation.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

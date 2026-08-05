@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SimpleResultXdr"
+
 /**
  * XDR Source:
  * union SimpleResult switch (SimpleStatus status)
@@ -44,6 +49,19 @@ sealed class SimpleResultXdr {
         else -> throw IllegalArgumentException("Unknown SimpleResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SimpleResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SimpleResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SimpleResultXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "active" -> SuccessCode(XdrJson.int32(value, XDR_JSON_TYPE, "active"))
+        "inactive" -> ErrorMessage(XdrJson.unescapeString(value, XDR_JSON_TYPE, "inactive", maxLength = 256))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -57,4 +75,11 @@ sealed class SimpleResultXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is SuccessCode -> buildJsonObject { put("active", XdrJson.int32(value)) }
+    is ErrorMessage -> buildJsonObject { put("inactive", XdrJson.escapedString(value)) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

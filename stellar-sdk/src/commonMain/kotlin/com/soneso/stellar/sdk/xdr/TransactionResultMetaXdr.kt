@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionResultMetaXdr"
+
 /**
  * XDR Source:
  * struct TransactionResultMeta
@@ -25,6 +30,19 @@ data class TransactionResultMetaXdr(
       val txApplyProcessing = TransactionMetaXdr.decode(reader)
       return TransactionResultMetaXdr(result, feeProcessing, txApplyProcessing)
     }
+
+    fun fromXdrJson(json: String): TransactionResultMetaXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultMetaXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionResultMetaXdr(
+        TransactionResultPairXdr.fromXdrJsonTree(XdrJson.field(json, "result", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "fee_processing", XDR_JSON_TYPE)),
+        TransactionMetaXdr.fromXdrJsonTree(XdrJson.field(json, "tx_apply_processing", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +50,12 @@ data class TransactionResultMetaXdr(
     feeProcessing.encode(writer)
     txApplyProcessing.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("result", result.toXdrJsonElement())
+    put("fee_processing", feeProcessing.toXdrJsonElement())
+    put("tx_apply_processing", txApplyProcessing.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

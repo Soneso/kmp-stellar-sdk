@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimableBalanceIDXdr"
+
 /**
  * XDR Source:
  * union ClaimableBalanceID switch (ClaimableBalanceIDType type)
@@ -32,6 +37,18 @@ sealed class ClaimableBalanceIDXdr {
         else -> throw IllegalArgumentException("Unknown ClaimableBalanceIDXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClaimableBalanceIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimableBalanceIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimableBalanceIDXdr {
+      val payload = XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "a B strkey") { StrKey.decodeClaimableBalance(it) }
+      return when (payload[0].toInt()) {
+        ClaimableBalanceIDTypeXdr.CLAIMABLE_BALANCE_ID_TYPE_V0.value -> V0(HashXdr(payload.copyOfRange(1, payload.size)))
+        else -> XdrJson.fail(XDR_JSON_TYPE, "has no type numbered ${payload[0].toInt()}")
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +59,10 @@ sealed class ClaimableBalanceIDXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> XdrJson.name(StrKey.encodeClaimableBalance(byteArrayOf(discriminant.value.toByte()) + value.value))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

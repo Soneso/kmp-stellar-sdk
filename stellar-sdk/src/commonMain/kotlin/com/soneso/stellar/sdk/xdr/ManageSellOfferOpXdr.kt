@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ManageSellOfferOpXdr"
+
 /**
  * XDR Source:
  * struct ManageSellOfferOp
@@ -36,6 +41,21 @@ data class ManageSellOfferOpXdr(
       val offerId = Int64Xdr.decode(reader)
       return ManageSellOfferOpXdr(selling, buying, amount, price, offerId)
     }
+
+    fun fromXdrJson(json: String): ManageSellOfferOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageSellOfferOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageSellOfferOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ManageSellOfferOpXdr(
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "selling", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "buying", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE)),
+        PriceXdr.fromXdrJsonTree(XdrJson.field(json, "price", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "offer_id", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -45,4 +65,14 @@ data class ManageSellOfferOpXdr(
     price.encode(writer)
     offerId.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("selling", selling.toXdrJsonElement())
+    put("buying", buying.toXdrJsonElement())
+    put("amount", amount.toXdrJsonElement())
+    put("price", price.toXdrJsonElement())
+    put("offer_id", offerId.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

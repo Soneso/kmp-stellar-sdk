@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SignerKeyEd25519SignedPayloadXdr"
+
 /**
  * XDR Source:
  * struct
@@ -24,10 +29,29 @@ data class SignerKeyEd25519SignedPayloadXdr(
       val payload = reader.readVariableOpaque()
       return SignerKeyEd25519SignedPayloadXdr(ed25519, payload)
     }
+
+    fun fromXdrJson(json: String): SignerKeyEd25519SignedPayloadXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SignerKeyEd25519SignedPayloadXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SignerKeyEd25519SignedPayloadXdr {
+      val key = XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "a P strkey") { StrKey.decodeSignedPayload(it) }
+      return SignerKeyEd25519SignedPayloadXdr(Uint256Xdr(key.copyOfRange(0, 32)), XdrJson.signedPayload(key, XDR_JSON_TYPE))
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ed25519.encode(writer)
     writer.writeVariableOpaque(payload)
   }
+
+  /**
+   * @throws IllegalArgumentException if [payload] is empty. SEP-0051 renders this type as
+   *   a P strkey, and a strkey has no form for an empty payload, so such a signer has no
+   *   XDR-JSON form even though it is valid XDR. Every other length XDR admits, 1 to 64
+   *   bytes, renders.
+   */
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeSignedPayload(XdrJson.signedPayloadKey(ed25519.value, payload, XDR_JSON_TYPE)))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

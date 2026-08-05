@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "CreateAccountOpXdr"
+
 /**
  * XDR Source:
  * struct CreateAccountOp
@@ -24,10 +29,29 @@ data class CreateAccountOpXdr(
       val startingBalance = Int64Xdr.decode(reader)
       return CreateAccountOpXdr(destination, startingBalance)
     }
+
+    fun fromXdrJson(json: String): CreateAccountOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateAccountOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateAccountOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return CreateAccountOpXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "starting_balance", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     destination.encode(writer)
     startingBalance.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("destination", destination.toXdrJsonElement())
+    put("starting_balance", startingBalance.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

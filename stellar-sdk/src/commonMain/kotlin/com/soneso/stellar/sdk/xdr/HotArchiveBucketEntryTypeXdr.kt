@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "HotArchiveBucketEntryTypeXdr"
+
 /**
  * XDR Source:
  * enum HotArchiveBucketEntryType
@@ -14,13 +18,13 @@ package com.soneso.stellar.sdk.xdr
  *                                 // Does not need to be persisted.
  * };
  */
-enum class HotArchiveBucketEntryTypeXdr(val value: Int) {
+enum class HotArchiveBucketEntryTypeXdr(val value: Int, internal val xdrJsonName: String) {
   /** Bucket metadata, should come first. */
-  HOT_ARCHIVE_METAENTRY(-1),
+  HOT_ARCHIVE_METAENTRY(-1, "metaentry"),
   /** Entry is Archived */
-  HOT_ARCHIVE_ARCHIVED(0),
+  HOT_ARCHIVE_ARCHIVED(0, "archived"),
   /** Entry was previously HOT_ARCHIVE_ARCHIVED, but */
-  HOT_ARCHIVE_LIVE(1);
+  HOT_ARCHIVE_LIVE(1, "live");
 
   companion object {
 
@@ -29,9 +33,24 @@ enum class HotArchiveBucketEntryTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown HotArchiveBucketEntryTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): HotArchiveBucketEntryTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HotArchiveBucketEntryTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HotArchiveBucketEntryTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): HotArchiveBucketEntryTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

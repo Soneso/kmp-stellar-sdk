@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "BucketMetadataXdr"
+
 /**
  * XDR Source:
  * struct BucketMetadata
@@ -33,10 +38,29 @@ data class BucketMetadataXdr(
       val ext = BucketMetadataExtXdr.decode(reader)
       return BucketMetadataXdr(ledgerVersion, ext)
     }
+
+    fun fromXdrJson(json: String): BucketMetadataXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BucketMetadataXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BucketMetadataXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return BucketMetadataXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_version", XDR_JSON_TYPE)),
+        BucketMetadataExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ledgerVersion.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_version", ledgerVersion.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

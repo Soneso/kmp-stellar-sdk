@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecTypeResultXdr"
+
 /**
  * XDR Source:
  * struct SCSpecTypeResult
@@ -22,10 +27,29 @@ data class SCSpecTypeResultXdr(
       val errorType = SCSpecTypeDefXdr.decode(reader)
       return SCSpecTypeResultXdr(okType, errorType)
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeResultXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCSpecTypeResultXdr(
+        SCSpecTypeDefXdr.fromXdrJsonTree(XdrJson.field(json, "ok_type", XDR_JSON_TYPE)),
+        SCSpecTypeDefXdr.fromXdrJsonTree(XdrJson.field(json, "error_type", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     okType.encode(writer)
     errorType.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ok_type", okType.toXdrJsonElement())
+    put("error_type", errorType.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

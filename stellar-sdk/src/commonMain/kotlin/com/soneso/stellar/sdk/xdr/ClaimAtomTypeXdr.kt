@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimAtomTypeXdr"
+
 /**
  * XDR Source:
  * enum ClaimAtomType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     CLAIM_ATOM_TYPE_LIQUIDITY_POOL = 2
  * };
  */
-enum class ClaimAtomTypeXdr(val value: Int) {
-  CLAIM_ATOM_TYPE_V0(0),
-  CLAIM_ATOM_TYPE_ORDER_BOOK(1),
-  CLAIM_ATOM_TYPE_LIQUIDITY_POOL(2);
+enum class ClaimAtomTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CLAIM_ATOM_TYPE_V0(0, "v0"),
+  CLAIM_ATOM_TYPE_ORDER_BOOK(1, "order_book"),
+  CLAIM_ATOM_TYPE_LIQUIDITY_POOL(2, "liquidity_pool");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class ClaimAtomTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ClaimAtomTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ClaimAtomTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimAtomTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimAtomTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ClaimAtomTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionSignaturePayloadXdr"
+
 /**
  * XDR Source:
  * struct TransactionSignaturePayload
@@ -30,10 +35,29 @@ data class TransactionSignaturePayloadXdr(
       val taggedTransaction = TransactionSignaturePayloadTaggedTransactionXdr.decode(reader)
       return TransactionSignaturePayloadXdr(networkId, taggedTransaction)
     }
+
+    fun fromXdrJson(json: String): TransactionSignaturePayloadXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionSignaturePayloadXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionSignaturePayloadXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionSignaturePayloadXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "network_id", XDR_JSON_TYPE)),
+        TransactionSignaturePayloadTaggedTransactionXdr.fromXdrJsonTree(XdrJson.field(json, "tagged_transaction", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     networkId.encode(writer)
     taggedTransaction.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("network_id", networkId.toXdrJsonElement())
+    put("tagged_transaction", taggedTransaction.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

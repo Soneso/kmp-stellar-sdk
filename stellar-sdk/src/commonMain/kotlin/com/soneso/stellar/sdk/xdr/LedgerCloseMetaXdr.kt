@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerCloseMetaXdr"
+
 /**
  * XDR Source:
  * union LedgerCloseMeta switch (int v)
@@ -56,6 +61,20 @@ sealed class LedgerCloseMetaXdr {
         else -> throw IllegalArgumentException("Unknown LedgerCloseMetaXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LedgerCloseMetaXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerCloseMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseMetaXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v0" -> V0(LedgerCloseMetaV0Xdr.fromXdrJsonTree(value))
+        "v1" -> V1(LedgerCloseMetaV1Xdr.fromXdrJsonTree(value))
+        "v2" -> V2(LedgerCloseMetaV2Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -72,4 +91,12 @@ sealed class LedgerCloseMetaXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> buildJsonObject { put("v0", value.toXdrJsonElement()) }
+    is V1 -> buildJsonObject { put("v1", value.toXdrJsonElement()) }
+    is V2 -> buildJsonObject { put("v2", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

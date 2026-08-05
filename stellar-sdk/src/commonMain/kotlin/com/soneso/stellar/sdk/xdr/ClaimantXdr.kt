@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimantXdr"
+
 /**
  * XDR Source:
  * union Claimant switch (ClaimantType type)
@@ -36,6 +41,18 @@ sealed class ClaimantXdr {
         else -> throw IllegalArgumentException("Unknown ClaimantXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClaimantXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimantXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimantXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "claimant_type_v0" -> V0(ClaimantV0Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -46,4 +63,10 @@ sealed class ClaimantXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> buildJsonObject { put("claimant_type_v0", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

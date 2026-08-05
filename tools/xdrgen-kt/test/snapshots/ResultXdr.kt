@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ResultXdr"
+
 /**
  * XDR Source:
  * union Result switch (ResultType type)
@@ -55,6 +61,26 @@ sealed class ResultXdr {
         }
       }
     }
+
+    fun fromXdrJson(json: String): ResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "error" -> Error(ErrorDetailXdr.fromXdrJsonTree(value))
+          else -> FallbackCode(ResultTypeXdr.findXdrJsonName(arm) ?: XdrJson.unknownArm(XDR_JSON_TYPE, arm), XdrJson.int32(value, XDR_JSON_TYPE, "default"))
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "ok" -> Void(ResultTypeXdr.RESULT_OK)
+        "pending" -> Void(ResultTypeXdr.RESULT_PENDING)
+        "unknown" -> Void(ResultTypeXdr.RESULT_UNKNOWN)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -69,4 +95,12 @@ sealed class ResultXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+    is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }
+    is FallbackCode -> buildJsonObject { put(discriminant.xdrJsonName, XdrJson.int32(value)) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

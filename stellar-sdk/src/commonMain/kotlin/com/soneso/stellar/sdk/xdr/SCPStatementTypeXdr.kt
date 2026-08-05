@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCPStatementTypeXdr"
+
 /**
  * XDR Source:
  * enum SCPStatementType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     SCP_ST_NOMINATE = 3
  * };
  */
-enum class SCPStatementTypeXdr(val value: Int) {
-  SCP_ST_PREPARE(0),
-  SCP_ST_CONFIRM(1),
-  SCP_ST_EXTERNALIZE(2),
-  SCP_ST_NOMINATE(3);
+enum class SCPStatementTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SCP_ST_PREPARE(0, "prepare"),
+  SCP_ST_CONFIRM(1, "confirm"),
+  SCP_ST_EXTERNALIZE(2, "externalize"),
+  SCP_ST_NOMINATE(3, "nominate");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class SCPStatementTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCPStatementTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCPStatementTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPStatementTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPStatementTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCPStatementTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

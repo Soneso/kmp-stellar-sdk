@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "InflationResultXdr"
+
 /**
  * XDR Source:
  * union InflationResult switch (InflationResultCode code)
@@ -39,6 +45,24 @@ sealed class InflationResultXdr {
         else -> throw IllegalArgumentException("Unknown InflationResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): InflationResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InflationResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InflationResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> Payouts(XdrJson.array(value, XDR_JSON_TYPE, "success").map { InflationPayoutXdr.fromXdrJsonTree(it) })
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "not_time" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -53,4 +77,11 @@ sealed class InflationResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Payouts -> buildJsonObject { put("success", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is Void -> XdrJson.name("not_time")
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

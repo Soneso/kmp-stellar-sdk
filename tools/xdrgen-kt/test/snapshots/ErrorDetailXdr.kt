@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ErrorDetailXdr"
+
 /**
  * XDR Source:
  * struct ErrorDetail
@@ -22,10 +27,29 @@ data class ErrorDetailXdr(
       val message = reader.readString()
       return ErrorDetailXdr(code, message)
     }
+
+    fun fromXdrJson(json: String): ErrorDetailXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ErrorDetailXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ErrorDetailXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ErrorDetailXdr(
+        XdrJson.int32(XdrJson.field(json, "code", XDR_JSON_TYPE), XDR_JSON_TYPE, "code"),
+        XdrJson.unescapeString(XdrJson.field(json, "message", XDR_JSON_TYPE), XDR_JSON_TYPE, "message", maxLength = 256)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(code)
     writer.writeString(message)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("code", XdrJson.int32(code))
+    put("message", XdrJson.escapedString(message))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

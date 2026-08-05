@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimPredicateTypeXdr"
+
 /**
  * XDR Source:
  * enum ClaimPredicateType
@@ -15,13 +19,13 @@ package com.soneso.stellar.sdk.xdr
  *     CLAIM_PREDICATE_BEFORE_RELATIVE_TIME = 5
  * };
  */
-enum class ClaimPredicateTypeXdr(val value: Int) {
-  CLAIM_PREDICATE_UNCONDITIONAL(0),
-  CLAIM_PREDICATE_AND(1),
-  CLAIM_PREDICATE_OR(2),
-  CLAIM_PREDICATE_NOT(3),
-  CLAIM_PREDICATE_BEFORE_ABSOLUTE_TIME(4),
-  CLAIM_PREDICATE_BEFORE_RELATIVE_TIME(5);
+enum class ClaimPredicateTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CLAIM_PREDICATE_UNCONDITIONAL(0, "unconditional"),
+  CLAIM_PREDICATE_AND(1, "and"),
+  CLAIM_PREDICATE_OR(2, "or"),
+  CLAIM_PREDICATE_NOT(3, "not"),
+  CLAIM_PREDICATE_BEFORE_ABSOLUTE_TIME(4, "before_absolute_time"),
+  CLAIM_PREDICATE_BEFORE_RELATIVE_TIME(5, "before_relative_time");
 
   companion object {
 
@@ -30,9 +34,24 @@ enum class ClaimPredicateTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ClaimPredicateTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ClaimPredicateTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimPredicateTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimPredicateTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ClaimPredicateTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

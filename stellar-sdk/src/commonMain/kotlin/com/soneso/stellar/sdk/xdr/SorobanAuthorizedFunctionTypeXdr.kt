@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SorobanAuthorizedFunctionTypeXdr"
+
 /**
  * XDR Source:
  * enum SorobanAuthorizedFunctionType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     SOROBAN_AUTHORIZED_FUNCTION_TYPE_CREATE_CONTRACT_V2_HOST_FN = 2
  * };
  */
-enum class SorobanAuthorizedFunctionTypeXdr(val value: Int) {
-  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CONTRACT_FN(0),
-  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CREATE_CONTRACT_HOST_FN(1),
-  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CREATE_CONTRACT_V2_HOST_FN(2);
+enum class SorobanAuthorizedFunctionTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CONTRACT_FN(0, "contract_fn"),
+  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CREATE_CONTRACT_HOST_FN(1, "create_contract_host_fn"),
+  SOROBAN_AUTHORIZED_FUNCTION_TYPE_CREATE_CONTRACT_V2_HOST_FN(2, "create_contract_v2_host_fn");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class SorobanAuthorizedFunctionTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SorobanAuthorizedFunctionTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SorobanAuthorizedFunctionTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizedFunctionTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizedFunctionTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SorobanAuthorizedFunctionTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

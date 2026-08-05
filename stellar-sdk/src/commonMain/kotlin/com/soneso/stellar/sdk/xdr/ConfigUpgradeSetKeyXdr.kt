@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigUpgradeSetKeyXdr"
+
 /**
  * XDR Source:
  * struct ConfigUpgradeSetKey {
@@ -21,10 +26,29 @@ data class ConfigUpgradeSetKeyXdr(
       val contentHash = HashXdr.decode(reader)
       return ConfigUpgradeSetKeyXdr(contractId, contentHash)
     }
+
+    fun fromXdrJson(json: String): ConfigUpgradeSetKeyXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigUpgradeSetKeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigUpgradeSetKeyXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ConfigUpgradeSetKeyXdr(
+        ContractIDXdr.fromXdrJsonTree(XdrJson.field(json, "contract_id", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "content_hash", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     contractId.encode(writer)
     contentHash.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("contract_id", contractId.toXdrJsonElement())
+    put("content_hash", contentHash.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractDataDurabilityXdr"
+
 /**
  * XDR Source:
  * enum ContractDataDurability {
@@ -10,9 +14,9 @@ package com.soneso.stellar.sdk.xdr
  *     PERSISTENT = 1
  * };
  */
-enum class ContractDataDurabilityXdr(val value: Int) {
-  TEMPORARY(0),
-  PERSISTENT(1);
+enum class ContractDataDurabilityXdr(val value: Int, internal val xdrJsonName: String) {
+  TEMPORARY(0, "temporary"),
+  PERSISTENT(1, "persistent");
 
   companion object {
 
@@ -21,9 +25,24 @@ enum class ContractDataDurabilityXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ContractDataDurabilityXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ContractDataDurabilityXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractDataDurabilityXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractDataDurabilityXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ContractDataDurabilityXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

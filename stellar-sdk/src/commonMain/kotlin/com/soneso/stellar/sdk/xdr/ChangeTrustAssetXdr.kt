@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ChangeTrustAssetXdr"
+
 /**
  * XDR Source:
  * union ChangeTrustAsset switch (AssetType type)
@@ -69,6 +75,26 @@ sealed class ChangeTrustAssetXdr {
         else -> throw IllegalArgumentException("Unknown ChangeTrustAssetXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ChangeTrustAssetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ChangeTrustAssetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ChangeTrustAssetXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "credit_alphanum4" -> AlphaNum4(AlphaNum4Xdr.fromXdrJsonTree(value))
+          "credit_alphanum12" -> AlphaNum12(AlphaNum12Xdr.fromXdrJsonTree(value))
+          "pool_share" -> LiquidityPool(LiquidityPoolParametersXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "native" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -86,4 +112,13 @@ sealed class ChangeTrustAssetXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("native")
+    is AlphaNum4 -> buildJsonObject { put("credit_alphanum4", value.toXdrJsonElement()) }
+    is AlphaNum12 -> buildJsonObject { put("credit_alphanum12", value.toXdrJsonElement()) }
+    is LiquidityPool -> buildJsonObject { put("pool_share", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

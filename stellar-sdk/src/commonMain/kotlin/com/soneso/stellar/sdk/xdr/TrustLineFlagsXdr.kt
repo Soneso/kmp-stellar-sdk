@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "TrustLineFlagsXdr"
+
 /**
  * XDR Source:
  * enum TrustLineFlags
@@ -17,19 +21,19 @@ package com.soneso.stellar.sdk.xdr
  *     TRUSTLINE_CLAWBACK_ENABLED_FLAG = 4
  * };
  */
-enum class TrustLineFlagsXdr(val value: Int) {
+enum class TrustLineFlagsXdr(val value: Int, internal val xdrJsonName: String) {
   /** issuer has authorized account to perform transactions with its credit */
-  AUTHORIZED_FLAG(1),
+  AUTHORIZED_FLAG(1, "authorized_flag"),
   /**
    * issuer has authorized account to maintain and reduce liabilities for its
    * credit
    */
-  AUTHORIZED_TO_MAINTAIN_LIABILITIES_FLAG(2),
+  AUTHORIZED_TO_MAINTAIN_LIABILITIES_FLAG(2, "authorized_to_maintain_liabilities_flag"),
   /**
    * issuer has specified that it may clawback its credit, and that claimable
    * balances created with its credit may also be clawed back
    */
-  TRUSTLINE_CLAWBACK_ENABLED_FLAG(4);
+  TRUSTLINE_CLAWBACK_ENABLED_FLAG(4, "trustline_clawback_enabled_flag");
 
   companion object {
 
@@ -38,9 +42,24 @@ enum class TrustLineFlagsXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown TrustLineFlagsXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): TrustLineFlagsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TrustLineFlagsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TrustLineFlagsXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): TrustLineFlagsXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

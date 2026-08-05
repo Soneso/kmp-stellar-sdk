@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SignerKeyTypeXdr"
+
 /**
  * XDR Source:
  * enum SignerKeyType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     SIGNER_KEY_TYPE_ED25519_SIGNED_PAYLOAD = KEY_TYPE_ED25519_SIGNED_PAYLOAD
  * };
  */
-enum class SignerKeyTypeXdr(val value: Int) {
-  SIGNER_KEY_TYPE_ED25519(0),
-  SIGNER_KEY_TYPE_PRE_AUTH_TX(1),
-  SIGNER_KEY_TYPE_HASH_X(2),
-  SIGNER_KEY_TYPE_ED25519_SIGNED_PAYLOAD(3);
+enum class SignerKeyTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SIGNER_KEY_TYPE_ED25519(0, "ed25519"),
+  SIGNER_KEY_TYPE_PRE_AUTH_TX(1, "pre_auth_tx"),
+  SIGNER_KEY_TYPE_HASH_X(2, "hash_x"),
+  SIGNER_KEY_TYPE_ED25519_SIGNED_PAYLOAD(3, "ed25519_signed_payload");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class SignerKeyTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SignerKeyTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SignerKeyTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SignerKeyTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SignerKeyTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SignerKeyTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

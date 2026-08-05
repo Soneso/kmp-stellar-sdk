@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AccountFlagsXdr"
+
 /**
  * XDR Source:
  * enum AccountFlags
@@ -23,26 +27,26 @@ package com.soneso.stellar.sdk.xdr
  *     AUTH_CLAWBACK_ENABLED_FLAG = 0x8
  * };
  */
-enum class AccountFlagsXdr(val value: Int) {
+enum class AccountFlagsXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * Flags set on issuer accounts
    * TrustLines are created with authorized set to "false" requiring
    * the issuer to set it for each TrustLine
    */
-  AUTH_REQUIRED_FLAG(1),
+  AUTH_REQUIRED_FLAG(1, "required_flag"),
   /**
    * If set, the authorized flag in TrustLines can be cleared
    * otherwise, authorization cannot be revoked
    */
-  AUTH_REVOCABLE_FLAG(2),
+  AUTH_REVOCABLE_FLAG(2, "revocable_flag"),
   /** Once set, causes all AUTH_* flags to be read-only */
-  AUTH_IMMUTABLE_FLAG(4),
+  AUTH_IMMUTABLE_FLAG(4, "immutable_flag"),
   /**
    * Trustlines are created with clawback enabled set to "true",
    * and claimable balances created from those trustlines are created
    * with clawback enabled set to "true"
    */
-  AUTH_CLAWBACK_ENABLED_FLAG(8);
+  AUTH_CLAWBACK_ENABLED_FLAG(8, "clawback_enabled_flag");
 
   companion object {
 
@@ -51,9 +55,24 @@ enum class AccountFlagsXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown AccountFlagsXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): AccountFlagsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountFlagsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountFlagsXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): AccountFlagsXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

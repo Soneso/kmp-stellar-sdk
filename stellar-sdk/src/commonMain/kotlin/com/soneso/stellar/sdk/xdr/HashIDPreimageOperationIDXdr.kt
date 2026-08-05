@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HashIDPreimageOperationIDXdr"
+
 /**
  * XDR Source:
  * struct
@@ -25,6 +30,19 @@ data class HashIDPreimageOperationIDXdr(
       val opNum = Uint32Xdr.decode(reader)
       return HashIDPreimageOperationIDXdr(sourceAccount, seqNum, opNum)
     }
+
+    fun fromXdrJson(json: String): HashIDPreimageOperationIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HashIDPreimageOperationIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HashIDPreimageOperationIDXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return HashIDPreimageOperationIDXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "source_account", XDR_JSON_TYPE)),
+        SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "seq_num", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "op_num", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +50,12 @@ data class HashIDPreimageOperationIDXdr(
     seqNum.encode(writer)
     opNum.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("source_account", sourceAccount.toXdrJsonElement())
+    put("seq_num", seqNum.toXdrJsonElement())
+    put("op_num", opNum.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

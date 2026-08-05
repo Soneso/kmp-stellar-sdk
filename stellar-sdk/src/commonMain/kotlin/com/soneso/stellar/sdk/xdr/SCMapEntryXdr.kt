@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCMapEntryXdr"
+
 /**
  * XDR Source:
  * struct SCMapEntry
@@ -19,8 +24,20 @@ data class SCMapEntryXdr(
 
     fun decode(reader: XdrReader): SCMapEntryXdr {
       val key = SCValXdr.decode(reader)
-      val value = SCValXdr.decode(reader)
-      return SCMapEntryXdr(key, value)
+      val `val` = SCValXdr.decode(reader)
+      return SCMapEntryXdr(key, `val`)
+    }
+
+    fun fromXdrJson(json: String): SCMapEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCMapEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCMapEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCMapEntryXdr(
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "key", XDR_JSON_TYPE)),
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "val", XDR_JSON_TYPE))
+      )
     }
   }
 
@@ -28,4 +45,11 @@ data class SCMapEntryXdr(
     key.encode(writer)
     `val`.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("key", key.toXdrJsonElement())
+    put("val", `val`.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

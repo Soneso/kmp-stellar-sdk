@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecUDTUnionCaseV0Xdr"
+
 /**
  * XDR Source:
  * union SCSpecUDTUnionCaseV0 switch (SCSpecUDTUnionCaseV0Kind kind)
@@ -44,6 +49,19 @@ sealed class SCSpecUDTUnionCaseV0Xdr {
         else -> throw IllegalArgumentException("Unknown SCSpecUDTUnionCaseV0Xdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCSpecUDTUnionCaseV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecUDTUnionCaseV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecUDTUnionCaseV0Xdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "void_v0" -> VoidCase(SCSpecUDTUnionCaseVoidV0Xdr.fromXdrJsonTree(value))
+        "tuple_v0" -> TupleCase(SCSpecUDTUnionCaseTupleV0Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -57,4 +75,11 @@ sealed class SCSpecUDTUnionCaseV0Xdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is VoidCase -> buildJsonObject { put("void_v0", value.toXdrJsonElement()) }
+    is TupleCase -> buildJsonObject { put("tuple_v0", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

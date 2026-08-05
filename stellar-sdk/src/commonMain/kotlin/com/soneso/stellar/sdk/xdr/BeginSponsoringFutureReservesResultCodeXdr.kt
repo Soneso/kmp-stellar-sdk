@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BeginSponsoringFutureReservesResultCodeXdr"
+
 /**
  * XDR Source:
  * enum BeginSponsoringFutureReservesResultCode
@@ -16,13 +20,13 @@ package com.soneso.stellar.sdk.xdr
  *     BEGIN_SPONSORING_FUTURE_RESERVES_RECURSIVE = -3
  * };
  */
-enum class BeginSponsoringFutureReservesResultCodeXdr(val value: Int) {
+enum class BeginSponsoringFutureReservesResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  BEGIN_SPONSORING_FUTURE_RESERVES_SUCCESS(0),
+  BEGIN_SPONSORING_FUTURE_RESERVES_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  BEGIN_SPONSORING_FUTURE_RESERVES_MALFORMED(-1),
-  BEGIN_SPONSORING_FUTURE_RESERVES_ALREADY_SPONSORED(-2),
-  BEGIN_SPONSORING_FUTURE_RESERVES_RECURSIVE(-3);
+  BEGIN_SPONSORING_FUTURE_RESERVES_MALFORMED(-1, "malformed"),
+  BEGIN_SPONSORING_FUTURE_RESERVES_ALREADY_SPONSORED(-2, "already_sponsored"),
+  BEGIN_SPONSORING_FUTURE_RESERVES_RECURSIVE(-3, "recursive");
 
   companion object {
 
@@ -31,9 +35,24 @@ enum class BeginSponsoringFutureReservesResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown BeginSponsoringFutureReservesResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): BeginSponsoringFutureReservesResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BeginSponsoringFutureReservesResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BeginSponsoringFutureReservesResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): BeginSponsoringFutureReservesResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

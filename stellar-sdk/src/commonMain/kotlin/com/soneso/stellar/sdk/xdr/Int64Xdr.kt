@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "Int64Xdr"
+
 /**
  * XDR Source:
  * typedef hyper int64;
@@ -15,9 +19,19 @@ value class Int64Xdr(val value: Long) {
       val value = reader.readLong()
       return Int64Xdr(value)
     }
+
+    fun fromXdrJson(json: String): Int64Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): Int64Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): Int64Xdr = Int64Xdr(XdrJson.int64(element, XDR_JSON_TYPE, "value"))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeLong(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.int64(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "CreateAccountResultCodeXdr"
+
 /**
  * XDR Source:
  * enum CreateAccountResultCode
@@ -18,22 +22,22 @@ package com.soneso.stellar.sdk.xdr
  *     CREATE_ACCOUNT_ALREADY_EXIST = -4 // account already exists
  * };
  */
-enum class CreateAccountResultCodeXdr(val value: Int) {
+enum class CreateAccountResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * codes considered as "success" for the operation
    * account was created
    */
-  CREATE_ACCOUNT_SUCCESS(0),
+  CREATE_ACCOUNT_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * invalid destination
    */
-  CREATE_ACCOUNT_MALFORMED(-1),
+  CREATE_ACCOUNT_MALFORMED(-1, "malformed"),
   /** not enough funds in source account */
-  CREATE_ACCOUNT_UNDERFUNDED(-2),
-  CREATE_ACCOUNT_LOW_RESERVE(-3),
+  CREATE_ACCOUNT_UNDERFUNDED(-2, "underfunded"),
+  CREATE_ACCOUNT_LOW_RESERVE(-3, "low_reserve"),
   /** account already exists */
-  CREATE_ACCOUNT_ALREADY_EXIST(-4);
+  CREATE_ACCOUNT_ALREADY_EXIST(-4, "already_exist");
 
   companion object {
 
@@ -42,9 +46,24 @@ enum class CreateAccountResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown CreateAccountResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): CreateAccountResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateAccountResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateAccountResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): CreateAccountResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "StellarValueXdr"
+
 /**
  * XDR Source:
  * struct StellarValue
@@ -53,6 +58,20 @@ data class StellarValueXdr(
       val ext = StellarValueExtXdr.decode(reader)
       return StellarValueXdr(txSetHash, closeTime, upgrades, ext)
     }
+
+    fun fromXdrJson(json: String): StellarValueXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): StellarValueXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): StellarValueXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return StellarValueXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "tx_set_hash", XDR_JSON_TYPE)),
+        TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "close_time", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "upgrades", XDR_JSON_TYPE), XDR_JSON_TYPE, "upgrades", maxLength = 6).map { UpgradeTypeXdr.fromXdrJsonTree(it) },
+        StellarValueExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -64,4 +83,13 @@ data class StellarValueXdr(
     }
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("tx_set_hash", txSetHash.toXdrJsonElement())
+    put("close_time", closeTime.toXdrJsonElement())
+    put("upgrades", XdrJson.array(upgrades) { it.toXdrJsonElement() })
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

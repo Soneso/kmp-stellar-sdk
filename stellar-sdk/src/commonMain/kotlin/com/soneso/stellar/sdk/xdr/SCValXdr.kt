@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCValXdr"
+
 /**
  * XDR Source:
  * union SCVal switch (SCValType type)
@@ -304,6 +310,45 @@ sealed class SCValXdr {
         else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCValXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCValXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCValXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "bool" -> B(XdrJson.bool(value, XDR_JSON_TYPE, "bool"))
+          "error" -> Error(SCErrorXdr.fromXdrJsonTree(value))
+          "u32" -> U32(Uint32Xdr.fromXdrJsonTree(value))
+          "i32" -> I32(Int32Xdr.fromXdrJsonTree(value))
+          "u64" -> U64(Uint64Xdr.fromXdrJsonTree(value))
+          "i64" -> I64(Int64Xdr.fromXdrJsonTree(value))
+          "timepoint" -> Timepoint(TimePointXdr.fromXdrJsonTree(value))
+          "duration" -> Duration(DurationXdr.fromXdrJsonTree(value))
+          "u128" -> U128(UInt128PartsXdr.fromXdrJsonTree(value))
+          "i128" -> I128(Int128PartsXdr.fromXdrJsonTree(value))
+          "u256" -> U256(UInt256PartsXdr.fromXdrJsonTree(value))
+          "i256" -> I256(Int256PartsXdr.fromXdrJsonTree(value))
+          "bytes" -> Bytes(SCBytesXdr.fromXdrJsonTree(value))
+          "string" -> Str(SCStringXdr.fromXdrJsonTree(value))
+          "symbol" -> Sym(SCSymbolXdr.fromXdrJsonTree(value))
+          "vec" -> Vec(XdrJson.optional(value)?.let { SCVecXdr.fromXdrJsonTree(it) })
+          "map" -> Map(XdrJson.optional(value)?.let { SCMapXdr.fromXdrJsonTree(it) })
+          "address" -> Address(SCAddressXdr.fromXdrJsonTree(value))
+          "contract_instance" -> Instance(SCContractInstanceXdr.fromXdrJsonTree(value))
+          "ledger_key_nonce" -> NonceKey(SCNonceKeyXdr.fromXdrJsonTree(value))
+          "executable_tag" -> ExecutableTag(SCStringXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "void" -> Void(SCValTypeXdr.SCV_VOID)
+        "ledger_key_contract_instance" -> Void(SCValTypeXdr.SCV_LEDGER_KEY_CONTRACT_INSTANCE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -385,4 +430,31 @@ sealed class SCValXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is B -> buildJsonObject { put("bool", XdrJson.bool(value)) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+    is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }
+    is U32 -> buildJsonObject { put("u32", value.toXdrJsonElement()) }
+    is I32 -> buildJsonObject { put("i32", value.toXdrJsonElement()) }
+    is U64 -> buildJsonObject { put("u64", value.toXdrJsonElement()) }
+    is I64 -> buildJsonObject { put("i64", value.toXdrJsonElement()) }
+    is Timepoint -> buildJsonObject { put("timepoint", value.toXdrJsonElement()) }
+    is Duration -> buildJsonObject { put("duration", value.toXdrJsonElement()) }
+    is U128 -> buildJsonObject { put("u128", value.toXdrJsonElement()) }
+    is I128 -> buildJsonObject { put("i128", value.toXdrJsonElement()) }
+    is U256 -> buildJsonObject { put("u256", value.toXdrJsonElement()) }
+    is I256 -> buildJsonObject { put("i256", value.toXdrJsonElement()) }
+    is Bytes -> buildJsonObject { put("bytes", value.toXdrJsonElement()) }
+    is Str -> buildJsonObject { put("string", value.toXdrJsonElement()) }
+    is Sym -> buildJsonObject { put("symbol", value.toXdrJsonElement()) }
+    is Vec -> buildJsonObject { put("vec", XdrJson.optional(value) { it.toXdrJsonElement() }) }
+    is Map -> buildJsonObject { put("map", XdrJson.optional(value) { it.toXdrJsonElement() }) }
+    is Address -> buildJsonObject { put("address", value.toXdrJsonElement()) }
+    is Instance -> buildJsonObject { put("contract_instance", value.toXdrJsonElement()) }
+    is NonceKey -> buildJsonObject { put("ledger_key_nonce", value.toXdrJsonElement()) }
+    is ExecutableTag -> buildJsonObject { put("executable_tag", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanAuthorizedInvocationXdr"
+
 /**
  * XDR Source:
  * struct SorobanAuthorizedInvocation
@@ -22,6 +27,18 @@ data class SorobanAuthorizedInvocationXdr(
       val subInvocations = List(reader.readInt()) { SorobanAuthorizedInvocationXdr.decode(reader) }
       return SorobanAuthorizedInvocationXdr(function, subInvocations)
     }
+
+    fun fromXdrJson(json: String): SorobanAuthorizedInvocationXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizedInvocationXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizedInvocationXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SorobanAuthorizedInvocationXdr(
+        SorobanAuthorizedFunctionXdr.fromXdrJsonTree(XdrJson.field(json, "function", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "sub_invocations", XDR_JSON_TYPE), XDR_JSON_TYPE, "sub_invocations").map { SorobanAuthorizedInvocationXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +48,11 @@ data class SorobanAuthorizedInvocationXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("function", function.toXdrJsonElement())
+    put("sub_invocations", XdrJson.array(subInvocations) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionResultPairXdr"
+
 /**
  * XDR Source:
  * struct TransactionResultPair
@@ -23,10 +28,29 @@ data class TransactionResultPairXdr(
       val result = TransactionResultXdr.decode(reader)
       return TransactionResultPairXdr(transactionHash, result)
     }
+
+    fun fromXdrJson(json: String): TransactionResultPairXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultPairXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultPairXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionResultPairXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "transaction_hash", XDR_JSON_TYPE)),
+        TransactionResultXdr.fromXdrJsonTree(XdrJson.field(json, "result", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     transactionHash.encode(writer)
     result.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("transaction_hash", transactionHash.toXdrJsonElement())
+    put("result", result.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

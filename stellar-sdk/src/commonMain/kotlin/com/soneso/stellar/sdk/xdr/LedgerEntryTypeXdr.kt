@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LedgerEntryTypeXdr"
+
 /**
  * XDR Source:
  * enum LedgerEntryType
@@ -19,17 +23,17 @@ package com.soneso.stellar.sdk.xdr
  *     TTL = 9
  * };
  */
-enum class LedgerEntryTypeXdr(val value: Int) {
-  ACCOUNT(0),
-  TRUSTLINE(1),
-  OFFER(2),
-  DATA(3),
-  CLAIMABLE_BALANCE(4),
-  LIQUIDITY_POOL(5),
-  CONTRACT_DATA(6),
-  CONTRACT_CODE(7),
-  CONFIG_SETTING(8),
-  TTL(9);
+enum class LedgerEntryTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  ACCOUNT(0, "account"),
+  TRUSTLINE(1, "trustline"),
+  OFFER(2, "offer"),
+  DATA(3, "data"),
+  CLAIMABLE_BALANCE(4, "claimable_balance"),
+  LIQUIDITY_POOL(5, "liquidity_pool"),
+  CONTRACT_DATA(6, "contract_data"),
+  CONTRACT_CODE(7, "contract_code"),
+  CONFIG_SETTING(8, "config_setting"),
+  TTL(9, "ttl");
 
   companion object {
 
@@ -38,9 +42,24 @@ enum class LedgerEntryTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown LedgerEntryTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): LedgerEntryTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): LedgerEntryTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

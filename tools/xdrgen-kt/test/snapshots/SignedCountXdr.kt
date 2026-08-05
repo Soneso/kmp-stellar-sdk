@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SignedCountXdr"
+
 /**
  * XDR Source:
  * typedef Int32 SignedCount;
@@ -15,9 +19,19 @@ value class SignedCountXdr(val value: Int32Xdr) {
       val value = Int32Xdr.decode(reader)
       return SignedCountXdr(value)
     }
+
+    fun fromXdrJson(json: String): SignedCountXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SignedCountXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SignedCountXdr = SignedCountXdr(Int32Xdr.fromXdrJsonTree(element))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

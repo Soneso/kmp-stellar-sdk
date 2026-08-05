@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractCodeCostInputsXdr"
+
 /**
  * XDR Source:
  * struct ContractCodeCostInputs {
@@ -48,6 +53,27 @@ data class ContractCodeCostInputsXdr(
       val nDataSegmentBytes = Uint32Xdr.decode(reader)
       return ContractCodeCostInputsXdr(ext, nInstructions, nFunctions, nGlobals, nTableEntries, nTypes, nDataSegments, nElemSegments, nImports, nExports, nDataSegmentBytes)
     }
+
+    fun fromXdrJson(json: String): ContractCodeCostInputsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractCodeCostInputsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractCodeCostInputsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractCodeCostInputsXdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_instructions", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_functions", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_globals", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_table_entries", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_types", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_data_segments", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_elem_segments", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_imports", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_exports", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_data_segment_bytes", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -63,4 +89,20 @@ data class ContractCodeCostInputsXdr(
     nExports.encode(writer)
     nDataSegmentBytes.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("n_instructions", nInstructions.toXdrJsonElement())
+    put("n_functions", nFunctions.toXdrJsonElement())
+    put("n_globals", nGlobals.toXdrJsonElement())
+    put("n_table_entries", nTableEntries.toXdrJsonElement())
+    put("n_types", nTypes.toXdrJsonElement())
+    put("n_data_segments", nDataSegments.toXdrJsonElement())
+    put("n_elem_segments", nElemSegments.toXdrJsonElement())
+    put("n_imports", nImports.toXdrJsonElement())
+    put("n_exports", nExports.toXdrJsonElement())
+    put("n_data_segment_bytes", nDataSegmentBytes.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

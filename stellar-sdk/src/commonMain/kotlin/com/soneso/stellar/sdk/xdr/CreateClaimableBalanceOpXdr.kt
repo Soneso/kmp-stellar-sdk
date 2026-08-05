@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "CreateClaimableBalanceOpXdr"
+
 /**
  * XDR Source:
  * struct CreateClaimableBalanceOp
@@ -25,6 +30,19 @@ data class CreateClaimableBalanceOpXdr(
       val claimants = List(reader.readInt()) { ClaimantXdr.decode(reader) }
       return CreateClaimableBalanceOpXdr(asset, amount, claimants)
     }
+
+    fun fromXdrJson(json: String): CreateClaimableBalanceOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateClaimableBalanceOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateClaimableBalanceOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return CreateClaimableBalanceOpXdr(
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "claimants", XDR_JSON_TYPE), XDR_JSON_TYPE, "claimants", maxLength = 10).map { ClaimantXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -35,4 +53,12 @@ data class CreateClaimableBalanceOpXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("asset", asset.toXdrJsonElement())
+    put("amount", amount.toXdrJsonElement())
+    put("claimants", XdrJson.array(claimants) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

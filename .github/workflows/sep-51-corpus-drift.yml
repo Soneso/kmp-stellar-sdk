@@ -1,0 +1,241 @@
+name: Check SEP-51 conformance against the reference
+
+# The SEP-0051 name table and conformance corpus are checked against a pinned build of the
+# XDR-JSON reference CLI. That build has to be compiled from source, which is too slow to put
+# in front of every pull request, so these checks run on a schedule instead. The checks that
+# need only committed artefacts run per pull request, in the xdr-generator job of tests.yml.
+#
+# Drift is expected to be rare and is never fixed here: the job reports it and a maintainer
+# regenerates the artefacts locally, because regeneration needs the same reference build.
+
+on:
+  schedule:
+    # Mondays at 04:15 UTC
+    - cron: '15 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without creating an issue (for testing)'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-against-reference:
+    name: Name table and corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read the pinned reference build
+        id: pin
+        run: |
+          PIN_FILE="tools/sep-51-oracle/oracle-pin.json"
+          if [ ! -f "$PIN_FILE" ]; then
+            echo "::error::Reference pin not found: $PIN_FILE"
+            exit 1
+          fi
+
+          VERSION=$(jq -r '.version' "$PIN_FILE")
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "::error::No version recorded in $PIN_FILE"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Pinned reference build: stellar-xdr $VERSION"
+
+      - name: Cache the reference CLI
+        id: cli-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/stellar-xdr
+          key: stellar-xdr-cli-${{ runner.os }}-${{ steps.pin.outputs.version }}
+
+      - name: Install the reference CLI
+        if: steps.cli-cache.outputs.cache-hit != 'true'
+        run: |
+          cargo install stellar-xdr \
+            --features cli \
+            --version "${{ steps.pin.outputs.version }}" \
+            --locked
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: '3.4'
+
+      - name: Cache generator gems
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/xdrgen-kt/vendor
+          key: xdrgen-gems-${{ runner.os }}-${{ hashFiles('tools/xdrgen-kt/Gemfile.lock') }}
+
+      - name: Download the pinned XDR definitions
+        # The name table is derived from the .x sources, so they have to be present.
+        run: make -C tools/xdrgen-kt setup download
+
+      - name: Check the name table against the reference
+        id: names
+        run: |
+          set +e
+          ruby tools/sep-51-oracle/name_map.rb --check > /tmp/name_check.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/name_check.log
+
+          if [ "$status" -eq 2 ]; then
+            echo "::error::The reference CLI is missing or does not match the pin recorded in tools/sep-51-oracle/oracle-pin.json."
+            echo "This is a broken job, not name drift. Check the install step above."
+            exit 1
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Check the corpus against the reference
+        id: corpus
+        run: |
+          set +e
+          bash tools/sep-51-corpus/refresh_corpus.sh > /tmp/corpus_check.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/corpus_check.log
+
+          if [ "$status" -eq 2 ]; then
+            echo "::error::The reference CLI is missing or does not match the pin recorded in tools/sep-51-oracle/oracle-pin.json."
+            echo "This is a broken job, not corpus drift. Check the install step above."
+            exit 1
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Summarise
+        id: summary
+        run: |
+          NAMES_STATUS="${{ steps.names.outputs.status }}"
+          CORPUS_STATUS="${{ steps.corpus.outputs.status }}"
+
+          if [ "$NAMES_STATUS" = "0" ] && [ "$CORPUS_STATUS" = "0" ]; then
+            echo "The name table and the corpus both match the pinned reference build."
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "drift=true" >> "$GITHUB_OUTPUT"
+
+          {
+            printf 'The SEP-0051 artefacts no longer match the pinned reference build.\n'
+            printf '\n'
+            printf '**Reference build:** stellar-xdr `%s`\n' "${{ steps.pin.outputs.version }}"
+            printf '\n'
+          } > /tmp/report.md
+
+          if [ "$NAMES_STATUS" != "0" ]; then
+            {
+              printf '## Name table\n\n'
+              printf '`tools/sep-51-oracle/name-map.json` disagrees with the reference, or a committed artefact is out of date.\n\n'
+              printf '```\n'
+              cat /tmp/name_check.log
+              printf '\n```\n\n'
+            } >> /tmp/report.md
+          fi
+
+          if [ "$CORPUS_STATUS" != "0" ]; then
+            {
+              printf '## Corpus\n\n'
+              printf '`tools/sep-51-corpus/corpus.json` differs from a fresh generation.\n\n'
+              printf '```diff\n'
+              head -c 40000 /tmp/corpus_check.log
+              printf '\n```\n\n'
+            } >> /tmp/report.md
+          fi
+
+          {
+            printf '## Required actions\n\n'
+            printf 'Both checks need the pinned reference CLI, so they are resolved locally rather than here:\n\n'
+            printf '1. Install it: `cargo install stellar-xdr --features cli --version %s --locked`\n' "${{ steps.pin.outputs.version }}"
+            printf '2. Rebuild the name table: `ruby tools/sep-51-oracle/name_map.rb --diff`\n'
+            printf '3. Regenerate the corpus: `python3 tools/sep-51-corpus/generate_corpus.py`\n'
+            printf '4. Re-embed it in the test sources: `make -C tools/xdrgen-kt emit-json-tests`\n'
+            printf '5. Run the tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
+            printf '6. Review the diff before committing. A changed rendering is a wire-format change and belongs in the changelog.\n'
+            printf '\n'
+            printf 'A wire-format change caused by an XDR pin bump is expected and is not a SEP-0051 specification change.\n'
+          } >> /tmp/report.md
+
+          FINGERPRINT=$(sha256sum /tmp/report.md | cut -c1-16)
+          printf '\n<!-- drift-fingerprint: %s -->\n' "$FINGERPRINT" >> /tmp/report.md
+          printf '\n---\n*Reported by the [SEP-51 conformance workflow](.github/workflows/sep-51-corpus-drift.yml).*\n' >> /tmp/report.md
+
+          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          echo "::warning::SEP-0051 artefacts drifted from the pinned reference build."
+          cat /tmp/report.md
+
+      - name: Find an open drift issue
+        if: steps.summary.outputs.drift == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issues=$(gh issue list --label "sep-51-corpus-drift" --state open --json number)
+          echo "open_issues=$(jq 'length' <<< "$issues")" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$(jq -r '.[0].number // empty' <<< "$issues")" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure the label exists
+        if: >-
+          steps.summary.outputs.drift == 'true'
+          && steps.existing.outputs.open_issues == '0'
+          && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "sep-51-corpus-drift" \
+            --description "SEP-0051 artefacts differ from the pinned reference build" \
+            --color "5319e7" \
+            2>/dev/null || true
+
+      - name: Open an issue
+        if: >-
+          steps.summary.outputs.drift == 'true'
+          && steps.existing.outputs.open_issues == '0'
+          && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "SEP-51 artefacts drifted from the pinned reference build" \
+            --label "sep-51-corpus-drift" \
+            --body-file /tmp/report.md
+
+      - name: Comment on the open issue
+        if: >-
+          steps.summary.outputs.drift == 'true'
+          && steps.existing.outputs.open_issues != '0'
+          && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.existing.outputs.issue_number }}
+          FINGERPRINT: ${{ steps.summary.outputs.fingerprint }}
+        run: |
+          # The same drift would otherwise be re-reported every week. Only a report whose
+          # content differs from everything already in the thread is worth a comment.
+          thread=$(gh issue view "$ISSUE_NUMBER" --json body,comments --jq '.body + "\n" + ([.comments[].body] | join("\n"))')
+          if grep -qF "drift-fingerprint: $FINGERPRINT" <<< "$thread"; then
+            echo "Issue #$ISSUE_NUMBER already reports this drift."
+            exit 0
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/report.md
+
+      - name: Dry run summary
+        if: steps.summary.outputs.drift == 'true' && inputs.dry_run == 'true'
+        run: |
+          echo "::notice::Dry run: no issue was filed. Report:"
+          cat /tmp/report.md

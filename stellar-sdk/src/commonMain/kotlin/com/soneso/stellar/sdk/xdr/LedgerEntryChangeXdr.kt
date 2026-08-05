@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerEntryChangeXdr"
+
 /**
  * XDR Source:
  * union LedgerEntryChange switch (LedgerEntryChangeType type)
@@ -80,6 +85,22 @@ sealed class LedgerEntryChangeXdr {
         else -> throw IllegalArgumentException("Unknown LedgerEntryChangeXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LedgerEntryChangeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryChangeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryChangeXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "created" -> Created(LedgerEntryXdr.fromXdrJsonTree(value))
+        "updated" -> Updated(LedgerEntryXdr.fromXdrJsonTree(value))
+        "removed" -> Removed(LedgerKeyXdr.fromXdrJsonTree(value))
+        "state" -> State(LedgerEntryXdr.fromXdrJsonTree(value))
+        "restored" -> Restored(LedgerEntryXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -102,4 +123,14 @@ sealed class LedgerEntryChangeXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Created -> buildJsonObject { put("created", value.toXdrJsonElement()) }
+    is Updated -> buildJsonObject { put("updated", value.toXdrJsonElement()) }
+    is Removed -> buildJsonObject { put("removed", value.toXdrJsonElement()) }
+    is State -> buildJsonObject { put("state", value.toXdrJsonElement()) }
+    is Restored -> buildJsonObject { put("restored", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

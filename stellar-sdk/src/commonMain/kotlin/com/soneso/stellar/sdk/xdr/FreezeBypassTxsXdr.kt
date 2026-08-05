@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "FreezeBypassTxsXdr"
+
 /**
  * XDR Source:
  * struct FreezeBypassTxs {
@@ -18,6 +23,17 @@ data class FreezeBypassTxsXdr(
       val txHashes = List(reader.readInt()) { HashXdr.decode(reader) }
       return FreezeBypassTxsXdr(txHashes)
     }
+
+    fun fromXdrJson(json: String): FreezeBypassTxsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): FreezeBypassTxsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): FreezeBypassTxsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return FreezeBypassTxsXdr(
+        XdrJson.array(XdrJson.field(json, "tx_hashes", XDR_JSON_TYPE), XDR_JSON_TYPE, "tx_hashes").map { HashXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -26,4 +42,10 @@ data class FreezeBypassTxsXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("tx_hashes", XdrJson.array(txHashes) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

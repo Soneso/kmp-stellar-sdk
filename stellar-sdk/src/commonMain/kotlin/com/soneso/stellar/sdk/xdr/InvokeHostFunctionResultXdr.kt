@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "InvokeHostFunctionResultXdr"
+
 /**
  * XDR Source:
  * union InvokeHostFunctionResult switch (InvokeHostFunctionResultCode code)
@@ -47,6 +53,28 @@ sealed class InvokeHostFunctionResultXdr {
         else -> throw IllegalArgumentException("Unknown InvokeHostFunctionResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): InvokeHostFunctionResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InvokeHostFunctionResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InvokeHostFunctionResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> Success(HashXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "malformed" -> Void(InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_MALFORMED)
+        "trapped" -> Void(InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_TRAPPED)
+        "resource_limit_exceeded" -> Void(InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_RESOURCE_LIMIT_EXCEEDED)
+        "entry_archived" -> Void(InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_ENTRY_ARCHIVED)
+        "insufficient_refundable_fee" -> Void(InvokeHostFunctionResultCodeXdr.INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -58,4 +86,11 @@ sealed class InvokeHostFunctionResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Success -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

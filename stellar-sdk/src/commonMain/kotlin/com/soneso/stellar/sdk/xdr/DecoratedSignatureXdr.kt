@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "DecoratedSignatureXdr"
+
 /**
  * XDR Source:
  * struct DecoratedSignature
@@ -24,10 +29,29 @@ data class DecoratedSignatureXdr(
       val signature = SignatureXdr.decode(reader)
       return DecoratedSignatureXdr(hint, signature)
     }
+
+    fun fromXdrJson(json: String): DecoratedSignatureXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): DecoratedSignatureXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): DecoratedSignatureXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return DecoratedSignatureXdr(
+        SignatureHintXdr.fromXdrJsonTree(XdrJson.field(json, "hint", XDR_JSON_TYPE)),
+        SignatureXdr.fromXdrJsonTree(XdrJson.field(json, "signature", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     hint.encode(writer)
     signature.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("hint", hint.toXdrJsonElement())
+    put("signature", signature.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

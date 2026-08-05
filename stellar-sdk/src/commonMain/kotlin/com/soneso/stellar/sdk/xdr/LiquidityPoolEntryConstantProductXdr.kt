@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolEntryConstantProductXdr"
+
 /**
  * XDR Source:
  * struct
@@ -37,6 +42,21 @@ data class LiquidityPoolEntryConstantProductXdr(
       val poolSharesTrustLineCount = Int64Xdr.decode(reader)
       return LiquidityPoolEntryConstantProductXdr(params, reserveA, reserveB, totalPoolShares, poolSharesTrustLineCount)
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolEntryConstantProductXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolEntryConstantProductXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolEntryConstantProductXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LiquidityPoolEntryConstantProductXdr(
+        LiquidityPoolConstantProductParametersXdr.fromXdrJsonTree(XdrJson.field(json, "params", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "reserve_a", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "reserve_b", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "total_pool_shares", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "pool_shares_trust_line_count", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -46,4 +66,14 @@ data class LiquidityPoolEntryConstantProductXdr(
     totalPoolShares.encode(writer)
     poolSharesTrustLineCount.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("params", params.toXdrJsonElement())
+    put("reserve_a", reserveA.toXdrJsonElement())
+    put("reserve_b", reserveB.toXdrJsonElement())
+    put("total_pool_shares", totalPoolShares.toXdrJsonElement())
+    put("pool_shares_trust_line_count", poolSharesTrustLineCount.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

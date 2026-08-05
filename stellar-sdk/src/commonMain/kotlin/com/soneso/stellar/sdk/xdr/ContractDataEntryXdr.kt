@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractDataEntryXdr"
+
 /**
  * XDR Source:
  * struct ContractDataEntry {
@@ -28,8 +33,23 @@ data class ContractDataEntryXdr(
       val contract = SCAddressXdr.decode(reader)
       val key = SCValXdr.decode(reader)
       val durability = ContractDataDurabilityXdr.decode(reader)
-      val value = SCValXdr.decode(reader)
-      return ContractDataEntryXdr(ext, contract, key, durability, value)
+      val `val` = SCValXdr.decode(reader)
+      return ContractDataEntryXdr(ext, contract, key, durability, `val`)
+    }
+
+    fun fromXdrJson(json: String): ContractDataEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractDataEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractDataEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractDataEntryXdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "contract", XDR_JSON_TYPE)),
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "key", XDR_JSON_TYPE)),
+        ContractDataDurabilityXdr.fromXdrJsonTree(XdrJson.field(json, "durability", XDR_JSON_TYPE)),
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "val", XDR_JSON_TYPE))
+      )
     }
   }
 
@@ -40,4 +60,14 @@ data class ContractDataEntryXdr(
     durability.encode(writer)
     `val`.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("contract", contract.toXdrJsonElement())
+    put("key", key.toXdrJsonElement())
+    put("durability", durability.toXdrJsonElement())
+    put("val", `val`.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

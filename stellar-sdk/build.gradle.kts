@@ -171,7 +171,10 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                // JSON tree types for multiplatform. Exposed via `api` because the SDK's
+                // public surface (the XDR-JSON methods on every generated XDR type) takes
+                // and returns kotlinx.serialization.json.JsonElement.
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 implementation("io.ktor:ktor-client-core:3.3.2")
@@ -395,6 +398,17 @@ tasks.named("check") {
 
 // Dokka 2.x generates docs from shared source sets without requiring native compilation
 // No special configuration needed for cross-compilation on CI
+
+// Package-level documentation. The generated XDR types carry no per-member KDoc, so the
+// contract their encode/decode and XDR-JSON members share is stated once at the package
+// level instead of on ~1,700 generated members. Attached to commonMain only: the packages
+// documented here are declared there, and attaching to every source set would document the
+// same package repeatedly.
+dokka {
+    dokkaSourceSets.named("commonMain") {
+        includes.from("dokka/packages.md")
+    }
+}
 
 // Maven Central requires a -javadoc.jar to exist but does not validate its
 // contents, so the published jar is intentionally empty. The full Dokka HTML

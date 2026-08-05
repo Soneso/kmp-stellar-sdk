@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.10.0. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
 metadata:
   author: soneso
-  version: "1.1.9"
+  version: "1.1.10"
   sdk_repo: https://github.com/Soneso/kmp-stellar-sdk
 ---
 
@@ -13,7 +13,7 @@ metadata:
 
 ## Overview
 
-The KMP Stellar SDK (`com.soneso.stellar:stellar-sdk`) is a Kotlin Multiplatform library for building Stellar blockchain applications on JVM/Android, iOS/macOS, and JavaScript (Browser/Node.js). It provides full Horizon API coverage, full Soroban RPC coverage, 27 Stellar operations, and 14 SEP implementations. Crypto operations (KeyPair, signing) are `suspend` functions. Uses Ktor for networking and kotlinx.coroutines for async.
+The KMP Stellar SDK (`com.soneso.stellar:stellar-sdk`) is a Kotlin Multiplatform library for building Stellar blockchain applications on JVM/Android, iOS/macOS, and JavaScript (Browser/Node.js). It provides full Horizon API coverage, full Soroban RPC coverage, 27 Stellar operations, and 15 SEP implementations. Crypto operations (KeyPair, signing) are `suspend` functions. Uses Ktor for networking and kotlinx.coroutines for async.
 
 ## Installation
 
@@ -469,7 +469,7 @@ Covers secret key management (`getSecretSeed()` returns `CharArray?`), transacti
 
 ## 11. SEP Implementations
 
-The KMP SDK implements 14 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 31, 38, 45, 53. See [SEP Implementations Guide](./references/sep.md).
+The KMP SDK implements 15 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 31, 38, 45, 51, 53. See [SEP Implementations Guide](./references/sep.md).
 
 ## Reference Documentation
 
@@ -484,7 +484,7 @@ The KMP SDK implements 14 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 31, 38, 
 - [XDR](./references/xdr.md) - XDR encoding/decoding and debugging
 - [Troubleshooting](./references/troubleshooting.md) - Error codes, platform & environment info
 - [Security](./references/security.md) - Platform-specific key storage, production deployment
-- [SEP Implementations](./references/sep.md) - 14 SEPs with per-SEP references: [01](./references/sep-01.md), [02](./references/sep-02.md), [05](./references/sep-05.md), [06](./references/sep-06.md), [08](./references/sep-08.md), [09](./references/sep-09.md), [10](./references/sep-10.md), [12](./references/sep-12.md), [24](./references/sep-24.md), [30](./references/sep-30.md), [31](./references/sep-31.md), [38](./references/sep-38.md), [45](./references/sep-45.md), [53](./references/sep-53.md)
+- [SEP Implementations](./references/sep.md) - 15 SEPs with per-SEP references: [01](./references/sep-01.md), [02](./references/sep-02.md), [05](./references/sep-05.md), [06](./references/sep-06.md), [08](./references/sep-08.md), [09](./references/sep-09.md), [10](./references/sep-10.md), [12](./references/sep-12.md), [24](./references/sep-24.md), [30](./references/sep-30.md), [31](./references/sep-31.md), [38](./references/sep-38.md), [45](./references/sep-45.md), [51](./references/sep-51.md), [53](./references/sep-53.md)
 - [Advanced](./references/advanced.md) - Multi-sig, sponsorship, fee bumps, liquidity pools, muxed accounts
 - [API Reference](./references/api_reference.md) - All public class/method signatures
 

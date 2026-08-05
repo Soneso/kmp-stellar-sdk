@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerUpgradeXdr"
+
 /**
  * XDR Source:
  * union LedgerUpgrade switch (LedgerUpgradeType type)
@@ -109,6 +114,24 @@ sealed class LedgerUpgradeXdr {
         else -> throw IllegalArgumentException("Unknown LedgerUpgradeXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LedgerUpgradeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerUpgradeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerUpgradeXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "version" -> NewLedgerVersion(Uint32Xdr.fromXdrJsonTree(value))
+        "base_fee" -> NewBaseFee(Uint32Xdr.fromXdrJsonTree(value))
+        "max_tx_set_size" -> NewMaxTxSetSize(Uint32Xdr.fromXdrJsonTree(value))
+        "base_reserve" -> NewBaseReserve(Uint32Xdr.fromXdrJsonTree(value))
+        "flags" -> NewFlags(Uint32Xdr.fromXdrJsonTree(value))
+        "config" -> NewConfig(ConfigUpgradeSetKeyXdr.fromXdrJsonTree(value))
+        "max_soroban_tx_set_size" -> NewMaxSorobanTxSetSize(Uint32Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -137,4 +160,16 @@ sealed class LedgerUpgradeXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is NewLedgerVersion -> buildJsonObject { put("version", value.toXdrJsonElement()) }
+    is NewBaseFee -> buildJsonObject { put("base_fee", value.toXdrJsonElement()) }
+    is NewMaxTxSetSize -> buildJsonObject { put("max_tx_set_size", value.toXdrJsonElement()) }
+    is NewBaseReserve -> buildJsonObject { put("base_reserve", value.toXdrJsonElement()) }
+    is NewFlags -> buildJsonObject { put("flags", value.toXdrJsonElement()) }
+    is NewConfig -> buildJsonObject { put("config", value.toXdrJsonElement()) }
+    is NewMaxSorobanTxSetSize -> buildJsonObject { put("max_soroban_tx_set_size", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

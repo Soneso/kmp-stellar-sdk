@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingContractLedgerCostV0Xdr"
+
 /**
  * XDR Source:
  * struct ConfigSettingContractLedgerCostV0
@@ -96,6 +101,31 @@ data class ConfigSettingContractLedgerCostV0Xdr(
       val sorobanStateRentFeeGrowthFactor = Uint32Xdr.decode(reader)
       return ConfigSettingContractLedgerCostV0Xdr(ledgerMaxDiskReadEntries, ledgerMaxDiskReadBytes, ledgerMaxWriteLedgerEntries, ledgerMaxWriteBytes, txMaxDiskReadEntries, txMaxDiskReadBytes, txMaxWriteLedgerEntries, txMaxWriteBytes, feeDiskReadLedgerEntry, feeWriteLedgerEntry, feeDiskRead1Kb, sorobanStateTargetSizeBytes, rentFee1KbSorobanStateSizeLow, rentFee1KbSorobanStateSizeHigh, sorobanStateRentFeeGrowthFactor)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingContractLedgerCostV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractLedgerCostV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractLedgerCostV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ConfigSettingContractLedgerCostV0Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_disk_read_entries", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_disk_read_bytes", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_write_ledger_entries", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_write_bytes", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_disk_read_entries", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_disk_read_bytes", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_write_ledger_entries", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_write_bytes", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_disk_read_ledger_entry", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_write_ledger_entry", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_disk_read1_kb", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "soroban_state_target_size_bytes", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "rent_fee1_kb_soroban_state_size_low", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "rent_fee1_kb_soroban_state_size_high", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "soroban_state_rent_fee_growth_factor", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -115,4 +145,24 @@ data class ConfigSettingContractLedgerCostV0Xdr(
     rentFee1KbSorobanStateSizeHigh.encode(writer)
     sorobanStateRentFeeGrowthFactor.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_max_disk_read_entries", ledgerMaxDiskReadEntries.toXdrJsonElement())
+    put("ledger_max_disk_read_bytes", ledgerMaxDiskReadBytes.toXdrJsonElement())
+    put("ledger_max_write_ledger_entries", ledgerMaxWriteLedgerEntries.toXdrJsonElement())
+    put("ledger_max_write_bytes", ledgerMaxWriteBytes.toXdrJsonElement())
+    put("tx_max_disk_read_entries", txMaxDiskReadEntries.toXdrJsonElement())
+    put("tx_max_disk_read_bytes", txMaxDiskReadBytes.toXdrJsonElement())
+    put("tx_max_write_ledger_entries", txMaxWriteLedgerEntries.toXdrJsonElement())
+    put("tx_max_write_bytes", txMaxWriteBytes.toXdrJsonElement())
+    put("fee_disk_read_ledger_entry", feeDiskReadLedgerEntry.toXdrJsonElement())
+    put("fee_write_ledger_entry", feeWriteLedgerEntry.toXdrJsonElement())
+    put("fee_disk_read1_kb", feeDiskRead1Kb.toXdrJsonElement())
+    put("soroban_state_target_size_bytes", sorobanStateTargetSizeBytes.toXdrJsonElement())
+    put("rent_fee1_kb_soroban_state_size_low", rentFee1KbSorobanStateSizeLow.toXdrJsonElement())
+    put("rent_fee1_kb_soroban_state_size_high", rentFee1KbSorobanStateSizeHigh.toXdrJsonElement())
+    put("soroban_state_rent_fee_growth_factor", sorobanStateRentFeeGrowthFactor.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

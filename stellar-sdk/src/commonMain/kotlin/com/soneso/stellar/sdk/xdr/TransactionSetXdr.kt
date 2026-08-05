@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionSetXdr"
+
 /**
  * XDR Source:
  * struct TransactionSet
@@ -22,6 +27,18 @@ data class TransactionSetXdr(
       val txs = List(reader.readInt()) { TransactionEnvelopeXdr.decode(reader) }
       return TransactionSetXdr(previousLedgerHash, txs)
     }
+
+    fun fromXdrJson(json: String): TransactionSetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionSetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionSetXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionSetXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "previous_ledger_hash", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "txs", XDR_JSON_TYPE), XDR_JSON_TYPE, "txs").map { TransactionEnvelopeXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +48,11 @@ data class TransactionSetXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement())
+    put("txs", XdrJson.array(txs) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

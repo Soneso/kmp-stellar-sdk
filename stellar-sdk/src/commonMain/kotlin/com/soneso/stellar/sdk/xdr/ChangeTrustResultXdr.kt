@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ChangeTrustResultXdr"
+
 /**
  * XDR Source:
  * union ChangeTrustResult switch (ChangeTrustResultCode code)
@@ -44,6 +48,25 @@ sealed class ChangeTrustResultXdr {
         else -> throw IllegalArgumentException("Unknown ChangeTrustResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ChangeTrustResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ChangeTrustResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ChangeTrustResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_SUCCESS)
+        "malformed" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_MALFORMED)
+        "no_issuer" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_NO_ISSUER)
+        "invalid_limit" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_INVALID_LIMIT)
+        "low_reserve" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_LOW_RESERVE)
+        "self_not_allowed" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_SELF_NOT_ALLOWED)
+        "trust_line_missing" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_TRUST_LINE_MISSING)
+        "cannot_delete" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_CANNOT_DELETE)
+        "not_auth_maintain_liabilities" -> Void(ChangeTrustResultCodeXdr.CHANGE_TRUST_NOT_AUTH_MAINTAIN_LIABILITIES)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -52,4 +75,10 @@ sealed class ChangeTrustResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

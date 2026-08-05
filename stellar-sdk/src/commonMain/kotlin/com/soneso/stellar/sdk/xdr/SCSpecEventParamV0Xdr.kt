@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecEventParamV0Xdr"
+
 /**
  * XDR Source:
  * struct SCSpecEventParamV0
@@ -28,6 +33,20 @@ data class SCSpecEventParamV0Xdr(
       val location = SCSpecEventParamLocationV0Xdr.decode(reader)
       return SCSpecEventParamV0Xdr(doc, name, type, location)
     }
+
+    fun fromXdrJson(json: String): SCSpecEventParamV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecEventParamV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecEventParamV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCSpecEventParamV0Xdr(
+        XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 30),
+        SCSpecTypeDefXdr.fromXdrJsonTree(XdrJson.field(json, "type", "type_", XDR_JSON_TYPE)),
+        SCSpecEventParamLocationV0Xdr.fromXdrJsonTree(XdrJson.field(json, "location", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -36,4 +55,13 @@ data class SCSpecEventParamV0Xdr(
     type.encode(writer)
     location.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("doc", XdrJson.escapedString(doc))
+    put("name", XdrJson.escapedString(name))
+    put("type", type.toXdrJsonElement())
+    put("location", location.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "Uint32Xdr"
+
 /**
  * XDR Source:
  * typedef unsigned int Uint32;
@@ -15,9 +19,19 @@ value class Uint32Xdr(val value: UInt) {
       val value = reader.readUnsignedInt()
       return Uint32Xdr(value)
     }
+
+    fun fromXdrJson(json: String): Uint32Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): Uint32Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): Uint32Xdr = Uint32Xdr(XdrJson.uint32(element, XDR_JSON_TYPE, "value"))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeUnsignedInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.uint32(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

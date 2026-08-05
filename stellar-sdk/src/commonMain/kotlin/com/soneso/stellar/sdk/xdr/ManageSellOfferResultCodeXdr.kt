@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ManageSellOfferResultCodeXdr"
+
 /**
  * XDR Source:
  * enum ManageSellOfferResultCode
@@ -32,33 +36,33 @@ package com.soneso.stellar.sdk.xdr
  *         -12 // not enough funds to create a new Offer
  * };
  */
-enum class ManageSellOfferResultCodeXdr(val value: Int) {
+enum class ManageSellOfferResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  MANAGE_SELL_OFFER_SUCCESS(0),
+  MANAGE_SELL_OFFER_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * generated offer would be invalid
    */
-  MANAGE_SELL_OFFER_MALFORMED(-1),
-  MANAGE_SELL_OFFER_SELL_NO_TRUST(-2),
+  MANAGE_SELL_OFFER_MALFORMED(-1, "malformed"),
+  MANAGE_SELL_OFFER_SELL_NO_TRUST(-2, "sell_no_trust"),
   /** no trust line for what we're buying */
-  MANAGE_SELL_OFFER_BUY_NO_TRUST(-3),
+  MANAGE_SELL_OFFER_BUY_NO_TRUST(-3, "buy_no_trust"),
   /** not authorized to sell */
-  MANAGE_SELL_OFFER_SELL_NOT_AUTHORIZED(-4),
+  MANAGE_SELL_OFFER_SELL_NOT_AUTHORIZED(-4, "sell_not_authorized"),
   /** not authorized to buy */
-  MANAGE_SELL_OFFER_BUY_NOT_AUTHORIZED(-5),
+  MANAGE_SELL_OFFER_BUY_NOT_AUTHORIZED(-5, "buy_not_authorized"),
   /** can't receive more of what it's buying */
-  MANAGE_SELL_OFFER_LINE_FULL(-6),
+  MANAGE_SELL_OFFER_LINE_FULL(-6, "line_full"),
   /** doesn't hold what it's trying to sell */
-  MANAGE_SELL_OFFER_UNDERFUNDED(-7),
-  MANAGE_SELL_OFFER_CROSS_SELF(-8),
+  MANAGE_SELL_OFFER_UNDERFUNDED(-7, "underfunded"),
+  MANAGE_SELL_OFFER_CROSS_SELF(-8, "cross_self"),
   /** no issuer for what we're selling */
-  MANAGE_SELL_OFFER_SELL_NO_ISSUER(-9),
+  MANAGE_SELL_OFFER_SELL_NO_ISSUER(-9, "sell_no_issuer"),
   /** no issuer for what we're buying */
-  MANAGE_SELL_OFFER_BUY_NO_ISSUER(-10),
+  MANAGE_SELL_OFFER_BUY_NO_ISSUER(-10, "buy_no_issuer"),
   /** update errors */
-  MANAGE_SELL_OFFER_NOT_FOUND(-11),
-  MANAGE_SELL_OFFER_LOW_RESERVE(-12);
+  MANAGE_SELL_OFFER_NOT_FOUND(-11, "not_found"),
+  MANAGE_SELL_OFFER_LOW_RESERVE(-12, "low_reserve");
 
   companion object {
 
@@ -67,9 +71,24 @@ enum class ManageSellOfferResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ManageSellOfferResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ManageSellOfferResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageSellOfferResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageSellOfferResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ManageSellOfferResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

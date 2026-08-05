@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "CreateContractArgsV2Xdr"
+
 /**
  * XDR Source:
  * struct CreateContractArgsV2
@@ -26,6 +31,19 @@ data class CreateContractArgsV2Xdr(
       val constructorArgs = List(reader.readInt()) { SCValXdr.decode(reader) }
       return CreateContractArgsV2Xdr(contractIdPreimage, executable, constructorArgs)
     }
+
+    fun fromXdrJson(json: String): CreateContractArgsV2Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateContractArgsV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateContractArgsV2Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return CreateContractArgsV2Xdr(
+        ContractIDPreimageXdr.fromXdrJsonTree(XdrJson.field(json, "contract_id_preimage", XDR_JSON_TYPE)),
+        ContractExecutableXdr.fromXdrJsonTree(XdrJson.field(json, "executable", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "constructor_args", XDR_JSON_TYPE), XDR_JSON_TYPE, "constructor_args").map { SCValXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -36,4 +54,12 @@ data class CreateContractArgsV2Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("contract_id_preimage", contractIdPreimage.toXdrJsonElement())
+    put("executable", executable.toXdrJsonElement())
+    put("constructor_args", XdrJson.array(constructorArgs) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

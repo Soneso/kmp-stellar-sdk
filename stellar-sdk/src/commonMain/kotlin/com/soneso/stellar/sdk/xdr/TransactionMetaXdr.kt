@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionMetaXdr"
+
 /**
  * XDR Source:
  * union TransactionMeta switch (int v)
@@ -80,6 +85,22 @@ sealed class TransactionMetaXdr {
         else -> throw IllegalArgumentException("Unknown TransactionMetaXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): TransactionMetaXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionMetaXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v0" -> Operations(XdrJson.array(value, XDR_JSON_TYPE, "v0").map { OperationMetaXdr.fromXdrJsonTree(it) })
+        "v1" -> V1(TransactionMetaV1Xdr.fromXdrJsonTree(value))
+        "v2" -> V2(TransactionMetaV2Xdr.fromXdrJsonTree(value))
+        "v3" -> V3(TransactionMetaV3Xdr.fromXdrJsonTree(value))
+        "v4" -> V4(TransactionMetaV4Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -105,4 +126,14 @@ sealed class TransactionMetaXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Operations -> buildJsonObject { put("v0", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is V1 -> buildJsonObject { put("v1", value.toXdrJsonElement()) }
+    is V2 -> buildJsonObject { put("v2", value.toXdrJsonElement()) }
+    is V3 -> buildJsonObject { put("v3", value.toXdrJsonElement()) }
+    is V4 -> buildJsonObject { put("v4", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

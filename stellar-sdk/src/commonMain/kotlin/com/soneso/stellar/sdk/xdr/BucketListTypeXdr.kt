@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BucketListTypeXdr"
+
 /**
  * XDR Source:
  * enum BucketListType
@@ -11,9 +15,9 @@ package com.soneso.stellar.sdk.xdr
  *     HOT_ARCHIVE = 1
  * };
  */
-enum class BucketListTypeXdr(val value: Int) {
-  LIVE(0),
-  HOT_ARCHIVE(1);
+enum class BucketListTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  LIVE(0, "live"),
+  HOT_ARCHIVE(1, "hot_archive");
 
   companion object {
 
@@ -22,9 +26,24 @@ enum class BucketListTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown BucketListTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): BucketListTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BucketListTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BucketListTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): BucketListTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AccountEntryExtensionV3Xdr"
+
 /**
  * XDR Source:
  * struct AccountEntryExtensionV3
@@ -37,6 +42,19 @@ data class AccountEntryExtensionV3Xdr(
       val seqTime = TimePointXdr.decode(reader)
       return AccountEntryExtensionV3Xdr(ext, seqLedger, seqTime)
     }
+
+    fun fromXdrJson(json: String): AccountEntryExtensionV3Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountEntryExtensionV3Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountEntryExtensionV3Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return AccountEntryExtensionV3Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "seq_ledger", XDR_JSON_TYPE)),
+        TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "seq_time", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +62,12 @@ data class AccountEntryExtensionV3Xdr(
     seqLedger.encode(writer)
     seqTime.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("seq_ledger", seqLedger.toXdrJsonElement())
+    put("seq_time", seqTime.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

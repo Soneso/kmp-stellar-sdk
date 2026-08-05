@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "NestedStructXdr"
+
 /**
  * XDR Source:
  * struct NestedStruct
@@ -37,6 +42,23 @@ data class NestedStructXdr(
       val hash = HashXdr.decode(reader)
       return NestedStructXdr(inner, optionalInner, items, fixedItems, rawData, fixedData, hash)
     }
+
+    fun fromXdrJson(json: String): NestedStructXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): NestedStructXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): NestedStructXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return NestedStructXdr(
+        SimpleStructXdr.fromXdrJsonTree(XdrJson.field(json, "inner", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "optional_inner", XDR_JSON_TYPE))?.let { SimpleStructXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "items", XDR_JSON_TYPE), XDR_JSON_TYPE, "items", maxLength = 10).map { SimpleStructXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "fixed_items", XDR_JSON_TYPE), XDR_JSON_TYPE, "fixed_items", expectedLength = 3).map { SimpleStructXdr.fromXdrJsonTree(it) }.toTypedArray(),
+        XdrJson.hex(XdrJson.field(json, "raw_data", XDR_JSON_TYPE), XDR_JSON_TYPE, "raw_data"),
+        XdrJson.hex(XdrJson.field(json, "fixed_data", XDR_JSON_TYPE), XDR_JSON_TYPE, "fixed_data", expectedLength = 4),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "hash", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -58,4 +80,16 @@ data class NestedStructXdr(
     writer.writeFixedOpaque(fixedData, 4)
     hash.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("inner", inner.toXdrJsonElement())
+    put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })
+    put("items", XdrJson.array(items) { it.toXdrJsonElement() })
+    put("fixed_items", XdrJson.array(fixedItems.asList()) { it.toXdrJsonElement() })
+    put("raw_data", XdrJson.hex(rawData))
+    put("fixed_data", XdrJson.hex(fixedData))
+    put("hash", hash.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

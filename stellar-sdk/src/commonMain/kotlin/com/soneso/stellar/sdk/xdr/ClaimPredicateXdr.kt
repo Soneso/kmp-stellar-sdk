@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimPredicateXdr"
+
 /**
  * XDR Source:
  * union ClaimPredicate switch (ClaimPredicateType type)
@@ -88,6 +94,28 @@ sealed class ClaimPredicateXdr {
         else -> throw IllegalArgumentException("Unknown ClaimPredicateXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClaimPredicateXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimPredicateXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimPredicateXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "and" -> AndPredicates(XdrJson.array(value, XDR_JSON_TYPE, "and", maxLength = 2).map { ClaimPredicateXdr.fromXdrJsonTree(it) })
+          "or" -> OrPredicates(XdrJson.array(value, XDR_JSON_TYPE, "or", maxLength = 2).map { ClaimPredicateXdr.fromXdrJsonTree(it) })
+          "not" -> NotPredicate(XdrJson.optional(value)?.let { ClaimPredicateXdr.fromXdrJsonTree(it) })
+          "before_absolute_time" -> AbsBefore(Int64Xdr.fromXdrJsonTree(value))
+          "before_relative_time" -> RelBefore(Int64Xdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "unconditional" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -122,4 +150,15 @@ sealed class ClaimPredicateXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("unconditional")
+    is AndPredicates -> buildJsonObject { put("and", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is OrPredicates -> buildJsonObject { put("or", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is NotPredicate -> buildJsonObject { put("not", XdrJson.optional(value) { it.toXdrJsonElement() }) }
+    is AbsBefore -> buildJsonObject { put("before_absolute_time", value.toXdrJsonElement()) }
+    is RelBefore -> buildJsonObject { put("before_relative_time", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

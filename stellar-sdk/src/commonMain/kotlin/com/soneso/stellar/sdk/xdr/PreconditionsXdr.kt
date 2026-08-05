@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PreconditionsXdr"
+
 /**
  * XDR Source:
  * union Preconditions switch (PreconditionType type)
@@ -51,6 +57,25 @@ sealed class PreconditionsXdr {
         else -> throw IllegalArgumentException("Unknown PreconditionsXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): PreconditionsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PreconditionsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PreconditionsXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "time" -> TimeBounds(TimeBoundsXdr.fromXdrJsonTree(value))
+          "v2" -> V2(PreconditionsV2Xdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "none" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -65,4 +90,12 @@ sealed class PreconditionsXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("none")
+    is TimeBounds -> buildJsonObject { put("time", value.toXdrJsonElement()) }
+    is V2 -> buildJsonObject { put("v2", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

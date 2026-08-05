@@ -76,6 +76,7 @@ class SEPCompatibilityGenerator:
         "0046": "Defines a standard Wasm custom section (`contractmetav0`) for embedding arbitrary key-value metadata into deployed Soroban contracts, using XDR-encoded SCMetaEntry pairs.",
         "0047": "Defines how Soroban contracts advertise which SEPs they implement via a `sep` key in the contract metadata section, enabling clients to discover supported protocols at runtime.",
         "0048": "Defines the binary contract interface specification stored in the `contractspecv0` Wasm custom section, covering function signatures, user-defined types, and the full XDR type system.",
+        "0051": "Defines XDR-JSON, a lossless bi-directional mapping between Stellar's XDR structures and JSON, so protocol data can be read and edited as text instead of base64.",
         "0053": "Standardizes signing and verification of arbitrary messages using Stellar Ed25519 keypairs, enabling proof-of-ownership for off-chain scenarios without requiring on-chain transactions.",
     }
 
@@ -708,6 +709,7 @@ class SEPCompatibilityGenerator:
                 '0046': 'com.soneso.stellar.sdk.contract',
                 '0047': 'com.soneso.stellar.sdk.contract',
                 '0048': 'com.soneso.stellar.sdk.contract',
+                '0051': 'com.soneso.stellar.sdk.xdr',
                 '0053': 'com.soneso.stellar.sdk.KeyPair',
             }
             package = package_overrides.get(self.sep_number, f'com.soneso.stellar.sdk.sep.sep{self.sep_number}')

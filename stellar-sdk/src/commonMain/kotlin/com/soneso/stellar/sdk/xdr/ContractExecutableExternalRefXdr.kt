@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractExecutableExternalRefXdr"
+
 /**
  * XDR Source:
  * struct ContractExecutableExternalRef {
@@ -21,10 +26,29 @@ data class ContractExecutableExternalRefXdr(
       val tag = SCStringXdr.decode(reader)
       return ContractExecutableExternalRefXdr(executableOwner, tag)
     }
+
+    fun fromXdrJson(json: String): ContractExecutableExternalRefXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractExecutableExternalRefXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractExecutableExternalRefXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ContractExecutableExternalRefXdr(
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "executable_owner", XDR_JSON_TYPE)),
+        SCStringXdr.fromXdrJsonTree(XdrJson.field(json, "tag", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     executableOwner.encode(writer)
     tag.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("executable_owner", executableOwner.toXdrJsonElement())
+    put("tag", tag.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

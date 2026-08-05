@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCSpecEventParamLocationV0Xdr"
+
 /**
  * XDR Source:
  * enum SCSpecEventParamLocationV0
@@ -11,9 +15,9 @@ package com.soneso.stellar.sdk.xdr
  *     SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST = 1
  * };
  */
-enum class SCSpecEventParamLocationV0Xdr(val value: Int) {
-  SC_SPEC_EVENT_PARAM_LOCATION_DATA(0),
-  SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST(1);
+enum class SCSpecEventParamLocationV0Xdr(val value: Int, internal val xdrJsonName: String) {
+  SC_SPEC_EVENT_PARAM_LOCATION_DATA(0, "data"),
+  SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST(1, "topic_list");
 
   companion object {
 
@@ -22,9 +26,24 @@ enum class SCSpecEventParamLocationV0Xdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCSpecEventParamLocationV0Xdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCSpecEventParamLocationV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecEventParamLocationV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecEventParamLocationV0Xdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCSpecEventParamLocationV0Xdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

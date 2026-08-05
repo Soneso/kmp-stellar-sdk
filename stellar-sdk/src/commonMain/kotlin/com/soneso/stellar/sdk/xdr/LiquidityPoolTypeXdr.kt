@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LiquidityPoolTypeXdr"
+
 /**
  * XDR Source:
  * enum LiquidityPoolType
@@ -10,8 +14,8 @@ package com.soneso.stellar.sdk.xdr
  *     LIQUIDITY_POOL_CONSTANT_PRODUCT = 0
  * };
  */
-enum class LiquidityPoolTypeXdr(val value: Int) {
-  LIQUIDITY_POOL_CONSTANT_PRODUCT(0);
+enum class LiquidityPoolTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  LIQUIDITY_POOL_CONSTANT_PRODUCT(0, "liquidity_pool_constant_product");
 
   companion object {
 
@@ -20,9 +24,24 @@ enum class LiquidityPoolTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown LiquidityPoolTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): LiquidityPoolTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

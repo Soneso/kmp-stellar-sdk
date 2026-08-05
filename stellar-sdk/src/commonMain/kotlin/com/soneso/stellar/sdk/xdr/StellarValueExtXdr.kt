@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "StellarValueExtXdr"
+
 /**
  * XDR Source:
  * union switch (StellarValueType v)
@@ -57,6 +63,25 @@ sealed class StellarValueExtXdr {
         else -> throw IllegalArgumentException("Unknown StellarValueExtXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): StellarValueExtXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): StellarValueExtXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): StellarValueExtXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "signed" -> LcValueSignature(LedgerCloseValueSignatureXdr.fromXdrJsonTree(value))
+          "empty_tx_set" -> ProposedValue(StellarValueProposedValueXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "basic" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -71,4 +96,12 @@ sealed class StellarValueExtXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("basic")
+    is LcValueSignature -> buildJsonObject { put("signed", value.toXdrJsonElement()) }
+    is ProposedValue -> buildJsonObject { put("empty_tx_set", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

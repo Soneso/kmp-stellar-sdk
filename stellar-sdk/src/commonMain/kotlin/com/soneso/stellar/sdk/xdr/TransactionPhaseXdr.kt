@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionPhaseXdr"
+
 /**
  * XDR Source:
  * union TransactionPhase switch (int v)
@@ -44,6 +49,19 @@ sealed class TransactionPhaseXdr {
         else -> throw IllegalArgumentException("Unknown TransactionPhaseXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): TransactionPhaseXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionPhaseXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionPhaseXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v0" -> V0Components(XdrJson.array(value, XDR_JSON_TYPE, "v0").map { TxSetComponentXdr.fromXdrJsonTree(it) })
+        "v1" -> ParallelTxsComponent(ParallelTxsComponentXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -60,4 +78,11 @@ sealed class TransactionPhaseXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0Components -> buildJsonObject { put("v0", XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is ParallelTxsComponent -> buildJsonObject { put("v1", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

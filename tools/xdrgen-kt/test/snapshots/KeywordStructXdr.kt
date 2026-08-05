@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "KeywordStructXdr"
+
 /**
  * XDR Source:
  * struct KeywordStruct
@@ -18,9 +23,21 @@ data class KeywordStructXdr(
   companion object {
 
     fun decode(reader: XdrReader): KeywordStructXdr {
-      val value = reader.readInt()
-      val when = reader.readString()
-      return KeywordStructXdr(value, when)
+      val `val` = reader.readInt()
+      val `when` = reader.readString()
+      return KeywordStructXdr(`val`, `when`)
+    }
+
+    fun fromXdrJson(json: String): KeywordStructXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): KeywordStructXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): KeywordStructXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return KeywordStructXdr(
+        XdrJson.int32(XdrJson.field(json, "val", XDR_JSON_TYPE), XDR_JSON_TYPE, "val"),
+        XdrJson.unescapeString(XdrJson.field(json, "when", XDR_JSON_TYPE), XDR_JSON_TYPE, "when", maxLength = 32)
+      )
     }
   }
 
@@ -28,4 +45,11 @@ data class KeywordStructXdr(
     writer.writeInt(`val`)
     writer.writeString(`when`)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("val", XdrJson.int32(`val`))
+    put("when", XdrJson.escapedString(`when`))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

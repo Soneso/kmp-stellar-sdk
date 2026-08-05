@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ShortHashSeedXdr"
+
 /**
  * XDR Source:
  * struct ShortHashSeed
@@ -19,9 +24,26 @@ data class ShortHashSeedXdr(
       val seed = reader.readFixedOpaque(16)
       return ShortHashSeedXdr(seed)
     }
+
+    fun fromXdrJson(json: String): ShortHashSeedXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ShortHashSeedXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ShortHashSeedXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ShortHashSeedXdr(
+        XdrJson.hex(XdrJson.field(json, "seed", XDR_JSON_TYPE), XDR_JSON_TYPE, "seed", expectedLength = 16)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(seed, 16)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("seed", XdrJson.hex(seed))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -26,6 +26,7 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-46 | Contract Meta | [Contract Parser](../advanced.md#contract-parser) |
 | SEP-47 | Contract Interface Discovery | [Contract Parser](../advanced.md#contract-parser) |
 | SEP-48 | Contract Interface Specification | [Contract Parser](../advanced.md#contract-parser) |
+| SEP-51 | XDR-JSON | [sep-51.md](sep-51.md) |
 | SEP-53 | Sign and Verify Messages | [sep-53.md](sep-53.md) |
 
 ## Compatibility Matrices
@@ -48,10 +49,11 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0046 Compatibility Matrix](../../compatibility/sep/SEP-0046_COMPATIBILITY_MATRIX.md)
 - [SEP-0047 Compatibility Matrix](../../compatibility/sep/SEP-0047_COMPATIBILITY_MATRIX.md)
 - [SEP-0048 Compatibility Matrix](../../compatibility/sep/SEP-0048_COMPATIBILITY_MATRIX.md)
+- [SEP-0051 Compatibility Matrix](../../compatibility/sep/SEP-0051_COMPATIBILITY_MATRIX.md)
 - [SEP-0053 Compatibility Matrix](../../compatibility/sep/SEP-0053_COMPATIBILITY_MATRIX.md)
 
 To regenerate all matrices: `python3 tools/matrix-generator/run_analysis.py`
 
 ---
 
-**Last Updated**: 2026-05-20
+**Last Updated**: 2026-08-05

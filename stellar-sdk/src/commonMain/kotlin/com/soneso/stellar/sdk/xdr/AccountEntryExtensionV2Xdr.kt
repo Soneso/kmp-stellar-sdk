@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AccountEntryExtensionV2Xdr"
+
 /**
  * XDR Source:
  * struct AccountEntryExtensionV2
@@ -36,6 +41,20 @@ data class AccountEntryExtensionV2Xdr(
       val ext = AccountEntryExtensionV2ExtXdr.decode(reader)
       return AccountEntryExtensionV2Xdr(numSponsored, numSponsoring, signerSponsoringIDs, ext)
     }
+
+    fun fromXdrJson(json: String): AccountEntryExtensionV2Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountEntryExtensionV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountEntryExtensionV2Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return AccountEntryExtensionV2Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "num_sponsored", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "num_sponsoring", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "signer_sponsoring_i_ds", XDR_JSON_TYPE), XDR_JSON_TYPE, "signer_sponsoring_i_ds", maxLength = MAX_SIGNERS).map { SponsorshipDescriptorXdr.fromXdrJsonTree(it) },
+        AccountEntryExtensionV2ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -47,4 +66,13 @@ data class AccountEntryExtensionV2Xdr(
     }
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("num_sponsored", numSponsored.toXdrJsonElement())
+    put("num_sponsoring", numSponsoring.toXdrJsonElement())
+    put("signer_sponsoring_i_ds", XdrJson.array(signerSponsoringIDs) { it.toXdrJsonElement() })
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

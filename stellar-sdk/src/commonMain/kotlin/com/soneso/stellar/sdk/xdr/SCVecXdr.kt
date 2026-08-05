@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCVecXdr"
+
 /**
  * XDR Source:
  * typedef SCVal SCVec<>;
@@ -15,6 +19,12 @@ value class SCVecXdr(val value: List<SCValXdr>) {
       val value = List(reader.readInt()) { SCValXdr.decode(reader) }
       return SCVecXdr(value)
     }
+
+    fun fromXdrJson(json: String): SCVecXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCVecXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCVecXdr = SCVecXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { SCValXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class SCVecXdr(val value: List<SCValXdr>) {
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

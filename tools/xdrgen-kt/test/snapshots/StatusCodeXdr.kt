@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "StatusCodeXdr"
+
 /**
  * XDR Source:
  * enum StatusCode
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     STATUS_UNKNOWN = -1
  * };
  */
-enum class StatusCodeXdr(val value: Int) {
-  STATUS_OK(0),
-  STATUS_NOT_FOUND(1),
-  STATUS_ERROR(2),
-  STATUS_UNKNOWN(-1);
+enum class StatusCodeXdr(val value: Int, internal val xdrJsonName: String) {
+  STATUS_OK(0, "ok"),
+  STATUS_NOT_FOUND(1, "not_found"),
+  STATUS_ERROR(2, "error"),
+  STATUS_UNKNOWN(-1, "unknown");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class StatusCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown StatusCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): StatusCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): StatusCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): StatusCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): StatusCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

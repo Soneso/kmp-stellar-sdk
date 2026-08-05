@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCEnvMetaEntryInterfaceVersionXdr"
+
 /**
  * XDR Source:
  * struct {
@@ -21,10 +26,29 @@ data class SCEnvMetaEntryInterfaceVersionXdr(
       val preRelease = Uint32Xdr.decode(reader)
       return SCEnvMetaEntryInterfaceVersionXdr(protocol, preRelease)
     }
+
+    fun fromXdrJson(json: String): SCEnvMetaEntryInterfaceVersionXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCEnvMetaEntryInterfaceVersionXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCEnvMetaEntryInterfaceVersionXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCEnvMetaEntryInterfaceVersionXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "protocol", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "pre_release", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     protocol.encode(writer)
     preRelease.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("protocol", protocol.toXdrJsonElement())
+    put("pre_release", preRelease.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

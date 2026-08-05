@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanTransactionMetaExtV1Xdr"
+
 /**
  * XDR Source:
  * struct SorobanTransactionMetaExtV1
@@ -84,6 +89,20 @@ data class SorobanTransactionMetaExtV1Xdr(
       val rentFeeCharged = Int64Xdr.decode(reader)
       return SorobanTransactionMetaExtV1Xdr(ext, totalNonRefundableResourceFeeCharged, totalRefundableResourceFeeCharged, rentFeeCharged)
     }
+
+    fun fromXdrJson(json: String): SorobanTransactionMetaExtV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanTransactionMetaExtV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanTransactionMetaExtV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SorobanTransactionMetaExtV1Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "total_non_refundable_resource_fee_charged", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "total_refundable_resource_fee_charged", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "rent_fee_charged", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -92,4 +111,13 @@ data class SorobanTransactionMetaExtV1Xdr(
     totalRefundableResourceFeeCharged.encode(writer)
     rentFeeCharged.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("total_non_refundable_resource_fee_charged", totalNonRefundableResourceFeeCharged.toXdrJsonElement())
+    put("total_refundable_resource_fee_charged", totalRefundableResourceFeeCharged.toXdrJsonElement())
+    put("rent_fee_charged", rentFeeCharged.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

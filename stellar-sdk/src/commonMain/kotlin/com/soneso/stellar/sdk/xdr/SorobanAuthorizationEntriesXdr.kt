@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SorobanAuthorizationEntriesXdr"
+
 /**
  * XDR Source:
  * typedef SorobanAuthorizationEntry SorobanAuthorizationEntries<>;
@@ -15,6 +19,12 @@ value class SorobanAuthorizationEntriesXdr(val value: List<SorobanAuthorizationE
       val value = List(reader.readInt()) { SorobanAuthorizationEntryXdr.decode(reader) }
       return SorobanAuthorizationEntriesXdr(value)
     }
+
+    fun fromXdrJson(json: String): SorobanAuthorizationEntriesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizationEntriesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizationEntriesXdr = SorobanAuthorizationEntriesXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { SorobanAuthorizationEntryXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class SorobanAuthorizationEntriesXdr(val value: List<SorobanAuthorizationE
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

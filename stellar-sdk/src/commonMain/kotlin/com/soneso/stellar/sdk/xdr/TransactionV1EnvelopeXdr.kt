@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionV1EnvelopeXdr"
+
 /**
  * XDR Source:
  * struct TransactionV1Envelope
@@ -24,6 +29,18 @@ data class TransactionV1EnvelopeXdr(
       val signatures = List(reader.readInt()) { DecoratedSignatureXdr.decode(reader) }
       return TransactionV1EnvelopeXdr(tx, signatures)
     }
+
+    fun fromXdrJson(json: String): TransactionV1EnvelopeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionV1EnvelopeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionV1EnvelopeXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionV1EnvelopeXdr(
+        TransactionXdr.fromXdrJsonTree(XdrJson.field(json, "tx", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "signatures", XDR_JSON_TYPE), XDR_JSON_TYPE, "signatures", maxLength = 20).map { DecoratedSignatureXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -33,4 +50,11 @@ data class TransactionV1EnvelopeXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("tx", tx.toXdrJsonElement())
+    put("signatures", XdrJson.array(signatures) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

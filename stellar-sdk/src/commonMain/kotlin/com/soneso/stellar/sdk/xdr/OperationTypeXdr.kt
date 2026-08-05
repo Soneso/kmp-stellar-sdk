@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "OperationTypeXdr"
+
 /**
  * XDR Source:
  * enum OperationType
@@ -36,34 +40,34 @@ package com.soneso.stellar.sdk.xdr
  *     RESTORE_FOOTPRINT = 26
  * };
  */
-enum class OperationTypeXdr(val value: Int) {
-  CREATE_ACCOUNT(0),
-  PAYMENT(1),
-  PATH_PAYMENT_STRICT_RECEIVE(2),
-  MANAGE_SELL_OFFER(3),
-  CREATE_PASSIVE_SELL_OFFER(4),
-  SET_OPTIONS(5),
-  CHANGE_TRUST(6),
-  ALLOW_TRUST(7),
-  ACCOUNT_MERGE(8),
-  INFLATION(9),
-  MANAGE_DATA(10),
-  BUMP_SEQUENCE(11),
-  MANAGE_BUY_OFFER(12),
-  PATH_PAYMENT_STRICT_SEND(13),
-  CREATE_CLAIMABLE_BALANCE(14),
-  CLAIM_CLAIMABLE_BALANCE(15),
-  BEGIN_SPONSORING_FUTURE_RESERVES(16),
-  END_SPONSORING_FUTURE_RESERVES(17),
-  REVOKE_SPONSORSHIP(18),
-  CLAWBACK(19),
-  CLAWBACK_CLAIMABLE_BALANCE(20),
-  SET_TRUST_LINE_FLAGS(21),
-  LIQUIDITY_POOL_DEPOSIT(22),
-  LIQUIDITY_POOL_WITHDRAW(23),
-  INVOKE_HOST_FUNCTION(24),
-  EXTEND_FOOTPRINT_TTL(25),
-  RESTORE_FOOTPRINT(26);
+enum class OperationTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CREATE_ACCOUNT(0, "create_account"),
+  PAYMENT(1, "payment"),
+  PATH_PAYMENT_STRICT_RECEIVE(2, "path_payment_strict_receive"),
+  MANAGE_SELL_OFFER(3, "manage_sell_offer"),
+  CREATE_PASSIVE_SELL_OFFER(4, "create_passive_sell_offer"),
+  SET_OPTIONS(5, "set_options"),
+  CHANGE_TRUST(6, "change_trust"),
+  ALLOW_TRUST(7, "allow_trust"),
+  ACCOUNT_MERGE(8, "account_merge"),
+  INFLATION(9, "inflation"),
+  MANAGE_DATA(10, "manage_data"),
+  BUMP_SEQUENCE(11, "bump_sequence"),
+  MANAGE_BUY_OFFER(12, "manage_buy_offer"),
+  PATH_PAYMENT_STRICT_SEND(13, "path_payment_strict_send"),
+  CREATE_CLAIMABLE_BALANCE(14, "create_claimable_balance"),
+  CLAIM_CLAIMABLE_BALANCE(15, "claim_claimable_balance"),
+  BEGIN_SPONSORING_FUTURE_RESERVES(16, "begin_sponsoring_future_reserves"),
+  END_SPONSORING_FUTURE_RESERVES(17, "end_sponsoring_future_reserves"),
+  REVOKE_SPONSORSHIP(18, "revoke_sponsorship"),
+  CLAWBACK(19, "clawback"),
+  CLAWBACK_CLAIMABLE_BALANCE(20, "clawback_claimable_balance"),
+  SET_TRUST_LINE_FLAGS(21, "set_trust_line_flags"),
+  LIQUIDITY_POOL_DEPOSIT(22, "liquidity_pool_deposit"),
+  LIQUIDITY_POOL_WITHDRAW(23, "liquidity_pool_withdraw"),
+  INVOKE_HOST_FUNCTION(24, "invoke_host_function"),
+  EXTEND_FOOTPRINT_TTL(25, "extend_footprint_ttl"),
+  RESTORE_FOOTPRINT(26, "restore_footprint");
 
   companion object {
 
@@ -72,9 +76,24 @@ enum class OperationTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown OperationTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): OperationTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): OperationTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

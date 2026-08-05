@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "OperationResultXdr"
+
 /**
  * XDR Source:
  * union OperationResult switch (OperationResultCode code)
@@ -106,6 +112,29 @@ sealed class OperationResultXdr {
         else -> throw IllegalArgumentException("Unknown OperationResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): OperationResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "op_inner" -> Tr(OperationResultTrXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "op_bad_auth" -> Void(OperationResultCodeXdr.opBAD_AUTH)
+        "op_no_account" -> Void(OperationResultCodeXdr.opNO_ACCOUNT)
+        "op_not_supported" -> Void(OperationResultCodeXdr.opNOT_SUPPORTED)
+        "op_too_many_subentries" -> Void(OperationResultCodeXdr.opTOO_MANY_SUBENTRIES)
+        "op_exceeded_work_limit" -> Void(OperationResultCodeXdr.opEXCEEDED_WORK_LIMIT)
+        "op_too_many_sponsoring" -> Void(OperationResultCodeXdr.opTOO_MANY_SPONSORING)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -117,4 +146,11 @@ sealed class OperationResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Tr -> buildJsonObject { put("op_inner", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

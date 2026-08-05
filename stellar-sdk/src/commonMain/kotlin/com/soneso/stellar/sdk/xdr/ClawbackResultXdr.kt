@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClawbackResultXdr"
+
 /**
  * XDR Source:
  * union ClawbackResult switch (ClawbackResultCode code)
@@ -36,6 +40,21 @@ sealed class ClawbackResultXdr {
         else -> throw IllegalArgumentException("Unknown ClawbackResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClawbackResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClawbackResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClawbackResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ClawbackResultCodeXdr.CLAWBACK_SUCCESS)
+        "malformed" -> Void(ClawbackResultCodeXdr.CLAWBACK_MALFORMED)
+        "not_clawback_enabled" -> Void(ClawbackResultCodeXdr.CLAWBACK_NOT_CLAWBACK_ENABLED)
+        "no_trust" -> Void(ClawbackResultCodeXdr.CLAWBACK_NO_TRUST)
+        "underfunded" -> Void(ClawbackResultCodeXdr.CLAWBACK_UNDERFUNDED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +63,10 @@ sealed class ClawbackResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimableBalanceIDTypeXdr"
+
 /**
  * XDR Source:
  * enum ClaimableBalanceIDType
@@ -10,8 +14,8 @@ package com.soneso.stellar.sdk.xdr
  *     CLAIMABLE_BALANCE_ID_TYPE_V0 = 0
  * };
  */
-enum class ClaimableBalanceIDTypeXdr(val value: Int) {
-  CLAIMABLE_BALANCE_ID_TYPE_V0(0);
+enum class ClaimableBalanceIDTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CLAIMABLE_BALANCE_ID_TYPE_V0(0, "claimable_balance_id_type_v0");
 
   companion object {
 
@@ -20,9 +24,24 @@ enum class ClaimableBalanceIDTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ClaimableBalanceIDTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ClaimableBalanceIDTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimableBalanceIDTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimableBalanceIDTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ClaimableBalanceIDTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

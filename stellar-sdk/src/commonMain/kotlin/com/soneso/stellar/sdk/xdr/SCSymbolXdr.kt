@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCSymbolXdr"
+
 /**
  * XDR Source:
  * typedef string SCSymbol<SCSYMBOL_LIMIT>;
@@ -15,9 +19,19 @@ value class SCSymbolXdr(val value: String) {
       val value = reader.readString()
       return SCSymbolXdr(value)
     }
+
+    fun fromXdrJson(json: String): SCSymbolXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSymbolXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSymbolXdr = SCSymbolXdr(XdrJson.unescapeString(element, XDR_JSON_TYPE, "value", maxLength = SCSYMBOL_LIMIT))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeString(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

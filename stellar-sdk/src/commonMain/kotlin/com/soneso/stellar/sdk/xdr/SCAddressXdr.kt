@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCAddressXdr"
+
 /**
  * XDR Source:
  * union SCAddress switch (SCAddressType type)
@@ -80,6 +84,20 @@ sealed class SCAddressXdr {
         else -> throw IllegalArgumentException("Unknown SCAddressXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCAddressXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCAddressXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCAddressXdr =
+      when (XdrJson.name(element, XDR_JSON_TYPE).firstOrNull()) {
+        'G' -> AccountId(AccountIDXdr.fromXdrJsonTree(element))
+        'C' -> ContractId(ContractIDXdr.fromXdrJsonTree(element))
+        'M' -> MuxedAccount(MuxedEd25519AccountXdr.fromXdrJsonTree(element))
+        'B' -> ClaimableBalanceId(ClaimableBalanceIDXdr.fromXdrJsonTree(element))
+        'L' -> LiquidityPoolId(PoolIDXdr.fromXdrJsonTree(element))
+        else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, C, M, B or L strkey, got ${XdrJson.preview(element)}")
+      }
   }
 
   fun encode(writer: XdrWriter) {
@@ -102,4 +120,14 @@ sealed class SCAddressXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is AccountId -> value.toXdrJsonElement()
+    is ContractId -> value.toXdrJsonElement()
+    is MuxedAccount -> value.toXdrJsonElement()
+    is ClaimableBalanceId -> value.toXdrJsonElement()
+    is LiquidityPoolId -> value.toXdrJsonElement()
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

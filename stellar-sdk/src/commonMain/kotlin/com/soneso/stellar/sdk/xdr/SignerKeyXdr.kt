@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SignerKeyXdr"
+
 /**
  * XDR Source:
  * union SignerKey switch (SignerKeyType type)
@@ -76,6 +81,21 @@ sealed class SignerKeyXdr {
         else -> throw IllegalArgumentException("Unknown SignerKeyXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SignerKeyXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SignerKeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SignerKeyXdr {
+      val text = XdrJson.name(element, XDR_JSON_TYPE)
+      return when (text.firstOrNull()) {
+        'G' -> Ed25519(Uint256Xdr(XdrJson.strkey(text, XDR_JSON_TYPE, "a G strkey") { StrKey.decodeEd25519PublicKey(it) }))
+        'T' -> PreAuthTx(Uint256Xdr(XdrJson.strkey(text, XDR_JSON_TYPE, "a T strkey") { StrKey.decodePreAuthTx(it) }))
+        'X' -> HashX(Uint256Xdr(XdrJson.strkey(text, XDR_JSON_TYPE, "an X strkey") { StrKey.decodeSha256Hash(it) }))
+        'P' -> Ed25519SignedPayload(SignerKeyEd25519SignedPayloadXdr.fromXdrJsonTree(element))
+        else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, T, X or P strkey, got ${XdrJson.preview(element)}")
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -95,4 +115,13 @@ sealed class SignerKeyXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Ed25519 -> XdrJson.name(StrKey.encodeEd25519PublicKey(value.value))
+    is PreAuthTx -> XdrJson.name(StrKey.encodePreAuthTx(value.value))
+    is HashX -> XdrJson.name(StrKey.encodeSha256Hash(value.value))
+    is Ed25519SignedPayload -> value.toXdrJsonElement()
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

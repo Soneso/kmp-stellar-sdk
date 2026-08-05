@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPStatementConfirmXdr"
+
 /**
  * XDR Source:
  * struct
@@ -36,6 +41,21 @@ data class SCPStatementConfirmXdr(
       val quorumSetHash = HashXdr.decode(reader)
       return SCPStatementConfirmXdr(ballot, nPrepared, nCommit, nH, quorumSetHash)
     }
+
+    fun fromXdrJson(json: String): SCPStatementConfirmXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPStatementConfirmXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPStatementConfirmXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCPStatementConfirmXdr(
+        SCPBallotXdr.fromXdrJsonTree(XdrJson.field(json, "ballot", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_prepared", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_commit", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_h", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "quorum_set_hash", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -45,4 +65,14 @@ data class SCPStatementConfirmXdr(
     nH.encode(writer)
     quorumSetHash.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ballot", ballot.toXdrJsonElement())
+    put("n_prepared", nPrepared.toXdrJsonElement())
+    put("n_commit", nCommit.toXdrJsonElement())
+    put("n_h", nH.toXdrJsonElement())
+    put("quorum_set_hash", quorumSetHash.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "TimePointXdr"
+
 /**
  * XDR Source:
  * typedef uint64 TimePoint;
@@ -15,9 +19,19 @@ value class TimePointXdr(val value: Uint64Xdr) {
       val value = Uint64Xdr.decode(reader)
       return TimePointXdr(value)
     }
+
+    fun fromXdrJson(json: String): TimePointXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TimePointXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TimePointXdr = TimePointXdr(Uint64Xdr.fromXdrJsonTree(element))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

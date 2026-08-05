@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LedgerEntryChangeTypeXdr"
+
 /**
  * XDR Source:
  * enum LedgerEntryChangeType
@@ -14,17 +18,17 @@ package com.soneso.stellar.sdk.xdr
  *     LEDGER_ENTRY_RESTORED = 4  // archived entry was restored in the ledger
  * };
  */
-enum class LedgerEntryChangeTypeXdr(val value: Int) {
+enum class LedgerEntryChangeTypeXdr(val value: Int, internal val xdrJsonName: String) {
   /** entry was added to the ledger */
-  LEDGER_ENTRY_CREATED(0),
+  LEDGER_ENTRY_CREATED(0, "created"),
   /** entry was modified in the ledger */
-  LEDGER_ENTRY_UPDATED(1),
+  LEDGER_ENTRY_UPDATED(1, "updated"),
   /** entry was removed from the ledger */
-  LEDGER_ENTRY_REMOVED(2),
+  LEDGER_ENTRY_REMOVED(2, "removed"),
   /** value of the entry */
-  LEDGER_ENTRY_STATE(3),
+  LEDGER_ENTRY_STATE(3, "state"),
   /** archived entry was restored in the ledger */
-  LEDGER_ENTRY_RESTORED(4);
+  LEDGER_ENTRY_RESTORED(4, "restored");
 
   companion object {
 
@@ -33,9 +37,24 @@ enum class LedgerEntryChangeTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown LedgerEntryChangeTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): LedgerEntryChangeTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryChangeTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryChangeTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): LedgerEntryChangeTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

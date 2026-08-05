@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClawbackClaimableBalanceOpXdr"
+
 /**
  * XDR Source:
  * struct ClawbackClaimableBalanceOp
@@ -19,9 +24,26 @@ data class ClawbackClaimableBalanceOpXdr(
       val balanceId = ClaimableBalanceIDXdr.decode(reader)
       return ClawbackClaimableBalanceOpXdr(balanceId)
     }
+
+    fun fromXdrJson(json: String): ClawbackClaimableBalanceOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClawbackClaimableBalanceOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClawbackClaimableBalanceOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ClawbackClaimableBalanceOpXdr(
+        ClaimableBalanceIDXdr.fromXdrJsonTree(XdrJson.field(json, "balance_id", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     balanceId.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("balance_id", balanceId.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

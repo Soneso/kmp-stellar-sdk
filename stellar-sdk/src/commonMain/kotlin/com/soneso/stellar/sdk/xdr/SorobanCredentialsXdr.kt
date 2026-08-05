@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanCredentialsXdr"
+
 /**
  * XDR Source:
  * union SorobanCredentials switch (SorobanCredentialsType type)
@@ -63,6 +69,26 @@ sealed class SorobanCredentialsXdr {
         else -> throw IllegalArgumentException("Unknown SorobanCredentialsXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SorobanCredentialsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanCredentialsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanCredentialsXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "address" -> Address(SorobanAddressCredentialsXdr.fromXdrJsonTree(value))
+          "address_v2" -> AddressV2(SorobanAddressCredentialsXdr.fromXdrJsonTree(value))
+          "address_with_delegates" -> AddressWithDelegates(SorobanAddressCredentialsWithDelegatesXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "source_account" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -80,4 +106,13 @@ sealed class SorobanCredentialsXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("source_account")
+    is Address -> buildJsonObject { put("address", value.toXdrJsonElement()) }
+    is AddressV2 -> buildJsonObject { put("address_v2", value.toXdrJsonElement()) }
+    is AddressWithDelegates -> buildJsonObject { put("address_with_delegates", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

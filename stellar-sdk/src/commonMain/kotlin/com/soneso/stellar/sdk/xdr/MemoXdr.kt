@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "MemoXdr"
+
 /**
  * XDR Source:
  * union Memo switch (MemoType type)
@@ -75,6 +81,27 @@ sealed class MemoXdr {
         else -> throw IllegalArgumentException("Unknown MemoXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): MemoXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): MemoXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): MemoXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "text" -> Text(XdrJson.unescapeString(value, XDR_JSON_TYPE, "text", maxLength = 28))
+          "id" -> Id(Uint64Xdr.fromXdrJsonTree(value))
+          "hash" -> Hash(HashXdr.fromXdrJsonTree(value))
+          "return" -> RetHash(HashXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "none" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -95,4 +122,14 @@ sealed class MemoXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name("none")
+    is Text -> buildJsonObject { put("text", XdrJson.escapedString(value)) }
+    is Id -> buildJsonObject { put("id", value.toXdrJsonElement()) }
+    is Hash -> buildJsonObject { put("hash", value.toXdrJsonElement()) }
+    is RetHash -> buildJsonObject { put("return", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

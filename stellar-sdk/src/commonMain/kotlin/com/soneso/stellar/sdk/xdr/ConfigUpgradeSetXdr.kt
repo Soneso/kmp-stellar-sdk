@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigUpgradeSetXdr"
+
 /**
  * XDR Source:
  * struct ConfigUpgradeSet {
@@ -18,6 +23,17 @@ data class ConfigUpgradeSetXdr(
       val updatedEntry = List(reader.readInt()) { ConfigSettingEntryXdr.decode(reader) }
       return ConfigUpgradeSetXdr(updatedEntry)
     }
+
+    fun fromXdrJson(json: String): ConfigUpgradeSetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigUpgradeSetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigUpgradeSetXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ConfigUpgradeSetXdr(
+        XdrJson.array(XdrJson.field(json, "updated_entry", XDR_JSON_TYPE), XDR_JSON_TYPE, "updated_entry").map { ConfigSettingEntryXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -26,4 +42,10 @@ data class ConfigUpgradeSetXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("updated_entry", XdrJson.array(updatedEntry) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionMetaV4Xdr"
+
 /**
  * XDR Source:
  * struct TransactionMetaV4
@@ -48,6 +53,23 @@ data class TransactionMetaV4Xdr(
       val diagnosticEvents = List(reader.readInt()) { DiagnosticEventXdr.decode(reader) }
       return TransactionMetaV4Xdr(ext, txChangesBefore, operations, txChangesAfter, sorobanMeta, events, diagnosticEvents)
     }
+
+    fun fromXdrJson(json: String): TransactionMetaV4Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionMetaV4Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionMetaV4Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionMetaV4Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "tx_changes_before", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "operations", XDR_JSON_TYPE), XDR_JSON_TYPE, "operations").map { OperationMetaV2Xdr.fromXdrJsonTree(it) },
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "tx_changes_after", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "soroban_meta", XDR_JSON_TYPE))?.let { SorobanTransactionMetaV2Xdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "events", XDR_JSON_TYPE), XDR_JSON_TYPE, "events").map { TransactionEventXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "diagnostic_events", XDR_JSON_TYPE), XDR_JSON_TYPE, "diagnostic_events").map { DiagnosticEventXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -73,4 +95,16 @@ data class TransactionMetaV4Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("tx_changes_before", txChangesBefore.toXdrJsonElement())
+    put("operations", XdrJson.array(operations) { it.toXdrJsonElement() })
+    put("tx_changes_after", txChangesAfter.toXdrJsonElement())
+    put("soroban_meta", XdrJson.optional(sorobanMeta) { it.toXdrJsonElement() })
+    put("events", XdrJson.array(events) { it.toXdrJsonElement() })
+    put("diagnostic_events", XdrJson.array(diagnosticEvents) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

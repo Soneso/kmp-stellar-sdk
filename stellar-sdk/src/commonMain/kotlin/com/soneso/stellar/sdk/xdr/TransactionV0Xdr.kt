@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionV0Xdr"
+
 /**
  * XDR Source:
  * struct TransactionV0
@@ -42,6 +47,23 @@ data class TransactionV0Xdr(
       val ext = TransactionV0ExtXdr.decode(reader)
       return TransactionV0Xdr(sourceAccountEd25519, fee, seqNum, timeBounds, memo, operations, ext)
     }
+
+    fun fromXdrJson(json: String): TransactionV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionV0Xdr(
+        Uint256Xdr.fromXdrJsonTree(XdrJson.field(json, "source_account_ed25519", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "fee", XDR_JSON_TYPE)),
+        SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "seq_num", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "time_bounds", XDR_JSON_TYPE))?.let { TimeBoundsXdr.fromXdrJsonTree(it) },
+        MemoXdr.fromXdrJsonTree(XdrJson.field(json, "memo", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "operations", XDR_JSON_TYPE), XDR_JSON_TYPE, "operations", maxLength = MAX_OPS_PER_TX).map { OperationXdr.fromXdrJsonTree(it) },
+        TransactionV0ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -61,4 +83,16 @@ data class TransactionV0Xdr(
     }
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("source_account_ed25519", sourceAccountEd25519.toXdrJsonElement())
+    put("fee", fee.toXdrJsonElement())
+    put("seq_num", seqNum.toXdrJsonElement())
+    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement() })
+    put("memo", memo.toXdrJsonElement())
+    put("operations", XdrJson.array(operations) { it.toXdrJsonElement() })
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

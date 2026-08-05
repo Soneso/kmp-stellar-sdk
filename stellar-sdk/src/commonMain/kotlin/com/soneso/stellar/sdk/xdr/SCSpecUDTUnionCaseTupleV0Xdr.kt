@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecUDTUnionCaseTupleV0Xdr"
+
 /**
  * XDR Source:
  * struct SCSpecUDTUnionCaseTupleV0
@@ -25,6 +30,19 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
       val type = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecUDTUnionCaseTupleV0Xdr(doc, name, type)
     }
+
+    fun fromXdrJson(json: String): SCSpecUDTUnionCaseTupleV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecUDTUnionCaseTupleV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecUDTUnionCaseTupleV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return SCSpecUDTUnionCaseTupleV0Xdr(
+        XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 60),
+        XdrJson.array(XdrJson.field(json, "type", "type_", XDR_JSON_TYPE), XDR_JSON_TYPE, "type").map { SCSpecTypeDefXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -35,4 +53,12 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("doc", XdrJson.escapedString(doc))
+    put("name", XdrJson.escapedString(name))
+    put("type", XdrJson.array(type) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

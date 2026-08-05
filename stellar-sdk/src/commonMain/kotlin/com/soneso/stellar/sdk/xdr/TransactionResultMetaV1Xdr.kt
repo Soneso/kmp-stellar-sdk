@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionResultMetaV1Xdr"
+
 /**
  * XDR Source:
  * struct TransactionResultMetaV1
@@ -33,6 +38,21 @@ data class TransactionResultMetaV1Xdr(
       val postTxApplyFeeProcessing = LedgerEntryChangesXdr.decode(reader)
       return TransactionResultMetaV1Xdr(ext, result, feeProcessing, txApplyProcessing, postTxApplyFeeProcessing)
     }
+
+    fun fromXdrJson(json: String): TransactionResultMetaV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultMetaV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultMetaV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return TransactionResultMetaV1Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        TransactionResultPairXdr.fromXdrJsonTree(XdrJson.field(json, "result", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "fee_processing", XDR_JSON_TYPE)),
+        TransactionMetaXdr.fromXdrJsonTree(XdrJson.field(json, "tx_apply_processing", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "post_tx_apply_fee_processing", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +62,14 @@ data class TransactionResultMetaV1Xdr(
     txApplyProcessing.encode(writer)
     postTxApplyFeeProcessing.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("result", result.toXdrJsonElement())
+    put("fee_processing", feeProcessing.toXdrJsonElement())
+    put("tx_apply_processing", txApplyProcessing.toXdrJsonElement())
+    put("post_tx_apply_fee_processing", postTxApplyFeeProcessing.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

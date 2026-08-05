@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanAuthorizedFunctionXdr"
+
 /**
  * XDR Source:
  * union SorobanAuthorizedFunction switch (SorobanAuthorizedFunctionType type)
@@ -76,6 +81,20 @@ sealed class SorobanAuthorizedFunctionXdr {
         else -> throw IllegalArgumentException("Unknown SorobanAuthorizedFunctionXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SorobanAuthorizedFunctionXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizedFunctionXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizedFunctionXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "contract_fn" -> ContractFn(InvokeContractArgsXdr.fromXdrJsonTree(value))
+        "create_contract_host_fn" -> CreateContractHostFn(CreateContractArgsXdr.fromXdrJsonTree(value))
+        "create_contract_v2_host_fn" -> CreateContractV2HostFn(CreateContractArgsV2Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -92,4 +111,12 @@ sealed class SorobanAuthorizedFunctionXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is ContractFn -> buildJsonObject { put("contract_fn", value.toXdrJsonElement()) }
+    is CreateContractHostFn -> buildJsonObject { put("create_contract_host_fn", value.toXdrJsonElement()) }
+    is CreateContractV2HostFn -> buildJsonObject { put("create_contract_v2_host_fn", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

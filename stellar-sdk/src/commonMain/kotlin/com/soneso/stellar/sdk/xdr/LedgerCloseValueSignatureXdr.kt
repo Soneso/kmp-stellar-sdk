@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerCloseValueSignatureXdr"
+
 /**
  * XDR Source:
  * struct LedgerCloseValueSignature
@@ -24,10 +29,29 @@ data class LedgerCloseValueSignatureXdr(
       val signature = SignatureXdr.decode(reader)
       return LedgerCloseValueSignatureXdr(nodeId, signature)
     }
+
+    fun fromXdrJson(json: String): LedgerCloseValueSignatureXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerCloseValueSignatureXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseValueSignatureXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return LedgerCloseValueSignatureXdr(
+        NodeIDXdr.fromXdrJsonTree(XdrJson.field(json, "node_id", XDR_JSON_TYPE)),
+        SignatureXdr.fromXdrJsonTree(XdrJson.field(json, "signature", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     nodeId.encode(writer)
     signature.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("node_id", nodeId.toXdrJsonElement())
+    put("signature", signature.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

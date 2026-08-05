@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ManageDataOpXdr"
+
 /**
  * XDR Source:
  * struct ManageDataOp
@@ -23,6 +28,18 @@ data class ManageDataOpXdr(
       val dataValue = if (reader.readBoolean()) DataValueXdr.decode(reader) else null
       return ManageDataOpXdr(dataName, dataValue)
     }
+
+    fun fromXdrJson(json: String): ManageDataOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageDataOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageDataOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      return ManageDataOpXdr(
+        String64Xdr.fromXdrJsonTree(XdrJson.field(json, "data_name", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "data_value", XDR_JSON_TYPE))?.let { DataValueXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -34,4 +51,11 @@ data class ManageDataOpXdr(
       writer.writeBoolean(false)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("data_name", dataName.toXdrJsonElement())
+    put("data_value", XdrJson.optional(dataValue) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

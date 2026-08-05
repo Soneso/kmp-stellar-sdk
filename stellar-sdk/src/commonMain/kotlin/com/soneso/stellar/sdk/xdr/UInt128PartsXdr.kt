@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "UInt128PartsXdr"
+
 /**
  * XDR Source:
  * struct UInt128Parts {
@@ -21,10 +25,23 @@ data class UInt128PartsXdr(
       val lo = Uint64Xdr.decode(reader)
       return UInt128PartsXdr(hi, lo)
     }
+
+    fun fromXdrJson(json: String): UInt128PartsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): UInt128PartsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): UInt128PartsXdr {
+      val limbs = XdrJson.decimalStringToUInt128(element, XDR_JSON_TYPE, "value")
+      return UInt128PartsXdr(Uint64Xdr(limbs.hi), Uint64Xdr(limbs.lo))
+    }
   }
 
   fun encode(writer: XdrWriter) {
     hi.encode(writer)
     lo.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(XdrJson.uint128ToDecimalString(hi.value, lo.value))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }
