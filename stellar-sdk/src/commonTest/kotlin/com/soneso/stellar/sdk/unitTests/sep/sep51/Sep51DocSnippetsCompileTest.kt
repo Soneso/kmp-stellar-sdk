@@ -7,6 +7,7 @@ package com.soneso.stellar.sdk.unitTests.sep.sep51
 import com.soneso.stellar.sdk.xdr.AssetCode12Xdr
 import com.soneso.stellar.sdk.xdr.AssetCode4Xdr
 import com.soneso.stellar.sdk.xdr.AssetXdr
+import com.soneso.stellar.sdk.xdr.EvictionIteratorXdr
 import com.soneso.stellar.sdk.xdr.Int32Xdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.SCBytesXdr
@@ -165,6 +166,34 @@ class Sep51DocSnippetsCompileTest {
         )
         assertEquals("\"1\"", Int64Xdr.fromXdrJson("1").toXdrJson())
         assertFailsWith<IllegalArgumentException> { Int32Xdr.fromXdrJson("\"1\"") }
+    }
+
+    @Test
+    fun booleans() {
+        val json = "{\"bucket_list_level\":3,\"is_curr_bucket\":true,\"bucket_file_offset\":\"64\"}"
+        assertTrue(EvictionIteratorXdr.fromXdrJson(json).toXdrJson() == json)
+
+        assertEquals("{\"bool\":true}", SCValXdr.fromXdrJson("{\"bool\":true}").toXdrJson())
+
+        // Only the JSON literals are accepted, as the section states.
+        assertFailsWith<IllegalArgumentException> { SCValXdr.fromXdrJson("{\"bool\":\"true\"}") }
+        assertFailsWith<IllegalArgumentException> { SCValXdr.fromXdrJson("{\"bool\":1}") }
+    }
+
+    @Test
+    fun compareAcrossProducers() {
+        // The same value written two ways: our canonical form, and a foreign producer's
+        // pretty-printed form with the keys in the other order.
+        val ours = "{\"min_time\":\"0\",\"max_time\":\"1700000000\"}"
+        val theirs = "{\n  \"max_time\": \"1700000000\",\n  \"min_time\": \"0\"\n}"
+
+        assertTrue(ours != theirs, "the two documents differ byte for byte")
+        val equal = TimeBoundsXdr.fromXdrJson(ours).toXdrJsonElement() ==
+            TimeBoundsXdr.fromXdrJson(theirs).toXdrJsonElement()
+        assertTrue(equal, "they compare equal once decoded")
+
+        // Comparing the decoded values works too, since the generated types are data classes.
+        assertEquals(TimeBoundsXdr.fromXdrJson(ours), TimeBoundsXdr.fromXdrJson(theirs))
     }
 
     @Test

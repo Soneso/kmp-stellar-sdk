@@ -104,6 +104,10 @@ class XdrJsonSCPTest {
     val text = ValueXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ValueXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ValueXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ValueXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ValueXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -123,6 +127,10 @@ class XdrJsonSCPTest {
     val text = SCPBallotXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPBallotXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPBallotXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPBallotXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPBallotXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -190,6 +198,10 @@ class XdrJsonSCPTest {
     val text = SCPNominationXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPNominationXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPNominationXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPNominationXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPNominationXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -210,6 +222,10 @@ class XdrJsonSCPTest {
     val text = SCPStatementPrepareXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPStatementPrepareXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPStatementPrepareXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPStatementPrepareXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPStatementPrepareXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -230,6 +246,10 @@ class XdrJsonSCPTest {
     val text = SCPStatementConfirmXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPStatementConfirmXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPStatementConfirmXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPStatementConfirmXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPStatementConfirmXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -250,6 +270,10 @@ class XdrJsonSCPTest {
     val text = SCPStatementExternalizeXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPStatementExternalizeXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPStatementExternalizeXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPStatementExternalizeXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPStatementExternalizeXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -270,6 +294,10 @@ class XdrJsonSCPTest {
     val text = SCPStatementPledgesXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPStatementPledgesXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPStatementPledgesXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPStatementPledgesXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPStatementPledgesXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -340,6 +368,10 @@ class XdrJsonSCPTest {
     val text = SCPStatementXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPStatementXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPStatementXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPStatementXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPStatementXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -360,6 +392,10 @@ class XdrJsonSCPTest {
     val text = SCPEnvelopeXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPEnvelopeXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPEnvelopeXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPEnvelopeXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPEnvelopeXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -380,6 +416,10 @@ class XdrJsonSCPTest {
     val text = SCPQuorumSetXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCPQuorumSetXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCPQuorumSetXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCPQuorumSetXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCPQuorumSetXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test

@@ -661,6 +661,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ThresholdsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ThresholdsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ThresholdsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ThresholdsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ThresholdsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -680,6 +684,10 @@ class XdrJsonLedgerEntriesTest {
     val text = String32Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, String32Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, String32Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    String32Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, String32Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -699,6 +707,10 @@ class XdrJsonLedgerEntriesTest {
     val text = String64Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, String64Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, String64Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    String64Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, String64Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -718,6 +730,10 @@ class XdrJsonLedgerEntriesTest {
     val text = SequenceNumberXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SequenceNumberXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SequenceNumberXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SequenceNumberXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SequenceNumberXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -737,6 +753,10 @@ class XdrJsonLedgerEntriesTest {
     val text = DataValueXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, DataValueXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, DataValueXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    DataValueXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, DataValueXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -756,6 +776,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AssetCode4Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AssetCode4Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AssetCode4Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AssetCode4Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AssetCode4Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -775,6 +799,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AssetCode12Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AssetCode12Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AssetCode12Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AssetCode12Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AssetCode12Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -841,6 +869,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AssetCodeXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AssetCodeXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AssetCodeXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AssetCodeXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AssetCodeXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -891,6 +923,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AlphaNum4Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AlphaNum4Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AlphaNum4Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AlphaNum4Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AlphaNum4Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -911,6 +947,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AlphaNum12Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AlphaNum12Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AlphaNum12Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AlphaNum12Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AlphaNum12Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -931,6 +971,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AssetXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AssetXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AssetXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AssetXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AssetXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -994,6 +1038,10 @@ class XdrJsonLedgerEntriesTest {
     val text = PriceXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, PriceXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, PriceXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    PriceXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, PriceXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1014,6 +1062,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LiabilitiesXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LiabilitiesXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LiabilitiesXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LiabilitiesXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LiabilitiesXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1188,6 +1240,10 @@ class XdrJsonLedgerEntriesTest {
     val text = SignerXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SignerXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SignerXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SignerXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SignerXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1255,6 +1311,10 @@ class XdrJsonLedgerEntriesTest {
     val text = SponsorshipDescriptorXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SponsorshipDescriptorXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SponsorshipDescriptorXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SponsorshipDescriptorXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SponsorshipDescriptorXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1274,6 +1334,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtensionV3Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtensionV3Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtensionV3Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtensionV3Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtensionV3Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1294,6 +1358,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtensionV2ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtensionV2ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtensionV2ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtensionV2ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtensionV2ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1347,6 +1415,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtensionV2Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtensionV2Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtensionV2Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtensionV2Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtensionV2Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1367,6 +1439,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtensionV1ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1420,6 +1496,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtensionV1Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtensionV1Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtensionV1Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtensionV1Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtensionV1Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1440,6 +1520,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1493,6 +1577,10 @@ class XdrJsonLedgerEntriesTest {
     val text = AccountEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, AccountEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, AccountEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    AccountEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, AccountEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1567,6 +1655,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineAssetXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineAssetXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineAssetXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineAssetXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineAssetXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1640,6 +1732,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryExtensionV2ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryExtensionV2ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryExtensionV2ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryExtensionV2ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryExtensionV2ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1672,6 +1768,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryExtensionV2Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryExtensionV2Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryExtensionV2Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryExtensionV2Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryExtensionV2Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1692,6 +1792,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryV1ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryV1ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryV1ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryV1ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryV1ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1745,6 +1849,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryV1Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryV1Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryV1Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryV1Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryV1Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1765,6 +1873,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1818,6 +1930,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TrustLineEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TrustLineEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TrustLineEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TrustLineEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TrustLineEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1855,6 +1971,10 @@ class XdrJsonLedgerEntriesTest {
     val text = OfferEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, OfferEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, OfferEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    OfferEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, OfferEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1887,6 +2007,10 @@ class XdrJsonLedgerEntriesTest {
     val text = OfferEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, OfferEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, OfferEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    OfferEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, OfferEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1907,6 +2031,10 @@ class XdrJsonLedgerEntriesTest {
     val text = DataEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, DataEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, DataEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    DataEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, DataEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1939,6 +2067,10 @@ class XdrJsonLedgerEntriesTest {
     val text = DataEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, DataEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, DataEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    DataEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, DataEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2026,6 +2158,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimPredicateXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimPredicateXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimPredicateXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimPredicateXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimPredicateXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2136,6 +2272,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimantV0Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimantV0Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimantV0Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimantV0Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimantV0Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2156,6 +2296,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimantXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimantXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimantXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimantXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimantXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2213,6 +2357,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimableBalanceEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimableBalanceEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimableBalanceEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimableBalanceEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimableBalanceEntryExtensionV1ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2245,6 +2393,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimableBalanceEntryExtensionV1Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimableBalanceEntryExtensionV1Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimableBalanceEntryExtensionV1Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimableBalanceEntryExtensionV1Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimableBalanceEntryExtensionV1Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2265,6 +2417,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimableBalanceEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimableBalanceEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimableBalanceEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimableBalanceEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimableBalanceEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2318,6 +2474,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ClaimableBalanceEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ClaimableBalanceEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ClaimableBalanceEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ClaimableBalanceEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ClaimableBalanceEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2338,6 +2498,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LiquidityPoolConstantProductParametersXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LiquidityPoolConstantProductParametersXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LiquidityPoolConstantProductParametersXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LiquidityPoolConstantProductParametersXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LiquidityPoolConstantProductParametersXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2358,6 +2522,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LiquidityPoolEntryConstantProductXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LiquidityPoolEntryConstantProductXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LiquidityPoolEntryConstantProductXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LiquidityPoolEntryConstantProductXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LiquidityPoolEntryConstantProductXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2378,6 +2546,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LiquidityPoolEntryBodyXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LiquidityPoolEntryBodyXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LiquidityPoolEntryBodyXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LiquidityPoolEntryBodyXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LiquidityPoolEntryBodyXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2418,6 +2590,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LiquidityPoolEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LiquidityPoolEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LiquidityPoolEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LiquidityPoolEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LiquidityPoolEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2465,6 +2641,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ContractDataEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractDataEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractDataEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractDataEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractDataEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2485,6 +2665,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ContractCodeCostInputsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractCodeCostInputsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractCodeCostInputsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractCodeCostInputsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractCodeCostInputsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2505,6 +2689,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ContractCodeEntryV1Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractCodeEntryV1Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractCodeEntryV1Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractCodeEntryV1Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractCodeEntryV1Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2525,6 +2713,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ContractCodeEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractCodeEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractCodeEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractCodeEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractCodeEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2578,6 +2770,10 @@ class XdrJsonLedgerEntriesTest {
     val text = ContractCodeEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractCodeEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractCodeEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractCodeEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractCodeEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2598,6 +2794,10 @@ class XdrJsonLedgerEntriesTest {
     val text = TTLEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, TTLEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, TTLEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TTLEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TTLEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2618,6 +2818,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerEntryExtensionV1ExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerEntryExtensionV1ExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerEntryExtensionV1ExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2650,6 +2854,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerEntryExtensionV1Xdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerEntryExtensionV1Xdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerEntryExtensionV1Xdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerEntryExtensionV1Xdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerEntryExtensionV1Xdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2670,6 +2878,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerEntryDataXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerEntryDataXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerEntryDataXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerEntryDataXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerEntryDataXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2800,6 +3012,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerEntryExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerEntryExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerEntryExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerEntryExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerEntryExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2853,6 +3069,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2873,6 +3093,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyAccountXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyAccountXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyAccountXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyAccountXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyAccountXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2893,6 +3117,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyTrustLineXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyTrustLineXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyTrustLineXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyTrustLineXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyTrustLineXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2913,6 +3141,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyOfferXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyOfferXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyOfferXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyOfferXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyOfferXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2933,6 +3165,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyDataXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyDataXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyDataXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyDataXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyDataXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2953,6 +3189,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyClaimableBalanceXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyClaimableBalanceXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyClaimableBalanceXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyClaimableBalanceXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyClaimableBalanceXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2973,6 +3213,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyLiquidityPoolXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyLiquidityPoolXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyLiquidityPoolXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyLiquidityPoolXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyLiquidityPoolXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -2993,6 +3237,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyContractDataXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyContractDataXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyContractDataXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyContractDataXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyContractDataXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3013,6 +3261,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyContractCodeXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyContractCodeXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyContractCodeXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyContractCodeXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyContractCodeXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3033,6 +3285,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyConfigSettingXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyConfigSettingXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyConfigSettingXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyConfigSettingXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyConfigSettingXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3053,6 +3309,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyTtlXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyTtlXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyTtlXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyTtlXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyTtlXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3073,6 +3333,10 @@ class XdrJsonLedgerEntriesTest {
     val text = LedgerKeyXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, LedgerKeyXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, LedgerKeyXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    LedgerKeyXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, LedgerKeyXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3431,6 +3695,10 @@ class XdrJsonLedgerEntriesTest {
     val text = BucketMetadataExtXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, BucketMetadataExtXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, BucketMetadataExtXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    BucketMetadataExtXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, BucketMetadataExtXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3484,6 +3752,10 @@ class XdrJsonLedgerEntriesTest {
     val text = BucketMetadataXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, BucketMetadataXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, BucketMetadataXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    BucketMetadataXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, BucketMetadataXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3504,6 +3776,10 @@ class XdrJsonLedgerEntriesTest {
     val text = BucketEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, BucketEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, BucketEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    BucketEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, BucketEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -3574,6 +3850,10 @@ class XdrJsonLedgerEntriesTest {
     val text = HotArchiveBucketEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, HotArchiveBucketEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, HotArchiveBucketEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    HotArchiveBucketEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, HotArchiveBucketEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test

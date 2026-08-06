@@ -1786,8 +1786,9 @@ class SEPParser:
 
         The specification is prose and JSON snippets rather than field tables, so the
         requirements are transcribed from its Specification sections: the XDR data type
-        mappings, the Stellar-specific address, asset code and integer types, and the
-        optional `$schema` property.
+        mappings, the Stellar-specific address, asset code and integer types, the optional
+        `$schema` property, and the two version-1 compatibility notes carried inside the
+        Hyper Integer and Unsigned Hyper Integer sections.
         """
         print(f"{Colors.BLUE}Using SEP-51 specific parser (hardcoded){Colors.END}")
 
@@ -1854,6 +1855,19 @@ class SEPParser:
         ]
         sections.append(section)
         print(f"{Colors.GREEN}  Found 'Integer Types': {len(section.fields)} fields{Colors.END}")
+
+        # Backward Compatibility
+        #
+        # Stated as notes at the end of the "Hyper Integer (64-bit)" and "Unsigned Hyper
+        # Integer (64-bit)" sections rather than under a heading of their own. Both are
+        # "should" rather than "must", so they are recorded as optional.
+        section = Section(title='Backward Compatibility', key='backward_compatibility')
+        section.fields = [
+            Field(name='hyper_accepts_json_number', description='Deserializing a JSON number for Hyper is supported, for compatibility with XDR-JSON v1', field_type='feature', required=False),
+            Field(name='unsigned_hyper_accepts_json_number', description='Deserializing a JSON number for Unsigned Hyper is supported, for compatibility with XDR-JSON v1', field_type='feature', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Backward Compatibility': {len(section.fields)} fields{Colors.END}")
 
         # JSON Schema
         section = Section(title='JSON Schema', key='json_schema')

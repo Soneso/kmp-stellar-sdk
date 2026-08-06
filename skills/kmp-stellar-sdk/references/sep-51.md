@@ -3,6 +3,19 @@
 **Purpose:** Render any XDR value as canonical JSON and read that JSON back into the same value.
 **Prerequisites:** None (no network, no authentication, no anchor)
 **SDK Class:** every generated XDR type in `com.soneso.stellar.sdk.xdr`
+**Specification:** SEP-0051 v2.0.1, Draft status
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [JSON Forms by XDR Category](#json-forms-by-xdr-category)
+- [Worked Example: a Transaction Envelope](#worked-example-a-transaction-envelope)
+- [Reading XDR Returned by the Network](#reading-xdr-returned-by-the-network)
+- [Working with JsonElement](#working-with-jsonelement)
+- [Canonical Output](#canonical-output)
+- [Error Handling](#error-handling)
+- [Common Pitfalls](#common-pitfalls)
 
 ## Overview
 

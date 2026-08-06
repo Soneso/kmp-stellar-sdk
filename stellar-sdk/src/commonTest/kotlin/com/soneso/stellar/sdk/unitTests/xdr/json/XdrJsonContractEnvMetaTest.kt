@@ -58,6 +58,10 @@ class XdrJsonContractEnvMetaTest {
     val text = SCEnvMetaEntryInterfaceVersionXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCEnvMetaEntryInterfaceVersionXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCEnvMetaEntryInterfaceVersionXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCEnvMetaEntryInterfaceVersionXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCEnvMetaEntryInterfaceVersionXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -78,6 +82,10 @@ class XdrJsonContractEnvMetaTest {
     val text = SCEnvMetaEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCEnvMetaEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCEnvMetaEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCEnvMetaEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCEnvMetaEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test

@@ -589,6 +589,14 @@ module Xdrgen
           out.puts "val text = #{type}.fromXdrJsonElement(tree).toXdrJson()"
           out.puts "assertEquals(tree, #{type}.fromXdrJson(text).toXdrJsonElement())"
           out.puts "assertEquals(text, #{type}.fromXdrJson(text).toXdrJson())"
+          out.puts
+          # The value decoded from JSON is also carried through the binary codec and rendered
+          # again. Without this the two codecs are only ever exercised apart, and a value the
+          # JSON path builds differently from what encode expects would round-trip cleanly
+          # through JSON while being wrong on the wire.
+          out.puts "val writer = XdrWriter()"
+          out.puts "#{type}.fromXdrJsonElement(tree).encode(writer)"
+          out.puts "assertEquals(tree, #{type}.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())"
         end
         out.puts '}'
         out.puts

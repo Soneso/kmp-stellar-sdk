@@ -191,6 +191,25 @@ fun integers() {
 
 A 32-bit integer accepts only a JSON number: the string form is rejected.
 
+### Booleans
+
+A boolean is a JSON boolean, as a struct member and as a union arm alike.
+
+```kotlin
+import com.soneso.stellar.sdk.xdr.EvictionIteratorXdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
+
+fun booleans() {
+    val json = "{\"bucket_list_level\":3,\"is_curr_bucket\":true,\"bucket_file_offset\":\"64\"}"
+    println(EvictionIteratorXdr.fromXdrJson(json).toXdrJson() == json) // true
+
+    // The same value inside a contract value, where the arm key names the type
+    println(SCValXdr.fromXdrJson("{\"bool\":true}").toXdrJson()) // {"bool":true}
+}
+```
+
+Only `true` and `false` are accepted. The strings `"true"` and `"false"`, and the numbers `1` and `0`, are rejected.
+
 ### Opaque Data
 
 Opaque data is a lowercase hexadecimal string, whether the XDR declares a fixed or a variable length. Empty variable-length data is `""`.
@@ -369,6 +388,27 @@ fun stellarTypes() {
 
 `toXdrJson()` emits one form and only that form: compact, with no inserted whitespace, and with object keys in XDR declaration order rather than sorted. Two equal values always produce byte-identical documents, which is what makes the output safe to hash, diff or use as a test fixture. There is no pretty-printing option; format the tree from `toXdrJsonElement()` if a document needs to be displayed.
 
+That guarantee covers documents this SDK produced. SEP-0051 does not fix key order or whitespace, so another producer may render the same value with the keys in a different order, or with whitespace, and the two documents will differ byte for byte while meaning the same thing. The SDK ships no normaliser for foreign documents.
+
+Compare across producers by decoding both and comparing the values, not the text:
+
+```kotlin
+import com.soneso.stellar.sdk.xdr.TimeBoundsXdr
+
+fun compareAcrossProducers(ours: String, theirs: String) {
+    // Structural comparison: whitespace and key order stop mattering
+    val equal = TimeBoundsXdr.fromXdrJson(ours).toXdrJsonElement() ==
+        TimeBoundsXdr.fromXdrJson(theirs).toXdrJsonElement()
+    println(equal)
+}
+```
+
+Comparing the decoded values themselves works too, since the generated types are data classes.
+
+## When Not to Use XDR-JSON
+
+XDR-JSON is for reading, logging and interchange. Keep the binary base64 form where size or verification matters: it is several times smaller on the wire, it is what Horizon and the Soroban RPC server accept for submission, and it is the form signatures and hashes are computed over, so it is what has to be stored when a value must stay cryptographically verifiable.
+
 ## Input Strictness
 
 Decoding accepts only the spelling encoding produces. These rules are narrower than SEP-0051 requires, and they exist so that two different documents cannot decode to the same value:
@@ -450,4 +490,6 @@ All four members exist on every generated XDR type in `com.soneso.stellar.sdk.xd
 
 **Implementation**: `com.soneso.stellar.sdk.xdr`
 
-**Last Updated**: 2026-08-05
+**Coverage**: [SEP-0051 Compatibility Matrix](../../compatibility/sep/SEP-0051_COMPATIBILITY_MATRIX.md)
+
+**Last Updated**: 2026-08-06

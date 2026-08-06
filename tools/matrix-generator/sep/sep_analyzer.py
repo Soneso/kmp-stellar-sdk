@@ -2169,6 +2169,15 @@ class SEPAnalyzer:
                 'uint256_parts': ('XdrJson.uint256ToDecimalString', 'UInt256PartsXdr.kt', 'XdrJson.uint256ToDecimalString'),
                 'int256_parts': ('XdrJson.int256ToDecimalString', 'Int256PartsXdr.kt', 'XdrJson.int256ToDecimalString'),
             },
+            # The decoder's allowString flag is what carries these: it is false for the
+            # 32-bit paths and true for the 64-bit ones, so a 64-bit value is read from a
+            # JSON number as well as from the string form that is always emitted. The
+            # behaviour is pinned by Sep51SpecExampleTest.hyperIntegerAlsoReadsTheJsonNumberForm
+            # and its unsigned counterpart.
+            'backward_compatibility': {
+                'hyper_accepts_json_number': ('XdrJson.int64', 'XdrJson.kt', '"a 64-bit signed integer", allowString = true'),
+                'unsigned_hyper_accepts_json_number': ('XdrJson.uint64', 'XdrJson.kt', '"a 64-bit unsigned integer", allowString = true'),
+            },
             'json_schema': {
                 'schema_property': ('XdrJson.stripSchema', 'XdrJson.kt', 'fun stripSchema('),
             },

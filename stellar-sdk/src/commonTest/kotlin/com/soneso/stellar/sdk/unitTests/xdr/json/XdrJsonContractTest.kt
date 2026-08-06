@@ -281,6 +281,10 @@ class XdrJsonContractTest {
     val text = SCBytesXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCBytesXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCBytesXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCBytesXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCBytesXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -300,6 +304,10 @@ class XdrJsonContractTest {
     val text = SCStringXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCStringXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCStringXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCStringXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCStringXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -319,6 +327,10 @@ class XdrJsonContractTest {
     val text = SCSymbolXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCSymbolXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCSymbolXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCSymbolXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCSymbolXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -789,6 +801,10 @@ class XdrJsonContractTest {
     val text = SCErrorXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCErrorXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCErrorXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCErrorXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCErrorXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -919,6 +935,10 @@ class XdrJsonContractTest {
     val text = UInt128PartsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, UInt128PartsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, UInt128PartsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    UInt128PartsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, UInt128PartsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -939,6 +959,10 @@ class XdrJsonContractTest {
     val text = Int128PartsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, Int128PartsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, Int128PartsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    Int128PartsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, Int128PartsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -959,6 +983,10 @@ class XdrJsonContractTest {
     val text = UInt256PartsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, UInt256PartsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, UInt256PartsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    UInt256PartsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, UInt256PartsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -979,6 +1007,10 @@ class XdrJsonContractTest {
     val text = Int256PartsXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, Int256PartsXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, Int256PartsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    Int256PartsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, Int256PartsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1093,6 +1125,10 @@ class XdrJsonContractTest {
     val text = MuxedEd25519AccountXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, MuxedEd25519AccountXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, MuxedEd25519AccountXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    MuxedEd25519AccountXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, MuxedEd25519AccountXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1113,6 +1149,10 @@ class XdrJsonContractTest {
     val text = SCAddressXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCAddressXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCAddressXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCAddressXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCAddressXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1193,6 +1233,10 @@ class XdrJsonContractTest {
     val text = ContractExecutableExternalRefXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractExecutableExternalRefXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractExecutableExternalRefXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractExecutableExternalRefXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractExecutableExternalRefXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1213,6 +1257,10 @@ class XdrJsonContractTest {
     val text = ContractExecutableXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, ContractExecutableXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, ContractExecutableXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    ContractExecutableXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, ContractExecutableXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1276,6 +1324,10 @@ class XdrJsonContractTest {
     val text = SCVecXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCVecXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCVecXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCVecXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCVecXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1295,6 +1347,10 @@ class XdrJsonContractTest {
     val text = SCMapXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCMapXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCMapXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCMapXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCMapXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1314,6 +1370,10 @@ class XdrJsonContractTest {
     val text = SCNonceKeyXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCNonceKeyXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCNonceKeyXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCNonceKeyXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCNonceKeyXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1334,6 +1394,10 @@ class XdrJsonContractTest {
     val text = SCContractInstanceXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCContractInstanceXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCContractInstanceXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCContractInstanceXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCContractInstanceXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1354,6 +1418,10 @@ class XdrJsonContractTest {
     val text = SCValXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCValXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCValXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCValXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCValXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test
@@ -1617,6 +1685,10 @@ class XdrJsonContractTest {
     val text = SCMapEntryXdr.fromXdrJsonElement(tree).toXdrJson()
     assertEquals(tree, SCMapEntryXdr.fromXdrJson(text).toXdrJsonElement())
     assertEquals(text, SCMapEntryXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    SCMapEntryXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, SCMapEntryXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
   }
 
   @Test

@@ -1,6 +1,6 @@
 # SEP-0051 (XDR-JSON) Compatibility Matrix
 
-**Generated:** 2026-08-05 00:58:08
+**Generated:** 2026-08-06 10:56:52
 
 **SEP Version:** 2.0.1  
 **SEP Status:** Draft  
@@ -13,14 +13,14 @@ Defines XDR-JSON, a lossless bi-directional mapping between Stellar's XDR struct
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (35/35 fields)
+**Total Coverage:** 100.0% (37/37 fields)
 
-- ✅ **Implemented:** 35/35
-- ❌ **Not Implemented:** 0/35
+- ✅ **Implemented:** 37/37
+- ❌ **Not Implemented:** 0/37
 
 **Required Fields:** 100.0% (34/34)
 
-**Optional Fields:** 100.0% (1/1)
+**Optional Fields:** 100.0% (3/3)
 
 ## Implementation Status
 
@@ -32,6 +32,7 @@ Defines XDR-JSON, a lossless bi-directional mapping between Stellar's XDR struct
 |---------|----------|----------|-------------|-------|
 | Address Types | 100.0% | 12/12 | 12 | 12 |
 | Asset Code Types | 100.0% | 3/3 | 3 | 3 |
+| Backward Compatibility | 100.0% | N/A | 2 | 2 |
 | Integer Types | 100.0% | 4/4 | 4 | 4 |
 | JSON Schema | 100.0% | N/A | 1 | 1 |
 | XDR Data Types | 100.0% | 15/15 | 15 | 15 |
@@ -62,6 +63,13 @@ Defines XDR-JSON, a lossless bi-directional mapping between Stellar's XDR struct
 | `asset_code` | ✓ | ✅ | `AssetCodeXdr.toXdrJsonElement` | AssetCode maps according to AssetCode4 or AssetCode12 |
 | `asset_code4` | ✓ | ✅ | `AssetCode4Xdr.toXdrJsonElement` | AssetCode4 drops all trailing zero bytes, then applies the string escaping |
 | `asset_code12` | ✓ | ✅ | `AssetCode12Xdr.toXdrJsonElement` | AssetCode12 drops trailing zero bytes down to the 6th, keeping at least 5 characters |
+
+### Backward Compatibility
+
+| Field | Required | Status | SDK Property | Description |
+|-------|----------|--------|--------------|-------------|
+| `hyper_accepts_json_number` |  | ✅ | `XdrJson.int64` | Deserializing a JSON number for Hyper is supported, for compatibility with XDR-JSON v1 |
+| `unsigned_hyper_accepts_json_number` |  | ✅ | `XdrJson.uint64` | Deserializing a JSON number for Unsigned Hyper is supported, for compatibility with XDR-JSON v1 |
 
 ### Integer Types
 
