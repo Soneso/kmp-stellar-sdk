@@ -61,6 +61,10 @@ fails the run instead of passing unnoticed.
 # Check the committed corpus against a fresh generation
 bash refresh_corpus.sh
 
+# Ask whether a newer reference build would render the corpus differently.
+# Reports only; the committed corpus is never written.
+STELLAR_XDR=/path/to/newer/stellar-xdr bash refresh_corpus.sh --advisory
+
 # Rewrite it
 python3 generate_corpus.py
 
@@ -92,3 +96,16 @@ Re-run after either pin moves: the SDK's XDR pin in
 | 0 | No drift. |
 | 1 | Drift; the diff is printed. |
 | 2 | A prerequisite is missing. |
+
+In `--advisory` mode the same codes mean the same things, measured against whatever build
+`STELLAR_XDR` names rather than the pinned one: 0 that the build renders the corpus
+identically, 1 that it does not, with the diff and any per-seed findings both printed. A seed
+the build cannot process is recorded as a finding and its entry omitted, so one run
+enumerates every affected seed instead of stopping at the first, and the omission shows up in
+the diff as a smaller `entry_count`.
+
+The advisory comparison ignores `reference_version` and `reference_xdr_commit`. The generated
+document records the build that actually produced it, but those two fields differ on every
+real release and would otherwise mask the only question being asked: does anything the SDK
+emits change? `entry_count` stays in the comparison, because a dropped seed is a real
+difference.

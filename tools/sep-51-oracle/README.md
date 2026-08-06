@@ -27,7 +27,7 @@ with an older build would bake six wrong keys into the SDK.
 
 | File | Role |
 |---|---|
-| `oracle-pin.json` | The pinned reference build: version, its vendored XDR commit, and the SDK's own XDR commit. |
+| `oracle-pin.json` | The pinned reference build: version, its vendored XDR commit, and the SDK's own XDR commit. `sep_spec` records the specification revision this implementation targets. |
 | `probe.sh` | Prints the reference rendering of one value, one schema, or the type list. |
 | `name_map.rb` | Derives all JSON names from the `.x` sources; `--diff` checks them against the reference. |
 | `name-map.json` | Frozen derivation output, including the verification summary of the last `--diff` run. |
@@ -51,6 +51,9 @@ ruby name_map.rb --diff
 # Check without writing: are the names right, and are the artefacts current?
 ruby name_map.rb --check
 
+# Compare against a build other than the pinned one, writing nothing
+STELLAR_XDR=/path/to/newer/stellar-xdr ruby name_map.rb --advisory
+
 # Check the names the generator actually emitted against that table
 ruby emitted_names.rb
 ```
@@ -69,6 +72,19 @@ which is the form to run from a build.
 | 0 | The derived names agree with the reference, and the artefacts are current. |
 | 1 | A name disagrees, or a committed artefact is stale. |
 | 2 | The reference CLI is missing or does not match the pin. |
+
+### Advisory mode
+
+`--advisory` answers a different question: *if we adopted this other build, would our
+output change?* It accepts whatever `STELLAR_XDR` names instead of enforcing the pin,
+reports the build it actually used, writes nothing, and leaves the pinned gates untouched.
+Exit 0 means every derived name matches that build, so a pin bump would be routine; exit 1
+enumerates the names that differ. A missing or unrunnable binary is still exit 2.
+
+`tools/sep-51-corpus/refresh_corpus.sh --advisory` is the corpus half of the same question.
+Both are driven from the release watcher in
+`.github/workflows/sep-51-corpus-drift.yml`, which runs them only when the reference crate
+publishes a version newer than the pin.
 
 A missing CLI is a separate code because it calls for a different response —
 install the pinned build — and a caller that read every non-zero exit as

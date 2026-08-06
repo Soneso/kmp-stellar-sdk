@@ -68,8 +68,8 @@ def resolve_cli(pin):
     return resolved
 
 
-def verify_pin(cli, pin):
-    """`<cli> version` prints the tool version first and its vendored xdr commit after."""
+def read_version(cli):
+    """The version and vendored xdr commit `<cli> version` reports."""
     try:
         out = subprocess.run([cli, "version"], capture_output=True, text=True,
                              check=True).stdout
@@ -84,6 +84,12 @@ def verify_pin(cli, pin):
         if line.startswith("xdr:"):
             commit = line.split()[1]
             break
+    return version, commit
+
+
+def verify_pin(cli, pin):
+    """Refuses any build but the pinned one: key spellings differ between releases."""
+    version, commit = read_version(cli)
     if version != pin["version"] or commit != pin["xdr_commit"]:
         raise PrerequisiteError(
             "reference CLI does not match the pin.\n"
@@ -287,9 +293,22 @@ def read_unresolvable():
         )
 
 
-def build_entry(cli, seed):
-    base64_text = encode(cli, seed["type"], seed["json"])
-    oracle_text = decode(cli, seed["type"], base64_text)
+def build_entry(cli, seed, findings=None):
+    """Builds one corpus entry.
+
+    A seed problem normally raises. When ``findings`` is a list the problem is appended to
+    it instead, so an advisory run reports every affected seed in one pass rather than
+    stopping at the first. A seed the build cannot process at all yields no entry, and its
+    absence shows up in the diff alongside the recorded finding.
+    """
+    try:
+        base64_text = encode(cli, seed["type"], seed["json"])
+        oracle_text = decode(cli, seed["type"], base64_text)
+    except GenerationError as error:
+        if findings is None:
+            raise
+        findings.append("%s: %s" % (seed["type"], error))
+        return None
     oracle_value = json.loads(oracle_text)
 
     if seed.get("oracle") != "incomparable":
@@ -310,11 +329,14 @@ def build_entry(cli, seed):
     transform, reason = SPEC_FORMS[form]
     specified = transform(oracle_value)
     if specified == oracle_value:
-        raise GenerationError(
+        message = (
             "seed for %s is marked incomparable under %s, but the reference "
             "already emits the specified form; the divergence is gone and the "
             "seed must be reclassified" % (seed["type"], form)
         )
+        if findings is None:
+            raise GenerationError(message)
+        findings.append(message)
     return {
         "type": seed["type"],
         "kmp_type": seed["kmp_type"],
@@ -326,10 +348,27 @@ def build_entry(cli, seed):
     }
 
 
-def generate(output_path):
+def generate(output_path, advisory=False):
+    """Builds the corpus.
+
+    Normally the reference build must match the pin exactly. An advisory run instead
+    accepts whatever build is on PATH and records its version in the metadata, so a newer
+    release can be compared against the committed corpus without disturbing it. It never
+    writes to the committed file; the caller supplies a scratch path.
+    """
     pin = read_pin()
     cli = resolve_cli(pin)
-    verify_pin(cli, pin)
+    findings = [] if advisory else None
+
+    if advisory:
+        if os.path.abspath(output_path) == os.path.abspath(DEFAULT_OUTPUT):
+            raise PrerequisiteError(
+                "an advisory run must not write the committed corpus; pass --output"
+            )
+        version, commit = read_version(cli)
+    else:
+        verify_pin(cli, pin)
+        version, commit = pin["version"], pin["xdr_commit"]
 
     type_map = read_json(
         TYPE_MAP_FILE, "the type map",
@@ -337,7 +376,8 @@ def generate(output_path):
     )["type_map"]
     check_type_names(type_map, known_types(cli))
 
-    entries = [build_entry(cli, seed) for seed in SEEDS]
+    built = [build_entry(cli, seed, findings) for seed in SEEDS]
+    entries = [entry for entry in built if entry is not None]
     unresolvable_enum_members, unresolvable_struct_types = read_unresolvable()
 
     corpus = {
@@ -348,8 +388,8 @@ def generate(output_path):
                 "base64 XDR that value encodes to."
             ),
             "reference_tool": pin["tool"],
-            "reference_version": pin["version"],
-            "reference_xdr_commit": pin["xdr_commit"],
+            "reference_version": version,
+            "reference_xdr_commit": commit,
             "sdk_xdr_commit": read_sdk_xdr_commit(),
             "entry_count": len(entries),
             "unresolvable_enum_members": unresolvable_enum_members,
@@ -362,17 +402,21 @@ def generate(output_path):
         json.dump(corpus, handle, ensure_ascii=False, indent=2, sort_keys=False)
         handle.write("\n")
 
-    return corpus
+    return corpus, findings or []
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", default=DEFAULT_OUTPUT,
                         help="where to write corpus.json (default: %(default)s)")
+    parser.add_argument("--advisory", action="store_true",
+                        help="accept a build other than the pinned one and record its "
+                             "version; requires --output and never writes the committed "
+                             "corpus. For comparing a new reference release.")
     args = parser.parse_args()
 
     try:
-        corpus = generate(args.output)
+        corpus, findings = generate(args.output, advisory=args.advisory)
     except PrerequisiteError as error:
         print("generate_corpus.py: %s" % error, file=sys.stderr)
         return 2
@@ -383,12 +427,23 @@ def main():
     entries = corpus["entries"]
     incomparable = [entry for entry in entries if entry["oracle"] == "incomparable"]
     incomparable_types = sorted({entry["type"] for entry in incomparable})
+    if args.advisory:
+        print("ADVISORY: generated against %s %s, not the pinned build."
+              % (corpus["metadata"]["reference_tool"],
+                 corpus["metadata"]["reference_version"]))
     print("Wrote %s" % args.output)
     print("  entries:        %d" % len(entries))
     print("  distinct types: %d" % len({entry["type"] for entry in entries}))
     print("  comparable:     %d" % (len(entries) - len(incomparable)))
     print("  incomparable:   %d (%s)" % (len(incomparable),
                                          ", ".join(incomparable_types)))
+
+    if findings:
+        print("")
+        print("ADVISORY: %d seed(s) behave differently under this build:" % len(findings))
+        for finding in findings:
+            print("  - %s" % finding)
+        return 1
     return 0
 
 

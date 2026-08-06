@@ -23,6 +23,10 @@
 #                                 whether the committed artefacts are current.
 #                                 Exits 1 on a mismatch or a stale artefact,
 #                                 so it can gate a build.
+#   ruby name_map.rb --advisory   Diff against whatever build STELLAR_XDR names
+#                                 instead of the pinned one, writing nothing. For
+#                                 checking a new reference release before adopting
+#                                 it; the pinned gates are unaffected.
 #   ruby name_map.rb --diff --quiet   Diff, printing only the summary.
 #
 # Exit codes, matching tools/sep-51-corpus/refresh_corpus.sh:
@@ -187,9 +191,12 @@ end
 class Oracle
   UnknownType = Class.new(StandardError)
 
-  def initialize(pin)
+  attr_reader :version, :xdr_commit
+
+  def initialize(pin, advisory: false)
     @cli = ENV.fetch('STELLAR_XDR', 'stellar-xdr')
     @pin = pin
+    @advisory = advisory
     verify_pin
   end
 
@@ -236,10 +243,16 @@ class Oracle
       MESSAGE
     end
 
-    version = output.lines.first.to_s.split[1]
-    xdr_commit = output.lines.find { |line| line.start_with?('xdr:') }.to_s.split[1]
+    @version = output.lines.first.to_s.split[1]
+    @xdr_commit = output.lines.find { |line| line.start_with?('xdr:') }.to_s.split[1]
+    version = @version
+    xdr_commit = @xdr_commit
 
     return if version == @pin['version'] && xdr_commit == @pin['xdr_commit']
+
+    # An advisory run exists precisely to probe a build other than the pinned one, so the
+    # mismatch is the point rather than a failure. The build actually used is reported.
+    return if @advisory
 
     raise PrerequisiteError, <<~MESSAGE
       reference CLI does not match oracle-pin.json.
@@ -392,7 +405,7 @@ def diff(oracle, builder, quiet:)
 
   unless quiet
     puts
-    puts 'Unresolvable by the pinned reference CLI (newer than the commit it vendors):'
+    puts "Unresolvable by reference CLI #{oracle.version} (newer than the XDR commit it vendors):"
     puts "  enum members (#{enum_unresolvable.length}):"
     enum_unresolvable.each { |label| puts "    #{label}" }
     puts "  struct types (#{struct_unresolvable.length}):"
@@ -403,7 +416,7 @@ def diff(oracle, builder, quiet:)
   end
 
   puts
-  puts 'SEP-0051 name derivation vs pinned reference CLI'
+  puts "SEP-0051 name derivation vs reference CLI #{oracle.version}"
   puts format('  enum members:  %d total, %d resolvable, %d matched, %d mismatched',
               enum_total, enum_checked, enum_checked - enum_mismatches, enum_mismatches)
   puts format('  struct types:  %d total, %d field-comparable, %d matched, %d mismatched ' \
@@ -444,15 +457,23 @@ def emit(name, content, check_only:)
 end
 
 def main
+  advisory = ARGV.include?('--advisory')
   check_only = ARGV.include?('--check')
   # Checking without diffing would compare the artefacts against themselves and prove nothing.
-  run_diff = ARGV.include?('--diff') || check_only
+  run_diff = ARGV.include?('--diff') || check_only || advisory
   quiet = ARGV.include?('--quiet')
 
   builder = NameMapBuilder.new(load_ast).build
 
   pin = JSON.parse(File.read(PIN_FILE))
-  oracle = Oracle.new(pin)
+  oracle = Oracle.new(pin, advisory: advisory)
+
+  if advisory
+    puts "ADVISORY: comparing against #{oracle.version} (xdr #{oracle.xdr_commit}), " \
+         "not the pinned #{pin['version']}."
+    puts 'Nothing is written; the pinned gates are unaffected.'
+    puts
+  end
 
   entries = builder.enums + builder.structs + builder.unions
   type_map, unknown = build_type_map(oracle, entries)
@@ -494,6 +515,17 @@ def main
     )}\n"
 
   puts
+  if advisory
+    # An advisory run reports and stops: the artefacts belong to the pinned build, so
+    # neither writing them nor judging them stale against another build would be right.
+    if result[:mismatches].empty?
+      puts 'ADVISORY: every derived name matches this build. A pin bump would be routine.'
+      exit 0
+    end
+    puts "ADVISORY: #{result[:mismatches].length} name(s) differ under this build."
+    exit 1
+  end
+
   current = emit('type_map.json', type_map_content, check_only: check_only)
   current &= emit('name-map.json', name_map_content, check_only: check_only)
 
