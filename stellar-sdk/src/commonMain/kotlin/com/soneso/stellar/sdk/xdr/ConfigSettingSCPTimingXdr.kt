@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingSCPTimingXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_target_close_time_milliseconds", "nomination_timeout_initial_milliseconds", "nomination_timeout_increment_milliseconds", "ballot_timeout_initial_milliseconds", "ballot_timeout_increment_milliseconds")
+
 /**
  * XDR Source:
  * struct ConfigSettingSCPTiming {
@@ -41,7 +43,7 @@ data class ConfigSettingSCPTimingXdr(
     fun fromXdrJsonElement(element: JsonElement): ConfigSettingSCPTimingXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingSCPTimingXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ConfigSettingSCPTimingXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_target_close_time_milliseconds", XDR_JSON_TYPE)),
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "nomination_timeout_initial_milliseconds", XDR_JSON_TYPE)),

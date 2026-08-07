@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerEntryExtensionV1Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("sponsoring_id", "ext")
+
 /**
  * XDR Source:
  * struct LedgerEntryExtensionV1
@@ -39,7 +41,7 @@ data class LedgerEntryExtensionV1Xdr(
     fun fromXdrJsonElement(element: JsonElement): LedgerEntryExtensionV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryExtensionV1Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LedgerEntryExtensionV1Xdr(
         SponsorshipDescriptorXdr.fromXdrJsonTree(XdrJson.field(json, "sponsoring_id", XDR_JSON_TYPE)),
         LedgerEntryExtensionV1ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))

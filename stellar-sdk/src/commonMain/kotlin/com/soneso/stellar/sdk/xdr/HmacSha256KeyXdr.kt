@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HmacSha256KeyXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key")
+
 /**
  * XDR Source:
  * struct HmacSha256Key
@@ -30,7 +32,7 @@ data class HmacSha256KeyXdr(
     fun fromXdrJsonElement(element: JsonElement): HmacSha256KeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): HmacSha256KeyXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return HmacSha256KeyXdr(
         XdrJson.hex(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key", expectedLength = 32)
       )

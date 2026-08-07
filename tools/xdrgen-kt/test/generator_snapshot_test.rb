@@ -332,8 +332,20 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_struct_reads_every_declared_key
     content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
-    assert_includes content, 'val json = XdrJson.obj(element, XDR_JSON_TYPE)'
+    assert_includes content, 'val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)'
     assert_includes content, 'XdrJson.field(json, "big_number", XDR_JSON_TYPE)'
+  end
+
+  # The decoder rejects a key that names no field, so each struct declares the keys it answers
+  # to in the order it reads them.
+  def test_struct_declares_the_keys_it_accepts
+    content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
+    assert_includes content,
+                    'private val XDR_JSON_KEYS: Array<String> = ' \
+                    'arrayOf("count", "flags", "big_number", "unsigned_big", "active", "label")'
+
+    keyword = File.read(File.join(@output_dir, 'KeywordStructXdr.kt'))
+    assert_includes keyword, 'private val XDR_JSON_KEYS: Array<String> = arrayOf("val", "when")'
   end
 
   def test_declared_maxima_are_validated_on_input

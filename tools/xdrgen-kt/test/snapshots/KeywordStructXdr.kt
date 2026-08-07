@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "KeywordStructXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("val", "when")
+
 /**
  * XDR Source:
  * struct KeywordStruct
@@ -33,7 +35,7 @@ data class KeywordStructXdr(
     fun fromXdrJsonElement(element: JsonElement): KeywordStructXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): KeywordStructXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return KeywordStructXdr(
         XdrJson.int32(XdrJson.field(json, "val", XDR_JSON_TYPE), XDR_JSON_TYPE, "val"),
         XdrJson.unescapeString(XdrJson.field(json, "when", XDR_JSON_TYPE), XDR_JSON_TYPE, "when", maxLength = 32)

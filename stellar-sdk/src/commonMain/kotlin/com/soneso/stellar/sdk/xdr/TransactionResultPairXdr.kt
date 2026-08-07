@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionResultPairXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("transaction_hash", "result")
+
 /**
  * XDR Source:
  * struct TransactionResultPair
@@ -34,7 +36,7 @@ data class TransactionResultPairXdr(
     fun fromXdrJsonElement(element: JsonElement): TransactionResultPairXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): TransactionResultPairXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return TransactionResultPairXdr(
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "transaction_hash", XDR_JSON_TYPE)),
         TransactionResultXdr.fromXdrJsonTree(XdrJson.field(json, "result", XDR_JSON_TYPE))

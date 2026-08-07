@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ClaimantV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("destination", "predicate")
+
 /**
  * XDR Source:
  * struct
@@ -35,7 +37,7 @@ data class ClaimantV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): ClaimantV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ClaimantV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ClaimantV0Xdr(
         AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
         ClaimPredicateXdr.fromXdrJsonTree(XdrJson.field(json, "predicate", XDR_JSON_TYPE))

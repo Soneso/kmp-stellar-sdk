@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerFootprintXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("read_only", "read_write")
+
 /**
  * XDR Source:
  * struct LedgerFootprint
@@ -33,7 +35,7 @@ data class LedgerFootprintXdr(
     fun fromXdrJsonElement(element: JsonElement): LedgerFootprintXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LedgerFootprintXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LedgerFootprintXdr(
         XdrJson.array(XdrJson.field(json, "read_only", XDR_JSON_TYPE), XDR_JSON_TYPE, "read_only").map { LedgerKeyXdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "read_write", XDR_JSON_TYPE), XDR_JSON_TYPE, "read_write").map { LedgerKeyXdr.fromXdrJsonTree(it) }

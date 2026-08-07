@@ -27,6 +27,12 @@ class XdrJsonHelperTest {
     private val type = "SampleXdr"
     private val key = "field"
 
+    /**
+     * Keys or sibling objects in the documents that pin the cost of the duplicate-key scan. Large
+     * enough that quadratic behaviour would not finish, small enough to stay quick when linear.
+     */
+    private val largeDocumentWidth = 50_000
+
     private fun text(element: JsonElement): String = (element as JsonPrimitive).content
 
     private fun rejects(block: () -> Unit): IllegalArgumentException =
@@ -586,6 +592,65 @@ class XdrJsonHelperTest {
     }
 
     @Test
+    fun objectAcceptsExactlyItsDeclaredKeys() {
+        val value = buildJsonObject {
+            put("a", JsonPrimitive(1))
+            put("b", JsonPrimitive(2))
+        }
+        assertEquals(setOf("a", "b"), XdrJson.obj(value, type, arrayOf("a", "b")).keys)
+    }
+
+    /** A declared key may be absent here; [XdrJson.field] is what requires each one. */
+    @Test
+    fun objectAcceptsASubsetOfItsDeclaredKeys() {
+        val value = buildJsonObject { put("a", JsonPrimitive(1)) }
+        assertEquals(setOf("a"), XdrJson.obj(value, type, arrayOf("a", "b")).keys)
+    }
+
+    @Test
+    fun objectRejectsAKeyItDoesNotDeclare() {
+        val value = buildJsonObject {
+            put("a", JsonPrimitive(1))
+            put("c", JsonPrimitive(3))
+        }
+        val error = rejects { XdrJson.obj(value, type, arrayOf("a", "b")) }
+        assertEquals("$type: has the unknown key \"c\"", error.message)
+    }
+
+    @Test
+    fun objectNamesEveryKeyItDoesNotDeclare() {
+        val value = buildJsonObject {
+            put("c", JsonPrimitive(3))
+            put("a", JsonPrimitive(1))
+            put("d", JsonPrimitive(4))
+        }
+        val error = rejects { XdrJson.obj(value, type, arrayOf("a", "b")) }
+        assertEquals("$type: has the unknown keys \"c\", \"d\"", error.message)
+    }
+
+    @Test
+    fun objectCountsUnknownKeysBeyondTheOnesItNames() {
+        val value = buildJsonObject {
+            repeat(7) { put("k$it", JsonPrimitive(it)) }
+        }
+        val error = rejects { XdrJson.obj(value, type, arrayOf("a")) }
+        assertEquals(
+            "$type: has the unknown keys \"k0\", \"k1\", \"k2\", \"k3\", \"k4\" and 2 more",
+            error.message
+        )
+    }
+
+    /** Both spellings of an aliased key count as declared; [XdrJson.field] rejects having both. */
+    @Test
+    fun objectAcceptsEitherSpellingOfAnAliasedKey() {
+        val declared = arrayOf("type", "type_")
+        val canonical = buildJsonObject { put("type", JsonPrimitive("v")) }
+        val historical = buildJsonObject { put("type_", JsonPrimitive("v")) }
+        assertEquals(setOf("type"), XdrJson.obj(canonical, type, declared).keys)
+        assertEquals(setOf("type_"), XdrJson.obj(historical, type, declared).keys)
+    }
+
+    @Test
     fun schemaPropertyIsStrippedOnInput() {
         val value = buildJsonObject {
             put("\$schema", JsonPrimitive("https://example.test/schema.json"))
@@ -593,6 +658,16 @@ class XdrJsonHelperTest {
         }
         val stripped = XdrJson.obj(value, type)
         assertEquals(setOf("a"), stripped.keys)
+    }
+
+    /** `$schema` is dropped before the declared-key check, so it never reads as unknown. */
+    @Test
+    fun schemaPropertyIsStrippedBeforeTheDeclaredKeyCheck() {
+        val value = buildJsonObject {
+            put("\$schema", JsonPrimitive("https://example.test/schema.json"))
+            put("a", JsonPrimitive(1))
+        }
+        assertEquals(setOf("a"), XdrJson.obj(value, type, arrayOf("a")).keys)
     }
 
     @Test
@@ -667,13 +742,21 @@ class XdrJsonHelperTest {
         assertTrue(error.message!!.contains("\"a\""))
     }
 
+    /**
+     * The canonical key and its alias name one field, so a document carrying both states that
+     * field twice. Resolving it in favour of either spelling would let the other pass unread.
+     */
     @Test
-    fun fieldPrefersCanonicalKeyOverAlias() {
+    fun fieldRejectsBothSpellingsOfOneKey() {
         val value = buildJsonObject {
             put("type", JsonPrimitive("canonical"))
             put("type_", JsonPrimitive("alias"))
         }
-        assertEquals(JsonPrimitive("canonical"), XdrJson.field(value, "type", "type_", type))
+        val error = rejects { XdrJson.field(value, "type", "type_", type) }
+        assertEquals(
+            "$type: has both \"type\" and \"type_\", which are two spellings of one key",
+            error.message
+        )
     }
 
     @Test
@@ -801,6 +884,266 @@ class XdrJsonHelperTest {
         var element: JsonElement = JsonPrimitive(1)
         repeat(XdrJson.RECURSION_CAP + 1) { element = buildJsonObject { put("a", element) } }
         rejects { XdrJson.checkDepth(element, type) }
+    }
+
+    // -------------------------------------------------------------------------------------
+    // Duplicate object keys
+    // -------------------------------------------------------------------------------------
+
+    @Test
+    fun parseRejectsARepeatedKeyCarryingDifferentValues() {
+        val error = rejects { XdrJson.parse("{\"a\":1,\"a\":2}", type) }
+        assertEquals("$type: repeats the key \"a\"", error.message)
+    }
+
+    /**
+     * A repetition is refused for naming one key twice, not for disagreeing: the two occurrences
+     * carrying the same value is the case a decoder that compared values would let through.
+     */
+    @Test
+    fun parseRejectsARepeatedKeyCarryingTheSameValue() {
+        rejects { XdrJson.parse("{\"a\":1,\"a\":1}", type) }
+    }
+
+    @Test
+    fun parseRejectsAKeyRepeatedMoreThanTwice() {
+        rejects { XdrJson.parse("{\"a\":1,\"a\":2,\"a\":3}", type) }
+    }
+
+    /**
+     * Keys are compared after their escapes are resolved, so a repetition cannot be hidden by
+     * spelling one occurrence differently. Escaping changes how a key is written, never which
+     * key it is.
+     */
+    @Test
+    fun parseRejectsARepetitionSpelledWithAnEscape() {
+        rejects { XdrJson.parse("{\"\\u0061\":1,\"a\":2}", type) }
+        rejects { XdrJson.parse("{\"a\":1,\"\\u0061\":2}", type) }
+        rejects { XdrJson.parse("{\"\\u0061\":1,\"\\u0061\":2}", type) }
+    }
+
+    @Test
+    fun parseAcceptsAnEscapedKeyThatRepeatsNothing() {
+        val element = XdrJson.parse("{\"\\u0061\":1,\"b\":2}", type) as JsonObject
+        assertEquals(setOf("a", "b"), element.keys)
+    }
+
+    /**
+     * Every escape JSON defines resolves to the character it names, so each short escape and its
+     * `\uXXXX` spelling are the same key. An escape resolved to the wrong character, or passed
+     * through unresolved, would let a repetition of that key go unseen.
+     */
+    @Test
+    fun parseRejectsARepetitionSpelledWithAShortEscape() {
+        val equivalents = listOf(
+            "\\b" to "\\u0008",
+            "\\f" to "\\u000c",
+            "\\n" to "\\u000a",
+            "\\r" to "\\u000d",
+            "\\t" to "\\u0009",
+            "\\\"" to "\\u0022",
+            "\\\\" to "\\u005c",
+            "\\/" to "\\u002f"
+        )
+        for ((short, long) in equivalents) {
+            rejects { XdrJson.parse("{\"a${short}b\":1,\"a${long}b\":2}", type) }
+        }
+    }
+
+    /** A `\uXXXX` escape is JSON syntax, so its digits are read in either case, as JSON reads them. */
+    @Test
+    fun parseResolvesAUnicodeEscapeInEitherDigitCase() {
+        rejects { XdrJson.parse("{\"\\u006E\":1,\"n\":2}", type) }
+        rejects { XdrJson.parse("{\"\\u006E\":1,\"\\u006e\":2}", type) }
+    }
+
+    /**
+     * An escape the format does not define, or one cut short, is malformed input for the parser
+     * to report. The scan resolves what it can and completes its pass rather than failing first
+     * with a message about a rule that is not the one being broken.
+     */
+    @Test
+    fun parseLeavesAMalformedUnicodeEscapeToTheParser() {
+        val error = rejects { XdrJson.parse("{\"a\\uZZZZb\":1}", type) }
+        assertTrue(error.message!!.contains("not valid JSON"), error.message!!)
+        rejects { XdrJson.parse("{\"a\\u12\":1}", type) }
+    }
+
+    /**
+     * Characters on either side of each hexadecimal range, so a range read one character too wide
+     * would resolve an escape the parser will refuse and give the key a character it never had.
+     */
+    @Test
+    fun parseTreatsEveryNonHexadecimalDigitAsMalformed() {
+        for (character in listOf('/', ':', '@', 'G', 'Z', 'g', 'z', '`')) {
+            rejects { XdrJson.parse("{\"a\\u00$character${character}b\":1}", type) }
+        }
+    }
+
+    @Test
+    fun parseRejectsARepetitionOfAKeyHoldingAMalformedEscape() {
+        rejects { XdrJson.parse("{\"a\\uZZZZb\":1,\"a\\uZZZZb\":2}", type) }
+    }
+
+    @Test
+    fun parseRejectsARepeatedEmptyKey() {
+        rejects { XdrJson.parse("{\"\":1,\"\":2}", type) }
+    }
+
+    @Test
+    fun parseAcceptsAnEmptyKeyUsedOnce() {
+        val element = XdrJson.parse("{\"\":1,\"a\":2}", type) as JsonObject
+        assertEquals(setOf("", "a"), element.keys)
+    }
+
+    @Test
+    fun parseLeavesAnUnterminatedStringToTheParser() {
+        val error = rejects { XdrJson.parse("{\"a", type) }
+        assertTrue(error.message!!.contains("not valid JSON"), error.message!!)
+        rejects { XdrJson.parse("{\"a\":\"b", type) }
+    }
+
+    /**
+     * A closing brace with nothing open is malformed input the parser reports. The scan must
+     * carry no negative depth past it, since a depth below zero would index the frame it uses to
+     * track objects out of its bounds when the next container opens.
+     */
+    @Test
+    fun parseLeavesAnUnbalancedClosingBraceToTheParser() {
+        val error = rejects { XdrJson.parse("}{\"a\":1}", type) }
+        assertTrue(error.message!!.contains("not valid JSON"), error.message!!)
+        rejects { XdrJson.parse("]]]]{\"a\":1,\"a\":2}", type) }
+    }
+
+    /**
+     * A surrogate pair reaches the comparison as the two code units it is made of, whichever way
+     * the document writes it, so the escaped and literal spellings of one character collide.
+     */
+    @Test
+    fun parseRejectsARepetitionSpelledWithASurrogatePair() {
+        rejects { XdrJson.parse("{\"\\ud83d\\ude00\":1,\"\uD83D\uDE00\":2}", type) }
+    }
+
+    /**
+     * The set of seen keys belongs to one object, so two objects are free to use the same key.
+     * Sharing a set across objects would refuse the ordinary case where every element of an array
+     * has the same shape.
+     */
+    @Test
+    fun parseAcceptsTheSameKeyInSiblingObjects() {
+        val element = XdrJson.parse("{\"x\":{\"a\":1},\"y\":{\"a\":2}}", type) as JsonObject
+        assertEquals(setOf("x", "y"), element.keys)
+    }
+
+    @Test
+    fun parseAcceptsTheSameKeyInSiblingArrayElements() {
+        val element = XdrJson.parse("[{\"a\":1},{\"a\":2},{\"a\":3}]", type) as JsonArray
+        assertEquals(3, element.size)
+    }
+
+    @Test
+    fun parseAcceptsANestedObjectRepeatingTheKeyOfItsParent() {
+        val element = XdrJson.parse("{\"a\":{\"a\":{\"a\":1}}}", type) as JsonObject
+        assertEquals(setOf("a"), element.keys)
+    }
+
+    @Test
+    fun parseRejectsARepetitionInsideANestedObject() {
+        rejects { XdrJson.parse("{\"outer\":{\"a\":1,\"a\":2}}", type) }
+    }
+
+    @Test
+    fun parseRejectsARepetitionInsideAnArrayElement() {
+        rejects { XdrJson.parse("[{\"a\":1,\"a\":2}]", type) }
+    }
+
+    /**
+     * A frame closes with the container that opened it, so keys seen inside a nested object never
+     * leak into what its parent has already used.
+     */
+    @Test
+    fun parseAcceptsAKeyReusedAfterANestedObjectClosed() {
+        val element = XdrJson.parse("{\"a\":{\"b\":1},\"c\":{\"b\":2}}", type) as JsonObject
+        assertEquals(setOf("a", "c"), element.keys)
+    }
+
+    /** Only the text before a colon names a key; a value that reads like one is still a value. */
+    @Test
+    fun parseAcceptsAValueEqualToAKeyBesideIt() {
+        val element = XdrJson.parse("{\"a\":\"a\",\"b\":\"a\"}", type) as JsonObject
+        assertEquals(setOf("a", "b"), element.keys)
+    }
+
+    @Test
+    fun parseAcceptsRepeatedStringsInsideAnArray() {
+        val element = XdrJson.parse("{\"a\":[\"k\",\"k\",\"k\"]}", type) as JsonObject
+        assertEquals(3, (element["a"] as JsonArray).size)
+    }
+
+    /** A whole document quoted as a value is text, so its keys are not this document's keys. */
+    @Test
+    fun parseAcceptsARepetitionQuotedInsideAStringValue() {
+        val element = XdrJson.parse("{\"a\":\"{\\\"b\\\":1,\\\"b\\\":2}\"}", type) as JsonObject
+        assertEquals(setOf("a"), element.keys)
+    }
+
+    /**
+     * A key is the text before its colon, and JSON allows any of its four whitespace characters
+     * between the two. Whitespace the scan did not skip would leave the key unrecognised, and the
+     * repetition with it.
+     */
+    @Test
+    fun parseRejectsARepetitionSeparatedByWhitespace() {
+        rejects { XdrJson.parse("{ \"a\" : 1 , \"a\" : 2 }", type) }
+        for (space in listOf(" ", "\t", "\n", "\r", " \t\n\r ")) {
+            rejects { XdrJson.parse("{\"a\"$space:1,\"a\"$space:2}", type) }
+        }
+    }
+
+    /** Text after a string that is neither whitespace nor a colon leaves it a value, not a key. */
+    @Test
+    fun parseAcceptsRepeatedStringsThatNoColonFollows() {
+        val element = XdrJson.parse("[\"a\" , \"a\"]", type) as JsonArray
+        assertEquals(2, element.size)
+    }
+
+    /**
+     * The scan visits each character once regardless of how many keys or objects the document
+     * carries. A duplicate check that rescanned an object per key, or that reused and cleared one
+     * key set across sibling objects, would take time in the square of these sizes and leave the
+     * decoder open to a document that costs far more to reject than to send.
+     */
+    @Test
+    fun parseStaysLinearOverADocumentWithManyKeys() {
+        val document = (0 until largeDocumentWidth).joinToString(
+            separator = ",", prefix = "{", postfix = "}"
+        ) { "\"k$it\":$it" }
+        assertEquals(largeDocumentWidth, (XdrJson.parse(document, type) as JsonObject).size)
+    }
+
+    @Test
+    fun parseStaysLinearOverADocumentWithManySiblingObjects() {
+        val document = (0 until largeDocumentWidth).joinToString(
+            separator = ",", prefix = "[", postfix = "]"
+        ) { "{\"k\":$it}" }
+        assertEquals(largeDocumentWidth, (XdrJson.parse(document, type) as JsonArray).size)
+    }
+
+    /**
+     * The tree entry points cannot meet a duplicate: a [JsonObject] is a map, so a caller
+     * building one has already resolved any repetition before the decoder sees it. The check
+     * therefore belongs to the text path alone, and this pins that the tree path stays free of
+     * one rather than silently missing it.
+     */
+    @Test
+    fun aTreeObjectCannotCarryARepeatedKey() {
+        val built = buildJsonObject {
+            put("a", JsonPrimitive(1))
+            put("a", JsonPrimitive(2))
+        }
+        assertEquals(1, built.size)
+        assertEquals(JsonPrimitive(2), built["a"])
+        XdrJson.checkDepth(built, type)
     }
 
     // -------------------------------------------------------------------------------------

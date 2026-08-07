@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "Curve25519SecretXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key")
+
 /**
  * XDR Source:
  * struct Curve25519Secret
@@ -30,7 +32,7 @@ data class Curve25519SecretXdr(
     fun fromXdrJsonElement(element: JsonElement): Curve25519SecretXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): Curve25519SecretXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return Curve25519SecretXdr(
         XdrJson.hex(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key", expectedLength = 32)
       )

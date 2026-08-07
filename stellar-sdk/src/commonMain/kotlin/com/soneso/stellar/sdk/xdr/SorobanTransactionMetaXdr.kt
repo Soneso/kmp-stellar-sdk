@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SorobanTransactionMetaXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "events", "return_value", "diagnostic_events")
+
 /**
  * XDR Source:
  * struct SorobanTransactionMeta
@@ -49,7 +51,7 @@ data class SorobanTransactionMetaXdr(
     fun fromXdrJsonElement(element: JsonElement): SorobanTransactionMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SorobanTransactionMetaXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SorobanTransactionMetaXdr(
         SorobanTransactionMetaExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
         XdrJson.array(XdrJson.field(json, "events", XDR_JSON_TYPE), XDR_JSON_TYPE, "events").map { ContractEventXdr.fromXdrJsonTree(it) },

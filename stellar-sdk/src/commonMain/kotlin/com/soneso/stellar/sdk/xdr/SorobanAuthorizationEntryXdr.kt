@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SorobanAuthorizationEntryXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("credentials", "root_invocation")
+
 /**
  * XDR Source:
  * struct SorobanAuthorizationEntry
@@ -33,7 +35,7 @@ data class SorobanAuthorizationEntryXdr(
     fun fromXdrJsonElement(element: JsonElement): SorobanAuthorizationEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SorobanAuthorizationEntryXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SorobanAuthorizationEntryXdr(
         SorobanCredentialsXdr.fromXdrJsonTree(XdrJson.field(json, "credentials", XDR_JSON_TYPE)),
         SorobanAuthorizedInvocationXdr.fromXdrJsonTree(XdrJson.field(json, "root_invocation", XDR_JSON_TYPE))

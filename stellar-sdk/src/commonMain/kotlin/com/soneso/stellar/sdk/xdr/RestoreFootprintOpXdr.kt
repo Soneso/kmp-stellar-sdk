@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "RestoreFootprintOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext")
+
 /**
  * XDR Source:
  * struct RestoreFootprintOp
@@ -30,7 +32,7 @@ data class RestoreFootprintOpXdr(
     fun fromXdrJsonElement(element: JsonElement): RestoreFootprintOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): RestoreFootprintOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return RestoreFootprintOpXdr(
         ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
       )

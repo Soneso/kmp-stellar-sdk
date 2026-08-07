@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerCloseValueSignatureXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("node_id", "signature")
+
 /**
  * XDR Source:
  * struct LedgerCloseValueSignature
@@ -35,7 +37,7 @@ data class LedgerCloseValueSignatureXdr(
     fun fromXdrJsonElement(element: JsonElement): LedgerCloseValueSignatureXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseValueSignatureXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LedgerCloseValueSignatureXdr(
         NodeIDXdr.fromXdrJsonTree(XdrJson.field(json, "node_id", XDR_JSON_TYPE)),
         SignatureXdr.fromXdrJsonTree(XdrJson.field(json, "signature", XDR_JSON_TYPE))

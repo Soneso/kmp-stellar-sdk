@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "InvokeHostFunctionOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("host_function", "auth")
+
 /**
  * XDR Source:
  * struct InvokeHostFunctionOp
@@ -36,7 +38,7 @@ data class InvokeHostFunctionOpXdr(
     fun fromXdrJsonElement(element: JsonElement): InvokeHostFunctionOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): InvokeHostFunctionOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return InvokeHostFunctionOpXdr(
         HostFunctionXdr.fromXdrJsonTree(XdrJson.field(json, "host_function", XDR_JSON_TYPE)),
         XdrJson.array(XdrJson.field(json, "auth", XDR_JSON_TYPE), XDR_JSON_TYPE, "auth").map { SorobanAuthorizationEntryXdr.fromXdrJsonTree(it) }

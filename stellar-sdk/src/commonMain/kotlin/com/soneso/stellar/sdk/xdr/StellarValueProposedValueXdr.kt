@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StellarValueProposedValueXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("tx_set_hash", "previous_ledger_hash", "previous_ledger_version", "lc_value_signature")
+
 /**
  * XDR Source:
  * struct
@@ -39,7 +41,7 @@ data class StellarValueProposedValueXdr(
     fun fromXdrJsonElement(element: JsonElement): StellarValueProposedValueXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): StellarValueProposedValueXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return StellarValueProposedValueXdr(
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "tx_set_hash", XDR_JSON_TYPE)),
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "previous_ledger_hash", XDR_JSON_TYPE)),

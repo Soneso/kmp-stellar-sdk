@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerSCPMessagesXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_seq", "messages")
+
 /**
  * XDR Source:
  * struct LedgerSCPMessages
@@ -33,7 +35,7 @@ data class LedgerSCPMessagesXdr(
     fun fromXdrJsonElement(element: JsonElement): LedgerSCPMessagesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LedgerSCPMessagesXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LedgerSCPMessagesXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_seq", XDR_JSON_TYPE)),
         XdrJson.array(XdrJson.field(json, "messages", XDR_JSON_TYPE), XDR_JSON_TYPE, "messages").map { SCPEnvelopeXdr.fromXdrJsonTree(it) }

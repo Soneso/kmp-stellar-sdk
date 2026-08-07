@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "BumpSequenceOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("bump_to")
+
 /**
  * XDR Source:
  * struct BumpSequenceOp
@@ -30,7 +32,7 @@ data class BumpSequenceOpXdr(
     fun fromXdrJsonElement(element: JsonElement): BumpSequenceOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): BumpSequenceOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return BumpSequenceOpXdr(
         SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "bump_to", XDR_JSON_TYPE))
       )

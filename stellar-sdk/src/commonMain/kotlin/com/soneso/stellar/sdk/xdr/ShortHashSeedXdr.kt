@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ShortHashSeedXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("seed")
+
 /**
  * XDR Source:
  * struct ShortHashSeed
@@ -30,7 +32,7 @@ data class ShortHashSeedXdr(
     fun fromXdrJsonElement(element: JsonElement): ShortHashSeedXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ShortHashSeedXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ShortHashSeedXdr(
         XdrJson.hex(XdrJson.field(json, "seed", XDR_JSON_TYPE), XDR_JSON_TYPE, "seed", expectedLength = 16)
       )

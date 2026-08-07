@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StateArchivalSettingsXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("max_entry_ttl", "min_temporary_ttl", "min_persistent_ttl", "persistent_rent_rate_denominator", "temp_rent_rate_denominator", "max_entries_to_archive", "live_soroban_state_size_window_sample_size", "live_soroban_state_size_window_sample_period", "eviction_scan_size", "starting_eviction_scan_level")
+
 /**
  * XDR Source:
  * struct StateArchivalSettings {
@@ -74,7 +76,7 @@ data class StateArchivalSettingsXdr(
     fun fromXdrJsonElement(element: JsonElement): StateArchivalSettingsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): StateArchivalSettingsXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return StateArchivalSettingsXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "max_entry_ttl", XDR_JSON_TYPE)),
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "min_temporary_ttl", XDR_JSON_TYPE)),

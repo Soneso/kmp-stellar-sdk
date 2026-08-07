@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "FreezeBypassTxsDeltaXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("add_txs", "remove_txs")
+
 /**
  * XDR Source:
  * struct FreezeBypassTxsDelta {
@@ -32,7 +34,7 @@ data class FreezeBypassTxsDeltaXdr(
     fun fromXdrJsonElement(element: JsonElement): FreezeBypassTxsDeltaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): FreezeBypassTxsDeltaXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return FreezeBypassTxsDeltaXdr(
         XdrJson.array(XdrJson.field(json, "add_txs", XDR_JSON_TYPE), XDR_JSON_TYPE, "add_txs").map { HashXdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "remove_txs", XDR_JSON_TYPE), XDR_JSON_TYPE, "remove_txs").map { HashXdr.fromXdrJsonTree(it) }

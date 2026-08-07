@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ErrorDetailXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("code", "message")
+
 /**
  * XDR Source:
  * struct ErrorDetail
@@ -33,7 +35,7 @@ data class ErrorDetailXdr(
     fun fromXdrJsonElement(element: JsonElement): ErrorDetailXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ErrorDetailXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ErrorDetailXdr(
         XdrJson.int32(XdrJson.field(json, "code", XDR_JSON_TYPE), XDR_JSON_TYPE, "code"),
         XdrJson.unescapeString(XdrJson.field(json, "message", XDR_JSON_TYPE), XDR_JSON_TYPE, "message", maxLength = 256)

@@ -15,8 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back without loss. Output is compact and in XDR declaration order, so equal
   values produce byte-identical documents. Decoding raises
   `IllegalArgumentException` on malformed input, naming the type and the
-  offending key. The methods are emitted by the XDR generator, so they track the
-  XDR pin; see `docs/sep/sep-51.md` for the mapping rules, the documented
+  offending key. A struct accepts only the keys it declares: an unrecognised key
+  is rejected rather than ignored, so a misspelled field fails instead of quietly
+  discarding its value. `$schema` is the one property accepted without being
+  declared. An object must also name each key once. `fromXdrJson` rejects a
+  repeated key rather than resolving it to one occurrence and discarding the
+  other; the rule covers one object at a time, so separate objects may share a
+  key name. The methods are emitted by the XDR generator, so they track the XDR
+  pin; see `docs/sep/sep-51.md` for the mapping rules, the documented
   limitations and the input-strictness choices.
 - `kotlinx-serialization-json` moved from `implementation` to `api` in
   `stellar-sdk/build.gradle.kts`. `JsonElement` appears in the public signature

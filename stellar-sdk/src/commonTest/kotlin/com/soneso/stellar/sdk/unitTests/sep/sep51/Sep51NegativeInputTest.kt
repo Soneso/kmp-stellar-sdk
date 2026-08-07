@@ -8,6 +8,7 @@ import com.soneso.stellar.sdk.xdr.Curve25519PublicXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int32Xdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
+import com.soneso.stellar.sdk.xdr.SCSpecUDTStructFieldV0Xdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.ShortHashSeedXdr
@@ -30,9 +31,10 @@ import kotlin.test.assertTrue
  *
  * Decoding accepts only the exact spelling encoding produces: hexadecimal is lowercase and of
  * even length, the escape ladder uses lowercase `\xNN` and no other escape, an integer is a plain
- * base-10 literal within the range of its bit size, a struct carries every key it declares, and a
- * union carries exactly one arm it declares. Every refusal raises [IllegalArgumentException]
- * naming the type, and the offending key where the value sits under one.
+ * base-10 literal within the range of its bit size, a struct carries every key it declares and no
+ * key it does not, and a union carries exactly one arm it declares. Every refusal raises
+ * [IllegalArgumentException] naming the type, and the offending key where the value sits under
+ * one.
  */
 class Sep51NegativeInputTest {
 
@@ -343,7 +345,87 @@ class Sep51NegativeInputTest {
     fun aStructRejectsAnUnknownKeyStandingInForADeclaredOne() {
         val document = "{\"key_hash\":\"${hex(32)}\",\"live_until\":1}"
         val error = rejects { TTLEntryXdr.fromXdrJson(document) }
-        assertTrue(error.message!!.contains("live_until_ledger_seq"), error.message!!)
+        assertEquals("TTLEntryXdr: has the unknown key \"live_until\"", error.message)
+    }
+
+    @Test
+    fun aStructRejectsAKeyThatNamesNoField() {
+        val document =
+            "{\"key_hash\":\"${hex(32)}\",\"live_until_ledger_seq\":1,\"note\":\"anything\"}"
+        val error = rejects { TTLEntryXdr.fromXdrJson(document) }
+        assertEquals("TTLEntryXdr: has the unknown key \"note\"", error.message)
+    }
+
+    @Test
+    fun aStructNamesEveryUnknownKeyItCarries() {
+        val document = "{\"alpha\":1,\"key_hash\":\"${hex(32)}\"," +
+            "\"live_until_ledger_seq\":1,\"omega\":2}"
+        val error = rejects { TTLEntryXdr.fromXdrJson(document) }
+        assertEquals("TTLEntryXdr: has the unknown keys \"alpha\", \"omega\"", error.message)
+    }
+
+    /**
+     * A hostile document can carry more unknown keys than any message should repeat, so the
+     * message names a bounded prefix and counts the rest.
+     */
+    @Test
+    fun aStructCountsUnknownKeysBeyondTheOnesItNames() {
+        val extras = (1..8).joinToString(",") { "\"k$it\":1" }
+        val document = "{\"key_hash\":\"${hex(32)}\",\"live_until_ledger_seq\":1,$extras}"
+        val error = rejects { TTLEntryXdr.fromXdrJson(document) }
+        assertEquals(
+            "TTLEntryXdr: has the unknown keys \"k1\", \"k2\", \"k3\", \"k4\", \"k5\" and 3 more",
+            error.message
+        )
+    }
+
+    /**
+     * A key name reaches the message through the same rendering every other untrusted value
+     * uses, so it cannot carry a line break or a terminal control sequence into a log. A newline
+     * is already escaped by the JSON rendering; a delete character survives it and is escaped
+     * after it.
+     */
+    @Test
+    fun aStructEscapesAnUnknownKeyItNames() {
+        fun messageFor(key: String): String? {
+            val document = buildJsonObject {
+                put("key_hash", JsonPrimitive(hex(32)))
+                put("live_until_ledger_seq", JsonPrimitive(1))
+                put(key, JsonPrimitive(1))
+            }
+            return rejects { TTLEntryXdr.fromXdrJsonElement(document) }.message
+        }
+        assertEquals("TTLEntryXdr: has the unknown key \"a\\nb\"", messageFor("a\nb"))
+        assertEquals("TTLEntryXdr: has the unknown key \"a\\x7fb\"", messageFor("a\u007Fb"))
+    }
+
+    /**
+     * `type` and `type_` are two spellings of one key, so a document supplying both states the
+     * field twice rather than once, and neither spelling gets to win by position.
+     */
+    @Test
+    fun aStructRejectsBothSpellingsOfAKeyThatHasAHistoricalOne() {
+        val error = rejects {
+            SCSpecUDTStructFieldV0Xdr.fromXdrJson(
+                "{\"doc\":\"d\",\"name\":\"n\",\"type\":\"val\",\"type_\":\"val\"}"
+            )
+        }
+        assertEquals(
+            "SCSpecUDTStructFieldV0Xdr: has both \"type\" and \"type_\", " +
+                "which are two spellings of one key",
+            error.message
+        )
+    }
+
+    /** Either spelling alone names the declared field, so neither is an unknown key. */
+    @Test
+    fun aStructAcceptsEitherSpellingOfAKeyThatHasAHistoricalOne() {
+        val canonical = SCSpecUDTStructFieldV0Xdr
+            .fromXdrJson("{\"doc\":\"d\",\"name\":\"n\",\"type\":\"val\"}")
+        val historical = SCSpecUDTStructFieldV0Xdr
+            .fromXdrJson("{\"doc\":\"d\",\"name\":\"n\",\"type_\":\"val\"}")
+        assertEquals(canonical, historical)
+        assertEquals("n", canonical.name)
     }
 
     // -------------------------------------------------------------------------------------
@@ -509,6 +591,92 @@ class Sep51NegativeInputTest {
     @Test
     fun theSameDocumentWithoutTheTrailingContentIsAccepted() {
         assertEquals(1u, TTLEntryXdr.fromXdrJson(TTL_ENTRY_JSON).liveUntilLedgerSeq.value)
+    }
+
+    // -------------------------------------------------------------------------------------
+    // Repeated keys
+    // -------------------------------------------------------------------------------------
+
+    /**
+     * SEP-0051 gives a value one document, so an object naming a key twice describes two values
+     * where the format admits one. Reading either occurrence would discard the other silently,
+     * so the document is refused instead.
+     *
+     * The refusal belongs to the text form alone. A tree handed to `fromXdrJsonElement` reaches
+     * the decoder as a map, which resolved any repetition before the decoder could see it.
+     */
+    @Test
+    fun aRepeatedKeyIsRejected() {
+        val document = "{\"key_hash\":\"${hex(32)}\",\"live_until_ledger_seq\":1," +
+            "\"live_until_ledger_seq\":2}"
+        val error = rejects { TTLEntryXdr.fromXdrJson(document) }
+        assertEquals("TTLEntryXdr: repeats the key \"live_until_ledger_seq\"", error.message)
+    }
+
+    /** Two occurrences agreeing is still two occurrences; the count is what the format fixes. */
+    @Test
+    fun aRepeatedKeyIsRejectedEvenWhenBothOccurrencesAgree() {
+        val document = "{\"key_hash\":\"${hex(32)}\",\"live_until_ledger_seq\":1," +
+            "\"live_until_ledger_seq\":1}"
+        rejects { TTLEntryXdr.fromXdrJson(document) }
+    }
+
+    /**
+     * Keys compare after their escapes resolve, so a repetition cannot be smuggled past the check
+     * by writing one occurrence as escapes. Both spellings name `live_until_ledger_seq`.
+     */
+    @Test
+    fun aRepeatedKeySpelledWithEscapesIsRejected() {
+        val escaped = "\\u006cive_until_ledger_seq"
+        val document = "{\"key_hash\":\"${hex(32)}\",\"live_until_ledger_seq\":1,\"$escaped\":2}"
+        val error = rejects { TTLEntryXdr.fromXdrJson(document) }
+        assertEquals("TTLEntryXdr: repeats the key \"live_until_ledger_seq\"", error.message)
+    }
+
+    /** An escaped spelling that repeats nothing names its field and decodes. */
+    @Test
+    fun anEscapedKeySpellingIsAcceptedOnItsOwn() {
+        val escaped = "\\u006cive_until_ledger_seq"
+        val document = "{\"key_hash\":\"${hex(32)}\",\"$escaped\":7}"
+        assertEquals(7u, TTLEntryXdr.fromXdrJson(document).liveUntilLedgerSeq.value)
+    }
+
+    @Test
+    fun aRepeatedArmKeyOnAUnionIsRejected() {
+        rejects { AssetXdr.fromXdrJson("{\"credit_alphanum4\":1,\"credit_alphanum4\":2}") }
+    }
+
+    @Test
+    fun aRepeatedKeyInsideANestedObjectIsRejected() {
+        val document = "{\"map\":[{\"key\":{\"u32\":1,\"u32\":2},\"val\":\"void\"}]}"
+        val error = rejects { SCValXdr.fromXdrJson(document) }
+        assertEquals("SCValXdr: repeats the key \"u32\"", error.message)
+    }
+
+    @Test
+    fun aRepeatedKeyInsideAnArrayElementIsRejected() {
+        val document = "{\"map\":[{\"key\":\"void\",\"key\":\"void\",\"val\":\"void\"}]}"
+        rejects { SCValXdr.fromXdrJson(document) }
+    }
+
+    /**
+     * The check is scoped to one object, so the shape every element of an array shares is not
+     * mistaken for a repetition, and neither is a nested value reusing the key that carries it.
+     */
+    @Test
+    fun theSameKeyInSeparateObjectsIsAccepted() {
+        val document = "{\"map\":[{\"key\":\"void\",\"val\":\"void\"}," +
+            "{\"key\":\"void\",\"val\":\"void\"}]}"
+        val decoded = SCValXdr.fromXdrJson(document)
+        assertEquals(2, (decoded as SCValXdr.Map).value!!.value.size)
+    }
+
+    @Test
+    fun aNestedObjectRepeatingTheKeyOfItsParentIsAccepted() {
+        val inner = "{\"map\":[{\"key\":\"void\",\"val\":\"void\"}]}"
+        val document = "{\"map\":[{\"key\":$inner,\"val\":\"void\"}]}"
+        val decoded = SCValXdr.fromXdrJson(document)
+        assertEquals(1, (decoded as SCValXdr.Map).value!!.value.size)
     }
 
     // -------------------------------------------------------------------------------------

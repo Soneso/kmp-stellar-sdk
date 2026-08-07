@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementConfirmXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ballot", "n_prepared", "n_commit", "n_h", "quorum_set_hash")
+
 /**
  * XDR Source:
  * struct
@@ -47,7 +49,7 @@ data class SCPStatementConfirmXdr(
     fun fromXdrJsonElement(element: JsonElement): SCPStatementConfirmXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCPStatementConfirmXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCPStatementConfirmXdr(
         SCPBallotXdr.fromXdrJsonTree(XdrJson.field(json, "ballot", XDR_JSON_TYPE)),
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_prepared", XDR_JSON_TYPE)),

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "BucketMetadataXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_version", "ext")
+
 /**
  * XDR Source:
  * struct BucketMetadata
@@ -44,7 +46,7 @@ data class BucketMetadataXdr(
     fun fromXdrJsonElement(element: JsonElement): BucketMetadataXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): BucketMetadataXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return BucketMetadataXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_version", XDR_JSON_TYPE)),
         BucketMetadataExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))

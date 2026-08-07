@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SetTrustLineFlagsOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("trustor", "asset", "clear_flags", "set_flags")
+
 /**
  * XDR Source:
  * struct SetTrustLineFlagsOp
@@ -42,7 +44,7 @@ data class SetTrustLineFlagsOpXdr(
     fun fromXdrJsonElement(element: JsonElement): SetTrustLineFlagsOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SetTrustLineFlagsOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SetTrustLineFlagsOpXdr(
         AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "trustor", XDR_JSON_TYPE)),
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),

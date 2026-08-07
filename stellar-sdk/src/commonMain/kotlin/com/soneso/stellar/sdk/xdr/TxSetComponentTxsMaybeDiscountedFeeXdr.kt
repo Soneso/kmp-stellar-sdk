@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TxSetComponentTxsMaybeDiscountedFeeXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("base_fee", "txs")
+
 /**
  * XDR Source:
  * struct
@@ -33,7 +35,7 @@ data class TxSetComponentTxsMaybeDiscountedFeeXdr(
     fun fromXdrJsonElement(element: JsonElement): TxSetComponentTxsMaybeDiscountedFeeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): TxSetComponentTxsMaybeDiscountedFeeXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return TxSetComponentTxsMaybeDiscountedFeeXdr(
         XdrJson.optional(XdrJson.field(json, "base_fee", XDR_JSON_TYPE))?.let { Int64Xdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "txs", XDR_JSON_TYPE), XDR_JSON_TYPE, "txs").map { TransactionEnvelopeXdr.fromXdrJsonTree(it) }

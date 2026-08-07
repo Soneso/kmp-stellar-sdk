@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ParallelTxsComponentXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("base_fee", "execution_stages")
+
 /**
  * XDR Source:
  * struct ParallelTxsComponent
@@ -36,7 +38,7 @@ data class ParallelTxsComponentXdr(
     fun fromXdrJsonElement(element: JsonElement): ParallelTxsComponentXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ParallelTxsComponentXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ParallelTxsComponentXdr(
         XdrJson.optional(XdrJson.field(json, "base_fee", XDR_JSON_TYPE))?.let { Int64Xdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "execution_stages", XDR_JSON_TYPE), XDR_JSON_TYPE, "execution_stages").map { ParallelTxExecutionStageXdr.fromXdrJsonTree(it) }

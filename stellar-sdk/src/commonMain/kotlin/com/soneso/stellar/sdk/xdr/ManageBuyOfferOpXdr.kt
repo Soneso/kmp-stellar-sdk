@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ManageBuyOfferOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("selling", "buying", "buy_amount", "price", "offer_id")
+
 /**
  * XDR Source:
  * struct ManageBuyOfferOp
@@ -51,7 +53,7 @@ data class ManageBuyOfferOpXdr(
     fun fromXdrJsonElement(element: JsonElement): ManageBuyOfferOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ManageBuyOfferOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ManageBuyOfferOpXdr(
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "selling", XDR_JSON_TYPE)),
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "buying", XDR_JSON_TYPE)),

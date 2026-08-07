@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigUpgradeSetKeyXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("contract_id", "content_hash")
+
 /**
  * XDR Source:
  * struct ConfigUpgradeSetKey {
@@ -32,7 +34,7 @@ data class ConfigUpgradeSetKeyXdr(
     fun fromXdrJsonElement(element: JsonElement): ConfigUpgradeSetKeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ConfigUpgradeSetKeyXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ConfigUpgradeSetKeyXdr(
         ContractIDXdr.fromXdrJsonTree(XdrJson.field(json, "contract_id", XDR_JSON_TYPE)),
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "content_hash", XDR_JSON_TYPE))

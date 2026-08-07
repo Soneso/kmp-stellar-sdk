@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ManageDataOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("data_name", "data_value")
+
 /**
  * XDR Source:
  * struct ManageDataOp
@@ -34,7 +36,7 @@ data class ManageDataOpXdr(
     fun fromXdrJsonElement(element: JsonElement): ManageDataOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ManageDataOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ManageDataOpXdr(
         String64Xdr.fromXdrJsonTree(XdrJson.field(json, "data_name", XDR_JSON_TYPE)),
         XdrJson.optional(XdrJson.field(json, "data_value", XDR_JSON_TYPE))?.let { DataValueXdr.fromXdrJsonTree(it) }

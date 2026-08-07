@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractExecutionLanesV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_max_tx_count")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractExecutionLanesV0
@@ -32,7 +34,7 @@ data class ConfigSettingContractExecutionLanesV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractExecutionLanesV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractExecutionLanesV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ConfigSettingContractExecutionLanesV0Xdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_tx_count", XDR_JSON_TYPE))
       )

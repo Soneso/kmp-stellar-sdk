@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerKeyTtlXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key_hash")
+
 /**
  * XDR Source:
  * struct
@@ -32,7 +34,7 @@ data class LedgerKeyTtlXdr(
     fun fromXdrJsonElement(element: JsonElement): LedgerKeyTtlXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LedgerKeyTtlXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LedgerKeyTtlXdr(
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "key_hash", XDR_JSON_TYPE))
       )

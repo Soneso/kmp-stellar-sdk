@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionSignaturePayloadXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("network_id", "tagged_transaction")
+
 /**
  * XDR Source:
  * struct TransactionSignaturePayload
@@ -41,7 +43,7 @@ data class TransactionSignaturePayloadXdr(
     fun fromXdrJsonElement(element: JsonElement): TransactionSignaturePayloadXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): TransactionSignaturePayloadXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return TransactionSignaturePayloadXdr(
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "network_id", XDR_JSON_TYPE)),
         TransactionSignaturePayloadTaggedTransactionXdr.fromXdrJsonTree(XdrJson.field(json, "tagged_transaction", XDR_JSON_TYPE))

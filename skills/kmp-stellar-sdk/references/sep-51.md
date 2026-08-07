@@ -371,14 +371,17 @@ Decoding is deliberately stricter than encoding is lax: the SDK accepts the spel
 - integer literals with a leading `+`, a leading zero, a negative zero, a decimal point, an exponent or a hexadecimal prefix
 - a 32-bit integer given as a string
 - a value outside the range of its declared bit width
-- a struct missing any declared key, or holding `null` where the member is not optional
+- a struct missing any declared key, carrying a key that names no field, or holding `null` where the member is not optional
+- an object naming the same key twice, `$schema` included
 - a union object carrying zero or more than one arm, an arm name the union does not declare, or an enum member name the enum does not declare (including the right name in the wrong case)
 - an array longer than its declared maximum, or opaque data longer than its declared maximum
 - a document nesting more than 128 containers deep
 
 A `$schema` property is accepted anywhere an object is read, ignored, and never emitted, so a document annotated with its schema URL decodes unchanged. A `$schema` property on its own does not identify a value: a union still needs an arm.
 
-Where a struct member is spelled `type` in XDR, the key is `type`; the historical spelling `type_` is still accepted on input and never emitted.
+The repeated-key rule covers one object at a time, so separate objects may share a key name, as every element of an array normally does. It applies to `fromXdrJson`, which reads text. `fromXdrJsonElement` takes a `JsonElement` the caller built, and a `JsonObject` is a map, so a repetition was resolved before the decoder saw it.
+
+Where a struct member is spelled `type` in XDR, the key is `type`; the historical spelling `type_` is still accepted on input and never emitted. The two spellings name one field: either one alone decodes, and a document carrying both is rejected.
 
 ## Error Handling
 

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecEventParamV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "name", "type", "type_", "location")
+
 /**
  * XDR Source:
  * struct SCSpecEventParamV0
@@ -39,7 +41,7 @@ data class SCSpecEventParamV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): SCSpecEventParamV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCSpecEventParamV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCSpecEventParamV0Xdr(
         XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
         XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 30),

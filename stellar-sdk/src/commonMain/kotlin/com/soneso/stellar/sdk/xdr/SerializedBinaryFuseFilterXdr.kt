@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SerializedBinaryFuseFilterXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("type", "type_", "input_hash_seed", "filter_seed", "segment_length", "segement_length_mask", "segment_count", "segment_count_length", "fingerprint_length", "fingerprints")
+
 /**
  * XDR Source:
  * struct SerializedBinaryFuseFilter
@@ -63,7 +65,7 @@ data class SerializedBinaryFuseFilterXdr(
     fun fromXdrJsonElement(element: JsonElement): SerializedBinaryFuseFilterXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SerializedBinaryFuseFilterXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SerializedBinaryFuseFilterXdr(
         BinaryFuseFilterTypeXdr.fromXdrJsonTree(XdrJson.field(json, "type", "type_", XDR_JSON_TYPE)),
         ShortHashSeedXdr.fromXdrJsonTree(XdrJson.field(json, "input_hash_seed", XDR_JSON_TYPE)),

@@ -568,10 +568,14 @@ AssetXdr.fromXdrJson("""{"gold":{}}""")
 ```
 
 Decoding accepts only the spelling the SDK emits, plus a 64-bit integer as a JSON number, a
-`$schema` property (ignored, never emitted) and the historical `type_` key. Uppercase hexadecimal,
-uppercase `\xNN` escapes, unrecognised escapes, integer literals with a leading zero, a sign, a
-decimal point or an exponent, a missing struct key, an undeclared union arm or enum member, and a
-document nesting more than 128 containers deep are all rejected.
+`$schema` property (ignored, never emitted) and the historical `type_` key. That key and `type`
+name one field: either one alone decodes, and a document carrying both is rejected. Uppercase
+hexadecimal, uppercase `\xNN` escapes, unrecognised escapes, integer literals with a leading zero,
+a sign, a decimal point or an exponent, a missing struct key, a struct key that names no field, an
+object naming the same key twice, an undeclared union arm or enum member, and a document nesting
+more than 128 containers deep are all rejected. The repeated-key rule covers one object at a time,
+so separate objects may share a key name. It applies to `fromXdrJson`: a `JsonObject` passed to
+`fromXdrJsonElement` resolved any repetition before the decoder saw it.
 
 ```
 // WRONG: expecting an unset optional to be absent, or a void union arm to be null

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ChangeTrustOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("line", "limit")
+
 /**
  * XDR Source:
  * struct ChangeTrustOp
@@ -36,7 +38,7 @@ data class ChangeTrustOpXdr(
     fun fromXdrJsonElement(element: JsonElement): ChangeTrustOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ChangeTrustOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ChangeTrustOpXdr(
         ChangeTrustAssetXdr.fromXdrJsonTree(XdrJson.field(json, "line", XDR_JSON_TYPE)),
         Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "limit", XDR_JSON_TYPE))

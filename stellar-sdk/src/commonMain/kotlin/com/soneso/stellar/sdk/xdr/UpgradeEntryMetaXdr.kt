@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "UpgradeEntryMetaXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("upgrade", "changes")
+
 /**
  * XDR Source:
  * struct UpgradeEntryMeta
@@ -33,7 +35,7 @@ data class UpgradeEntryMetaXdr(
     fun fromXdrJsonElement(element: JsonElement): UpgradeEntryMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): UpgradeEntryMetaXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return UpgradeEntryMetaXdr(
         LedgerUpgradeXdr.fromXdrJsonTree(XdrJson.field(json, "upgrade", XDR_JSON_TYPE)),
         LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "changes", XDR_JSON_TYPE))

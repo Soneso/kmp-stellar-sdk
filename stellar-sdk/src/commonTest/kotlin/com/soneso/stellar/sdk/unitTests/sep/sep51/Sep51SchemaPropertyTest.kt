@@ -50,11 +50,35 @@ class Sep51SchemaPropertyTest {
         assertEquals(ASSET_JSON, AssetXdr.fromXdrJson(withSchema(ASSET_JSON)).toXdrJson())
     }
 
+    /**
+     * `$schema` is the one property a struct accepts without declaring it, so dropping it must
+     * not extend to anything else the document carries.
+     */
+    @Test
+    fun schemaPropertyDoesNotExcuseAKeyThatNamesNoField() {
+        val carried = withSchema(TTL_ENTRY_JSON).removeSuffix("}") + ",\"note\":1}"
+        val error = assertFailsWith<IllegalArgumentException> { TTLEntryXdr.fromXdrJson(carried) }
+        assertEquals("TTLEntryXdr: has the unknown key \"note\"", error.message)
+    }
+
     @Test
     fun anObjectCarryingOnlyTheSchemaPropertyIsRejected() {
         val only = "{\"\$schema\":\"$SCHEMA_URL\"}"
         assertFailsWith<IllegalArgumentException> { AssetXdr.fromXdrJson(only) }
         assertFailsWith<IllegalArgumentException> { TTLEntryXdr.fromXdrJson(only) }
+    }
+
+    /**
+     * `$schema` is accepted once, like any other key. Being the one property a struct does not
+     * declare does not exempt it from the rule that an object names each key once: the check runs
+     * on the document text, before the property is dropped, so a repetition is caught there.
+     */
+    @Test
+    fun aRepeatedSchemaPropertyIsRejected() {
+        val repeated = "{\"\$schema\":\"$SCHEMA_URL\",\"\$schema\":\"$SCHEMA_URL\"," +
+            TTL_ENTRY_JSON.removePrefix("{")
+        val error = assertFailsWith<IllegalArgumentException> { TTLEntryXdr.fromXdrJson(repeated) }
+        assertEquals("TTLEntryXdr: repeats the key \"\$schema\"", error.message)
     }
 
     private companion object {

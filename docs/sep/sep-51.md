@@ -417,12 +417,16 @@ Decoding accepts only the spelling encoding produces. These rules are narrower t
 - An `\xNN` escape must use lowercase hexadecimal digits.
 - Only the escapes in the ladder above are recognised; any other escape, and a trailing backslash, are rejected.
 - An integer must be a plain base-10 literal. `1.0`, `1e10`, `0x10` and a leading `+` are rejected, as is a value outside the range of its bit size.
+- A struct object must carry only the keys the type declares. An unrecognised key is rejected, and the error quotes it alongside the type, so a misspelled field fails instead of quietly discarding the value it carried.
+- An object must name each key once. A repeated key is rejected rather than resolved to one of its occurrences, since resolving it would discard the other silently. The rule covers one object at a time, so separate objects may share a key name, as every element of an array normally does. It applies to `$schema` as it does to any other key.
+
+The repeated-key rule holds for `fromXdrJson`, which reads a document as text. `fromXdrJsonElement` takes a `JsonElement` you have already built, and a `JsonObject` is a map, so a repetition was resolved before the decoder saw it.
 
 A document written by other SEP-0051 tooling that uses uppercase hexadecimal will therefore need normalising before it decodes here. Output is unaffected: this SDK emits the lowercase form the specification shows.
 
-Two spellings are accepted for compatibility and never emitted: a 64-bit integer as a JSON number, and the key `type_` where a struct field named `type` is expected.
+Two spellings are accepted for compatibility and never emitted: a 64-bit integer as a JSON number, and the key `type_` where a struct field named `type` is expected. The two spellings name one field: either one alone decodes, and a document carrying both is rejected.
 
-A `$schema` property is accepted anywhere an object is read, ignored, and never emitted.
+A `$schema` property is accepted anywhere an object is read, ignored, and never emitted. No other undeclared property is accepted.
 
 ## Limitations
 
@@ -471,7 +475,7 @@ fun handleErrors() {
 }
 ```
 
-The decoder rejects rather than repairs. A struct missing a key, a union carrying two arms or none, an unknown enum member, a fixed-length field of the wrong size, an integer out of range and a document nested more than 128 levels deep all raise, and none of them produce a partially built value.
+The decoder rejects rather than repairs. A struct missing a key or carrying one that names no field, an object repeating a key, a union carrying two arms or none, an unknown enum member, a fixed-length field of the wrong size, an integer out of range and a document nested more than 128 levels deep all raise, and none of them produce a partially built value.
 
 ## API Reference
 

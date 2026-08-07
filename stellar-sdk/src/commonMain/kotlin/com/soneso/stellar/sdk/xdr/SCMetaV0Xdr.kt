@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCMetaV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key", "val")
+
 /**
  * XDR Source:
  * struct SCMetaV0
@@ -33,7 +35,7 @@ data class SCMetaV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): SCMetaV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCMetaV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCMetaV0Xdr(
         XdrJson.unescapeString(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key"),
         XdrJson.unescapeString(XdrJson.field(json, "val", XDR_JSON_TYPE), XDR_JSON_TYPE, "val")

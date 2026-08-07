@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "BeginSponsoringFutureReservesOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("sponsored_id")
+
 /**
  * XDR Source:
  * struct BeginSponsoringFutureReservesOp
@@ -30,7 +32,7 @@ data class BeginSponsoringFutureReservesOpXdr(
     fun fromXdrJsonElement(element: JsonElement): BeginSponsoringFutureReservesOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): BeginSponsoringFutureReservesOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return BeginSponsoringFutureReservesOpXdr(
         AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "sponsored_id", XDR_JSON_TYPE))
       )

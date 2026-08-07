@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "InflationPayoutXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("destination", "amount")
+
 /**
  * XDR Source:
  * struct InflationPayout // or use PaymentResultAtom to limit types?
@@ -33,7 +35,7 @@ data class InflationPayoutXdr(
     fun fromXdrJsonElement(element: JsonElement): InflationPayoutXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): InflationPayoutXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return InflationPayoutXdr(
         AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
         Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE))

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCNonceKeyXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("nonce")
+
 /**
  * XDR Source:
  * struct SCNonceKey {
@@ -29,7 +31,7 @@ data class SCNonceKeyXdr(
     fun fromXdrJsonElement(element: JsonElement): SCNonceKeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCNonceKeyXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCNonceKeyXdr(
         Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "nonce", XDR_JSON_TYPE))
       )

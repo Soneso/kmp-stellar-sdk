@@ -31,6 +31,15 @@ module Xdrgen
       # at each call site.
       JSON_TYPE_CONSTANT = 'XDR_JSON_TYPE'
 
+      # A struct names the keys it accepts once, beside its type name, so the decoder can reject
+      # a key that belongs to no field without rebuilding the list at every call.
+      JSON_KEYS_CONSTANT = 'XDR_JSON_KEYS'
+
+      # A field named "type" is spelled "type_" by tooling that escapes it as a keyword of its
+      # own language. SEP-0051 requires the key "type", so that is what this SDK emits; the
+      # older spelling is accepted on input and never written back out.
+      JSON_KEY_ALIASES = { 'type' => 'type_' }.freeze
+
       def generate
         @output_files = {}
         @package = @namespace.gsub('::', '.')
@@ -229,6 +238,7 @@ module Xdrgen
         override = json_override(struct_name)
         default_imports = override ? [JSON_ELEMENT_IMPORT] : [JSON_ELEMENT_IMPORT, JSON_BUILDER_IMPORT]
         render_file_header(out, json_imports(override, default_imports), struct_name)
+        render_declared_json_keys(out, struct) unless override
         render_source_comment(out, struct)
 
         out.puts "data class #{struct_name}("
@@ -312,7 +322,7 @@ module Xdrgen
       def render_struct_from_json(out, struct, struct_name)
         out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{struct_name} {"
         out.indent do
-          out.puts "val json = XdrJson.obj(element, #{JSON_TYPE_CONSTANT})"
+          out.puts "val json = XdrJson.obj(element, #{JSON_TYPE_CONSTANT}, #{JSON_KEYS_CONSTANT})"
           out.puts "return #{struct_name}("
           out.indent do
             struct.members.each_with_index do |member, idx|
@@ -327,15 +337,27 @@ module Xdrgen
         out.puts "}"
       end
 
-      # A field named "type" is spelled "type_" by tooling that escapes it as a keyword of its
-      # own language. SEP-0051 requires the key "type", so that is what this SDK emits; the
-      # older spelling is accepted on input and never written back out.
       def json_field_expression(key)
-        if key == 'type'
-          "XdrJson.field(json, \"type\", \"type_\", #{JSON_TYPE_CONSTANT})"
+        alias_key = JSON_KEY_ALIASES[key]
+        if alias_key
+          "XdrJson.field(json, \"#{key}\", \"#{alias_key}\", #{JSON_TYPE_CONSTANT})"
         else
           "XdrJson.field(json, \"#{key}\", #{JSON_TYPE_CONSTANT})"
         end
+      end
+
+      # Every key a struct answers to: its declared field keys, plus the historical spelling of
+      # any field that accepts one. Listing both spellings lets the decoder recognise either as
+      # the field it names; a document supplying both at once is rejected where the field is
+      # read, which is what knows the two are one field.
+      def render_declared_json_keys(out, struct)
+        keys = struct.members.flat_map do |member|
+          key = JSON_NAMES.struct_field_json_name(member.name)
+          [key, JSON_KEY_ALIASES[key]].compact
+        end
+        literals = keys.map { |key| "\"#{key}\"" }.join(', ')
+        out.puts "private val #{JSON_KEYS_CONSTANT}: Array<String> = arrayOf(#{literals})"
+        out.puts
       end
 
       def render_union(union)

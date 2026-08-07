@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecTypeOptionXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("value_type")
+
 /**
  * XDR Source:
  * struct SCSpecTypeOption
@@ -30,7 +32,7 @@ data class SCSpecTypeOptionXdr(
     fun fromXdrJsonElement(element: JsonElement): SCSpecTypeOptionXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeOptionXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCSpecTypeOptionXdr(
         SCSpecTypeDefXdr.fromXdrJsonTree(XdrJson.field(json, "value_type", XDR_JSON_TYPE))
       )

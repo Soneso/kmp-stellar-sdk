@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LiquidityPoolWithdrawOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("liquidity_pool_id", "amount", "min_amount_a", "min_amount_b")
+
 /**
  * XDR Source:
  * struct LiquidityPoolWithdrawOp
@@ -42,7 +44,7 @@ data class LiquidityPoolWithdrawOpXdr(
     fun fromXdrJsonElement(element: JsonElement): LiquidityPoolWithdrawOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolWithdrawOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return LiquidityPoolWithdrawOpXdr(
         PoolIDXdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_id", XDR_JSON_TYPE)),
         Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE)),

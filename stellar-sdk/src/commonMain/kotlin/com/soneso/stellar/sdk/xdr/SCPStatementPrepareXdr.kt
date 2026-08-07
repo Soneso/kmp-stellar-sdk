@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementPrepareXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("quorum_set_hash", "ballot", "prepared", "prepared_prime", "n_c", "n_h")
+
 /**
  * XDR Source:
  * struct
@@ -51,7 +53,7 @@ data class SCPStatementPrepareXdr(
     fun fromXdrJsonElement(element: JsonElement): SCPStatementPrepareXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCPStatementPrepareXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCPStatementPrepareXdr(
         HashXdr.fromXdrJsonTree(XdrJson.field(json, "quorum_set_hash", XDR_JSON_TYPE)),
         SCPBallotXdr.fromXdrJsonTree(XdrJson.field(json, "ballot", XDR_JSON_TYPE)),

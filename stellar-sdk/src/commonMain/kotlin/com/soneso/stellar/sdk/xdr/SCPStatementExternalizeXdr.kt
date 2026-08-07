@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementExternalizeXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("commit", "n_h", "commit_quorum_set_hash")
+
 /**
  * XDR Source:
  * struct
@@ -39,7 +41,7 @@ data class SCPStatementExternalizeXdr(
     fun fromXdrJsonElement(element: JsonElement): SCPStatementExternalizeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCPStatementExternalizeXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCPStatementExternalizeXdr(
         SCPBallotXdr.fromXdrJsonTree(XdrJson.field(json, "commit", XDR_JSON_TYPE)),
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_h", XDR_JSON_TYPE)),

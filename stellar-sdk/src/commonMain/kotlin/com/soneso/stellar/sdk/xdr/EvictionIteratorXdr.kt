@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "EvictionIteratorXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("bucket_list_level", "is_curr_bucket", "bucket_file_offset")
+
 /**
  * XDR Source:
  * struct EvictionIterator {
@@ -35,7 +37,7 @@ data class EvictionIteratorXdr(
     fun fromXdrJsonElement(element: JsonElement): EvictionIteratorXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): EvictionIteratorXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return EvictionIteratorXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "bucket_list_level", XDR_JSON_TYPE)),
         XdrJson.bool(XdrJson.field(json, "is_curr_bucket", XDR_JSON_TYPE), XDR_JSON_TYPE, "is_curr_bucket"),

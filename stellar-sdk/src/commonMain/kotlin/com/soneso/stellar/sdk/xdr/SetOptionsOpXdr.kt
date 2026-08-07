@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SetOptionsOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("inflation_dest", "clear_flags", "set_flags", "master_weight", "low_threshold", "med_threshold", "high_threshold", "home_domain", "signer")
+
 /**
  * XDR Source:
  * struct SetOptionsOp
@@ -73,7 +75,7 @@ data class SetOptionsOpXdr(
     fun fromXdrJsonElement(element: JsonElement): SetOptionsOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SetOptionsOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SetOptionsOpXdr(
         XdrJson.optional(XdrJson.field(json, "inflation_dest", XDR_JSON_TYPE))?.let { AccountIDXdr.fromXdrJsonTree(it) },
         XdrJson.optional(XdrJson.field(json, "clear_flags", XDR_JSON_TYPE))?.let { Uint32Xdr.fromXdrJsonTree(it) },

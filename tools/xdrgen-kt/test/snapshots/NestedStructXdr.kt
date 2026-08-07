@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "NestedStructXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("inner", "optional_inner", "items", "fixed_items", "raw_data", "fixed_data", "hash")
+
 /**
  * XDR Source:
  * struct NestedStruct
@@ -48,7 +50,7 @@ data class NestedStructXdr(
     fun fromXdrJsonElement(element: JsonElement): NestedStructXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): NestedStructXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return NestedStructXdr(
         SimpleStructXdr.fromXdrJsonTree(XdrJson.field(json, "inner", XDR_JSON_TYPE)),
         XdrJson.optional(XdrJson.field(json, "optional_inner", XDR_JSON_TYPE))?.let { SimpleStructXdr.fromXdrJsonTree(it) },

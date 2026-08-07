@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PathPaymentStrictReceiveResultSuccessXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("offers", "last")
+
 /**
  * XDR Source:
  * struct
@@ -33,7 +35,7 @@ data class PathPaymentStrictReceiveResultSuccessXdr(
     fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictReceiveResultSuccessXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictReceiveResultSuccessXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return PathPaymentStrictReceiveResultSuccessXdr(
         XdrJson.array(XdrJson.field(json, "offers", XDR_JSON_TYPE), XDR_JSON_TYPE, "offers").map { ClaimAtomXdr.fromXdrJsonTree(it) },
         SimplePaymentResultXdr.fromXdrJsonTree(XdrJson.field(json, "last", XDR_JSON_TYPE))

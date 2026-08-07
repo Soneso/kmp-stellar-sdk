@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPQuorumSetXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("threshold", "validators", "inner_sets")
+
 /**
  * XDR Source:
  * struct SCPQuorumSet
@@ -36,7 +38,7 @@ data class SCPQuorumSetXdr(
     fun fromXdrJsonElement(element: JsonElement): SCPQuorumSetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCPQuorumSetXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCPQuorumSetXdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "threshold", XDR_JSON_TYPE)),
         XdrJson.array(XdrJson.field(json, "validators", XDR_JSON_TYPE), XDR_JSON_TYPE, "validators").map { NodeIDXdr.fromXdrJsonTree(it) },

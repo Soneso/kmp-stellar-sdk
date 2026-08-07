@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "OperationXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("source_account", "body")
+
 /**
  * XDR Source:
  * struct Operation
@@ -99,7 +101,7 @@ data class OperationXdr(
     fun fromXdrJsonElement(element: JsonElement): OperationXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): OperationXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return OperationXdr(
         XdrJson.optional(XdrJson.field(json, "source_account", XDR_JSON_TYPE))?.let { MuxedAccountXdr.fromXdrJsonTree(it) },
         OperationBodyXdr.fromXdrJsonTree(XdrJson.field(json, "body", XDR_JSON_TYPE))

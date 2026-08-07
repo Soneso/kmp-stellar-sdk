@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreatePassiveSellOfferOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("selling", "buying", "amount", "price")
+
 /**
  * XDR Source:
  * struct CreatePassiveSellOfferOp
@@ -43,7 +45,7 @@ data class CreatePassiveSellOfferOpXdr(
     fun fromXdrJsonElement(element: JsonElement): CreatePassiveSellOfferOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): CreatePassiveSellOfferOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return CreatePassiveSellOfferOpXdr(
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "selling", XDR_JSON_TYPE)),
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "buying", XDR_JSON_TYPE)),

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PreconditionsV2Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("time_bounds", "ledger_bounds", "min_seq_num", "min_seq_age", "min_seq_ledger_gap", "extra_signers")
+
 /**
  * XDR Source:
  * struct PreconditionsV2
@@ -90,7 +92,7 @@ data class PreconditionsV2Xdr(
     fun fromXdrJsonElement(element: JsonElement): PreconditionsV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): PreconditionsV2Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return PreconditionsV2Xdr(
         XdrJson.optional(XdrJson.field(json, "time_bounds", XDR_JSON_TYPE))?.let { TimeBoundsXdr.fromXdrJsonTree(it) },
         XdrJson.optional(XdrJson.field(json, "ledger_bounds", XDR_JSON_TYPE))?.let { LedgerBoundsXdr.fromXdrJsonTree(it) },

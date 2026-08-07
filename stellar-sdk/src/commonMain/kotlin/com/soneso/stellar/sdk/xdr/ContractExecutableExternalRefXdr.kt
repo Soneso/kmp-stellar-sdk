@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ContractExecutableExternalRefXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("executable_owner", "tag")
+
 /**
  * XDR Source:
  * struct ContractExecutableExternalRef {
@@ -32,7 +34,7 @@ data class ContractExecutableExternalRefXdr(
     fun fromXdrJsonElement(element: JsonElement): ContractExecutableExternalRefXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ContractExecutableExternalRefXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ContractExecutableExternalRefXdr(
         SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "executable_owner", XDR_JSON_TYPE)),
         SCStringXdr.fromXdrJsonTree(XdrJson.field(json, "tag", XDR_JSON_TYPE))

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPHistoryEntryV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("quorum_sets", "ledger_messages")
+
 /**
  * XDR Source:
  * struct SCPHistoryEntryV0
@@ -33,7 +35,7 @@ data class SCPHistoryEntryV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): SCPHistoryEntryV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCPHistoryEntryV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCPHistoryEntryV0Xdr(
         XdrJson.array(XdrJson.field(json, "quorum_sets", XDR_JSON_TYPE), XDR_JSON_TYPE, "quorum_sets").map { SCPQuorumSetXdr.fromXdrJsonTree(it) },
         LedgerSCPMessagesXdr.fromXdrJsonTree(XdrJson.field(json, "ledger_messages", XDR_JSON_TYPE))

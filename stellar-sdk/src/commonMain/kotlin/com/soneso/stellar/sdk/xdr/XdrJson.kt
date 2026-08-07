@@ -25,6 +25,14 @@ import kotlinx.serialization.json.JsonPrimitive
  * - Arrays are JSON arrays and are always present, empty ones as `[]`.
  * - An optional value is `null` or the value, and its key stays present in the parent object.
  * - A `$schema` property is accepted anywhere an object is read, ignored, and never emitted.
+ * - A struct object carries its declared keys and nothing else. A key that names no field is
+ *   rejected rather than ignored, so a misspelled field name fails loudly instead of silently
+ *   dropping the value it carried. `$schema` is the single exception, because SEP-0051 requires
+ *   that it be accepted wherever an object is read.
+ *
+ * - An object carries each key once. A repeated key names two values where the format admits
+ *   one, so it is rejected rather than resolved to either occurrence. The check runs on the
+ *   document text, because a parsed [JsonObject] is a map and no longer shows the repetition.
  *
  * Decoding is deliberately stricter than encoding is lax: this SDK accepts only the exact
  * spelling it emits. Uppercase hexadecimal, uppercase `\xNN` escapes and unrecognised escapes
@@ -44,6 +52,13 @@ internal object XdrJson {
 
     /** Truncation length for untrusted values quoted back in error messages. */
     private const val PREVIEW_LIMIT = 80
+
+    /**
+     * How many unknown keys an error message names before it falls back to counting the rest,
+     * so a document carrying thousands of them cannot turn one rejection into an unbounded
+     * message.
+     */
+    private const val UNKNOWN_KEY_LIMIT = 5
 
     private const val HEX_DIGITS = "0123456789abcdef"
 
@@ -134,11 +149,13 @@ internal object XdrJson {
     // ---------------------------------------------------------------------------------------
 
     /**
-     * Parses a document, rejecting one nested more deeply than [RECURSION_CAP] before the JSON
-     * parser descends into it.
+     * Parses a document, first scanning its text for the two faults the parser would not
+     * report: nesting past [RECURSION_CAP], which must be caught before the parser descends,
+     * and a repeated object key, which the parser resolves silently in favour of the last
+     * occurrence.
      */
     fun parse(text: String, type: String): JsonElement {
-        checkTextDepth(text, type)
+        checkText(text, type)
         return try {
             json.parseToJsonElement(text)
         } catch (e: Exception) {
@@ -147,13 +164,33 @@ internal object XdrJson {
     }
 
     /**
-     * Reads an object, dropping the optional `$schema` property. Call at the entry of every
-     * struct and union decode.
+     * Reads an object and drops the optional `$schema` property, leaving the remaining keys
+     * unchecked. A union names its selected arm in the key, so [singleKeyObject] reads it from
+     * here and checks the shape itself; a struct knows the keys it declares and goes through the
+     * [obj] overload that takes them.
      */
     fun obj(element: JsonElement, type: String): JsonObject {
         val value = element as? JsonObject
             ?: fail(type, "expects a JSON object, got ${preview(element)}")
         return stripSchema(value)
+    }
+
+    /**
+     * Reads a struct object, rejecting any key that is not one of [declaredKeys]. The `$schema`
+     * property is dropped before the check, so it is accepted here as it is anywhere else.
+     *
+     * [declaredKeys] holds every spelling the type answers to, so a field that also accepts a
+     * historical spelling contributes both; supplying both at once is caught by [field], which
+     * is what knows the two name one field.
+     */
+    fun obj(element: JsonElement, type: String, declaredKeys: Array<String>): JsonObject {
+        val value = obj(element, type)
+        for (key in value.keys) {
+            if (!declaredKeys.contains(key)) {
+                rejectUnknownKeys(value, declaredKeys, type)
+            }
+        }
+        return value
     }
 
     /** Removes the `$schema` property, which is accepted on input but never emitted. */
@@ -174,10 +211,18 @@ internal object XdrJson {
     /**
      * Reads a required key that also answers to a historical spelling. Only [key] is ever
      * emitted; [alias] is accepted so documents written by older tooling still decode.
+     *
+     * The two spellings name one field, so a document carrying both is rejected rather than
+     * silently resolved in favour of either one.
      */
-    fun field(value: JsonObject, key: String, alias: String, type: String): JsonElement =
-        value[key] ?: value[alias]
-            ?: fail(type, "is missing the required key \"$key\"")
+    fun field(value: JsonObject, key: String, alias: String, type: String): JsonElement {
+        val primary = value[key]
+        val secondary = value[alias]
+        if (primary != null && secondary != null) {
+            fail(type, "has both \"$key\" and \"$alias\", which are two spellings of one key")
+        }
+        return primary ?: secondary ?: fail(type, "is missing the required key \"$key\"")
+    }
 
     /** Returns null for a JSON null, otherwise the element itself. */
     fun optional(element: JsonElement): JsonElement? = if (element is JsonNull) null else element
@@ -604,6 +649,25 @@ internal object XdrJson {
     // ---------------------------------------------------------------------------------------
 
     /**
+     * Names the keys of [value] that no field of [type] declares, in the order the document
+     * lists them. Reached only once a key is known to be unknown, so the common decode never
+     * pays for building this list.
+     */
+    private fun rejectUnknownKeys(
+        value: JsonObject,
+        declaredKeys: Array<String>,
+        type: String
+    ): Nothing {
+        val unknown = value.keys.filter { !declaredKeys.contains(it) }
+        val named = unknown.take(UNKNOWN_KEY_LIMIT)
+            .joinToString(", ") { preview(JsonPrimitive(it)) }
+        val remainder = unknown.size - UNKNOWN_KEY_LIMIT
+        val suffix = if (remainder > 0) " and $remainder more" else ""
+        val subject = if (unknown.size == 1) "the unknown key" else "the unknown keys"
+        fail(type, "has $subject $named$suffix")
+    }
+
+    /**
      * Encodes bytes as lowercase hexadecimal against the same digit table the escape ladder and
      * the error preview use, into a single pre-sized buffer rather than one string per byte.
      */
@@ -777,38 +841,172 @@ internal object XdrJson {
         if (text.length <= PREVIEW_LIMIT) text else text.take(PREVIEW_LIMIT) + "..."
 
     /**
-     * Measures structural nesting in raw text without building a tree, so an over-deep document
-     * is rejected before the JSON parser recurses into it. Brackets inside string literals are
-     * not structural and are skipped.
+     * Establishes, on the raw text and before the JSON parser builds a tree, the two properties
+     * the parser itself does not: that the document nests no deeper than [RECURSION_CAP], and
+     * that no object repeats a key.
+     *
+     * Both checks need the text rather than the tree. Depth must be known before the parser
+     * recurses into an over-deep document, and a duplicate key is unobservable afterwards
+     * because [JsonObject] is a map: the parser keeps the last occurrence and the earlier value
+     * disappears silently. SEP-0051 fixes one document per value, so a repeated key names two
+     * values where the format admits one and is refused rather than resolved.
+     *
+     * The scan is a single forward pass and never recurses, since a guard that recursed could
+     * exhaust the stack on the very input it exists to reject. Structure inside a string literal
+     * is text, not structure, so each literal is consumed whole.
+     *
+     * Text that is not valid JSON is left to the parser to report; this scan establishes its two
+     * properties and nothing more.
      */
-    private fun checkTextDepth(text: String, type: String) {
+    private fun checkText(text: String, type: String) {
+        // One frame per open container, indexed by depth - 1. An object frame allocates its key
+        // set on the first key it carries, so an empty object and every array cost nothing.
+        val objectFrame = BooleanArray(RECURSION_CAP)
+        val frameKeys = arrayOfNulls<MutableSet<String>>(RECURSION_CAP)
         var depth = 0
         var index = 0
-        var inString = false
-        var escaped = false
 
         while (index < text.length) {
-            val character = text[index]
-            if (inString) {
-                when {
-                    escaped -> escaped = false
-                    character == '\\' -> escaped = true
-                    character == '"' -> inString = false
-                }
-            } else {
-                when (character) {
-                    '"' -> inString = true
-                    '{', '[' -> {
-                        depth++
-                        if (depth > RECURSION_CAP) {
-                            fail(type, "input nests deeper than the limit of $RECURSION_CAP")
+            when (text[index]) {
+                '"' -> {
+                    val end = endOfStringLiteral(text, index)
+                    if (depth > 0 && objectFrame[depth - 1] && followedByColon(text, end)) {
+                        val key = unescapedText(text, index, end)
+                        val keys = frameKeys[depth - 1]
+                            ?: HashSet<String>().also { frameKeys[depth - 1] = it }
+                        if (!keys.add(key)) {
+                            fail(type, "repeats the key ${preview(JsonPrimitive(key))}")
                         }
                     }
-                    '}', ']' -> depth--
+                    index = end
                 }
+                '{', '[' -> {
+                    depth++
+                    if (depth > RECURSION_CAP) {
+                        fail(type, "input nests deeper than the limit of $RECURSION_CAP")
+                    }
+                    objectFrame[depth - 1] = text[index] == '{'
+                    frameKeys[depth - 1] = null
+                    index++
+                }
+                '}', ']' -> {
+                    if (depth > 0) {
+                        // Released rather than pooled, so the next object at this depth starts
+                        // empty without paying to clear a set an earlier one may have grown.
+                        frameKeys[depth - 1] = null
+                        depth--
+                    }
+                    index++
+                }
+                else -> index++
             }
+        }
+    }
+
+    /**
+     * The index one past the closing quote of the string literal opening at [start], or the end
+     * of [text] if the literal is unterminated. A backslash consumes the character after it, so
+     * an escaped quote does not end the literal.
+     */
+    private fun endOfStringLiteral(text: String, start: Int): Int {
+        var index = start + 1
+        while (index < text.length) {
+            when (text[index]) {
+                '\\' -> index += 2
+                '"' -> return index + 1
+                else -> index++
+            }
+        }
+        return text.length
+    }
+
+    /** Whether the next non-whitespace character at or after [index] is `:`, marking a key. */
+    private fun followedByColon(text: String, index: Int): Boolean {
+        var probe = index
+        while (probe < text.length) {
+            when (text[probe]) {
+                ' ', '\t', '\n', '\r' -> probe++
+                else -> return text[probe] == ':'
+            }
+        }
+        return false
+    }
+
+    /**
+     * Resolves the escapes of the string literal spanning [start] until [end], so two keys
+     * written differently but denoting the same text compare equal. Comparison is by UTF-16 code
+     * unit, which is all equality needs: a surrogate pair written either as one character or as
+     * its two `\uXXXX` escapes yields the same units in the same order.
+     *
+     * An escape the format does not define is malformed input, which the parser reports; the
+     * marker character stands for itself here so the scan can finish the pass.
+     *
+     * Called only for a literal that closed, which is what makes a backslash safe to read past:
+     * an unpaired backslash before the closing quote would have made [endOfStringLiteral] skip
+     * that quote and keep looking, so every backslash in the span has its escaped character
+     * inside the span too.
+     */
+    private fun unescapedText(text: String, start: Int, end: Int): String {
+        val from = start + 1
+        val until = end - 1
+        if (until <= from) {
+            return ""
+        }
+
+        var index = from
+        while (index < until && text[index] != '\\') {
             index++
         }
+        if (index == until) {
+            return text.substring(from, until)
+        }
+
+        val resolved = StringBuilder(until - from)
+        resolved.append(text, from, index)
+        while (index < until) {
+            val character = text[index]
+            if (character != '\\') {
+                resolved.append(character)
+                index++
+                continue
+            }
+            index++
+            val marker = text[index]
+            index++
+            when (marker) {
+                'b' -> resolved.append('\b')
+                'f' -> resolved.append('\u000C')
+                'n' -> resolved.append('\n')
+                'r' -> resolved.append('\r')
+                't' -> resolved.append('\t')
+                'u' -> {
+                    val code = if (index + 4 <= until) hexCode(text, index) else null
+                    if (code == null) {
+                        resolved.append(marker)
+                    } else {
+                        resolved.append(code.toChar())
+                        index += 4
+                    }
+                }
+                else -> resolved.append(marker)
+            }
+        }
+        return resolved.toString()
+    }
+
+    /** The four hexadecimal digits of a `\uXXXX` escape at [index], or null if they are not. */
+    private fun hexCode(text: String, index: Int): Int? {
+        var code = 0
+        for (offset in 0 until 4) {
+            val digit = when (val character = text[index + offset]) {
+                in '0'..'9' -> character - '0'
+                in 'a'..'f' -> character - 'a' + 10
+                in 'A'..'F' -> character - 'A' + 10
+                else -> return null
+            }
+            code = (code shl 4) or digit
+        }
+        return code
     }
 }
 

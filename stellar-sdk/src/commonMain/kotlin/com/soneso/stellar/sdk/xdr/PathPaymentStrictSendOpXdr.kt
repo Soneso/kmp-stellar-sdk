@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PathPaymentStrictSendOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("send_asset", "send_amount", "destination", "dest_asset", "dest_min", "path")
+
 /**
  * XDR Source:
  * struct PathPaymentStrictSendOp
@@ -54,7 +56,7 @@ data class PathPaymentStrictSendOpXdr(
     fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictSendOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictSendOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return PathPaymentStrictSendOpXdr(
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "send_asset", XDR_JSON_TYPE)),
         Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "send_amount", XDR_JSON_TYPE)),

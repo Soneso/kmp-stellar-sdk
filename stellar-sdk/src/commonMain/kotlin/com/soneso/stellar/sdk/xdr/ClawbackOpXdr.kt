@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ClawbackOpXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("asset", "from", "amount")
+
 /**
  * XDR Source:
  * struct ClawbackOp
@@ -36,7 +38,7 @@ data class ClawbackOpXdr(
     fun fromXdrJsonElement(element: JsonElement): ClawbackOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ClawbackOpXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ClawbackOpXdr(
         AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
         MuxedAccountXdr.fromXdrJsonTree(XdrJson.field(json, "from", XDR_JSON_TYPE)),

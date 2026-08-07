@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreateContractArgsV2Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("contract_id_preimage", "executable", "constructor_args")
+
 /**
  * XDR Source:
  * struct CreateContractArgsV2
@@ -37,7 +39,7 @@ data class CreateContractArgsV2Xdr(
     fun fromXdrJsonElement(element: JsonElement): CreateContractArgsV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): CreateContractArgsV2Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return CreateContractArgsV2Xdr(
         ContractIDPreimageXdr.fromXdrJsonTree(XdrJson.field(json, "contract_id_preimage", XDR_JSON_TYPE)),
         ContractExecutableXdr.fromXdrJsonTree(XdrJson.field(json, "executable", XDR_JSON_TYPE)),

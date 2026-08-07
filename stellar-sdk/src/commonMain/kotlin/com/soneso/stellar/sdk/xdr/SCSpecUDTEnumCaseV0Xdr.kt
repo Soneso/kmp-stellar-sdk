@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecUDTEnumCaseV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "name", "value")
+
 /**
  * XDR Source:
  * struct SCSpecUDTEnumCaseV0
@@ -36,7 +38,7 @@ data class SCSpecUDTEnumCaseV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): SCSpecUDTEnumCaseV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): SCSpecUDTEnumCaseV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCSpecUDTEnumCaseV0Xdr(
         XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
         XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 60),

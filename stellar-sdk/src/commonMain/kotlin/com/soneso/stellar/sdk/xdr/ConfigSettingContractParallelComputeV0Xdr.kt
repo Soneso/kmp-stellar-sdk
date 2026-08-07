@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractParallelComputeV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_max_dependent_tx_clusters")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractParallelComputeV0
@@ -40,7 +42,7 @@ data class ConfigSettingContractParallelComputeV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractParallelComputeV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractParallelComputeV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ConfigSettingContractParallelComputeV0Xdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_dependent_tx_clusters", XDR_JSON_TYPE))
       )

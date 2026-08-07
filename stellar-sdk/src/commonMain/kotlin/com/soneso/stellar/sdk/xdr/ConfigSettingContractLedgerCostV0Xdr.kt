@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractLedgerCostV0Xdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_max_disk_read_entries", "ledger_max_disk_read_bytes", "ledger_max_write_ledger_entries", "ledger_max_write_bytes", "tx_max_disk_read_entries", "tx_max_disk_read_bytes", "tx_max_write_ledger_entries", "tx_max_write_bytes", "fee_disk_read_ledger_entry", "fee_write_ledger_entry", "fee_disk_read1_kb", "soroban_state_target_size_bytes", "rent_fee1_kb_soroban_state_size_low", "rent_fee1_kb_soroban_state_size_high", "soroban_state_rent_fee_growth_factor")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractLedgerCostV0
@@ -107,7 +109,7 @@ data class ConfigSettingContractLedgerCostV0Xdr(
     fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractLedgerCostV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractLedgerCostV0Xdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ConfigSettingContractLedgerCostV0Xdr(
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_disk_read_entries", XDR_JSON_TYPE)),
         Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_disk_read_bytes", XDR_JSON_TYPE)),

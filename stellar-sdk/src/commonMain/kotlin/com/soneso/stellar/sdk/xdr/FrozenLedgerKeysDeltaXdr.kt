@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "FrozenLedgerKeysDeltaXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("keys_to_freeze", "keys_to_unfreeze")
+
 /**
  * XDR Source:
  * struct FrozenLedgerKeysDelta {
@@ -32,7 +34,7 @@ data class FrozenLedgerKeysDeltaXdr(
     fun fromXdrJsonElement(element: JsonElement): FrozenLedgerKeysDeltaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): FrozenLedgerKeysDeltaXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return FrozenLedgerKeysDeltaXdr(
         XdrJson.array(XdrJson.field(json, "keys_to_freeze", XDR_JSON_TYPE), XDR_JSON_TYPE, "keys_to_freeze").map { EncodedLedgerKeyXdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "keys_to_unfreeze", XDR_JSON_TYPE), XDR_JSON_TYPE, "keys_to_unfreeze").map { EncodedLedgerKeyXdr.fromXdrJsonTree(it) }

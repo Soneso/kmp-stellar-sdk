@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HashIDPreimageOperationIDXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("source_account", "seq_num", "op_num")
+
 /**
  * XDR Source:
  * struct
@@ -36,7 +38,7 @@ data class HashIDPreimageOperationIDXdr(
     fun fromXdrJsonElement(element: JsonElement): HashIDPreimageOperationIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): HashIDPreimageOperationIDXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return HashIDPreimageOperationIDXdr(
         AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "source_account", XDR_JSON_TYPE)),
         SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "seq_num", XDR_JSON_TYPE)),

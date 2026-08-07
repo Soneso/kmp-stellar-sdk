@@ -8,6 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TimeBoundsXdr"
 
+private val XDR_JSON_KEYS: Array<String> = arrayOf("min_time", "max_time")
+
 /**
  * XDR Source:
  * struct TimeBounds
@@ -34,7 +36,7 @@ data class TimeBoundsXdr(
     fun fromXdrJsonElement(element: JsonElement): TimeBoundsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): TimeBoundsXdr {
-      val json = XdrJson.obj(element, XDR_JSON_TYPE)
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return TimeBoundsXdr(
         TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "min_time", XDR_JSON_TYPE)),
         TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "max_time", XDR_JSON_TYPE))
