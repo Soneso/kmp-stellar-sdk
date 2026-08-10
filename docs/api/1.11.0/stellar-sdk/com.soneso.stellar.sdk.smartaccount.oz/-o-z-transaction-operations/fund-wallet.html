@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>fundWallet</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.11.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="member" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.smartaccount.oz/OZTransactionOperations/fundWallet/#kotlin.String#com.soneso.stellar.sdk.smartaccount.core.SubmissionMethod?/PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.smartaccount.oz</a><span class="delimiter">/</span><a href="index.html">OZTransactionOperations</a><span class="delimiter">/</span><span class="current">fundWallet</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>fund</span><wbr></wbr><span><span>Wallet</span></span></h1>
+  </div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="fund-wallet.html"><span class="token function">fundWallet</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">nativeTokenContract<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">forceMethod<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.smartaccount.core/-submission-method/index.html">SubmissionMethod</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><p class="paragraph">Funds the smart account wallet using Friendbot (testnet only).</p><p class="paragraph">Creates a temporary keypair, funds it via Friendbot, then transfers the balance (minus reserve) to the smart account contract. Supports relayer fee sponsoring by converting source_account auth entries to Address credentials.</p><p class="paragraph">Flow:</p><ol><li><p class="paragraph">Generate random temporary keypair</p></li><li><p class="paragraph">Fund temp account via Friendbot HTTP GET</p></li><li><p class="paragraph">Poll the Soroban RPC until the funded temp account is visible to simulation</p></li><li><p class="paragraph">Query temp account balance via native token contract simulation</p></li><li><p class="paragraph">Calculate transfer amount (balance - reserve)</p></li><li><p class="paragraph">Build transfer from temp to smart account</p></li><li><p class="paragraph">Simulate to get auth entries</p></li><li><p class="paragraph">Convert source_account auth entries to Address credentials (for relayer)</p></li><li><p class="paragraph">Sign auth entries with temp keypair</p></li><li><p class="paragraph">Re-simulate with signed auth entries</p></li><li><p class="paragraph">Decide fee sponsoring mode and submit</p></li><li><p class="paragraph">Return funded amount in XLM</p></li></ol><h2 class="">Fee Sponsoring</h2><p class="paragraph">When a relayer URL is configured via <code class="lang-kotlin">config.relayerUrl</code>:</p><ul><li><p class="paragraph"><strong>Mode 1</strong>: Used when no source_account auth exists after conversion. Sends host function + signed auth entries without signing the transaction envelope.</p></li><li><p class="paragraph"><strong>Mode 2</strong>: Used when source_account auth still exists (not converted). Sends fully signed transaction XDR with temp keypair signature.</p></li></ul><p class="paragraph">When no relayer is configured, submits directly via RPC with temp keypair signature.</p><h2 class="">Latency</h2><p class="paragraph">After Friendbot funding, the call waits for the temporary account to become visible to the Soroban RPC before simulating the balance read. That wait is a single poll bounded by <a href="../-o-z-constants/-r-p-c_-v-i-s-i-b-i-l-i-t-y_-t-i-m-e-o-u-t_-s-e-c-o-n-d-s.html">OZConstants.RPC_VISIBILITY_TIMEOUT_SECONDS</a> (45s); when testnet propagation is slow the worst-case added latency approaches that budget before the call either proceeds or raises <a href="../../com.soneso.stellar.sdk.smartaccount.core/-transaction-exception/-timeout/index.html">TransactionException.Timeout</a>. Invoked from <code class="lang-kotlin">createWallet(autoFund = true)</code> this poll runs after the deploy contract-visibility poll, so the two budgets add up to roughly 90s in the worst case. The common case returns within a few seconds.</p><h2 class="">Source Account Auth Conversion</h2><p class="paragraph">The funding flow converts source_account (Void) credentials to Address credentials with a generated nonce. This allows the relayer to substitute its own channel accounts for fee sponsoring, enabling zero-balance smart accounts to receive their first funds.</p><p class="paragraph">IMPORTANT: Only works on testnet. Do not use on mainnet.</p><span class="kdoc-tag"><h4 class="">Return</h4><p class="paragraph">The amount funded in XLM</p></span><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>native</span><wbr></wbr><span>Token</span><wbr></wbr><span><span>Contract</span></span></u></div></span></div><div><div class="title"><p class="paragraph">The native token (XLM) contract address (C-address)</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>force</span><wbr></wbr><span><span>Method</span></span></u></div></span></div><div><div class="title"><p class="paragraph">Optional override to force relayer or RPC submission (default: auto-detect)</p></div></div></div></div></div><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><span data-unresolved-link="com.soneso.stellar.sdk.smartaccount.oz/OZTransactionOperations/convertAndSignAuthEntries/#kotlin.collections.List[com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr]#com.soneso.stellar.sdk.KeyPair#kotlin.UInt/PointingToDeclaration/"><span>OZTransaction</span><wbr></wbr><span>Operations.</span><wbr></wbr><span>convert</span><wbr></wbr><span>And</span><wbr></wbr><span>Sign</span><wbr></wbr><span>Auth</span><wbr></wbr><span><span>Entries</span></span></span></div></span></div><div><div class="title"><p class="paragraph">for source_account to Address credential conversion</p></div></div></div></div></div><h4 class="tableheader">Throws</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-wallet-exception/-not-connected/index.html"><span>Wallet</span><wbr></wbr><span>Exception.</span><wbr></wbr><span>Not</span><wbr></wbr><span><span>Connected</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if no wallet is connected</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-validation-exception/index.html"><span>Validation</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if the contract address is invalid</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-transaction-exception/index.html"><span>Transaction</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if any step of the funding flow fails</p><p class="paragraph">Example:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Fund wallet (uses relayer if configured)<br>val fundedAmount = txOps.fundWallet(<br>    nativeTokenContract = &quot;CBCD1234...&quot;<br>)<br>println(&quot;Funded $fundedAmount XLM&quot;)<br><br>// Fund wallet with direct RPC submission (no relayer)<br>val kit = OZSmartAccountKit.create(<br>    config = config.copy(relayerUrl = null)<br>)<br>val amount = kit.transactionOperations.fundWallet(nativeTokenContract)<br>println(&quot;Funded directly: $amount XLM&quot;)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div></div></div></div></div></div></div></div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

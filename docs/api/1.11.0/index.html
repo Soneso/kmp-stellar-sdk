@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>stellar-sdk</title>
+    <link href="images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="scripts/sourceset_dependencies.js" async="async"></script>
+<link href="styles/style.css" rel="Stylesheet">
+<link href="styles/main.css" rel="Stylesheet">
+<link href="styles/prism.css" rel="Stylesheet">
+<link href="styles/logo-styles.css" rel="Stylesheet">
+<link href="ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.11.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/androidMain">android</button>
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+                <button class="platform-tag platform-selector js-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/jsMain">js</button>
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/jvmMain">jvm</button>
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/nativeMain">native</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/androidMain"
+                                       data-filter=":stellar-sdk/androidMain"/>
+                                <span class="checkbox--icon"></span>
+                                android
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option js-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/jsMain"
+                                       data-filter=":stellar-sdk/jsMain"/>
+                                <span class="checkbox--icon"></span>
+                                js
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/jvmMain"
+                                       data-filter=":stellar-sdk/jvmMain"/>
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/nativeMain"
+                                       data-filter=":stellar-sdk/nativeMain"/>
+                                <span class="checkbox--icon"></span>
+                                native
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" id="content" pageIds="stellar-sdk::////PointingToDeclaration//1860085137">
+  <div class="breadcrumbs"></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>stellar-sdk</span></span></h1>
+  </div>
+  <h2 class="">Packages</h2>
+  <div class="table"><a data-name="-1925137007%2FPackages%2F-559440866" anchor-label="com.soneso.stellar.sdk" id="-1925137007%2FPackages%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk/index.html">com.soneso.stellar.sdk</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1925137007%2FPackages%2F-559440866"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+              <div class="platform-tag js-like">js</div>
+              <div class="platform-tag common-like">jvm</div>
+              <div class="platform-tag common-like">native</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1892369325%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.contract" id="-1892369325%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.contract/index.html">com.soneso.stellar.sdk.contract</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1892369325%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-735838284%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.contract.exception" id="-735838284%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.contract.exception/index.html">com.soneso.stellar.sdk.contract.exception</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-735838284%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1210186498%2FPackages%2F-559440866" anchor-label="com.soneso.stellar.sdk.crypto" id="1210186498%2FPackages%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.crypto/index.html">com.soneso.stellar.sdk.crypto</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1210186498%2FPackages%2F-559440866"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+              <div class="platform-tag js-like">js</div>
+              <div class="platform-tag common-like">jvm</div>
+              <div class="platform-tag common-like">native</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1846556162%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.horizon" id="-1846556162%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon/index.html">com.soneso.stellar.sdk.horizon</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1846556162%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="449371256%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.horizon.exceptions" id="449371256%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon.exceptions/index.html">com.soneso.stellar.sdk.horizon.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="449371256%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-817181000%2FPackages%2F-1522268594" anchor-label="com.soneso.stellar.sdk.horizon.requests" id="-817181000%2FPackages%2F-1522268594" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon.requests/index.html">com.soneso.stellar.sdk.horizon.requests</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-817181000%2FPackages%2F-1522268594"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+              <div class="platform-tag js-like">js</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1665136158%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.horizon.responses" id="-1665136158%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon.responses/index.html">com.soneso.stellar.sdk.horizon.responses</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1665136158%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-927882762%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.horizon.responses.effects" id="-927882762%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon.responses.effects/index.html">com.soneso.stellar.sdk.horizon.responses.effects</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-927882762%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-151711236%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.horizon.responses.operations" id="-151711236%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.horizon.responses.operations/index.html">com.soneso.stellar.sdk.horizon.responses.operations</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-151711236%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-459793848%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.rpc" id="-459793848%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.rpc/index.html">com.soneso.stellar.sdk.rpc</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-459793848%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1651101847%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.rpc.exception" id="-1651101847%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.rpc.exception/index.html">com.soneso.stellar.sdk.rpc.exception</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1651101847%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1976094290%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.rpc.requests" id="-1976094290%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.rpc.requests/index.html">com.soneso.stellar.sdk.rpc.requests</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1976094290%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1063257516%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.rpc.responses" id="1063257516%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.rpc.responses/index.html">com.soneso.stellar.sdk.rpc.responses</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1063257516%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1690944524%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.scval" id="-1690944524%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.scval/index.html">com.soneso.stellar.sdk.scval</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1690944524%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-228205636%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.common" id="-228205636%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.common/index.html">com.soneso.stellar.sdk.sep.common</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-228205636%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1231390834%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep01" id="1231390834%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep01/index.html">com.soneso.stellar.sdk.sep.sep01</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1231390834%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-2101962445%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep02" id="-2101962445%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep02/index.html">com.soneso.stellar.sdk.sep.sep02</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2101962445%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1321331235%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep02.exceptions" id="1321331235%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep02.exceptions/index.html">com.soneso.stellar.sdk.sep.sep02.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1321331235%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="782879606%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep05" id="782879606%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep05/index.html">com.soneso.stellar.sdk.sep.sep05</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="782879606%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1924775936%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep05.exceptions" id="1924775936%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep05.exceptions/index.html">com.soneso.stellar.sdk.sep.sep05.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1924775936%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1744493623%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep06" id="1744493623%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep06/index.html">com.soneso.stellar.sdk.sep.sep06</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1744493623%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-737387361%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep06.exceptions" id="-737387361%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep06.exceptions/index.html">com.soneso.stellar.sdk.sep.sep06.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-737387361%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-627245639%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep08" id="-627245639%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep08/index.html">com.soneso.stellar.sdk.sep.sep08</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-627245639%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1766746659%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep08.exceptions" id="-1766746659%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep08.exceptions/index.html">com.soneso.stellar.sdk.sep.sep08.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1766746659%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="334368378%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep09" id="334368378%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep09/index.html">com.soneso.stellar.sdk.sep.sep09</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="334368378%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="15040272%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep10" id="15040272%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep10/index.html">com.soneso.stellar.sdk.sep.sep10</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="15040272%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1428006950%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep10.exceptions" id="1428006950%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep10.exceptions/index.html">com.soneso.stellar.sdk.sep.sep10.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1428006950%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1938268306%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep12" id="1938268306%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep12/index.html">com.soneso.stellar.sdk.sep.sep12</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1938268306%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="398647652%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep12.exceptions" id="398647652%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep12.exceptions/index.html">com.soneso.stellar.sdk.sep.sep12.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="398647652%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-688207501%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep24" id="-688207501%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep24/index.html">com.soneso.stellar.sdk.sep.sep24</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-688207501%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1553395229%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep24.exceptions" id="-1553395229%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep24.exceptions/index.html">com.soneso.stellar.sdk.sep.sep24.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1553395229%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-494432818%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep30" id="-494432818%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep30/index.html">com.soneso.stellar.sdk.sep.sep30</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-494432818%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-417360216%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep30.exceptions" id="-417360216%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep30.exceptions/index.html">com.soneso.stellar.sdk.sep.sep30.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-417360216%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="467181199%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep31" id="467181199%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep31/index.html">com.soneso.stellar.sdk.sep.sep31</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="467181199%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1215443783%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep31.exceptions" id="1215443783%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep31.exceptions/index.html">com.soneso.stellar.sdk.sep.sep31.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1215443783%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1391455274%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep38" id="-1391455274%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep38/index.html">com.soneso.stellar.sdk.sep.sep38</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1391455274%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-239830112%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep38.exceptions" id="-239830112%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep38.exceptions/index.html">com.soneso.stellar.sdk.sep.sep38.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-239830112%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-236066574%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep45" id="-236066574%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep45/index.html">com.soneso.stellar.sdk.sep.sep45</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-236066574%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1765958396%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.sep.sep45.exceptions" id="-1765958396%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.sep.sep45.exceptions/index.html">com.soneso.stellar.sdk.sep.sep45.exceptions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1765958396%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1622197883%2FPackages%2F-909025475" anchor-label="com.soneso.stellar.sdk.smartaccount" id="-1622197883%2FPackages%2F-909025475" data-filterable-set=":stellar-sdk/androidMain,:stellar-sdk/jsMain,:stellar-sdk/nativeMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/androidMain,:stellar-sdk/jsMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/androidMain,:stellar-sdk/jsMain,:stellar-sdk/nativeMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.smartaccount/index.html">com.soneso.stellar.sdk.smartaccount</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1622197883%2FPackages%2F-909025475"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag jvm-like">android</div>
+              <div class="platform-tag js-like">js</div>
+              <div class="platform-tag common-like">native</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-1226098516%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.smartaccount.core" id="-1226098516%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.smartaccount.core/index.html">com.soneso.stellar.sdk.smartaccount.core</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1226098516%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="1782009528%2FPackages%2F-2014708805" anchor-label="com.soneso.stellar.sdk.smartaccount.oz" id="1782009528%2FPackages%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.smartaccount.oz/index.html">com.soneso.stellar.sdk.smartaccount.oz</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1782009528%2FPackages%2F-2014708805"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+<a data-name="-294971351%2FPackages%2F-559440866" anchor-label="com.soneso.stellar.sdk.xdr" id="-294971351%2FPackages%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+    <div class="table-row table-row_platform-tagged" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+      <div>
+        <div class="main-subrow ">
+          <div class=""><span class="inline-flex">
+              <div><a href="stellar-sdk/com.soneso.stellar.sdk.xdr/index.html">com.soneso.stellar.sdk.xdr</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-294971351%2FPackages%2F-559440866"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div class="pull-right platform-tags--wrapper">
+            <div class="platform-tags no-gutters">
+              <div class="platform-tag common-like">common</div>
+              <div class="platform-tag js-like">js</div>
+              <div class="platform-tag common-like">jvm</div>
+              <div class="platform-tag common-like">native</div>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

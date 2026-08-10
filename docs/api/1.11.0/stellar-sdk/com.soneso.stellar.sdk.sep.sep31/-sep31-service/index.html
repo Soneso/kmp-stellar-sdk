@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Sep31Service</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.11.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep31/Sep31Service///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep31</a><span class="delimiter">/</span><span class="current">Sep31Service</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Sep31Service</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">Sep31Service</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>serviceUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">httpRequestHeaders<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><p class="paragraph">SEP-31 Cross-Border Payments service client.</p><p class="paragraph">Provides the Sending Anchor side of SEP-31 by talking to a Receiving Anchor's <code class="lang-kotlin">DIRECT_PAYMENT_SERVER</code>. Wraps the five HTTP endpoints defined by SEP-0031:</p><ul><li><p class="paragraph"><code class="lang-kotlin">GET /info</code> — discover supported assets, limits, and KYC requirements.</p></li><li><p class="paragraph"><code class="lang-kotlin">POST /transactions</code> — initiate a cross-border payment and receive on-chain instructions.</p></li><li><p class="paragraph"><code class="lang-kotlin">GET /transactions/:id</code> — fetch the current state of a transaction.</p></li><li><p class="paragraph"><code class="lang-kotlin">PUT /transactions/:id/callback</code> — register a callback URL for status notifications.</p></li><li><p class="paragraph"><code class="lang-kotlin">PATCH /transactions/:id</code> — update legacy per-transaction fields (deprecated; use SEP-12 instead).</p></li></ul><h2 class="">Security posture</h2><ul><li><p class="paragraph"><strong>HTTPS enforcement.</strong> The constructor rejects non-HTTPS <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31Service//#kotlin.String#io.ktor.client.HttpClient?#kotlin.collections.Map[kotlin.String,kotlin.String]?/PointingToCallableParameters(0)/">serviceUrl</span> values, the companion <a href="-companion/from-domain.html">Companion.fromDomain</a> re-validates the resolved <code class="lang-kotlin">DIRECT_PAYMENT_SERVER</code>, and <a href="put-transaction-callback.html">putTransactionCallback</a> re-validates the supplied callback URL before any network call. <code class="lang-kotlin">http://</code> is allowed only for the three loopback authorities (<code class="lang-kotlin">localhost</code>, <code class="lang-kotlin">127.0.0.1</code>, <code class="lang-kotlin">[::1]</code>, each optionally with a port) so callers can integrate against a local Anchor Platform without standing up a TLS proxy; every other host must use HTTPS. Validation errors do not echo the offending input to avoid log-injection.</p></li><li><p class="paragraph"><strong>Path-segment validation.</strong> Every transaction id interpolated into a URL is percent-decoded once and matched against the RFC 3986 <code class="lang-kotlin">pchar</code> allow-list (<code class="lang-kotlin">A-Z</code>, <code class="lang-kotlin">a-z</code>, <code class="lang-kotlin">0-9</code>, <code class="lang-kotlin">-</code>, <code class="lang-kotlin">.</code>, <code class="lang-kotlin">_</code>, <code class="lang-kotlin">~</code>, <code class="lang-kotlin">!</code>, <code class="lang-kotlin">$</code>, <code class="lang-kotlin">&amp;</code>, <code class="lang-kotlin">'</code>, <code class="lang-kotlin">(</code>, <code class="lang-kotlin">)</code>, <code class="lang-kotlin">*</code>, <code class="lang-kotlin">+</code>, <code class="lang-kotlin">,</code>, <code class="lang-kotlin">;</code>, <code class="lang-kotlin">=</code>, <code class="lang-kotlin">:</code>, <code class="lang-kotlin">@</code>). The substring <code class="lang-kotlin">..</code> is additionally rejected to prevent path-traversal attempts, which is stricter than what RFC 3986 alone requires.</p></li><li><p class="paragraph"><strong>Redirect handling.</strong> The default HTTP client used by this service sets <code class="lang-kotlin">followRedirects = false</code>. The anchor URL is authoritative; a redirect indicates misconfiguration or an attack. A caller-supplied <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31Service//#kotlin.String#io.ktor.client.HttpClient?#kotlin.collections.Map[kotlin.String,kotlin.String]?/PointingToCallableParameters(1)/">httpClient</span> is used as-is — the caller is responsible for redirect policy on the client they pass in.</p></li><li><p class="paragraph"><strong>Response body caps.</strong> Bodies are size-capped before decoding (2 MB for <code class="lang-kotlin">/info</code>, 256 KB for transaction responses). If the response advertises a <code class="lang-kotlin">Content-Length</code> larger than the cap, or streams more bytes than the cap, <a href="../../com.soneso.stellar.sdk.sep.sep31.exceptions/-sep31-invalid-response-exception/index.html">Sep31InvalidResponseException</a> is raised before any body content is materialized.</p></li><li><p class="paragraph"><strong>Content-Type allow-list.</strong> Responses must declare <code class="lang-kotlin">application/json</code> or <code class="lang-kotlin">application/problem+json</code> (RFC 7807). Other types raise <a href="../../com.soneso.stellar.sdk.sep.sep31.exceptions/-sep31-invalid-response-exception/index.html">Sep31InvalidResponseException</a> before body read; this defends against anchors returning HTML error pages that would otherwise reach the error-message extractor.</p></li><li><p class="paragraph"><strong>No logging plugin by default.</strong> This service does not install Ktor's <code class="lang-kotlin">Logging</code> plugin. If a caller supplies a logging-enabled <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31Service//#kotlin.String#io.ktor.client.HttpClient?#kotlin.collections.Map[kotlin.String,kotlin.String]?/PointingToCallableParameters(1)/">httpClient</span>, the caller is responsible for redaction. JWT bearer tokens, PII (KYC fields, customer ids, refund memos, names), and full request bodies must be filtered upstream.</p></li><li><p class="paragraph"><strong>TLS baseline.</strong> TLS minimum version and certificate pinning follow the platform Ktor client defaults. Production deployments that require pinning or a higher TLS floor should construct an <code class="lang-kotlin">HttpClient</code> with their engine's pinning policy and pass it via the <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31Service//#kotlin.String#io.ktor.client.HttpClient?#kotlin.collections.Map[kotlin.String,kotlin.String]?/PointingToCallableParameters(1)/">httpClient</span> constructor parameter.</p></li></ul><h2 class="">Typical workflow</h2><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// 1. Initialize from the receiving anchor's domain.<br>val sep31 = Sep31Service.fromDomain(&quot;anchor.example.org&quot;)<br><br>// 2. Discover available assets.<br>val info = sep31.info(jwt = jwtToken)<br>val usdc = info.receiveAssets[&quot;USDC&quot;] ?: error(&quot;USDC not supported&quot;)<br><br>// 3. Initiate a transaction.<br>val request = Sep31PostTransactionsRequest(<br>    amount = 100.0,<br>    assetCode = &quot;USDC&quot;,<br>    fundingMethod = &quot;SWIFT&quot;,<br>    senderId = &quot;11111111-1111-1111-1111-111111111111&quot;,<br>    receiverId = &quot;22222222-2222-2222-2222-222222222222&quot;<br>)<br>val post = sep31.postTransactions(request, jwtToken)<br><br>// 4. Poll for status.<br>val transaction = sep31.getTransaction(post.id, jwtToken)<br>println(&quot;Status: ${transaction.status}&quot;)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="-companion/from-domain.html">Companion.fromDomain</a> for automatic configuration via stellar.toml</p></li><li><p class="paragraph"><a href="../-sep31-post-transactions-request/index.html">Sep31PostTransactionsRequest</a> for request construction</p></li><li><p class="paragraph"><a href="../-sep31-transaction-response/index.html">Sep31TransactionResponse</a> for transaction state</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md">SEP-0031 Specification</a></p></li></ul><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>http</span><wbr></wbr><span><span>Client</span></span></u></div></span></div><div><div class="title"><p class="paragraph">Optional caller-supplied HTTP client. When <code class="lang-kotlin">null</code>, the service constructs a Ktor client with <code class="lang-kotlin">followRedirects = false</code>, content negotiation, and a 30 s request timeout. A caller-supplied client is used verbatim and never closed by this service.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>http</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Headers</span></span></u></div></span></div><div><div class="title"><p class="paragraph">Optional headers attached to every outbound request in addition to <code class="lang-kotlin">Authorization</code> and <code class="lang-kotlin">Content-Type</code>.</p></div></div></div></div></div><h4 class="tableheader">Throws</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-illegal-argument-exception/index.html"><span>Illegal</span><wbr></wbr><span>Argument</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31Service//#kotlin.String#io.ktor.client.HttpClient?#kotlin.collections.Map[kotlin.String,kotlin.String]?/PointingToCallableParameters(0)/">serviceUrl</span> is neither HTTPS nor HTTP targeting a loopback authority.</p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="1552902282%2FConstructors%2F-2014708805" anchor-label="Sep31Service" id="1552902282%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-sep31-service.html"><span><span>Sep31Service</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1552902282%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">serviceUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">httpRequestHeaders<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="-182814536%2FClasslikes%2F-2014708805" anchor-label="Companion" id="-182814536%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-182814536%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="922576207%2FProperties%2F-2014708805" anchor-label="serviceUrl" id="922576207%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="service-url.html"><span>service</span><wbr></wbr><span><span>Url</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="922576207%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="service-url.html">serviceUrl</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Base URL of the Receiving Anchor's <code class="lang-kotlin">DIRECT_PAYMENT_SERVER</code>. Must be HTTPS, or <code class="lang-kotlin">http://</code> against the loopback authorities <code class="lang-kotlin">localhost</code>, <code class="lang-kotlin">127.0.0.1</code>, or <code class="lang-kotlin">[::1]</code> for local-development integration.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-843738520%2FFunctions%2F-2014708805" anchor-label="getTransaction" id="-843738520%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-transaction.html"><span>get</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-843738520%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-transaction.html"><span class="token function">getTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep31-transaction-response/index.html">Sep31TransactionResponse</a></div><div class="brief "><p class="paragraph">Fetches the current state of a previously-initiated transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="392965429%2FFunctions%2F-2014708805" anchor-label="info" id="392965429%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="info.html"><span><span>info</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="392965429%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="info.html"><span class="token function">info</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">lang<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep31-info-response/index.html">Sep31InfoResponse</a></div><div class="brief "><p class="paragraph">Fetches the Receiving Anchor's supported assets, limits, and KYC requirements.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-789870871%2FFunctions%2F-2014708805" anchor-label="patchTransaction" id="-789870871%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="patch-transaction.html"><span>patch</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-789870871%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="patch-transaction.html"><span class="token function"><strike>patchTransaction</strike></span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">fields<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep31-transaction-response/index.html">Sep31TransactionResponse</a></div><div class="brief "><p class="paragraph">Updates legacy per-transaction fields on a pending transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2098194260%2FFunctions%2F-2014708805" anchor-label="postTransactions" id="2098194260%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="post-transactions.html"><span>post</span><wbr></wbr><span><span>Transactions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2098194260%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="post-transactions.html"><span class="token function">postTransactions</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep31-post-transactions-request/index.html">Sep31PostTransactionsRequest</a><span class="token punctuation">, </span></span><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep31-post-transactions-response/index.html">Sep31PostTransactionsResponse</a></div><div class="brief "><p class="paragraph">Initiates a SEP-31 cross-border payment.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-104416679%2FFunctions%2F-2014708805" anchor-label="putTransactionCallback" id="-104416679%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="put-transaction-callback.html"><span>put</span><wbr></wbr><span>Transaction</span><wbr></wbr><span><span>Callback</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-104416679%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="put-transaction-callback.html"><span class="token function">putTransactionCallback</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">callbackUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Registers a callback URL the Receiving Anchor will invoke when the transaction status changes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

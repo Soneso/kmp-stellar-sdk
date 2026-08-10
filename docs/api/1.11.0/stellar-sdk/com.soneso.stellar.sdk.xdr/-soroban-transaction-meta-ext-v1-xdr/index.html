@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>SorobanTransactionMetaExtV1Xdr</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.11.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.xdr/SorobanTransactionMetaExtV1Xdr///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.xdr</a><span class="delimiter">/</span><span class="current">SorobanTransactionMetaExtV1Xdr</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Soroban</span><wbr></wbr><span>Transaction</span><wbr></wbr><span>Meta</span><wbr></wbr><span>Ext</span><wbr></wbr><span><span>V1Xdr</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">SorobanTransactionMetaExtV1Xdr</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>ext<span class="token operator">: </span><a href="../-extension-point-xdr/index.html">ExtensionPointXdr</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>totalNonRefundableResourceFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>totalRefundableResourceFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>rentFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a></span></span><span class="token punctuation">)</span></div><p class="paragraph">XDR Source: struct SorobanTransactionMetaExtV1 {     ExtensionPoint ext;</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// The following are the components of the overall Soroban resource fee
+// charged for the transaction.
+// The following relation holds:
+// `resourceFeeCharged = totalNonRefundableResourceFeeCharged + totalRefundableResourceFeeCharged`
+// where `resourceFeeCharged` is the overall fee charged for the
+// transaction. Also, `resourceFeeCharged` <= `sorobanData.resourceFee`
+// i.e.we never charge more than the declared resource fee.
+// The inclusion fee for charged the Soroban transaction can be found using
+// the following equation:
+// `result.feeCharged = resourceFeeCharged + inclusionFeeCharged`.
+
+// Total amount (in stroops) that has been charged for non-refundable
+// Soroban resources.
+// Non-refundable resources are charged based on the usage declared in
+// the transaction envelope (such as `instructions`, `readBytes` etc.) and
+// is charged regardless of the success of the transaction.
+int64 totalNonRefundableResourceFeeCharged;
+// Total amount (in stroops) that has been charged for refundable
+// Soroban resource fees.
+// Currently this comprises the rent fee (`rentFeeCharged`) and the
+// fee for the events and return value.
+// Refundable resources are charged based on the actual resources usage.
+// Since currently refundable resources are only used for the successful
+// transactions, this will be `0` for failed transactions.
+int64 totalRefundableResourceFeeCharged;
+// Amount (in stroops) that has been charged for rent.
+// This is a part of `totalRefundableResourceFeeCharged`.
+int64 rentFeeCharged;</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">};</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="127586321%2FConstructors%2F-2014708805" anchor-label="SorobanTransactionMetaExtV1Xdr" id="127586321%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-soroban-transaction-meta-ext-v1-xdr.html"><span>Soroban</span><wbr></wbr><span>Transaction</span><wbr></wbr><span>Meta</span><wbr></wbr><span>Ext</span><wbr></wbr><span><span>V1Xdr</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="127586321%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">ext<span class="token operator">: </span><a href="../-extension-point-xdr/index.html">ExtensionPointXdr</a><span class="token punctuation">, </span></span><span class="parameter ">totalNonRefundableResourceFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a><span class="token punctuation">, </span></span><span class="parameter ">totalRefundableResourceFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a><span class="token punctuation">, </span></span><span class="parameter ">rentFeeCharged<span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="712922260%2FClasslikes%2F-2014708805" anchor-label="Companion" id="712922260%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="712922260%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-1217012660%2FProperties%2F-2014708805" anchor-label="ext" id="-1217012660%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="ext.html"><span><span>ext</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1217012660%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="ext.html">ext</a><span class="token operator">: </span><a href="../-extension-point-xdr/index.html">ExtensionPointXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1067069866%2FProperties%2F-2014708805" anchor-label="rentFeeCharged" id="1067069866%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="rent-fee-charged.html"><span>rent</span><wbr></wbr><span>Fee</span><wbr></wbr><span><span>Charged</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1067069866%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="rent-fee-charged.html">rentFeeCharged</a><span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a></div><div class="brief "><p class="paragraph">Amount (in stroops) that has been charged for rent. This is a part of <code class="lang-kotlin">totalRefundableResourceFeeCharged</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-600208614%2FProperties%2F-2014708805" anchor-label="totalNonRefundableResourceFeeCharged" id="-600208614%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="total-non-refundable-resource-fee-charged.html"><span>total</span><wbr></wbr><span>Non</span><wbr></wbr><span>Refundable</span><wbr></wbr><span>Resource</span><wbr></wbr><span>Fee</span><wbr></wbr><span><span>Charged</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-600208614%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="total-non-refundable-resource-fee-charged.html">totalNonRefundableResourceFeeCharged</a><span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a></div><div class="brief "><p class="paragraph">The following are the components of the overall Soroban resource fee charged for the transaction. The following relation holds: <code class="lang-kotlin">resourceFeeCharged = totalNonRefundableResourceFeeCharged + totalRefundableResourceFeeCharged</code> where <code class="lang-kotlin">resourceFeeCharged</code> is the overall fee charged for the transaction. Also, <code class="lang-kotlin">resourceFeeCharged</code><= <code class="lang-kotlin">sorobanData.resourceFee</code> i.e.we never charge more than the declared resource fee. The inclusion fee for charged the Soroban transaction can be found using the following equation: <code class="lang-kotlin">result.feeCharged = resourceFeeCharged + inclusionFeeCharged</code>. Total amount (in stroops) that has been charged for non-refundable Soroban resources. Non-refundable resources are charged based on the usage declared in the transaction envelope (such as <code class="lang-kotlin">instructions</code>, <code class="lang-kotlin">readBytes</code> etc.) and is charged regardless of the success of the transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1487510719%2FProperties%2F-2014708805" anchor-label="totalRefundableResourceFeeCharged" id="1487510719%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="total-refundable-resource-fee-charged.html"><span>total</span><wbr></wbr><span>Refundable</span><wbr></wbr><span>Resource</span><wbr></wbr><span>Fee</span><wbr></wbr><span><span>Charged</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1487510719%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="total-refundable-resource-fee-charged.html">totalRefundableResourceFeeCharged</a><span class="token operator">: </span><a href="../-int64-xdr/index.html">Int64Xdr</a></div><div class="brief "><p class="paragraph">Total amount (in stroops) that has been charged for refundable Soroban resource fees. Currently this comprises the rent fee (<code class="lang-kotlin">rentFeeCharged</code>) and the fee for the events and return value. Refundable resources are charged based on the actual resources usage. Since currently refundable resources are only used for the successful transactions, this will be <code class="lang-kotlin">0</code> for failed transactions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="567974341%2FFunctions%2F-2014708805" anchor-label="encode" id="567974341%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="encode.html"><span><span>encode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="567974341%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="encode.html"><span class="token function">encode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">writer<span class="token operator">: </span><a href="../-xdr-writer/index.html">XdrWriter</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-236988262%2FFunctions%2F-2014708805" anchor-label="toXdrJson" id="-236988262%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span><span>Json</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-236988262%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json.html"><span class="token function">toXdrJson</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2138121444%2FFunctions%2F-2014708805" anchor-label="toXdrJsonElement" id="2138121444%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json-element.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span>Json</span><wbr></wbr><span><span>Element</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2138121444%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json-element.html"><span class="token function">toXdrJsonElement</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><span data-unresolved-link="kotlinx.serialization.json/JsonElement///PointingToDeclaration/">JsonElement</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

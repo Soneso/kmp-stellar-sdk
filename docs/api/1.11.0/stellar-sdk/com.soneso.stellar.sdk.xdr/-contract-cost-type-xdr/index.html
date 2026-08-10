@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>ContractCostTypeXdr</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.11.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.xdr/ContractCostTypeXdr///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.xdr</a><span class="delimiter">/</span><span class="current">ContractCostTypeXdr</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Contract</span><wbr></wbr><span>Cost</span><wbr></wbr><span>Type</span><wbr></wbr><span><span>Xdr</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">enum </span><a href="index.html">ContractCostTypeXdr</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="index.html">ContractCostTypeXdr</a><span class="token operator">&gt; </span></div><p class="paragraph">XDR Source: enum ContractCostType {     // Cost of running 1 wasm instruction     WasmInsnExec = 0,     // Cost of allocating a slice of memory (in bytes)     MemAlloc = 1,     // Cost of copying a slice of bytes into a pre-allocated memory     MemCpy = 2,     // Cost of comparing two slices of memory     MemCmp = 3,     // Cost of a host function dispatch, not including the actual work done by     // the function nor the cost of VM invocation machinary     DispatchHostFunction = 4,     // Cost of visiting a host object from the host object storage. Exists to     // make sure some baseline cost coverage, i.e. repeatly visiting objects     // by the guest will always incur some charges.     VisitObject = 5,     // Cost of serializing an xdr object to bytes     ValSer = 6,     // Cost of deserializing an xdr object from bytes     ValDeser = 7,     // Cost of computing the sha256 hash from bytes     ComputeSha256Hash = 8,     // Cost of computing the ed25519 pubkey from bytes     ComputeEd25519PubKey = 9,     // Cost of verifying ed25519 signature of a payload.     VerifyEd25519Sig = 10,     // Cost of instantiation a VM from wasm bytes code.     VmInstantiation = 11,     // Cost of instantiation a VM from a cached state.     VmCachedInstantiation = 12,     // Cost of invoking a function on the VM. If the function is a host function,     // additional cost will be covered by <code class="lang-kotlin">DispatchHostFunction</code>.     InvokeVmFunction = 13,     // Cost of computing a keccak256 hash from bytes.     ComputeKeccak256Hash = 14,     // Cost of decoding an ECDSA signature computed from a 256-bit prime modulus     // curve (e.g. secp256k1 and secp256r1)     DecodeEcdsaCurve256Sig = 15,     // Cost of recovering an ECDSA secp256k1 key from a signature.     RecoverEcdsaSecp256k1Key = 16,     // Cost of int256 addition (<code class="lang-kotlin">+</code>) and subtraction (<code class="lang-kotlin">-</code>) operations     Int256AddSub = 17,     // Cost of int256 multiplication (<code class="lang-kotlin">*</code>) operation     Int256Mul = 18,     // Cost of int256 division (<code class="lang-kotlin">/</code>) operation     Int256Div = 19,     // Cost of int256 power (<code class="lang-kotlin">exp</code>) operation     Int256Pow = 20,     // Cost of int256 shift (<code class="lang-kotlin">shl</code>, <code class="lang-kotlin">shr</code>) operation     Int256Shift = 21,     // Cost of drawing random bytes using a ChaCha20 PRNG     ChaCha20DrawBytes = 22,</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Cost of parsing wasm bytes that only encode instructions.
+ParseWasmInstructions = 23,
+// Cost of parsing a known number of wasm functions.
+ParseWasmFunctions = 24,
+// Cost of parsing a known number of wasm globals.
+ParseWasmGlobals = 25,
+// Cost of parsing a known number of wasm table entries.
+ParseWasmTableEntries = 26,
+// Cost of parsing a known number of wasm types.
+ParseWasmTypes = 27,
+// Cost of parsing a known number of wasm data segments.
+ParseWasmDataSegments = 28,
+// Cost of parsing a known number of wasm element segments.
+ParseWasmElemSegments = 29,
+// Cost of parsing a known number of wasm imports.
+ParseWasmImports = 30,
+// Cost of parsing a known number of wasm exports.
+ParseWasmExports = 31,
+// Cost of parsing a known number of data segment bytes.
+ParseWasmDataSegmentBytes = 32,
+
+// Cost of instantiating wasm bytes that only encode instructions.
+InstantiateWasmInstructions = 33,
+// Cost of instantiating a known number of wasm functions.
+InstantiateWasmFunctions = 34,
+// Cost of instantiating a known number of wasm globals.
+InstantiateWasmGlobals = 35,
+// Cost of instantiating a known number of wasm table entries.
+InstantiateWasmTableEntries = 36,
+// Cost of instantiating a known number of wasm types.
+InstantiateWasmTypes = 37,
+// Cost of instantiating a known number of wasm data segments.
+InstantiateWasmDataSegments = 38,
+// Cost of instantiating a known number of wasm element segments.
+InstantiateWasmElemSegments = 39,
+// Cost of instantiating a known number of wasm imports.
+InstantiateWasmImports = 40,
+// Cost of instantiating a known number of wasm exports.
+InstantiateWasmExports = 41,
+// Cost of instantiating a known number of data segment bytes.
+InstantiateWasmDataSegmentBytes = 42,
+
+// Cost of decoding a bytes array representing an uncompressed SEC-1 encoded
+// point on a 256-bit elliptic curve
+Sec1DecodePointUncompressed = 43,
+// Cost of verifying an ECDSA Secp256r1 signature
+VerifyEcdsaSecp256r1Sig = 44,
+
+// Cost of encoding a BLS12-381 Fp (base field element)
+Bls12381EncodeFp = 45,
+// Cost of decoding a BLS12-381 Fp (base field element)
+Bls12381DecodeFp = 46,
+// Cost of checking a G1 point lies on the curve
+Bls12381G1CheckPointOnCurve = 47,
+// Cost of checking a G1 point belongs to the correct subgroup
+Bls12381G1CheckPointInSubgroup = 48,
+// Cost of checking a G2 point lies on the curve
+Bls12381G2CheckPointOnCurve = 49,
+// Cost of checking a G2 point belongs to the correct subgroup
+Bls12381G2CheckPointInSubgroup = 50,
+// Cost of converting a BLS12-381 G1 point from projective to affine coordinates
+Bls12381G1ProjectiveToAffine = 51,
+// Cost of converting a BLS12-381 G2 point from projective to affine coordinates
+Bls12381G2ProjectiveToAffine = 52,
+// Cost of performing BLS12-381 G1 point addition
+Bls12381G1Add = 53,
+// Cost of performing BLS12-381 G1 scalar multiplication
+Bls12381G1Mul = 54,
+// Cost of performing BLS12-381 G1 multi-scalar multiplication (MSM)
+Bls12381G1Msm = 55,
+// Cost of mapping a BLS12-381 Fp field element to a G1 point
+Bls12381MapFpToG1 = 56,
+// Cost of hashing to a BLS12-381 G1 point
+Bls12381HashToG1 = 57,
+// Cost of performing BLS12-381 G2 point addition
+Bls12381G2Add = 58,
+// Cost of performing BLS12-381 G2 scalar multiplication
+Bls12381G2Mul = 59,
+// Cost of performing BLS12-381 G2 multi-scalar multiplication (MSM)
+Bls12381G2Msm = 60,
+// Cost of mapping a BLS12-381 Fp2 field element to a G2 point
+Bls12381MapFp2ToG2 = 61,
+// Cost of hashing to a BLS12-381 G2 point
+Bls12381HashToG2 = 62,
+// Cost of performing BLS12-381 pairing operation
+Bls12381Pairing = 63,
+// Cost of converting a BLS12-381 scalar element from U256
+Bls12381FrFromU256 = 64,
+// Cost of converting a BLS12-381 scalar element to U256
+Bls12381FrToU256 = 65,
+// Cost of performing BLS12-381 scalar element addition/subtraction
+Bls12381FrAddSub = 66,
+// Cost of performing BLS12-381 scalar element multiplication
+Bls12381FrMul = 67,
+// Cost of performing BLS12-381 scalar element exponentiation
+Bls12381FrPow = 68,
+// Cost of performing BLS12-381 scalar element inversion
+Bls12381FrInv = 69,
+
+// Cost of encoding a BN254 Fp (base field element)
+Bn254EncodeFp = 70,
+// Cost of decoding a BN254 Fp (base field element)
+Bn254DecodeFp = 71,
+// Cost of checking a G1 point lies on the curve
+Bn254G1CheckPointOnCurve = 72,
+// Cost of checking a G2 point lies on the curve
+Bn254G2CheckPointOnCurve = 73,
+// Cost of checking a G2 point belongs to the correct subgroup
+Bn254G2CheckPointInSubgroup = 74,
+// Cost of converting a BN254 G1 point from projective to affine coordinates
+Bn254G1ProjectiveToAffine = 75,
+// Cost of performing BN254 G1 point addition
+Bn254G1Add = 76,
+// Cost of performing BN254 G1 scalar multiplication
+Bn254G1Mul = 77,
+// Cost of performing BN254 pairing operation
+Bn254Pairing = 78,
+// Cost of converting a BN254 scalar element from U256
+Bn254FrFromU256 = 79,
+// Cost of converting a BN254 scalar element to U256
+Bn254FrToU256 = 80,
+// // Cost of performing BN254 scalar element addition/subtraction
+Bn254FrAddSub = 81,
+// Cost of performing BN254 scalar element multiplication
+Bn254FrMul = 82,
+// Cost of performing BN254 scalar element exponentiation
+Bn254FrPow = 83,
+ // Cost of performing BN254 scalar element inversion
+Bn254FrInv = 84,
+// Cost of performing BN254 G1 multi-scalar multiplication (MSM)
+Bn254G1Msm = 85</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">};</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button><button class="section-tab" data-togglable="ENTRY">Entries</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="ENTRY">
+        <h2 class="tableheader">Entries</h2>
+        <div class="table"><a data-name="-1380604942%2FClasslikes%2F-2014708805" anchor-label="WasmInsnExec" id="-1380604942%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-wasm-insn-exec/index.html">WasmInsnExec</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1380604942%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-wasm-insn-exec/index.html">WasmInsnExec</a></div></div><div class="brief "><p class="paragraph">Cost of running 1 wasm instruction</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1704993757%2FClasslikes%2F-2014708805" anchor-label="MemAlloc" id="1704993757%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-mem-alloc/index.html">MemAlloc</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1704993757%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-mem-alloc/index.html">MemAlloc</a></div></div><div class="brief "><p class="paragraph">Cost of allocating a slice of memory (in bytes)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="540584212%2FClasslikes%2F-2014708805" anchor-label="MemCpy" id="540584212%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-mem-cpy/index.html">MemCpy</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="540584212%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-mem-cpy/index.html">MemCpy</a></div></div><div class="brief "><p class="paragraph">Cost of copying a slice of bytes into a pre-allocated memory</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1225533230%2FClasslikes%2F-2014708805" anchor-label="MemCmp" id="1225533230%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-mem-cmp/index.html">MemCmp</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1225533230%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-mem-cmp/index.html">MemCmp</a></div></div><div class="brief "><p class="paragraph">Cost of comparing two slices of memory</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1352878519%2FClasslikes%2F-2014708805" anchor-label="DispatchHostFunction" id="1352878519%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-dispatch-host-function/index.html">DispatchHostFunction</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1352878519%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-dispatch-host-function/index.html">DispatchHostFunction</a></div></div><div class="brief "><p class="paragraph">Cost of a host function dispatch, not including the actual work done by the function nor the cost of VM invocation machinary</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1396839413%2FClasslikes%2F-2014708805" anchor-label="VisitObject" id="1396839413%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-visit-object/index.html">VisitObject</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1396839413%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-visit-object/index.html">VisitObject</a></div></div><div class="brief "><p class="paragraph">Cost of visiting a host object from the host object storage. Exists to make sure some baseline cost coverage, i.e. repeatly visiting objects by the guest will always incur some charges.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-254965508%2FClasslikes%2F-2014708805" anchor-label="ValSer" id="-254965508%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-val-ser/index.html">ValSer</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-254965508%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-val-ser/index.html">ValSer</a></div></div><div class="brief "><p class="paragraph">Cost of serializing an xdr object to bytes</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1754069659%2FClasslikes%2F-2014708805" anchor-label="ValDeser" id="1754069659%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-val-deser/index.html">ValDeser</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1754069659%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-val-deser/index.html">ValDeser</a></div></div><div class="brief "><p class="paragraph">Cost of deserializing an xdr object from bytes</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-980522441%2FClasslikes%2F-2014708805" anchor-label="ComputeSha256Hash" id="-980522441%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-compute-sha256-hash/index.html">ComputeSha256Hash</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-980522441%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-compute-sha256-hash/index.html">ComputeSha256Hash</a></div></div><div class="brief "><p class="paragraph">Cost of computing the sha256 hash from bytes</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1150106813%2FClasslikes%2F-2014708805" anchor-label="ComputeEd25519PubKey" id="-1150106813%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-compute-ed25519-pub-key/index.html">ComputeEd25519PubKey</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1150106813%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-compute-ed25519-pub-key/index.html">ComputeEd25519PubKey</a></div></div><div class="brief "><p class="paragraph">Cost of computing the ed25519 pubkey from bytes</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="604812716%2FClasslikes%2F-2014708805" anchor-label="VerifyEd25519Sig" id="604812716%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-verify-ed25519-sig/index.html">VerifyEd25519Sig</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="604812716%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-verify-ed25519-sig/index.html">VerifyEd25519Sig</a></div></div><div class="brief "><p class="paragraph">Cost of verifying ed25519 signature of a payload.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-981548319%2FClasslikes%2F-2014708805" anchor-label="VmInstantiation" id="-981548319%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-vm-instantiation/index.html">VmInstantiation</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-981548319%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-vm-instantiation/index.html">VmInstantiation</a></div></div><div class="brief "><p class="paragraph">Cost of instantiation a VM from wasm bytes code.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-884567969%2FClasslikes%2F-2014708805" anchor-label="VmCachedInstantiation" id="-884567969%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-vm-cached-instantiation/index.html">VmCachedInstantiation</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-884567969%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-vm-cached-instantiation/index.html">VmCachedInstantiation</a></div></div><div class="brief "><p class="paragraph">Cost of instantiation a VM from a cached state.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1035908988%2FClasslikes%2F-2014708805" anchor-label="InvokeVmFunction" id="-1035908988%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-invoke-vm-function/index.html">InvokeVmFunction</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1035908988%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-invoke-vm-function/index.html">InvokeVmFunction</a></div></div><div class="brief "><p class="paragraph">Cost of invoking a function on the VM. If the function is a host function, additional cost will be covered by <code class="lang-kotlin">DispatchHostFunction</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1468732195%2FClasslikes%2F-2014708805" anchor-label="ComputeKeccak256Hash" id="1468732195%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-compute-keccak256-hash/index.html">ComputeKeccak256Hash</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1468732195%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-compute-keccak256-hash/index.html">ComputeKeccak256Hash</a></div></div><div class="brief "><p class="paragraph">Cost of computing a keccak256 hash from bytes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1471067076%2FClasslikes%2F-2014708805" anchor-label="DecodeEcdsaCurve256Sig" id="1471067076%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-decode-ecdsa-curve256-sig/index.html">DecodeEcdsaCurve256Sig</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1471067076%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-decode-ecdsa-curve256-sig/index.html">DecodeEcdsaCurve256Sig</a></div></div><div class="brief "><p class="paragraph">Cost of decoding an ECDSA signature computed from a 256-bit prime modulus curve (e.g. secp256k1 and secp256r1)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1063116206%2FClasslikes%2F-2014708805" anchor-label="RecoverEcdsaSecp256k1Key" id="-1063116206%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-recover-ecdsa-secp256k1-key/index.html">RecoverEcdsaSecp256k1Key</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1063116206%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-recover-ecdsa-secp256k1-key/index.html">RecoverEcdsaSecp256k1Key</a></div></div><div class="brief "><p class="paragraph">Cost of recovering an ECDSA secp256k1 key from a signature.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1992654656%2FClasslikes%2F-2014708805" anchor-label="Int256AddSub" id="-1992654656%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-int256-add-sub/index.html">Int256AddSub</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1992654656%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-int256-add-sub/index.html">Int256AddSub</a></div></div><div class="brief "><p class="paragraph">Cost of int256 addition (<code class="lang-kotlin">+</code>) and subtraction (<code class="lang-kotlin">-</code>) operations</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1770943467%2FClasslikes%2F-2014708805" anchor-label="Int256Mul" id="1770943467%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-int256-mul/index.html">Int256Mul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1770943467%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-int256-mul/index.html">Int256Mul</a></div></div><div class="brief "><p class="paragraph">Cost of int256 multiplication (<code class="lang-kotlin">*</code>) operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1216655368%2FClasslikes%2F-2014708805" anchor-label="Int256Div" id="-1216655368%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-int256-div/index.html">Int256Div</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1216655368%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-int256-div/index.html">Int256Div</a></div></div><div class="brief "><p class="paragraph">Cost of int256 division (<code class="lang-kotlin">/</code>) operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1860883327%2FClasslikes%2F-2014708805" anchor-label="Int256Pow" id="1860883327%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-int256-pow/index.html">Int256Pow</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1860883327%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-int256-pow/index.html">Int256Pow</a></div></div><div class="brief "><p class="paragraph">Cost of int256 power (<code class="lang-kotlin">exp</code>) operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="534370153%2FClasslikes%2F-2014708805" anchor-label="Int256Shift" id="534370153%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-int256-shift/index.html">Int256Shift</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="534370153%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-int256-shift/index.html">Int256Shift</a></div></div><div class="brief "><p class="paragraph">Cost of int256 shift (<code class="lang-kotlin">shl</code>, <code class="lang-kotlin">shr</code>) operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1603972972%2FClasslikes%2F-2014708805" anchor-label="ChaCha20DrawBytes" id="-1603972972%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-cha-cha20-draw-bytes/index.html">ChaCha20DrawBytes</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1603972972%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-cha-cha20-draw-bytes/index.html">ChaCha20DrawBytes</a></div></div><div class="brief "><p class="paragraph">Cost of drawing random bytes using a ChaCha20 PRNG</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1188680057%2FClasslikes%2F-2014708805" anchor-label="ParseWasmInstructions" id="-1188680057%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-instructions/index.html">ParseWasmInstructions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1188680057%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-instructions/index.html">ParseWasmInstructions</a></div></div><div class="brief "><p class="paragraph">Cost of parsing wasm bytes that only encode instructions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1960409249%2FClasslikes%2F-2014708805" anchor-label="ParseWasmFunctions" id="1960409249%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-functions/index.html">ParseWasmFunctions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1960409249%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-functions/index.html">ParseWasmFunctions</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm functions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1191643146%2FClasslikes%2F-2014708805" anchor-label="ParseWasmGlobals" id="-1191643146%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-globals/index.html">ParseWasmGlobals</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1191643146%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-globals/index.html">ParseWasmGlobals</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm globals.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2054160124%2FClasslikes%2F-2014708805" anchor-label="ParseWasmTableEntries" id="-2054160124%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-table-entries/index.html">ParseWasmTableEntries</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2054160124%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-table-entries/index.html">ParseWasmTableEntries</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm table entries.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1717063169%2FClasslikes%2F-2014708805" anchor-label="ParseWasmTypes" id="-1717063169%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-types/index.html">ParseWasmTypes</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1717063169%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-types/index.html">ParseWasmTypes</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm types.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-251021428%2FClasslikes%2F-2014708805" anchor-label="ParseWasmDataSegments" id="-251021428%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-data-segments/index.html">ParseWasmDataSegments</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-251021428%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-data-segments/index.html">ParseWasmDataSegments</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm data segments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="28689329%2FClasslikes%2F-2014708805" anchor-label="ParseWasmElemSegments" id="28689329%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-elem-segments/index.html">ParseWasmElemSegments</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="28689329%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-elem-segments/index.html">ParseWasmElemSegments</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm element segments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-522739788%2FClasslikes%2F-2014708805" anchor-label="ParseWasmImports" id="-522739788%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-imports/index.html">ParseWasmImports</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-522739788%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-imports/index.html">ParseWasmImports</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm imports.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="338833861%2FClasslikes%2F-2014708805" anchor-label="ParseWasmExports" id="338833861%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-exports/index.html">ParseWasmExports</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="338833861%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-exports/index.html">ParseWasmExports</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of wasm exports.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-995740956%2FClasslikes%2F-2014708805" anchor-label="ParseWasmDataSegmentBytes" id="-995740956%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-parse-wasm-data-segment-bytes/index.html">ParseWasmDataSegmentBytes</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-995740956%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-parse-wasm-data-segment-bytes/index.html">ParseWasmDataSegmentBytes</a></div></div><div class="brief "><p class="paragraph">Cost of parsing a known number of data segment bytes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1959875902%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmInstructions" id="1959875902%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-instructions/index.html">InstantiateWasmInstructions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1959875902%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-instructions/index.html">InstantiateWasmInstructions</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating wasm bytes that only encode instructions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="976987466%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmFunctions" id="976987466%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-functions/index.html">InstantiateWasmFunctions</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="976987466%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-functions/index.html">InstantiateWasmFunctions</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm functions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1797274335%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmGlobals" id="1797274335%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-globals/index.html">InstantiateWasmGlobals</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1797274335%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-globals/index.html">InstantiateWasmGlobals</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm globals.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1094395835%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmTableEntries" id="1094395835%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-table-entries/index.html">InstantiateWasmTableEntries</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1094395835%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-table-entries/index.html">InstantiateWasmTableEntries</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm table entries.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-949707992%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmTypes" id="-949707992%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-types/index.html">InstantiateWasmTypes</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-949707992%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-types/index.html">InstantiateWasmTypes</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm types.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1397432765%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmDataSegments" id="-1397432765%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-data-segments/index.html">InstantiateWasmDataSegments</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1397432765%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-data-segments/index.html">InstantiateWasmDataSegments</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm data segments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1117722008%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmElemSegments" id="-1117722008%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-elem-segments/index.html">InstantiateWasmElemSegments</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1117722008%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-elem-segments/index.html">InstantiateWasmElemSegments</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm element segments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1828789603%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmImports" id="-1828789603%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-imports/index.html">InstantiateWasmImports</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1828789603%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-imports/index.html">InstantiateWasmImports</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm imports.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-967215954%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmExports" id="-967215954%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-exports/index.html">InstantiateWasmExports</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-967215954%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-exports/index.html">InstantiateWasmExports</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of wasm exports.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-731830757%2FClasslikes%2F-2014708805" anchor-label="InstantiateWasmDataSegmentBytes" id="-731830757%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-instantiate-wasm-data-segment-bytes/index.html">InstantiateWasmDataSegmentBytes</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-731830757%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-instantiate-wasm-data-segment-bytes/index.html">InstantiateWasmDataSegmentBytes</a></div></div><div class="brief "><p class="paragraph">Cost of instantiating a known number of data segment bytes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1832476633%2FClasslikes%2F-2014708805" anchor-label="Sec1DecodePointUncompressed" id="-1832476633%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-sec1-decode-point-uncompressed/index.html">Sec1DecodePointUncompressed</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1832476633%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-sec1-decode-point-uncompressed/index.html">Sec1DecodePointUncompressed</a></div></div><div class="brief "><p class="paragraph">Cost of decoding a bytes array representing an uncompressed SEC-1 encoded point on a 256-bit elliptic curve</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-617969948%2FClasslikes%2F-2014708805" anchor-label="VerifyEcdsaSecp256r1Sig" id="-617969948%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-verify-ecdsa-secp256r1-sig/index.html">VerifyEcdsaSecp256r1Sig</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-617969948%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-verify-ecdsa-secp256r1-sig/index.html">VerifyEcdsaSecp256r1Sig</a></div></div><div class="brief "><p class="paragraph">Cost of verifying an ECDSA Secp256r1 signature</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="721664383%2FClasslikes%2F-2014708805" anchor-label="Bls12381EncodeFp" id="721664383%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-encode-fp/index.html">Bls12381EncodeFp</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="721664383%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-encode-fp/index.html">Bls12381EncodeFp</a></div></div><div class="brief "><p class="paragraph">Cost of encoding a BLS12-381 Fp (base field element)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2042269015%2FClasslikes%2F-2014708805" anchor-label="Bls12381DecodeFp" id="2042269015%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-decode-fp/index.html">Bls12381DecodeFp</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2042269015%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-decode-fp/index.html">Bls12381DecodeFp</a></div></div><div class="brief "><p class="paragraph">Cost of decoding a BLS12-381 Fp (base field element)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="938014215%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1CheckPointOnCurve" id="938014215%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-check-point-on-curve/index.html">Bls12381G1CheckPointOnCurve</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="938014215%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-check-point-on-curve/index.html">Bls12381G1CheckPointOnCurve</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G1 point lies on the curve</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-385431019%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1CheckPointInSubgroup" id="-385431019%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-check-point-in-subgroup/index.html">Bls12381G1CheckPointInSubgroup</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-385431019%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-check-point-in-subgroup/index.html">Bls12381G1CheckPointInSubgroup</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G1 point belongs to the correct subgroup</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1107157990%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2CheckPointOnCurve" id="1107157990%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-check-point-on-curve/index.html">Bls12381G2CheckPointOnCurve</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1107157990%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-check-point-on-curve/index.html">Bls12381G2CheckPointOnCurve</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G2 point lies on the curve</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="580131798%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2CheckPointInSubgroup" id="580131798%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-check-point-in-subgroup/index.html">Bls12381G2CheckPointInSubgroup</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="580131798%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-check-point-in-subgroup/index.html">Bls12381G2CheckPointInSubgroup</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G2 point belongs to the correct subgroup</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="391686274%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1ProjectiveToAffine" id="391686274%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-projective-to-affine/index.html">Bls12381G1ProjectiveToAffine</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="391686274%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-projective-to-affine/index.html">Bls12381G1ProjectiveToAffine</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BLS12-381 G1 point from projective to affine coordinates</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1340176003%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2ProjectiveToAffine" id="1340176003%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-projective-to-affine/index.html">Bls12381G2ProjectiveToAffine</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1340176003%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-projective-to-affine/index.html">Bls12381G2ProjectiveToAffine</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BLS12-381 G2 point from projective to affine coordinates</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1892592544%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1Add" id="-1892592544%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-add/index.html">Bls12381G1Add</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1892592544%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-add/index.html">Bls12381G1Add</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G1 point addition</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1404583869%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1Mul" id="-1404583869%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-mul/index.html">Bls12381G1Mul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1404583869%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-mul/index.html">Bls12381G1Mul</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G1 scalar multiplication</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1110418630%2FClasslikes%2F-2014708805" anchor-label="Bls12381G1Msm" id="1110418630%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g1-msm/index.html">Bls12381G1Msm</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1110418630%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g1-msm/index.html">Bls12381G1Msm</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G1 multi-scalar multiplication (MSM)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="742877236%2FClasslikes%2F-2014708805" anchor-label="Bls12381MapFpToG1" id="742877236%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-map-fp-to-g1/index.html">Bls12381MapFpToG1</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="742877236%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-map-fp-to-g1/index.html">Bls12381MapFpToG1</a></div></div><div class="brief "><p class="paragraph">Cost of mapping a BLS12-381 Fp field element to a G1 point</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-891387022%2FClasslikes%2F-2014708805" anchor-label="Bls12381HashToG1" id="-891387022%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-hash-to-g1/index.html">Bls12381HashToG1</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-891387022%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-hash-to-g1/index.html">Bls12381HashToG1</a></div></div><div class="brief "><p class="paragraph">Cost of hashing to a BLS12-381 G1 point</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="592471167%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2Add" id="592471167%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-add/index.html">Bls12381G2Add</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="592471167%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-add/index.html">Bls12381G2Add</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G2 point addition</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1080479842%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2Mul" id="1080479842%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-mul/index.html">Bls12381G2Mul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1080479842%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-mul/index.html">Bls12381G2Mul</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G2 scalar multiplication</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-699484955%2FClasslikes%2F-2014708805" anchor-label="Bls12381G2Msm" id="-699484955%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-g2-msm/index.html">Bls12381G2Msm</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-699484955%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-g2-msm/index.html">Bls12381G2Msm</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 G2 multi-scalar multiplication (MSM)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1317134865%2FClasslikes%2F-2014708805" anchor-label="Bls12381MapFp2ToG2" id="1317134865%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-map-fp2-to-g2/index.html">Bls12381MapFp2ToG2</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1317134865%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-map-fp2-to-g2/index.html">Bls12381MapFp2ToG2</a></div></div><div class="brief "><p class="paragraph">Cost of mapping a BLS12-381 Fp2 field element to a G2 point</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1038843827%2FClasslikes%2F-2014708805" anchor-label="Bls12381HashToG2" id="1038843827%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-hash-to-g2/index.html">Bls12381HashToG2</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1038843827%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-hash-to-g2/index.html">Bls12381HashToG2</a></div></div><div class="brief "><p class="paragraph">Cost of hashing to a BLS12-381 G2 point</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1728403823%2FClasslikes%2F-2014708805" anchor-label="Bls12381Pairing" id="-1728403823%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-pairing/index.html">Bls12381Pairing</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1728403823%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-pairing/index.html">Bls12381Pairing</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 pairing operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="270130099%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrFromU256" id="270130099%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-from-u256/index.html">Bls12381FrFromU256</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="270130099%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-from-u256/index.html">Bls12381FrFromU256</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BLS12-381 scalar element from U256</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="796838916%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrToU256" id="796838916%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-to-u256/index.html">Bls12381FrToU256</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="796838916%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-to-u256/index.html">Bls12381FrToU256</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BLS12-381 scalar element to U256</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1293896566%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrAddSub" id="-1293896566%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-add-sub/index.html">Bls12381FrAddSub</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1293896566%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-add-sub/index.html">Bls12381FrAddSub</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 scalar element addition/subtraction</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1483203681%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrMul" id="1483203681%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-mul/index.html">Bls12381FrMul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1483203681%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-mul/index.html">Bls12381FrMul</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 scalar element multiplication</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1573143541%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrPow" id="1573143541%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-pow/index.html">Bls12381FrPow</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1573143541%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-pow/index.html">Bls12381FrPow</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 scalar element exponentiation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1041486898%2FClasslikes%2F-2014708805" anchor-label="Bls12381FrInv" id="-1041486898%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bls12381-fr-inv/index.html">Bls12381FrInv</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1041486898%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bls12381-fr-inv/index.html">Bls12381FrInv</a></div></div><div class="brief "><p class="paragraph">Cost of performing BLS12-381 scalar element inversion</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="281003952%2FClasslikes%2F-2014708805" anchor-label="Bn254EncodeFp" id="281003952%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-encode-fp/index.html">Bn254EncodeFp</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="281003952%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-encode-fp/index.html">Bn254EncodeFp</a></div></div><div class="brief "><p class="paragraph">Cost of encoding a BN254 Fp (base field element)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1601608584%2FClasslikes%2F-2014708805" anchor-label="Bn254DecodeFp" id="1601608584%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-decode-fp/index.html">Bn254DecodeFp</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1601608584%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-decode-fp/index.html">Bn254DecodeFp</a></div></div><div class="brief "><p class="paragraph">Cost of decoding a BN254 Fp (base field element)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-726085834%2FClasslikes%2F-2014708805" anchor-label="Bn254G1CheckPointOnCurve" id="-726085834%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g1-check-point-on-curve/index.html">Bn254G1CheckPointOnCurve</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-726085834%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g1-check-point-on-curve/index.html">Bn254G1CheckPointOnCurve</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G1 point lies on the curve</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-556942059%2FClasslikes%2F-2014708805" anchor-label="Bn254G2CheckPointOnCurve" id="-556942059%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g2-check-point-on-curve/index.html">Bn254G2CheckPointOnCurve</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-556942059%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g2-check-point-on-curve/index.html">Bn254G2CheckPointOnCurve</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G2 point lies on the curve</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2111897529%2FClasslikes%2F-2014708805" anchor-label="Bn254G2CheckPointInSubgroup" id="-2111897529%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g2-check-point-in-subgroup/index.html">Bn254G2CheckPointInSubgroup</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2111897529%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g2-check-point-in-subgroup/index.html">Bn254G2CheckPointInSubgroup</a></div></div><div class="brief "><p class="paragraph">Cost of checking a G2 point belongs to the correct subgroup</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="344192307%2FClasslikes%2F-2014708805" anchor-label="Bn254G1ProjectiveToAffine" id="344192307%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g1-projective-to-affine/index.html">Bn254G1ProjectiveToAffine</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="344192307%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g1-projective-to-affine/index.html">Bn254G1ProjectiveToAffine</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BN254 G1 point from projective to affine coordinates</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1119247311%2FClasslikes%2F-2014708805" anchor-label="Bn254G1Add" id="1119247311%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g1-add/index.html">Bn254G1Add</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1119247311%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g1-add/index.html">Bn254G1Add</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 G1 point addition</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1607255986%2FClasslikes%2F-2014708805" anchor-label="Bn254G1Mul" id="1607255986%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g1-mul/index.html">Bn254G1Mul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1607255986%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g1-mul/index.html">Bn254G1Mul</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 G1 scalar multiplication</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2136706624%2FClasslikes%2F-2014708805" anchor-label="Bn254Pairing" id="2136706624%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-pairing/index.html">Bn254Pairing</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2136706624%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-pairing/index.html">Bn254Pairing</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 pairing operation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1997218212%2FClasslikes%2F-2014708805" anchor-label="Bn254FrFromU256" id="1997218212%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-from-u256/index.html">Bn254FrFromU256</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1997218212%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-from-u256/index.html">Bn254FrFromU256</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BN254 scalar element from U256</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="356178485%2FClasslikes%2F-2014708805" anchor-label="Bn254FrToU256" id="356178485%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-to-u256/index.html">Bn254FrToU256</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="356178485%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-to-u256/index.html">Bn254FrToU256</a></div></div><div class="brief "><p class="paragraph">Cost of converting a BN254 scalar element to U256</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1734556997%2FClasslikes%2F-2014708805" anchor-label="Bn254FrAddSub" id="-1734556997%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-add-sub/index.html">Bn254FrAddSub</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1734556997%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-add-sub/index.html">Bn254FrAddSub</a></div></div><div class="brief "><p class="paragraph">// Cost of performing BN254 scalar element addition/subtraction</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="200076240%2FClasslikes%2F-2014708805" anchor-label="Bn254FrMul" id="200076240%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-mul/index.html">Bn254FrMul</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="200076240%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-mul/index.html">Bn254FrMul</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 scalar element multiplication</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="290016100%2FClasslikes%2F-2014708805" anchor-label="Bn254FrPow" id="290016100%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-pow/index.html">Bn254FrPow</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="290016100%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-pow/index.html">Bn254FrPow</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 scalar element exponentiation</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1970352957%2FClasslikes%2F-2014708805" anchor-label="Bn254FrInv" id="1970352957%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-fr-inv/index.html">Bn254FrInv</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1970352957%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-fr-inv/index.html">Bn254FrInv</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 scalar element inversion</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-172708811%2FClasslikes%2F-2014708805" anchor-label="Bn254G1Msm" id="-172708811%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bn254-g1-msm/index.html">Bn254G1Msm</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-172708811%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><div class="block"><a href="-bn254-g1-msm/index.html">Bn254G1Msm</a></div></div><div class="brief "><p class="paragraph">Cost of performing BN254 G1 multi-scalar multiplication (MSM)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="-691592434%2FClasslikes%2F-2014708805" anchor-label="Companion" id="-691592434%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-691592434%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="613091767%2FProperties%2F-2014708805" anchor-label="entries" id="613091767%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="entries.html"><span><span>entries</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="613091767%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="entries.html">entries</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.enums/-enum-entries/index.html">EnumEntries</a><span class="token operator">&lt;</span><a href="index.html">ContractCostTypeXdr</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns a representation of an immutable list of all enum entries, in the order they're declared.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-372974862%2FProperties%2F-2014708805" anchor-label="name" id="-372974862%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-tx-set-component-type-xdr/-t-x-s-e-t_-c-o-m-p_-t-x-s_-m-a-y-b-e_-d-i-s-c-o-u-n-t-e-d_-f-e-e/index.html#-372974862%2FProperties%2F-2014708805"><span><span>name</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-372974862%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">val </span><a href="../-tx-set-component-type-xdr/-t-x-s-e-t_-c-o-m-p_-t-x-s_-m-a-y-b-e_-d-i-s-c-o-u-n-t-e-d_-f-e-e/index.html#-372974862%2FProperties%2F-2014708805">name</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-739389684%2FProperties%2F-2014708805" anchor-label="ordinal" id="-739389684%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-tx-set-component-type-xdr/-t-x-s-e-t_-c-o-m-p_-t-x-s_-m-a-y-b-e_-d-i-s-c-o-u-n-t-e-d_-f-e-e/index.html#-739389684%2FProperties%2F-2014708805"><span><span>ordinal</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-739389684%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">val </span><a href="../-tx-set-component-type-xdr/-t-x-s-e-t_-c-o-m-p_-t-x-s_-m-a-y-b-e_-d-i-s-c-o-u-n-t-e-d_-f-e-e/index.html#-739389684%2FProperties%2F-2014708805">ordinal</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-789764490%2FProperties%2F-2014708805" anchor-label="value" id="-789764490%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="value.html"><span><span>value</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-789764490%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="value.html">value</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-813235573%2FFunctions%2F-2014708805" anchor-label="encode" id="-813235573%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="encode.html"><span><span>encode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-813235573%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="encode.html"><span class="token function">encode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">writer<span class="token operator">: </span><a href="../-xdr-writer/index.html">XdrWriter</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1641502956%2FFunctions%2F-2014708805" anchor-label="toXdrJson" id="-1641502956%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span><span>Json</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1641502956%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json.html"><span class="token function">toXdrJson</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1517029078%2FFunctions%2F-2014708805" anchor-label="toXdrJsonElement" id="-1517029078%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json-element.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span>Json</span><wbr></wbr><span><span>Element</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1517029078%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json-element.html"><span class="token function">toXdrJsonElement</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><span data-unresolved-link="kotlinx.serialization.json/JsonElement///PointingToDeclaration/">JsonElement</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="348296517%2FFunctions%2F-2014708805" anchor-label="valueOf" id="348296517%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="value-of.html"><span>value</span><wbr></wbr><span><span>Of</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="348296517%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="value-of.html"><span class="token function">valueOf</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">ContractCostTypeXdr</a></div><div class="brief "><p class="paragraph">Returns the enum constant of this type with the specified name. The string must match exactly an identifier used to declare an enum constant in this type. (Extraneous whitespace characters are not permitted.)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1441607919%2FFunctions%2F-2014708805" anchor-label="values" id="-1441607919%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="values.html"><span><span>values</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1441607919%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="values.html"><span class="token function">values</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-array/index.html">Array</a><span class="token operator">&lt;</span><a href="index.html">ContractCostTypeXdr</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns an array containing the constants of this enum type, in the order they're declared.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
