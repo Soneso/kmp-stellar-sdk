@@ -171,7 +171,7 @@ class SorobanAtomicSwapIntegrationTest {
      * (soroban_test_atomic_swap.dart lines 520-538)
      */
     @Test
-    fun testStep1InstallContracts() = runTest(timeout = 300.seconds) {
+    fun testStep1InstallContracts() = runTest(timeout = 600.seconds) {
         // Given: Create and fund three test accounts
         val admin = KeyPair.random()
         val adminId = admin.getAccountId()
@@ -180,23 +180,22 @@ class SorobanAtomicSwapIntegrationTest {
         val bob = KeyPair.random()
         val bobId = bob.getAccountId()
 
-        // Fund all accounts via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(adminId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(adminId)
-        }
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(aliceId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(aliceId)
-        }
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(bobId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(bobId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            adminId,
+            rpc = sorobanServer,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            aliceId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            bobId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Store keypairs for later tests
         adminKeyPair = admin
@@ -389,12 +388,11 @@ class SorobanAtomicSwapIntegrationTest {
         // Create and fund test account for restore operations
         val restoreAdmin = KeyPair.random()
         val restoreAdminId = restoreAdmin.getAccountId()
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(restoreAdminId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(restoreAdminId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            restoreAdminId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Temporarily set adminKeyPair for restore operations
         val originalAdminKeyPair = adminKeyPair

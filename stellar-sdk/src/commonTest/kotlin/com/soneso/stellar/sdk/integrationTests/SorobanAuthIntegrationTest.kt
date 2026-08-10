@@ -127,22 +127,23 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 232-280)
      */
     @Test
-    fun testStep1UploadAuthContract() = runTest(timeout = 150.seconds) {
+    fun testStep1UploadAuthContract() = runTest(timeout = 300.seconds) {
         // Given: Create and fund two test accounts (submitter and invoker)
         val submitter = KeyPair.random()
         val submitterId = submitter.getAccountId()
         val invoker = KeyPair.random()
         val invokerId = invoker.getAccountId()
 
-        // Fund both accounts via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(submitterId)
-            FriendBot.fundTestnetAccount(invokerId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(submitterId)
-            FriendBot.fundFuturenetAccount(invokerId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            submitterId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            invokerId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Store keypairs for later tests
         submitterKeyPair = submitter
@@ -351,20 +352,18 @@ class SorobanAuthIntegrationTest {
      * (soroban_test_auth.dart lines 328-330, references lines 70-143)
      */
     @Test
-    fun testStep3RestoreFootprint() = runTest(timeout = 120.seconds) {
+    fun testStep3RestoreFootprint() = runTest(timeout = 180.seconds) {
         realDelay(5000) // Wait between tests
 
         // Given: Create and fund test account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Load account
         var account = sorobanServer.getAccount(accountId)

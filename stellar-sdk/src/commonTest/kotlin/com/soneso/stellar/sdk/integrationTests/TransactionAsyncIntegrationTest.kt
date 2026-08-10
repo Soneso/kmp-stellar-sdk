@@ -174,20 +174,18 @@ class TransactionAsyncIntegrationTest {
      * - `transactionResponse.successful == true`: Transaction succeeded in ledger
      */
     @Test
-    fun testSubmitAsyncSuccess() = runTest(timeout = 90.seconds) {
+    fun testSubmitAsyncSuccess() = runTest(timeout = 180.seconds) {
         // 1. Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
         println("[testSubmitAsyncSuccess] Test account: $accountId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(5000) // Increased delay for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -303,20 +301,18 @@ class TransactionAsyncIntegrationTest {
      * - Transaction succeeds in ledger (only once)
      */
     @Test
-    fun testSubmitAsyncDuplicate() = runTest(timeout = 90.seconds) {
+    fun testSubmitAsyncDuplicate() = runTest(timeout = 180.seconds) {
         // 1. Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
         println("[testSubmitAsyncDuplicate] Test account: $accountId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(5000) // Increased delay for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -437,20 +433,18 @@ class TransactionAsyncIntegrationTest {
      * - Exception is thrown (not returned as ERROR status)
      */
     @Test
-    fun testSubmitAsyncMalformed() = runTest(timeout = 90.seconds) {
+    fun testSubmitAsyncMalformed() = runTest(timeout = 180.seconds) {
         // 1. Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
         println("[testSubmitAsyncMalformed] Test account: $accountId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(5000) // Increased delay for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Get account details
         val account = horizonServer.accounts().account(accountId)
@@ -544,20 +538,18 @@ class TransactionAsyncIntegrationTest {
      * - No exception thrown (unlike malformed XDR)
      */
     @Test
-    fun testSubmitAsyncError() = runTest(timeout = 90.seconds) {
+    fun testSubmitAsyncError() = runTest(timeout = 180.seconds) {
         // 1. Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
         println("[testSubmitAsyncError] Test account: $accountId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(5000) // Increased delay for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Create Account with INVALID sequence number
         // This will cause the transaction to fail with tx_bad_seq

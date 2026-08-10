@@ -45,9 +45,8 @@ class SorobanP27AuthIntegrationTest {
         // Fund a submitter (transaction source) and a distinct invoker (the authorizing account).
         val submitter = KeyPair.random()
         val invoker = KeyPair.random()
-        FriendBot.fundTestnetAccount(submitter.getAccountId())
-        FriendBot.fundTestnetAccount(invoker.getAccountId())
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(submitter.getAccountId(), rpc = sorobanServer)
+        fundTestAccountAndAwaitVisibility(invoker.getAccountId(), rpc = sorobanServer)
 
         // Deploy the auth contract.
         val contractId = ContractClient.deploy(

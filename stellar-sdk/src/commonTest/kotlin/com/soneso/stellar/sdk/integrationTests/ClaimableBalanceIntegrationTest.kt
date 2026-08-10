@@ -75,7 +75,7 @@ class ClaimableBalanceIntegrationTest {
      * ```
      */
     @Test
-    fun testClaimableBalance() = runTest(timeout = 120.seconds) {
+    fun testClaimableBalance() = runTest(timeout = 300.seconds) {
         // Create and fund source account
         val sourceAccountKeyPair = KeyPair.random()
         val sourceAccountId = sourceAccountKeyPair.getAccountId()
@@ -83,13 +83,11 @@ class ClaimableBalanceIntegrationTest {
         println("Source account ID: $sourceAccountId")
         println("Source account seed: ${sourceAccountKeyPair.getSecretSeed()?.concatToString()}")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sourceAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val sourceAccount = horizonServer.accounts().account(sourceAccountId)
 
@@ -211,13 +209,11 @@ class ClaimableBalanceIntegrationTest {
         assertEquals(sourceAccountId, claimableBalance.sponsor, "Sponsor should be source account")
 
         // Fund the first claimant account
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(firstClaimantId)
-        } else {
-            FriendBot.fundFuturenetAccount(firstClaimantId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            firstClaimantId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Claim the claimable balance
         val claimClaimableBalanceOp = ClaimClaimableBalanceOperation(

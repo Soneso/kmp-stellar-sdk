@@ -6,6 +6,7 @@ import com.soneso.stellar.sdk.contract.bindings.AtomicSwapContract
 import com.soneso.stellar.sdk.contract.bindings.AuthContract
 import com.soneso.stellar.sdk.contract.bindings.HelloContract
 import com.soneso.stellar.sdk.contract.bindings.TokenContract
+import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -64,6 +65,24 @@ class SorobanClientIntegrationTest {
     }
 
     /**
+     * Funds [accountIds] via Friendbot and returns once the RPC serves every one of them.
+     */
+    private suspend fun fundAccounts(vararg accountIds: String) {
+        val rpcServer = SorobanServer(rpcUrl)
+        try {
+            for (accountId in accountIds) {
+                fundTestAccountAndAwaitVisibility(
+                    accountId,
+                    rpc = rpcServer,
+                    useFuturenet = testOn != "testnet"
+                )
+            }
+        } finally {
+            rpcServer.close()
+        }
+    }
+
+    /**
      * Test hello contract with high-level invoke API and manual result parsing.
      *
      * This test demonstrates:
@@ -84,12 +103,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -150,12 +164,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy auth contract
         val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
@@ -197,12 +206,7 @@ class SorobanClientIntegrationTest {
         val invokerKeyPair = KeyPair.random()
         val invokerAccountId = invokerKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(invokerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(invokerAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(invokerAccountId)
 
         // Step 6: Attempt without auth should fail
         var thrown = false
@@ -278,24 +282,7 @@ class SorobanClientIntegrationTest {
         val bobKeyPair = KeyPair.random()
         val bobId = bobKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(adminId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(aliceId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(bobId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(adminId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(aliceId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(bobId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId, adminId, aliceId, bobId)
 
         println("Accounts funded:")
         println("  Source: $sourceAccountId")
@@ -463,16 +450,7 @@ class SorobanClientIntegrationTest {
         val invokerKeyPair = KeyPair.random()
         val invokerAccountId = invokerKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(invokerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(invokerAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId, invokerAccountId)
 
         // Step 2: Deploy auth contract
         val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
@@ -557,12 +535,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Install WASM once
         val tokenContractWasm = TestResourceUtil.readWasmFile("soroban_token_contract.wasm")
@@ -657,12 +630,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -722,12 +690,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -789,12 +752,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy hello contract
         val helloContractWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
@@ -860,12 +818,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy hello contract; the binding embeds all type knowledge, so the
         // client stays spec-free.
@@ -908,12 +861,7 @@ class SorobanClientIntegrationTest {
         val sourceKeyPair = KeyPair.random()
         val sourceAccountId = sourceKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId)
 
         // Step 2: Deploy auth contract
         val authContractWasm = TestResourceUtil.readWasmFile("soroban_auth_contract.wasm")
@@ -939,12 +887,7 @@ class SorobanClientIntegrationTest {
         val invokerKeyPair = KeyPair.random()
         val invokerAccountId = invokerKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(invokerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(invokerAccountId)
-        }
-        realDelay(5000)
+        fundAccounts(invokerAccountId)
 
         val assembled = authContract.buildIncrementTx(
             Address(invokerAccountId), 4u, sourceAccountId, signer = sourceKeyPair
@@ -987,24 +930,7 @@ class SorobanClientIntegrationTest {
         val bobKeyPair = KeyPair.random()
         val bobId = bobKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(adminId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(aliceId)
-            realDelay(3000)
-            FriendBot.fundTestnetAccount(bobId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceAccountId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(adminId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(aliceId)
-            realDelay(3000)
-            FriendBot.fundFuturenetAccount(bobId)
-        }
-        realDelay(5000)
+        fundAccounts(sourceAccountId, adminId, aliceId, bobId)
 
         // Step 2: Deploy the swap contract (no constructor) and the two tokens (the
         // constructor arguments are converted from the spec parsed out of the wasm)

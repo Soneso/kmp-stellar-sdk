@@ -786,18 +786,16 @@ class SorobanIntegrationTest {
      * @see InvokeHostFunctionOperation.uploadContractWasm
      */
     @Test
-    fun testStep1UploadContract() = runTest(timeout = 120.seconds) {
+    fun testStep1UploadContract() = runTest(timeout = 180.seconds) {
         // Given: Create and fund test account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            rpc = sorobanServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Load account for sequence number
         val account = sorobanServer.getAccount(accountId)
@@ -1305,13 +1303,12 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            rpc = sorobanServer,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Step 1: Upload events contract WASM using helper method
         var account = sorobanServer.getAccount(accountId)
@@ -1690,22 +1687,25 @@ class SorobanIntegrationTest {
      * @see InvokeHostFunctionOperation
      */
     @Test
-    fun testSACWithAsset() = runTest(timeout = 150.seconds) {
+    fun testSACWithAsset() = runTest(timeout = 300.seconds) {
         // Given: Create and fund two test accounts
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
         val keyPairB = KeyPair.random()
         val accountBId = keyPairB.getAccountId()
 
-        // Fund accounts via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-            FriendBot.fundTestnetAccount(accountBId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(accountAId)
-            FriendBot.fundFuturenetAccount(accountBId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            rpc = sorobanServer,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            accountBId,
+            rpc = sorobanServer,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create custom asset (Fsdk issued by account B)
         val assetFsdk = AssetTypeCreditAlphaNum4("FSDK", accountBId)
@@ -1877,7 +1877,7 @@ class SorobanIntegrationTest {
      * @see InvokeHostFunctionOperation.uploadContractWasm
      */
     @Test
-    fun testRestoreFootprint() = runTest(timeout = 120.seconds) {
+    fun testRestoreFootprint() = runTest(timeout = 300.seconds) {
         // Test with hello world contract
         restoreContractFootprint("soroban_hello_world_contract.wasm")
 
@@ -1906,13 +1906,12 @@ class SorobanIntegrationTest {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        // Fund account via FriendBot (network-dependent)
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else if (testOn == "futurenet") {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-        realDelay(5000) // Wait for account creation
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            rpc = sorobanServer,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Load account
         var account = sorobanServer.getAccount(accountId)

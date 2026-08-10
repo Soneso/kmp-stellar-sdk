@@ -1,7 +1,6 @@
 package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -23,15 +22,16 @@ import kotlin.time.Duration.Companion.seconds
  * - AccountData endpoint
  * - Operations and effects parsing
  *
- * **IMPORTANT**: These tests are marked with @Ignore by default because they:
- * 1. Require network access to Stellar testnet
- * 2. Depend on FriendBot availability for funding
- * 3. Take longer to execute (network latency)
+ * **IMPORTANT**: These tests run by default and require:
+ * 1. Network access to Stellar testnet
+ * 2. FriendBot availability, which funds every account the tests use
+ * 3. Test timeouts that cover network latency and the wait for a funded
+ *    account to become visible to Horizon
  *
- * To run these tests:
- * 1. Remove @Ignore annotations
- * 2. Ensure you have stable internet connection
- * 3. Run: `./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest"`
+ * Run them with:
+ * `./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest"`
+ *
+ * Exclude them from a run with `-PexcludeIntegrationTests`.
  *
  * ## Test Network
  *
@@ -70,19 +70,16 @@ class AccountIntegrationTest {
      * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testSetAccountOptions() = runTest(timeout = 60.seconds) {
+    fun testSetAccountOptions() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        // Wait for account to be created
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
         val seqNum = accountA.sequenceNumber
@@ -190,18 +187,16 @@ class AccountIntegrationTest {
      * 5. Verifies operations and effects can be parsed
      */
     @Test
-    fun testFindAccountsForAsset() = runTest(timeout = 60.seconds) {
+    fun testFindAccountsForAsset() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -296,7 +291,7 @@ class AccountIntegrationTest {
      * 4. Verifies operations and effects can be parsed
      */
     @Test
-    fun testAccountMerge() = runTest(timeout = 60.seconds) {
+    fun testAccountMerge() = runTest(timeout = 300.seconds) {
         // Create and fund accounts X and Y
         val keyPairX = KeyPair.random()
         val keyPairY = KeyPair.random()
@@ -304,15 +299,16 @@ class AccountIntegrationTest {
         val accountXId = keyPairX.getAccountId()
         val accountYId = keyPairY.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountXId)
-            FriendBot.fundTestnetAccount(accountYId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountXId)
-            FriendBot.fundFuturenetAccount(accountYId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountXId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            accountYId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Merge Y into X
         val accountMergeOp = AccountMergeOperation(destination = accountXId)
@@ -369,7 +365,7 @@ class AccountIntegrationTest {
      * 5. Verifies operations and effects can be parsed
      */
     @Test
-    fun testAccountMergeMuxedAccounts() = runTest(timeout = 60.seconds) {
+    fun testAccountMergeMuxedAccounts() = runTest(timeout = 300.seconds) {
         // Create and fund accounts X and Y
         val keyPairX = KeyPair.random()
         val keyPairY = KeyPair.random()
@@ -377,15 +373,16 @@ class AccountIntegrationTest {
         val accountXId = keyPairX.getAccountId()
         val accountYId = keyPairY.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountXId)
-            FriendBot.fundTestnetAccount(accountYId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountXId)
-            FriendBot.fundFuturenetAccount(accountYId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountXId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            accountYId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create muxed accounts
         val muxedDestinationAccount = MuxedAccount(accountXId, 10120291UL)
@@ -446,18 +443,16 @@ class AccountIntegrationTest {
      * 5. Verifies operations and effects can be parsed
      */
     @Test
-    fun testBumpSequence() = runTest(timeout = 60.seconds) {
+    fun testBumpSequence() = runTest(timeout = 180.seconds) {
         // Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val account = horizonServer.accounts().account(accountId)
         val startSequence = account.sequenceNumber
@@ -506,18 +501,16 @@ class AccountIntegrationTest {
      * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testManageData() = runTest(timeout = 60.seconds) {
+    fun testManageData() = runTest(timeout = 180.seconds) {
         // Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val account = horizonServer.accounts().account(accountId)
 
@@ -613,18 +606,16 @@ class AccountIntegrationTest {
      * 6. Verifies the data retrieval fails with 404
      */
     @Test
-    fun testAccountDataEndpoint() = runTest(timeout = 60.seconds) {
+    fun testAccountDataEndpoint() = runTest(timeout = 180.seconds) {
         // Create and fund account
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val account = horizonServer.accounts().account(accountId)
 
@@ -702,18 +693,16 @@ class AccountIntegrationTest {
      * 7. Closes the stream properly
      */
     @Test
-    fun testStreamTransactionsForAccount() = runTest(timeout = 90.seconds) {
+    fun testStreamTransactionsForAccount() = runTest(timeout = 300.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 

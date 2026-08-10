@@ -1,14 +1,13 @@
 package com.soneso.stellar.sdk.integrationTests.contract.bindings
 
 import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MuxedAccount
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.bindings.*
 import com.soneso.stellar.sdk.contract.exception.SimulationFailedException
-import com.soneso.stellar.sdk.integrationTests.realDelay
+import com.soneso.stellar.sdk.integrationTests.fundTestAccountAndAwaitVisibility
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -39,8 +38,7 @@ class BindingsSpecTestContractIntegrationTest {
         // Fund a fresh source account.
         val sourceKeyPair = KeyPair.random()
         val source = sourceKeyPair.getAccountId()
-        FriendBot.fundTestnetAccount(source)
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(source, rpcUrl = rpcUrl)
 
         // Deploy the reference contract; keep the client spec-free (the binding embeds types).
         val wasm = TestResourceUtil.readWasmFile("soroban_bindings_spec_test_contract.wasm")

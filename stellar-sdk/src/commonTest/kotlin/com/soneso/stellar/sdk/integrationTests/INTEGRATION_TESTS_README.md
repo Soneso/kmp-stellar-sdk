@@ -63,16 +63,33 @@ Tests for Soroban smart contract interactions:
 
 See `contract/INTEGRATION_TESTS_README.md` for details.
 
-### FriendBot.kt
+### TestUtils.kt
 
-Helper utility for funding test accounts:
+`fundTestAccountAndAwaitVisibility` funds a test account and returns only once the endpoints the
+test uses can serve it. Pass the server instance(s) the test already holds:
+
 ```kotlin
-// Fund a testnet account
-FriendBot.fundTestnetAccount(keypair.getAccountId())
+// Horizon-flow test
+fundTestAccountAndAwaitVisibility(keypair.getAccountId(), horizon = horizonServer)
 
-// Fund a futurenet account
-FriendBot.fundFuturenetAccount(keypair.getAccountId())
+// Soroban-flow test
+fundTestAccountAndAwaitVisibility(keypair.getAccountId(), rpc = sorobanServer)
+
+// Test that holds no server instance: the helper builds and closes its own RPC client
+fundTestAccountAndAwaitVisibility(keypair.getAccountId(), rpcUrl = rpcUrl)
+
+// Futurenet instead of testnet
+fundTestAccountAndAwaitVisibility(keypair.getAccountId(), horizon = horizonServer, useFuturenet = true)
 ```
+
+A Friendbot success does not mean the account can be served. Horizon and Soroban RPC ingest
+ledgers independently, either can trail Friendbot by tens of seconds under load, and both answer
+from replicas that disagree while ingestion converges. The helper therefore requires three
+consecutive rounds in which every endpoint passed to it serves the account, and gives up after a
+90-second budget with a message naming each endpoint's last failure.
+
+The same file provides `realDelay`, which waits in real wall-clock time. `runTest` uses virtual
+time, so a plain `delay()` is skipped.
 
 ### SorobanIntegrationTest.kt
 
@@ -472,10 +489,12 @@ private val testOn = "futurenet"  // or "testnet"
 **Symptom**: Tests fail with timeout error
 
 **Solutions**:
-1. Increase timeout in `runTest`:
+1. Check the timeout covers the funding waits. Budget about 92 seconds per account the test
+   funds (the worst case of `fundTestAccountAndAwaitVisibility`), plus the `realDelay()` calls
+   on the path, plus the test's own network work, then round up:
    ```kotlin
    @Test
-   fun testSomething() = runTest(timeout = 120_000) { // 2 minutes
+   fun testSomething() = runTest(timeout = 300.seconds) { // two funded accounts
        // ...
    }
    ```
@@ -483,7 +502,7 @@ private val testOn = "futurenet"  // or "testnet"
 2. Add more delays after transactions:
    ```kotlin
    horizonServer.submitTransaction(tx)
-   delay(5000)  // Wait 5 seconds instead of 3
+   realDelay(5000)  // Wait 5 seconds instead of 3
    ```
 
 3. Check network status: https://status.stellar.org
@@ -503,10 +522,10 @@ private val testOn = "futurenet"  // or "testnet"
 **Symptom**: `Account not found` or `404` error immediately after funding
 
 **Solutions**:
-1. Increase delay after funding:
+1. Fund through the helper and pass it every server the test queries, so it waits for that
+   endpoint rather than for a fixed delay:
    ```kotlin
-   FriendBot.fundTestnetAccount(accountId)
-   delay(5000)  // Wait longer
+   fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer, rpc = sorobanServer)
    ```
 
 2. Verify account was actually funded:
@@ -566,12 +585,12 @@ private val testOn = "futurenet"  // or "testnet"
 Each test should be independent:
 ```kotlin
 @Test
-fun testSomething() = runTest {
+fun testSomething() = runTest(timeout = 180.seconds) {
     // Create fresh keypairs for each test
     val keyPair = KeyPair.random()
 
     // Don't reuse accounts between tests
-    FriendBot.fundTestnetAccount(keyPair.getAccountId())
+    fundTestAccountAndAwaitVisibility(keyPair.getAccountId(), horizon = horizonServer)
 
     // ...
 }
@@ -579,18 +598,20 @@ fun testSomething() = runTest {
 
 ### 2. Proper Delays
 
-Always add delays after network operations:
+Add `realDelay()` after network operations that need real wall-clock waiting:
 ```kotlin
-// After funding
-FriendBot.fundTestnetAccount(accountId)
-delay(3000)  // Wait for account creation
-
 // After submitting transaction
 horizonServer.submitTransaction(tx)
-delay(3000)  // Wait for transaction to be processed
+realDelay(3000)  // Wait for transaction to be processed
 
 // Before querying results
-delay(3000)  // Ensure data is available
+realDelay(3000)  // Ensure data is available
+```
+
+Funding is the exception. `fundTestAccountAndAwaitVisibility` waits on the endpoint's answer, so
+no delay follows it:
+```kotlin
+fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer)
 ```
 
 ### 3. Error Handling
@@ -619,16 +640,30 @@ fun testSomething() = runTest {
 
 ### 5. Timeouts
 
-Set appropriate timeouts based on operations:
+Size the timeout from the number of accounts the test funds (about 92 seconds each, worst case),
+the `realDelay()` calls on its path, and its own network work. Count the fundings in any shared
+setup helper the test calls, then round up:
 ```kotlin
-// Simple tests
+// Queries only, no funded accounts
 @Test
-fun simpleTest() = runTest(timeout = 30_000) { ... }
+fun queryTest() = runTest(timeout = 60.seconds) { ... }
 
-// Complex tests with multiple transactions
+// One funded account
 @Test
-fun complexTest() = runTest(timeout = 120_000) { ... }
+fun singleAccountTest() = runTest(timeout = 180.seconds) { ... }
+
+// Two funded accounts
+@Test
+fun twoAccountTest() = runTest(timeout = 300.seconds) { ... }
+
+// Shared setup funding three or more accounts
+@Test
+fun multiAccountTest() = runTest(timeout = 600.seconds) { ... }
 ```
+
+A timeout below the worst-case funding wait hides the diagnostic: the test dies on an opaque
+`runTest` timeout instead of the helper's message naming the endpoint that never served the
+account.
 
 ## Missing Features
 
@@ -733,10 +768,11 @@ When adding new integration tests:
 
 1. **Document the test** in this README
 2. **Use descriptive names** that explain what's being tested
-3. **Add proper delays** after network operations
+3. **Add proper `realDelay()` waits** after network operations
 4. **Handle errors gracefully** with meaningful assertions
 5. **Follow existing patterns** for consistency
-6. **Use FriendBot for automatic account funding**
+6. **Fund accounts with `fundTestAccountAndAwaitVisibility`**, passing the servers the test uses,
+   and size the `runTest` timeout for about 92 seconds per funded account
 7. **Test on multiple platforms** (JVM, JS, Native)
 
 ## Resources

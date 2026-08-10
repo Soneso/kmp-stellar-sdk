@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -116,27 +117,23 @@ class StellarTomlIntegrationTest {
     }
 
     @Test
-    fun testFetchFromCircleCom() = runTest {
-        // Test fetching from circle.com (Circle - major USDC and EURC issuer)
-        val stellarToml = StellarToml.fromDomain("circle.com")
+    fun testFetchFromMykoboCo() = runTest {
+        // Test fetching from mykobo.co (MYKOBO - regulated EURC anchor). The assertions
+        // pin the structure and the long-lived identifiers, not editorial content: an
+        // issuer's TOML gains and loses entries over time, so exact counts and free-text
+        // fields are checked for shape rather than value.
+        val stellarToml = StellarToml.fromDomain("mykobo.co")
 
-        // Validate general information exists (version is optional for Circle)
+        // Validate general information
         val generalInfo = stellarToml.generalInformation
         assertNotNull(generalInfo, "General information should be present")
+        assertNotNull(generalInfo.version, "Version should be present")
 
-        // Validate accounts list is present and contains known Circle issuing accounts
-        assertNotNull(generalInfo.accounts, "Accounts list should be present")
-        assertEquals(4, generalInfo.accounts.size, "circle.com should have 4 accounts")
-
-        // Verify USDC issuing account is present
-        val usdcIssuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
-        assertEquals(true, generalInfo.accounts.contains(usdcIssuer), "Should contain USDC issuing account")
-
-        // Verify EURC issuing account is present
-        val eurcIssuer = "GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2"
-        assertEquals(true, generalInfo.accounts.contains(eurcIssuer), "Should contain EURC issuing account")
-
-        // Validate all accounts start with G (valid Stellar accounts)
+        // Validate accounts: non-empty, all valid ed25519 account IDs, and the EURC
+        // issuing account present. The issuer account is stable for the asset's lifetime.
+        val eurcIssuer = "GAQRF3UGHBT6JYQZ7YSUYCIYWAF4T2SAA5237Q5LIQYJOHHFAWDXZ7NM"
+        assertTrue(generalInfo.accounts.isNotEmpty(), "Accounts list should not be empty")
+        assertTrue(generalInfo.accounts.contains(eurcIssuer), "Should contain the EURC issuing account")
         generalInfo.accounts.forEach { account ->
             assertEquals('G', account.first(), "All accounts should start with G")
         }
@@ -144,49 +141,30 @@ class StellarTomlIntegrationTest {
         // Validate organization documentation
         val documentation = stellarToml.documentation
         assertNotNull(documentation, "Documentation section should be present")
-        assertEquals("Circle Internet Financial, LLC", documentation.orgName)
-        assertEquals("https://www.circle.com", documentation.orgUrl)
-        assertEquals("circlefin", documentation.orgGithub)
-        assertEquals("circle", documentation.orgTwitter)
-        assertNotNull(documentation.orgPhysicalAddress, "Physical address should be present")
-        assertEquals("support@circle.com", documentation.orgOfficialEmail)
+        assertEquals("MYKOBO", documentation.orgName)
+        assertNotNull(documentation.orgUrl, "Organization URL should be present")
+        assertNotNull(documentation.orgOfficialEmail, "Official email should be present")
 
-        // Validate principal contact
+        // Validate principals: present, each carrying a name and an email
         val pointsOfContact = stellarToml.pointsOfContact
         assertNotNull(pointsOfContact, "Points of contact should be present")
-        assertEquals(1, pointsOfContact.size, "Should have 1 point of contact")
-        val contact = pointsOfContact.first()
-        assertEquals("Jeremy Allaire", contact.name)
-        assertEquals("support@circle.com", contact.email)
+        assertTrue(pointsOfContact.isNotEmpty(), "Should have at least one point of contact")
+        pointsOfContact.forEach { contact ->
+            assertNotNull(contact.name, "Each principal should have a name")
+            assertNotNull(contact.email, "Each principal should have an email")
+        }
 
-        // Validate currencies are present (USDC and EURC)
+        // Validate the EURC currency: a fiat-anchored asset whose issuer matches the
+        // accounts list
         val currencies = stellarToml.currencies
         assertNotNull(currencies, "Currencies should be present")
-        assertEquals(2, currencies.size, "circle.com should have 2 currencies (USDC, EURC)")
-
-        // Verify USDC currency details
-        val usdc = currencies.find { it.code == "USDC" }
-        assertNotNull(usdc, "USDC currency should be present")
-        assertEquals(usdcIssuer, usdc.issuer)
-        assertEquals(true, usdc.isAssetAnchored, "USDC should be asset-anchored")
-        assertEquals("fiat", usdc.anchorAssetType, "USDC anchor asset type should be fiat")
-        assertEquals("USD", usdc.anchorAsset, "USDC is anchored to USD")
-        assertNotNull(usdc.desc, "USDC should have description")
-        assertEquals("https://www.circle.com/en/transparency", usdc.attestationOfReserve)
-        assertEquals(true, usdc.redemptionInstructions?.contains("https://circle.com") == true,
-            "USDC should have redemption instructions with circle.com URL")
-
-        // Verify EURC currency details
         val eurc = currencies.find { it.code == "EURC" }
         assertNotNull(eurc, "EURC currency should be present")
-        assertEquals(eurcIssuer, eurc.issuer)
+        assertEquals(eurcIssuer, eurc.issuer, "EURC issuer should match the issuing account")
         assertEquals(true, eurc.isAssetAnchored, "EURC should be asset-anchored")
         assertEquals("fiat", eurc.anchorAssetType, "EURC anchor asset type should be fiat")
         assertEquals("EUR", eurc.anchorAsset, "EURC is anchored to EUR")
-        assertNotNull(eurc.desc, "EURC should have description")
-        assertEquals("https://www.circle.com/en/transparency", eurc.attestationOfReserve)
-        assertEquals(true, eurc.redemptionInstructions?.contains("https://circle.com") == true,
-            "EURC should have redemption instructions with circle.com URL")
+        assertNotNull(eurc.desc, "EURC should have a description")
     }
 
     @Test

@@ -7,6 +7,9 @@ package com.soneso.stellar.sdk.integrationTests.sep.sep45
 import com.soneso.stellar.sdk.sep.sep45.*
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.ContractClient
+import com.soneso.stellar.sdk.integrationTests.fundTestAccountAndAwaitVisibility
+import com.soneso.stellar.sdk.integrationTests.realDelay
+import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.sep.sep45.exceptions.Sep45UnknownResponseException
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import io.ktor.client.*
@@ -46,16 +49,18 @@ import kotlin.time.Duration.Companion.seconds
  *
  * ## Notes
  *
- * The test anchor may reject during simulation because the test contract doesn't implement
- * the expected SEP-45 contract interface (the actual anchor web auth contract). However,
- * the important part is that we successfully:
+ * The test anchor's token endpoint intermittently fails with HTTP 500
+ * ("Failed to simulate transaction") even for correctly signed entries; the usual
+ * outcome is a real JWT. The tests accept that intermittent server-side failure
+ * (surfaced as [Sep45UnknownResponseException]) because the client-side flow is
+ * fully exercised either way:
  * 1. Deploy a contract to testnet
  * 2. Receive a challenge from the anchor
  * 3. Validate the challenge
  * 4. Sign the authorization entries
  *
- * The failure happens at submission, which is acceptable for this test as it validates
- * the client-side flow.
+ * The challenge nonce is single-use, so every jwtToken() call is a fresh
+ * challenge round.
  *
  * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0045.md">SEP-45 Specification</a>
  */
@@ -75,6 +80,54 @@ class Sep45IntegrationTest {
     private val network = Network.TESTNET
 
     /**
+     * Deploys the sep_45_account contract, retrying when the RPC has not
+     * caught up with the just-funded source account. The RPC answers from
+     * load-balanced replicas that can disagree while ingestion converges, so
+     * individual requests inside a deploy can still miss the account (or read
+     * a stale sequence number) after a successful visibility check. Each retry
+     * is a fresh deployment with a new salt, so retrying is side-effect free.
+     */
+    private suspend fun deployAccountContract(
+        contractCode: ByteArray,
+        sourceKeyPair: KeyPair,
+        constructorArgs: Map<String, Any?>
+    ): ContractClient {
+        var lastFailure: Exception? = null
+        val attempts = 4
+        repeat(attempts) { attempt ->
+            try {
+                return ContractClient.deploy(
+                    wasmBytes = contractCode,
+                    source = sourceKeyPair.getAccountId(),
+                    signer = sourceKeyPair,
+                    network = network,
+                    rpcUrl = RPC_URL,
+                    constructorArgs = constructorArgs,
+                    loadSpec = false  // The SEP-45 flow does not need the spec
+                )
+            } catch (e: Exception) {
+                // "may not be visible to the RPC yet" is the constructor-argument
+                // conversion failing because the just-uploaded code entry is not
+                // served yet — the same lagging-replica symptom as the others.
+                val notCaughtUp = e is AccountNotFoundException ||
+                    e.message?.contains("txNO_ACCOUNT") == true ||
+                    e.message?.contains("txBAD_SEQ") == true ||
+                    e.message?.contains("may not be visible to the RPC yet") == true
+                if (!notCaughtUp) throw e
+                lastFailure = e
+                if (attempt < attempts - 1) {
+                    println(
+                        "Deploy attempt ${attempt + 1} hit a lagging RPC replica " +
+                            "(${e.message?.lineSequence()?.first()}), retrying in 5s"
+                    )
+                    realDelay(5000)
+                }
+            }
+        }
+        throw IllegalStateException("Contract deployment kept hitting lagging RPC replicas", lastFailure)
+    }
+
+    /**
      * Test SEP-45 authentication flow with the Stellar test anchor.
      *
      * This test:
@@ -85,19 +138,20 @@ class Sep45IntegrationTest {
      * 3. Creates WebAuthForContracts using fromDomain("testanchor.stellar.org", Network.TESTNET)
      * 4. Calls jwtToken(contractId, [signerKeyPair])
      * 5. Asserts we either get a JWT token OR Sep45UnknownResponseException
-     *    (the anchor may fail during simulation but challenge flow should work)
+     *    (the anchor's simulation fails intermittently server-side; the usual
+     *    outcome is a real JWT)
      *
-     * The test validates the SEP-45 client-side flow even if the server rejects during simulation.
+     * The test validates the SEP-45 client-side flow even when the server's
+     * simulation fails.
      */
     @Test
     fun testWithStellarTestAnchor() = runTest(timeout = 300.seconds) {
-        // Step 1: Create and fund test account
+        // Step 1: Create and fund test account, waiting until the RPC serves it
         val sourceKeyPair = KeyPair.random()
         println("Created test account: ${sourceKeyPair.getAccountId()}")
 
-        val funded = FriendBot.fundTestnetAccount(sourceKeyPair.getAccountId())
-        assertTrue(funded, "Friendbot should fund the test account")
-        println("Funded test account via Friendbot")
+        fundTestAccountAndAwaitVisibility(sourceKeyPair.getAccountId(), rpcUrl = RPC_URL)
+        println("Funded test account via Friendbot; account visible to RPC")
 
         // Step 2: Create signer keypair (used for both constructor and authentication)
         val signerKeyPair = KeyPair.random()
@@ -118,15 +172,7 @@ class Sep45IntegrationTest {
         )
 
         println("Deploying contract...")
-        val client = ContractClient.deploy(
-            wasmBytes = contractCode,
-            source = sourceKeyPair.getAccountId(),
-            signer = sourceKeyPair,
-            network = network,
-            rpcUrl = RPC_URL,
-            constructorArgs = constructorArgs,
-            loadSpec = false  // Don't need spec for this test
-        )
+        val client = deployAccountContract(contractCode, sourceKeyPair, constructorArgs)
 
         val contractId = client.contractId
         println("Deployed contract ID: $contractId")
@@ -156,17 +202,20 @@ class Sep45IntegrationTest {
             println("Issuer: ${authToken.issuer}")
             println("Account: ${authToken.account}")
         } catch (e: Sep45UnknownResponseException) {
-            // The test anchor may fail during token submission because it tries to
-            // simulate the transaction and the auth contract doesn't implement the
-            // expected SEP-45 contract interface. However, the important part is
-            // that we successfully:
+            // The test anchor's simulation of the signed entries fails intermittently
+            // server-side (HTTP 500) even for correctly signed entries. Only a
+            // server-side failure is tolerated; a 4xx would mean the SDK produced a
+            // submission the anchor rejects. The client-side flow is still fully
+            // validated at this point:
             // 1. Deployed a contract to testnet
             // 2. Received a challenge from the anchor
             // 3. Validated the challenge
             // 4. Signed the authorization entries with auto-filled expiration
-            // The failure happens at submission, which is acceptable for this test
-            println("Note: Token submission failed (expected): ${e.message}")
-            println("HTTP code: ${e.code}")
+            assertTrue(
+                e.code >= 500,
+                "Tolerated token-submission failures are server-side (5xx); got HTTP ${e.code}: ${e.body?.take(200)}"
+            )
+            println("Note: Token submission failed (intermittent server-side failure): ${e.message}")
             println("Response body: ${e.body?.take(200)}...")  // Print first 200 chars
             println("Contract deployment and challenge flow validated successfully")
             // Test passes - we verified the client-side flow works
@@ -207,13 +256,12 @@ class Sep45IntegrationTest {
      */
     @Test
     fun testWithStellarTestAnchorAndClientDomain() = runTest(timeout = 300.seconds) {
-        // Step 1: Create and fund test account
+        // Step 1: Create and fund test account, waiting until the RPC serves it
         val sourceKeyPair = KeyPair.random()
         println("Created test account: ${sourceKeyPair.getAccountId()}")
 
-        val funded = FriendBot.fundTestnetAccount(sourceKeyPair.getAccountId())
-        assertTrue(funded, "Friendbot should fund the test account")
-        println("Funded test account via Friendbot")
+        fundTestAccountAndAwaitVisibility(sourceKeyPair.getAccountId(), rpcUrl = RPC_URL)
+        println("Funded test account via Friendbot; account visible to RPC")
 
         // Step 2: Create signer keypair (used for both constructor and authentication)
         val signerKeyPair = KeyPair.random()
@@ -231,15 +279,7 @@ class Sep45IntegrationTest {
         )
 
         println("Deploying contract...")
-        val client = ContractClient.deploy(
-            wasmBytes = contractCode,
-            source = sourceKeyPair.getAccountId(),
-            signer = sourceKeyPair,
-            network = network,
-            rpcUrl = RPC_URL,
-            constructorArgs = constructorArgs,
-            loadSpec = false
-        )
+        val client = deployAccountContract(contractCode, sourceKeyPair, constructorArgs)
 
         val contractId = client.contractId
         println("Deployed contract ID: $contractId")
@@ -336,11 +376,15 @@ class Sep45IntegrationTest {
             println("Issuer: ${authToken.issuer}")
             println("Account: ${authToken.account}")
         } catch (e: Sep45UnknownResponseException) {
-            // Similar to testWithStellarTestAnchor, the submission may fail but
-            // the important part is that we successfully completed the full flow
-            // including remote client domain signing via the callback
-            println("Note: Token submission failed (expected): ${e.message}")
-            println("HTTP code: ${e.code}")
+            // Similar to testWithStellarTestAnchor, the submission may fail
+            // intermittently server-side, but the important part is that we
+            // successfully completed the full flow including remote client
+            // domain signing via the callback
+            assertTrue(
+                e.code >= 500,
+                "Tolerated token-submission failures are server-side (5xx); got HTTP ${e.code}: ${e.body?.take(200)}"
+            )
+            println("Note: Token submission failed (intermittent server-side failure): ${e.message}")
             println("Response body: ${e.body?.take(200)}...")
             println("Contract deployment, challenge flow, and remote signing validated successfully")
             assertTrue(callbackInvoked, "Client domain signing callback should have been invoked")

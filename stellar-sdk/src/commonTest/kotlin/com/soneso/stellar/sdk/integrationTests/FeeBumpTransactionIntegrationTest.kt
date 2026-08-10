@@ -78,7 +78,7 @@ class FeeBumpTransactionIntegrationTest {
      * 13. Verifies operations and effects can be parsed for both accounts
      */
     @Test
-    fun testSubmitFeeBumpTransaction() = runTest(timeout = 120.seconds) {
+    fun testSubmitFeeBumpTransaction() = runTest(timeout = 300.seconds) {
         // 1. Create and fund accounts
         val sourceKeyPair = KeyPair.random()
         val sourceId = sourceKeyPair.getAccountId()
@@ -91,15 +91,16 @@ class FeeBumpTransactionIntegrationTest {
         println("Destination account ID: $destinationId")
         println("Payer account ID: $payerId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceId)
-            FriendBot.fundTestnetAccount(payerId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceId)
-            FriendBot.fundFuturenetAccount(payerId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sourceId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            payerId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Get source account details
         val sourceAccount = horizonServer.accounts().account(sourceId)
@@ -234,7 +235,7 @@ class FeeBumpTransactionIntegrationTest {
      * 13. Verifies operations and effects can be parsed for both base accounts
      */
     @Test
-    fun testSubmitFeeBumpTransactionWithMuxedAccounts() = runTest(timeout = 120.seconds) {
+    fun testSubmitFeeBumpTransactionWithMuxedAccounts() = runTest(timeout = 300.seconds) {
         // 1. Create and fund accounts
         val sourceKeyPair = KeyPair.random()
         val sourceId = sourceKeyPair.getAccountId()
@@ -247,15 +248,16 @@ class FeeBumpTransactionIntegrationTest {
         println("Destination account ID: $destinationId")
         println("Payer account ID: $payerId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sourceId)
-            FriendBot.fundTestnetAccount(payerId)
-        } else {
-            FriendBot.fundFuturenetAccount(sourceId)
-            FriendBot.fundFuturenetAccount(payerId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sourceId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            payerId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Create muxed accounts
         val muxedSourceAccount = MuxedAccount(sourceId, 97839283928292UL)

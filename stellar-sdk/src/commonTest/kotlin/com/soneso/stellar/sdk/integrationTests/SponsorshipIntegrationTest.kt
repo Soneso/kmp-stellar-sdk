@@ -97,20 +97,18 @@ class SponsorshipIntegrationTest {
      * account A (sponsored), as account A must authorize operations with its source account.
      */
     @Test
-    fun testSponsorship() = runTest(timeout = 120.seconds) {
+    fun testSponsorship() = runTest(timeout = 180.seconds) {
         // 1. Create and fund master account (sponsor)
         val masterAccountKeyPair = KeyPair.random()
         val masterAccountId = masterAccountKeyPair.getAccountId()
 
         println("Master account ID: $masterAccountId")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(masterAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(masterAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            masterAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val masterAccount = horizonServer.accounts().account(masterAccountId)
 

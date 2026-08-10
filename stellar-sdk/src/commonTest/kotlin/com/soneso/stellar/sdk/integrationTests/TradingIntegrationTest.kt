@@ -94,13 +94,11 @@ class TradingIntegrationTest {
         val buyerAccountId = buyerKeyPair.getAccountId()
 
         // Fund buyer account via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(buyerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(buyerAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            buyerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create issuer account
         val buyerAccount = horizonServer.accounts().account(buyerAccountId)
@@ -409,13 +407,11 @@ class TradingIntegrationTest {
         val sellerAccountId = sellerKeyPair.getAccountId()
 
         // Fund seller account via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sellerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sellerAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sellerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)
@@ -712,13 +708,11 @@ class TradingIntegrationTest {
         val sellerAccountId = sellerKeyPair.getAccountId()
 
         // Fund seller account via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sellerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sellerAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sellerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)
@@ -951,7 +945,7 @@ class TradingIntegrationTest {
      * at least one trade is executed.
      */
     @Test
-    fun testOfferTradesEndpoint() = runTest(timeout = 180.seconds) {
+    fun testOfferTradesEndpoint() = runTest(timeout = 300.seconds) {
         // Create keypairs for issuer, seller, and buyer
         val issuerKeyPair = KeyPair.random()
         val sellerKeyPair = KeyPair.random()
@@ -962,15 +956,16 @@ class TradingIntegrationTest {
         val buyerAccountId = buyerKeyPair.getAccountId()
 
         // Fund seller and buyer accounts via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(sellerAccountId)
-            FriendBot.fundTestnetAccount(buyerAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(sellerAccountId)
-            FriendBot.fundFuturenetAccount(buyerAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            sellerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            buyerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create issuer account
         val sellerAccount = horizonServer.accounts().account(sellerAccountId)

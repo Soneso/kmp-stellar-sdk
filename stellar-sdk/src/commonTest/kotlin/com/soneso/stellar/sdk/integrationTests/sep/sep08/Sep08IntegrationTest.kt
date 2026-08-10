@@ -6,6 +6,7 @@ package com.soneso.stellar.sdk.integrationTests.sep.sep08
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.integrationTests.fundTestAccountAndAwaitVisibility
 import com.soneso.stellar.sdk.integrationTests.realDelay
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep08.RegulatedAsset
@@ -87,12 +88,10 @@ class Sep08IntegrationTest {
     """.trimIndent()
 
     /**
-     * Funds a testnet account via FriendBot and waits for the funding to settle.
+     * Funds a testnet account via FriendBot and returns once Horizon serves it.
      */
     private suspend fun fundAccount(accountId: String) {
-        val funded = FriendBot.fundTestnetAccount(accountId)
-        assertTrue(funded, "Account funding should succeed")
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer)
     }
 
     /**
@@ -227,7 +226,7 @@ class Sep08IntegrationTest {
      * 5. Call authorizationRequired and assert it returns true
      */
     @Test
-    fun testAuthorizationRequiredWithRegulatedIssuer() = runTest(timeout = 120.seconds) {
+    fun testAuthorizationRequiredWithRegulatedIssuer() = runTest(timeout = 180.seconds) {
         val issuerKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
 
@@ -272,7 +271,7 @@ class Sep08IntegrationTest {
      * 4. Call authorizationRequired and assert it returns false
      */
     @Test
-    fun testAuthorizationNotRequiredWithoutFlags() = runTest(timeout = 60.seconds) {
+    fun testAuthorizationNotRequiredWithoutFlags() = runTest(timeout = 180.seconds) {
         val keyPair = KeyPair.random()
         val accountId = keyPair.getAccountId()
 
@@ -427,7 +426,7 @@ class Sep08IntegrationTest {
      * 6. Verify response is Sep08PostTransactionResponse.Success
      */
     @Test
-    fun testPostTransactionWithMockApprovalServer() = runTest(timeout = 120.seconds) {
+    fun testPostTransactionWithMockApprovalServer() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
@@ -494,7 +493,7 @@ class Sep08IntegrationTest {
      * 5. Verify response is Sep08PostTransactionResponse.Revised
      */
     @Test
-    fun testPostTransactionRevisedFlow() = runTest(timeout = 120.seconds) {
+    fun testPostTransactionRevisedFlow() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
@@ -562,7 +561,7 @@ class Sep08IntegrationTest {
      * 5. Verify response is Sep08PostTransactionResponse.Pending with correct fields
      */
     @Test
-    fun testPostTransactionPendingFlow() = runTest(timeout = 120.seconds) {
+    fun testPostTransactionPendingFlow() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
@@ -629,7 +628,7 @@ class Sep08IntegrationTest {
      * 5. Verify response is Sep08PostTransactionResponse.Rejected with error
      */
     @Test
-    fun testPostTransactionRejectedFlow() = runTest(timeout = 120.seconds) {
+    fun testPostTransactionRejectedFlow() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
@@ -695,7 +694,7 @@ class Sep08IntegrationTest {
      * 5. Verify response is Sep08PostTransactionResponse.ActionRequired with all fields
      */
     @Test
-    fun testPostTransactionActionRequiredFlow() = runTest(timeout = 120.seconds) {
+    fun testPostTransactionActionRequiredFlow() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()
@@ -1030,7 +1029,7 @@ class Sep08IntegrationTest {
      * 5. Test postAction done and next_url responses
      */
     @Test
-    fun testFullRegulatedTransactionFlowAllResponses() = runTest(timeout = 180.seconds) {
+    fun testFullRegulatedTransactionFlowAllResponses() = runTest(timeout = 300.seconds) {
         val issuerKeyPair = KeyPair.random()
         val userKeyPair = KeyPair.random()
         val issuerId = issuerKeyPair.getAccountId()

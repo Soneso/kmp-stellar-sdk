@@ -82,13 +82,11 @@ class ClawbackIntegrationTest {
         println("Master account ID: $masterAccountId")
         println("Master account seed: ${masterAccountKeyPair.getSecretSeed()?.concatToString()}")
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(masterAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(masterAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            masterAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // 2. Create destination account
         val destinationAccountKeyPair = KeyPair.random()

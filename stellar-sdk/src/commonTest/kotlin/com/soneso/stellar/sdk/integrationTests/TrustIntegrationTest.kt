@@ -109,13 +109,11 @@ class TrustIntegrationTest {
         val trustorAccountId = trustorKeyPair.getAccountId()
 
         // Fund trustor account via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(trustorAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(trustorAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            trustorAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create issuer account
         val trustorAccount = horizonServer.accounts().account(trustorAccountId)
@@ -286,7 +284,7 @@ class TrustIntegrationTest {
      * - Accounts that don't want to manage limits
      */
     @Test
-    fun testMaxTrustAmount() = runTest(timeout = 90.seconds) {
+    fun testMaxTrustAmount() = runTest(timeout = 300.seconds) {
         // Create keypairs
         val issuerKeyPair = KeyPair.random()
         val trustingKeyPair = KeyPair.random()
@@ -295,15 +293,16 @@ class TrustIntegrationTest {
         val trustingAccountId = trustingKeyPair.getAccountId()
 
         // Fund both accounts via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(issuerAccountId)
-            FriendBot.fundTestnetAccount(trustingAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(issuerAccountId)
-            FriendBot.fundFuturenetAccount(trustingAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            issuerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            trustingAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create custom asset IOM (AlphaNum4)
         val myAsset = AssetTypeCreditAlphaNum4("IOM", issuerAccountId)
@@ -403,15 +402,16 @@ class TrustIntegrationTest {
         val trustorAccountId = trustorKeyPair.getAccountId()
 
         // Fund both accounts via FriendBot
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(issuerAccountId)
-            FriendBot.fundTestnetAccount(trustorAccountId)
-        } else {
-            FriendBot.fundFuturenetAccount(issuerAccountId)
-            FriendBot.fundFuturenetAccount(trustorAccountId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            issuerAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            trustorAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create custom asset ASTRO (AlphaNum12)
         val assetCode = "ASTRO"

@@ -77,18 +77,16 @@ class QueryIntegrationTest {
      * 6. Verifies accounts appear in forAsset query with pagination
      */
     @Test
-    fun testQueryAccounts() = runTest(timeout = 120.seconds) {
+    fun testQueryAccounts() = runTest(timeout = 180.seconds) {
         // Create and fund main account
             val accountKeyPair = KeyPair.random()
             val accountId = accountKeyPair.getAccountId()
 
-            if (testOn == "testnet") {
-                FriendBot.fundTestnetAccount(accountId)
-            } else {
-                FriendBot.fundFuturenetAccount(accountId)
-            }
-
-            realDelay(3000)
+            fundTestAccountAndAwaitVisibility(
+                accountId,
+                horizon = horizonServer,
+                useFuturenet = testOn != "testnet"
+            )
 
             val account = horizonServer.accounts().account(accountId)
 
@@ -612,18 +610,16 @@ class QueryIntegrationTest {
      * 7. Verifies offer details and order book structure
      */
     @Test
-    fun testQueryOffersAndOrderBook() = runTest(timeout = 120.seconds) {
+    fun testQueryOffersAndOrderBook() = runTest(timeout = 180.seconds) {
         // Create and fund buyer account
             val buyerKeyPair = KeyPair.random()
             val buyerAccountId = buyerKeyPair.getAccountId()
 
-            if (testOn == "testnet") {
-                FriendBot.fundTestnetAccount(buyerAccountId)
-            } else {
-                FriendBot.fundFuturenetAccount(buyerAccountId)
-            }
-
-            realDelay(3000)
+            fundTestAccountAndAwaitVisibility(
+                buyerAccountId,
+                horizon = horizonServer,
+                useFuturenet = testOn != "testnet"
+            )
 
             val buyerAccount = horizonServer.accounts().account(buyerAccountId)
 
@@ -809,13 +805,11 @@ class QueryIntegrationTest {
             val keyPairA = KeyPair.random()
             val accountAId = keyPairA.getAccountId()
 
-            if (testOn == "testnet") {
-                FriendBot.fundTestnetAccount(accountAId)
-            } else {
-                FriendBot.fundFuturenetAccount(accountAId)
-            }
-
-            realDelay(3000)
+            fundTestAccountAndAwaitVisibility(
+                accountAId,
+                horizon = horizonServer,
+                useFuturenet = testOn != "testnet"
+            )
 
             val accountA = horizonServer.accounts().account(accountAId)
 

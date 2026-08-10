@@ -92,17 +92,21 @@ class AMMIntegrationTest {
         val assetBIssuerId = assetBIssuerKeyPair.getAccountId()
 
         // Fund accounts
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(testAccountId)
-            FriendBot.fundTestnetAccount(assetAIssuerId)
-            FriendBot.fundTestnetAccount(assetBIssuerId)
-        } else {
-            FriendBot.fundFuturenetAccount(testAccountId)
-            FriendBot.fundFuturenetAccount(assetAIssuerId)
-            FriendBot.fundFuturenetAccount(assetBIssuerId)
-        }
-
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(
+            testAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            assetAIssuerId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            assetBIssuerId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create assets
         val assetA = AssetTypeCreditAlphaNum4("SDK", assetAIssuerId)
@@ -252,7 +256,7 @@ class AMMIntegrationTest {
      * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testCreatePoolShareTrustlineNonNative() = runTest(timeout = 180.seconds) {
+    fun testCreatePoolShareTrustlineNonNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         createPoolShareTrustlineNonNative(context)
     }
@@ -331,7 +335,7 @@ class AMMIntegrationTest {
      * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testCreatePoolShareTrustlineNative() = runTest(timeout = 180.seconds) {
+    fun testCreatePoolShareTrustlineNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         createPoolShareTrustlineNative(context)
     }
@@ -435,7 +439,7 @@ class AMMIntegrationTest {
      * 7. Verifies operations and effects can be parsed
      */
     @Test
-    fun testDepositNonNative() = runTest(timeout = 180.seconds) {
+    fun testDepositNonNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         val contextWithTrustline = createPoolShareTrustlineNonNative(context)
         depositNonNative(contextWithTrustline)
@@ -540,7 +544,7 @@ class AMMIntegrationTest {
      * 7. Verifies operations and effects can be parsed
      */
     @Test
-    fun testDepositNative() = runTest(timeout = 180.seconds) {
+    fun testDepositNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         val contextWithTrustline = createPoolShareTrustlineNative(context)
         depositNative(contextWithTrustline)
@@ -644,7 +648,7 @@ class AMMIntegrationTest {
      * 8. Verifies operations and effects can be parsed
      */
     @Test
-    fun testWithdrawNonNative() = runTest(timeout = 180.seconds) {
+    fun testWithdrawNonNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         val contextWithTrustline = createPoolShareTrustlineNonNative(context)
         val contextWithDeposit = depositNonNative(contextWithTrustline)
@@ -749,7 +753,7 @@ class AMMIntegrationTest {
      * 8. Verifies operations and effects can be parsed
      */
     @Test
-    fun testWithdrawNative() = runTest(timeout = 180.seconds) {
+    fun testWithdrawNative() = runTest(timeout = 600.seconds) {
         val context = setupTestContext()
         val contextWithTrustline = createPoolShareTrustlineNative(context)
         val contextWithDeposit = depositNative(contextWithTrustline)
@@ -775,7 +779,7 @@ class AMMIntegrationTest {
      * 13. Verifies all query results can be parsed correctly
      */
     @Test
-    fun testLiquidityPoolQueries() = runTest(timeout = 180.seconds) {
+    fun testLiquidityPoolQueries() = runTest(timeout = 600.seconds) {
         // Setup context and execute deposit and withdrawal
         val context = setupTestContext()
         val contextWithTrustline = createPoolShareTrustlineNonNative(context)
@@ -880,15 +884,16 @@ class AMMIntegrationTest {
         val accXId = accXKeyPair.getAccountId()
         val accYId = accYKeyPair.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accXId)
-            FriendBot.fundTestnetAccount(accYId)
-        } else {
-            FriendBot.fundFuturenetAccount(accXId)
-            FriendBot.fundFuturenetAccount(accYId)
-        }
-
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(
+            accXId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+        fundTestAccountAndAwaitVisibility(
+            accYId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         // Create trustlines for new accounts
         val changeTrustOp1 = ChangeTrustOperation(
@@ -1017,7 +1022,7 @@ class AMMIntegrationTest {
      * 4. Verifies the response contains expected pools
      */
     @Test
-    fun testForAccountQueryParameter() = runTest(timeout = 180.seconds) {
+    fun testForAccountQueryParameter() = runTest(timeout = 600.seconds) {
         // Setup context and create pool trustlines
         val context = setupTestContext()
         val contextWithNonNative = createPoolShareTrustlineNonNative(context)

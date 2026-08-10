@@ -7,7 +7,6 @@
 
 package com.soneso.stellar.sdk.integrationTests
 
-import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.smartaccount.core.ContractErrorCodes
@@ -56,7 +55,7 @@ class OZConstructorPoliciesIntegrationTest {
 
     private suspend fun createKit(): OZSmartAccountKit {
         val deployer = KeyPair.random()
-        FriendBot.fundTestnetAccount(deployer.getAccountId())
+        fundTestAccountAndAwaitVisibility(deployer.getAccountId(), rpcUrl = rpcUrl)
 
         val provider = MockWebAuthnProvider()
         provider.registrationResult = WebAuthnRegistrationResult(

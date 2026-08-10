@@ -62,18 +62,16 @@ class PaymentsIntegrationTest {
      * 6. Verifies operations and effects can be parsed
      */
     @Test
-    fun testSendNativePayment() = runTest(timeout = 90.seconds) {
+    fun testSendNativePayment() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -164,18 +162,16 @@ class PaymentsIntegrationTest {
      * timing issues with minSequenceAge/minSequenceLedgerGap in integration tests.
      */
     @Test
-    fun testSendNativePaymentWithPreconditions() = runTest(timeout = 90.seconds) {
+    fun testSendNativePaymentWithPreconditions() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -292,18 +288,16 @@ class PaymentsIntegrationTest {
      * 5. Verifies payment and transaction appear in queries
      */
     @Test
-    fun testSendNativePaymentMuxedAccounts() = runTest(timeout = 90.seconds) {
+    fun testSendNativePaymentMuxedAccounts() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -413,18 +407,16 @@ class PaymentsIntegrationTest {
      * 5. Verifies transactions succeed with custom fee
      */
     @Test
-    fun testSendNativePaymentWithMaxOperationFee() = runTest(timeout = 90.seconds) {
+    fun testSendNativePaymentWithMaxOperationFee() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -492,18 +484,16 @@ class PaymentsIntegrationTest {
      * 6. Verifies balances are correct
      */
     @Test
-    fun testSendNonNativePayment() = runTest(timeout = 120.seconds) {
+    fun testSendNonNativePayment() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -660,18 +650,16 @@ class PaymentsIntegrationTest {
      * 6. Verifies balances are correct
      */
     @Test
-    fun testSendNonNativePaymentWithMuxedAccounts() = runTest(timeout = 120.seconds) {
+    fun testSendNonNativePaymentWithMuxedAccounts() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 
@@ -851,18 +839,16 @@ class PaymentsIntegrationTest {
      * 4. Verifies the transaction can be round-tripped without signatures
      */
     @Test
-    fun testNoSignatureTransactionEnvelope() = runTest(timeout = 60.seconds) {
+    fun testNoSignatureTransactionEnvelope() = runTest(timeout = 180.seconds) {
         // Create and fund account A
         val keyPairA = KeyPair.random()
         val accountAId = keyPairA.getAccountId()
 
-        if (testOn == "testnet") {
-            FriendBot.fundTestnetAccount(accountAId)
-        } else {
-            FriendBot.fundFuturenetAccount(accountAId)
-        }
-
-        realDelay(3000)
+        fundTestAccountAndAwaitVisibility(
+            accountAId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
 
         val accountA = horizonServer.accounts().account(accountAId)
 

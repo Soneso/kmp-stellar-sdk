@@ -1,11 +1,10 @@
 package com.soneso.stellar.sdk.integrationTests.contract.bindings
 
-import com.soneso.stellar.sdk.FriendBot
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.bindings.*
-import com.soneso.stellar.sdk.integrationTests.realDelay
+import com.soneso.stellar.sdk.integrationTests.fundTestAccountAndAwaitVisibility
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -34,8 +33,7 @@ class OptionShapesContractIntegrationTest {
         // Fund a fresh source account.
         val sourceKeyPair = KeyPair.random()
         val source = sourceKeyPair.getAccountId()
-        FriendBot.fundTestnetAccount(source)
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(source, rpcUrl = rpcUrl)
 
         // Deploy the contract; keep the client spec-free (the binding embeds types).
         val wasm = TestResourceUtil.readWasmFile("soroban_bindings_option_shapes_contract.wasm")

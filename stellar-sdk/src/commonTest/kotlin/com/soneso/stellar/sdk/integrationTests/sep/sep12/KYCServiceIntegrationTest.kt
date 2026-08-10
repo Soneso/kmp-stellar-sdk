@@ -19,6 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
+import kotlin.test.fail
 
 /**
  * Integration tests for SEP-12 KYC API against live testnet anchor.
@@ -497,14 +498,19 @@ class KYCServiceIntegrationTest {
     }
 
     /**
-     * Tests error handling for customer not found.
+     * Tests error handling for a customer id the anchor does not know.
      *
-     * Validates that:
-     * - Requesting non-existent customer by ID returns 404
-     * - CustomerNotFoundException is thrown
+     * SEP-12 requires a 404 response for an id that does not exist, which the SDK
+     * raises as [CustomerNotFoundException]. The test anchor currently answers 403
+     * ("not authorized for customer id") for any id the authenticated account does
+     * not own, without distinguishing nonexistent ids; the SDK raises that as a
+     * [KYCException] carrying the status. The test accepts both, so it verifies
+     * the SDK's live error wiring while the spec-mandated 404 mapping stays pinned
+     * offline by the unit tests.
      *
      * Expected Result:
-     * - CustomerNotFoundException is thrown
+     * - CustomerNotFoundException (spec-conforming anchor), or
+     * - KYCException carrying HTTP 403 (current test anchor behavior)
      */
     @Test
     fun testCustomerNotFoundError() = runTest {
@@ -516,14 +522,22 @@ class KYCServiceIntegrationTest {
 
         val request = GetCustomerInfoRequest(
             jwt = jwtToken,
-            id = "non-existent-customer-id-12345"
+            id = "94ca1a52-0916-4a91-a7ef-fedd5a052510"
         )
 
-        assertFailsWith<CustomerNotFoundException> {
+        try {
             kycService.getCustomerInfo(request)
+            fail("Requesting an unknown customer id should raise")
+        } catch (_: CustomerNotFoundException) {
+            println("Customer not found error handling works correctly (404)")
+        } catch (e: KYCException) {
+            assertTrue(
+                e.message?.startsWith("HTTP 403") == true,
+                "An unknown customer id should raise 404 as CustomerNotFoundException " +
+                    "or the test anchor's 403, but was: ${e.message}"
+            )
+            println("Customer not found error handling works correctly (test anchor 403)")
         }
-
-        println("Customer not found error handling works correctly")
     }
 
     /**

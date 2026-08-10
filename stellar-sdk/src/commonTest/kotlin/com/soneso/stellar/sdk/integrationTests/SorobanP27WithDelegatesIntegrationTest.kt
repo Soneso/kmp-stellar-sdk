@@ -55,9 +55,8 @@ class SorobanP27WithDelegatesIntegrationTest {
         // on behalf of the modular account).
         val submitter = KeyPair.random()
         val delegate = KeyPair.random()
-        FriendBot.fundTestnetAccount(submitter.getAccountId())
-        FriendBot.fundTestnetAccount(delegate.getAccountId())
-        realDelay(5000)
+        fundTestAccountAndAwaitVisibility(submitter.getAccountId(), rpc = sorobanServer)
+        fundTestAccountAndAwaitVisibility(delegate.getAccountId(), rpc = sorobanServer)
 
         // Deploy the modular custom account, registering the delegate G-account as an allowed signer.
         val modularAccountId = ContractClient.deploy(
