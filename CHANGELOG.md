@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.11.0] - 2026-08-10
 
 ### Added
 - SEP-51 (XDR-JSON) support on the whole XDR type system. Every generated XDR
@@ -37,9 +37,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arm with `StellarValueProposedValueXdr` (`STELLAR_VALUE_EMPTY_TX_SET`).
   `Scv` gains `toExecutableTag` / `fromExecutableTag`, and smart-account ScMap
   key ordering compares `SCV_EXECUTABLE_TAG` values by content like `String`
-  and `Symbol`.
+  and `Symbol`. The new arms extend sealed classes, so a `when` over
+  `SCValXdr`, `ContractExecutableXdr`, or `StellarValueExtXdr` without an
+  `else` branch needs branches for them.
 
 ### Fixed
+- SEP-45 and SEP-10 token submissions are never auto-retried. The default HTTP
+  client retries on server errors, which resubmitted the one-time challenge:
+  SEP-45 servers consume the challenge nonce on the first attempt, so the
+  retry could never succeed and replaced the original error with a misleading
+  "invalid nonce" rejection. Both token POSTs now disable retries at the
+  request level (also effective on caller-supplied clients that install
+  `HttpRequestRetry`); retrying requires a fresh challenge round via
+  `jwtToken()`. Challenge requests keep their retries.
+- `ContractClient.deploy` and `deployFromWasmId` load the returned client's
+  spec from the uploaded code before deploying instead of reading back the
+  instance entry the deployment just wrote. On a busy RPC, whose ledger-entry
+  ingestion runs behind transaction status, that read could miss and a
+  successful deployment surfaced as "Contract spec not found". Code without
+  spec entries keeps the current error semantics through the forContract
+  fallback. Constructor arguments that cannot be converted — the spec is
+  unreadable or declares no `__constructor` — now raise before anything
+  deploys; the arguments were previously discarded and the contract deployed
+  without running its constructor.
+- `ContractClient.deploy`, `install`, and `deployFromWasmId` raise
+  `SendTransactionFailedException` when the network refuses a transaction at
+  submission, carrying the status, the error result XDR with its parsed form,
+  and any diagnostic events. A refused submission previously went undetected
+  and the polling window reported the misleading status NOT_FOUND after three
+  minutes. A DUPLICATE response is polled like a pending one, since it names a
+  transaction the network already knows, so a resubmitted deployment that
+  already succeeded reports that success. The exception's
+  `assembledTransaction` property is now nullable, since these entry points
+  submit without one.
 - Contract-deployment salts now come from the platform CSPRNG
   (`secureRandomBytes`) instead of `kotlin.random.Random`. This covers
   `InvokeHostFunctionOperation.createContract` and the `ContractClient.deploy`

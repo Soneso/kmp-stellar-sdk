@@ -47,6 +47,12 @@ Example: `0.2.1` for a patch release with bug fixes.
 
 Update version in the following files:
 
+**gradle.properties** (the compatibility-matrix generator reads the SDK version from here):
+```properties
+version=X.Y.Z
+demo.version=X.Y.Z
+```
+
 **build.gradle.kts** (root):
 ```kotlin
 allprojects {
@@ -60,7 +66,7 @@ allprojects {
 
 **Documentation files** (update all version references):
 - `README.md` - badge and dependency
-- `CLAUDE.md` - SEP support list
+- `CLAUDE.md` - only if it carries version references; its SEP support list is maintained by feature PRs, not by releases
 - `docs/getting-started.md`, `docs/quick-start.md`
 - `docs/platforms/` - ios.md, macos.md, jvm.md, javascript.md
 - `demo/CLAUDE.md`, `demo/README.md`
@@ -81,6 +87,12 @@ skill files and bump the skill version (patch increment for version-only changes
 1. `skills/kmp-stellar-sdk/SKILL.md` — Update `compatibility:` line with new SDK version, bump `metadata.version`
 2. `skills/.claude-plugin/plugin.json` — Bump `version` to match
 3. `.claude-plugin/marketplace.json` — Bump `version` to match
+
+Verify the three carry the same skill version (they have drifted before):
+```bash
+grep -m1 'version:' skills/kmp-stellar-sdk/SKILL.md
+grep -m1 '"version"' skills/.claude-plugin/plugin.json .claude-plugin/marketplace.json
+```
 
 **Skill API reference** (regenerate when SDK public API surface changed):
 
@@ -194,11 +206,11 @@ Always pass `-PexcludeIntegrationTests` during release verification. Integration
 ./gradlew :stellar-sdk:macosArm64Test -PexcludeIntegrationTests
 ```
 
-**Note**: integration tests should still pass when run separately against a healthy testnet, but they are not part of the release gate.
+**Note**: the integration tests run later, as the pre-publish gate in Phase 3 (Step 10).
 
-### Phase 3: Local Maven Verification
+### Phase 3: Pre-Publish Verification
 
-Before publishing to Maven Central, verify the artifact works correctly with a local Maven repository.
+Before publishing to Maven Central, verify the artifact works with a local Maven repository, test the demo apps against it, and run the integration tests.
 
 #### Step 8: Publish to Local Maven
 
@@ -212,6 +224,7 @@ Temporarily switch a demo app to use the local artifact instead of the project d
 
 - **Smart account changes**: Use the smart account demo (`smart-account-demo/`)
 - **Core SDK changes**: Use the main demo (`demo/`)
+- **Both**: When the release touches the core SDK and smart accounts, test both demos.
 
 In the demo app's `shared/build.gradle.kts`, replace the project dependency with the local Maven artifact:
 
@@ -226,11 +239,26 @@ Ensure `mavenLocal()` is listed in the repositories block. Build, install, and v
 
 **Revert the demo app change after testing.** Do not commit the Maven artifact dependency.
 
+#### Step 10: Run Integration Tests Against Testnet
+
+Run the integration test suite before publishing:
+
+```bash
+./gradlew :stellar-sdk:jvmTest
+```
+
+Integration tests hit live infrastructure, so this gate is run and evaluate, not run and require green. Judge every failure by whether it implicates the release:
+
+- **Release blockers**: wrong SDK behavior, regressions, broken flows.
+- **Not blockers**: testnet weather (RPC ingestion lag, replica inconsistency, Friendbot delays), anchor-side outages or specification divergences, rate limits. These fail tests for reasons no release can influence.
+
+When a failure is ambiguous, reproduce it against the affected service directly (curl the endpoint, probe with a scratch client) before deciding. Fixes that come out of this step ride as regular commits before the release commit.
+
 ### Phase 4: Publish to Maven Central
 
 Publish before committing to Git. This allows fixing any build or publishing issues without amending commits.
 
-#### Step 10: Publish to Staging Repository
+#### Step 11: Publish to Staging Repository
 
 Use the **Nexus Publishing Plugin** command (NOT the direct OSSRH command):
 
@@ -265,7 +293,7 @@ BUILD SUCCESSFUL in 6m 5s
 
 **Save the staging repository ID** from the output (e.g., `com.soneso--e77ef82e-2f32-48a6-bbf5-bdb77392d6cb`).
 
-#### Step 11: Verify Publication
+#### Step 12: Verify Publication
 
 Check the Central Portal:
 - URL: https://central.sonatype.com/publishing/deployments
@@ -274,7 +302,7 @@ Check the Central Portal:
 
 ### Phase 5: Wait for Maven Central Sync
 
-#### Step 12: Monitor Sync Progress
+#### Step 13: Monitor Sync Progress
 
 Maven Central sync typically takes **15-30 minutes**.
 
@@ -292,7 +320,7 @@ When synced, you'll see:
 
 ### Phase 6: Git Release
 
-#### Step 13: Commit Release Changes
+#### Step 14: Commit Release Changes
 
 Include any build fixes made during publishing in this commit.
 
@@ -308,14 +336,12 @@ Brief description of the release.
 Changes:
 - List major changes
 - Update version numbers
-- Update documentation
-
-Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+- Update documentation"
 ```
 
-#### Step 14: Create Git Tag
+Do not add AI attribution lines (`Generated with...`, `Co-Authored-By: Claude`) to the commit message.
+
+#### Step 15: Create Git Tag
 
 ```bash
 # Create annotated tag
@@ -328,7 +354,7 @@ git show vX.Y.Z --no-patch
 
 ### Phase 7: Push to GitHub
 
-#### Step 15: Push Commits and Tags
+#### Step 16: Push Commits and Tags
 
 **Only after Maven Central sync is complete:**
 
@@ -343,7 +369,7 @@ git push origin vX.Y.Z
 git log --oneline -5
 ```
 
-#### Step 16: Create GitHub Release
+#### Step 17: Create GitHub Release
 
 1. Navigate to: https://github.com/Soneso/kmp-stellar-sdk/releases/new
 2. **Choose tag**: Select `vX.Y.Z`
@@ -354,7 +380,7 @@ git log --oneline -5
 
 ### Phase 8: Verify Release
 
-#### Step 17: Final Verification
+#### Step 18: Final Verification
 
 Verify the release is complete:
 
@@ -490,6 +516,8 @@ Use this checklist for each release:
 - [ ] Release notes created
 - [ ] Clean build successful
 - [ ] Tests passing (or failures documented)
+- [ ] Demo app(s) verified against the local Maven artifact (dependency switch reverted)
+- [ ] Integration tests run against testnet; failures evaluated, none implicate the release
 - [ ] Published to Maven Central (BUILD SUCCESSFUL)
 - [ ] Staging repository ID saved
 - [ ] Central Portal shows "Published"
@@ -505,6 +533,6 @@ Use this checklist for each release:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: October 25, 2025
-**Based on**: Releases 0.2.0 and 0.2.1
+**Document Version**: 1.2
+**Last Updated**: August 10, 2026
+**Based on**: Releases 0.2.0 through 1.11.0
