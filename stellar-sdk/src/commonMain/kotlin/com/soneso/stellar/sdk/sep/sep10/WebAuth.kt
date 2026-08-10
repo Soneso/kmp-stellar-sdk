@@ -1328,8 +1328,12 @@ class WebAuth(
         val requestBody = TokenSubmissionRequest(transaction = signedChallengeXdr)
 
         // 3. Make HTTP POST request
+        // The signed challenge is single-use: an automatically retried POST after a
+        // server error can be rejected as a replay and would mask the original error,
+        // so per-request retries are disabled. Retrying requires a new challenge round.
         val response: HttpResponse = try {
             client.post(authEndpoint) {
+                retry { noRetry() }
                 contentType(ContentType.Application.Json)
                 // Add custom headers if provided
                 httpRequestHeaders?.forEach { (key, value) ->

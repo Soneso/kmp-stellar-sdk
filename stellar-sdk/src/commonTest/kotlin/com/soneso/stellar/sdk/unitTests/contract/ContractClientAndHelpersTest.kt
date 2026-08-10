@@ -4,6 +4,9 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.*
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
+import com.soneso.stellar.sdk.contract.exception.SendTransactionFailedException
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
@@ -460,5 +463,89 @@ class ContractClientAndHelpersTest {
             )
         )
         return ContractSpec(listOf(entry))
+    }
+
+    // ==================== requirePollableSend ====================
+    //
+    // The deploy and install paths poll a transaction hash only after the network
+    // accepted the submission. A response with any other status reports a submission
+    // the network did not accept, so it must raise immediately instead of surfacing
+    // as NOT_FOUND after the polling window.
+
+    private fun insufficientFeeResultXdr(): String = TransactionResultXdr(
+        feeCharged = Int64Xdr(100),
+        result = TransactionResultResultXdr.Void(TransactionResultCodeXdr.txINSUFFICIENT_FEE),
+        ext = TransactionResultExtXdr.Void
+    ).toXdrBase64()
+
+    @Test
+    fun testRequirePollableSendAcceptsAPendingResponse() {
+        val response = SendTransactionResponse(
+            status = SendTransactionStatus.PENDING,
+            hash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304"
+        )
+        ContractClient.requirePollableSend(response)
+    }
+
+    @Test
+    fun testRequirePollableSendRejectsAnErrorResponseNamingTheParsedResult() {
+        val errorXdr = insufficientFeeResultXdr()
+        val response = SendTransactionResponse(
+            status = SendTransactionStatus.ERROR,
+            hash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304",
+            errorResultXdr = errorXdr,
+            diagnosticEventsXdr = listOf("AAAA")
+        )
+        val exception = assertFailsWith<SendTransactionFailedException> {
+            ContractClient.requirePollableSend(response)
+        }
+        val message = exception.message ?: fail("Exception should carry a message")
+        assertTrue(message.contains("Status: ERROR"), "Message should name the status")
+        assertTrue(message.contains("Error Result XDR: $errorXdr"), "Message should carry the error result XDR")
+        assertTrue(message.contains("Parsed Error:"), "Message should carry the parsed result")
+        assertTrue(message.contains("txINSUFFICIENT_FEE"), "Parsed result should name the failure code")
+        assertTrue(message.contains("Diagnostic Events: AAAA"), "Message should carry the diagnostic events")
+        assertNull(exception.assembledTransaction, "The deploy path submits without an AssembledTransaction")
+    }
+
+    @Test
+    fun testRequirePollableSendRejectsATryAgainLaterResponse() {
+        val response = SendTransactionResponse(
+            status = SendTransactionStatus.TRY_AGAIN_LATER,
+            hash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304"
+        )
+        val exception = assertFailsWith<SendTransactionFailedException> {
+            ContractClient.requirePollableSend(response)
+        }
+        val message = exception.message ?: fail("Exception should carry a message")
+        assertTrue(message.contains("Status: TRY_AGAIN_LATER"), "Message should name the status")
+        assertFalse(message.contains("Error Result XDR"), "A response without an error result carries no XDR section")
+    }
+
+    @Test
+    fun testRequirePollableSendAcceptsADuplicateResponse() {
+        // A DUPLICATE response names a transaction the network already knows, so its hash
+        // polls to the true outcome; a resubmitted deployment that already succeeded must
+        // report that success rather than fail.
+        val response = SendTransactionResponse(
+            status = SendTransactionStatus.DUPLICATE,
+            hash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304"
+        )
+        ContractClient.requirePollableSend(response)
+    }
+
+    @Test
+    fun testRequirePollableSendReportsAnUnparsableErrorResult() {
+        val response = SendTransactionResponse(
+            status = SendTransactionStatus.ERROR,
+            hash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304",
+            errorResultXdr = "not a base64 transaction result"
+        )
+        val exception = assertFailsWith<SendTransactionFailedException> {
+            ContractClient.requirePollableSend(response)
+        }
+        val message = exception.message ?: fail("Exception should carry a message")
+        assertTrue(message.contains("Status: ERROR"), "Message should name the status")
+        assertTrue(message.contains("Could not parse error XDR"), "Message should report the unparsable XDR")
     }
 }

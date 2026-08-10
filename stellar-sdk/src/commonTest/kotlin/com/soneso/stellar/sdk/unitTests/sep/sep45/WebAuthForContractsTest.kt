@@ -17,6 +17,7 @@ import com.soneso.stellar.sdk.sep.sep45.exceptions.*
 import com.soneso.stellar.sdk.xdr.*
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.http.content.TextContent
@@ -647,6 +648,85 @@ class WebAuthForContractsTest {
                 signatureExpirationLedger = 1000000L
             )
         }
+    }
+
+    /**
+     * Drives a full jwtToken flow against a client with [HttpRequestRetry] installed
+     * (as the default client has) and a token endpoint that always answers HTTP 500,
+     * asserting the POST reaches the server exactly once: the server consumes the
+     * challenge nonce on the first attempt, so a retried POST cannot succeed and
+     * would mask the original error.
+     */
+    private suspend fun assertTokenSubmissionNotRetried(useFormUrlEncoded: Boolean) {
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce
+        )
+
+        var tokenPostCount = 0
+        val mockEngine = MockEngine { request ->
+            when (request.method) {
+                HttpMethod.Get -> respond(
+                    content = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> {
+                    tokenPostCount++
+                    respond(
+                        content = """{"error": "Failed to simulate transaction"}""",
+                        status = HttpStatusCode.InternalServerError,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+        val retryingClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+            install(HttpRequestRetry) {
+                retryOnServerErrors(maxRetries = 3)
+            }
+        }
+
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            httpClient = retryingClient
+        )
+        webAuth.useFormUrlEncoded = useFormUrlEncoded
+        val exception = assertFailsWith<Sep45UnknownResponseException> {
+            webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(KeyPair.random()),
+                homeDomain = DOMAIN,
+                signatureExpirationLedger = 1000000L
+            )
+        }
+        assertEquals(500, exception.code)
+        assertEquals(1, tokenPostCount, "The token submission must not be retried")
+    }
+
+    @Test
+    fun testJwtToken_tokenServerError500_isNotRetried() = runTest {
+        assertTokenSubmissionNotRetried(useFormUrlEncoded = true)
+    }
+
+    /**
+     * Same no-retry requirement for the JSON submission branch
+     * (useFormUrlEncoded = false); both branches disable per-request retries.
+     */
+    @Test
+    fun testJwtToken_tokenServerError500JsonBranch_isNotRetried() = runTest {
+        assertTokenSubmissionNotRetried(useFormUrlEncoded = false)
     }
 
     @Test

@@ -879,6 +879,11 @@ class WebAuthForContracts(
     ): Sep45AuthToken {
         val base64Xdr = encodeAuthorizationEntries(signedEntries)
 
+        // The token submission is not idempotent: the server consumes the challenge
+        // nonce on the first attempt, so an automatically retried POST cannot succeed
+        // and would replace the original error with an "invalid nonce" rejection.
+        // Per-request retries are disabled on both branches; retrying requires a new
+        // challenge round via jwtToken().
         val response: HttpResponse = try {
             if (useFormUrlEncoded) {
                 client.submitForm(
@@ -887,12 +892,14 @@ class WebAuthForContracts(
                         append("authorization_entries", base64Xdr)
                     }
                 ) {
+                    retry { noRetry() }
                     httpRequestHeaders?.forEach { (key, headerValue) ->
                         header(key, headerValue)
                     }
                 }
             } else {
                 client.post(authEndpoint) {
+                    retry { noRetry() }
                     contentType(ContentType.Application.Json)
                     httpRequestHeaders?.forEach { (key, headerValue) ->
                         header(key, headerValue)

@@ -1,8 +1,11 @@
 package com.soneso.stellar.sdk.contract
 
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.exception.SendTransactionFailedException
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.xdr.*
 
 /**
@@ -751,8 +754,8 @@ class ContractClient private constructor(
          *
          * This is the **primary deployment method** that handles everything:
          * 1. Upload WASM (with duplicate detection)
-         * 2. Deploy contract with optional constructor
-         * 3. Load contract spec
+         * 2. Load the contract spec from the uploaded code
+         * 3. Deploy contract with optional constructor
          * 4. Return ready-to-use client
          *
          * For advanced scenarios requiring WASM reuse, see [install] and [deployFromWasmId].
@@ -764,8 +767,17 @@ class ContractClient private constructor(
          * @param network Network to deploy to
          * @param rpcUrl RPC server URL
          * @param salt Salt for contract ID generation (default: 32 bytes from the platform CSPRNG)
-         * @param loadSpec Whether to load spec after deployment (default: true)
+         * @param loadSpec Whether to load the contract spec from the uploaded code before
+         * deploying, so the returned client carries it (default: true)
          * @return ContractClient for the deployed contract
+         * @throws SendTransactionFailedException if the network refuses the upload or
+         * deployment transaction at submission
+         * @throws IllegalStateException if constructor arguments are provided but the
+         * uploaded code cannot be found on the RPC to convert them
+         * @throws IllegalArgumentException if constructor arguments are provided but the
+         * contract spec declares no `__constructor` function
+         * @throws SorobanContractParserException if constructor arguments are provided
+         * but the uploaded code cannot be parsed
          *
          * @sample
          * ```kotlin
@@ -836,6 +848,8 @@ class ContractClient private constructor(
          * @param network Network to upload to
          * @param rpcUrl RPC server URL
          * @return WASM ID as hex string (ready to use)
+         * @throws SendTransactionFailedException if the network refuses the upload
+         * transaction at submission
          *
          * @sample
          * ```kotlin
@@ -880,8 +894,12 @@ class ContractClient private constructor(
          * @param network Network to deploy to
          * @param rpcUrl RPC server URL
          * @param salt Salt for contract ID generation (default: 32 bytes from the platform CSPRNG)
-         * @param loadSpec Whether to load spec after deployment (default: true)
+         * @param loadSpec Whether to load the contract spec from the uploaded code before
+         * deploying, so the returned client carries it (default: true)
          * @return ContractClient for the deployed contract
+         * @throws SendTransactionFailedException if the network refuses the deployment
+         * transaction at submission
+         * @throws IllegalArgumentException if [wasmId] is not a valid hex string
          *
          * @sample
          * ```kotlin
@@ -918,6 +936,23 @@ class ContractClient private constructor(
                 "Invalid WASM ID format: hex string must have even length (got: ${wasmId.length})"
             }
 
+            // Load the spec from the uploaded code before deploying: the code entry is
+            // already settled, while the instance entry this call is about to write can
+            // trail getTransaction's SUCCESS on a busy RPC. Code without a parseable
+            // spec deploys anyway; the forContract fallback reports it with its usual
+            // error semantics.
+            val contractInfo = if (loadSpec) {
+                SorobanServer(rpcUrl).use { rpc ->
+                    try {
+                        rpc.loadContractInfoForWasmId(wasmId)
+                    } catch (_: SorobanContractParserException) {
+                        null
+                    }
+                }
+            } else {
+                null
+            }
+
             // Convert hex string to ByteArray
             val wasmHash = hexStringToByteArray(wasmId)
 
@@ -932,12 +967,7 @@ class ContractClient private constructor(
                 salt = salt
             )
 
-            // Return client with or without spec
-            return if (loadSpec) {
-                forContract(contractId, rpcUrl, network)
-            } else {
-                ContractClient(contractId, rpcUrl, network, null)
-            }
+            return clientForDeployedContract(contractId, rpcUrl, network, contractInfo, loadSpec)
         }
 
         /**
@@ -975,6 +1005,7 @@ class ContractClient private constructor(
             preparedTransaction.sign(signer)
 
             val sendResponse = server.sendTransaction(preparedTransaction)
+            requirePollableSend(sendResponse)
             if (sendResponse.hash == null) {
                 throw IllegalStateException("Failed to send WASM upload transaction")
             }
@@ -1009,26 +1040,50 @@ class ContractClient private constructor(
             salt: ByteArray,
             loadSpec: Boolean
         ): ContractClient {
-            // First load the spec from WASM to convert constructor args
-            val server = SorobanServer(rpcUrl)
-
-            val constructorXdr = if (constructorArgs.isNotEmpty()) {
-                val contractInfo = server.loadContractInfoForWasmId(wasmId)
-                if (contractInfo?.specEntries?.isNotEmpty() == true) {
-                    val spec = ContractSpec(contractInfo.specEntries)
-                    // Look for constructor function (usually named "__constructor")
-                    val constructorFunc = spec.getFunc("__constructor")
-                    if (constructorFunc != null) {
-                        spec.funcArgsToXdrSCValues("__constructor", constructorArgs)
-                    } else {
-                        // If no constructor function, assume direct parameter mapping
-                        emptyList()
+            // Load the contract info from the uploaded code once, before deploying. It
+            // converts the constructor arguments, and its spec entries are the spec of the
+            // contract this call creates, so the returned client carries them without
+            // reading back the instance entry the deployment just wrote. That read can
+            // trail getTransaction's SUCCESS on a busy RPC, whose ledger-entry ingestion
+            // runs behind transaction status. With no arguments to convert, code without
+            // a parseable spec deploys anyway and the forContract fallback reports it
+            // with its usual error semantics; with arguments, the parse failure means
+            // they cannot be converted, so it propagates before anything deploys.
+            val contractInfo = if (constructorArgs.isNotEmpty() || loadSpec) {
+                SorobanServer(rpcUrl).use { rpc ->
+                    try {
+                        rpc.loadContractInfoForWasmId(wasmId)
+                    } catch (e: SorobanContractParserException) {
+                        if (constructorArgs.isNotEmpty()) throw e
+                        null
                     }
-                } else {
-                    emptyList()
                 }
             } else {
+                null
+            }
+
+            // Supplied constructor arguments must be converted through the spec's
+            // __constructor signature. Deploying without them would run no constructor
+            // and leave the contract uninitialized, so an unusable spec raises instead.
+            val constructorXdr = if (constructorArgs.isEmpty()) {
                 emptyList()
+            } else {
+                val specEntries = contractInfo?.specEntries
+                if (specEntries.isNullOrEmpty()) {
+                    throw IllegalStateException(
+                        "Constructor arguments were provided, but the contract spec could not be " +
+                            "loaded from wasm id $wasmId, so they cannot be converted. The code " +
+                            "entry may not be visible to the RPC yet."
+                    )
+                }
+                val spec = ContractSpec(specEntries)
+                if (spec.getFunc("__constructor") == null) {
+                    throw IllegalArgumentException(
+                        "Constructor arguments were provided, but the contract spec declares no " +
+                            "__constructor function."
+                    )
+                }
+                spec.funcArgsToXdrSCValues("__constructor", constructorArgs)
             }
 
             // Convert hex string to ByteArray for deployment
@@ -1045,12 +1100,7 @@ class ContractClient private constructor(
                 salt = salt
             )
 
-            // Return client with or without spec
-            return if (loadSpec) {
-                forContract(contractId, rpcUrl, network)
-            } else {
-                ContractClient(contractId, rpcUrl, network, null)
-            }
+            return clientForDeployedContract(contractId, rpcUrl, network, contractInfo, loadSpec)
         }
 
         /**
@@ -1120,6 +1170,7 @@ class ContractClient private constructor(
             preparedTransaction.sign(signer)
 
             val sendResponse = server.sendTransaction(preparedTransaction)
+            requirePollableSend(sendResponse)
             if (sendResponse.hash == null) {
                 throw IllegalStateException("Failed to send contract deployment transaction")
             }
@@ -1136,6 +1187,48 @@ class ContractClient private constructor(
 
             return rpcResponse.getCreatedContractId()
                 ?: throw IllegalStateException("Failed to extract contract ID from transaction response")
+        }
+
+        /**
+         * Builds the client for a contract this call just deployed. The spec loaded
+         * from the uploaded code before deployment is used when it has entries; code
+         * whose spec section is absent or empty falls back to [forContract], which
+         * reports it with its usual error semantics.
+         */
+        private suspend fun clientForDeployedContract(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            contractInfo: SorobanContractInfo?,
+            loadSpec: Boolean
+        ): ContractClient = when {
+            !loadSpec -> ContractClient(contractId, rpcUrl, network, null)
+            contractInfo?.specEntries?.isNotEmpty() == true ->
+                ContractClient(contractId, rpcUrl, network, ContractSpec(contractInfo.specEntries))
+            else -> forContract(contractId, rpcUrl, network)
+        }
+
+        /**
+         * Requires a sendTransaction response to be one whose hash will appear in a ledger
+         * query before polling for its result.
+         *
+         * A PENDING submission was accepted into the queue, and a DUPLICATE one names a
+         * transaction the network already knows, so both poll to their true outcome. Any
+         * other status reports a submission the network did not accept, so polling its
+         * hash is not expected to find a result. The raised
+         * [SendTransactionFailedException] carries the status, the error result XDR with
+         * its parsed form when the network supplied one, and any diagnostic events,
+         * sharing its failure report with [AssembledTransaction.signAndSubmit].
+         *
+         * @throws SendTransactionFailedException when the status is neither PENDING nor DUPLICATE
+         */
+        internal fun requirePollableSend(sendResponse: SendTransactionResponse) {
+            if (sendResponse.status == SendTransactionStatus.PENDING ||
+                sendResponse.status == SendTransactionStatus.DUPLICATE
+            ) {
+                return
+            }
+            throw SendTransactionFailedException(SendTransactionFailedException.describe(sendResponse))
         }
 
         /**

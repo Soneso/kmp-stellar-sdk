@@ -9,6 +9,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.exceptions.TokenSubmissionException
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -256,6 +257,50 @@ class WebAuthTokenSubmissionTest {
 
         assertTrue(exception.message?.contains("500") == true)
         assertTrue(exception.message?.contains("Server error") == true)
+    }
+
+    /**
+     * The token submission must reach the server exactly once even when the client
+     * has [HttpRequestRetry] installed (as the default client does): the signed
+     * challenge is single-use, so a retried POST can be rejected as a replay and
+     * would mask the original error.
+     */
+    @Test
+    fun testSendSignedChallenge500ServerError_isNotRetried() = runTest {
+        var postCount = 0
+        val mockEngine = MockEngine { _ ->
+            postCount++
+            respond(
+                content = """{"error": "Internal server error"}""",
+                status = HttpStatusCode.InternalServerError,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val retryingClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+            install(HttpRequestRetry) {
+                retryOnServerErrors(maxRetries = 3)
+            }
+        }
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = Network.TESTNET,
+            serverSigningKey = testServerKey,
+            serverHomeDomain = testHomeDomain,
+            httpClient = retryingClient
+        )
+
+        val exception = assertFailsWith<TokenSubmissionException> {
+            webAuth.sendSignedChallenge(signedChallengeXdr)
+        }
+
+        assertTrue(exception.message?.contains("500") == true)
+        assertEquals(1, postCount, "The token submission must not be retried")
     }
 
     @Test

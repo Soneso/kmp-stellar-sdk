@@ -792,26 +792,10 @@ class AssembledTransaction<T> internal constructor(
         if (sendTransactionResponse == null) {
             sendTransactionResponse = server.sendTransaction(builtTransaction!!)
             if (sendTransactionResponse!!.status != SendTransactionStatus.PENDING) {
-                val status = sendTransactionResponse!!.status
-                val errorMessage = buildString {
-                    append("Sending the transaction to the network failed! Status: $status")
-
-                    if (status == SendTransactionStatus.ERROR && sendTransactionResponse!!.errorResultXdr != null) {
-                        append("\nError Result XDR: ${sendTransactionResponse!!.errorResultXdr}")
-                        try {
-                            val txResult = sendTransactionResponse!!.parseErrorResultXdr()
-                            append("\nParsed Error: $txResult")
-                        } catch (e: Exception) {
-                            append("\n(Could not parse error XDR: ${e.message})")
-                        }
-                    }
-
-                    if (sendTransactionResponse!!.diagnosticEventsXdr != null && sendTransactionResponse!!.diagnosticEventsXdr!!.isNotEmpty()) {
-                        append("\nDiagnostic Events: ${sendTransactionResponse!!.diagnosticEventsXdr!!.joinToString(", ")}")
-                    }
-                }
-
-                throw SendTransactionFailedException(errorMessage, this)
+                throw SendTransactionFailedException(
+                    SendTransactionFailedException.describe(sendTransactionResponse!!),
+                    this
+                )
             }
         }
 
