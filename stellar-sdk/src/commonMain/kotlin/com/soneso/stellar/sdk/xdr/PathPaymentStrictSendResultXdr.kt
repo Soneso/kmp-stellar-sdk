@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PathPaymentStrictSendResultXdr"
+
 /**
  * XDR Source:
  * union PathPaymentStrictSendResult switch (PathPaymentStrictSendResultCode code)
@@ -76,6 +82,35 @@ sealed class PathPaymentStrictSendResultXdr {
         else -> throw IllegalArgumentException("Unknown PathPaymentStrictSendResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): PathPaymentStrictSendResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictSendResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictSendResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> Success(PathPaymentStrictSendResultSuccessXdr.fromXdrJsonTree(value))
+          "no_issuer" -> NoIssuer(AssetXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "malformed" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_MALFORMED)
+        "underfunded" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_UNDERFUNDED)
+        "src_no_trust" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_SRC_NO_TRUST)
+        "src_not_authorized" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_SRC_NOT_AUTHORIZED)
+        "no_destination" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_NO_DESTINATION)
+        "no_trust" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_NO_TRUST)
+        "not_authorized" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_NOT_AUTHORIZED)
+        "line_full" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_LINE_FULL)
+        "too_few_offers" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_TOO_FEW_OFFERS)
+        "offer_cross_self" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_OFFER_CROSS_SELF)
+        "under_destmin" -> Void(PathPaymentStrictSendResultCodeXdr.PATH_PAYMENT_STRICT_SEND_UNDER_DESTMIN)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -90,4 +125,12 @@ sealed class PathPaymentStrictSendResultXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Success -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+    is NoIssuer -> buildJsonObject { put("no_issuer", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCEnvMetaKindXdr"
+
 /**
  * XDR Source:
  * enum SCEnvMetaKind
@@ -10,8 +14,8 @@ package com.soneso.stellar.sdk.xdr
  *     SC_ENV_META_KIND_INTERFACE_VERSION = 0
  * };
  */
-enum class SCEnvMetaKindXdr(val value: Int) {
-  SC_ENV_META_KIND_INTERFACE_VERSION(0);
+enum class SCEnvMetaKindXdr(val value: Int, internal val xdrJsonName: String) {
+  SC_ENV_META_KIND_INTERFACE_VERSION(0, "sc_env_meta_kind_interface_version");
 
   companion object {
 
@@ -20,9 +24,24 @@ enum class SCEnvMetaKindXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCEnvMetaKindXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCEnvMetaKindXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCEnvMetaKindXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCEnvMetaKindXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCEnvMetaKindXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

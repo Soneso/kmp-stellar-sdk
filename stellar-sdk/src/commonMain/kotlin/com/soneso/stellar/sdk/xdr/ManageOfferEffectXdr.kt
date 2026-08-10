@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ManageOfferEffectXdr"
+
 /**
  * XDR Source:
  * enum ManageOfferEffect
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     MANAGE_OFFER_DELETED = 2
  * };
  */
-enum class ManageOfferEffectXdr(val value: Int) {
-  MANAGE_OFFER_CREATED(0),
-  MANAGE_OFFER_UPDATED(1),
-  MANAGE_OFFER_DELETED(2);
+enum class ManageOfferEffectXdr(val value: Int, internal val xdrJsonName: String) {
+  MANAGE_OFFER_CREATED(0, "created"),
+  MANAGE_OFFER_UPDATED(1, "updated"),
+  MANAGE_OFFER_DELETED(2, "deleted");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class ManageOfferEffectXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ManageOfferEffectXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ManageOfferEffectXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageOfferEffectXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageOfferEffectXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ManageOfferEffectXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

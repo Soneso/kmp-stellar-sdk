@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AllowTrustResultXdr"
+
 /**
  * XDR Source:
  * union AllowTrustResult switch (AllowTrustResultCode code)
@@ -40,6 +44,23 @@ sealed class AllowTrustResultXdr {
         else -> throw IllegalArgumentException("Unknown AllowTrustResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): AllowTrustResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AllowTrustResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AllowTrustResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_SUCCESS)
+        "malformed" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_MALFORMED)
+        "no_trust_line" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_NO_TRUST_LINE)
+        "trust_not_required" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_TRUST_NOT_REQUIRED)
+        "cant_revoke" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_CANT_REVOKE)
+        "self_not_allowed" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_SELF_NOT_ALLOWED)
+        "low_reserve" -> Void(AllowTrustResultCodeXdr.ALLOW_TRUST_LOW_RESERVE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -48,4 +69,10 @@ sealed class AllowTrustResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

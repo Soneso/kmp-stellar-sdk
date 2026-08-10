@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ParallelTxsComponentXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("base_fee", "execution_stages")
+
 /**
  * XDR Source:
  * struct ParallelTxsComponent
@@ -25,6 +32,18 @@ data class ParallelTxsComponentXdr(
       val executionStages = List(reader.readInt()) { ParallelTxExecutionStageXdr.decode(reader) }
       return ParallelTxsComponentXdr(baseFee, executionStages)
     }
+
+    fun fromXdrJson(json: String): ParallelTxsComponentXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ParallelTxsComponentXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ParallelTxsComponentXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ParallelTxsComponentXdr(
+        XdrJson.optional(XdrJson.field(json, "base_fee", XDR_JSON_TYPE))?.let { Int64Xdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "execution_stages", XDR_JSON_TYPE), XDR_JSON_TYPE, "execution_stages").map { ParallelTxExecutionStageXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -39,4 +58,11 @@ data class ParallelTxsComponentXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("base_fee", XdrJson.optional(baseFee) { it.toXdrJsonElement() })
+    put("execution_stages", XdrJson.array(executionStages) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

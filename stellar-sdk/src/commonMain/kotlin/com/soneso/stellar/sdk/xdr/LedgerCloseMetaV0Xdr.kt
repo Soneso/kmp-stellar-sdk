@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerCloseMetaV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_header", "tx_set", "tx_processing", "upgrades_processing", "scp_info")
+
 /**
  * XDR Source:
  * struct LedgerCloseMetaV0
@@ -41,6 +48,21 @@ data class LedgerCloseMetaV0Xdr(
       val scpInfo = List(reader.readInt()) { SCPHistoryEntryXdr.decode(reader) }
       return LedgerCloseMetaV0Xdr(ledgerHeader, txSet, txProcessing, upgradesProcessing, scpInfo)
     }
+
+    fun fromXdrJson(json: String): LedgerCloseMetaV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerCloseMetaV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseMetaV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerCloseMetaV0Xdr(
+        LedgerHeaderHistoryEntryXdr.fromXdrJsonTree(XdrJson.field(json, "ledger_header", XDR_JSON_TYPE)),
+        TransactionSetXdr.fromXdrJsonTree(XdrJson.field(json, "tx_set", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "tx_processing", XDR_JSON_TYPE), XDR_JSON_TYPE, "tx_processing").map { TransactionResultMetaXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "upgrades_processing", XDR_JSON_TYPE), XDR_JSON_TYPE, "upgrades_processing").map { UpgradeEntryMetaXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "scp_info", XDR_JSON_TYPE), XDR_JSON_TYPE, "scp_info").map { SCPHistoryEntryXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -59,4 +81,14 @@ data class LedgerCloseMetaV0Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_header", ledgerHeader.toXdrJsonElement())
+    put("tx_set", txSet.toXdrJsonElement())
+    put("tx_processing", XdrJson.array(txProcessing) { it.toXdrJsonElement() })
+    put("upgrades_processing", XdrJson.array(upgradesProcessing) { it.toXdrJsonElement() })
+    put("scp_info", XdrJson.array(scpInfo) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

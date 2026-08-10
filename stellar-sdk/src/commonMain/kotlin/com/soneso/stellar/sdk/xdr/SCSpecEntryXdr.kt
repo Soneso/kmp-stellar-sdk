@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecEntryXdr"
+
 /**
  * XDR Source:
  * union SCSpecEntry switch (SCSpecEntryKind kind)
@@ -92,6 +97,23 @@ sealed class SCSpecEntryXdr {
         else -> throw IllegalArgumentException("Unknown SCSpecEntryXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCSpecEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecEntryXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "function_v0" -> FunctionV0(SCSpecFunctionV0Xdr.fromXdrJsonTree(value))
+        "udt_struct_v0" -> UdtStructV0(SCSpecUDTStructV0Xdr.fromXdrJsonTree(value))
+        "udt_union_v0" -> UdtUnionV0(SCSpecUDTUnionV0Xdr.fromXdrJsonTree(value))
+        "udt_enum_v0" -> UdtEnumV0(SCSpecUDTEnumV0Xdr.fromXdrJsonTree(value))
+        "udt_error_enum_v0" -> UdtErrorEnumV0(SCSpecUDTErrorEnumV0Xdr.fromXdrJsonTree(value))
+        "event_v0" -> EventV0(SCSpecEventV0Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -117,4 +139,15 @@ sealed class SCSpecEntryXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is FunctionV0 -> buildJsonObject { put("function_v0", value.toXdrJsonElement()) }
+    is UdtStructV0 -> buildJsonObject { put("udt_struct_v0", value.toXdrJsonElement()) }
+    is UdtUnionV0 -> buildJsonObject { put("udt_union_v0", value.toXdrJsonElement()) }
+    is UdtEnumV0 -> buildJsonObject { put("udt_enum_v0", value.toXdrJsonElement()) }
+    is UdtErrorEnumV0 -> buildJsonObject { put("udt_error_enum_v0", value.toXdrJsonElement()) }
+    is EventV0 -> buildJsonObject { put("event_v0", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

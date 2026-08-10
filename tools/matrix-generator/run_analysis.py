@@ -41,6 +41,7 @@ KNOWN_SEPS: Dict[str, str] = {
     '0046': 'Contract Meta',
     '0047': 'Contract Interface Discovery',
     '0048': 'Contract Interface Specification',
+    '0051': 'XDR-JSON',
     '0053': 'Message Signing',
 }
 
@@ -86,6 +87,26 @@ _CONTRACT_PARSER_FILE = (
     / "contract"
     / "SorobanContractParser.kt"
 )
+
+# Generated XDR package used for SEP-51 detection
+_XDR_SOURCE_DIR = (
+    SDK_ROOT
+    / "stellar-sdk"
+    / "src"
+    / "commonMain"
+    / "kotlin"
+    / "com"
+    / "soneso"
+    / "stellar"
+    / "sdk"
+    / "xdr"
+)
+
+# Shared XDR-JSON runtime backing the conversion methods
+_XDR_JSON_FILE = _XDR_SOURCE_DIR / "XdrJson.kt"
+
+# Generated XDR type sampled to confirm the conversion methods are emitted
+_XDR_JSON_TYPE_FILE = _XDR_SOURCE_DIR / "TransactionEnvelopeXdr.kt"
 
 
 class AnalysisOrchestrator:
@@ -139,6 +160,22 @@ class AnalysisOrchestrator:
                 for padded in ('0046', '0047', '0048'):
                     if padded not in sep_numbers:
                         sep_numbers.append(padded)
+
+        # SEP-51 (XDR-JSON) has no sep51/ directory: the conversion methods are emitted
+        # onto every generated XDR type and delegate to the XdrJson.kt runtime. Both
+        # halves are checked, since the runtime alone does not prove the methods reach
+        # the types, and one type alone does not prove the runtime exists.
+        if _XDR_JSON_FILE.exists() and _XDR_JSON_TYPE_FILE.exists():
+            runtime = _XDR_JSON_FILE.read_text(encoding='utf-8')
+            xdr_type = _XDR_JSON_TYPE_FILE.read_text(encoding='utf-8')
+            if (
+                'object XdrJson' in runtime
+                and 'fun toXdrJson' in xdr_type
+                and 'fun fromXdrJson' in xdr_type
+            ):
+                padded = '0051'
+                if padded not in sep_numbers:
+                    sep_numbers.append(padded)
 
         return sorted(sep_numbers)
 

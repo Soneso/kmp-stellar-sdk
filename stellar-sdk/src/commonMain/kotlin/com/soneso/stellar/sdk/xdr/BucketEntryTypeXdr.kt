@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BucketEntryTypeXdr"
+
 /**
  * XDR Source:
  * enum BucketEntryType
@@ -15,14 +19,14 @@ package com.soneso.stellar.sdk.xdr
  *     INITENTRY = 2 // At-and-after protocol 11: only created.
  * };
  */
-enum class BucketEntryTypeXdr(val value: Int) {
-  METAENTRY(-1),
+enum class BucketEntryTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  METAENTRY(-1, "metaentry"),
   /** Before protocol 11: created-or-updated; */
-  LIVEENTRY(0),
+  LIVEENTRY(0, "liveentry"),
   /** At-and-after protocol 11: only updated. */
-  DEADENTRY(1),
+  DEADENTRY(1, "deadentry"),
   /** At-and-after protocol 11: only created. */
-  INITENTRY(2);
+  INITENTRY(2, "initentry");
 
   companion object {
 
@@ -31,9 +35,24 @@ enum class BucketEntryTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown BucketEntryTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): BucketEntryTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BucketEntryTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BucketEntryTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): BucketEntryTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCErrorTypeXdr"
+
 /**
  * XDR Source:
  * enum SCErrorType
@@ -19,27 +23,27 @@ package com.soneso.stellar.sdk.xdr
  *     SCE_AUTH = 9               // Errors from the authentication subsystem.
  * };
  */
-enum class SCErrorTypeXdr(val value: Int) {
+enum class SCErrorTypeXdr(val value: Int, internal val xdrJsonName: String) {
   /** Contract-specific, user-defined codes. */
-  SCE_CONTRACT(0),
+  SCE_CONTRACT(0, "contract"),
   /** Errors while interpreting WASM bytecode. */
-  SCE_WASM_VM(1),
+  SCE_WASM_VM(1, "wasm_vm"),
   /** Errors in the contract's host context. */
-  SCE_CONTEXT(2),
+  SCE_CONTEXT(2, "context"),
   /** Errors accessing host storage. */
-  SCE_STORAGE(3),
+  SCE_STORAGE(3, "storage"),
   /** Errors working with host objects. */
-  SCE_OBJECT(4),
+  SCE_OBJECT(4, "object"),
   /** Errors in cryptographic operations. */
-  SCE_CRYPTO(5),
+  SCE_CRYPTO(5, "crypto"),
   /** Errors while emitting events. */
-  SCE_EVENTS(6),
+  SCE_EVENTS(6, "events"),
   /** Errors relating to budget limits. */
-  SCE_BUDGET(7),
+  SCE_BUDGET(7, "budget"),
   /** Errors working with host values or SCVals. */
-  SCE_VALUE(8),
+  SCE_VALUE(8, "value"),
   /** Errors from the authentication subsystem. */
-  SCE_AUTH(9);
+  SCE_AUTH(9, "auth");
 
   companion object {
 
@@ -48,9 +52,24 @@ enum class SCErrorTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCErrorTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCErrorTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCErrorTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCErrorTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCErrorTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

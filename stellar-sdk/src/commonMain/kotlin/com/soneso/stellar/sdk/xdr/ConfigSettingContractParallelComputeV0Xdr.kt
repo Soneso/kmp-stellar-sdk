@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingContractParallelComputeV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_max_dependent_tx_clusters")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractParallelComputeV0
@@ -29,9 +36,26 @@ data class ConfigSettingContractParallelComputeV0Xdr(
       val ledgerMaxDependentTxClusters = Uint32Xdr.decode(reader)
       return ConfigSettingContractParallelComputeV0Xdr(ledgerMaxDependentTxClusters)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingContractParallelComputeV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractParallelComputeV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractParallelComputeV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ConfigSettingContractParallelComputeV0Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_dependent_tx_clusters", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ledgerMaxDependentTxClusters.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_max_dependent_tx_clusters", ledgerMaxDependentTxClusters.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

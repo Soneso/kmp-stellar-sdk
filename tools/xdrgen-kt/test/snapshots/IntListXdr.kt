@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "IntListXdr"
+
 /**
  * XDR Source:
  * typedef int IntList<100>;
@@ -15,6 +19,12 @@ value class IntListXdr(val value: List<Int>) {
       val value = List(reader.readInt()) { reader.readInt() }
       return IntListXdr(value)
     }
+
+    fun fromXdrJson(json: String): IntListXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): IntListXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): IntListXdr = IntListXdr(XdrJson.array(element, XDR_JSON_TYPE, "value", maxLength = 100).map { XdrJson.int32(it, XDR_JSON_TYPE, "value") })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class IntListXdr(val value: List<Int>) {
       writer.writeInt(item)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { XdrJson.int32(it) }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LiquidityPoolDepositResultXdr"
+
 /**
  * XDR Source:
  * union LiquidityPoolDepositResult switch (LiquidityPoolDepositResultCode code)
@@ -44,6 +48,25 @@ sealed class LiquidityPoolDepositResultXdr {
         else -> throw IllegalArgumentException("Unknown LiquidityPoolDepositResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolDepositResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolDepositResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolDepositResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_SUCCESS)
+        "malformed" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_MALFORMED)
+        "no_trust" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_NO_TRUST)
+        "not_authorized" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_NOT_AUTHORIZED)
+        "underfunded" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_UNDERFUNDED)
+        "line_full" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_LINE_FULL)
+        "bad_price" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_BAD_PRICE)
+        "pool_full" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_POOL_FULL)
+        "trustline_frozen" -> Void(LiquidityPoolDepositResultCodeXdr.LIQUIDITY_POOL_DEPOSIT_TRUSTLINE_FROZEN)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -52,4 +75,10 @@ sealed class LiquidityPoolDepositResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

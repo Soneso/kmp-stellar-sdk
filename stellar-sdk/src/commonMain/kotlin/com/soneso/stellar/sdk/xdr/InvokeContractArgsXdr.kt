@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "InvokeContractArgsXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("contract_address", "function_name", "args")
+
 /**
  * XDR Source:
  * struct InvokeContractArgs {
@@ -24,6 +31,19 @@ data class InvokeContractArgsXdr(
       val args = List(reader.readInt()) { SCValXdr.decode(reader) }
       return InvokeContractArgsXdr(contractAddress, functionName, args)
     }
+
+    fun fromXdrJson(json: String): InvokeContractArgsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InvokeContractArgsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InvokeContractArgsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return InvokeContractArgsXdr(
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "contract_address", XDR_JSON_TYPE)),
+        SCSymbolXdr.fromXdrJsonTree(XdrJson.field(json, "function_name", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "args", XDR_JSON_TYPE), XDR_JSON_TYPE, "args").map { SCValXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -34,4 +54,12 @@ data class InvokeContractArgsXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("contract_address", contractAddress.toXdrJsonElement())
+    put("function_name", functionName.toXdrJsonElement())
+    put("args", XdrJson.array(args) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

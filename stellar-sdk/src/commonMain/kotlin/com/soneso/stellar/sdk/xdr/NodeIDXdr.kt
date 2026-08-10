@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "NodeIDXdr"
+
 /**
  * XDR Source:
  * typedef PublicKey NodeID;
@@ -15,9 +19,19 @@ value class NodeIDXdr(val value: PublicKeyXdr) {
       val value = PublicKeyXdr.decode(reader)
       return NodeIDXdr(value)
     }
+
+    fun fromXdrJson(json: String): NodeIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): NodeIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): NodeIDXdr = NodeIDXdr(PublicKeyXdr.fromXdrJsonTree(element))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

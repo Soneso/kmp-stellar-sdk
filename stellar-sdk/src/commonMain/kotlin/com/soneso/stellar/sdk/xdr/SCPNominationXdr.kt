@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPNominationXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("quorum_set_hash", "votes", "accepted")
+
 /**
  * XDR Source:
  * struct SCPNomination
@@ -26,6 +33,19 @@ data class SCPNominationXdr(
       val accepted = List(reader.readInt()) { ValueXdr.decode(reader) }
       return SCPNominationXdr(quorumSetHash, votes, accepted)
     }
+
+    fun fromXdrJson(json: String): SCPNominationXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPNominationXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPNominationXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCPNominationXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "quorum_set_hash", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "votes", XDR_JSON_TYPE), XDR_JSON_TYPE, "votes").map { ValueXdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "accepted", XDR_JSON_TYPE), XDR_JSON_TYPE, "accepted").map { ValueXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -39,4 +59,12 @@ data class SCPNominationXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("quorum_set_hash", quorumSetHash.toXdrJsonElement())
+    put("votes", XdrJson.array(votes) { it.toXdrJsonElement() })
+    put("accepted", XdrJson.array(accepted) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

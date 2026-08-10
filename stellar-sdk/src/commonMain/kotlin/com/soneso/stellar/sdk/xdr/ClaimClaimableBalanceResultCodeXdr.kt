@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimClaimableBalanceResultCodeXdr"
+
 /**
  * XDR Source:
  * enum ClaimClaimableBalanceResultCode
@@ -16,14 +20,14 @@ package com.soneso.stellar.sdk.xdr
  *     CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN = -6
  * };
  */
-enum class ClaimClaimableBalanceResultCodeXdr(val value: Int) {
-  CLAIM_CLAIMABLE_BALANCE_SUCCESS(0),
-  CLAIM_CLAIMABLE_BALANCE_DOES_NOT_EXIST(-1),
-  CLAIM_CLAIMABLE_BALANCE_CANNOT_CLAIM(-2),
-  CLAIM_CLAIMABLE_BALANCE_LINE_FULL(-3),
-  CLAIM_CLAIMABLE_BALANCE_NO_TRUST(-4),
-  CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED(-5),
-  CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN(-6);
+enum class ClaimClaimableBalanceResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
+  CLAIM_CLAIMABLE_BALANCE_SUCCESS(0, "success"),
+  CLAIM_CLAIMABLE_BALANCE_DOES_NOT_EXIST(-1, "does_not_exist"),
+  CLAIM_CLAIMABLE_BALANCE_CANNOT_CLAIM(-2, "cannot_claim"),
+  CLAIM_CLAIMABLE_BALANCE_LINE_FULL(-3, "line_full"),
+  CLAIM_CLAIMABLE_BALANCE_NO_TRUST(-4, "no_trust"),
+  CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED(-5, "not_authorized"),
+  CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN(-6, "trustline_frozen");
 
   companion object {
 
@@ -32,9 +36,24 @@ enum class ClaimClaimableBalanceResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ClaimClaimableBalanceResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ClaimClaimableBalanceResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimClaimableBalanceResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimClaimableBalanceResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ClaimClaimableBalanceResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

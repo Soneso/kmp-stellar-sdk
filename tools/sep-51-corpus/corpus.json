@@ -1,0 +1,2498 @@
+{
+  "metadata": {
+    "description": "SEP-0051 (XDR-JSON) conformance corpus. Each entry pins the exact JSON text the SDK must emit for one XDR value and the base64 XDR that value encodes to.",
+    "reference_tool": "stellar-xdr",
+    "reference_version": "28.0.0",
+    "reference_xdr_commit": "9c9c145953e80990d6ff1ae3a6a973a0ce6d0694",
+    "sdk_xdr_commit": "911c9356277468cb588481bd90b5d4b6eda395a7",
+    "entry_count": 350,
+    "unresolvable_enum_members": [],
+    "unresolvable_struct_types": []
+  },
+  "entries": [
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAAASAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/",
+      "json": "\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAAAgAAAAAAAATSAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAAAgAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAAAA54K\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAAAwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScAddress",
+      "kmp_type": "SCAddressXdr",
+      "xdr": "AAAABICBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f",
+      "json": "\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SignerKey",
+      "kmp_type": "SignerKeyXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SignerKey",
+      "kmp_type": "SignerKeyXdr",
+      "xdr": "AAAAAUBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5f",
+      "json": "\"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SignerKey",
+      "kmp_type": "SignerKeyXdr",
+      "xdr": "AAAAAmBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/",
+      "json": "\"XBQGCYTDMRSWMZ3INFVGW3DNNZXXA4LSON2HK5TXPB4XU634PV7H7YJH\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SignerKey",
+      "kmp_type": "SignerKeyXdr",
+      "xdr": "AAAAAwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAABAECAwQ=",
+      "json": "\"PAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAACACAQDATYOS\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SignerKey",
+      "kmp_type": "SignerKeyXdr",
+      "xdr": "AAAAAwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAIAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"PAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAQACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHX7Q\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "MuxedAccount",
+      "kmp_type": "MuxedAccountXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "MuxedAccount",
+      "kmp_type": "MuxedAccountXdr",
+      "xdr": "AAABAAAAAAAAAATSAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "MuxedAccount",
+      "kmp_type": "MuxedAccountXdr",
+      "xdr": "AAABAP//////////AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSB7777777777777NGG\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "PublicKey",
+      "kmp_type": "PublicKeyXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AccountId",
+      "kmp_type": "AccountIDXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "NodeId",
+      "kmp_type": "NodeIDXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimableBalanceId",
+      "kmp_type": "ClaimableBalanceIDXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "PoolId",
+      "kmp_type": "PoolIDXdr",
+      "xdr": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=",
+      "json": "\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode",
+      "kmp_type": "AssetCodeXdr",
+      "xdr": "AAAAAVVTRAA=",
+      "json": "\"USD\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode",
+      "kmp_type": "AssetCodeXdr",
+      "xdr": "AAAAAkxPTkdBU1NFVAAAAA==",
+      "json": "\"LONGASSET\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode4",
+      "kmp_type": "AssetCode4Xdr",
+      "xdr": "QQAAAA==",
+      "json": "\"A\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode4",
+      "kmp_type": "AssetCode4Xdr",
+      "xdr": "QUJDAA==",
+      "json": "\"ABC\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode4",
+      "kmp_type": "AssetCode4Xdr",
+      "xdr": "QUJDRA==",
+      "json": "\"ABCD\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode4",
+      "kmp_type": "AssetCode4Xdr",
+      "xdr": "wwAAAA==",
+      "json": "\"\\\\xc3\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode4",
+      "kmp_type": "AssetCode4Xdr",
+      "xdr": "YVxiAA==",
+      "json": "\"a\\\\\\\\b\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "QUJDAAAAAAAAAAAA",
+      "json": "\"ABC\\\\0\\\\0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "QUJDREUAAAAAAAAA",
+      "json": "\"ABCDE\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "QUJDREVGR0gAAAAA",
+      "json": "\"ABCDEFGH\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "QUJDREVGR0hJSktM",
+      "json": "\"ABCDEFGHIJKL\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "AAAAAAAAAAAAAAAA",
+      "json": "\"\\\\0\\\\0\\\\0\\\\0\\\\0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "aGVsbG/Dd29ybGQA",
+      "json": "\"hello\\\\xc3world\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AssetCode12",
+      "kmp_type": "AssetCode12Xdr",
+      "xdr": "dGFiCWhlcmUAAAAA",
+      "json": "\"tab\\\\there\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Asset",
+      "kmp_type": "AssetXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"native\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Asset",
+      "kmp_type": "AssetXdr",
+      "xdr": "AAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Asset",
+      "kmp_type": "AssetXdr",
+      "xdr": "AAAAAkxPTkdBU1NFVAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"credit_alphanum12\":{\"asset_code\":\"LONGASSET\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineAsset",
+      "kmp_type": "TrustLineAssetXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"native\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineAsset",
+      "kmp_type": "TrustLineAssetXdr",
+      "xdr": "AAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineAsset",
+      "kmp_type": "TrustLineAssetXdr",
+      "xdr": "AAAAAkxPTkdBU1NFVAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"credit_alphanum12\":{\"asset_code\":\"LONGASSET\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineAsset",
+      "kmp_type": "TrustLineAssetXdr",
+      "xdr": "AAAAA4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f",
+      "json": "{\"pool_share\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ChangeTrustAsset",
+      "kmp_type": "ChangeTrustAssetXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"native\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ChangeTrustAsset",
+      "kmp_type": "ChangeTrustAssetXdr",
+      "xdr": "AAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ChangeTrustAsset",
+      "kmp_type": "ChangeTrustAssetXdr",
+      "xdr": "AAAAAkxPTkdBU1NFVAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"credit_alphanum12\":{\"asset_code\":\"LONGASSET\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ChangeTrustAsset",
+      "kmp_type": "ChangeTrustAssetXdr",
+      "xdr": "AAAAAwAAAAAAAAAAAAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAe",
+      "json": "{\"pool_share\":{\"liquidity_pool_constant_product\":{\"asset_a\":\"native\",\"asset_b\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"fee\":30}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LiquidityPoolParameters",
+      "kmp_type": "LiquidityPoolParametersXdr",
+      "xdr": "AAAAAAAAAAAAAAACTE9OR0FTU0VUAAAAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAHg==",
+      "json": "{\"liquidity_pool_constant_product\":{\"asset_a\":\"native\",\"asset_b\":{\"credit_alphanum12\":{\"asset_code\":\"LONGASSET\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"fee\":30}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int128Parts",
+      "kmp_type": "Int128PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int128Parts",
+      "kmp_type": "Int128PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAQ==",
+      "json": "\"1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int128Parts",
+      "kmp_type": "Int128PartsXdr",
+      "xdr": "/////////////////////w==",
+      "json": "\"-1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int128Parts",
+      "kmp_type": "Int128PartsXdr",
+      "xdr": "gAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "\"-170141183460469231731687303715884105728\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int128Parts",
+      "kmp_type": "Int128PartsXdr",
+      "xdr": "f////////////////////w==",
+      "json": "\"170141183460469231731687303715884105727\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt128Parts",
+      "kmp_type": "UInt128PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt128Parts",
+      "kmp_type": "UInt128PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAQ==",
+      "json": "\"1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt128Parts",
+      "kmp_type": "UInt128PartsXdr",
+      "xdr": "/////////////////////w==",
+      "json": "\"340282366920938463463374607431768211455\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int256Parts",
+      "kmp_type": "Int256PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int256Parts",
+      "kmp_type": "Int256PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=",
+      "json": "\"1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int256Parts",
+      "kmp_type": "Int256PartsXdr",
+      "xdr": "//////////////////////////////////////////8=",
+      "json": "\"-1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int256Parts",
+      "kmp_type": "Int256PartsXdr",
+      "xdr": "gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "\"-57896044618658097711785492504343953926634992332820282019728792003956564819968\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int256Parts",
+      "kmp_type": "Int256PartsXdr",
+      "xdr": "f/////////////////////////////////////////8=",
+      "json": "\"57896044618658097711785492504343953926634992332820282019728792003956564819967\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt256Parts",
+      "kmp_type": "UInt256PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt256Parts",
+      "kmp_type": "UInt256PartsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=",
+      "json": "\"1\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "UInt256Parts",
+      "kmp_type": "UInt256PartsXdr",
+      "xdr": "//////////////////////////////////////////8=",
+      "json": "\"115792089237316195423570985008687907853269984665640564039457584007913129639935\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "TimeBounds",
+      "kmp_type": "TimeBoundsXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "{\"min_time\":\"0\",\"max_time\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TimeBounds",
+      "kmp_type": "TimeBoundsXdr",
+      "xdr": "AAAAAAAAAAH//////////w==",
+      "json": "{\"min_time\":\"1\",\"max_time\":\"18446744073709551615\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Liabilities",
+      "kmp_type": "LiabilitiesXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "{\"buying\":\"0\",\"selling\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Liabilities",
+      "kmp_type": "LiabilitiesXdr",
+      "xdr": "f/////////+AAAAAAAAAAA==",
+      "json": "{\"buying\":\"9223372036854775807\",\"selling\":\"-9223372036854775808\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SequenceNumber",
+      "kmp_type": "SequenceNumberXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SequenceNumber",
+      "kmp_type": "SequenceNumberXdr",
+      "xdr": "f/////////8=",
+      "json": "\"9223372036854775807\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SequenceNumber",
+      "kmp_type": "SequenceNumberXdr",
+      "xdr": "gAAAAAAAAAA=",
+      "json": "\"-9223372036854775808\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "TimePoint",
+      "kmp_type": "TimePointXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "TimePoint",
+      "kmp_type": "TimePointXdr",
+      "xdr": "//////////8=",
+      "json": "\"18446744073709551615\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Duration",
+      "kmp_type": "DurationXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Duration",
+      "kmp_type": "DurationXdr",
+      "xdr": "//////////8=",
+      "json": "\"18446744073709551615\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Hash",
+      "kmp_type": "HashXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Hash",
+      "kmp_type": "HashXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "\"0000000000000000000000000000000000000000000000000000000000000000\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Uint256",
+      "kmp_type": "Uint256Xdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "DataValue",
+      "kmp_type": "DataValueXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "DataValue",
+      "kmp_type": "DataValueXdr",
+      "xdr": "AAAAAQAAAAA=",
+      "json": "\"00\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "DataValue",
+      "kmp_type": "DataValueXdr",
+      "xdr": "AAAABN6tvu8=",
+      "json": "\"deadbeef\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "DataValue",
+      "kmp_type": "DataValueXdr",
+      "xdr": "AAAAQP////////////////////////////////////////////////////////////////////////////////////8=",
+      "json": "\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"none\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAQAAAAVoZWxsbwAAAA==",
+      "json": "{\"text\":\"hello\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAQAAAAA=",
+      "json": "{\"text\":\"\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAQAAAAh0YWIJaGVyZQ==",
+      "json": "{\"text\":\"tab\\\\there\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAgAAAAAAAAAA",
+      "json": "{\"id\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAv//////////",
+      "json": "{\"id\":\"18446744073709551615\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAAAwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Memo",
+      "kmp_type": "MemoXdr",
+      "xdr": "AAAABAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"return\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"unconditional\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAQAAAAA=",
+      "json": "{\"and\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAQAAAAIAAAAAAAAABQAAAAAAAAA8",
+      "json": "{\"and\":[\"unconditional\",{\"before_relative_time\":\"60\"}]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAgAAAAIAAAAAAAAAAA==",
+      "json": "{\"or\":[\"unconditional\",\"unconditional\"]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAwAAAAA=",
+      "json": "{\"not\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAAAwAAAAEAAAAA",
+      "json": "{\"not\":\"unconditional\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAABAAAAAAAAAAA",
+      "json": "{\"before_absolute_time\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimPredicate",
+      "kmp_type": "ClaimPredicateXdr",
+      "xdr": "AAAABX//////////",
+      "json": "{\"before_relative_time\":\"9223372036854775807\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Claimant",
+      "kmp_type": "ClaimantXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAA=",
+      "json": "{\"claimant_type_v0\":{\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"predicate\":\"unconditional\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"account\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAA=",
+      "json": "{\"trustline\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":\"native\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAOAgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2enw==",
+      "json": "{\"trustline\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":{\"pool_share\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAAAgAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAM",
+      "json": "{\"offer\":{\"seller_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"offer_id\":\"12\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAAAwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAZjb25maWcAAA==",
+      "json": "{\"data\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"data_name\":\"config\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAABAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"claimable_balance\":{\"balance_id\":\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAABYCBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f",
+      "json": "{\"liquidity_pool\":{\"liquidity_pool_id\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAABgAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAAEAAAAB",
+      "json": "{\"contract_data\":{\"contract\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"key\":\"void\",\"durability\":\"persistent\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAABgAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAPAAAAAWsAAAAAAAAA",
+      "json": "{\"contract_data\":{\"contract\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"key\":{\"symbol\":\"k\"},\"durability\":\"temporary\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAABwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"contract_code\":{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAACAAAAAA=",
+      "json": "{\"config_setting\":{\"config_setting_id\":\"contract_max_size_bytes\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerKey",
+      "kmp_type": "LedgerKeyXdr",
+      "xdr": "AAAACQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAAAAAAE=",
+      "json": "{\"bool\":true}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "{\"bool\":false}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAQ==",
+      "json": "\"void\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAgAAAAAAAAAH",
+      "json": "{\"error\":{\"contract\":7}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAgAAAAEAAAAH",
+      "json": "{\"error\":{\"wasm_vm\":\"internal_error\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAAwAAAAA=",
+      "json": "{\"u32\":0}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAA/////8=",
+      "json": "{\"u32\":4294967295}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABIAAAAA=",
+      "json": "{\"i32\":-2147483648}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABQAAAAAAAAAA",
+      "json": "{\"u64\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABf//////////",
+      "json": "{\"u64\":\"18446744073709551615\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABoAAAAAAAAAA",
+      "json": "{\"i64\":\"-9223372036854775808\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABn//////////",
+      "json": "{\"i64\":\"9223372036854775807\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAABwAAAABndIWA",
+      "json": "{\"timepoint\":\"1735689600\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAACAAAAAAAAAAA",
+      "json": "{\"duration\":\"0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAACf////////////////////8=",
+      "json": "{\"u128\":\"340282366920938463463374607431768211455\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAACv////////////////////8=",
+      "json": "{\"i128\":\"-1\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAACoAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"i128\":\"-170141183460469231731687303715884105728\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAC///////////////////////////////////////////",
+      "json": "{\"u256\":\"115792089237316195423570985008687907853269984665640564039457584007913129639935\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAADIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"i256\":\"-57896044618658097711785492504343953926634992332820282019728792003956564819968\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAADQAAAAIA/wAA",
+      "json": "{\"bytes\":\"00ff\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAADgAAAAA=",
+      "json": "{\"string\":\"\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAADgAAAANhXGIA",
+      "json": "{\"string\":\"a\\\\\\\\b\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAADwAAAAh0cmFuc2Zlcg==",
+      "json": "{\"symbol\":\"transfer\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEAAAAAA=",
+      "json": "{\"vec\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEAAAAAEAAAAA",
+      "json": "{\"vec\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEAAAAAEAAAACAAAAAwAAAAEAAAAB",
+      "json": "{\"vec\":[{\"u32\":1},\"void\"]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEQAAAAA=",
+      "json": "{\"map\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEQAAAAEAAAAA",
+      "json": "{\"map\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEQAAAAEAAAABAAAADwAAAAFrAAAAAAAAAwAAAAE=",
+      "json": "{\"map\":[{\"key\":{\"symbol\":\"k\"},\"val\":{\"u32\":1}}]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEgAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"address\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEgAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+Pw==",
+      "json": "{\"address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAFA==",
+      "json": "\"ledger_key_contract_instance\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAFQAAAAAAAAAF",
+      "json": "{\"ledger_key_nonce\":{\"nonce\":\"5\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEwAAAAEAAAAA",
+      "json": "{\"contract_instance\":{\"executable\":\"stellar_asset\",\"storage\":null}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAEwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAAA",
+      "json": "{\"contract_instance\":{\"executable\":{\"wasm\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"},\"storage\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVal",
+      "kmp_type": "SCValXdr",
+      "xdr": "AAAAFgAAAAN0YWcA",
+      "json": "{\"executable_tag\":\"tag\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVec",
+      "kmp_type": "SCVecXdr",
+      "xdr": "AAAAAA==",
+      "json": "[]",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScVec",
+      "kmp_type": "SCVecXdr",
+      "xdr": "AAAAAgAAAAMAAAABAAAABP////8=",
+      "json": "[{\"u32\":1},{\"i32\":-1}]",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScMap",
+      "kmp_type": "SCMapXdr",
+      "xdr": "AAAAAA==",
+      "json": "[]",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScMapEntry",
+      "kmp_type": "SCMapEntryXdr",
+      "xdr": "AAAADwAAAAFrAAAAAAAAAAAAAAE=",
+      "json": "{\"key\":{\"symbol\":\"k\"},\"val\":{\"bool\":true}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScBytes",
+      "kmp_type": "SCBytesXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScBytes",
+      "kmp_type": "SCBytesXdr",
+      "xdr": "AAAAAwoLDAA=",
+      "json": "\"0a0b0c\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScString",
+      "kmp_type": "SCStringXdr",
+      "xdr": "AAAABWhlbGxvAAAA",
+      "json": "\"hello\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSymbol",
+      "kmp_type": "SCSymbolXdr",
+      "xdr": "AAAAA3N5bQA=",
+      "json": "\"sym\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScNonceKey",
+      "kmp_type": "SCNonceKeyXdr",
+      "xdr": "gAAAAAAAAAA=",
+      "json": "{\"nonce\":\"-9223372036854775808\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScContractInstance",
+      "kmp_type": "SCContractInstanceXdr",
+      "xdr": "AAAAAQAAAAEAAAABAAAADwAAAAFrAAAAAAAAAQ==",
+      "json": "{\"executable\":\"stellar_asset\",\"storage\":[{\"key\":{\"symbol\":\"k\"},\"val\":\"void\"}]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "{\"contract\":0}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAAAP////8=",
+      "json": "{\"contract\":4294967295}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAAAQAAAAA=",
+      "json": "{\"wasm_vm\":\"arith_domain\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAAAgAAAAE=",
+      "json": "{\"context\":\"index_bounds\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAAAwAAAAI=",
+      "json": "{\"storage\":\"invalid_input\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAABAAAAAM=",
+      "json": "{\"object\":\"missing_value\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAABQAAAAQ=",
+      "json": "{\"crypto\":\"existing_value\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAABgAAAAU=",
+      "json": "{\"events\":\"exceeded_limit\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAABwAAAAY=",
+      "json": "{\"budget\":\"invalid_action\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAACAAAAAc=",
+      "json": "{\"value\":\"internal_error\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScError",
+      "kmp_type": "SCErrorXdr",
+      "xdr": "AAAACQAAAAg=",
+      "json": "{\"auth\":\"unexpected_type\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Operation",
+      "kmp_type": "OperationXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAZA==",
+      "json": "{\"source_account\":null,\"body\":{\"create_account\":{\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"starting_balance\":\"100\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Operation",
+      "kmp_type": "OperationXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAAAAAAE=",
+      "json": "{\"source_account\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"body\":{\"payment\":{\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":\"native\",\"amount\":\"1\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Operation",
+      "kmp_type": "OperationXdr",
+      "xdr": "AAAAAQAAAQAAAAAAAAAE0gECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAACQ==",
+      "json": "{\"source_account\":\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\",\"body\":\"inflation\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAB",
+      "json": "{\"create_account\":{\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"starting_balance\":\"1\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAAQAAAQAAAAAAAAAE0gECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyB//////////w==",
+      "json": "{\"payment\":{\"destination\":\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\",\"asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount\":\"9223372036854775807\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAAgAAAAAAAAAAAAAACgAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAUAAAAA",
+      "json": "{\"path_payment_strict_receive\":{\"send_asset\":\"native\",\"send_max\":\"10\",\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"dest_asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"dest_amount\":\"5\",\"path\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAADQAAAAJMT05HQVNTRVQAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAACgAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAAAAAABQAAAAIAAAAAAAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"path_payment_strict_send\":{\"send_asset\":{\"credit_alphanum12\":{\"asset_code\":\"LONGASSET\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"send_amount\":\"10\",\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"dest_asset\":\"native\",\"dest_min\":\"5\",\"path\":[\"native\",{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAAwAAAAAAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAABAAAAAQAAAAIAAAAAAAAAAA==",
+      "json": "{\"manage_sell_offer\":{\"selling\":\"native\",\"buying\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount\":\"1\",\"price\":{\"n\":1,\"d\":2},\"offer_id\":\"0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAADAAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAAAAAABAAAABwAAAAMAAAAAAAAACQ==",
+      "json": "{\"manage_buy_offer\":{\"selling\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"buying\":\"native\",\"buy_amount\":\"1\",\"price\":{\"n\":7,\"d\":3},\"offer_id\":\"9\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAABAAAAAAAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAABAAAAAQAAAAE=",
+      "json": "{\"create_passive_sell_offer\":{\"selling\":\"native\",\"buying\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount\":\"1\",\"price\":{\"n\":1,\"d\":1}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAABQAAAAEAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAABAAAAAQAAAAEAAAACAAAAAQAAAP8AAAABAAAAAAAAAAEAAAABAAAAAQAAAAIAAAABAAAAC2V4YW1wbGUuY29tAAAAAAEAAAACYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8AAAAD",
+      "json": "{\"set_options\":{\"inflation_dest\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"clear_flags\":1,\"set_flags\":2,\"master_weight\":255,\"low_threshold\":0,\"med_threshold\":1,\"high_threshold\":2,\"home_domain\":\"example.com\",\"signer\":{\"key\":\"XBQGCYTDMRSWMZ3INFVGW3DNNZXXA4LSON2HK5TXPB4XU634PV7H7YJH\",\"weight\":3}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAABgAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gf/////////8=",
+      "json": "{\"change_trust\":{\"line\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"limit\":\"9223372036854775807\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAABwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAFVU0QAAAAAAQ==",
+      "json": "{\"allow_trust\":{\"trustor\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":\"USD\",\"authorize\":1}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAACAAAAQAAAAAAAAAE0gECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"account_merge\":\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAACQ==",
+      "json": "\"inflation\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAACgAAAAFrAAAAAAAAAA==",
+      "json": "{\"manage_data\":{\"data_name\":\"k\",\"data_value\":null}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAACwAAAAAAAAAJ",
+      "json": "{\"bump_sequence\":{\"bump_to\":\"9\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAADgAAAAAAAAAAAAAAAQAAAAEAAAAAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAA==",
+      "json": "{\"create_claimable_balance\":{\"asset\":\"native\",\"amount\":\"1\",\"claimants\":[{\"claimant_type_v0\":{\"destination\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"predicate\":\"unconditional\"}}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAADwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"claim_claimable_balance\":{\"balance_id\":\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAEAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"begin_sponsoring_future_reserves\":{\"sponsored_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAEQ==",
+      "json": "\"end_sponsoring_future_reserves\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAEgAAAAAAAAAAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"revoke_sponsorship\":{\"ledger_entry\":{\"account\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAEgAAAAEAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAABQEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+      "json": "{\"revoke_sponsorship\":{\"signer\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"signer_key\":\"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAEwAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAABAAAAAAAAAATSAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAQ==",
+      "json": "{\"clawback\":{\"asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"from\":\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\",\"amount\":\"1\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAFAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"clawback_claimable_balance\":{\"balance_id\":\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAFQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAQAAAAI=",
+      "json": "{\"set_trust_line_flags\":{\"trustor\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"clear_flags\":1,\"set_flags\":2}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAFoCBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6fAAAAAAAAAAEAAAAAAAAAAgAAAAEAAAACAAAAAwAAAAE=",
+      "json": "{\"liquidity_pool_deposit\":{\"liquidity_pool_id\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\",\"max_amount_a\":\"1\",\"max_amount_b\":\"2\",\"min_price\":{\"n\":1,\"d\":2},\"max_price\":{\"n\":3,\"d\":1}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAF4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6fAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"liquidity_pool_withdraw\":{\"liquidity_pool_id\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\",\"amount\":\"1\",\"min_amount_a\":\"0\",\"min_amount_b\":\"0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAGAAAAAIAAAAEAGFzbQAAAAA=",
+      "json": "{\"invoke_host_function\":{\"host_function\":{\"upload_contract_wasm\":\"0061736d\"},\"auth\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAGQAAAAAAAABk",
+      "json": "{\"extend_footprint_ttl\":{\"ext\":\"v0\",\"extend_to\":100}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationBody",
+      "kmp_type": "OperationBodyXdr",
+      "xdr": "AAAAGgAAAAA=",
+      "json": "{\"restore_footprint\":{\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAADHBsYWluLW5hbWVfMQAAAAEAAAACAQIAAA==",
+      "json": "{\"data_name\":\"plain-name_1\",\"data_value\":\"0102\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAAA2FcYgAAAAAA",
+      "json": "{\"data_name\":\"a\\\\\\\\b\",\"data_value\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAAA2EJYgAAAAABAAAAAA==",
+      "json": "{\"data_name\":\"a\\\\tb\",\"data_value\":\"\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAAA2EAYgAAAAAA",
+      "json": "{\"data_name\":\"a\\\\0b\",\"data_value\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAAA2F/YgAAAAAA",
+      "json": "{\"data_name\":\"a\\\\x7fb\",\"data_value\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAABWEKYg1jAAAAAAAAAA==",
+      "json": "{\"data_name\":\"a\\\\nb\\\\rc\",\"data_value\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ManageDataOp",
+      "kmp_type": "ManageDataOpXdr",
+      "xdr": "AAAAAiB+AAAAAAAA",
+      "json": "{\"data_name\":\" ~\",\"data_value\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SetOptionsOp",
+      "kmp_type": "SetOptionsOpXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"inflation_dest\":null,\"clear_flags\":null,\"set_flags\":null,\"master_weight\":null,\"low_threshold\":null,\"med_threshold\":null,\"high_threshold\":null,\"home_domain\":null,\"signer\":null}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SetOptionsOp",
+      "kmp_type": "SetOptionsOpXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAEAAAADYVxiAAAAAAEAAAADAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAEAQIDBAAAAP8=",
+      "json": "{\"inflation_dest\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"clear_flags\":0,\"set_flags\":0,\"master_weight\":0,\"low_threshold\":0,\"med_threshold\":0,\"high_threshold\":0,\"home_domain\":\"a\\\\\\\\b\",\"signer\":{\"key\":\"PAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAACACAQDATYOS\",\"weight\":255}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionEnvelope",
+      "kmp_type": "TransactionEnvelopeXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAZAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"tx_v0\":{\"tx\":{\"source_account_ed25519\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"fee\":100,\"seq_num\":\"1\",\"time_bounds\":null,\"memo\":\"none\",\"operations\":[],\"ext\":\"v0\"},\"signatures\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionEnvelope",
+      "kmp_type": "TransactionEnvelopeXdr",
+      "xdr": "AAAAAgAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAGQAAAAAAAAAAQAAAAAAAAAAAAAAAQAAAAAAAAAJAAAAAAAAAAEBAgMEAAAAAgoLAAA=",
+      "json": "{\"tx\":{\"tx\":{\"source_account\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"fee\":100,\"seq_num\":\"1\",\"cond\":\"none\",\"memo\":\"none\",\"operations\":[{\"source_account\":null,\"body\":\"inflation\"}],\"ext\":\"v0\"},\"signatures\":[{\"hint\":\"01020304\",\"signature\":\"0a0b\"}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionEnvelope",
+      "kmp_type": "TransactionEnvelopeXdr",
+      "xdr": "AAAABQAAAQAAAAAAAAAE0gECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAMgAAAACAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAZAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "json": "{\"tx_fee_bump\":{\"tx\":{\"fee_source\":\"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE\",\"fee\":\"200\",\"inner_tx\":{\"tx\":{\"tx\":{\"source_account\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"fee\":100,\"seq_num\":\"1\",\"cond\":\"none\",\"memo\":\"none\",\"operations\":[],\"ext\":\"v0\"},\"signatures\":[]}},\"ext\":\"v0\"},\"signatures\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Preconditions",
+      "kmp_type": "PreconditionsXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"none\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "Preconditions",
+      "kmp_type": "PreconditionsXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAAAAAGQ=",
+      "json": "{\"time\":{\"min_time\":\"0\",\"max_time\":\"100\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Preconditions",
+      "kmp_type": "PreconditionsXdr",
+      "xdr": "AAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"v2\":{\"time_bounds\":null,\"ledger_bounds\":null,\"min_seq_num\":null,\"min_seq_age\":\"0\",\"min_seq_ledger_gap\":0,\"extra_signers\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "PreconditionsV2",
+      "kmp_type": "PreconditionsV2Xdr",
+      "xdr": "AAAAAQAAAAAAAAABAAAAAAAAAAIAAAABAAAAAQAAAAIAAAABAAAAAAAAAAcAAAAAAAAAAwAAAAQAAAACAAAAAUBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fAAAAAmBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/",
+      "json": "{\"time_bounds\":{\"min_time\":\"1\",\"max_time\":\"2\"},\"ledger_bounds\":{\"min_ledger\":1,\"max_ledger\":2},\"min_seq_num\":\"7\",\"min_seq_age\":\"3\",\"min_seq_ledger_gap\":4,\"extra_signers\":[\"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ\",\"XBQGCYTDMRSWMZ3INFVGW3DNNZXXA4LSON2HK5TXPB4XU634PV7H7YJH\"]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerBounds",
+      "kmp_type": "LedgerBoundsXdr",
+      "xdr": "AAAAAP////8=",
+      "json": "{\"min_ledger\":0,\"max_ledger\":4294967295}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionResult",
+      "kmp_type": "TransactionResultXdr",
+      "xdr": "AAAAAAAAAGQAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAA=",
+      "json": "{\"fee_charged\":\"100\",\"result\":{\"tx_success\":[{\"op_inner\":{\"payment\":\"success\"}}]},\"ext\":\"v0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionResult",
+      "kmp_type": "TransactionResultXdr",
+      "xdr": "AAAAAAAAAAD/////AAAAAAAAAAA=",
+      "json": "{\"fee_charged\":\"0\",\"result\":{\"tx_failed\":[]},\"ext\":\"v0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionResult",
+      "kmp_type": "TransactionResultXdr",
+      "xdr": "f/////////8AAAABAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"fee_charged\":\"9223372036854775807\",\"result\":{\"tx_fee_bump_inner_success\":{\"transaction_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"result\":{\"fee_charged\":\"1\",\"result\":{\"tx_success\":[]},\"ext\":\"v0\"}}},\"ext\":\"v0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationResult",
+      "kmp_type": "OperationResultXdr",
+      "xdr": "/////w==",
+      "json": "\"op_bad_auth\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationResult",
+      "kmp_type": "OperationResultXdr",
+      "xdr": "AAAAAAAAAAAAAAAA",
+      "json": "{\"op_inner\":{\"create_account\":\"success\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationResult",
+      "kmp_type": "OperationResultXdr",
+      "xdr": "AAAAAAAAAAH/////",
+      "json": "{\"op_inner\":{\"payment\":\"malformed\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationResult",
+      "kmp_type": "OperationResultXdr",
+      "xdr": "AAAAAAAAAAMAAAAAAAAAAAAAAAI=",
+      "json": "{\"op_inner\":{\"manage_sell_offer\":{\"success\":{\"offers_claimed\":[],\"offer\":\"deleted\"}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "OperationResult",
+      "kmp_type": "OperationResultXdr",
+      "xdr": "AAAAAAAAAAkAAAAAAAAAAA==",
+      "json": "{\"op_inner\":{\"inflation\":{\"success\":[]}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAKAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAA",
+      "json": "{\"account\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"balance\":\"10\",\"seq_num\":\"1\",\"num_sub_entries\":0,\"inflation_dest\":null,\"flags\":0,\"home_domain\":\"\",\"thresholds\":\"01000000\",\"signers\":[],\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAAAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAKAAAAAAAAAAEAAAABAAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAALZXhhbXBsZS5jb20AAQIDBAAAAAEAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAABAAAAAQAAAAAAAAABAAAAAAAAAAIAAAAA",
+      "json": "{\"account\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"balance\":\"10\",\"seq_num\":\"1\",\"num_sub_entries\":1,\"inflation_dest\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"flags\":1,\"home_domain\":\"example.com\",\"thresholds\":\"01020304\",\"signers\":[{\"key\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"weight\":1}],\"ext\":{\"v1\":{\"liabilities\":{\"buying\":\"1\",\"selling\":\"2\"},\"ext\":\"v0\"}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAV//////////wAAAAEAAAAA",
+      "json": "{\"trustline\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"balance\":\"5\",\"limit\":\"9223372036854775807\",\"flags\":1,\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAAAgAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAABAAAAAAAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAEAAAABAAAAAgAAAAAAAAAA",
+      "json": "{\"offer\":{\"seller_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"offer_id\":\"1\",\"selling\":\"native\",\"buying\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount\":\"1\",\"price\":{\"n\":1,\"d\":2},\"flags\":0,\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAAAwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAFrAAAAAAAAAAAAAAA=",
+      "json": "{\"data\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"data_name\":\"k\",\"data_value\":\"\",\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAABAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAAAAAAAAAAAAEAAAAA",
+      "json": "{\"claimable_balance\":{\"balance_id\":\"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE\",\"claimants\":[],\"asset\":\"native\",\"amount\":\"1\",\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAABYCBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6fAAAAAAAAAAAAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAB4AAAAAAAAAAQAAAAAAAAACAAAAAAAAAAMAAAAAAAAABA==",
+      "json": "{\"liquidity_pool\":{\"liquidity_pool_id\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\",\"body\":{\"liquidity_pool_constant_product\":{\"params\":{\"asset_a\":\"native\",\"asset_b\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"fee\":30},\"reserve_a\":\"1\",\"reserve_b\":\"2\",\"total_pool_shares\":\"3\",\"pool_shares_trust_line_count\":\"4\"}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAABgAAAAAAAAABICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAABAAAAAQAAAAMAAAAB",
+      "json": "{\"contract_data\":{\"ext\":\"v0\",\"contract\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"key\":\"void\",\"durability\":\"persistent\",\"val\":{\"u32\":1}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAABwAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAQAYXNt",
+      "json": "{\"contract_code\":{\"ext\":\"v0\",\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"code\":\"0061736d\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAACAAAAAAAAABk",
+      "json": "{\"config_setting\":{\"contract_max_size_bytes\":100}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryData",
+      "kmp_type": "LedgerEntryDataXdr",
+      "xdr": "AAAACQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAABw==",
+      "json": "{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":7}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntry",
+      "kmp_type": "LedgerEntryXdr",
+      "xdr": "AAAAAQAAAAkBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAcAAAAA",
+      "json": "{\"last_modified_ledger_seq\":1,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":7}},\"ext\":\"v0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntry",
+      "kmp_type": "LedgerEntryXdr",
+      "xdr": "/////wAAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAA=",
+      "json": "{\"last_modified_ledger_seq\":4294967295,\"data\":{\"ttl\":{\"key_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"live_until_ledger_seq\":0}},\"ext\":{\"v1\":{\"sponsoring_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"ext\":\"v0\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryChange",
+      "kmp_type": "LedgerEntryChangeXdr",
+      "xdr": "AAAAAAAAAAEAAAAJAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAHAAAAAA==",
+      "json": "{\"created\":{\"last_modified_ledger_seq\":1,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":7}},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryChange",
+      "kmp_type": "LedgerEntryChangeXdr",
+      "xdr": "AAAAAQAAAAIAAAAJAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAIAAAAAA==",
+      "json": "{\"updated\":{\"last_modified_ledger_seq\":2,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":8}},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryChange",
+      "kmp_type": "LedgerEntryChangeXdr",
+      "xdr": "AAAAAgAAAAcBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"removed\":{\"contract_code\":{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryChange",
+      "kmp_type": "LedgerEntryChangeXdr",
+      "xdr": "AAAAAwAAAAMAAAAJAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAJAAAAAA==",
+      "json": "{\"state\":{\"last_modified_ledger_seq\":3,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":9}},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryChange",
+      "kmp_type": "LedgerEntryChangeXdr",
+      "xdr": "AAAABAAAAAQAAAAJAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAKAAAAAA==",
+      "json": "{\"restored\":{\"last_modified_ledger_seq\":4,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":10}},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerFootprint",
+      "kmp_type": "LedgerFootprintXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "{\"read_only\":[],\"read_write\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerFootprint",
+      "kmp_type": "LedgerFootprintXdr",
+      "xdr": "AAAAAQAAAAcBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"read_only\":[{\"contract_code\":{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}],\"read_write\":[{\"ttl\":{\"key_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\"}}]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerHeader",
+      "kmp_type": "LedgerHeaderXdr",
+      "xdr": "AAAAFwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAAAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAIAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZABMS0AAAABkAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"ledger_version\":23,\"previous_ledger_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"scp_value\":{\"tx_set_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"close_time\":\"0\",\"upgrades\":[],\"ext\":\"basic\"},\"tx_set_result_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"bucket_list_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"ledger_seq\":2,\"total_coins\":\"1\",\"fee_pool\":\"0\",\"inflation_seq\":0,\"id_pool\":\"0\",\"base_fee\":100,\"base_reserve\":5000000,\"max_tx_set_size\":100,\"skip_list\":[\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"0000000000000000000000000000000000000000000000000000000000000000\"],\"ext\":\"v0\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanCredentials",
+      "kmp_type": "SorobanCredentialsXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"source_account\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanCredentials",
+      "kmp_type": "SorobanCredentialsXdr",
+      "xdr": "AAAAAQAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAAAAAAABAAAAZAAAAAE=",
+      "json": "{\"address\":{\"address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"nonce\":\"1\",\"signature_expiration_ledger\":100,\"signature\":\"void\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanAuthorizedInvocation",
+      "kmp_type": "SorobanAuthorizedInvocationXdr",
+      "xdr": "AAAAAAAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAAh0cmFuc2ZlcgAAAAEAAAADAAAAAQAAAAA=",
+      "json": "{\"function\":{\"contract_fn\":{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"transfer\",\"args\":[{\"u32\":1}]}},\"sub_invocations\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanAuthorizationEntry",
+      "kmp_type": "SorobanAuthorizationEntryXdr",
+      "xdr": "AAAAAAAAAAAAAAABICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAAFaGVsbG8AAAAAAAAAAAAAAA==",
+      "json": "{\"credentials\":\"source_account\",\"root_invocation\":{\"function\":{\"contract_fn\":{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"hello\",\"args\":[]}},\"sub_invocations\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanAuthorizationEntry",
+      "kmp_type": "SorobanAuthorizationEntryXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyB//////////wAAAAAAAAAQAAAAAQAAAAAAAAABAAAAAQAAAAAAAAABAAAAAA==",
+      "json": "{\"credentials\":{\"address\":{\"address\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"nonce\":\"9223372036854775807\",\"signature_expiration_ledger\":0,\"signature\":{\"vec\":[]}}},\"root_invocation\":{\"function\":{\"create_contract_host_fn\":{\"contract_id_preimage\":{\"asset\":\"native\"},\"executable\":\"stellar_asset\"}},\"sub_invocations\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanAuthorizationEntry",
+      "kmp_type": "SorobanAuthorizationEntryXdr",
+      "xdr": "AAAAAAAAAAAAAAABICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAAFb3V0ZXIAAAAAAAAAAAAAAQAAAAAAAAABICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAAFaW5uZXIAAAAAAAAAAAAAAA==",
+      "json": "{\"credentials\":\"source_account\",\"root_invocation\":{\"function\":{\"contract_fn\":{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"outer\",\"args\":[]}},\"sub_invocations\":[{\"function\":{\"contract_fn\":{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"inner\",\"args\":[]}},\"sub_invocations\":[]}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractIdPreimage",
+      "kmp_type": "ContractIDPreimageXdr",
+      "xdr": "AAAAAAAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"address\":{\"address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"salt\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractIdPreimage",
+      "kmp_type": "ContractIDPreimageXdr",
+      "xdr": "AAAAAQAAAAFVU0QAAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"asset\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractExecutable",
+      "kmp_type": "ContractExecutableXdr",
+      "xdr": "AAAAAQ==",
+      "json": "\"stellar_asset\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractExecutable",
+      "kmp_type": "ContractExecutableXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+      "json": "{\"wasm\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractExecutable",
+      "kmp_type": "ContractExecutableXdr",
+      "xdr": "AAAAAgAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAANyZWYA",
+      "json": "{\"external_ref\":{\"executable_owner\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"tag\":\"ref\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HostFunction",
+      "kmp_type": "HostFunctionXdr",
+      "xdr": "AAAAAAAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAAVoZWxsbwAAAAAAAAA=",
+      "json": "{\"invoke_contract\":{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"hello\",\"args\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HostFunction",
+      "kmp_type": "HostFunctionXdr",
+      "xdr": "AAAAAQAAAAEAAAAAAAAAAQ==",
+      "json": "{\"create_contract\":{\"contract_id_preimage\":{\"asset\":\"native\"},\"executable\":\"stellar_asset\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HostFunction",
+      "kmp_type": "HostFunctionXdr",
+      "xdr": "AAAAAgAAAAA=",
+      "json": "{\"upload_contract_wasm\":\"\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HostFunction",
+      "kmp_type": "HostFunctionXdr",
+      "xdr": "AAAAAgAAAAQAYXNt",
+      "json": "{\"upload_contract_wasm\":\"0061736d\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HostFunction",
+      "kmp_type": "HostFunctionXdr",
+      "xdr": "AAAAAwAAAAAAAAABICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8BAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAEAAAADAAAAAQ==",
+      "json": "{\"create_contract_v2\":{\"contract_id_preimage\":{\"address\":{\"address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"salt\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}},\"executable\":{\"wasm\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"},\"constructor_args\":[{\"u32\":1}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "InvokeContractArgs",
+      "kmp_type": "InvokeContractArgsXdr",
+      "xdr": "AAAAASAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/AAAAAWYAAAAAAAAA",
+      "json": "{\"contract_address\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"function_name\":\"f\",\"args\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractEvent",
+      "kmp_type": "ContractEventXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+      "json": "{\"ext\":\"v0\",\"contract_id\":null,\"type\":\"system\",\"body\":{\"v0\":{\"topics\":[],\"data\":\"void\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractEvent",
+      "kmp_type": "ContractEventXdr",
+      "xdr": "AAAAAAAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAAEAAAAAAAAAAQAAAA8AAAAIdHJhbnNmZXIAAAADAAAAAQ==",
+      "json": "{\"ext\":\"v0\",\"contract_id\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"type\":\"contract\",\"body\":{\"v0\":{\"topics\":[{\"symbol\":\"transfer\"}],\"data\":{\"u32\":1}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "DiagnosticEvent",
+      "kmp_type": "DiagnosticEventXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAQ==",
+      "json": "{\"in_successful_contract_call\":true,\"event\":{\"ext\":\"v0\",\"contract_id\":null,\"type\":\"diagnostic\",\"body\":{\"v0\":{\"topics\":[],\"data\":\"void\"}}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEventParamV0",
+      "kmp_type": "SCSpecEventParamV0Xdr",
+      "xdr": "AAAAAAAAAAFwAAAAAAAABAAAAAA=",
+      "json": "{\"doc\":\"\",\"name\":\"p\",\"type\":\"u32\",\"location\":\"data\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecFunctionInputV0",
+      "kmp_type": "SCSpecFunctionInputV0Xdr",
+      "xdr": "AAAAAWQAAAAAAAADYXJnAAAAA+gAAAAB",
+      "json": "{\"doc\":\"d\",\"name\":\"arg\",\"type\":{\"option\":{\"value_type\":\"bool\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecUdtStructFieldV0",
+      "kmp_type": "SCSpecUDTStructFieldV0Xdr",
+      "xdr": "AAAAAAAAAAVmaWVsZAAAAAAAAAc=",
+      "json": "{\"doc\":\"\",\"name\":\"field\",\"type\":\"i64\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecUdtUnionCaseTupleV0",
+      "kmp_type": "SCSpecUDTUnionCaseTupleV0Xdr",
+      "xdr": "AAAAAAAAAARjYXNlAAAAAgAAAAQAAAAB",
+      "json": "{\"doc\":\"\",\"name\":\"case\",\"type\":[\"u32\",\"bool\"]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SerializedBinaryFuseFilter",
+      "kmp_type": "SerializedBinaryFuseFilterXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxABAgMEBQYHCAkKCwwNDg8QAAAAAQAAAAIAAAADAAAABAAAAAUAAAACAQIAAA==",
+      "json": "{\"type\":\"b8_bit\",\"input_hash_seed\":{\"seed\":\"0102030405060708090a0b0c0d0e0f10\"},\"filter_seed\":{\"seed\":\"0102030405060708090a0b0c0d0e0f10\"},\"segment_length\":1,\"segement_length_mask\":2,\"segment_count\":3,\"segment_count_length\":4,\"fingerprint_length\":5,\"fingerprints\":\"0102\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"type\":\"b8_bit\",\"input_hash_seed\":{\"seed\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},\"filter_seed\":{\"seed\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},\"segment_length\":1,\"segement_length_mask\":2,\"segment_count\":3,\"segment_count_length\":4,\"fingerprint_length\":5,\"fingerprints\":\"0102\"}"
+    },
+    {
+      "type": "SerializedBinaryFuseFilter",
+      "kmp_type": "SerializedBinaryFuseFilterXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAAAAAAD/////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"type\":\"b16_bit\",\"input_hash_seed\":{\"seed\":\"00000000000000000000000000000000\"},\"filter_seed\":{\"seed\":\"ffffffffffffffffffffffffffffffff\"},\"segment_length\":0,\"segement_length_mask\":0,\"segment_count\":0,\"segment_count_length\":0,\"fingerprint_length\":0,\"fingerprints\":\"\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"type\":\"b16_bit\",\"input_hash_seed\":{\"seed\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},\"filter_seed\":{\"seed\":[255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255]},\"segment_length\":0,\"segement_length_mask\":0,\"segment_count\":0,\"segment_count_length\":0,\"fingerprint_length\":0,\"fingerprints\":\"\"}"
+    },
+    {
+      "type": "SerializedBinaryFuseFilter",
+      "kmp_type": "SerializedBinaryFuseFilterXdr",
+      "xdr": "AAAAAgECAwQFBgcICQoLDA0ODxABAgMEBQYHCAkKCwwNDg8Q//////////////////////////8AAAAC//8AAA==",
+      "json": "{\"type\":\"b32_bit\",\"input_hash_seed\":{\"seed\":\"0102030405060708090a0b0c0d0e0f10\"},\"filter_seed\":{\"seed\":\"0102030405060708090a0b0c0d0e0f10\"},\"segment_length\":4294967295,\"segement_length_mask\":4294967295,\"segment_count\":4294967295,\"segment_count_length\":4294967295,\"fingerprint_length\":4294967295,\"fingerprints\":\"ffff\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"type\":\"b32_bit\",\"input_hash_seed\":{\"seed\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},\"filter_seed\":{\"seed\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},\"segment_length\":4294967295,\"segement_length_mask\":4294967295,\"segment_count\":4294967295,\"segment_count_length\":4294967295,\"fingerprint_length\":4294967295,\"fingerprints\":\"ffff\"}"
+    },
+    {
+      "type": "BinaryFuseFilterType",
+      "kmp_type": "BinaryFuseFilterTypeXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"b8_bit\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "BinaryFuseFilterType",
+      "kmp_type": "BinaryFuseFilterTypeXdr",
+      "xdr": "AAAAAQ==",
+      "json": "\"b16_bit\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "BinaryFuseFilterType",
+      "kmp_type": "BinaryFuseFilterTypeXdr",
+      "xdr": "AAAAAg==",
+      "json": "\"b32_bit\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"val\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAAAQ==",
+      "json": "\"bool\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAABA==",
+      "json": "\"u32\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAACw==",
+      "json": "\"i128\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAAEw==",
+      "json": "\"address\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAAFA==",
+      "json": "\"muxed_address\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD6AAAAAQ=",
+      "json": "{\"option\":{\"value_type\":\"u32\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD6QAAAAQAAAAD",
+      "json": "{\"result\":{\"ok_type\":\"u32\",\"error_type\":\"error\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD6gAAAAE=",
+      "json": "{\"vec\":{\"element_type\":\"bool\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD7AAAABEAAAAG",
+      "json": "{\"map\":{\"key_type\":\"symbol\",\"value_type\":\"u64\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD7QAAAAA=",
+      "json": "{\"tuple\":{\"value_types\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD7QAAAAIAAAAEAAAAAQ==",
+      "json": "{\"tuple\":{\"value_types\":[\"u32\",\"bool\"]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAD7gAAACA=",
+      "json": "{\"bytes_n\":{\"n\":32}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecTypeDef",
+      "kmp_type": "SCSpecTypeDefXdr",
+      "xdr": "AAAH0AAAAAdBY2NvdW50AA==",
+      "json": "{\"udt\":{\"name\":\"Account\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEntry",
+      "kmp_type": "SCSpecEntryXdr",
+      "xdr": "AAAAAAAAAAAAAAAFaGVsbG8AAAAAAAAAAAAAAA==",
+      "json": "{\"function_v0\":{\"doc\":\"\",\"name\":\"hello\",\"inputs\":[],\"outputs\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEntry",
+      "kmp_type": "SCSpecEntryXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAVMAAAAAAAABAAAAAAAAAAFmAAAAAAAABA==",
+      "json": "{\"udt_struct_v0\":{\"doc\":\"\",\"lib\":\"\",\"name\":\"S\",\"fields\":[{\"doc\":\"\",\"name\":\"f\",\"type\":\"u32\"}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEntry",
+      "kmp_type": "SCSpecEntryXdr",
+      "xdr": "AAAAAgAAAAAAAAAAAAAAAVUAAAAAAAACAAAAAAAAAAAAAAABQQAAAAAAAAEAAAAAAAAAAUIAAAAAAAABAAAABA==",
+      "json": "{\"udt_union_v0\":{\"doc\":\"\",\"lib\":\"\",\"name\":\"U\",\"cases\":[{\"void_v0\":{\"doc\":\"\",\"name\":\"A\"}},{\"tuple_v0\":{\"doc\":\"\",\"name\":\"B\",\"type\":[\"u32\"]}}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEntry",
+      "kmp_type": "SCSpecEntryXdr",
+      "xdr": "AAAAAwAAAAAAAAAAAAAAAUUAAAAAAAABAAAAAAAAAAFBAAAAAAAAAQ==",
+      "json": "{\"udt_enum_v0\":{\"doc\":\"\",\"lib\":\"\",\"name\":\"E\",\"cases\":[{\"doc\":\"\",\"name\":\"A\",\"value\":1}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecEntry",
+      "kmp_type": "SCSpecEntryXdr",
+      "xdr": "AAAABAAAAAAAAAAAAAAAA0VycgAAAAABAAAAAAAAAANCYWQAAAAAAg==",
+      "json": "{\"udt_error_enum_v0\":{\"doc\":\"\",\"lib\":\"\",\"name\":\"Err\",\"cases\":[{\"doc\":\"\",\"name\":\"Bad\",\"value\":2}]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecUdtUnionCaseV0",
+      "kmp_type": "SCSpecUDTUnionCaseV0Xdr",
+      "xdr": "AAAAAAAAAAAAAAABQQAAAA==",
+      "json": "{\"void_v0\":{\"doc\":\"\",\"name\":\"A\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecUdtUnionCaseV0",
+      "kmp_type": "SCSpecUDTUnionCaseV0Xdr",
+      "xdr": "AAAAAQAAAAAAAAABQgAAAAAAAAEAAAAB",
+      "json": "{\"tuple_v0\":{\"doc\":\"\",\"name\":\"B\",\"type\":[\"bool\"]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScSpecFunctionV0",
+      "kmp_type": "SCSpecFunctionV0Xdr",
+      "xdr": "AAAAA2RvYwAAAAABZgAAAAAAAAEAAAAAAAAAAWEAAAAAAAAEAAAAAQAAAAE=",
+      "json": "{\"doc\":\"doc\",\"name\":\"f\",\"inputs\":[{\"doc\":\"\",\"name\":\"a\",\"type\":\"u32\"}],\"outputs\":[\"bool\"]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScEnvMetaEntry",
+      "kmp_type": "SCEnvMetaEntryXdr",
+      "xdr": "AAAAAAAAABcAAAAA",
+      "json": "{\"sc_env_meta_kind_interface_version\":{\"protocol\":23,\"pre_release\":0}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ScMetaEntry",
+      "kmp_type": "SCMetaEntryXdr",
+      "xdr": "AAAAAAAAAAFrAAAAAAAAAXYAAAA=",
+      "json": "{\"sc_meta_v0\":{\"key\":\"k\",\"val\":\"v\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ExtensionPoint",
+      "kmp_type": "ExtensionPointXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AccountEntryExt",
+      "kmp_type": "AccountEntryExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AccountEntryExt",
+      "kmp_type": "AccountEntryExtXdr",
+      "xdr": "AAAAAQAAAAAAAAABAAAAAAAAAAIAAAAA",
+      "json": "{\"v1\":{\"liabilities\":{\"buying\":\"1\",\"selling\":\"2\"},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "AccountEntryExtensionV1Ext",
+      "kmp_type": "AccountEntryExtensionV1ExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "AccountEntryExtensionV1Ext",
+      "kmp_type": "AccountEntryExtensionV1ExtXdr",
+      "xdr": "AAAAAgAAAAEAAAACAAAAAgAAAAAAAAABAAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAA==",
+      "json": "{\"v2\":{\"num_sponsored\":1,\"num_sponsoring\":2,\"signer_sponsoring_i_ds\":[null,\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"],\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryExt",
+      "kmp_type": "LedgerEntryExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerEntryExt",
+      "kmp_type": "LedgerEntryExtXdr",
+      "xdr": "AAAAAQAAAAAAAAAA",
+      "json": "{\"v1\":{\"sponsoring_id\":null,\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineEntryExt",
+      "kmp_type": "TrustLineEntryExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "TrustLineEntryExt",
+      "kmp_type": "TrustLineEntryExtXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "json": "{\"v1\":{\"liabilities\":{\"buying\":\"0\",\"selling\":\"0\"},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanTransactionMetaExt",
+      "kmp_type": "SorobanTransactionMetaExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "SorobanTransactionMetaExt",
+      "kmp_type": "SorobanTransactionMetaExtXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAQAAAAAAAAACAAAAAAAAAAM=",
+      "json": "{\"v1\":{\"ext\":\"v0\",\"total_non_refundable_resource_fee_charged\":\"1\",\"total_refundable_resource_fee_charged\":\"2\",\"rent_fee_charged\":\"3\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionPhase",
+      "kmp_type": "TransactionPhaseXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "{\"v0\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionPhase",
+      "kmp_type": "TransactionPhaseXdr",
+      "xdr": "AAAAAQAAAAAAAAAA",
+      "json": "{\"v1\":{\"base_fee\":null,\"execution_stages\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionMeta",
+      "kmp_type": "TransactionMetaXdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "{\"v0\":[]}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TransactionMeta",
+      "kmp_type": "TransactionMetaXdr",
+      "xdr": "AAAAAQAAAAAAAAAA",
+      "json": "{\"v1\":{\"tx_changes\":[],\"operations\":[]}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerCloseMetaExt",
+      "kmp_type": "LedgerCloseMetaExtXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"v0\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "LedgerCloseMetaExt",
+      "kmp_type": "LedgerCloseMetaExtXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAQ==",
+      "json": "{\"v1\":{\"ext\":\"v0\",\"soroban_fee_write1_kb\":\"1\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int64",
+      "kmp_type": "Int64Xdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "0"
+    },
+    {
+      "type": "Int64",
+      "kmp_type": "Int64Xdr",
+      "xdr": "AAAAAAAAAAE=",
+      "json": "\"1\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "1"
+    },
+    {
+      "type": "Int64",
+      "kmp_type": "Int64Xdr",
+      "xdr": "//////////8=",
+      "json": "\"-1\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "-1"
+    },
+    {
+      "type": "Int64",
+      "kmp_type": "Int64Xdr",
+      "xdr": "gAAAAAAAAAA=",
+      "json": "\"-9223372036854775808\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "-9223372036854775808"
+    },
+    {
+      "type": "Int64",
+      "kmp_type": "Int64Xdr",
+      "xdr": "f/////////8=",
+      "json": "\"9223372036854775807\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "9223372036854775807"
+    },
+    {
+      "type": "Uint64",
+      "kmp_type": "Uint64Xdr",
+      "xdr": "AAAAAAAAAAA=",
+      "json": "\"0\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "0"
+    },
+    {
+      "type": "Uint64",
+      "kmp_type": "Uint64Xdr",
+      "xdr": "AAAAAAAAAAE=",
+      "json": "\"1\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "1"
+    },
+    {
+      "type": "Uint64",
+      "kmp_type": "Uint64Xdr",
+      "xdr": "//////////8=",
+      "json": "\"18446744073709551615\"",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders a 64-bit integer as a base-10 string; the reference emits a bare JSON number.",
+      "oracle_json": "18446744073709551615"
+    },
+    {
+      "type": "Curve25519Secret",
+      "kmp_type": "Curve25519SecretXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"key\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"key\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32]}"
+    },
+    {
+      "type": "Curve25519Secret",
+      "kmp_type": "Curve25519SecretXdr",
+      "xdr": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "json": "{\"key\":\"0000000000000000000000000000000000000000000000000000000000000000\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"key\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}"
+    },
+    {
+      "type": "Curve25519Public",
+      "kmp_type": "Curve25519PublicXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"key\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"key\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32]}"
+    },
+    {
+      "type": "HmacSha256Key",
+      "kmp_type": "HmacSha256KeyXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "json": "{\"key\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"key\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32]}"
+    },
+    {
+      "type": "HmacSha256Mac",
+      "kmp_type": "HmacSha256MacXdr",
+      "xdr": "//////////////////////////////////////////8=",
+      "json": "{\"mac\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"mac\":[255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255]}"
+    },
+    {
+      "type": "ShortHashSeed",
+      "kmp_type": "ShortHashSeedXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEA==",
+      "json": "{\"seed\":\"0102030405060708090a0b0c0d0e0f10\"}",
+      "oracle": "incomparable",
+      "reason": "SEP-0051 renders fixed-length opaque data as lowercase hex; the reference emits an array of byte numbers.",
+      "oracle_json": "{\"seed\":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}"
+    },
+    {
+      "type": "Price",
+      "kmp_type": "PriceXdr",
+      "xdr": "gAAAAH////8=",
+      "json": "{\"n\":-2147483648,\"d\":2147483647}",
+      "oracle": "reference"
+    },
+    {
+      "type": "Int32",
+      "kmp_type": "Int32Xdr",
+      "xdr": "gAAAAA==",
+      "json": "-2147483648",
+      "oracle": "reference"
+    },
+    {
+      "type": "Uint32",
+      "kmp_type": "Uint32Xdr",
+      "xdr": "/////w==",
+      "json": "4294967295",
+      "oracle": "reference"
+    },
+    {
+      "type": "DecoratedSignature",
+      "kmp_type": "DecoratedSignatureXdr",
+      "xdr": "AQIDBAAAAAA=",
+      "json": "{\"hint\":\"01020304\",\"signature\":\"\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "DecoratedSignature",
+      "kmp_type": "DecoratedSignatureXdr",
+      "xdr": "/////wAAAAKquwAA",
+      "json": "{\"hint\":\"ffffffff\",\"signature\":\"aabb\"}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractCostParams",
+      "kmp_type": "ContractCostParamsXdr",
+      "xdr": "AAAAAA==",
+      "json": "[]",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractCostParams",
+      "kmp_type": "ContractCostParamsXdr",
+      "xdr": "AAAAAQAAAAAAAAAAAAAAAQAAAAAAAAAC",
+      "json": "[{\"ext\":\"v0\",\"const_term\":\"1\",\"linear_term\":\"2\"}]",
+      "oracle": "reference"
+    },
+    {
+      "type": "ConfigSettingEntry",
+      "kmp_type": "ConfigSettingEntryXdr",
+      "xdr": "AAAAAAAAAGQ=",
+      "json": "{\"contract_max_size_bytes\":100}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ConfigSettingEntry",
+      "kmp_type": "ConfigSettingEntryXdr",
+      "xdr": "AAAAAQAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAQ=",
+      "json": "{\"contract_compute_v0\":{\"ledger_max_instructions\":\"1\",\"tx_max_instructions\":\"2\",\"fee_rate_per_instructions_increment\":\"3\",\"tx_memory_limit\":4}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ThresholdIndexes",
+      "kmp_type": "ThresholdIndexesXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"master_weight\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "EnvelopeType",
+      "kmp_type": "EnvelopeTypeXdr",
+      "xdr": "AAAAAg==",
+      "json": "\"tx\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "EnvelopeType",
+      "kmp_type": "EnvelopeTypeXdr",
+      "xdr": "AAAACQ==",
+      "json": "\"soroban_authorization\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractCostType",
+      "kmp_type": "ContractCostTypeXdr",
+      "xdr": "AAAAAA==",
+      "json": "\"wasm_insn_exec\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimAtom",
+      "kmp_type": "ClaimAtomXdr",
+      "xdr": "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAC",
+      "json": "{\"v0\":{\"seller_ed25519\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"offer_id\":\"1\",\"asset_sold\":\"native\",\"amount_sold\":\"1\",\"asset_bought\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount_bought\":\"2\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ClaimAtom",
+      "kmp_type": "ClaimAtomXdr",
+      "xdr": "AAAAAoCBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6fAAAAAAAAAAAAAAABAAAAAVVTRAAAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAg==",
+      "json": "{\"liquidity_pool\":{\"liquidity_pool_id\":\"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M\",\"asset_sold\":\"native\",\"amount_sold\":\"1\",\"asset_bought\":{\"credit_alphanum4\":{\"asset_code\":\"USD\",\"issuer\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\"}},\"amount_bought\":\"2\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "RevokeSponsorshipOp",
+      "kmp_type": "RevokeSponsorshipOpXdr",
+      "xdr": "AAAAAAAAAAIAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAAAAAAAw==",
+      "json": "{\"ledger_entry\":{\"offer\":{\"seller_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"offer_id\":\"3\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "RevokeSponsorshipOp",
+      "kmp_type": "RevokeSponsorshipOpXdr",
+      "xdr": "AAAAAQAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAMBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAQBAgME",
+      "json": "{\"signer\":{\"account_id\":\"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV\",\"signer_key\":\"PAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAACACAQDATYOS\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "BucketEntry",
+      "kmp_type": "BucketEntryXdr",
+      "xdr": "/////wAAABcAAAAA",
+      "json": "{\"metaentry\":{\"ledger_version\":23,\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "BucketEntry",
+      "kmp_type": "BucketEntryXdr",
+      "xdr": "AAAAAQAAAAcBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"deadentry\":{\"contract_code\":{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HotArchiveBucketEntry",
+      "kmp_type": "HotArchiveBucketEntryXdr",
+      "xdr": "AAAAAAAAAAEAAAAJAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAACAAAAAA==",
+      "json": "{\"archived\":{\"last_modified_ledger_seq\":1,\"data\":{\"ttl\":{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":2}},\"ext\":\"v0\"}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "HotArchiveBucketEntry",
+      "kmp_type": "HotArchiveBucketEntryXdr",
+      "xdr": "AAAAAQAAAAcBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIA==",
+      "json": "{\"live\":{\"contract_code\":{\"hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\"}}}",
+      "oracle": "reference"
+    },
+    {
+      "type": "TtlEntry",
+      "kmp_type": "TTLEntryXdr",
+      "xdr": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAAAAAA",
+      "json": "{\"key_hash\":\"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\",\"live_until_ledger_seq\":0}",
+      "oracle": "reference"
+    },
+    {
+      "type": "ContractDataEntry",
+      "kmp_type": "ContractDataEntryXdr",
+      "xdr": "AAAAAAAAAAEgISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+PwAAAA8AAAABawAAAAAAAAAAAAAB",
+      "json": "{\"ext\":\"v0\",\"contract\":\"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z\",\"key\":{\"symbol\":\"k\"},\"durability\":\"temporary\",\"val\":\"void\"}",
+      "oracle": "reference"
+    }
+  ]
+}

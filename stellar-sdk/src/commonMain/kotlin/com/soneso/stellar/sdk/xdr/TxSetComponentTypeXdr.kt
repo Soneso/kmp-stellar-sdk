@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "TxSetComponentTypeXdr"
+
 /**
  * XDR Source:
  * enum TxSetComponentType
@@ -12,12 +16,12 @@ package com.soneso.stellar.sdk.xdr
  *   TXSET_COMP_TXS_MAYBE_DISCOUNTED_FEE = 0
  * };
  */
-enum class TxSetComponentTypeXdr(val value: Int) {
+enum class TxSetComponentTypeXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * txs with effective fee <= bid derived from a base fee (if any).
    * If base fee is not specified, no discount is applied.
    */
-  TXSET_COMP_TXS_MAYBE_DISCOUNTED_FEE(0);
+  TXSET_COMP_TXS_MAYBE_DISCOUNTED_FEE(0, "txset_comp_txs_maybe_discounted_fee");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class TxSetComponentTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown TxSetComponentTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): TxSetComponentTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TxSetComponentTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TxSetComponentTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): TxSetComponentTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TTLEntryXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key_hash", "live_until_ledger_seq")
+
 /**
  * XDR Source:
  * struct TTLEntry {
@@ -23,10 +30,29 @@ data class TTLEntryXdr(
       val liveUntilLedgerSeq = Uint32Xdr.decode(reader)
       return TTLEntryXdr(keyHash, liveUntilLedgerSeq)
     }
+
+    fun fromXdrJson(json: String): TTLEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TTLEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TTLEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TTLEntryXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "key_hash", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "live_until_ledger_seq", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     keyHash.encode(writer)
     liveUntilLedgerSeq.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("key_hash", keyHash.toXdrJsonElement())
+    put("live_until_ledger_seq", liveUntilLedgerSeq.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

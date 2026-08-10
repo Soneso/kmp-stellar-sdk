@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SetTrustLineFlagsResultCodeXdr"
+
 /**
  * XDR Source:
  * enum SetTrustLineFlagsResultCode
@@ -19,16 +23,16 @@ package com.soneso.stellar.sdk.xdr
  *                                           // on revoke due to low reserves
  * };
  */
-enum class SetTrustLineFlagsResultCodeXdr(val value: Int) {
+enum class SetTrustLineFlagsResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  SET_TRUST_LINE_FLAGS_SUCCESS(0),
+  SET_TRUST_LINE_FLAGS_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  SET_TRUST_LINE_FLAGS_MALFORMED(-1),
-  SET_TRUST_LINE_FLAGS_NO_TRUST_LINE(-2),
-  SET_TRUST_LINE_FLAGS_CANT_REVOKE(-3),
-  SET_TRUST_LINE_FLAGS_INVALID_STATE(-4),
+  SET_TRUST_LINE_FLAGS_MALFORMED(-1, "malformed"),
+  SET_TRUST_LINE_FLAGS_NO_TRUST_LINE(-2, "no_trust_line"),
+  SET_TRUST_LINE_FLAGS_CANT_REVOKE(-3, "cant_revoke"),
+  SET_TRUST_LINE_FLAGS_INVALID_STATE(-4, "invalid_state"),
   /** claimable balances can't be created */
-  SET_TRUST_LINE_FLAGS_LOW_RESERVE(-5);
+  SET_TRUST_LINE_FLAGS_LOW_RESERVE(-5, "low_reserve");
 
   companion object {
 
@@ -37,9 +41,24 @@ enum class SetTrustLineFlagsResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SetTrustLineFlagsResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SetTrustLineFlagsResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SetTrustLineFlagsResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SetTrustLineFlagsResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SetTrustLineFlagsResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCErrorXdr"
+
 /**
  * XDR Source:
  * union SCError switch (SCErrorType type)
@@ -83,6 +88,27 @@ sealed class SCErrorXdr {
         else -> throw IllegalArgumentException("Unknown SCErrorXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCErrorXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCErrorXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCErrorXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "contract" -> ContractCode(Uint32Xdr.fromXdrJsonTree(value))
+        "wasm_vm" -> Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "context" -> Code(SCErrorTypeXdr.SCE_CONTEXT, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "storage" -> Code(SCErrorTypeXdr.SCE_STORAGE, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "object" -> Code(SCErrorTypeXdr.SCE_OBJECT, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "crypto" -> Code(SCErrorTypeXdr.SCE_CRYPTO, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "events" -> Code(SCErrorTypeXdr.SCE_EVENTS, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "budget" -> Code(SCErrorTypeXdr.SCE_BUDGET, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "value" -> Code(SCErrorTypeXdr.SCE_VALUE, SCErrorCodeXdr.fromXdrJsonTree(value))
+        "auth" -> Code(SCErrorTypeXdr.SCE_AUTH, SCErrorCodeXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -96,4 +122,11 @@ sealed class SCErrorXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is ContractCode -> buildJsonObject { put("contract", value.toXdrJsonElement()) }
+    is Code -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

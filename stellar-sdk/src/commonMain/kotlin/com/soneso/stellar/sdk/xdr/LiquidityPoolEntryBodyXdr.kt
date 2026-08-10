@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolEntryBodyXdr"
+
 /**
  * XDR Source:
  * union switch (LiquidityPoolType type)
@@ -41,6 +46,18 @@ sealed class LiquidityPoolEntryBodyXdr {
         else -> throw IllegalArgumentException("Unknown LiquidityPoolEntryBodyXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolEntryBodyXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolEntryBodyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolEntryBodyXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "liquidity_pool_constant_product" -> ConstantProduct(LiquidityPoolEntryConstantProductXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -51,4 +68,10 @@ sealed class LiquidityPoolEntryBodyXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is ConstantProduct -> buildJsonObject { put("liquidity_pool_constant_product", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

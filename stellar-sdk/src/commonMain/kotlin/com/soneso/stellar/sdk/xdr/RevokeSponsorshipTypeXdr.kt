@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "RevokeSponsorshipTypeXdr"
+
 /**
  * XDR Source:
  * enum RevokeSponsorshipType
@@ -11,9 +15,9 @@ package com.soneso.stellar.sdk.xdr
  *     REVOKE_SPONSORSHIP_SIGNER = 1
  * };
  */
-enum class RevokeSponsorshipTypeXdr(val value: Int) {
-  REVOKE_SPONSORSHIP_LEDGER_ENTRY(0),
-  REVOKE_SPONSORSHIP_SIGNER(1);
+enum class RevokeSponsorshipTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  REVOKE_SPONSORSHIP_LEDGER_ENTRY(0, "ledger_entry"),
+  REVOKE_SPONSORSHIP_SIGNER(1, "signer");
 
   companion object {
 
@@ -22,9 +26,24 @@ enum class RevokeSponsorshipTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown RevokeSponsorshipTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): RevokeSponsorshipTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RevokeSponsorshipTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RevokeSponsorshipTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): RevokeSponsorshipTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

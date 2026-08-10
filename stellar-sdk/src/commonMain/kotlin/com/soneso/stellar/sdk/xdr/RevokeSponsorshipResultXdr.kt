@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "RevokeSponsorshipResultXdr"
+
 /**
  * XDR Source:
  * union RevokeSponsorshipResult switch (RevokeSponsorshipResultCode code)
@@ -38,6 +42,22 @@ sealed class RevokeSponsorshipResultXdr {
         else -> throw IllegalArgumentException("Unknown RevokeSponsorshipResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): RevokeSponsorshipResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RevokeSponsorshipResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RevokeSponsorshipResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_SUCCESS)
+        "does_not_exist" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_DOES_NOT_EXIST)
+        "not_sponsor" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_NOT_SPONSOR)
+        "low_reserve" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_LOW_RESERVE)
+        "only_transferable" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_ONLY_TRANSFERABLE)
+        "malformed" -> Void(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_MALFORMED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -46,4 +66,10 @@ sealed class RevokeSponsorshipResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

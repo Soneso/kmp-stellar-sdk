@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "EnvelopeTypeXdr"
+
 /**
  * XDR Source:
  * enum EnvelopeType
@@ -20,18 +24,18 @@ package com.soneso.stellar.sdk.xdr
  *     ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS = 10
  * };
  */
-enum class EnvelopeTypeXdr(val value: Int) {
-  ENVELOPE_TYPE_TX_V0(0),
-  ENVELOPE_TYPE_SCP(1),
-  ENVELOPE_TYPE_TX(2),
-  ENVELOPE_TYPE_AUTH(3),
-  ENVELOPE_TYPE_SCPVALUE(4),
-  ENVELOPE_TYPE_TX_FEE_BUMP(5),
-  ENVELOPE_TYPE_OP_ID(6),
-  ENVELOPE_TYPE_POOL_REVOKE_OP_ID(7),
-  ENVELOPE_TYPE_CONTRACT_ID(8),
-  ENVELOPE_TYPE_SOROBAN_AUTHORIZATION(9),
-  ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS(10);
+enum class EnvelopeTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  ENVELOPE_TYPE_TX_V0(0, "tx_v0"),
+  ENVELOPE_TYPE_SCP(1, "scp"),
+  ENVELOPE_TYPE_TX(2, "tx"),
+  ENVELOPE_TYPE_AUTH(3, "auth"),
+  ENVELOPE_TYPE_SCPVALUE(4, "scpvalue"),
+  ENVELOPE_TYPE_TX_FEE_BUMP(5, "tx_fee_bump"),
+  ENVELOPE_TYPE_OP_ID(6, "op_id"),
+  ENVELOPE_TYPE_POOL_REVOKE_OP_ID(7, "pool_revoke_op_id"),
+  ENVELOPE_TYPE_CONTRACT_ID(8, "contract_id"),
+  ENVELOPE_TYPE_SOROBAN_AUTHORIZATION(9, "soroban_authorization"),
+  ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS(10, "soroban_authorization_with_address");
 
   companion object {
 
@@ -40,9 +44,24 @@ enum class EnvelopeTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown EnvelopeTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): EnvelopeTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): EnvelopeTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): EnvelopeTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): EnvelopeTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

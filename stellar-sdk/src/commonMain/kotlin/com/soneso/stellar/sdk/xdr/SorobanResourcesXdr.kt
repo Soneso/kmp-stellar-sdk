@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanResourcesXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("footprint", "instructions", "disk_read_bytes", "write_bytes")
+
 /**
  * XDR Source:
  * struct SorobanResources
@@ -37,6 +44,20 @@ data class SorobanResourcesXdr(
       val writeBytes = Uint32Xdr.decode(reader)
       return SorobanResourcesXdr(footprint, instructions, diskReadBytes, writeBytes)
     }
+
+    fun fromXdrJson(json: String): SorobanResourcesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanResourcesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanResourcesXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SorobanResourcesXdr(
+        LedgerFootprintXdr.fromXdrJsonTree(XdrJson.field(json, "footprint", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "instructions", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "disk_read_bytes", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "write_bytes", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -45,4 +66,13 @@ data class SorobanResourcesXdr(
     diskReadBytes.encode(writer)
     writeBytes.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("footprint", footprint.toXdrJsonElement())
+    put("instructions", instructions.toXdrJsonElement())
+    put("disk_read_bytes", diskReadBytes.toXdrJsonElement())
+    put("write_bytes", writeBytes.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

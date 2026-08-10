@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "EvictionIteratorXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("bucket_list_level", "is_curr_bucket", "bucket_file_offset")
+
 /**
  * XDR Source:
  * struct EvictionIterator {
@@ -24,6 +31,19 @@ data class EvictionIteratorXdr(
       val bucketFileOffset = Uint64Xdr.decode(reader)
       return EvictionIteratorXdr(bucketListLevel, isCurrBucket, bucketFileOffset)
     }
+
+    fun fromXdrJson(json: String): EvictionIteratorXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): EvictionIteratorXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): EvictionIteratorXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return EvictionIteratorXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "bucket_list_level", XDR_JSON_TYPE)),
+        XdrJson.bool(XdrJson.field(json, "is_curr_bucket", XDR_JSON_TYPE), XDR_JSON_TYPE, "is_curr_bucket"),
+        Uint64Xdr.fromXdrJsonTree(XdrJson.field(json, "bucket_file_offset", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +51,12 @@ data class EvictionIteratorXdr(
     writer.writeBoolean(isCurrBucket)
     bucketFileOffset.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("bucket_list_level", bucketListLevel.toXdrJsonElement())
+    put("is_curr_bucket", XdrJson.bool(isCurrBucket))
+    put("bucket_file_offset", bucketFileOffset.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

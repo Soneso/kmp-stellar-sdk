@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AllowTrustOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("trustor", "asset", "authorize")
+
 /**
  * XDR Source:
  * struct AllowTrustOp
@@ -28,6 +35,19 @@ data class AllowTrustOpXdr(
       val authorize = Uint32Xdr.decode(reader)
       return AllowTrustOpXdr(trustor, asset, authorize)
     }
+
+    fun fromXdrJson(json: String): AllowTrustOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AllowTrustOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AllowTrustOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return AllowTrustOpXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "trustor", XDR_JSON_TYPE)),
+        AssetCodeXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "authorize", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -35,4 +55,12 @@ data class AllowTrustOpXdr(
     asset.encode(writer)
     authorize.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("trustor", trustor.toXdrJsonElement())
+    put("asset", asset.toXdrJsonElement())
+    put("authorize", authorize.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

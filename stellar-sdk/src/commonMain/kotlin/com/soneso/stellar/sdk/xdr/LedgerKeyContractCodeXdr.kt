@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerKeyContractCodeXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("hash")
+
 /**
  * XDR Source:
  * struct
@@ -19,9 +26,26 @@ data class LedgerKeyContractCodeXdr(
       val hash = HashXdr.decode(reader)
       return LedgerKeyContractCodeXdr(hash)
     }
+
+    fun fromXdrJson(json: String): LedgerKeyContractCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerKeyContractCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerKeyContractCodeXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerKeyContractCodeXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "hash", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     hash.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("hash", hash.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

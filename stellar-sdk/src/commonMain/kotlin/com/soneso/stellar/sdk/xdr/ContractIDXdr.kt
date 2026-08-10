@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractIDXdr"
+
 /**
  * XDR Source:
  * typedef Hash ContractID;
@@ -15,9 +20,20 @@ value class ContractIDXdr(val value: HashXdr) {
       val value = HashXdr.decode(reader)
       return ContractIDXdr(value)
     }
+
+    fun fromXdrJson(json: String): ContractIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractIDXdr =
+      ContractIDXdr(HashXdr(XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "a C strkey") { StrKey.decodeContract(it) }))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeContract(value.value))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

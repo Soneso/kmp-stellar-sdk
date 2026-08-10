@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "MuxedAccountXdr"
+
 /**
  * XDR Source:
  * union MuxedAccount switch (CryptoKeyType type)
@@ -48,6 +53,19 @@ sealed class MuxedAccountXdr {
         else -> throw IllegalArgumentException("Unknown MuxedAccountXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): MuxedAccountXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): MuxedAccountXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): MuxedAccountXdr {
+      val text = XdrJson.name(element, XDR_JSON_TYPE)
+      return when (text.firstOrNull()) {
+        'G' -> Ed25519(Uint256Xdr(XdrJson.strkey(text, XDR_JSON_TYPE, "a G strkey") { StrKey.decodeEd25519PublicKey(it) }))
+        'M' -> Med25519(MuxedAccountMed25519Xdr.fromXdrJsonTree(element))
+        else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G or M strkey, got ${XdrJson.preview(element)}")
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -61,4 +79,11 @@ sealed class MuxedAccountXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Ed25519 -> XdrJson.name(StrKey.encodeEd25519PublicKey(value.value))
+    is Med25519 -> value.toXdrJsonElement()
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

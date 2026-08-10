@@ -153,5 +153,8 @@ plans/
 # Downloaded XDR definition files (fetched by download-xdr.sh)
 tools/xdrgen-kt/xdr/
 
+# Scratch output of tools/sep-51-corpus/refresh_corpus.sh
+tools/sep-51-corpus/.tmp/
+
 # Generated API docs staging area used by the pages workflow (rebuilt every deploy)
 docs/api/latest/

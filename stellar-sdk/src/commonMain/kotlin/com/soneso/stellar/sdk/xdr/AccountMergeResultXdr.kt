@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AccountMergeResultXdr"
+
 /**
  * XDR Source:
  * union AccountMergeResult switch (AccountMergeResultCode code)
@@ -51,6 +57,30 @@ sealed class AccountMergeResultXdr {
         else -> throw IllegalArgumentException("Unknown AccountMergeResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): AccountMergeResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountMergeResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountMergeResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> SourceAccountBalance(Int64Xdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "malformed" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_MALFORMED)
+        "no_account" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_NO_ACCOUNT)
+        "immutable_set" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_IMMUTABLE_SET)
+        "has_sub_entries" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_HAS_SUB_ENTRIES)
+        "seqnum_too_far" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_SEQNUM_TOO_FAR)
+        "dest_full" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_DEST_FULL)
+        "is_sponsor" -> Void(AccountMergeResultCodeXdr.ACCOUNT_MERGE_IS_SPONSOR)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -62,4 +92,11 @@ sealed class AccountMergeResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is SourceAccountBalance -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

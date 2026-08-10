@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "CreateClaimableBalanceResultCodeXdr"
+
 /**
  * XDR Source:
  * enum CreateClaimableBalanceResultCode
@@ -15,13 +19,13 @@ package com.soneso.stellar.sdk.xdr
  *     CREATE_CLAIMABLE_BALANCE_UNDERFUNDED = -5
  * };
  */
-enum class CreateClaimableBalanceResultCodeXdr(val value: Int) {
-  CREATE_CLAIMABLE_BALANCE_SUCCESS(0),
-  CREATE_CLAIMABLE_BALANCE_MALFORMED(-1),
-  CREATE_CLAIMABLE_BALANCE_LOW_RESERVE(-2),
-  CREATE_CLAIMABLE_BALANCE_NO_TRUST(-3),
-  CREATE_CLAIMABLE_BALANCE_NOT_AUTHORIZED(-4),
-  CREATE_CLAIMABLE_BALANCE_UNDERFUNDED(-5);
+enum class CreateClaimableBalanceResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
+  CREATE_CLAIMABLE_BALANCE_SUCCESS(0, "success"),
+  CREATE_CLAIMABLE_BALANCE_MALFORMED(-1, "malformed"),
+  CREATE_CLAIMABLE_BALANCE_LOW_RESERVE(-2, "low_reserve"),
+  CREATE_CLAIMABLE_BALANCE_NO_TRUST(-3, "no_trust"),
+  CREATE_CLAIMABLE_BALANCE_NOT_AUTHORIZED(-4, "not_authorized"),
+  CREATE_CLAIMABLE_BALANCE_UNDERFUNDED(-5, "underfunded");
 
   companion object {
 
@@ -30,9 +34,24 @@ enum class CreateClaimableBalanceResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown CreateClaimableBalanceResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): CreateClaimableBalanceResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateClaimableBalanceResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateClaimableBalanceResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): CreateClaimableBalanceResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

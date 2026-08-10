@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "BeginSponsoringFutureReservesOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("sponsored_id")
+
 /**
  * XDR Source:
  * struct BeginSponsoringFutureReservesOp
@@ -19,9 +26,26 @@ data class BeginSponsoringFutureReservesOpXdr(
       val sponsoredId = AccountIDXdr.decode(reader)
       return BeginSponsoringFutureReservesOpXdr(sponsoredId)
     }
+
+    fun fromXdrJson(json: String): BeginSponsoringFutureReservesOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BeginSponsoringFutureReservesOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BeginSponsoringFutureReservesOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return BeginSponsoringFutureReservesOpXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "sponsored_id", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     sponsoredId.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("sponsored_id", sponsoredId.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

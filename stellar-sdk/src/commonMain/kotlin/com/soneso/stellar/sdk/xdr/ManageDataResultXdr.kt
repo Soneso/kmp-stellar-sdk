@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ManageDataResultXdr"
+
 /**
  * XDR Source:
  * union ManageDataResult switch (ManageDataResultCode code)
@@ -36,6 +40,21 @@ sealed class ManageDataResultXdr {
         else -> throw IllegalArgumentException("Unknown ManageDataResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ManageDataResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageDataResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageDataResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ManageDataResultCodeXdr.MANAGE_DATA_SUCCESS)
+        "not_supported_yet" -> Void(ManageDataResultCodeXdr.MANAGE_DATA_NOT_SUPPORTED_YET)
+        "name_not_found" -> Void(ManageDataResultCodeXdr.MANAGE_DATA_NAME_NOT_FOUND)
+        "low_reserve" -> Void(ManageDataResultCodeXdr.MANAGE_DATA_LOW_RESERVE)
+        "invalid_name" -> Void(ManageDataResultCodeXdr.MANAGE_DATA_INVALID_NAME)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +63,10 @@ sealed class ManageDataResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

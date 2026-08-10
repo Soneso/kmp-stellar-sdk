@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecTypeUDTXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("name")
+
 /**
  * XDR Source:
  * struct SCSpecTypeUDT
@@ -19,9 +26,26 @@ data class SCSpecTypeUDTXdr(
       val name = reader.readString()
       return SCSpecTypeUDTXdr(name)
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeUDTXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeUDTXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeUDTXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCSpecTypeUDTXdr(
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 60)
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeString(name)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("name", XdrJson.escapedString(name))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

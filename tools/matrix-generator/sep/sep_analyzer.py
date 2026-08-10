@@ -23,13 +23,50 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import json
 import re
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional, Set, Tuple
 
 from common import Colors, DATA_DIR, SDK_ROOT, get_sdk_version, snake_to_camel
 
 
 class SEPAnalyzer:
     """Analyzer for KMP SDK SEP implementations"""
+
+    # Shared runtime behind the XDR-JSON conversion methods (SEP-51)
+    XDR_JSON_RUNTIME = 'XdrJson.kt'
+
+    # Generated XDR types that stand in for the SEP-51 source package: one type per
+    # distinct JSON form, every Stellar-specific type the specification calls out, and
+    # the envelope its worked example uses.
+    XDR_JSON_SAMPLE_TYPES = (
+        # Data type forms
+        'TimeBoundsXdr.kt',
+        'AssetXdr.kt',
+        'SCValTypeXdr.kt',
+        # Address types
+        'SCAddressXdr.kt',
+        'AccountIDXdr.kt',
+        'ContractIDXdr.kt',
+        'MuxedAccountXdr.kt',
+        'MuxedAccountMed25519Xdr.kt',
+        'MuxedEd25519AccountXdr.kt',
+        'PoolIDXdr.kt',
+        'ClaimableBalanceIDXdr.kt',
+        'PublicKeyXdr.kt',
+        'NodeIDXdr.kt',
+        'SignerKeyXdr.kt',
+        'SignerKeyEd25519SignedPayloadXdr.kt',
+        # Asset code types
+        'AssetCodeXdr.kt',
+        'AssetCode4Xdr.kt',
+        'AssetCode12Xdr.kt',
+        # Integer types
+        'UInt128PartsXdr.kt',
+        'Int128PartsXdr.kt',
+        'UInt256PartsXdr.kt',
+        'Int256PartsXdr.kt',
+        # Worked example
+        'TransactionEnvelopeXdr.kt',
+    )
 
     def __init__(self, sep_number: str):
         """
@@ -49,6 +86,9 @@ class SEPAnalyzer:
         self.keypair_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/KeyPair.kt'
         # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
         self.contract_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract'
+        # Special case: SEP-51 lives in the generated xdr/ package
+        self.xdr_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr'
+        self._xdr_sources: Dict[str, str] = {}
         self.analysis_data: Dict[str, Any] = {}
 
     def find_sep_files(self) -> List[Path]:
@@ -70,6 +110,16 @@ class SEPAnalyzer:
         if self.sep_number in ('0046', '0047', '0048'):
             if self.contract_dir.exists() and self.contract_dir.is_dir():
                 files.extend(self.contract_dir.glob('*.kt'))
+            return sorted(files)
+
+        # Special case: SEP-51 has no sep51/ directory. The conversion methods are emitted
+        # onto every generated XDR type, so the runtime plus the representative types cover
+        # the implementation without listing the whole xdr/ package.
+        if self.sep_number == '0051':
+            for file_name in (self.XDR_JSON_RUNTIME,) + self.XDR_JSON_SAMPLE_TYPES:
+                candidate = self.xdr_dir / file_name
+                if candidate.exists():
+                    files.append(candidate)
             return sorted(files)
 
         # Check if SEP directory exists
@@ -512,6 +562,7 @@ class SEPAnalyzer:
             '0046': self.map_sep_46_fields,
             '0047': self.map_sep_47_fields,
             '0048': self.map_sep_48_fields,
+            '0051': self.map_sep_51_fields,
             '0053': self.map_sep_53_fields,
         }
         mapper = mappers.get(self.sep_number, self.map_generic_fields)
@@ -2041,6 +2092,114 @@ class SEPAnalyzer:
             for field in sep_fields:
                 field_name = field.get('name', '')
                 section_mappings[field_name] = section_map.get(field_name)
+
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
+
+    def _xdr_source_contains(self, file_name: str, token: str) -> bool:
+        """
+        Check a file in the generated xdr/ package for a literal.
+
+        Args:
+            file_name: File name inside the xdr/ package (e.g. 'AssetXdr.kt')
+            token: Source text that proves the mapping is in place
+
+        Returns:
+            True if the file exists and contains the token
+        """
+        if file_name not in self._xdr_sources:
+            path = self.xdr_dir / file_name
+            self._xdr_sources[file_name] = (
+                path.read_text(encoding='utf-8') if path.exists() else ''
+            )
+        return token in self._xdr_sources[file_name]
+
+    def map_sep_51_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-51 (XDR-JSON) fields.
+
+        SEP-51 has no sep51/ source package: toXdrJson, toXdrJsonElement, fromXdrJson and
+        fromXdrJsonElement are emitted onto every generated XDR type and delegate to the
+        XdrJson.kt runtime. Every requirement is therefore mapped to the symbol that carries
+        it, and counts as implemented only while that symbol is present in the source.
+        """
+        # field name -> (SDK symbol, file in the xdr/ package, literal proving the mapping)
+        evidence: Dict[str, Dict[str, Tuple[str, str, str]]] = {
+            'xdr_data_types': {
+                'integer_32': ('XdrJson.int32', 'XdrJson.kt', 'fun int32(value: Int)'),
+                'unsigned_integer_32': ('XdrJson.uint32', 'XdrJson.kt', 'fun uint32(value: UInt)'),
+                'hyper_integer_64': ('XdrJson.int64', 'XdrJson.kt', 'fun int64(value: Long)'),
+                'unsigned_hyper_integer_64': ('XdrJson.uint64', 'XdrJson.kt', 'fun uint64(value: ULong)'),
+                'boolean': ('XdrJson.bool', 'XdrJson.kt', 'fun bool(value: Boolean)'),
+                'opaque_fixed_length': ('XdrJson.hex', 'XdrJson.kt', 'fun hex(bytes: ByteArray)'),
+                'opaque_variable_length': ('XdrJson.hex', 'XdrJson.kt', 'fun hex(bytes: ByteArray)'),
+                'string': ('XdrJson.escapedString', 'XdrJson.kt', 'fun escapedString(bytes: ByteArray)'),
+                'array_fixed_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
+                'array_variable_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
+                'enum': ('SCValTypeXdr.xdrJsonName', 'SCValTypeXdr.kt', 'xdrJsonName'),
+                'struct': ('TimeBoundsXdr.toXdrJsonElement', 'TimeBoundsXdr.kt', 'buildJsonObject'),
+                'discriminated_union': ('AssetXdr.toXdrJsonElement', 'AssetXdr.kt', 'XdrJson.singleKeyObject'),
+                'void': ('AssetXdr.Void', 'AssetXdr.kt', 'XdrJson.name("native")'),
+                'optional_data': ('XdrJson.optional', 'XdrJson.kt', 'fun <T> optional('),
+            },
+            'address_types': {
+                'sc_address': ('SCAddressXdr.toXdrJsonElement', 'SCAddressXdr.kt', 'MuxedEd25519AccountXdr.fromXdrJsonTree'),
+                'account_id': ('AccountIDXdr.toXdrJsonElement', 'AccountIDXdr.kt', 'PublicKeyXdr.fromXdrJsonTree'),
+                'contract_id': ('ContractIDXdr.toXdrJsonElement', 'ContractIDXdr.kt', 'StrKey.encodeContract'),
+                'muxed_account': ('MuxedAccountXdr.toXdrJsonElement', 'MuxedAccountXdr.kt', 'StrKey.encodeEd25519PublicKey'),
+                'muxed_account_med25519': ('MuxedAccountMed25519Xdr.toXdrJsonElement', 'MuxedAccountMed25519Xdr.kt', 'StrKey.encodeMed25519PublicKey'),
+                'muxed_ed25519_account': ('MuxedEd25519AccountXdr.toXdrJsonElement', 'MuxedEd25519AccountXdr.kt', 'StrKey.encodeMed25519PublicKey'),
+                'pool_id': ('PoolIDXdr.toXdrJsonElement', 'PoolIDXdr.kt', 'StrKey.encodeLiquidityPool'),
+                'claimable_balance_id': ('ClaimableBalanceIDXdr.toXdrJsonElement', 'ClaimableBalanceIDXdr.kt', 'StrKey.encodeClaimableBalance'),
+                'public_key': ('PublicKeyXdr.toXdrJsonElement', 'PublicKeyXdr.kt', 'StrKey.encodeEd25519PublicKey'),
+                'node_id': ('NodeIDXdr.toXdrJsonElement', 'NodeIDXdr.kt', 'PublicKeyXdr.fromXdrJsonTree'),
+                'signer_key': ('SignerKeyXdr.toXdrJsonElement', 'SignerKeyXdr.kt', 'StrKey.encodePreAuthTx'),
+                'signer_key_ed25519_signed_payload': ('SignerKeyEd25519SignedPayloadXdr.toXdrJsonElement', 'SignerKeyEd25519SignedPayloadXdr.kt', 'StrKey.encodeSignedPayload'),
+            },
+            'asset_code_types': {
+                'asset_code': ('AssetCodeXdr.toXdrJsonElement', 'AssetCodeXdr.kt', 'XdrJson.padAssetCode'),
+                'asset_code4': ('AssetCode4Xdr.toXdrJsonElement', 'AssetCode4Xdr.kt', 'XdrJson.trimAssetCode(value, 0)'),
+                'asset_code12': ('AssetCode12Xdr.toXdrJsonElement', 'AssetCode12Xdr.kt', 'XdrJson.trimAssetCode(value, 5)'),
+            },
+            'integer_types': {
+                'uint128_parts': ('XdrJson.uint128ToDecimalString', 'UInt128PartsXdr.kt', 'XdrJson.uint128ToDecimalString'),
+                'int128_parts': ('XdrJson.int128ToDecimalString', 'Int128PartsXdr.kt', 'XdrJson.int128ToDecimalString'),
+                'uint256_parts': ('XdrJson.uint256ToDecimalString', 'UInt256PartsXdr.kt', 'XdrJson.uint256ToDecimalString'),
+                'int256_parts': ('XdrJson.int256ToDecimalString', 'Int256PartsXdr.kt', 'XdrJson.int256ToDecimalString'),
+            },
+            # The decoder's allowString flag is what carries these: it is false for the
+            # 32-bit paths and true for the 64-bit ones, so a 64-bit value is read from a
+            # JSON number as well as from the string form that is always emitted. The
+            # behaviour is pinned by Sep51SpecExampleTest.hyperIntegerAlsoReadsTheJsonNumberForm
+            # and its unsigned counterpart.
+            'backward_compatibility': {
+                'hyper_accepts_json_number': ('XdrJson.int64', 'XdrJson.kt', '"a 64-bit signed integer", allowString = true'),
+                'unsigned_hyper_accepts_json_number': ('XdrJson.uint64', 'XdrJson.kt', '"a 64-bit unsigned integer", allowString = true'),
+            },
+            'json_schema': {
+                'schema_property': ('XdrJson.stripSchema', 'XdrJson.kt', 'fun stripSchema('),
+            },
+        }
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            section_evidence = evidence.get(section_key, {})
+
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in section.get('fields', []):
+                field_name = field.get('name', '')
+                entry = section_evidence.get(field_name)
+                if entry is None:
+                    section_mappings[field_name] = None
+                    continue
+                symbol, file_name, token = entry
+                section_mappings[field_name] = (
+                    symbol if self._xdr_source_contains(file_name, token) else None
+                )
 
             field_mappings[section_key] = section_mappings
 

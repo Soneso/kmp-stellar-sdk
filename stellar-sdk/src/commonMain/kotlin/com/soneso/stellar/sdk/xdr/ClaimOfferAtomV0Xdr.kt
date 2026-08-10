@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimOfferAtomV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("seller_ed25519", "offer_id", "asset_sold", "amount_sold", "asset_bought", "amount_bought")
+
 /**
  * XDR Source:
  * struct ClaimOfferAtomV0
@@ -45,6 +52,22 @@ data class ClaimOfferAtomV0Xdr(
       val amountBought = Int64Xdr.decode(reader)
       return ClaimOfferAtomV0Xdr(sellerEd25519, offerId, assetSold, amountSold, assetBought, amountBought)
     }
+
+    fun fromXdrJson(json: String): ClaimOfferAtomV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimOfferAtomV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimOfferAtomV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ClaimOfferAtomV0Xdr(
+        Uint256Xdr.fromXdrJsonTree(XdrJson.field(json, "seller_ed25519", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "offer_id", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset_sold", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount_sold", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset_bought", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount_bought", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -55,4 +78,15 @@ data class ClaimOfferAtomV0Xdr(
     assetBought.encode(writer)
     amountBought.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("seller_ed25519", sellerEd25519.toXdrJsonElement())
+    put("offer_id", offerId.toXdrJsonElement())
+    put("asset_sold", assetSold.toXdrJsonElement())
+    put("amount_sold", amountSold.toXdrJsonElement())
+    put("asset_bought", assetBought.toXdrJsonElement())
+    put("amount_bought", amountBought.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

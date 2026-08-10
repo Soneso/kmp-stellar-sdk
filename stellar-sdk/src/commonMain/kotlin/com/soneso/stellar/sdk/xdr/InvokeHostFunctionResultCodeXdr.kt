@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "InvokeHostFunctionResultCodeXdr"
+
 /**
  * XDR Source:
  * enum InvokeHostFunctionResultCode
@@ -18,15 +22,15 @@ package com.soneso.stellar.sdk.xdr
  *     INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE = -5
  * };
  */
-enum class InvokeHostFunctionResultCodeXdr(val value: Int) {
+enum class InvokeHostFunctionResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  INVOKE_HOST_FUNCTION_SUCCESS(0),
+  INVOKE_HOST_FUNCTION_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  INVOKE_HOST_FUNCTION_MALFORMED(-1),
-  INVOKE_HOST_FUNCTION_TRAPPED(-2),
-  INVOKE_HOST_FUNCTION_RESOURCE_LIMIT_EXCEEDED(-3),
-  INVOKE_HOST_FUNCTION_ENTRY_ARCHIVED(-4),
-  INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE(-5);
+  INVOKE_HOST_FUNCTION_MALFORMED(-1, "malformed"),
+  INVOKE_HOST_FUNCTION_TRAPPED(-2, "trapped"),
+  INVOKE_HOST_FUNCTION_RESOURCE_LIMIT_EXCEEDED(-3, "resource_limit_exceeded"),
+  INVOKE_HOST_FUNCTION_ENTRY_ARCHIVED(-4, "entry_archived"),
+  INVOKE_HOST_FUNCTION_INSUFFICIENT_REFUNDABLE_FEE(-5, "insufficient_refundable_fee");
 
   companion object {
 
@@ -35,9 +39,24 @@ enum class InvokeHostFunctionResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown InvokeHostFunctionResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): InvokeHostFunctionResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InvokeHostFunctionResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InvokeHostFunctionResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): InvokeHostFunctionResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

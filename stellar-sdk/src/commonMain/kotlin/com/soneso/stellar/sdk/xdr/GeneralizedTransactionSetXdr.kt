@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "GeneralizedTransactionSetXdr"
+
 /**
  * XDR Source:
  * union GeneralizedTransactionSet switch (int v)
@@ -34,6 +39,18 @@ sealed class GeneralizedTransactionSetXdr {
         else -> throw IllegalArgumentException("Unknown GeneralizedTransactionSetXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): GeneralizedTransactionSetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): GeneralizedTransactionSetXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): GeneralizedTransactionSetXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v1" -> V1TxSet(TransactionSetV1Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +61,10 @@ sealed class GeneralizedTransactionSetXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V1TxSet -> buildJsonObject { put("v1", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

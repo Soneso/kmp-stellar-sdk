@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPEnvelopeXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("statement", "signature")
+
 /**
  * XDR Source:
  * struct SCPEnvelope
@@ -22,10 +29,29 @@ data class SCPEnvelopeXdr(
       val signature = SignatureXdr.decode(reader)
       return SCPEnvelopeXdr(statement, signature)
     }
+
+    fun fromXdrJson(json: String): SCPEnvelopeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPEnvelopeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPEnvelopeXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCPEnvelopeXdr(
+        SCPStatementXdr.fromXdrJsonTree(XdrJson.field(json, "statement", XDR_JSON_TYPE)),
+        SignatureXdr.fromXdrJsonTree(XdrJson.field(json, "signature", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     statement.encode(writer)
     signature.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("statement", statement.toXdrJsonElement())
+    put("signature", signature.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

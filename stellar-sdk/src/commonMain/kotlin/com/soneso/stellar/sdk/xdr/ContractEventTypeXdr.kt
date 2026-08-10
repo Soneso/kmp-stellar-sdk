@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractEventTypeXdr"
+
 /**
  * XDR Source:
  * enum ContractEventType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     DIAGNOSTIC = 2
  * };
  */
-enum class ContractEventTypeXdr(val value: Int) {
-  SYSTEM(0),
-  CONTRACT(1),
-  DIAGNOSTIC(2);
+enum class ContractEventTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SYSTEM(0, "system"),
+  CONTRACT(1, "contract"),
+  DIAGNOSTIC(2, "diagnostic");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class ContractEventTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ContractEventTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ContractEventTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractEventTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractEventTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ContractEventTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

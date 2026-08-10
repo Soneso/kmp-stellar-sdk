@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractIDPreimageTypeXdr"
+
 /**
  * XDR Source:
  * enum ContractIDPreimageType
@@ -11,9 +15,9 @@ package com.soneso.stellar.sdk.xdr
  *     CONTRACT_ID_PREIMAGE_FROM_ASSET = 1
  * };
  */
-enum class ContractIDPreimageTypeXdr(val value: Int) {
-  CONTRACT_ID_PREIMAGE_FROM_ADDRESS(0),
-  CONTRACT_ID_PREIMAGE_FROM_ASSET(1);
+enum class ContractIDPreimageTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  CONTRACT_ID_PREIMAGE_FROM_ADDRESS(0, "address"),
+  CONTRACT_ID_PREIMAGE_FROM_ASSET(1, "asset");
 
   companion object {
 
@@ -22,9 +26,24 @@ enum class ContractIDPreimageTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ContractIDPreimageTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ContractIDPreimageTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractIDPreimageTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractIDPreimageTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ContractIDPreimageTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

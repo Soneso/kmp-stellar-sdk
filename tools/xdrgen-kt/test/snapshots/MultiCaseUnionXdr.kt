@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "MultiCaseUnionXdr"
+
 /**
  * XDR Source:
  * union MultiCaseUnion switch (int tag)
@@ -58,6 +63,20 @@ sealed class MultiCaseUnionXdr {
         }
       }
     }
+
+    fun fromXdrJson(json: String): MultiCaseUnionXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): MultiCaseUnionXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): MultiCaseUnionXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "v0" -> SimpleValue(XdrJson.int32(value, XDR_JSON_TYPE, "v0"))
+        "v1" -> TextValue(1, XdrJson.unescapeString(value, XDR_JSON_TYPE, "v1", maxLength = 128))
+        "v2" -> TextValue(2, XdrJson.unescapeString(value, XDR_JSON_TYPE, "v2", maxLength = 128))
+        else -> RawValue(XdrJson.intArm(XDR_JSON_TYPE, arm), XdrJson.hex(value, XDR_JSON_TYPE, "default"))
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -74,4 +93,12 @@ sealed class MultiCaseUnionXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is SimpleValue -> buildJsonObject { put("v0", XdrJson.int32(value)) }
+    is TextValue -> buildJsonObject { put("v$discriminant", XdrJson.escapedString(value)) }
+    is RawValue -> buildJsonObject { put("v$discriminant", XdrJson.hex(value)) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

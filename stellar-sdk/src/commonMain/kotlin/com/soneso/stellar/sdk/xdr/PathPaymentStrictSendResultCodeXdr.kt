@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PathPaymentStrictSendResultCodeXdr"
+
 /**
  * XDR Source:
  * enum PathPaymentStrictSendResultCode
@@ -33,31 +37,31 @@ package com.soneso.stellar.sdk.xdr
  *     PATH_PAYMENT_STRICT_SEND_UNDER_DESTMIN = -12 // could not satisfy destMin
  * };
  */
-enum class PathPaymentStrictSendResultCodeXdr(val value: Int) {
+enum class PathPaymentStrictSendResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * codes considered as "success" for the operation
    * success
    */
-  PATH_PAYMENT_STRICT_SEND_SUCCESS(0),
+  PATH_PAYMENT_STRICT_SEND_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * bad input
    */
-  PATH_PAYMENT_STRICT_SEND_MALFORMED(-1),
-  PATH_PAYMENT_STRICT_SEND_UNDERFUNDED(-2),
-  PATH_PAYMENT_STRICT_SEND_SRC_NO_TRUST(-3),
-  PATH_PAYMENT_STRICT_SEND_SRC_NOT_AUTHORIZED(-4),
-  PATH_PAYMENT_STRICT_SEND_NO_DESTINATION(-5),
-  PATH_PAYMENT_STRICT_SEND_NO_TRUST(-6),
-  PATH_PAYMENT_STRICT_SEND_NOT_AUTHORIZED(-7),
+  PATH_PAYMENT_STRICT_SEND_MALFORMED(-1, "malformed"),
+  PATH_PAYMENT_STRICT_SEND_UNDERFUNDED(-2, "underfunded"),
+  PATH_PAYMENT_STRICT_SEND_SRC_NO_TRUST(-3, "src_no_trust"),
+  PATH_PAYMENT_STRICT_SEND_SRC_NOT_AUTHORIZED(-4, "src_not_authorized"),
+  PATH_PAYMENT_STRICT_SEND_NO_DESTINATION(-5, "no_destination"),
+  PATH_PAYMENT_STRICT_SEND_NO_TRUST(-6, "no_trust"),
+  PATH_PAYMENT_STRICT_SEND_NOT_AUTHORIZED(-7, "not_authorized"),
   /** dest would go above their limit */
-  PATH_PAYMENT_STRICT_SEND_LINE_FULL(-8),
+  PATH_PAYMENT_STRICT_SEND_LINE_FULL(-8, "line_full"),
   /** missing issuer on one asset */
-  PATH_PAYMENT_STRICT_SEND_NO_ISSUER(-9),
-  PATH_PAYMENT_STRICT_SEND_TOO_FEW_OFFERS(-10),
-  PATH_PAYMENT_STRICT_SEND_OFFER_CROSS_SELF(-11),
+  PATH_PAYMENT_STRICT_SEND_NO_ISSUER(-9, "no_issuer"),
+  PATH_PAYMENT_STRICT_SEND_TOO_FEW_OFFERS(-10, "too_few_offers"),
+  PATH_PAYMENT_STRICT_SEND_OFFER_CROSS_SELF(-11, "offer_cross_self"),
   /** could not satisfy destMin */
-  PATH_PAYMENT_STRICT_SEND_UNDER_DESTMIN(-12);
+  PATH_PAYMENT_STRICT_SEND_UNDER_DESTMIN(-12, "under_destmin");
 
   companion object {
 
@@ -66,9 +70,24 @@ enum class PathPaymentStrictSendResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown PathPaymentStrictSendResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): PathPaymentStrictSendResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictSendResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictSendResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): PathPaymentStrictSendResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecTypeBytesNXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("n")
+
 /**
  * XDR Source:
  * struct SCSpecTypeBytesN
@@ -19,9 +26,26 @@ data class SCSpecTypeBytesNXdr(
       val n = Uint32Xdr.decode(reader)
       return SCSpecTypeBytesNXdr(n)
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeBytesNXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeBytesNXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeBytesNXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCSpecTypeBytesNXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     n.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("n", n.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

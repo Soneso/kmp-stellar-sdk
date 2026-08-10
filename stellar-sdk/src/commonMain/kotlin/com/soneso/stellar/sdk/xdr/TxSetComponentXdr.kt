@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TxSetComponentXdr"
+
 /**
  * XDR Source:
  * union TxSetComponent switch (TxSetComponentType type)
@@ -36,6 +41,18 @@ sealed class TxSetComponentXdr {
         else -> throw IllegalArgumentException("Unknown TxSetComponentXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): TxSetComponentXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TxSetComponentXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TxSetComponentXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "txset_comp_txs_maybe_discounted_fee" -> TxsMaybeDiscountedFee(TxSetComponentTxsMaybeDiscountedFeeXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -46,4 +63,10 @@ sealed class TxSetComponentXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is TxsMaybeDiscountedFee -> buildJsonObject { put("txset_comp_txs_maybe_discounted_fee", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

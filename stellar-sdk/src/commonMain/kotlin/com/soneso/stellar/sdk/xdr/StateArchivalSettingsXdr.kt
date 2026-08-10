@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "StateArchivalSettingsXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("max_entry_ttl", "min_temporary_ttl", "min_persistent_ttl", "persistent_rent_rate_denominator", "temp_rent_rate_denominator", "max_entries_to_archive", "live_soroban_state_size_window_sample_size", "live_soroban_state_size_window_sample_period", "eviction_scan_size", "starting_eviction_scan_level")
+
 /**
  * XDR Source:
  * struct StateArchivalSettings {
@@ -63,6 +70,26 @@ data class StateArchivalSettingsXdr(
       val startingEvictionScanLevel = Uint32Xdr.decode(reader)
       return StateArchivalSettingsXdr(maxEntryTtl, minTemporaryTtl, minPersistentTtl, persistentRentRateDenominator, tempRentRateDenominator, maxEntriesToArchive, liveSorobanStateSizeWindowSampleSize, liveSorobanStateSizeWindowSamplePeriod, evictionScanSize, startingEvictionScanLevel)
     }
+
+    fun fromXdrJson(json: String): StateArchivalSettingsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): StateArchivalSettingsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): StateArchivalSettingsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return StateArchivalSettingsXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "max_entry_ttl", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "min_temporary_ttl", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "min_persistent_ttl", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "persistent_rent_rate_denominator", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "temp_rent_rate_denominator", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "max_entries_to_archive", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "live_soroban_state_size_window_sample_size", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "live_soroban_state_size_window_sample_period", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "eviction_scan_size", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "starting_eviction_scan_level", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -77,4 +104,19 @@ data class StateArchivalSettingsXdr(
     evictionScanSize.encode(writer)
     startingEvictionScanLevel.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("max_entry_ttl", maxEntryTtl.toXdrJsonElement())
+    put("min_temporary_ttl", minTemporaryTtl.toXdrJsonElement())
+    put("min_persistent_ttl", minPersistentTtl.toXdrJsonElement())
+    put("persistent_rent_rate_denominator", persistentRentRateDenominator.toXdrJsonElement())
+    put("temp_rent_rate_denominator", tempRentRateDenominator.toXdrJsonElement())
+    put("max_entries_to_archive", maxEntriesToArchive.toXdrJsonElement())
+    put("live_soroban_state_size_window_sample_size", liveSorobanStateSizeWindowSampleSize.toXdrJsonElement())
+    put("live_soroban_state_size_window_sample_period", liveSorobanStateSizeWindowSamplePeriod.toXdrJsonElement())
+    put("eviction_scan_size", evictionScanSize.toXdrJsonElement())
+    put("starting_eviction_scan_level", startingEvictionScanLevel.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

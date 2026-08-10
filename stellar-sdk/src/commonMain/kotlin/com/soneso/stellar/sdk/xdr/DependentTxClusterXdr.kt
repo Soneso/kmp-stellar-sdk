@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "DependentTxClusterXdr"
+
 /**
  * XDR Source:
  * typedef TransactionEnvelope DependentTxCluster<>;
@@ -15,6 +19,12 @@ value class DependentTxClusterXdr(val value: List<TransactionEnvelopeXdr>) {
       val value = List(reader.readInt()) { TransactionEnvelopeXdr.decode(reader) }
       return DependentTxClusterXdr(value)
     }
+
+    fun fromXdrJson(json: String): DependentTxClusterXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): DependentTxClusterXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): DependentTxClusterXdr = DependentTxClusterXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { TransactionEnvelopeXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class DependentTxClusterXdr(val value: List<TransactionEnvelopeXdr>) {
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCContractInstanceXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("executable", "storage")
+
 /**
  * XDR Source:
  * struct SCContractInstance {
@@ -21,6 +28,18 @@ data class SCContractInstanceXdr(
       val storage = if (reader.readBoolean()) SCMapXdr.decode(reader) else null
       return SCContractInstanceXdr(executable, storage)
     }
+
+    fun fromXdrJson(json: String): SCContractInstanceXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCContractInstanceXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCContractInstanceXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCContractInstanceXdr(
+        ContractExecutableXdr.fromXdrJsonTree(XdrJson.field(json, "executable", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "storage", XDR_JSON_TYPE))?.let { SCMapXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +51,11 @@ data class SCContractInstanceXdr(
       writer.writeBoolean(false)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("executable", executable.toXdrJsonElement())
+    put("storage", XdrJson.optional(storage) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

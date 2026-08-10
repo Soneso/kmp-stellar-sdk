@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCSpecEventDataFormatXdr"
+
 /**
  * XDR Source:
  * enum SCSpecEventDataFormat
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     SC_SPEC_EVENT_DATA_FORMAT_MAP = 2
  * };
  */
-enum class SCSpecEventDataFormatXdr(val value: Int) {
-  SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE(0),
-  SC_SPEC_EVENT_DATA_FORMAT_VEC(1),
-  SC_SPEC_EVENT_DATA_FORMAT_MAP(2);
+enum class SCSpecEventDataFormatXdr(val value: Int, internal val xdrJsonName: String) {
+  SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE(0, "single_value"),
+  SC_SPEC_EVENT_DATA_FORMAT_VEC(1, "vec"),
+  SC_SPEC_EVENT_DATA_FORMAT_MAP(2, "map");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class SCSpecEventDataFormatXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCSpecEventDataFormatXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCSpecEventDataFormatXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecEventDataFormatXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecEventDataFormatXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCSpecEventDataFormatXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

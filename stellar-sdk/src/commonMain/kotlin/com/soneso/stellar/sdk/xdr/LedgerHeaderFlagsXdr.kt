@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LedgerHeaderFlagsXdr"
+
 /**
  * XDR Source:
  * enum LedgerHeaderFlags
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     DISABLE_LIQUIDITY_POOL_WITHDRAWAL_FLAG = 0x4
  * };
  */
-enum class LedgerHeaderFlagsXdr(val value: Int) {
-  DISABLE_LIQUIDITY_POOL_TRADING_FLAG(1),
-  DISABLE_LIQUIDITY_POOL_DEPOSIT_FLAG(2),
-  DISABLE_LIQUIDITY_POOL_WITHDRAWAL_FLAG(4);
+enum class LedgerHeaderFlagsXdr(val value: Int, internal val xdrJsonName: String) {
+  DISABLE_LIQUIDITY_POOL_TRADING_FLAG(1, "trading_flag"),
+  DISABLE_LIQUIDITY_POOL_DEPOSIT_FLAG(2, "deposit_flag"),
+  DISABLE_LIQUIDITY_POOL_WITHDRAWAL_FLAG(4, "withdrawal_flag");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class LedgerHeaderFlagsXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown LedgerHeaderFlagsXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): LedgerHeaderFlagsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerHeaderFlagsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerHeaderFlagsXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): LedgerHeaderFlagsXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

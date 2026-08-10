@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionEventXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("stage", "event")
+
 /**
  * XDR Source:
  * struct TransactionEvent {
@@ -23,10 +30,29 @@ data class TransactionEventXdr(
       val event = ContractEventXdr.decode(reader)
       return TransactionEventXdr(stage, event)
     }
+
+    fun fromXdrJson(json: String): TransactionEventXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionEventXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionEventXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TransactionEventXdr(
+        TransactionEventStageXdr.fromXdrJsonTree(XdrJson.field(json, "stage", XDR_JSON_TYPE)),
+        ContractEventXdr.fromXdrJsonTree(XdrJson.field(json, "event", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     stage.encode(writer)
     event.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("stage", stage.toXdrJsonElement())
+    put("event", event.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

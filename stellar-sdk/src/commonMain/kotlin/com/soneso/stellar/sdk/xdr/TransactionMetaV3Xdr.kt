@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionMetaV3Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "tx_changes_before", "operations", "tx_changes_after", "soroban_meta")
+
 /**
  * XDR Source:
  * struct TransactionMetaV3
@@ -41,6 +48,21 @@ data class TransactionMetaV3Xdr(
       val sorobanMeta = if (reader.readBoolean()) SorobanTransactionMetaXdr.decode(reader) else null
       return TransactionMetaV3Xdr(ext, txChangesBefore, operations, txChangesAfter, sorobanMeta)
     }
+
+    fun fromXdrJson(json: String): TransactionMetaV3Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionMetaV3Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionMetaV3Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TransactionMetaV3Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "tx_changes_before", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "operations", XDR_JSON_TYPE), XDR_JSON_TYPE, "operations").map { OperationMetaXdr.fromXdrJsonTree(it) },
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "tx_changes_after", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "soroban_meta", XDR_JSON_TYPE))?.let { SorobanTransactionMetaXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -58,4 +80,14 @@ data class TransactionMetaV3Xdr(
       writer.writeBoolean(false)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("tx_changes_before", txChangesBefore.toXdrJsonElement())
+    put("operations", XdrJson.array(operations) { it.toXdrJsonElement() })
+    put("tx_changes_after", txChangesAfter.toXdrJsonElement())
+    put("soroban_meta", XdrJson.optional(sorobanMeta) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

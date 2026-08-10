@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PaymentResultCodeXdr"
+
 /**
  * XDR Source:
  * enum PaymentResultCode
@@ -22,33 +26,33 @@ package com.soneso.stellar.sdk.xdr
  *     PAYMENT_NO_ISSUER = -9       // missing issuer on asset
  * };
  */
-enum class PaymentResultCodeXdr(val value: Int) {
+enum class PaymentResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * codes considered as "success" for the operation
    * payment successfully completed
    */
-  PAYMENT_SUCCESS(0),
+  PAYMENT_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * bad input
    */
-  PAYMENT_MALFORMED(-1),
+  PAYMENT_MALFORMED(-1, "malformed"),
   /** not enough funds in source account */
-  PAYMENT_UNDERFUNDED(-2),
+  PAYMENT_UNDERFUNDED(-2, "underfunded"),
   /** no trust line on source account */
-  PAYMENT_SRC_NO_TRUST(-3),
+  PAYMENT_SRC_NO_TRUST(-3, "src_no_trust"),
   /** source not authorized to transfer */
-  PAYMENT_SRC_NOT_AUTHORIZED(-4),
+  PAYMENT_SRC_NOT_AUTHORIZED(-4, "src_not_authorized"),
   /** destination account does not exist */
-  PAYMENT_NO_DESTINATION(-5),
+  PAYMENT_NO_DESTINATION(-5, "no_destination"),
   /** destination missing a trust line for asset */
-  PAYMENT_NO_TRUST(-6),
+  PAYMENT_NO_TRUST(-6, "no_trust"),
   /** destination not authorized to hold asset */
-  PAYMENT_NOT_AUTHORIZED(-7),
+  PAYMENT_NOT_AUTHORIZED(-7, "not_authorized"),
   /** destination would go above their limit */
-  PAYMENT_LINE_FULL(-8),
+  PAYMENT_LINE_FULL(-8, "line_full"),
   /** missing issuer on asset */
-  PAYMENT_NO_ISSUER(-9);
+  PAYMENT_NO_ISSUER(-9, "no_issuer");
 
   companion object {
 
@@ -57,9 +61,24 @@ enum class PaymentResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown PaymentResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): PaymentResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PaymentResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PaymentResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): PaymentResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

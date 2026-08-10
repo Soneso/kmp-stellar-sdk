@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "EndSponsoringFutureReservesResultCodeXdr"
+
 /**
  * XDR Source:
  * enum EndSponsoringFutureReservesResultCode
@@ -14,11 +18,11 @@ package com.soneso.stellar.sdk.xdr
  *     END_SPONSORING_FUTURE_RESERVES_NOT_SPONSORED = -1
  * };
  */
-enum class EndSponsoringFutureReservesResultCodeXdr(val value: Int) {
+enum class EndSponsoringFutureReservesResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  END_SPONSORING_FUTURE_RESERVES_SUCCESS(0),
+  END_SPONSORING_FUTURE_RESERVES_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  END_SPONSORING_FUTURE_RESERVES_NOT_SPONSORED(-1);
+  END_SPONSORING_FUTURE_RESERVES_NOT_SPONSORED(-1, "not_sponsored");
 
   companion object {
 
@@ -27,9 +31,24 @@ enum class EndSponsoringFutureReservesResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown EndSponsoringFutureReservesResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): EndSponsoringFutureReservesResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): EndSponsoringFutureReservesResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): EndSponsoringFutureReservesResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): EndSponsoringFutureReservesResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

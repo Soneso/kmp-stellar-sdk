@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ColorXdr"
+
 /**
  * XDR Source:
  * enum Color
@@ -14,12 +18,12 @@ package com.soneso.stellar.sdk.xdr
  *     BLUE = 2
  * };
  */
-enum class ColorXdr(val value: Int) {
+enum class ColorXdr(val value: Int, internal val xdrJsonName: String) {
   /** Red color */
-  RED(0),
+  RED(0, "red"),
   /** Green color */
-  GREEN(1),
-  BLUE(2);
+  GREEN(1, "green"),
+  BLUE(2, "blue");
 
   companion object {
 
@@ -28,9 +32,24 @@ enum class ColorXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ColorXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ColorXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ColorXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ColorXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ColorXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

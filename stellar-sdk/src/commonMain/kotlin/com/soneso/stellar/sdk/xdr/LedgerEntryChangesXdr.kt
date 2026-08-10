@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LedgerEntryChangesXdr"
+
 /**
  * XDR Source:
  * typedef LedgerEntryChange LedgerEntryChanges<>;
@@ -15,6 +19,12 @@ value class LedgerEntryChangesXdr(val value: List<LedgerEntryChangeXdr>) {
       val value = List(reader.readInt()) { LedgerEntryChangeXdr.decode(reader) }
       return LedgerEntryChangesXdr(value)
     }
+
+    fun fromXdrJson(json: String): LedgerEntryChangesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryChangesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryChangesXdr = LedgerEntryChangesXdr(XdrJson.array(element, XDR_JSON_TYPE, "value").map { LedgerEntryChangeXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class LedgerEntryChangesXdr(val value: List<LedgerEntryChangeXdr>) {
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

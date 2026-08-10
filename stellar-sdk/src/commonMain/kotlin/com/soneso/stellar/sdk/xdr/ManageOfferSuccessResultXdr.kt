@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ManageOfferSuccessResultXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("offers_claimed", "offer")
+
 /**
  * XDR Source:
  * struct ManageOfferSuccessResult
@@ -32,6 +39,18 @@ data class ManageOfferSuccessResultXdr(
       val offer = ManageOfferSuccessResultOfferXdr.decode(reader)
       return ManageOfferSuccessResultXdr(offersClaimed, offer)
     }
+
+    fun fromXdrJson(json: String): ManageOfferSuccessResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageOfferSuccessResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageOfferSuccessResultXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ManageOfferSuccessResultXdr(
+        XdrJson.array(XdrJson.field(json, "offers_claimed", XDR_JSON_TYPE), XDR_JSON_TYPE, "offers_claimed").map { ClaimAtomXdr.fromXdrJsonTree(it) },
+        ManageOfferSuccessResultOfferXdr.fromXdrJsonTree(XdrJson.field(json, "offer", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -41,4 +60,11 @@ data class ManageOfferSuccessResultXdr(
     }
     offer.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("offers_claimed", XdrJson.array(offersClaimed) { it.toXdrJsonElement() })
+    put("offer", offer.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

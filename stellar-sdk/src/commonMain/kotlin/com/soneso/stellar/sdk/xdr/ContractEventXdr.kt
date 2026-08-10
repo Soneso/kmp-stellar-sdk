@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractEventXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "contract_id", "type", "type_", "body")
+
 /**
  * XDR Source:
  * struct ContractEvent
@@ -45,6 +52,20 @@ data class ContractEventXdr(
       val body = ContractEventBodyXdr.decode(reader)
       return ContractEventXdr(ext, contractId, type, body)
     }
+
+    fun fromXdrJson(json: String): ContractEventXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractEventXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractEventXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ContractEventXdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "contract_id", XDR_JSON_TYPE))?.let { ContractIDXdr.fromXdrJsonTree(it) },
+        ContractEventTypeXdr.fromXdrJsonTree(XdrJson.field(json, "type", "type_", XDR_JSON_TYPE)),
+        ContractEventBodyXdr.fromXdrJsonTree(XdrJson.field(json, "body", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -58,4 +79,13 @@ data class ContractEventXdr(
     type.encode(writer)
     body.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("contract_id", XdrJson.optional(contractId) { it.toXdrJsonElement() })
+    put("type", type.toXdrJsonElement())
+    put("body", body.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

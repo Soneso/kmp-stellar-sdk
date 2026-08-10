@@ -310,9 +310,15 @@ jobs:
             printf '2. If new `.x` files were added upstream, add them to `XDR_FILES` in `xdr-source.cfg`\n'
             printf '3. Run `make -C tools/xdrgen-kt clean-all generate` to re-download and regenerate Kotlin XDR types\n'
             printf '4. Run `make -C tools/xdrgen-kt test` to verify snapshot tests pass (update snapshots if needed)\n'
-            printf '5. Build and run unit tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
-            printf '6. If the XDR changes introduce new types or modify existing ones, evaluate whether the SDK needs updated high-level APIs (operation builders, SEP implementations, etc.)\n'
-            printf '7. Update the changelog with any breaking changes or new features\n'
+            printf '5. Re-check the SEP-0051 name derivation: `ruby tools/sep-51-oracle/name_map.rb --diff`. New enum members and union arms can carry identifier shapes the derivation rules handle differently from the reference build, and this is the check that catches it. A type the reference build cannot resolve is reported as unresolvable rather than as a mismatch; the fix for that is to advance the reference pin in `tools/sep-51-oracle/oracle-pin.json`\n'
+            printf '6. Review whether any newly added type needs an XDR-JSON override in `tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_overrides.rb` — strkey-valued types, asset codes and the 128/256-bit integer types render as a single JSON string rather than as an object\n'
+            printf '7. Refresh the SEP-0051 conformance corpus: `python3 tools/sep-51-corpus/generate_corpus.py`\n'
+            printf '8. Re-emit the XDR-JSON test suite and the embedded corpus: `make -C tools/xdrgen-kt emit-json-tests`\n'
+            printf '9. Confirm the emitted names match the name table: `ruby tools/sep-51-oracle/emitted_names.rb`\n'
+            printf '10. Build and run unit tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
+            printf '11. If the XDR changes introduce new types or modify existing ones, evaluate whether the SDK needs updated high-level APIs (operation builders, SEP implementations, etc.)\n'
+            printf '12. Update the changelog with any breaking changes or new features. A changed XDR-JSON rendering is a wire-format change and belongs there; `Sep51RollbackRehearsalTest` fails until its frozen constants are updated, which is what makes such a change deliberate\n'
+            printf '\nSteps 5 and 7 need the pinned XDR-JSON reference CLI: `cargo install stellar-xdr --features cli --version 28.0.0 --locked`. See `tools/sep-51-oracle/README.md`.\n'
           } >> /tmp/issue_body.md
 
           printf '\n---\n*This issue was created automatically by the [XDR update check workflow](.github/workflows/xdr-update-check.yml).*\n' >> /tmp/issue_body.md

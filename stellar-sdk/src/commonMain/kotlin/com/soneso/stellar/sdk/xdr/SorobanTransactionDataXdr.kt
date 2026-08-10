@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanTransactionDataXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "resources", "resource_fee")
+
 /**
  * XDR Source:
  * struct SorobanTransactionData
@@ -51,6 +58,19 @@ data class SorobanTransactionDataXdr(
       val resourceFee = Int64Xdr.decode(reader)
       return SorobanTransactionDataXdr(ext, resources, resourceFee)
     }
+
+    fun fromXdrJson(json: String): SorobanTransactionDataXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanTransactionDataXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanTransactionDataXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SorobanTransactionDataXdr(
+        SorobanTransactionDataExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        SorobanResourcesXdr.fromXdrJsonTree(XdrJson.field(json, "resources", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "resource_fee", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -58,4 +78,12 @@ data class SorobanTransactionDataXdr(
     resources.encode(writer)
     resourceFee.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("resources", resources.toXdrJsonElement())
+    put("resource_fee", resourceFee.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

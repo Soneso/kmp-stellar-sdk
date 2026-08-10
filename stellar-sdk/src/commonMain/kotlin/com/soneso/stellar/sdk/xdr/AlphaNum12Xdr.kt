@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AlphaNum12Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("asset_code", "issuer")
+
 /**
  * XDR Source:
  * struct AlphaNum12
@@ -22,10 +29,29 @@ data class AlphaNum12Xdr(
       val issuer = AccountIDXdr.decode(reader)
       return AlphaNum12Xdr(assetCode, issuer)
     }
+
+    fun fromXdrJson(json: String): AlphaNum12Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AlphaNum12Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AlphaNum12Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return AlphaNum12Xdr(
+        AssetCode12Xdr.fromXdrJsonTree(XdrJson.field(json, "asset_code", XDR_JSON_TYPE)),
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "issuer", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     assetCode.encode(writer)
     issuer.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("asset_code", assetCode.toXdrJsonElement())
+    put("issuer", issuer.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

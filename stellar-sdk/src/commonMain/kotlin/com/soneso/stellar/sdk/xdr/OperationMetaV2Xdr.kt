@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "OperationMetaV2Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "changes", "events")
+
 /**
  * XDR Source:
  * struct OperationMetaV2
@@ -27,6 +34,19 @@ data class OperationMetaV2Xdr(
       val events = List(reader.readInt()) { ContractEventXdr.decode(reader) }
       return OperationMetaV2Xdr(ext, changes, events)
     }
+
+    fun fromXdrJson(json: String): OperationMetaV2Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationMetaV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationMetaV2Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return OperationMetaV2Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "changes", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "events", XDR_JSON_TYPE), XDR_JSON_TYPE, "events").map { ContractEventXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -37,4 +57,12 @@ data class OperationMetaV2Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("changes", changes.toXdrJsonElement())
+    put("events", XdrJson.array(events) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

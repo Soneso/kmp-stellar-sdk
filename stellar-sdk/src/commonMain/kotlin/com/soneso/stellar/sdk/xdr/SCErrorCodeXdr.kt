@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCErrorCodeXdr"
+
 /**
  * XDR Source:
  * enum SCErrorCode
@@ -19,27 +23,27 @@ package com.soneso.stellar.sdk.xdr
  *     SCEC_UNEXPECTED_SIZE = 9    // Something's size wasn't as expected.
  * };
  */
-enum class SCErrorCodeXdr(val value: Int) {
+enum class SCErrorCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** Some arithmetic was undefined (overflow, divide-by-zero). */
-  SCEC_ARITH_DOMAIN(0),
+  SCEC_ARITH_DOMAIN(0, "arith_domain"),
   /** Something was indexed beyond its bounds. */
-  SCEC_INDEX_BOUNDS(1),
+  SCEC_INDEX_BOUNDS(1, "index_bounds"),
   /** User provided some otherwise-bad data. */
-  SCEC_INVALID_INPUT(2),
+  SCEC_INVALID_INPUT(2, "invalid_input"),
   /** Some value was required but not provided. */
-  SCEC_MISSING_VALUE(3),
+  SCEC_MISSING_VALUE(3, "missing_value"),
   /** Some value was provided where not allowed. */
-  SCEC_EXISTING_VALUE(4),
+  SCEC_EXISTING_VALUE(4, "existing_value"),
   /** Some arbitrary limit -- gas or otherwise -- was hit. */
-  SCEC_EXCEEDED_LIMIT(5),
+  SCEC_EXCEEDED_LIMIT(5, "exceeded_limit"),
   /** Data was valid but action requested was not. */
-  SCEC_INVALID_ACTION(6),
+  SCEC_INVALID_ACTION(6, "invalid_action"),
   /** The host detected an error in its own logic. */
-  SCEC_INTERNAL_ERROR(7),
+  SCEC_INTERNAL_ERROR(7, "internal_error"),
   /** Some type wasn't as expected. */
-  SCEC_UNEXPECTED_TYPE(8),
+  SCEC_UNEXPECTED_TYPE(8, "unexpected_type"),
   /** Something's size wasn't as expected. */
-  SCEC_UNEXPECTED_SIZE(9);
+  SCEC_UNEXPECTED_SIZE(9, "unexpected_size");
 
   companion object {
 
@@ -48,9 +52,24 @@ enum class SCErrorCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCErrorCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCErrorCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCErrorCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCErrorCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCErrorCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ThresholdsXdr"
+
 /**
  * XDR Source:
  * typedef opaque Thresholds[4];
@@ -15,9 +19,19 @@ value class ThresholdsXdr(val value: ByteArray) {
       val value = reader.readFixedOpaque(4)
       return ThresholdsXdr(value)
     }
+
+    fun fromXdrJson(json: String): ThresholdsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ThresholdsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ThresholdsXdr = ThresholdsXdr(XdrJson.hex(element, XDR_JSON_TYPE, "value", expectedLength = 4))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(value, 4)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

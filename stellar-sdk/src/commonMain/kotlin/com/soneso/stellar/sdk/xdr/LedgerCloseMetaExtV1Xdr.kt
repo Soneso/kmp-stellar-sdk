@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerCloseMetaExtV1Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "soroban_fee_write1_kb")
+
 /**
  * XDR Source:
  * struct LedgerCloseMetaExtV1
@@ -22,10 +29,29 @@ data class LedgerCloseMetaExtV1Xdr(
       val sorobanFeeWrite1Kb = Int64Xdr.decode(reader)
       return LedgerCloseMetaExtV1Xdr(ext, sorobanFeeWrite1Kb)
     }
+
+    fun fromXdrJson(json: String): LedgerCloseMetaExtV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerCloseMetaExtV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerCloseMetaExtV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerCloseMetaExtV1Xdr(
+        ExtensionPointXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "soroban_fee_write1_kb", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ext.encode(writer)
     sorobanFeeWrite1Kb.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("soroban_fee_write1_kb", sorobanFeeWrite1Kb.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

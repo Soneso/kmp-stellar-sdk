@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative 'kotlin_json_names'
+require_relative 'kotlin_json_overrides'
+
 module Xdrgen
   module Generators
     # Kotlin code generator for XDR definitions
@@ -16,9 +19,31 @@ module Xdrgen
       RECURSIVE_TYPES = %w[SorobanDelegateSignatureXdr].freeze
       XDR_RECURSION_CAP = 128
 
+      JSON_NAMES = KotlinJsonNames
+      JSON_OVERRIDES = KotlinJsonOverrides
+
+      JSON_ELEMENT_IMPORT = 'kotlinx.serialization.json.JsonElement'
+      JSON_OBJECT_IMPORT = 'kotlinx.serialization.json.JsonObject'
+      JSON_BUILDER_IMPORT = 'kotlinx.serialization.json.buildJsonObject'
+
+      # Every generated file names its own type once, in a file-private constant, and the
+      # XDR-JSON methods refer to that constant wherever the name would otherwise be repeated
+      # at each call site.
+      JSON_TYPE_CONSTANT = 'XDR_JSON_TYPE'
+
+      # A struct names the keys it accepts once, beside its type name, so the decoder can reject
+      # a key that belongs to no field without rebuilding the list at every call.
+      JSON_KEYS_CONSTANT = 'XDR_JSON_KEYS'
+
+      # A field named "type" is spelled "type_" by tooling that escapes it as a keyword of its
+      # own language. SEP-0051 requires the key "type", so that is what this SDK emits; the
+      # older spelling is accepted on input and never written back out.
+      JSON_KEY_ALIASES = { 'type' => 'type_' }.freeze
+
       def generate
         @output_files = {}
         @package = @namespace.gsub('::', '.')
+        @json_overrides_used = []
 
         # Skip XdrReader/XdrWriter generation - will be provided by KMP SDK
         # render_xdr_utils
@@ -28,6 +53,8 @@ module Xdrgen
 
         # Generate all type definitions
         render_definitions(@top)
+
+        verify_json_overrides_consumed
       end
 
       private
@@ -84,10 +111,12 @@ module Xdrgen
         file_name = "#{enum_name}.kt"
         out = @output.open(file_name)
 
-        render_file_header(out)
+        render_file_header(out, [JSON_ELEMENT_IMPORT], enum_name)
         render_source_comment(out, enum)
 
-        out.puts "enum class #{enum_name}(val value: Int) {"
+        identifiers = enum.members.map(&:name)
+
+        out.puts "enum class #{enum_name}(val value: Int, internal val xdrJsonName: String) {"
         out.indent do
           enum.members.each_with_index do |member, idx|
             # Extract and render comments for this member
@@ -95,7 +124,8 @@ module Xdrgen
             render_member_comment(out, comments)
 
             suffix = idx < enum.members.length - 1 ? ',' : ';'
-            out.puts "#{member.name}(#{member.value})#{suffix}"
+            json_name = JSON_NAMES.enum_member_json_name(member.name, identifiers)
+            out.puts "#{member.name}(#{member.value}, \"#{json_name}\")#{suffix}"
           end
 
           out.puts
@@ -111,6 +141,18 @@ module Xdrgen
               end
             end
             out.puts "}"
+
+            out.puts
+            render_json_entry_points(out, enum_name)
+            out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{enum_name} {"
+            out.indent do
+              out.puts "val name = XdrJson.name(element, #{JSON_TYPE_CONSTANT})"
+              out.puts "return findXdrJsonName(name) ?: XdrJson.unknownMember(#{JSON_TYPE_CONSTANT}, name)"
+            end
+            out.puts "}"
+
+            out.puts
+            out.puts "internal fun findXdrJsonName(name: String): #{enum_name}? = entries.find { it.xdrJsonName == name }"
           end
           out.puts "}"
 
@@ -120,6 +162,11 @@ module Xdrgen
             out.puts "writer.writeInt(value)"
           end
           out.puts "}"
+
+          out.puts
+          out.puts "fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)"
+          out.puts
+          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
@@ -131,7 +178,8 @@ module Xdrgen
         file_name = "#{typedef_name}.kt"
         out = @output.open(file_name)
 
-        render_file_header(out)
+        override = json_override(typedef_name)
+        render_file_header(out, json_imports(override, [JSON_ELEMENT_IMPORT]), typedef_name)
         render_source_comment(out, typedef)
 
         # All typedefs become inline value classes (like Java wrappers but zero-cost)
@@ -149,6 +197,15 @@ module Xdrgen
               out.puts "return #{typedef_name}(value)"
             end
             out.puts "}"
+
+            out.puts
+            render_json_entry_points(out, typedef_name)
+            if override
+              out.puts override[:from]
+            else
+              from = json_from_expression(typedef.declaration, 'element', 'value')
+              out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{typedef_name} = #{typedef_name}(#{from})"
+            end
           end
           out.puts "}"
 
@@ -158,6 +215,15 @@ module Xdrgen
             encode_statement(typedef.declaration, 'value', 'writer', out)
           end
           out.puts "}"
+
+          out.puts
+          if override
+            out.puts override[:to]
+          else
+            out.puts "fun toXdrJsonElement(): JsonElement = #{json_to_expression(typedef.declaration, 'value')}"
+          end
+          out.puts
+          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
@@ -169,7 +235,10 @@ module Xdrgen
         file_name = "#{struct_name}.kt"
         out = @output.open(file_name)
 
-        render_file_header(out)
+        override = json_override(struct_name)
+        default_imports = override ? [JSON_ELEMENT_IMPORT] : [JSON_ELEMENT_IMPORT, JSON_BUILDER_IMPORT]
+        render_file_header(out, json_imports(override, default_imports), struct_name)
+        render_declared_json_keys(out, struct) unless override
         render_source_comment(out, struct)
 
         out.puts "data class #{struct_name}("
@@ -194,19 +263,24 @@ module Xdrgen
             out.puts "fun decode(reader: XdrReader): #{struct_name} {"
             out.indent do
               struct.members.each do |member|
-                base_name = member.name.underscore.camelize(:lower)
-                # Use 'value' as local variable name if property is a keyword
-                local_name = base_name == "val" ? "value" : base_name
+                local_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
                 out.puts "val #{local_name} = #{decode_expression_guarded(struct_name, member.declaration, 'reader')}"
               end
 
               param_list = struct.members.map { |m|
-                base_name = m.name.underscore.camelize(:lower)
-                base_name == "val" ? "value" : base_name
+                escape_kotlin_keyword(m.name.underscore.camelize(:lower))
               }.join(', ')
               out.puts "return #{struct_name}(#{param_list})"
             end
             out.puts "}"
+
+            out.puts
+            render_json_entry_points(out, struct_name)
+            if override
+              out.puts override[:from]
+            else
+              render_struct_from_json(out, struct, struct_name)
+            end
           end
           out.puts "}"
 
@@ -220,10 +294,70 @@ module Xdrgen
             end
           end
           out.puts "}"
+
+          out.puts
+          if override
+            out.puts override[:to]
+          else
+            out.puts "fun toXdrJsonElement(): JsonElement = buildJsonObject {"
+            out.indent do
+              struct.members.each do |member|
+                member_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
+                key = JSON_NAMES.struct_field_json_name(member.name)
+                out.puts "put(\"#{key}\", #{json_to_expression(member.declaration, member_name)})"
+              end
+            end
+            out.puts "}"
+          end
+          out.puts
+          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
         out.close
+      end
+
+      # Reads the object one key at a time and constructs positionally, so the JSON key order
+      # and the constructor order are both the .x declaration order by construction.
+      def render_struct_from_json(out, struct, struct_name)
+        out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{struct_name} {"
+        out.indent do
+          out.puts "val json = XdrJson.obj(element, #{JSON_TYPE_CONSTANT}, #{JSON_KEYS_CONSTANT})"
+          out.puts "return #{struct_name}("
+          out.indent do
+            struct.members.each_with_index do |member, idx|
+              key = JSON_NAMES.struct_field_json_name(member.name)
+              field = json_field_expression(key)
+              suffix = idx < struct.members.length - 1 ? ',' : ''
+              out.puts "#{json_from_expression(member.declaration, field, key)}#{suffix}"
+            end
+          end
+          out.puts ")"
+        end
+        out.puts "}"
+      end
+
+      def json_field_expression(key)
+        alias_key = JSON_KEY_ALIASES[key]
+        if alias_key
+          "XdrJson.field(json, \"#{key}\", \"#{alias_key}\", #{JSON_TYPE_CONSTANT})"
+        else
+          "XdrJson.field(json, \"#{key}\", #{JSON_TYPE_CONSTANT})"
+        end
+      end
+
+      # Every key a struct answers to: its declared field keys, plus the historical spelling of
+      # any field that accepts one. Listing both spellings lets the decoder recognise either as
+      # the field it names; a document supplying both at once is rejected where the field is
+      # read, which is what knows the two are one field.
+      def render_declared_json_keys(out, struct)
+        keys = struct.members.flat_map do |member|
+          key = JSON_NAMES.struct_field_json_name(member.name)
+          [key, JSON_KEY_ALIASES[key]].compact
+        end
+        literals = keys.map { |key| "\"#{key}\"" }.join(', ')
+        out.puts "private val #{JSON_KEYS_CONSTANT}: Array<String> = arrayOf(#{literals})"
+        out.puts
       end
 
       def render_union(union)
@@ -231,7 +365,8 @@ module Xdrgen
         file_name = "#{union_name}.kt"
         out = @output.open(file_name)
 
-        render_file_header(out)
+        override = json_override(union_name)
+        render_file_header(out, json_imports(override, union_json_imports(union, override)), union_name)
         render_source_comment(out, union)
 
         # Sealed class hierarchy for unions
@@ -400,6 +535,14 @@ module Xdrgen
               out.puts "}"
             end
             out.puts "}"
+
+            out.puts
+            render_json_entry_points(out, union_name)
+            if override
+              out.puts override[:from]
+            else
+              render_union_from_json(out, union, union_name)
+            end
           end
           out.puts "}"
 
@@ -428,10 +571,173 @@ module Xdrgen
             out.puts "}"
           end
           out.puts "}"
+
+          out.puts
+          if override
+            out.puts override[:to]
+          else
+            render_union_to_json(out, union)
+          end
+          out.puts
+          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
         out.close
+      end
+
+      # A void arm is a bare string naming the arm; an arm carrying a value is an object with
+      # that one key. An arm class covering more than one case, or the default arm, reads its
+      # key from the discriminant it carries rather than from a name fixed here.
+      def render_union_to_json(out, union)
+        out.puts "fun toXdrJsonElement(): JsonElement = when (this) {"
+        out.indent do
+          union_json_classes(union).each do |entry|
+            key = entry[:dynamic] ? union_json_dynamic_key(union) : "\"#{entry[:key]}\""
+            if entry[:void]
+              out.puts "is #{entry[:name]} -> XdrJson.name(#{key})"
+            else
+              arm = union.arms.find { |a| a.name.camelize == entry[:name] }
+              value = json_to_expression(arm.declaration, 'value')
+              out.puts "is #{entry[:name]} -> buildJsonObject { put(#{key}, #{value}) }"
+            end
+          end
+        end
+        out.puts "}"
+      end
+
+      def render_union_from_json(out, union, union_name)
+        default = union_default_arm(union)
+        value_arms = union.normal_arms.reject(&:void?)
+        void_arms = union.normal_arms.select(&:void?)
+        value_branch = value_arms.any? || (default && !default.void?)
+        void_branch = void_arms.any? || (default && default.void?)
+        both = value_branch && void_branch
+
+        out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{union_name} {"
+        out.indent do
+          if value_branch
+            out.puts "if (element is JsonObject) {" if both
+            out.indent(both ? 1 : 0) do
+              out.puts "val (arm, value) = XdrJson.singleKeyObject(element, #{JSON_TYPE_CONSTANT})"
+              out.puts "return when (arm) {"
+              out.indent do
+                value_arms.each do |arm|
+                  arm.cases.each { |kase| out.puts union_json_case(union, arm, kase) }
+                end
+                out.puts union_json_default(union, default, union_name, value: true)
+              end
+              out.puts "}"
+            end
+            out.puts "}" if both
+          end
+
+          if void_branch
+            out.puts "return when (val arm = XdrJson.name(element, #{JSON_TYPE_CONSTANT})) {"
+            out.indent do
+              void_arms.each do |arm|
+                arm.cases.each { |kase| out.puts union_json_case(union, arm, kase) }
+              end
+              out.puts union_json_default(union, default, union_name, value: false)
+            end
+            out.puts "}"
+          end
+        end
+        out.puts "}"
+      end
+
+      def union_default_arm(union)
+        union.default_arm.present? ? union.default_arm : nil
+      end
+
+      def union_json_case(union, arm, kase)
+        key = JSON_NAMES.union_arm_json_key(kase, union)
+        class_name = arm.name.camelize
+        discriminant = format_discriminant_value(kase, union)
+        arguments = []
+        arguments << discriminant if union_json_dynamic_arm?(union, arm)
+        arguments << json_from_expression(arm.declaration, 'value', key) unless arm.void?
+
+        if arguments.empty?
+          "\"#{key}\" -> #{class_name}"
+        else
+          "\"#{key}\" -> #{class_name}(#{arguments.join(', ')})"
+        end
+      end
+
+      # Without a default arm an unrecognised key is an error. With one, the key still has to
+      # name a discriminant the union can carry: an enum member outside the explicit cases, or
+      # the "v<n>" spelling of an integer discriminant.
+      def union_json_default(union, default, union_name, value:)
+        return "else -> XdrJson.unknownArm(#{JSON_TYPE_CONSTANT}, arm)" if default.nil?
+        return "else -> XdrJson.unknownArm(#{JSON_TYPE_CONSTANT}, arm)" if default.void? != !value
+
+        class_name = default.name.camelize
+        arguments = [union_json_discriminant_from_key(union, union_name)]
+        arguments << json_from_expression(default.declaration, 'value', 'default') unless default.void?
+        "else -> #{class_name}(#{arguments.join(', ')})"
+      end
+
+      def union_json_discriminant_from_key(union, union_name)
+        if union.discriminant_type.is_a?(AST::Definitions::Enum)
+          enum_name = name(union.discriminant_type)
+          "#{enum_name}.findXdrJsonName(arm) ?: XdrJson.unknownArm(#{JSON_TYPE_CONSTANT}, arm)"
+        else
+          require_int_discriminant(union, union_name)
+          "XdrJson.intArm(#{JSON_TYPE_CONSTANT}, arm)"
+        end
+      end
+
+      # The key an arm class derives from the discriminant it carries at run time.
+      def union_json_dynamic_key(union)
+        return 'discriminant.xdrJsonName' if union.discriminant_type.is_a?(AST::Definitions::Enum)
+
+        require_int_discriminant(union, name(union))
+        '"v$discriminant"'
+      end
+
+      def require_int_discriminant(union, union_name)
+        return if kotlin_type_for(union.discriminant) == 'Int'
+
+        raise "#{union_name} switches on #{kotlin_type_for(union.discriminant)}; SEP-0051 keys the " \
+              'arms of an integer-discriminated union from the case value, which this generator ' \
+              'only derives for a plain Int discriminant'
+      end
+
+      # Mirrors the arm-class shapes render_union emits: a class covering more than one case,
+      # and the default arm, carry the discriminant so the wire-read value survives a round trip.
+      def union_json_dynamic_arm?(union, arm)
+        return true if arm.is_a?(AST::Definitions::UnionDefaultArm)
+        return arm.cases.length > 1 unless arm.void?
+
+        class_name = arm.name.camelize
+        union.arms.select { |a| a.void? && a.name.camelize == class_name }
+             .sum { |a| a.is_a?(AST::Definitions::UnionDefaultArm) ? 1 : a.cases.length } > 1
+      end
+
+      def union_json_classes(union)
+        classes = {}
+        union.arms.each do |arm|
+          class_name = arm.name.camelize
+          entry = (classes[class_name] ||= { name: class_name, void: arm.void?, dynamic: false, key: nil })
+          entry[:dynamic] = true if union_json_dynamic_arm?(union, arm)
+          next if arm.is_a?(AST::Definitions::UnionDefaultArm)
+
+          entry[:key] ||= JSON_NAMES.union_arm_json_key(arm.cases.first, union)
+        end
+        classes.values
+      end
+
+      def union_json_imports(union, override)
+        return [JSON_ELEMENT_IMPORT] if override
+
+        imports = [JSON_ELEMENT_IMPORT]
+        default = union_default_arm(union)
+        if union.normal_arms.any? { |arm| !arm.void? } || (default && !default.void?)
+          imports << JSON_BUILDER_IMPORT
+          imports << JSON_OBJECT_IMPORT if union.normal_arms.any?(&:void?) || (default && default.void?)
+        end
+        imports
       end
 
       # Helper method to format a discriminant value for use in when expressions
@@ -644,12 +950,152 @@ module Xdrgen
         out.close
       end
 
-      def render_file_header(out)
+      def render_file_header(out, imports = [], type_name = nil)
         out.puts "// Automatically generated by xdrgen"
         out.puts "// DO NOT EDIT or your changes may be overwritten"
         out.puts
         out.puts "package #{@package}"
         out.puts
+        unless imports.empty?
+          imports.uniq.sort.each { |import| out.puts "import #{import}" }
+          out.puts
+        end
+        return if type_name.nil?
+
+        out.puts "private const val #{JSON_TYPE_CONSTANT} = \"#{type_name}\""
+        out.puts
+      end
+
+      # The two public decode entry points. Both funnel into fromXdrJsonTree, which every
+      # nested type calls directly: the depth limit is applied once, at the outermost type,
+      # because applying it per nested value would rewalk the tree at every level.
+      def render_json_entry_points(out, type_name)
+        out.puts "fun fromXdrJson(json: String): #{type_name} = fromXdrJsonTree(XdrJson.parse(json, #{JSON_TYPE_CONSTANT}))"
+        out.puts
+        out.puts "fun fromXdrJsonElement(element: JsonElement): #{type_name} = " \
+                 "fromXdrJsonTree(XdrJson.checkDepth(element, #{JSON_TYPE_CONSTANT}))"
+        out.puts
+      end
+
+      def json_override(type_name)
+        override = JSON_OVERRIDES.for_type(type_name)
+        @json_overrides_used << type_name if override
+        override
+      end
+
+      def json_imports(override, default_imports)
+        return default_imports unless override
+
+        default_imports + override[:imports]
+      end
+
+      # A registered override that never matched a generated type is a stale entry: the type
+      # was renamed or removed, and the Stellar-specific rendering it carries has silently
+      # stopped being applied. Only a run over the full Stellar .x set can conclude that, so
+      # the caller opts in; a run over a subset says nothing about the registry.
+      def verify_json_overrides_consumed
+        return unless @options[:verify_json_overrides]
+
+        missing = JSON_OVERRIDES.type_names - @json_overrides_used
+        return if missing.empty?
+
+        raise "SEP-0051 overrides registered for types this run did not generate: #{missing.join(', ')}"
+      end
+
+      # The JSON form of a value, as an expression yielding a JsonElement.
+      def json_to_expression(decl, value_expr)
+        case decl
+        when AST::Declarations::Optional
+          "XdrJson.optional(#{value_expr}) { #{json_to_typespec(decl.type, 'it')} }"
+        when AST::Declarations::Array
+          values = decl.fixed? ? "#{value_expr}.asList()" : value_expr
+          "XdrJson.array(#{values}) { #{json_to_typespec(decl.type, 'it')} }"
+        else
+          json_to_typespec(decl.type, value_expr)
+        end
+      end
+
+      def json_to_typespec(typespec, value_expr)
+        case typespec
+        when AST::Typespecs::Int
+          "XdrJson.int32(#{value_expr})"
+        when AST::Typespecs::UnsignedInt
+          "XdrJson.uint32(#{value_expr})"
+        when AST::Typespecs::Hyper
+          "XdrJson.int64(#{value_expr})"
+        when AST::Typespecs::UnsignedHyper
+          "XdrJson.uint64(#{value_expr})"
+        when AST::Typespecs::Float, AST::Typespecs::Double, AST::Typespecs::Quadruple
+          raise_unsupported_json_typespec(typespec)
+        when AST::Typespecs::Bool
+          "XdrJson.bool(#{value_expr})"
+        when AST::Typespecs::String
+          "XdrJson.escapedString(#{value_expr})"
+        when AST::Typespecs::Opaque
+          "XdrJson.hex(#{value_expr})"
+        else
+          "#{value_expr}.toXdrJsonElement()"
+        end
+      end
+
+      # The Kotlin value read out of a JSON element, as an expression. Declared lengths and
+      # maxima are checked here so a decoded instance is one the binary encoder also accepts.
+      def json_from_expression(decl, element_expr, key)
+        case decl
+        when AST::Declarations::Optional
+          inner = json_from_typespec(decl.type, 'it', key)
+          "XdrJson.optional(#{element_expr})?.let { #{inner} }"
+        when AST::Declarations::Array
+          inner = json_from_typespec(decl.type, 'it', key)
+          if decl.fixed?
+            "XdrJson.array(#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\", expectedLength = #{decl.size})" \
+              ".map { #{inner} }.toTypedArray()"
+          else
+            "XdrJson.array(#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\"#{json_max_length(decl.size)})" \
+              ".map { #{inner} }"
+          end
+        else
+          json_from_typespec(decl.type, element_expr, key)
+        end
+      end
+
+      def json_from_typespec(typespec, element_expr, key)
+        arguments = "#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\""
+        case typespec
+        when AST::Typespecs::Int
+          "XdrJson.int32(#{arguments})"
+        when AST::Typespecs::UnsignedInt
+          "XdrJson.uint32(#{arguments})"
+        when AST::Typespecs::Hyper
+          "XdrJson.int64(#{arguments})"
+        when AST::Typespecs::UnsignedHyper
+          "XdrJson.uint64(#{arguments})"
+        when AST::Typespecs::Float, AST::Typespecs::Double, AST::Typespecs::Quadruple
+          raise_unsupported_json_typespec(typespec)
+        when AST::Typespecs::Bool
+          "XdrJson.bool(#{arguments})"
+        when AST::Typespecs::String
+          "XdrJson.unescapeString(#{arguments}#{json_max_length(typespec.size)})"
+        when AST::Typespecs::Opaque
+          if typespec.fixed?
+            "XdrJson.hex(#{arguments}, expectedLength = #{typespec.size})"
+          else
+            "XdrJson.hex(#{arguments}#{json_max_length(typespec.size)})"
+          end
+        when AST::Typespecs::Simple
+          "#{name(typespec.resolved_type)}.fromXdrJsonTree(#{element_expr})"
+        else
+          "#{name(typespec)}.fromXdrJsonTree(#{element_expr})"
+        end
+      end
+
+      def json_max_length(size)
+        size.blank? ? '' : ", maxLength = #{size}"
+      end
+
+      def raise_unsupported_json_typespec(typespec)
+        kind = typespec.class.name.split('::').last.downcase
+        raise "SEP-0051 defines no JSON form for XDR #{kind}, which the Stellar .x files do not use"
       end
 
       def render_source_comment(out, defn)

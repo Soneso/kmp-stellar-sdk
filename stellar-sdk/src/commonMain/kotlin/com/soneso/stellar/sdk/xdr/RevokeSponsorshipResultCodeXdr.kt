@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "RevokeSponsorshipResultCodeXdr"
+
 /**
  * XDR Source:
  * enum RevokeSponsorshipResultCode
@@ -18,15 +22,15 @@ package com.soneso.stellar.sdk.xdr
  *     REVOKE_SPONSORSHIP_MALFORMED = -5
  * };
  */
-enum class RevokeSponsorshipResultCodeXdr(val value: Int) {
+enum class RevokeSponsorshipResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  REVOKE_SPONSORSHIP_SUCCESS(0),
+  REVOKE_SPONSORSHIP_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  REVOKE_SPONSORSHIP_DOES_NOT_EXIST(-1),
-  REVOKE_SPONSORSHIP_NOT_SPONSOR(-2),
-  REVOKE_SPONSORSHIP_LOW_RESERVE(-3),
-  REVOKE_SPONSORSHIP_ONLY_TRANSFERABLE(-4),
-  REVOKE_SPONSORSHIP_MALFORMED(-5);
+  REVOKE_SPONSORSHIP_DOES_NOT_EXIST(-1, "does_not_exist"),
+  REVOKE_SPONSORSHIP_NOT_SPONSOR(-2, "not_sponsor"),
+  REVOKE_SPONSORSHIP_LOW_RESERVE(-3, "low_reserve"),
+  REVOKE_SPONSORSHIP_ONLY_TRANSFERABLE(-4, "only_transferable"),
+  REVOKE_SPONSORSHIP_MALFORMED(-5, "malformed");
 
   companion object {
 
@@ -35,9 +39,24 @@ enum class RevokeSponsorshipResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown RevokeSponsorshipResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): RevokeSponsorshipResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RevokeSponsorshipResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RevokeSponsorshipResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): RevokeSponsorshipResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

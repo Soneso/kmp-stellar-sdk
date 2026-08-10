@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ContractCostParamsXdr"
+
 /**
  * XDR Source:
  * typedef ContractCostParamEntry ContractCostParams<CONTRACT_COST_COUNT_LIMIT>;
@@ -15,6 +19,12 @@ value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
       val value = List(reader.readInt()) { ContractCostParamEntryXdr.decode(reader) }
       return ContractCostParamsXdr(value)
     }
+
+    fun fromXdrJson(json: String): ContractCostParamsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractCostParamsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractCostParamsXdr = ContractCostParamsXdr(XdrJson.array(element, XDR_JSON_TYPE, "value", maxLength = CONTRACT_COST_COUNT_LIMIT).map { ContractCostParamEntryXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -23,4 +33,8 @@ value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

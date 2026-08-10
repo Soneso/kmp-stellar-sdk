@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SetTrustLineFlagsResultXdr"
+
 /**
  * XDR Source:
  * union SetTrustLineFlagsResult switch (SetTrustLineFlagsResultCode code)
@@ -38,6 +42,22 @@ sealed class SetTrustLineFlagsResultXdr {
         else -> throw IllegalArgumentException("Unknown SetTrustLineFlagsResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SetTrustLineFlagsResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SetTrustLineFlagsResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SetTrustLineFlagsResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_SUCCESS)
+        "malformed" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_MALFORMED)
+        "no_trust_line" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_NO_TRUST_LINE)
+        "cant_revoke" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_CANT_REVOKE)
+        "invalid_state" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_INVALID_STATE)
+        "low_reserve" -> Void(SetTrustLineFlagsResultCodeXdr.SET_TRUST_LINE_FLAGS_LOW_RESERVE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -46,4 +66,10 @@ sealed class SetTrustLineFlagsResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

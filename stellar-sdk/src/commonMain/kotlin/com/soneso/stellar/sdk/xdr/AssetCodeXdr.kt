@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AssetCodeXdr"
+
 /**
  * XDR Source:
  * union AssetCode switch (AssetType type)
@@ -47,6 +51,19 @@ sealed class AssetCodeXdr {
         else -> throw IllegalArgumentException("Unknown AssetCodeXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): AssetCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AssetCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AssetCodeXdr {
+      val code = XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value")
+      return if (code.size <= 4) {
+        AssetCode4(AssetCode4Xdr(XdrJson.padAssetCode(code, XDR_JSON_TYPE, 4)))
+      } else {
+        AssetCode12(AssetCode12Xdr(XdrJson.padAssetCode(code, XDR_JSON_TYPE, 12)))
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -60,4 +77,11 @@ sealed class AssetCodeXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is AssetCode4 -> value.toXdrJsonElement()
+    is AssetCode12 -> value.toXdrJsonElement()
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

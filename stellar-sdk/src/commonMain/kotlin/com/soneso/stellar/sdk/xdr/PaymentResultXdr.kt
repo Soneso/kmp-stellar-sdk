@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PaymentResultXdr"
+
 /**
  * XDR Source:
  * union PaymentResult switch (PaymentResultCode code)
@@ -46,6 +50,26 @@ sealed class PaymentResultXdr {
         else -> throw IllegalArgumentException("Unknown PaymentResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): PaymentResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PaymentResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PaymentResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(PaymentResultCodeXdr.PAYMENT_SUCCESS)
+        "malformed" -> Void(PaymentResultCodeXdr.PAYMENT_MALFORMED)
+        "underfunded" -> Void(PaymentResultCodeXdr.PAYMENT_UNDERFUNDED)
+        "src_no_trust" -> Void(PaymentResultCodeXdr.PAYMENT_SRC_NO_TRUST)
+        "src_not_authorized" -> Void(PaymentResultCodeXdr.PAYMENT_SRC_NOT_AUTHORIZED)
+        "no_destination" -> Void(PaymentResultCodeXdr.PAYMENT_NO_DESTINATION)
+        "no_trust" -> Void(PaymentResultCodeXdr.PAYMENT_NO_TRUST)
+        "not_authorized" -> Void(PaymentResultCodeXdr.PAYMENT_NOT_AUTHORIZED)
+        "line_full" -> Void(PaymentResultCodeXdr.PAYMENT_LINE_FULL)
+        "no_issuer" -> Void(PaymentResultCodeXdr.PAYMENT_NO_ISSUER)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -54,4 +78,10 @@ sealed class PaymentResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

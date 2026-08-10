@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCMetaEntryXdr"
+
 /**
  * XDR Source:
  * union SCMetaEntry switch (SCMetaKind kind)
@@ -32,6 +37,18 @@ sealed class SCMetaEntryXdr {
         else -> throw IllegalArgumentException("Unknown SCMetaEntryXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCMetaEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCMetaEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCMetaEntryXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "sc_meta_v0" -> V0(SCMetaV0Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +59,10 @@ sealed class SCMetaEntryXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> buildJsonObject { put("sc_meta_v0", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

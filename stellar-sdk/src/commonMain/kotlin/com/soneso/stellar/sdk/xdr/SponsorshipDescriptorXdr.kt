@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SponsorshipDescriptorXdr"
+
 /**
  * XDR Source:
  * typedef AccountID* SponsorshipDescriptor;
@@ -15,6 +19,12 @@ value class SponsorshipDescriptorXdr(val value: AccountIDXdr?) {
       val value = if (reader.readBoolean()) AccountIDXdr.decode(reader) else null
       return SponsorshipDescriptorXdr(value)
     }
+
+    fun fromXdrJson(json: String): SponsorshipDescriptorXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SponsorshipDescriptorXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SponsorshipDescriptorXdr = SponsorshipDescriptorXdr(XdrJson.optional(element)?.let { AccountIDXdr.fromXdrJsonTree(it) })
   }
 
   fun encode(writer: XdrWriter) {
@@ -25,4 +35,8 @@ value class SponsorshipDescriptorXdr(val value: AccountIDXdr?) {
       writer.writeBoolean(false)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.optional(value) { it.toXdrJsonElement() }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

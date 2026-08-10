@@ -1781,6 +1781,104 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def parse_sep_51(self) -> Dict[str, Any]:
+        """Parse SEP-51 (XDR-JSON) structure - hardcoded definitions
+
+        The specification is prose and JSON snippets rather than field tables, so the
+        requirements are transcribed from its Specification sections: the XDR data type
+        mappings, the Stellar-specific address, asset code and integer types, the optional
+        `$schema` property, and the two version-1 compatibility notes carried inside the
+        Hyper Integer and Unsigned Hyper Integer sections.
+        """
+        print(f"{Colors.BLUE}Using SEP-51 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # XDR Data Types
+        section = Section(title='XDR Data Types', key='xdr_data_types')
+        section.fields = [
+            Field(name='integer_32', description='Signed 32-bit integer maps to a JSON number', field_type='data_type', required=True),
+            Field(name='unsigned_integer_32', description='Unsigned 32-bit integer maps to a JSON number', field_type='data_type', required=True),
+            Field(name='hyper_integer_64', description='Signed 64-bit integer maps to a base-10 JSON string', field_type='data_type', required=True),
+            Field(name='unsigned_hyper_integer_64', description='Unsigned 64-bit integer maps to a base-10 JSON string', field_type='data_type', required=True),
+            Field(name='boolean', description='Boolean maps to a JSON boolean', field_type='data_type', required=True),
+            Field(name='opaque_fixed_length', description='Fixed-length opaque data maps to a hexadecimal string', field_type='data_type', required=True),
+            Field(name='opaque_variable_length', description='Variable-length opaque data maps to a hexadecimal string', field_type='data_type', required=True),
+            Field(name='string', description=r'String maps to ASCII with NUL, tab, newline, return and backslash escaped, other bytes as \xNN', field_type='data_type', required=True),
+            Field(name='array_fixed_length', description='Fixed-length array maps to a JSON array of encoded elements', field_type='data_type', required=True),
+            Field(name='array_variable_length', description='Variable-length array maps to a JSON array of encoded elements', field_type='data_type', required=True),
+            Field(name='enum', description='Enum maps to its member name in snake_case with any shared prefix removed', field_type='data_type', required=True),
+            Field(name='struct', description='Struct maps to a JSON object keyed by member names in snake_case', field_type='data_type', required=True),
+            Field(name='discriminated_union', description='Union maps to the arm name for a void arm, otherwise to a single-key object', field_type='data_type', required=True),
+            Field(name='void', description='Void carries no JSON value of its own', field_type='data_type', required=True),
+            Field(name='optional_data', description='Optional data maps to null when unset, otherwise to the encoded value', field_type='data_type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'XDR Data Types': {len(section.fields)} fields{Colors.END}")
+
+        # Address Types
+        section = Section(title='Address Types', key='address_types')
+        section.fields = [
+            Field(name='sc_address', description='SCAddress maps to a G, C, M, B or L strkey depending on the arm', field_type='stellar_type', required=True),
+            Field(name='account_id', description='AccountID maps to a G strkey', field_type='stellar_type', required=True),
+            Field(name='contract_id', description='ContractID maps to a C strkey', field_type='stellar_type', required=True),
+            Field(name='muxed_account', description='MuxedAccount maps to a G strkey for ed25519 and an M strkey for muxed ed25519', field_type='stellar_type', required=True),
+            Field(name='muxed_account_med25519', description='MuxedAccountMed25519 maps to an M strkey', field_type='stellar_type', required=True),
+            Field(name='muxed_ed25519_account', description='MuxedEd25519Account maps to an M strkey', field_type='stellar_type', required=True),
+            Field(name='pool_id', description='PoolID maps to an L strkey', field_type='stellar_type', required=True),
+            Field(name='claimable_balance_id', description='ClaimableBalanceID maps to a B strkey', field_type='stellar_type', required=True),
+            Field(name='public_key', description='PublicKey maps to a G strkey', field_type='stellar_type', required=True),
+            Field(name='node_id', description='NodeID maps to a G strkey', field_type='stellar_type', required=True),
+            Field(name='signer_key', description='SignerKey maps to a G, T, X or P strkey depending on the arm', field_type='stellar_type', required=True),
+            Field(name='signer_key_ed25519_signed_payload', description='SignerKeyEd25519SignedPayload maps to a P strkey', field_type='stellar_type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Address Types': {len(section.fields)} fields{Colors.END}")
+
+        # Asset Code Types
+        section = Section(title='Asset Code Types', key='asset_code_types')
+        section.fields = [
+            Field(name='asset_code', description='AssetCode maps according to AssetCode4 or AssetCode12', field_type='stellar_type', required=True),
+            Field(name='asset_code4', description='AssetCode4 drops all trailing zero bytes, then applies the string escaping', field_type='stellar_type', required=True),
+            Field(name='asset_code12', description='AssetCode12 drops trailing zero bytes down to the 6th, keeping at least 5 characters', field_type='stellar_type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Asset Code Types': {len(section.fields)} fields{Colors.END}")
+
+        # Integer Types
+        section = Section(title='Integer Types', key='integer_types')
+        section.fields = [
+            Field(name='uint128_parts', description='UInt128Parts maps to a base-10 JSON string of the 128-bit unsigned value', field_type='stellar_type', required=True),
+            Field(name='int128_parts', description='Int128Parts maps to a base-10 JSON string of the 128-bit signed value', field_type='stellar_type', required=True),
+            Field(name='uint256_parts', description='UInt256Parts maps to a base-10 JSON string of the 256-bit unsigned value', field_type='stellar_type', required=True),
+            Field(name='int256_parts', description='Int256Parts maps to a base-10 JSON string of the 256-bit signed value', field_type='stellar_type', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Integer Types': {len(section.fields)} fields{Colors.END}")
+
+        # Backward Compatibility
+        #
+        # Stated as notes at the end of the "Hyper Integer (64-bit)" and "Unsigned Hyper
+        # Integer (64-bit)" sections rather than under a heading of their own. Both are
+        # "should" rather than "must", so they are recorded as optional.
+        section = Section(title='Backward Compatibility', key='backward_compatibility')
+        section.fields = [
+            Field(name='hyper_accepts_json_number', description='Deserializing a JSON number for Hyper is supported, for compatibility with XDR-JSON v1', field_type='feature', required=False),
+            Field(name='unsigned_hyper_accepts_json_number', description='Deserializing a JSON number for Unsigned Hyper is supported, for compatibility with XDR-JSON v1', field_type='feature', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Backward Compatibility': {len(section.fields)} fields{Colors.END}")
+
+        # JSON Schema
+        section = Section(title='JSON Schema', key='json_schema')
+        section.fields = [
+            Field(name='schema_property', description='JSON objects allow, but do not require, a $schema property holding a JSON Schema URL', field_type='feature', required=False),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'JSON Schema': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
     def parse_sep_53(self) -> Dict[str, Any]:
         """Parse SEP-53 (Message Signing) structure - hardcoded definitions"""
         print(f"{Colors.BLUE}Using SEP-53 specific parser (hardcoded){Colors.END}")
@@ -1880,6 +1978,7 @@ class SEPParser:
             '0046': self.parse_sep_46,
             '0047': self.parse_sep_47,
             '0048': self.parse_sep_48,
+            '0051': self.parse_sep_51,
             '0053': self.parse_sep_53,
         }
 

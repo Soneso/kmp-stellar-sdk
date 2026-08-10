@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "CreateAccountResultXdr"
+
 /**
  * XDR Source:
  * union CreateAccountResult switch (CreateAccountResultCode code)
@@ -36,6 +40,21 @@ sealed class CreateAccountResultXdr {
         else -> throw IllegalArgumentException("Unknown CreateAccountResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): CreateAccountResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CreateAccountResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CreateAccountResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(CreateAccountResultCodeXdr.CREATE_ACCOUNT_SUCCESS)
+        "malformed" -> Void(CreateAccountResultCodeXdr.CREATE_ACCOUNT_MALFORMED)
+        "underfunded" -> Void(CreateAccountResultCodeXdr.CREATE_ACCOUNT_UNDERFUNDED)
+        "low_reserve" -> Void(CreateAccountResultCodeXdr.CREATE_ACCOUNT_LOW_RESERVE)
+        "already_exist" -> Void(CreateAccountResultCodeXdr.CREATE_ACCOUNT_ALREADY_EXIST)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +63,10 @@ sealed class CreateAccountResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

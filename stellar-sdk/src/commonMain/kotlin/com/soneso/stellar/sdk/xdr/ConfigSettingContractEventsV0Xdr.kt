@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingContractEventsV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("tx_max_contract_events_size_bytes", "fee_contract_events1_kb")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractEventsV0
@@ -26,10 +33,29 @@ data class ConfigSettingContractEventsV0Xdr(
       val feeContractEvents1Kb = Int64Xdr.decode(reader)
       return ConfigSettingContractEventsV0Xdr(txMaxContractEventsSizeBytes, feeContractEvents1Kb)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingContractEventsV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractEventsV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractEventsV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ConfigSettingContractEventsV0Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_contract_events_size_bytes", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_contract_events1_kb", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     txMaxContractEventsSizeBytes.encode(writer)
     feeContractEvents1Kb.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("tx_max_contract_events_size_bytes", txMaxContractEventsSizeBytes.toXdrJsonElement())
+    put("fee_contract_events1_kb", feeContractEvents1Kb.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "OperationResultCodeXdr"
+
 /**
  * XDR Source:
  * enum OperationResultCode
@@ -17,21 +21,21 @@ package com.soneso.stellar.sdk.xdr
  *     opTOO_MANY_SPONSORING = -6  // account is sponsoring too many entries
  * };
  */
-enum class OperationResultCodeXdr(val value: Int) {
+enum class OperationResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** inner object result is valid */
-  opINNER(0),
+  opINNER(0, "op_inner"),
   /** too few valid signatures / wrong network */
-  opBAD_AUTH(-1),
+  opBAD_AUTH(-1, "op_bad_auth"),
   /** source account was not found */
-  opNO_ACCOUNT(-2),
+  opNO_ACCOUNT(-2, "op_no_account"),
   /** operation not supported at this time */
-  opNOT_SUPPORTED(-3),
+  opNOT_SUPPORTED(-3, "op_not_supported"),
   /** max number of subentries already reached */
-  opTOO_MANY_SUBENTRIES(-4),
+  opTOO_MANY_SUBENTRIES(-4, "op_too_many_subentries"),
   /** operation did too much work */
-  opEXCEEDED_WORK_LIMIT(-5),
+  opEXCEEDED_WORK_LIMIT(-5, "op_exceeded_work_limit"),
   /** account is sponsoring too many entries */
-  opTOO_MANY_SPONSORING(-6);
+  opTOO_MANY_SPONSORING(-6, "op_too_many_sponsoring");
 
   companion object {
 
@@ -40,9 +44,24 @@ enum class OperationResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown OperationResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): OperationResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): OperationResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

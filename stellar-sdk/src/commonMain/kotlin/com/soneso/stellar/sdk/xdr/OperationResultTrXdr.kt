@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "OperationResultTrXdr"
+
 /**
  * XDR Source:
  * union switch (OperationType type)
@@ -344,6 +349,44 @@ sealed class OperationResultTrXdr {
         else -> throw IllegalArgumentException("Unknown OperationResultTrXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): OperationResultTrXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationResultTrXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationResultTrXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "create_account" -> CreateAccountResult(CreateAccountResultXdr.fromXdrJsonTree(value))
+        "payment" -> PaymentResult(PaymentResultXdr.fromXdrJsonTree(value))
+        "path_payment_strict_receive" -> PathPaymentStrictReceiveResult(PathPaymentStrictReceiveResultXdr.fromXdrJsonTree(value))
+        "manage_sell_offer" -> ManageSellOfferResult(ManageSellOfferResultXdr.fromXdrJsonTree(value))
+        "create_passive_sell_offer" -> CreatePassiveSellOfferResult(ManageSellOfferResultXdr.fromXdrJsonTree(value))
+        "set_options" -> SetOptionsResult(SetOptionsResultXdr.fromXdrJsonTree(value))
+        "change_trust" -> ChangeTrustResult(ChangeTrustResultXdr.fromXdrJsonTree(value))
+        "allow_trust" -> AllowTrustResult(AllowTrustResultXdr.fromXdrJsonTree(value))
+        "account_merge" -> AccountMergeResult(AccountMergeResultXdr.fromXdrJsonTree(value))
+        "inflation" -> InflationResult(InflationResultXdr.fromXdrJsonTree(value))
+        "manage_data" -> ManageDataResult(ManageDataResultXdr.fromXdrJsonTree(value))
+        "bump_sequence" -> BumpSeqResult(BumpSequenceResultXdr.fromXdrJsonTree(value))
+        "manage_buy_offer" -> ManageBuyOfferResult(ManageBuyOfferResultXdr.fromXdrJsonTree(value))
+        "path_payment_strict_send" -> PathPaymentStrictSendResult(PathPaymentStrictSendResultXdr.fromXdrJsonTree(value))
+        "create_claimable_balance" -> CreateClaimableBalanceResult(CreateClaimableBalanceResultXdr.fromXdrJsonTree(value))
+        "claim_claimable_balance" -> ClaimClaimableBalanceResult(ClaimClaimableBalanceResultXdr.fromXdrJsonTree(value))
+        "begin_sponsoring_future_reserves" -> BeginSponsoringFutureReservesResult(BeginSponsoringFutureReservesResultXdr.fromXdrJsonTree(value))
+        "end_sponsoring_future_reserves" -> EndSponsoringFutureReservesResult(EndSponsoringFutureReservesResultXdr.fromXdrJsonTree(value))
+        "revoke_sponsorship" -> RevokeSponsorshipResult(RevokeSponsorshipResultXdr.fromXdrJsonTree(value))
+        "clawback" -> ClawbackResult(ClawbackResultXdr.fromXdrJsonTree(value))
+        "clawback_claimable_balance" -> ClawbackClaimableBalanceResult(ClawbackClaimableBalanceResultXdr.fromXdrJsonTree(value))
+        "set_trust_line_flags" -> SetTrustLineFlagsResult(SetTrustLineFlagsResultXdr.fromXdrJsonTree(value))
+        "liquidity_pool_deposit" -> LiquidityPoolDepositResult(LiquidityPoolDepositResultXdr.fromXdrJsonTree(value))
+        "liquidity_pool_withdraw" -> LiquidityPoolWithdrawResult(LiquidityPoolWithdrawResultXdr.fromXdrJsonTree(value))
+        "invoke_host_function" -> InvokeHostFunctionResult(InvokeHostFunctionResultXdr.fromXdrJsonTree(value))
+        "extend_footprint_ttl" -> ExtendFootprintTTLResult(ExtendFootprintTTLResultXdr.fromXdrJsonTree(value))
+        "restore_footprint" -> RestoreFootprintResult(RestoreFootprintResultXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -432,4 +475,36 @@ sealed class OperationResultTrXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is CreateAccountResult -> buildJsonObject { put("create_account", value.toXdrJsonElement()) }
+    is PaymentResult -> buildJsonObject { put("payment", value.toXdrJsonElement()) }
+    is PathPaymentStrictReceiveResult -> buildJsonObject { put("path_payment_strict_receive", value.toXdrJsonElement()) }
+    is ManageSellOfferResult -> buildJsonObject { put("manage_sell_offer", value.toXdrJsonElement()) }
+    is CreatePassiveSellOfferResult -> buildJsonObject { put("create_passive_sell_offer", value.toXdrJsonElement()) }
+    is SetOptionsResult -> buildJsonObject { put("set_options", value.toXdrJsonElement()) }
+    is ChangeTrustResult -> buildJsonObject { put("change_trust", value.toXdrJsonElement()) }
+    is AllowTrustResult -> buildJsonObject { put("allow_trust", value.toXdrJsonElement()) }
+    is AccountMergeResult -> buildJsonObject { put("account_merge", value.toXdrJsonElement()) }
+    is InflationResult -> buildJsonObject { put("inflation", value.toXdrJsonElement()) }
+    is ManageDataResult -> buildJsonObject { put("manage_data", value.toXdrJsonElement()) }
+    is BumpSeqResult -> buildJsonObject { put("bump_sequence", value.toXdrJsonElement()) }
+    is ManageBuyOfferResult -> buildJsonObject { put("manage_buy_offer", value.toXdrJsonElement()) }
+    is PathPaymentStrictSendResult -> buildJsonObject { put("path_payment_strict_send", value.toXdrJsonElement()) }
+    is CreateClaimableBalanceResult -> buildJsonObject { put("create_claimable_balance", value.toXdrJsonElement()) }
+    is ClaimClaimableBalanceResult -> buildJsonObject { put("claim_claimable_balance", value.toXdrJsonElement()) }
+    is BeginSponsoringFutureReservesResult -> buildJsonObject { put("begin_sponsoring_future_reserves", value.toXdrJsonElement()) }
+    is EndSponsoringFutureReservesResult -> buildJsonObject { put("end_sponsoring_future_reserves", value.toXdrJsonElement()) }
+    is RevokeSponsorshipResult -> buildJsonObject { put("revoke_sponsorship", value.toXdrJsonElement()) }
+    is ClawbackResult -> buildJsonObject { put("clawback", value.toXdrJsonElement()) }
+    is ClawbackClaimableBalanceResult -> buildJsonObject { put("clawback_claimable_balance", value.toXdrJsonElement()) }
+    is SetTrustLineFlagsResult -> buildJsonObject { put("set_trust_line_flags", value.toXdrJsonElement()) }
+    is LiquidityPoolDepositResult -> buildJsonObject { put("liquidity_pool_deposit", value.toXdrJsonElement()) }
+    is LiquidityPoolWithdrawResult -> buildJsonObject { put("liquidity_pool_withdraw", value.toXdrJsonElement()) }
+    is InvokeHostFunctionResult -> buildJsonObject { put("invoke_host_function", value.toXdrJsonElement()) }
+    is ExtendFootprintTTLResult -> buildJsonObject { put("extend_footprint_ttl", value.toXdrJsonElement()) }
+    is RestoreFootprintResult -> buildJsonObject { put("restore_footprint", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

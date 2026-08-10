@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionEnvelopeXdr"
+
 /**
  * XDR Source:
  * union TransactionEnvelope switch (EnvelopeType type)
@@ -56,6 +61,20 @@ sealed class TransactionEnvelopeXdr {
         else -> throw IllegalArgumentException("Unknown TransactionEnvelopeXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): TransactionEnvelopeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionEnvelopeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionEnvelopeXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "tx_v0" -> V0(TransactionV0EnvelopeXdr.fromXdrJsonTree(value))
+        "tx" -> V1(TransactionV1EnvelopeXdr.fromXdrJsonTree(value))
+        "tx_fee_bump" -> FeeBump(FeeBumpTransactionEnvelopeXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -72,4 +91,12 @@ sealed class TransactionEnvelopeXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is V0 -> buildJsonObject { put("tx_v0", value.toXdrJsonElement()) }
+    is V1 -> buildJsonObject { put("tx", value.toXdrJsonElement()) }
+    is FeeBump -> buildJsonObject { put("tx_fee_bump", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

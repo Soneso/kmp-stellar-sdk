@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCSpecTypeXdr"
+
 /**
  * XDR Source:
  * enum SCSpecType
@@ -41,36 +45,36 @@ package com.soneso.stellar.sdk.xdr
  *     SC_SPEC_TYPE_UDT = 2000
  * };
  */
-enum class SCSpecTypeXdr(val value: Int) {
-  SC_SPEC_TYPE_VAL(0),
+enum class SCSpecTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SC_SPEC_TYPE_VAL(0, "val"),
   /** Types with no parameters. */
-  SC_SPEC_TYPE_BOOL(1),
-  SC_SPEC_TYPE_VOID(2),
-  SC_SPEC_TYPE_ERROR(3),
-  SC_SPEC_TYPE_U32(4),
-  SC_SPEC_TYPE_I32(5),
-  SC_SPEC_TYPE_U64(6),
-  SC_SPEC_TYPE_I64(7),
-  SC_SPEC_TYPE_TIMEPOINT(8),
-  SC_SPEC_TYPE_DURATION(9),
-  SC_SPEC_TYPE_U128(10),
-  SC_SPEC_TYPE_I128(11),
-  SC_SPEC_TYPE_U256(12),
-  SC_SPEC_TYPE_I256(13),
-  SC_SPEC_TYPE_BYTES(14),
-  SC_SPEC_TYPE_STRING(16),
-  SC_SPEC_TYPE_SYMBOL(17),
-  SC_SPEC_TYPE_ADDRESS(19),
-  SC_SPEC_TYPE_MUXED_ADDRESS(20),
+  SC_SPEC_TYPE_BOOL(1, "bool"),
+  SC_SPEC_TYPE_VOID(2, "void"),
+  SC_SPEC_TYPE_ERROR(3, "error"),
+  SC_SPEC_TYPE_U32(4, "u32"),
+  SC_SPEC_TYPE_I32(5, "i32"),
+  SC_SPEC_TYPE_U64(6, "u64"),
+  SC_SPEC_TYPE_I64(7, "i64"),
+  SC_SPEC_TYPE_TIMEPOINT(8, "timepoint"),
+  SC_SPEC_TYPE_DURATION(9, "duration"),
+  SC_SPEC_TYPE_U128(10, "u128"),
+  SC_SPEC_TYPE_I128(11, "i128"),
+  SC_SPEC_TYPE_U256(12, "u256"),
+  SC_SPEC_TYPE_I256(13, "i256"),
+  SC_SPEC_TYPE_BYTES(14, "bytes"),
+  SC_SPEC_TYPE_STRING(16, "string"),
+  SC_SPEC_TYPE_SYMBOL(17, "symbol"),
+  SC_SPEC_TYPE_ADDRESS(19, "address"),
+  SC_SPEC_TYPE_MUXED_ADDRESS(20, "muxed_address"),
   /** Types with parameters. */
-  SC_SPEC_TYPE_OPTION(1000),
-  SC_SPEC_TYPE_RESULT(1001),
-  SC_SPEC_TYPE_VEC(1002),
-  SC_SPEC_TYPE_MAP(1004),
-  SC_SPEC_TYPE_TUPLE(1005),
-  SC_SPEC_TYPE_BYTES_N(1006),
+  SC_SPEC_TYPE_OPTION(1000, "option"),
+  SC_SPEC_TYPE_RESULT(1001, "result"),
+  SC_SPEC_TYPE_VEC(1002, "vec"),
+  SC_SPEC_TYPE_MAP(1004, "map"),
+  SC_SPEC_TYPE_TUPLE(1005, "tuple"),
+  SC_SPEC_TYPE_BYTES_N(1006, "bytes_n"),
   /** User defined types. */
-  SC_SPEC_TYPE_UDT(2000);
+  SC_SPEC_TYPE_UDT(2000, "udt");
 
   companion object {
 
@@ -79,9 +83,24 @@ enum class SCSpecTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCSpecTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCSpecTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCSpecTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

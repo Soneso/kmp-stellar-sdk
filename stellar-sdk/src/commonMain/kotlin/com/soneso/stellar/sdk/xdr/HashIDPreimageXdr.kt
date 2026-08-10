@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HashIDPreimageXdr"
+
 /**
  * XDR Source:
  * union HashIDPreimage switch (EnvelopeType type)
@@ -109,6 +114,22 @@ sealed class HashIDPreimageXdr {
         else -> throw IllegalArgumentException("Unknown HashIDPreimageXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): HashIDPreimageXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HashIDPreimageXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HashIDPreimageXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "op_id" -> OperationID(HashIDPreimageOperationIDXdr.fromXdrJsonTree(value))
+        "pool_revoke_op_id" -> RevokeID(HashIDPreimageRevokeIDXdr.fromXdrJsonTree(value))
+        "contract_id" -> ContractID(HashIDPreimageContractIDXdr.fromXdrJsonTree(value))
+        "soroban_authorization" -> SorobanAuthorization(HashIDPreimageSorobanAuthorizationXdr.fromXdrJsonTree(value))
+        "soroban_authorization_with_address" -> SorobanAuthorizationWithAddress(HashIDPreimageSorobanAuthorizationWithAddressXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -131,4 +152,14 @@ sealed class HashIDPreimageXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is OperationID -> buildJsonObject { put("op_id", value.toXdrJsonElement()) }
+    is RevokeID -> buildJsonObject { put("pool_revoke_op_id", value.toXdrJsonElement()) }
+    is ContractID -> buildJsonObject { put("contract_id", value.toXdrJsonElement()) }
+    is SorobanAuthorization -> buildJsonObject { put("soroban_authorization", value.toXdrJsonElement()) }
+    is SorobanAuthorizationWithAddress -> buildJsonObject { put("soroban_authorization_with_address", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

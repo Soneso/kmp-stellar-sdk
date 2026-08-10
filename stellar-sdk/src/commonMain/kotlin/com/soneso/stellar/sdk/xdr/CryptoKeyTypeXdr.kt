@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "CryptoKeyTypeXdr"
+
 /**
  * XDR Source:
  * enum CryptoKeyType
@@ -16,16 +20,16 @@ package com.soneso.stellar.sdk.xdr
  *     KEY_TYPE_MUXED_ED25519 = 0x100
  * };
  */
-enum class CryptoKeyTypeXdr(val value: Int) {
-  KEY_TYPE_ED25519(0),
-  KEY_TYPE_PRE_AUTH_TX(1),
-  KEY_TYPE_HASH_X(2),
-  KEY_TYPE_ED25519_SIGNED_PAYLOAD(3),
+enum class CryptoKeyTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  KEY_TYPE_ED25519(0, "ed25519"),
+  KEY_TYPE_PRE_AUTH_TX(1, "pre_auth_tx"),
+  KEY_TYPE_HASH_X(2, "hash_x"),
+  KEY_TYPE_ED25519_SIGNED_PAYLOAD(3, "ed25519_signed_payload"),
   /**
    * MUXED enum values for supported type are derived from the enum values
    * above by ORing them with 0x100
    */
-  KEY_TYPE_MUXED_ED25519(256);
+  KEY_TYPE_MUXED_ED25519(256, "muxed_ed25519");
 
   companion object {
 
@@ -34,9 +38,24 @@ enum class CryptoKeyTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown CryptoKeyTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): CryptoKeyTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): CryptoKeyTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): CryptoKeyTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): CryptoKeyTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

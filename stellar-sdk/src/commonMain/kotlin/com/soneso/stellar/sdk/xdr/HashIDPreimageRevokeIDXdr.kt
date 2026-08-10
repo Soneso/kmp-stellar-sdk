@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HashIDPreimageRevokeIDXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("source_account", "seq_num", "op_num", "liquidity_pool_id", "asset")
+
 /**
  * XDR Source:
  * struct
@@ -31,6 +38,21 @@ data class HashIDPreimageRevokeIDXdr(
       val asset = AssetXdr.decode(reader)
       return HashIDPreimageRevokeIDXdr(sourceAccount, seqNum, opNum, liquidityPoolId, asset)
     }
+
+    fun fromXdrJson(json: String): HashIDPreimageRevokeIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HashIDPreimageRevokeIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HashIDPreimageRevokeIDXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return HashIDPreimageRevokeIDXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "source_account", XDR_JSON_TYPE)),
+        SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "seq_num", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "op_num", XDR_JSON_TYPE)),
+        PoolIDXdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_id", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -40,4 +62,14 @@ data class HashIDPreimageRevokeIDXdr(
     liquidityPoolId.encode(writer)
     asset.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("source_account", sourceAccount.toXdrJsonElement())
+    put("seq_num", seqNum.toXdrJsonElement())
+    put("op_num", opNum.toXdrJsonElement())
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
+    put("asset", asset.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HashIDPreimageSorobanAuthorizationWithAddressXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("network_id", "nonce", "signature_expiration_ledger", "address", "invocation")
+
 /**
  * XDR Source:
  * struct
@@ -31,6 +38,21 @@ data class HashIDPreimageSorobanAuthorizationWithAddressXdr(
       val invocation = SorobanAuthorizedInvocationXdr.decode(reader)
       return HashIDPreimageSorobanAuthorizationWithAddressXdr(networkId, nonce, signatureExpirationLedger, address, invocation)
     }
+
+    fun fromXdrJson(json: String): HashIDPreimageSorobanAuthorizationWithAddressXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HashIDPreimageSorobanAuthorizationWithAddressXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HashIDPreimageSorobanAuthorizationWithAddressXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return HashIDPreimageSorobanAuthorizationWithAddressXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "network_id", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "nonce", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "signature_expiration_ledger", XDR_JSON_TYPE)),
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "address", XDR_JSON_TYPE)),
+        SorobanAuthorizedInvocationXdr.fromXdrJsonTree(XdrJson.field(json, "invocation", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -40,4 +62,14 @@ data class HashIDPreimageSorobanAuthorizationWithAddressXdr(
     address.encode(writer)
     invocation.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("network_id", networkId.toXdrJsonElement())
+    put("nonce", nonce.toXdrJsonElement())
+    put("signature_expiration_ledger", signatureExpirationLedger.toXdrJsonElement())
+    put("address", address.toXdrJsonElement())
+    put("invocation", invocation.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

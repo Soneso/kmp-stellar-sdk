@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "BucketEntryXdr"
+
 /**
  * XDR Source:
  * union BucketEntry switch (BucketEntryType type)
@@ -61,6 +66,21 @@ sealed class BucketEntryXdr {
         else -> throw IllegalArgumentException("Unknown BucketEntryXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): BucketEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BucketEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BucketEntryXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "liveentry" -> LiveEntry(BucketEntryTypeXdr.LIVEENTRY, LedgerEntryXdr.fromXdrJsonTree(value))
+        "initentry" -> LiveEntry(BucketEntryTypeXdr.INITENTRY, LedgerEntryXdr.fromXdrJsonTree(value))
+        "deadentry" -> DeadEntry(LedgerKeyXdr.fromXdrJsonTree(value))
+        "metaentry" -> MetaEntry(BucketMetadataXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -77,4 +97,12 @@ sealed class BucketEntryXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is LiveEntry -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
+    is DeadEntry -> buildJsonObject { put("deadentry", value.toXdrJsonElement()) }
+    is MetaEntry -> buildJsonObject { put("metaentry", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AllowTrustResultCodeXdr"
+
 /**
  * XDR Source:
  * enum AllowTrustResultCode
@@ -20,24 +24,24 @@ package com.soneso.stellar.sdk.xdr
  *                                        // on revoke due to low reserves
  * };
  */
-enum class AllowTrustResultCodeXdr(val value: Int) {
+enum class AllowTrustResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  ALLOW_TRUST_SUCCESS(0),
+  ALLOW_TRUST_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * asset is not ASSET_TYPE_ALPHANUM
    */
-  ALLOW_TRUST_MALFORMED(-1),
+  ALLOW_TRUST_MALFORMED(-1, "malformed"),
   /** trustor does not have a trustline */
-  ALLOW_TRUST_NO_TRUST_LINE(-2),
+  ALLOW_TRUST_NO_TRUST_LINE(-2, "no_trust_line"),
   /** source account does not require trust */
-  ALLOW_TRUST_TRUST_NOT_REQUIRED(-3),
+  ALLOW_TRUST_TRUST_NOT_REQUIRED(-3, "trust_not_required"),
   /** source account can't revoke trust, */
-  ALLOW_TRUST_CANT_REVOKE(-4),
+  ALLOW_TRUST_CANT_REVOKE(-4, "cant_revoke"),
   /** trusting self is not allowed */
-  ALLOW_TRUST_SELF_NOT_ALLOWED(-5),
+  ALLOW_TRUST_SELF_NOT_ALLOWED(-5, "self_not_allowed"),
   /** claimable balances can't be created */
-  ALLOW_TRUST_LOW_RESERVE(-6);
+  ALLOW_TRUST_LOW_RESERVE(-6, "low_reserve");
 
   companion object {
 
@@ -46,9 +50,24 @@ enum class AllowTrustResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown AllowTrustResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): AllowTrustResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AllowTrustResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AllowTrustResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): AllowTrustResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

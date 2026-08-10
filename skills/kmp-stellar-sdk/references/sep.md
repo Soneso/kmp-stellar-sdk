@@ -1,6 +1,6 @@
 # SEP Implementations
 
-The KMP SDK implements 14 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
+The KMP SDK implements 15 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
 
 ## SEP Reference Table
 
@@ -19,6 +19,7 @@ The KMP SDK implements 14 Stellar Ecosystem Proposals (SEPs) that cover authenti
 | SEP-31 | Cross-Border Payments | Sending Anchor side of the SEP-31 payment flow | [Details](sep-31.md) |
 | SEP-38 | Anchor RFQ API | Get exchange quotes for asset conversions | [Details](sep-38.md) |
 | SEP-45 | Web Auth for Contracts | Authenticate Soroban contract accounts | [Details](sep-45.md) |
+| SEP-51 | XDR-JSON | Render XDR values as canonical JSON and read them back | [Details](sep-51.md) |
 | SEP-53 | Sign/Verify Messages | Sign and verify arbitrary messages with Ed25519 keypairs | [Details](sep-53.md) |
 
 ## Common Flow: SEP-01 -> SEP-10 -> SEP-24
@@ -65,4 +66,4 @@ The following SEPs depend on other SEPs:
 - **SEP-38 (Anchor RFQ API)** -> Requires SEP-10 for authentication; used with SEP-06, SEP-24, or SEP-31
 - **SEP-45 (Web Auth for Contracts)** -> Requires SEP-01 to discover web auth endpoint for contract accounts
 
-No dependencies: SEP-02, SEP-05, SEP-08, SEP-09
+No dependencies: SEP-02, SEP-05, SEP-08, SEP-09, SEP-51

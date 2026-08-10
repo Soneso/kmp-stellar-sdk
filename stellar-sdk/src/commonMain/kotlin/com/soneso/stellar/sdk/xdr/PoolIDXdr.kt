@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PoolIDXdr"
+
 /**
  * XDR Source:
  * typedef Hash PoolID;
@@ -15,9 +20,20 @@ value class PoolIDXdr(val value: HashXdr) {
       val value = HashXdr.decode(reader)
       return PoolIDXdr(value)
     }
+
+    fun fromXdrJson(json: String): PoolIDXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PoolIDXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PoolIDXdr =
+      PoolIDXdr(HashXdr(XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "an L strkey") { StrKey.decodeLiquidityPool(it) }))
   }
 
   fun encode(writer: XdrWriter) {
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeLiquidityPool(value.value))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

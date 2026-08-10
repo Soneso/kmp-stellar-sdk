@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerEntryDataXdr"
+
 /**
  * XDR Source:
  * union switch (LedgerEntryType type)
@@ -140,6 +145,27 @@ sealed class LedgerEntryDataXdr {
         else -> throw IllegalArgumentException("Unknown LedgerEntryDataXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LedgerEntryDataXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerEntryDataXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerEntryDataXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "account" -> Account(AccountEntryXdr.fromXdrJsonTree(value))
+        "trustline" -> TrustLine(TrustLineEntryXdr.fromXdrJsonTree(value))
+        "offer" -> Offer(OfferEntryXdr.fromXdrJsonTree(value))
+        "data" -> Data(DataEntryXdr.fromXdrJsonTree(value))
+        "claimable_balance" -> ClaimableBalance(ClaimableBalanceEntryXdr.fromXdrJsonTree(value))
+        "liquidity_pool" -> LiquidityPool(LiquidityPoolEntryXdr.fromXdrJsonTree(value))
+        "contract_data" -> ContractData(ContractDataEntryXdr.fromXdrJsonTree(value))
+        "contract_code" -> ContractCode(ContractCodeEntryXdr.fromXdrJsonTree(value))
+        "config_setting" -> ConfigSetting(ConfigSettingEntryXdr.fromXdrJsonTree(value))
+        "ttl" -> Ttl(TTLEntryXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -177,4 +203,19 @@ sealed class LedgerEntryDataXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Account -> buildJsonObject { put("account", value.toXdrJsonElement()) }
+    is TrustLine -> buildJsonObject { put("trustline", value.toXdrJsonElement()) }
+    is Offer -> buildJsonObject { put("offer", value.toXdrJsonElement()) }
+    is Data -> buildJsonObject { put("data", value.toXdrJsonElement()) }
+    is ClaimableBalance -> buildJsonObject { put("claimable_balance", value.toXdrJsonElement()) }
+    is LiquidityPool -> buildJsonObject { put("liquidity_pool", value.toXdrJsonElement()) }
+    is ContractData -> buildJsonObject { put("contract_data", value.toXdrJsonElement()) }
+    is ContractCode -> buildJsonObject { put("contract_code", value.toXdrJsonElement()) }
+    is ConfigSetting -> buildJsonObject { put("config_setting", value.toXdrJsonElement()) }
+    is Ttl -> buildJsonObject { put("ttl", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPStatementPrepareXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("quorum_set_hash", "ballot", "prepared", "prepared_prime", "n_c", "n_h")
+
 /**
  * XDR Source:
  * struct
@@ -40,6 +47,22 @@ data class SCPStatementPrepareXdr(
       val nH = Uint32Xdr.decode(reader)
       return SCPStatementPrepareXdr(quorumSetHash, ballot, prepared, preparedPrime, nC, nH)
     }
+
+    fun fromXdrJson(json: String): SCPStatementPrepareXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPStatementPrepareXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPStatementPrepareXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCPStatementPrepareXdr(
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "quorum_set_hash", XDR_JSON_TYPE)),
+        SCPBallotXdr.fromXdrJsonTree(XdrJson.field(json, "ballot", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "prepared", XDR_JSON_TYPE))?.let { SCPBallotXdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "prepared_prime", XDR_JSON_TYPE))?.let { SCPBallotXdr.fromXdrJsonTree(it) },
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_c", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "n_h", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -60,4 +83,15 @@ data class SCPStatementPrepareXdr(
     nC.encode(writer)
     nH.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("quorum_set_hash", quorumSetHash.toXdrJsonElement())
+    put("ballot", ballot.toXdrJsonElement())
+    put("prepared", XdrJson.optional(prepared) { it.toXdrJsonElement() })
+    put("prepared_prime", XdrJson.optional(preparedPrime) { it.toXdrJsonElement() })
+    put("n_c", nC.toXdrJsonElement())
+    put("n_h", nH.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

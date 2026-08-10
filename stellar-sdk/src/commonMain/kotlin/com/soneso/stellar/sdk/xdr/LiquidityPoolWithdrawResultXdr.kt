@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "LiquidityPoolWithdrawResultXdr"
+
 /**
  * XDR Source:
  * union LiquidityPoolWithdrawResult switch (LiquidityPoolWithdrawResultCode code)
@@ -40,6 +44,23 @@ sealed class LiquidityPoolWithdrawResultXdr {
         else -> throw IllegalArgumentException("Unknown LiquidityPoolWithdrawResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolWithdrawResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolWithdrawResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolWithdrawResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_SUCCESS)
+        "malformed" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_MALFORMED)
+        "no_trust" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_NO_TRUST)
+        "underfunded" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDERFUNDED)
+        "line_full" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_LINE_FULL)
+        "under_minimum" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_UNDER_MINIMUM)
+        "trustline_frozen" -> Void(LiquidityPoolWithdrawResultCodeXdr.LIQUIDITY_POOL_WITHDRAW_TRUSTLINE_FROZEN)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -48,4 +69,10 @@ sealed class LiquidityPoolWithdrawResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

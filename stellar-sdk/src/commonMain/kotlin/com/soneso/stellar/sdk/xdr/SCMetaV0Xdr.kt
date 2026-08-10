@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCMetaV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("key", "val")
+
 /**
  * XDR Source:
  * struct SCMetaV0
@@ -19,8 +26,20 @@ data class SCMetaV0Xdr(
 
     fun decode(reader: XdrReader): SCMetaV0Xdr {
       val key = reader.readString()
-      val value = reader.readString()
-      return SCMetaV0Xdr(key, value)
+      val `val` = reader.readString()
+      return SCMetaV0Xdr(key, `val`)
+    }
+
+    fun fromXdrJson(json: String): SCMetaV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCMetaV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCMetaV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCMetaV0Xdr(
+        XdrJson.unescapeString(XdrJson.field(json, "key", XDR_JSON_TYPE), XDR_JSON_TYPE, "key"),
+        XdrJson.unescapeString(XdrJson.field(json, "val", XDR_JSON_TYPE), XDR_JSON_TYPE, "val")
+      )
     }
   }
 
@@ -28,4 +47,11 @@ data class SCMetaV0Xdr(
     writer.writeString(key)
     writer.writeString(`val`)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("key", XdrJson.escapedString(key))
+    put("val", XdrJson.escapedString(`val`))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

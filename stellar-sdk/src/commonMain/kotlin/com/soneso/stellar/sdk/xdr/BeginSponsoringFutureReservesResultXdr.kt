@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BeginSponsoringFutureReservesResultXdr"
+
 /**
  * XDR Source:
  * union BeginSponsoringFutureReservesResult switch (
@@ -35,6 +39,20 @@ sealed class BeginSponsoringFutureReservesResultXdr {
         else -> throw IllegalArgumentException("Unknown BeginSponsoringFutureReservesResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): BeginSponsoringFutureReservesResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BeginSponsoringFutureReservesResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BeginSponsoringFutureReservesResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(BeginSponsoringFutureReservesResultCodeXdr.BEGIN_SPONSORING_FUTURE_RESERVES_SUCCESS)
+        "malformed" -> Void(BeginSponsoringFutureReservesResultCodeXdr.BEGIN_SPONSORING_FUTURE_RESERVES_MALFORMED)
+        "already_sponsored" -> Void(BeginSponsoringFutureReservesResultCodeXdr.BEGIN_SPONSORING_FUTURE_RESERVES_ALREADY_SPONSORED)
+        "recursive" -> Void(BeginSponsoringFutureReservesResultCodeXdr.BEGIN_SPONSORING_FUTURE_RESERVES_RECURSIVE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -43,4 +61,10 @@ sealed class BeginSponsoringFutureReservesResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

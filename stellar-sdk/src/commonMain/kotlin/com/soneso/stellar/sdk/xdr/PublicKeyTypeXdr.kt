@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PublicKeyTypeXdr"
+
 /**
  * XDR Source:
  * enum PublicKeyType
@@ -10,8 +14,8 @@ package com.soneso.stellar.sdk.xdr
  *     PUBLIC_KEY_TYPE_ED25519 = KEY_TYPE_ED25519
  * };
  */
-enum class PublicKeyTypeXdr(val value: Int) {
-  PUBLIC_KEY_TYPE_ED25519(0);
+enum class PublicKeyTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  PUBLIC_KEY_TYPE_ED25519(0, "public_key_type_ed25519");
 
   companion object {
 
@@ -20,9 +24,24 @@ enum class PublicKeyTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown PublicKeyTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): PublicKeyTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PublicKeyTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PublicKeyTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): PublicKeyTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

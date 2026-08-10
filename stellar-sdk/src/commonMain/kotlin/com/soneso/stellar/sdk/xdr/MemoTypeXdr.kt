@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "MemoTypeXdr"
+
 /**
  * XDR Source:
  * enum MemoType
@@ -14,12 +18,12 @@ package com.soneso.stellar.sdk.xdr
  *     MEMO_RETURN = 4
  * };
  */
-enum class MemoTypeXdr(val value: Int) {
-  MEMO_NONE(0),
-  MEMO_TEXT(1),
-  MEMO_ID(2),
-  MEMO_HASH(3),
-  MEMO_RETURN(4);
+enum class MemoTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  MEMO_NONE(0, "none"),
+  MEMO_TEXT(1, "text"),
+  MEMO_ID(2, "id"),
+  MEMO_HASH(3, "hash"),
+  MEMO_RETURN(4, "return");
 
   companion object {
 
@@ -28,9 +32,24 @@ enum class MemoTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown MemoTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): MemoTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): MemoTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): MemoTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): MemoTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

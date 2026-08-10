@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "OfferEntryFlagsXdr"
+
 /**
  * XDR Source:
  * enum OfferEntryFlags
@@ -12,12 +16,12 @@ package com.soneso.stellar.sdk.xdr
  *     PASSIVE_FLAG = 1
  * };
  */
-enum class OfferEntryFlagsXdr(val value: Int) {
+enum class OfferEntryFlagsXdr(val value: Int, internal val xdrJsonName: String) {
   /**
    * an offer with this flag will not act on and take a reverse offer of equal
    * price
    */
-  PASSIVE_FLAG(1);
+  PASSIVE_FLAG(1, "passive_flag");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class OfferEntryFlagsXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown OfferEntryFlagsXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): OfferEntryFlagsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OfferEntryFlagsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OfferEntryFlagsXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): OfferEntryFlagsXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

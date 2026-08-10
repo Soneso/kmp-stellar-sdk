@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BumpSequenceResultXdr"
+
 /**
  * XDR Source:
  * union BumpSequenceResult switch (BumpSequenceResultCode code)
@@ -30,6 +34,18 @@ sealed class BumpSequenceResultXdr {
         else -> throw IllegalArgumentException("Unknown BumpSequenceResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): BumpSequenceResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BumpSequenceResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BumpSequenceResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(BumpSequenceResultCodeXdr.BUMP_SEQUENCE_SUCCESS)
+        "bad_seq" -> Void(BumpSequenceResultCodeXdr.BUMP_SEQUENCE_BAD_SEQ)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -38,4 +54,10 @@ sealed class BumpSequenceResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

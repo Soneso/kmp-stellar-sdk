@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPStatementXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("node_id", "slot_index", "pledges")
+
 /**
  * XDR Source:
  * struct SCPStatement
@@ -59,6 +66,19 @@ data class SCPStatementXdr(
       val pledges = SCPStatementPledgesXdr.decode(reader)
       return SCPStatementXdr(nodeId, slotIndex, pledges)
     }
+
+    fun fromXdrJson(json: String): SCPStatementXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPStatementXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPStatementXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCPStatementXdr(
+        NodeIDXdr.fromXdrJsonTree(XdrJson.field(json, "node_id", XDR_JSON_TYPE)),
+        Uint64Xdr.fromXdrJsonTree(XdrJson.field(json, "slot_index", XDR_JSON_TYPE)),
+        SCPStatementPledgesXdr.fromXdrJsonTree(XdrJson.field(json, "pledges", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -66,4 +86,12 @@ data class SCPStatementXdr(
     slotIndex.encode(writer)
     pledges.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("node_id", nodeId.toXdrJsonElement())
+    put("slot_index", slotIndex.toXdrJsonElement())
+    put("pledges", pledges.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

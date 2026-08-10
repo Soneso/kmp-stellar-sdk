@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolWithdrawOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("liquidity_pool_id", "amount", "min_amount_a", "min_amount_b")
+
 /**
  * XDR Source:
  * struct LiquidityPoolWithdrawOp
@@ -31,6 +38,20 @@ data class LiquidityPoolWithdrawOpXdr(
       val minAmountB = Int64Xdr.decode(reader)
       return LiquidityPoolWithdrawOpXdr(liquidityPoolId, amount, minAmountA, minAmountB)
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolWithdrawOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolWithdrawOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolWithdrawOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LiquidityPoolWithdrawOpXdr(
+        PoolIDXdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_id", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "min_amount_a", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "min_amount_b", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -39,4 +60,13 @@ data class LiquidityPoolWithdrawOpXdr(
     minAmountA.encode(writer)
     minAmountB.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
+    put("amount", amount.toXdrJsonElement())
+    put("min_amount_a", minAmountA.toXdrJsonElement())
+    put("min_amount_b", minAmountB.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

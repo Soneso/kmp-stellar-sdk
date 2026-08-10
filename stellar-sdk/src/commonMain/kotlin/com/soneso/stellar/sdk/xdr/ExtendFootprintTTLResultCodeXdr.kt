@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ExtendFootprintTTLResultCodeXdr"
+
 /**
  * XDR Source:
  * enum ExtendFootprintTTLResultCode
@@ -16,13 +20,13 @@ package com.soneso.stellar.sdk.xdr
  *     EXTEND_FOOTPRINT_TTL_INSUFFICIENT_REFUNDABLE_FEE = -3
  * };
  */
-enum class ExtendFootprintTTLResultCodeXdr(val value: Int) {
+enum class ExtendFootprintTTLResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  EXTEND_FOOTPRINT_TTL_SUCCESS(0),
+  EXTEND_FOOTPRINT_TTL_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  EXTEND_FOOTPRINT_TTL_MALFORMED(-1),
-  EXTEND_FOOTPRINT_TTL_RESOURCE_LIMIT_EXCEEDED(-2),
-  EXTEND_FOOTPRINT_TTL_INSUFFICIENT_REFUNDABLE_FEE(-3);
+  EXTEND_FOOTPRINT_TTL_MALFORMED(-1, "malformed"),
+  EXTEND_FOOTPRINT_TTL_RESOURCE_LIMIT_EXCEEDED(-2, "resource_limit_exceeded"),
+  EXTEND_FOOTPRINT_TTL_INSUFFICIENT_REFUNDABLE_FEE(-3, "insufficient_refundable_fee");
 
   companion object {
 
@@ -31,9 +35,24 @@ enum class ExtendFootprintTTLResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ExtendFootprintTTLResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ExtendFootprintTTLResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ExtendFootprintTTLResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ExtendFootprintTTLResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ExtendFootprintTTLResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

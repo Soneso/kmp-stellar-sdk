@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerHeaderXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_version", "previous_ledger_hash", "scp_value", "tx_set_result_hash", "bucket_list_hash", "ledger_seq", "total_coins", "fee_pool", "inflation_seq", "id_pool", "base_fee", "base_reserve", "max_tx_set_size", "skip_list", "ext")
+
 /**
  * XDR Source:
  * struct LedgerHeader
@@ -98,6 +105,31 @@ data class LedgerHeaderXdr(
       val ext = LedgerHeaderExtXdr.decode(reader)
       return LedgerHeaderXdr(ledgerVersion, previousLedgerHash, scpValue, txSetResultHash, bucketListHash, ledgerSeq, totalCoins, feePool, inflationSeq, idPool, baseFee, baseReserve, maxTxSetSize, skipList, ext)
     }
+
+    fun fromXdrJson(json: String): LedgerHeaderXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerHeaderXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerHeaderXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerHeaderXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_version", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "previous_ledger_hash", XDR_JSON_TYPE)),
+        StellarValueXdr.fromXdrJsonTree(XdrJson.field(json, "scp_value", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "tx_set_result_hash", XDR_JSON_TYPE)),
+        HashXdr.fromXdrJsonTree(XdrJson.field(json, "bucket_list_hash", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_seq", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "total_coins", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_pool", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "inflation_seq", XDR_JSON_TYPE)),
+        Uint64Xdr.fromXdrJsonTree(XdrJson.field(json, "id_pool", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "base_fee", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "base_reserve", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "max_tx_set_size", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "skip_list", XDR_JSON_TYPE), XDR_JSON_TYPE, "skip_list", expectedLength = 4).map { HashXdr.fromXdrJsonTree(it) }.toTypedArray(),
+        LedgerHeaderExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -119,4 +151,24 @@ data class LedgerHeaderXdr(
     }
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_version", ledgerVersion.toXdrJsonElement())
+    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement())
+    put("scp_value", scpValue.toXdrJsonElement())
+    put("tx_set_result_hash", txSetResultHash.toXdrJsonElement())
+    put("bucket_list_hash", bucketListHash.toXdrJsonElement())
+    put("ledger_seq", ledgerSeq.toXdrJsonElement())
+    put("total_coins", totalCoins.toXdrJsonElement())
+    put("fee_pool", feePool.toXdrJsonElement())
+    put("inflation_seq", inflationSeq.toXdrJsonElement())
+    put("id_pool", idPool.toXdrJsonElement())
+    put("base_fee", baseFee.toXdrJsonElement())
+    put("base_reserve", baseReserve.toXdrJsonElement())
+    put("max_tx_set_size", maxTxSetSize.toXdrJsonElement())
+    put("skip_list", XdrJson.array(skipList.asList()) { it.toXdrJsonElement() })
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

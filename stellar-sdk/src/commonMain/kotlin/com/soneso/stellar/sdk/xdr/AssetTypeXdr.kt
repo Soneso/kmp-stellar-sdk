@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AssetTypeXdr"
+
 /**
  * XDR Source:
  * enum AssetType
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     ASSET_TYPE_POOL_SHARE = 3
  * };
  */
-enum class AssetTypeXdr(val value: Int) {
-  ASSET_TYPE_NATIVE(0),
-  ASSET_TYPE_CREDIT_ALPHANUM4(1),
-  ASSET_TYPE_CREDIT_ALPHANUM12(2),
-  ASSET_TYPE_POOL_SHARE(3);
+enum class AssetTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  ASSET_TYPE_NATIVE(0, "native"),
+  ASSET_TYPE_CREDIT_ALPHANUM4(1, "credit_alphanum4"),
+  ASSET_TYPE_CREDIT_ALPHANUM12(2, "credit_alphanum12"),
+  ASSET_TYPE_POOL_SHARE(3, "pool_share");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class AssetTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown AssetTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): AssetTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AssetTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AssetTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): AssetTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

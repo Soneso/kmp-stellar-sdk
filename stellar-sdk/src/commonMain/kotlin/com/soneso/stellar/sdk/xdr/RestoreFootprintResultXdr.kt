@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "RestoreFootprintResultXdr"
+
 /**
  * XDR Source:
  * union RestoreFootprintResult switch (RestoreFootprintResultCode code)
@@ -34,6 +38,20 @@ sealed class RestoreFootprintResultXdr {
         else -> throw IllegalArgumentException("Unknown RestoreFootprintResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): RestoreFootprintResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RestoreFootprintResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RestoreFootprintResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(RestoreFootprintResultCodeXdr.RESTORE_FOOTPRINT_SUCCESS)
+        "malformed" -> Void(RestoreFootprintResultCodeXdr.RESTORE_FOOTPRINT_MALFORMED)
+        "resource_limit_exceeded" -> Void(RestoreFootprintResultCodeXdr.RESTORE_FOOTPRINT_RESOURCE_LIMIT_EXCEEDED)
+        "insufficient_refundable_fee" -> Void(RestoreFootprintResultCodeXdr.RESTORE_FOOTPRINT_INSUFFICIENT_REFUNDABLE_FEE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +60,10 @@ sealed class RestoreFootprintResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

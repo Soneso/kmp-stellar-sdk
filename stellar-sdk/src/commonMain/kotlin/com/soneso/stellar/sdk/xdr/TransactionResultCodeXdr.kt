@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "TransactionResultCodeXdr"
+
 /**
  * XDR Source:
  * enum TransactionResultCode
@@ -33,47 +37,47 @@ package com.soneso.stellar.sdk.xdr
  *     txFROZEN_KEY_ACCESSED = -18     // a 'frozen' ledger key is accessed by any operation
  * };
  */
-enum class TransactionResultCodeXdr(val value: Int) {
+enum class TransactionResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** fee bump inner transaction succeeded */
-  txFEE_BUMP_INNER_SUCCESS(1),
+  txFEE_BUMP_INNER_SUCCESS(1, "tx_fee_bump_inner_success"),
   /** all operations succeeded */
-  txSUCCESS(0),
+  txSUCCESS(0, "tx_success"),
   /** one of the operations failed (none were applied) */
-  txFAILED(-1),
+  txFAILED(-1, "tx_failed"),
   /** ledger closeTime before minTime */
-  txTOO_EARLY(-2),
+  txTOO_EARLY(-2, "tx_too_early"),
   /** ledger closeTime after maxTime */
-  txTOO_LATE(-3),
+  txTOO_LATE(-3, "tx_too_late"),
   /** no operation was specified */
-  txMISSING_OPERATION(-4),
+  txMISSING_OPERATION(-4, "tx_missing_operation"),
   /** sequence number does not match source account */
-  txBAD_SEQ(-5),
+  txBAD_SEQ(-5, "tx_bad_seq"),
   /** too few valid signatures / wrong network */
-  txBAD_AUTH(-6),
+  txBAD_AUTH(-6, "tx_bad_auth"),
   /** fee would bring account below reserve */
-  txINSUFFICIENT_BALANCE(-7),
+  txINSUFFICIENT_BALANCE(-7, "tx_insufficient_balance"),
   /** source account not found */
-  txNO_ACCOUNT(-8),
+  txNO_ACCOUNT(-8, "tx_no_account"),
   /** fee is too small */
-  txINSUFFICIENT_FEE(-9),
+  txINSUFFICIENT_FEE(-9, "tx_insufficient_fee"),
   /** unused signatures attached to transaction */
-  txBAD_AUTH_EXTRA(-10),
+  txBAD_AUTH_EXTRA(-10, "tx_bad_auth_extra"),
   /** an unknown error occurred */
-  txINTERNAL_ERROR(-11),
+  txINTERNAL_ERROR(-11, "tx_internal_error"),
   /** transaction type not supported */
-  txNOT_SUPPORTED(-12),
+  txNOT_SUPPORTED(-12, "tx_not_supported"),
   /** fee bump inner transaction failed */
-  txFEE_BUMP_INNER_FAILED(-13),
+  txFEE_BUMP_INNER_FAILED(-13, "tx_fee_bump_inner_failed"),
   /** sponsorship not confirmed */
-  txBAD_SPONSORSHIP(-14),
+  txBAD_SPONSORSHIP(-14, "tx_bad_sponsorship"),
   /** minSeqAge or minSeqLedgerGap conditions not met */
-  txBAD_MIN_SEQ_AGE_OR_GAP(-15),
+  txBAD_MIN_SEQ_AGE_OR_GAP(-15, "tx_bad_min_seq_age_or_gap"),
   /** precondition is invalid */
-  txMALFORMED(-16),
+  txMALFORMED(-16, "tx_malformed"),
   /** soroban-specific preconditions were not met */
-  txSOROBAN_INVALID(-17),
+  txSOROBAN_INVALID(-17, "tx_soroban_invalid"),
   /** a 'frozen' ledger key is accessed by any operation */
-  txFROZEN_KEY_ACCESSED(-18);
+  txFROZEN_KEY_ACCESSED(-18, "tx_frozen_key_accessed");
 
   companion object {
 
@@ -82,9 +86,24 @@ enum class TransactionResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown TransactionResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): TransactionResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): TransactionResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerHeaderExtensionV1Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("flags", "ext")
+
 /**
  * XDR Source:
  * struct LedgerHeaderExtensionV1
@@ -29,10 +36,29 @@ data class LedgerHeaderExtensionV1Xdr(
       val ext = LedgerHeaderExtensionV1ExtXdr.decode(reader)
       return LedgerHeaderExtensionV1Xdr(flags, ext)
     }
+
+    fun fromXdrJson(json: String): LedgerHeaderExtensionV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerHeaderExtensionV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerHeaderExtensionV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerHeaderExtensionV1Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "flags", XDR_JSON_TYPE)),
+        LedgerHeaderExtensionV1ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     flags.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("flags", flags.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

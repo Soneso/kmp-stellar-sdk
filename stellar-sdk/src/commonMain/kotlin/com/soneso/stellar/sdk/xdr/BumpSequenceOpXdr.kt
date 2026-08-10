@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "BumpSequenceOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("bump_to")
+
 /**
  * XDR Source:
  * struct BumpSequenceOp
@@ -19,9 +26,26 @@ data class BumpSequenceOpXdr(
       val bumpTo = SequenceNumberXdr.decode(reader)
       return BumpSequenceOpXdr(bumpTo)
     }
+
+    fun fromXdrJson(json: String): BumpSequenceOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BumpSequenceOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BumpSequenceOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return BumpSequenceOpXdr(
+        SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "bump_to", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     bumpTo.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("bump_to", bumpTo.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

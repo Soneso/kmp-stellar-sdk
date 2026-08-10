@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TrustLineEntryExtensionV2Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("liquidity_pool_use_count", "ext")
+
 /**
  * XDR Source:
  * struct TrustLineEntryExtensionV2
@@ -28,10 +35,29 @@ data class TrustLineEntryExtensionV2Xdr(
       val ext = TrustLineEntryExtensionV2ExtXdr.decode(reader)
       return TrustLineEntryExtensionV2Xdr(liquidityPoolUseCount, ext)
     }
+
+    fun fromXdrJson(json: String): TrustLineEntryExtensionV2Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TrustLineEntryExtensionV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TrustLineEntryExtensionV2Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TrustLineEntryExtensionV2Xdr(
+        Int32Xdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_use_count", XDR_JSON_TYPE)),
+        TrustLineEntryExtensionV2ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     liquidityPoolUseCount.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("liquidity_pool_use_count", liquidityPoolUseCount.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

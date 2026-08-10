@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolEntryXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("liquidity_pool_id", "body")
+
 /**
  * XDR Source:
  * struct LiquidityPoolEntry
@@ -37,10 +44,29 @@ data class LiquidityPoolEntryXdr(
       val body = LiquidityPoolEntryBodyXdr.decode(reader)
       return LiquidityPoolEntryXdr(liquidityPoolId, body)
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LiquidityPoolEntryXdr(
+        PoolIDXdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_id", XDR_JSON_TYPE)),
+        LiquidityPoolEntryBodyXdr.fromXdrJsonTree(XdrJson.field(json, "body", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     liquidityPoolId.encode(writer)
     body.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
+    put("body", body.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

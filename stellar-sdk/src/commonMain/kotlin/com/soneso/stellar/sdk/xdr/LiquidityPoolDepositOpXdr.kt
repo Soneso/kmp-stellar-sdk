@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolDepositOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("liquidity_pool_id", "max_amount_a", "max_amount_b", "min_price", "max_price")
+
 /**
  * XDR Source:
  * struct LiquidityPoolDepositOp
@@ -35,6 +42,21 @@ data class LiquidityPoolDepositOpXdr(
       val maxPrice = PriceXdr.decode(reader)
       return LiquidityPoolDepositOpXdr(liquidityPoolId, maxAmountA, maxAmountB, minPrice, maxPrice)
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolDepositOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolDepositOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolDepositOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LiquidityPoolDepositOpXdr(
+        PoolIDXdr.fromXdrJsonTree(XdrJson.field(json, "liquidity_pool_id", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "max_amount_a", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "max_amount_b", XDR_JSON_TYPE)),
+        PriceXdr.fromXdrJsonTree(XdrJson.field(json, "min_price", XDR_JSON_TYPE)),
+        PriceXdr.fromXdrJsonTree(XdrJson.field(json, "max_price", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -44,4 +66,14 @@ data class LiquidityPoolDepositOpXdr(
     minPrice.encode(writer)
     maxPrice.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
+    put("max_amount_a", maxAmountA.toXdrJsonElement())
+    put("max_amount_b", maxAmountB.toXdrJsonElement())
+    put("min_price", minPrice.toXdrJsonElement())
+    put("max_price", maxPrice.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

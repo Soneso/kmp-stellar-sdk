@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TimeBoundsXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("min_time", "max_time")
+
 /**
  * XDR Source:
  * struct TimeBounds
@@ -23,10 +30,29 @@ data class TimeBoundsXdr(
       val maxTime = TimePointXdr.decode(reader)
       return TimeBoundsXdr(minTime, maxTime)
     }
+
+    fun fromXdrJson(json: String): TimeBoundsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TimeBoundsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TimeBoundsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TimeBoundsXdr(
+        TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "min_time", XDR_JSON_TYPE)),
+        TimePointXdr.fromXdrJsonTree(XdrJson.field(json, "max_time", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     minTime.encode(writer)
     maxTime.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("min_time", minTime.toXdrJsonElement())
+    put("max_time", maxTime.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingContractHistoricalDataV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("fee_historical1_kb")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractHistoricalDataV0
@@ -20,9 +27,26 @@ data class ConfigSettingContractHistoricalDataV0Xdr(
       val feeHistorical1Kb = Int64Xdr.decode(reader)
       return ConfigSettingContractHistoricalDataV0Xdr(feeHistorical1Kb)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingContractHistoricalDataV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractHistoricalDataV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractHistoricalDataV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ConfigSettingContractHistoricalDataV0Xdr(
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_historical1_kb", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     feeHistorical1Kb.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("fee_historical1_kb", feeHistorical1Kb.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

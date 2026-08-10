@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "AccountEntryXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("account_id", "balance", "seq_num", "num_sub_entries", "inflation_dest", "flags", "home_domain", "thresholds", "signers", "ext")
+
 /**
  * XDR Source:
  * struct AccountEntry
@@ -75,6 +82,26 @@ data class AccountEntryXdr(
       val ext = AccountEntryExtXdr.decode(reader)
       return AccountEntryXdr(accountId, balance, seqNum, numSubEntries, inflationDest, flags, homeDomain, thresholds, signers, ext)
     }
+
+    fun fromXdrJson(json: String): AccountEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return AccountEntryXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "account_id", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "balance", XDR_JSON_TYPE)),
+        SequenceNumberXdr.fromXdrJsonTree(XdrJson.field(json, "seq_num", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "num_sub_entries", XDR_JSON_TYPE)),
+        XdrJson.optional(XdrJson.field(json, "inflation_dest", XDR_JSON_TYPE))?.let { AccountIDXdr.fromXdrJsonTree(it) },
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "flags", XDR_JSON_TYPE)),
+        String32Xdr.fromXdrJsonTree(XdrJson.field(json, "home_domain", XDR_JSON_TYPE)),
+        ThresholdsXdr.fromXdrJsonTree(XdrJson.field(json, "thresholds", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "signers", XDR_JSON_TYPE), XDR_JSON_TYPE, "signers", maxLength = MAX_SIGNERS).map { SignerXdr.fromXdrJsonTree(it) },
+        AccountEntryExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -97,4 +124,19 @@ data class AccountEntryXdr(
     }
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("account_id", accountId.toXdrJsonElement())
+    put("balance", balance.toXdrJsonElement())
+    put("seq_num", seqNum.toXdrJsonElement())
+    put("num_sub_entries", numSubEntries.toXdrJsonElement())
+    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement() })
+    put("flags", flags.toXdrJsonElement())
+    put("home_domain", homeDomain.toXdrJsonElement())
+    put("thresholds", thresholds.toXdrJsonElement())
+    put("signers", XdrJson.array(signers) { it.toXdrJsonElement() })
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

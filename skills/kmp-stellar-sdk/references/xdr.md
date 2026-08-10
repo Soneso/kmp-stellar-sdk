@@ -22,6 +22,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 - [Soroban Transaction Data Inspection](#soroban-transaction-data-inspection)
 - [Transaction Inspection Before Signing](#transaction-inspection-before-signing)
 - [SorobanAuthorizationEntry XDR](#sorobanauthorizationentry-xdr)
+- [XDR-JSON (SEP-51)](#xdr-json-sep-51)
 
 ## Transaction Envelope Encoding
 
@@ -485,3 +486,102 @@ fun decodeSCAddress(base64: String): SCAddressXdr {
     return SCAddressXdr.decode(reader)
 }
 ```
+
+## XDR-JSON (SEP-51)
+
+Every generated XDR type in `com.soneso.stellar.sdk.xdr` carries four more members alongside its
+binary form. They implement SEP-0051, the canonical JSON rendering of XDR:
+
+```kotlin
+fun toXdrJson(): String                              // compact canonical JSON text
+fun toXdrJsonElement(): JsonElement                  // kotlinx.serialization.json.JsonElement
+Companion.fromXdrJson(json: String): T
+Companion.fromXdrJsonElement(element: JsonElement): T
+```
+
+None of the four are `suspend`, and none need an import beyond the type itself — unlike
+`toXdrBase64()` / `fromXdrBase64()`, which are extension functions declared only for the types
+listed above. `kotlinx-serialization-json` is an `api` dependency of the SDK, so `JsonElement` is
+already on the consumer compile classpath.
+
+```kotlin
+import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
+import com.soneso.stellar.sdk.xdr.fromXdrBase64
+import com.soneso.stellar.sdk.xdr.toXdrBase64
+
+// base64 XDR -> typed value -> JSON -> typed value -> base64 XDR, round-tripping exactly
+val envelope = TransactionEnvelopeXdr.fromXdrBase64(envelopeBase64)
+val json: String = envelope.toXdrJson()
+check(TransactionEnvelopeXdr.fromXdrJson(json).toXdrBase64() == envelopeBase64)
+
+println(Scv.toSymbol("transfer").toXdrJson())   // {"symbol":"transfer"}
+println(Scv.toUint64(1uL).toXdrJson())          // {"u64":"1"}
+```
+
+The JSON form is for inspection, logging, storage and interchange. The wire format is unchanged:
+`submitTransaction()` still takes base64.
+
+### JSON form per XDR category
+
+| XDR category | JSON form | Example |
+|--------------|-----------|---------|
+| `int`, `unsigned int` (32-bit) | JSON number; a string raises | `{"u32":4294967295}` |
+| `hyper`, `unsigned hyper` (64-bit) | base-10 JSON string; a number is accepted on input, never emitted | `{"i64":"-9223372036854775808"}` |
+| `bool` | JSON boolean | `{"bool":true}` |
+| `opaque` (fixed and variable) | lowercase hexadecimal string, empty as `""` | `{"bytes":"00ff"}` |
+| `string` | escaped string: `\0` `\t` `\n` `\r` `\\`, printable ASCII verbatim, everything else `\xNN` in lowercase | `{"text":"tab\\there"}` |
+| array (fixed and variable) | JSON array, always present, empty as `[]` | `{"vec":[]}` |
+| optional | `null` with the key still present | `{"source_account":null,...}` |
+| `enum` | bare string, snake_case with the enum's shared prefix removed | `"u32"` |
+| `struct` | object keyed by snake_case member names in `.x` declaration order | `{"min_time":"0","max_time":"0"}` |
+| `union`, void arm | bare string naming the arm | `"native"` |
+| `union`, value arm | single-key object | `{"credit_alphanum4":{...}}` |
+| `union` cased on an integer | `"v0"`, or `{"v1": value}` | `{"v3":{"ext":"v0","seq_ledger":7,"seq_time":"9"}}` |
+| `AccountID`, `PublicKey`, `NodeID` | `G...` strkey | `"GAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSABOV"` |
+| `MuxedAccount` | `G...` or `M...` strkey by arm | `"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE"` |
+| `ContractID` / `PoolID` / `ClaimableBalanceID` | `C...` / `L...` / `B...` strkey | `"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"` |
+| `SignerKey` | `G...` / `T...` / `X...` / `P...` strkey by arm | `"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ"` |
+| `SCAddress` | `G...`, `C...`, `M...`, `B...` or `L...` strkey by arm | `{"address":"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"}` |
+| `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string | `{"i128":"-1"}` |
+
+Output is deterministic: compact, keys in declaration order, hexadecimal lowercase. Use your own
+`Json` instance on the element form when you want it indented:
+
+```kotlin
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+
+println(Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), envelope.toXdrJsonElement()))
+```
+
+### Error contract
+
+Every malformed input raises `IllegalArgumentException`, naming the type and the offending key —
+including text that is not JSON at all, so one `catch` covers parsing and mapping alike:
+
+```kotlin
+TTLEntryXdr.fromXdrJson("""{"key_hash":"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"}""")
+// IllegalArgumentException: TTLEntryXdr: is missing the required key "live_until_ledger_seq"
+
+AssetXdr.fromXdrJson("""{"gold":{}}""")
+// IllegalArgumentException: AssetXdr: has no arm named "gold"
+```
+
+Decoding accepts only the spelling the SDK emits, plus a 64-bit integer as a JSON number, a
+`$schema` property (ignored, never emitted) and the historical `type_` key. That key and `type`
+name one field: either one alone decodes, and a document carrying both is rejected. Uppercase
+hexadecimal, uppercase `\xNN` escapes, unrecognised escapes, integer literals with a leading zero,
+a sign, a decimal point or an exponent, a missing struct key, a struct key that names no field, an
+object naming the same key twice, an undeclared union arm or enum member, and a document nesting
+more than 128 containers deep are all rejected. The repeated-key rule covers one object at a time,
+so separate objects may share a key name. It applies to `fromXdrJson`: a `JsonObject` passed to
+`fromXdrJsonElement` resolved any repetition before the decoder saw it.
+
+```
+// WRONG: expecting an unset optional to be absent, or a void union arm to be null
+// CORRECT: an unset optional is null with its key present ({"source_account":null});
+//          a void union arm is a bare string ({"body":"inflation"})
+```
+
+For the full rule set, the strkey table, a worked transaction envelope and the pitfalls:
+[SEP-51 Reference](./sep-51.md).

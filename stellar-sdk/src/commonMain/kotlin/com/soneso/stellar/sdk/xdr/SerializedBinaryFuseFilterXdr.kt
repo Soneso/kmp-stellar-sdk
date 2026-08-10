@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SerializedBinaryFuseFilterXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("type", "type_", "input_hash_seed", "filter_seed", "segment_length", "segement_length_mask", "segment_count", "segment_count_length", "fingerprint_length", "fingerprints")
+
 /**
  * XDR Source:
  * struct SerializedBinaryFuseFilter
@@ -52,6 +59,25 @@ data class SerializedBinaryFuseFilterXdr(
       val fingerprints = reader.readVariableOpaque()
       return SerializedBinaryFuseFilterXdr(type, inputHashSeed, filterSeed, segmentLength, segementLengthMask, segmentCount, segmentCountLength, fingerprintLength, fingerprints)
     }
+
+    fun fromXdrJson(json: String): SerializedBinaryFuseFilterXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SerializedBinaryFuseFilterXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SerializedBinaryFuseFilterXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SerializedBinaryFuseFilterXdr(
+        BinaryFuseFilterTypeXdr.fromXdrJsonTree(XdrJson.field(json, "type", "type_", XDR_JSON_TYPE)),
+        ShortHashSeedXdr.fromXdrJsonTree(XdrJson.field(json, "input_hash_seed", XDR_JSON_TYPE)),
+        ShortHashSeedXdr.fromXdrJsonTree(XdrJson.field(json, "filter_seed", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "segment_length", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "segement_length_mask", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "segment_count", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "segment_count_length", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "fingerprint_length", XDR_JSON_TYPE)),
+        XdrJson.hex(XdrJson.field(json, "fingerprints", XDR_JSON_TYPE), XDR_JSON_TYPE, "fingerprints")
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -65,4 +91,18 @@ data class SerializedBinaryFuseFilterXdr(
     fingerprintLength.encode(writer)
     writer.writeVariableOpaque(fingerprints)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("type", type.toXdrJsonElement())
+    put("input_hash_seed", inputHashSeed.toXdrJsonElement())
+    put("filter_seed", filterSeed.toXdrJsonElement())
+    put("segment_length", segmentLength.toXdrJsonElement())
+    put("segement_length_mask", segementLengthMask.toXdrJsonElement())
+    put("segment_count", segmentCount.toXdrJsonElement())
+    put("segment_count_length", segmentCountLength.toXdrJsonElement())
+    put("fingerprint_length", fingerprintLength.toXdrJsonElement())
+    put("fingerprints", XdrJson.hex(fingerprints))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

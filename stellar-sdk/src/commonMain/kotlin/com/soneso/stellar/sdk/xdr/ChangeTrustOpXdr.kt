@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ChangeTrustOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("line", "limit")
+
 /**
  * XDR Source:
  * struct ChangeTrustOp
@@ -25,10 +32,29 @@ data class ChangeTrustOpXdr(
       val limit = Int64Xdr.decode(reader)
       return ChangeTrustOpXdr(line, limit)
     }
+
+    fun fromXdrJson(json: String): ChangeTrustOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ChangeTrustOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ChangeTrustOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ChangeTrustOpXdr(
+        ChangeTrustAssetXdr.fromXdrJsonTree(XdrJson.field(json, "line", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "limit", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     line.encode(writer)
     limit.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("line", line.toXdrJsonElement())
+    put("limit", limit.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

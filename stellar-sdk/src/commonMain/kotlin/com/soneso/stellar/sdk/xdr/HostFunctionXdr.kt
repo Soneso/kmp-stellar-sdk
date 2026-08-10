@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HostFunctionXdr"
+
 /**
  * XDR Source:
  * union HostFunction switch (HostFunctionType type)
@@ -68,6 +73,21 @@ sealed class HostFunctionXdr {
         else -> throw IllegalArgumentException("Unknown HostFunctionXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): HostFunctionXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HostFunctionXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HostFunctionXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "invoke_contract" -> InvokeContract(InvokeContractArgsXdr.fromXdrJsonTree(value))
+        "create_contract" -> CreateContract(CreateContractArgsXdr.fromXdrJsonTree(value))
+        "upload_contract_wasm" -> Wasm(XdrJson.hex(value, XDR_JSON_TYPE, "upload_contract_wasm"))
+        "create_contract_v2" -> CreateContractV2(CreateContractArgsV2Xdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -87,4 +107,13 @@ sealed class HostFunctionXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is InvokeContract -> buildJsonObject { put("invoke_contract", value.toXdrJsonElement()) }
+    is CreateContract -> buildJsonObject { put("create_contract", value.toXdrJsonElement()) }
+    is Wasm -> buildJsonObject { put("upload_contract_wasm", XdrJson.hex(value)) }
+    is CreateContractV2 -> buildJsonObject { put("create_contract_v2", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

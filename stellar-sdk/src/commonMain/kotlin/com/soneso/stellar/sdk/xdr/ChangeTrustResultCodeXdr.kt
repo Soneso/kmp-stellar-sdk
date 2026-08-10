@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ChangeTrustResultCodeXdr"
+
 /**
  * XDR Source:
  * enum ChangeTrustResultCode
@@ -24,26 +28,26 @@ package com.soneso.stellar.sdk.xdr
  *         -8 // Asset trustline is deauthorized
  * };
  */
-enum class ChangeTrustResultCodeXdr(val value: Int) {
+enum class ChangeTrustResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  CHANGE_TRUST_SUCCESS(0),
+  CHANGE_TRUST_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * bad input
    */
-  CHANGE_TRUST_MALFORMED(-1),
+  CHANGE_TRUST_MALFORMED(-1, "malformed"),
   /** could not find issuer */
-  CHANGE_TRUST_NO_ISSUER(-2),
+  CHANGE_TRUST_NO_ISSUER(-2, "no_issuer"),
   /** cannot drop limit below balance */
-  CHANGE_TRUST_INVALID_LIMIT(-3),
+  CHANGE_TRUST_INVALID_LIMIT(-3, "invalid_limit"),
   /** cannot create with a limit of 0 */
-  CHANGE_TRUST_LOW_RESERVE(-4),
+  CHANGE_TRUST_LOW_RESERVE(-4, "low_reserve"),
   /** trusting self is not allowed */
-  CHANGE_TRUST_SELF_NOT_ALLOWED(-5),
+  CHANGE_TRUST_SELF_NOT_ALLOWED(-5, "self_not_allowed"),
   /** Asset trustline is missing for pool */
-  CHANGE_TRUST_TRUST_LINE_MISSING(-6),
-  CHANGE_TRUST_CANNOT_DELETE(-7),
-  CHANGE_TRUST_NOT_AUTH_MAINTAIN_LIABILITIES(-8);
+  CHANGE_TRUST_TRUST_LINE_MISSING(-6, "trust_line_missing"),
+  CHANGE_TRUST_CANNOT_DELETE(-7, "cannot_delete"),
+  CHANGE_TRUST_NOT_AUTH_MAINTAIN_LIABILITIES(-8, "not_auth_maintain_liabilities");
 
   companion object {
 
@@ -52,9 +56,24 @@ enum class ChangeTrustResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ChangeTrustResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ChangeTrustResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ChangeTrustResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ChangeTrustResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ChangeTrustResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

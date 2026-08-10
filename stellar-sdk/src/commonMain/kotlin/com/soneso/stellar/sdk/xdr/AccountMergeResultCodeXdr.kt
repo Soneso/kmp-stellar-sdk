@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AccountMergeResultCodeXdr"
+
 /**
  * XDR Source:
  * enum AccountMergeResultCode
@@ -20,29 +24,29 @@ package com.soneso.stellar.sdk.xdr
  *     ACCOUNT_MERGE_IS_SPONSOR = -7       // can't merge account that is a sponsor
  * };
  */
-enum class AccountMergeResultCodeXdr(val value: Int) {
+enum class AccountMergeResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  ACCOUNT_MERGE_SUCCESS(0),
+  ACCOUNT_MERGE_SUCCESS(0, "success"),
   /**
    * codes considered as "failure" for the operation
    * can't merge onto itself
    */
-  ACCOUNT_MERGE_MALFORMED(-1),
+  ACCOUNT_MERGE_MALFORMED(-1, "malformed"),
   /** destination does not exist */
-  ACCOUNT_MERGE_NO_ACCOUNT(-2),
+  ACCOUNT_MERGE_NO_ACCOUNT(-2, "no_account"),
   /** source account has AUTH_IMMUTABLE set */
-  ACCOUNT_MERGE_IMMUTABLE_SET(-3),
+  ACCOUNT_MERGE_IMMUTABLE_SET(-3, "immutable_set"),
   /** account has trust lines/offers */
-  ACCOUNT_MERGE_HAS_SUB_ENTRIES(-4),
+  ACCOUNT_MERGE_HAS_SUB_ENTRIES(-4, "has_sub_entries"),
   /** sequence number is over max allowed */
-  ACCOUNT_MERGE_SEQNUM_TOO_FAR(-5),
+  ACCOUNT_MERGE_SEQNUM_TOO_FAR(-5, "seqnum_too_far"),
   /** can't add source balance to */
-  ACCOUNT_MERGE_DEST_FULL(-6),
+  ACCOUNT_MERGE_DEST_FULL(-6, "dest_full"),
   /**
    * destination balance
    * can't merge account that is a sponsor
    */
-  ACCOUNT_MERGE_IS_SPONSOR(-7);
+  ACCOUNT_MERGE_IS_SPONSOR(-7, "is_sponsor");
 
   companion object {
 
@@ -51,9 +55,24 @@ enum class AccountMergeResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown AccountMergeResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): AccountMergeResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AccountMergeResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AccountMergeResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): AccountMergeResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

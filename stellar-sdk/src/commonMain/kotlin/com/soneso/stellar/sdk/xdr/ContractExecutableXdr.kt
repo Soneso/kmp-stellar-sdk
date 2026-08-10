@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ContractExecutableXdr"
+
 /**
  * XDR Source:
  * union ContractExecutable switch (ContractExecutableType type)
@@ -51,6 +57,25 @@ sealed class ContractExecutableXdr {
         else -> throw IllegalArgumentException("Unknown ContractExecutableXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ContractExecutableXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ContractExecutableXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ContractExecutableXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "wasm" -> WasmHash(HashXdr.fromXdrJsonTree(value))
+          "external_ref" -> ExternalRef(ContractExecutableExternalRefXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "stellar_asset" -> Void
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -65,4 +90,12 @@ sealed class ContractExecutableXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is WasmHash -> buildJsonObject { put("wasm", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name("stellar_asset")
+    is ExternalRef -> buildJsonObject { put("external_ref", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

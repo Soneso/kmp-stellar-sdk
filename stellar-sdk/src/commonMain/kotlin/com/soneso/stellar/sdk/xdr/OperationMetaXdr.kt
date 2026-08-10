@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "OperationMetaXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("changes")
+
 /**
  * XDR Source:
  * struct OperationMeta
@@ -19,9 +26,26 @@ data class OperationMetaXdr(
       val changes = LedgerEntryChangesXdr.decode(reader)
       return OperationMetaXdr(changes)
     }
+
+    fun fromXdrJson(json: String): OperationMetaXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): OperationMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): OperationMetaXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return OperationMetaXdr(
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "changes", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     changes.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("changes", changes.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

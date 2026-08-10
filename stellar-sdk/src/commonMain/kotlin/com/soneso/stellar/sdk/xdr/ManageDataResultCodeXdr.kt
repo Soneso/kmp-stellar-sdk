@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ManageDataResultCodeXdr"
+
 /**
  * XDR Source:
  * enum ManageDataResultCode
@@ -18,16 +22,16 @@ package com.soneso.stellar.sdk.xdr
  *     MANAGE_DATA_INVALID_NAME = -4 // Name not a valid string
  * };
  */
-enum class ManageDataResultCodeXdr(val value: Int) {
+enum class ManageDataResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  MANAGE_DATA_SUCCESS(0),
+  MANAGE_DATA_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  MANAGE_DATA_NOT_SUPPORTED_YET(-1),
-  MANAGE_DATA_NAME_NOT_FOUND(-2),
+  MANAGE_DATA_NOT_SUPPORTED_YET(-1, "not_supported_yet"),
+  MANAGE_DATA_NAME_NOT_FOUND(-2, "name_not_found"),
   /** not enough funds to create a new Data Entry */
-  MANAGE_DATA_LOW_RESERVE(-3),
+  MANAGE_DATA_LOW_RESERVE(-3, "low_reserve"),
   /** Name not a valid string */
-  MANAGE_DATA_INVALID_NAME(-4);
+  MANAGE_DATA_INVALID_NAME(-4, "invalid_name");
 
   companion object {
 
@@ -36,9 +40,24 @@ enum class ManageDataResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown ManageDataResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): ManageDataResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageDataResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageDataResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): ManageDataResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

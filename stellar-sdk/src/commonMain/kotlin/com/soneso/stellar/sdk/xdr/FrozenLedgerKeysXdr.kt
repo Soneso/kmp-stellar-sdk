@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "FrozenLedgerKeysXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("keys")
+
 /**
  * XDR Source:
  * struct FrozenLedgerKeys {
@@ -18,6 +25,17 @@ data class FrozenLedgerKeysXdr(
       val keys = List(reader.readInt()) { EncodedLedgerKeyXdr.decode(reader) }
       return FrozenLedgerKeysXdr(keys)
     }
+
+    fun fromXdrJson(json: String): FrozenLedgerKeysXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): FrozenLedgerKeysXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): FrozenLedgerKeysXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return FrozenLedgerKeysXdr(
+        XdrJson.array(XdrJson.field(json, "keys", XDR_JSON_TYPE), XDR_JSON_TYPE, "keys").map { EncodedLedgerKeyXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -26,4 +44,10 @@ data class FrozenLedgerKeysXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("keys", XdrJson.array(keys) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

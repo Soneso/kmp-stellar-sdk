@@ -75,6 +75,7 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-46 (Contract Meta) - Parse contract metadata from Wasm bytecode
 - SEP-47 (Contract Interface Discovery) - Discover contract-declared SEP support
 - SEP-48 (Contract Interface Specification) - Extract contract spec entries (functions, types, events)
+- SEP-51 (XDR-JSON) - Bi-directional XDR to JSON conversion on every generated XDR type
 - SEP-53 (Sign and Verify Messages) - Off-chain message signing with Ed25519
 
 ### Soroban RPC API

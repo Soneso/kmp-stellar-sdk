@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ManageSellOfferResultXdr"
+
 /**
  * XDR Source:
  * union ManageSellOfferResult switch (ManageSellOfferResultCode code)
@@ -61,6 +67,35 @@ sealed class ManageSellOfferResultXdr {
         else -> throw IllegalArgumentException("Unknown ManageSellOfferResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ManageSellOfferResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ManageSellOfferResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ManageSellOfferResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "success" -> Success(ManageOfferSuccessResultXdr.fromXdrJsonTree(value))
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "malformed" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_MALFORMED)
+        "sell_no_trust" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_SELL_NO_TRUST)
+        "buy_no_trust" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_BUY_NO_TRUST)
+        "sell_not_authorized" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_SELL_NOT_AUTHORIZED)
+        "buy_not_authorized" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_BUY_NOT_AUTHORIZED)
+        "line_full" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_LINE_FULL)
+        "underfunded" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_UNDERFUNDED)
+        "cross_self" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_CROSS_SELF)
+        "sell_no_issuer" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_SELL_NO_ISSUER)
+        "buy_no_issuer" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_BUY_NO_ISSUER)
+        "not_found" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_NOT_FOUND)
+        "low_reserve" -> Void(ManageSellOfferResultCodeXdr.MANAGE_SELL_OFFER_LOW_RESERVE)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -72,4 +107,11 @@ sealed class ManageSellOfferResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Success -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

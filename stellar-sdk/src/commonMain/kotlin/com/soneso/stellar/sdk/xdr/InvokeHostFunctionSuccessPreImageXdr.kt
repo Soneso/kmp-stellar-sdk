@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "InvokeHostFunctionSuccessPreImageXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("return_value", "events")
+
 /**
  * XDR Source:
  * struct InvokeHostFunctionSuccessPreImage
@@ -22,6 +29,18 @@ data class InvokeHostFunctionSuccessPreImageXdr(
       val events = List(reader.readInt()) { ContractEventXdr.decode(reader) }
       return InvokeHostFunctionSuccessPreImageXdr(returnValue, events)
     }
+
+    fun fromXdrJson(json: String): InvokeHostFunctionSuccessPreImageXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InvokeHostFunctionSuccessPreImageXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InvokeHostFunctionSuccessPreImageXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return InvokeHostFunctionSuccessPreImageXdr(
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "return_value", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "events", XDR_JSON_TYPE), XDR_JSON_TYPE, "events").map { ContractEventXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +50,11 @@ data class InvokeHostFunctionSuccessPreImageXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("return_value", returnValue.toXdrJsonElement())
+    put("events", XdrJson.array(events) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

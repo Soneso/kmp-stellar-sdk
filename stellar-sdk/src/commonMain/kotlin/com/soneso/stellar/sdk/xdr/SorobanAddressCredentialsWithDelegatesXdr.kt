@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanAddressCredentialsWithDelegatesXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("address_credentials", "delegates")
+
 /**
  * XDR Source:
  * struct SorobanAddressCredentialsWithDelegates
@@ -22,6 +29,18 @@ data class SorobanAddressCredentialsWithDelegatesXdr(
       val delegates = List(reader.readInt()) { SorobanDelegateSignatureXdr.decode(reader) }
       return SorobanAddressCredentialsWithDelegatesXdr(addressCredentials, delegates)
     }
+
+    fun fromXdrJson(json: String): SorobanAddressCredentialsWithDelegatesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAddressCredentialsWithDelegatesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAddressCredentialsWithDelegatesXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SorobanAddressCredentialsWithDelegatesXdr(
+        SorobanAddressCredentialsXdr.fromXdrJsonTree(XdrJson.field(json, "address_credentials", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "delegates", XDR_JSON_TYPE), XDR_JSON_TYPE, "delegates").map { SorobanDelegateSignatureXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -31,4 +50,11 @@ data class SorobanAddressCredentialsWithDelegatesXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("address_credentials", addressCredentials.toXdrJsonElement())
+    put("delegates", XdrJson.array(delegates) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PreconditionsV2Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("time_bounds", "ledger_bounds", "min_seq_num", "min_seq_age", "min_seq_ledger_gap", "extra_signers")
+
 /**
  * XDR Source:
  * struct PreconditionsV2
@@ -79,6 +86,22 @@ data class PreconditionsV2Xdr(
       val extraSigners = List(reader.readInt()) { SignerKeyXdr.decode(reader) }
       return PreconditionsV2Xdr(timeBounds, ledgerBounds, minSeqNum, minSeqAge, minSeqLedgerGap, extraSigners)
     }
+
+    fun fromXdrJson(json: String): PreconditionsV2Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PreconditionsV2Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PreconditionsV2Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return PreconditionsV2Xdr(
+        XdrJson.optional(XdrJson.field(json, "time_bounds", XDR_JSON_TYPE))?.let { TimeBoundsXdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "ledger_bounds", XDR_JSON_TYPE))?.let { LedgerBoundsXdr.fromXdrJsonTree(it) },
+        XdrJson.optional(XdrJson.field(json, "min_seq_num", XDR_JSON_TYPE))?.let { SequenceNumberXdr.fromXdrJsonTree(it) },
+        DurationXdr.fromXdrJsonTree(XdrJson.field(json, "min_seq_age", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "min_seq_ledger_gap", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "extra_signers", XDR_JSON_TYPE), XDR_JSON_TYPE, "extra_signers", maxLength = 2).map { SignerKeyXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -107,4 +130,15 @@ data class PreconditionsV2Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement() })
+    put("ledger_bounds", XdrJson.optional(ledgerBounds) { it.toXdrJsonElement() })
+    put("min_seq_num", XdrJson.optional(minSeqNum) { it.toXdrJsonElement() })
+    put("min_seq_age", minSeqAge.toXdrJsonElement())
+    put("min_seq_ledger_gap", minSeqLedgerGap.toXdrJsonElement())
+    put("extra_signers", XdrJson.array(extraSigners) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

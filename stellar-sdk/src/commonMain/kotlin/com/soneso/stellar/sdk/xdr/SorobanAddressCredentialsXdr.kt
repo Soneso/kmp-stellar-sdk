@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SorobanAddressCredentialsXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("address", "nonce", "signature_expiration_ledger", "signature")
+
 /**
  * XDR Source:
  * struct SorobanAddressCredentials
@@ -28,6 +35,20 @@ data class SorobanAddressCredentialsXdr(
       val signature = SCValXdr.decode(reader)
       return SorobanAddressCredentialsXdr(address, nonce, signatureExpirationLedger, signature)
     }
+
+    fun fromXdrJson(json: String): SorobanAddressCredentialsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SorobanAddressCredentialsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SorobanAddressCredentialsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SorobanAddressCredentialsXdr(
+        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "address", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "nonce", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "signature_expiration_ledger", XDR_JSON_TYPE)),
+        SCValXdr.fromXdrJsonTree(XdrJson.field(json, "signature", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -36,4 +57,13 @@ data class SorobanAddressCredentialsXdr(
     signatureExpirationLedger.encode(writer)
     signature.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("address", address.toXdrJsonElement())
+    put("nonce", nonce.toXdrJsonElement())
+    put("signature_expiration_ledger", signatureExpirationLedger.toXdrJsonElement())
+    put("signature", signature.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

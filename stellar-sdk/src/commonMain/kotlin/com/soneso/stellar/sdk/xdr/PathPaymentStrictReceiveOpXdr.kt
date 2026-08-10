@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "PathPaymentStrictReceiveOpXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("send_asset", "send_max", "destination", "dest_asset", "dest_amount", "path")
+
 /**
  * XDR Source:
  * struct PathPaymentStrictReceiveOp
@@ -47,6 +54,22 @@ data class PathPaymentStrictReceiveOpXdr(
       val path = List(reader.readInt()) { AssetXdr.decode(reader) }
       return PathPaymentStrictReceiveOpXdr(sendAsset, sendMax, destination, destAsset, destAmount, path)
     }
+
+    fun fromXdrJson(json: String): PathPaymentStrictReceiveOpXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PathPaymentStrictReceiveOpXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PathPaymentStrictReceiveOpXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return PathPaymentStrictReceiveOpXdr(
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "send_asset", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "send_max", XDR_JSON_TYPE)),
+        MuxedAccountXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "dest_asset", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "dest_amount", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "path", XDR_JSON_TYPE), XDR_JSON_TYPE, "path", maxLength = 5).map { AssetXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -60,4 +83,15 @@ data class PathPaymentStrictReceiveOpXdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("send_asset", sendAsset.toXdrJsonElement())
+    put("send_max", sendMax.toXdrJsonElement())
+    put("destination", destination.toXdrJsonElement())
+    put("dest_asset", destAsset.toXdrJsonElement())
+    put("dest_amount", destAmount.toXdrJsonElement())
+    put("path", XdrJson.array(path) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

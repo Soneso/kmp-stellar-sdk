@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCSpecFunctionV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "name", "inputs", "outputs")
+
 /**
  * XDR Source:
  * struct SCSpecFunctionV0
@@ -28,6 +35,20 @@ data class SCSpecFunctionV0Xdr(
       val outputs = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecFunctionV0Xdr(doc, name, inputs, outputs)
     }
+
+    fun fromXdrJson(json: String): SCSpecFunctionV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCSpecFunctionV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCSpecFunctionV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCSpecFunctionV0Xdr(
+        XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
+        SCSymbolXdr.fromXdrJsonTree(XdrJson.field(json, "name", XDR_JSON_TYPE)),
+        XdrJson.array(XdrJson.field(json, "inputs", XDR_JSON_TYPE), XDR_JSON_TYPE, "inputs").map { SCSpecFunctionInputV0Xdr.fromXdrJsonTree(it) },
+        XdrJson.array(XdrJson.field(json, "outputs", XDR_JSON_TYPE), XDR_JSON_TYPE, "outputs", maxLength = 1).map { SCSpecTypeDefXdr.fromXdrJsonTree(it) }
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +63,13 @@ data class SCSpecFunctionV0Xdr(
       item.encode(writer)
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("doc", XdrJson.escapedString(doc))
+    put("name", name.toXdrJsonElement())
+    put("inputs", XdrJson.array(inputs) { it.toXdrJsonElement() })
+    put("outputs", XdrJson.array(outputs) { it.toXdrJsonElement() })
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

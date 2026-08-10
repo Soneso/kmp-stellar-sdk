@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPStatementPledgesXdr"
+
 /**
  * XDR Source:
  * union switch (SCPStatementType type)
@@ -88,6 +93,21 @@ sealed class SCPStatementPledgesXdr {
         else -> throw IllegalArgumentException("Unknown SCPStatementPledgesXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SCPStatementPledgesXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPStatementPledgesXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPStatementPledgesXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "prepare" -> Prepare(SCPStatementPrepareXdr.fromXdrJsonTree(value))
+        "confirm" -> Confirm(SCPStatementConfirmXdr.fromXdrJsonTree(value))
+        "externalize" -> Externalize(SCPStatementExternalizeXdr.fromXdrJsonTree(value))
+        "nominate" -> Nominate(SCPNominationXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -107,4 +127,13 @@ sealed class SCPStatementPledgesXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Prepare -> buildJsonObject { put("prepare", value.toXdrJsonElement()) }
+    is Confirm -> buildJsonObject { put("confirm", value.toXdrJsonElement()) }
+    is Externalize -> buildJsonObject { put("externalize", value.toXdrJsonElement()) }
+    is Nominate -> buildJsonObject { put("nominate", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

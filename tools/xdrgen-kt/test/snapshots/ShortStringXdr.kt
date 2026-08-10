@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ShortStringXdr"
+
 /**
  * XDR Source:
  * typedef string ShortString<64>;
@@ -15,9 +19,19 @@ value class ShortStringXdr(val value: String) {
       val value = reader.readString()
       return ShortStringXdr(value)
     }
+
+    fun fromXdrJson(json: String): ShortStringXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ShortStringXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ShortStringXdr = ShortStringXdr(XdrJson.unescapeString(element, XDR_JSON_TYPE, "value", maxLength = 64))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeString(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

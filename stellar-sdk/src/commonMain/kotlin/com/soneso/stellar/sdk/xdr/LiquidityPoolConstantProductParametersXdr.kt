@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LiquidityPoolConstantProductParametersXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("asset_a", "asset_b", "fee")
+
 /**
  * XDR Source:
  * struct LiquidityPoolConstantProductParameters
@@ -27,6 +34,19 @@ data class LiquidityPoolConstantProductParametersXdr(
       val fee = Int32Xdr.decode(reader)
       return LiquidityPoolConstantProductParametersXdr(assetA, assetB, fee)
     }
+
+    fun fromXdrJson(json: String): LiquidityPoolConstantProductParametersXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LiquidityPoolConstantProductParametersXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LiquidityPoolConstantProductParametersXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LiquidityPoolConstantProductParametersXdr(
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset_a", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset_b", XDR_JSON_TYPE)),
+        Int32Xdr.fromXdrJsonTree(XdrJson.field(json, "fee", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -34,4 +54,12 @@ data class LiquidityPoolConstantProductParametersXdr(
     assetB.encode(writer)
     fee.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("asset_a", assetA.toXdrJsonElement())
+    put("asset_b", assetB.toXdrJsonElement())
+    put("fee", fee.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

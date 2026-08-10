@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "UpgradeTypeXdr"
+
 /**
  * XDR Source:
  * typedef opaque UpgradeType<128>;
@@ -15,9 +19,19 @@ value class UpgradeTypeXdr(val value: ByteArray) {
       val value = reader.readVariableOpaque()
       return UpgradeTypeXdr(value)
     }
+
+    fun fromXdrJson(json: String): UpgradeTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): UpgradeTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): UpgradeTypeXdr = UpgradeTypeXdr(XdrJson.hex(element, XDR_JSON_TYPE, "value", maxLength = 128))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeVariableOpaque(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

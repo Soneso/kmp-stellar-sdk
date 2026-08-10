@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "RevokeSponsorshipOpSignerXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("account_id", "signer_key")
+
 /**
  * XDR Source:
  * struct
@@ -22,10 +29,29 @@ data class RevokeSponsorshipOpSignerXdr(
       val signerKey = SignerKeyXdr.decode(reader)
       return RevokeSponsorshipOpSignerXdr(accountId, signerKey)
     }
+
+    fun fromXdrJson(json: String): RevokeSponsorshipOpSignerXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): RevokeSponsorshipOpSignerXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): RevokeSponsorshipOpSignerXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return RevokeSponsorshipOpSignerXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "account_id", XDR_JSON_TYPE)),
+        SignerKeyXdr.fromXdrJsonTree(XdrJson.field(json, "signer_key", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     accountId.encode(writer)
     signerKey.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("account_id", accountId.toXdrJsonElement())
+    put("signer_key", signerKey.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

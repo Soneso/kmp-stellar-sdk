@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "MuxedAccountMed25519Xdr"
+
 /**
  * XDR Source:
  * struct
@@ -22,10 +27,23 @@ data class MuxedAccountMed25519Xdr(
       val ed25519 = Uint256Xdr.decode(reader)
       return MuxedAccountMed25519Xdr(id, ed25519)
     }
+
+    fun fromXdrJson(json: String): MuxedAccountMed25519Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): MuxedAccountMed25519Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): MuxedAccountMed25519Xdr {
+      val payload = XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "an M strkey") { StrKey.decodeMed25519PublicKey(it) }
+      return MuxedAccountMed25519Xdr(Uint64Xdr(XdrJson.muxedId(payload)), Uint256Xdr(payload.copyOfRange(0, 32)))
+    }
   }
 
   fun encode(writer: XdrWriter) {
     id.encode(writer)
     ed25519.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeMed25519PublicKey(XdrJson.muxedPayload(ed25519.value, id.value)))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

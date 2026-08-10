@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import com.soneso.stellar.sdk.StrKey
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "PublicKeyXdr"
+
 /**
  * XDR Source:
  * union PublicKey switch (PublicKeyType type)
@@ -32,6 +37,13 @@ sealed class PublicKeyXdr {
         else -> throw IllegalArgumentException("Unknown PublicKeyXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): PublicKeyXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): PublicKeyXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): PublicKeyXdr =
+      Ed25519(Uint256Xdr(XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "a G strkey") { StrKey.decodeEd25519PublicKey(it) }))
   }
 
   fun encode(writer: XdrWriter) {
@@ -42,4 +54,10 @@ sealed class PublicKeyXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Ed25519 -> XdrJson.name(StrKey.encodeEd25519PublicKey(value.value))
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

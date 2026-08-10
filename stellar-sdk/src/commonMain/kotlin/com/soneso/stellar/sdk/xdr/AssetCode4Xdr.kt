@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "AssetCode4Xdr"
+
 /**
  * XDR Source:
  * typedef opaque AssetCode4[4];
@@ -15,9 +19,20 @@ value class AssetCode4Xdr(val value: ByteArray) {
       val value = reader.readFixedOpaque(4)
       return AssetCode4Xdr(value)
     }
+
+    fun fromXdrJson(json: String): AssetCode4Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): AssetCode4Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): AssetCode4Xdr =
+      AssetCode4Xdr(XdrJson.padAssetCode(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"), XDR_JSON_TYPE, 4))
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeFixedOpaque(value, 4)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(value, 0))
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "ClaimClaimableBalanceResultXdr"
+
 /**
  * XDR Source:
  * union ClaimClaimableBalanceResult switch (ClaimClaimableBalanceResultCode code)
@@ -40,6 +44,23 @@ sealed class ClaimClaimableBalanceResultXdr {
         else -> throw IllegalArgumentException("Unknown ClaimClaimableBalanceResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): ClaimClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimClaimableBalanceResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimClaimableBalanceResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_SUCCESS)
+        "does_not_exist" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_DOES_NOT_EXIST)
+        "cannot_claim" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_CANNOT_CLAIM)
+        "line_full" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_LINE_FULL)
+        "no_trust" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NO_TRUST)
+        "not_authorized" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_NOT_AUTHORIZED)
+        "trustline_frozen" -> Void(ClaimClaimableBalanceResultCodeXdr.CLAIM_CLAIMABLE_BALANCE_TRUSTLINE_FROZEN)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -48,4 +69,10 @@ sealed class ClaimClaimableBalanceResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

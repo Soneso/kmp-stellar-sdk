@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SCAddressTypeXdr"
+
 /**
  * XDR Source:
  * enum SCAddressType
@@ -14,12 +18,12 @@ package com.soneso.stellar.sdk.xdr
  *     SC_ADDRESS_TYPE_LIQUIDITY_POOL = 4
  * };
  */
-enum class SCAddressTypeXdr(val value: Int) {
-  SC_ADDRESS_TYPE_ACCOUNT(0),
-  SC_ADDRESS_TYPE_CONTRACT(1),
-  SC_ADDRESS_TYPE_MUXED_ACCOUNT(2),
-  SC_ADDRESS_TYPE_CLAIMABLE_BALANCE(3),
-  SC_ADDRESS_TYPE_LIQUIDITY_POOL(4);
+enum class SCAddressTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  SC_ADDRESS_TYPE_ACCOUNT(0, "account"),
+  SC_ADDRESS_TYPE_CONTRACT(1, "contract"),
+  SC_ADDRESS_TYPE_MUXED_ACCOUNT(2, "muxed_account"),
+  SC_ADDRESS_TYPE_CLAIMABLE_BALANCE(3, "claimable_balance"),
+  SC_ADDRESS_TYPE_LIQUIDITY_POOL(4, "liquidity_pool");
 
   companion object {
 
@@ -28,9 +32,24 @@ enum class SCAddressTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown SCAddressTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): SCAddressTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCAddressTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCAddressTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): SCAddressTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

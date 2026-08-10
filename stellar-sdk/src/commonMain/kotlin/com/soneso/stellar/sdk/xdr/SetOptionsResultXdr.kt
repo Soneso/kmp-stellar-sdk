@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "SetOptionsResultXdr"
+
 /**
  * XDR Source:
  * union SetOptionsResult switch (SetOptionsResultCode code)
@@ -48,6 +52,27 @@ sealed class SetOptionsResultXdr {
         else -> throw IllegalArgumentException("Unknown SetOptionsResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): SetOptionsResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SetOptionsResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SetOptionsResultXdr {
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "success" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_SUCCESS)
+        "low_reserve" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_LOW_RESERVE)
+        "too_many_signers" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_TOO_MANY_SIGNERS)
+        "bad_flags" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_BAD_FLAGS)
+        "invalid_inflation" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_INVALID_INFLATION)
+        "cant_change" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_CANT_CHANGE)
+        "unknown_flag" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_UNKNOWN_FLAG)
+        "threshold_out_of_range" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_THRESHOLD_OUT_OF_RANGE)
+        "bad_signer" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_BAD_SIGNER)
+        "invalid_home_domain" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_INVALID_HOME_DOMAIN)
+        "auth_revocable_required" -> Void(SetOptionsResultCodeXdr.SET_OPTIONS_AUTH_REVOCABLE_REQUIRED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -56,4 +81,10 @@ sealed class SetOptionsResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,11 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "HotArchiveBucketEntryXdr"
+
 /**
  * XDR Source:
  * union HotArchiveBucketEntry switch (HotArchiveBucketEntryType type)
@@ -57,6 +62,20 @@ sealed class HotArchiveBucketEntryXdr {
         else -> throw IllegalArgumentException("Unknown HotArchiveBucketEntryXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): HotArchiveBucketEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): HotArchiveBucketEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): HotArchiveBucketEntryXdr {
+      val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+      return when (arm) {
+        "archived" -> ArchivedEntry(LedgerEntryXdr.fromXdrJsonTree(value))
+        "live" -> Key(LedgerKeyXdr.fromXdrJsonTree(value))
+        "metaentry" -> MetaEntry(BucketMetadataXdr.fromXdrJsonTree(value))
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -73,4 +92,12 @@ sealed class HotArchiveBucketEntryXdr {
       }
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is ArchivedEntry -> buildJsonObject { put("archived", value.toXdrJsonElement()) }
+    is Key -> buildJsonObject { put("live", value.toXdrJsonElement()) }
+    is MetaEntry -> buildJsonObject { put("metaentry", value.toXdrJsonElement()) }
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

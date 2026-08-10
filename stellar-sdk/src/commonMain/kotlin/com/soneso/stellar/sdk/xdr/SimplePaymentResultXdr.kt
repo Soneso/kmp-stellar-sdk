@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SimplePaymentResultXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("destination", "asset", "amount")
+
 /**
  * XDR Source:
  * struct SimplePaymentResult
@@ -25,6 +32,19 @@ data class SimplePaymentResultXdr(
       val amount = Int64Xdr.decode(reader)
       return SimplePaymentResultXdr(destination, asset, amount)
     }
+
+    fun fromXdrJson(json: String): SimplePaymentResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SimplePaymentResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SimplePaymentResultXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SimplePaymentResultXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "destination", XDR_JSON_TYPE)),
+        AssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "amount", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -32,4 +52,12 @@ data class SimplePaymentResultXdr(
     asset.encode(writer)
     amount.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("destination", destination.toXdrJsonElement())
+    put("asset", asset.toXdrJsonElement())
+    put("amount", amount.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

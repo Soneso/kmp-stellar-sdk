@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ClaimableBalanceEntryExtensionV1Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ext", "flags")
+
 /**
  * XDR Source:
  * struct ClaimableBalanceEntryExtensionV1
@@ -29,10 +36,29 @@ data class ClaimableBalanceEntryExtensionV1Xdr(
       val flags = Uint32Xdr.decode(reader)
       return ClaimableBalanceEntryExtensionV1Xdr(ext, flags)
     }
+
+    fun fromXdrJson(json: String): ClaimableBalanceEntryExtensionV1Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ClaimableBalanceEntryExtensionV1Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ClaimableBalanceEntryExtensionV1Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ClaimableBalanceEntryExtensionV1Xdr(
+        ClaimableBalanceEntryExtensionV1ExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "flags", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     ext.encode(writer)
     flags.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ext", ext.toXdrJsonElement())
+    put("flags", flags.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

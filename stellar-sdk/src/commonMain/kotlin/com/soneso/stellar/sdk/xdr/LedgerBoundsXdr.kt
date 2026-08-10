@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "LedgerBoundsXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("min_ledger", "max_ledger")
+
 /**
  * XDR Source:
  * struct LedgerBounds
@@ -23,10 +30,29 @@ data class LedgerBoundsXdr(
       val maxLedger = Uint32Xdr.decode(reader)
       return LedgerBoundsXdr(minLedger, maxLedger)
     }
+
+    fun fromXdrJson(json: String): LedgerBoundsXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): LedgerBoundsXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): LedgerBoundsXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return LedgerBoundsXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "min_ledger", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "max_ledger", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     minLedger.encode(writer)
     maxLedger.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("min_ledger", minLedger.toXdrJsonElement())
+    put("max_ledger", maxLedger.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "SCPBallotXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("counter", "value")
+
 /**
  * XDR Source:
  * struct SCPBallot
@@ -24,10 +31,29 @@ data class SCPBallotXdr(
       val value = ValueXdr.decode(reader)
       return SCPBallotXdr(counter, value)
     }
+
+    fun fromXdrJson(json: String): SCPBallotXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): SCPBallotXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): SCPBallotXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return SCPBallotXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "counter", XDR_JSON_TYPE)),
+        ValueXdr.fromXdrJsonTree(XdrJson.field(json, "value", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     counter.encode(writer)
     value.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("counter", counter.toXdrJsonElement())
+    put("value", value.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

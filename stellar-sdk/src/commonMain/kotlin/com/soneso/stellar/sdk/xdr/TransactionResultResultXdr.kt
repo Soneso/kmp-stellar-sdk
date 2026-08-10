@@ -3,6 +3,12 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TransactionResultResultXdr"
+
 /**
  * XDR Source:
  * union switch (TransactionResultCode code)
@@ -91,6 +97,42 @@ sealed class TransactionResultResultXdr {
         else -> throw IllegalArgumentException("Unknown TransactionResultResultXdr discriminant: $discriminant")
       }
     }
+
+    fun fromXdrJson(json: String): TransactionResultResultXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TransactionResultResultXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TransactionResultResultXdr {
+      if (element is JsonObject) {
+        val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
+        return when (arm) {
+          "tx_fee_bump_inner_success" -> InnerResultPair(TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS, InnerTransactionResultPairXdr.fromXdrJsonTree(value))
+          "tx_fee_bump_inner_failed" -> InnerResultPair(TransactionResultCodeXdr.txFEE_BUMP_INNER_FAILED, InnerTransactionResultPairXdr.fromXdrJsonTree(value))
+          "tx_success" -> Results(TransactionResultCodeXdr.txSUCCESS, XdrJson.array(value, XDR_JSON_TYPE, "tx_success").map { OperationResultXdr.fromXdrJsonTree(it) })
+          "tx_failed" -> Results(TransactionResultCodeXdr.txFAILED, XdrJson.array(value, XDR_JSON_TYPE, "tx_failed").map { OperationResultXdr.fromXdrJsonTree(it) })
+          else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+        }
+      }
+      return when (val arm = XdrJson.name(element, XDR_JSON_TYPE)) {
+        "tx_too_early" -> Void(TransactionResultCodeXdr.txTOO_EARLY)
+        "tx_too_late" -> Void(TransactionResultCodeXdr.txTOO_LATE)
+        "tx_missing_operation" -> Void(TransactionResultCodeXdr.txMISSING_OPERATION)
+        "tx_bad_seq" -> Void(TransactionResultCodeXdr.txBAD_SEQ)
+        "tx_bad_auth" -> Void(TransactionResultCodeXdr.txBAD_AUTH)
+        "tx_insufficient_balance" -> Void(TransactionResultCodeXdr.txINSUFFICIENT_BALANCE)
+        "tx_no_account" -> Void(TransactionResultCodeXdr.txNO_ACCOUNT)
+        "tx_insufficient_fee" -> Void(TransactionResultCodeXdr.txINSUFFICIENT_FEE)
+        "tx_bad_auth_extra" -> Void(TransactionResultCodeXdr.txBAD_AUTH_EXTRA)
+        "tx_internal_error" -> Void(TransactionResultCodeXdr.txINTERNAL_ERROR)
+        "tx_not_supported" -> Void(TransactionResultCodeXdr.txNOT_SUPPORTED)
+        "tx_bad_sponsorship" -> Void(TransactionResultCodeXdr.txBAD_SPONSORSHIP)
+        "tx_bad_min_seq_age_or_gap" -> Void(TransactionResultCodeXdr.txBAD_MIN_SEQ_AGE_OR_GAP)
+        "tx_malformed" -> Void(TransactionResultCodeXdr.txMALFORMED)
+        "tx_soroban_invalid" -> Void(TransactionResultCodeXdr.txSOROBAN_INVALID)
+        "tx_frozen_key_accessed" -> Void(TransactionResultCodeXdr.txFROZEN_KEY_ACCESSED)
+        else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
+      }
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -108,4 +150,12 @@ sealed class TransactionResultResultXdr {
       is Void -> {}
     }
   }
+
+  fun toXdrJsonElement(): JsonElement = when (this) {
+    is InnerResultPair -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
+    is Results -> buildJsonObject { put(discriminant.xdrJsonName, XdrJson.array(value) { it.toXdrJsonElement() }) }
+    is Void -> XdrJson.name(discriminant.xdrJsonName)
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

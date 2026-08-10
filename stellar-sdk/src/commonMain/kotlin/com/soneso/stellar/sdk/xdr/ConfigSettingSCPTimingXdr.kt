@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingSCPTimingXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_target_close_time_milliseconds", "nomination_timeout_initial_milliseconds", "nomination_timeout_increment_milliseconds", "ballot_timeout_initial_milliseconds", "ballot_timeout_increment_milliseconds")
+
 /**
  * XDR Source:
  * struct ConfigSettingSCPTiming {
@@ -30,6 +37,21 @@ data class ConfigSettingSCPTimingXdr(
       val ballotTimeoutIncrementMilliseconds = Uint32Xdr.decode(reader)
       return ConfigSettingSCPTimingXdr(ledgerTargetCloseTimeMilliseconds, nominationTimeoutInitialMilliseconds, nominationTimeoutIncrementMilliseconds, ballotTimeoutInitialMilliseconds, ballotTimeoutIncrementMilliseconds)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingSCPTimingXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingSCPTimingXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingSCPTimingXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ConfigSettingSCPTimingXdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_target_close_time_milliseconds", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "nomination_timeout_initial_milliseconds", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "nomination_timeout_increment_milliseconds", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ballot_timeout_initial_milliseconds", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ballot_timeout_increment_milliseconds", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -39,4 +61,14 @@ data class ConfigSettingSCPTimingXdr(
     ballotTimeoutInitialMilliseconds.encode(writer)
     ballotTimeoutIncrementMilliseconds.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_target_close_time_milliseconds", ledgerTargetCloseTimeMilliseconds.toXdrJsonElement())
+    put("nomination_timeout_initial_milliseconds", nominationTimeoutInitialMilliseconds.toXdrJsonElement())
+    put("nomination_timeout_increment_milliseconds", nominationTimeoutIncrementMilliseconds.toXdrJsonElement())
+    put("ballot_timeout_initial_milliseconds", ballotTimeoutInitialMilliseconds.toXdrJsonElement())
+    put("ballot_timeout_increment_milliseconds", ballotTimeoutIncrementMilliseconds.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

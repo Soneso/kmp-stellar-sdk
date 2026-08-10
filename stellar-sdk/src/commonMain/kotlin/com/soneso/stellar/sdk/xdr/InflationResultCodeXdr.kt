@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "InflationResultCodeXdr"
+
 /**
  * XDR Source:
  * enum InflationResultCode
@@ -13,11 +17,11 @@ package com.soneso.stellar.sdk.xdr
  *     INFLATION_NOT_TIME = -1
  * };
  */
-enum class InflationResultCodeXdr(val value: Int) {
+enum class InflationResultCodeXdr(val value: Int, internal val xdrJsonName: String) {
   /** codes considered as "success" for the operation */
-  INFLATION_SUCCESS(0),
+  INFLATION_SUCCESS(0, "success"),
   /** codes considered as "failure" for the operation */
-  INFLATION_NOT_TIME(-1);
+  INFLATION_NOT_TIME(-1, "not_time");
 
   companion object {
 
@@ -26,9 +30,24 @@ enum class InflationResultCodeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown InflationResultCodeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): InflationResultCodeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): InflationResultCodeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): InflationResultCodeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): InflationResultCodeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

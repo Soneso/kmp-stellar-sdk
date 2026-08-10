@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "ConfigSettingContractBandwidthV0Xdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("ledger_max_txs_size_bytes", "tx_max_size_bytes", "fee_tx_size1_kb")
+
 /**
  * XDR Source:
  * struct ConfigSettingContractBandwidthV0
@@ -32,6 +39,19 @@ data class ConfigSettingContractBandwidthV0Xdr(
       val feeTxSize1Kb = Int64Xdr.decode(reader)
       return ConfigSettingContractBandwidthV0Xdr(ledgerMaxTxsSizeBytes, txMaxSizeBytes, feeTxSize1Kb)
     }
+
+    fun fromXdrJson(json: String): ConfigSettingContractBandwidthV0Xdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): ConfigSettingContractBandwidthV0Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): ConfigSettingContractBandwidthV0Xdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return ConfigSettingContractBandwidthV0Xdr(
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "ledger_max_txs_size_bytes", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "tx_max_size_bytes", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "fee_tx_size1_kb", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -39,4 +59,12 @@ data class ConfigSettingContractBandwidthV0Xdr(
     txMaxSizeBytes.encode(writer)
     feeTxSize1Kb.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("ledger_max_txs_size_bytes", ledgerMaxTxsSizeBytes.toXdrJsonElement())
+    put("tx_max_size_bytes", txMaxSizeBytes.toXdrJsonElement())
+    put("fee_tx_size1_kb", feeTxSize1Kb.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

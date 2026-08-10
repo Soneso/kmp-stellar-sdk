@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "TrustLineEntryXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("account_id", "asset", "balance", "limit", "flags", "ext")
+
 /**
  * XDR Source:
  * struct TrustLineEntry
@@ -65,6 +72,22 @@ data class TrustLineEntryXdr(
       val ext = TrustLineEntryExtXdr.decode(reader)
       return TrustLineEntryXdr(accountId, asset, balance, limit, flags, ext)
     }
+
+    fun fromXdrJson(json: String): TrustLineEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): TrustLineEntryXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): TrustLineEntryXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return TrustLineEntryXdr(
+        AccountIDXdr.fromXdrJsonTree(XdrJson.field(json, "account_id", XDR_JSON_TYPE)),
+        TrustLineAssetXdr.fromXdrJsonTree(XdrJson.field(json, "asset", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "balance", XDR_JSON_TYPE)),
+        Int64Xdr.fromXdrJsonTree(XdrJson.field(json, "limit", XDR_JSON_TYPE)),
+        Uint32Xdr.fromXdrJsonTree(XdrJson.field(json, "flags", XDR_JSON_TYPE)),
+        TrustLineEntryExtXdr.fromXdrJsonTree(XdrJson.field(json, "ext", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
@@ -75,4 +98,15 @@ data class TrustLineEntryXdr(
     flags.encode(writer)
     ext.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("account_id", accountId.toXdrJsonElement())
+    put("asset", asset.toXdrJsonElement())
+    put("balance", balance.toXdrJsonElement())
+    put("limit", limit.toXdrJsonElement())
+    put("flags", flags.toXdrJsonElement())
+    put("ext", ext.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

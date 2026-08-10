@@ -3,6 +3,10 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+
+private const val XDR_JSON_TYPE = "BinaryFuseFilterTypeXdr"
+
 /**
  * XDR Source:
  * enum BinaryFuseFilterType
@@ -12,10 +16,10 @@ package com.soneso.stellar.sdk.xdr
  *     BINARY_FUSE_FILTER_32_BIT = 2
  * };
  */
-enum class BinaryFuseFilterTypeXdr(val value: Int) {
-  BINARY_FUSE_FILTER_8_BIT(0),
-  BINARY_FUSE_FILTER_16_BIT(1),
-  BINARY_FUSE_FILTER_32_BIT(2);
+enum class BinaryFuseFilterTypeXdr(val value: Int, internal val xdrJsonName: String) {
+  BINARY_FUSE_FILTER_8_BIT(0, "b8_bit"),
+  BINARY_FUSE_FILTER_16_BIT(1, "b16_bit"),
+  BINARY_FUSE_FILTER_32_BIT(2, "b32_bit");
 
   companion object {
 
@@ -24,9 +28,24 @@ enum class BinaryFuseFilterTypeXdr(val value: Int) {
       return entries.find { it.value == value }
         ?: throw IllegalArgumentException("Unknown BinaryFuseFilterTypeXdr value: $value")
     }
+
+    fun fromXdrJson(json: String): BinaryFuseFilterTypeXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): BinaryFuseFilterTypeXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): BinaryFuseFilterTypeXdr {
+      val name = XdrJson.name(element, XDR_JSON_TYPE)
+      return findXdrJsonName(name) ?: XdrJson.unknownMember(XDR_JSON_TYPE, name)
+    }
+
+    internal fun findXdrJsonName(name: String): BinaryFuseFilterTypeXdr? = entries.find { it.xdrJsonName == name }
   }
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(value)
   }
+
+  fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

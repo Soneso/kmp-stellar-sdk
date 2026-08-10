@@ -3,6 +3,13 @@
 
 package com.soneso.stellar.sdk.xdr
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+
+private const val XDR_JSON_TYPE = "UpgradeEntryMetaXdr"
+
+private val XDR_JSON_KEYS: Array<String> = arrayOf("upgrade", "changes")
+
 /**
  * XDR Source:
  * struct UpgradeEntryMeta
@@ -22,10 +29,29 @@ data class UpgradeEntryMetaXdr(
       val changes = LedgerEntryChangesXdr.decode(reader)
       return UpgradeEntryMetaXdr(upgrade, changes)
     }
+
+    fun fromXdrJson(json: String): UpgradeEntryMetaXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
+
+    fun fromXdrJsonElement(element: JsonElement): UpgradeEntryMetaXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
+
+    internal fun fromXdrJsonTree(element: JsonElement): UpgradeEntryMetaXdr {
+      val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
+      return UpgradeEntryMetaXdr(
+        LedgerUpgradeXdr.fromXdrJsonTree(XdrJson.field(json, "upgrade", XDR_JSON_TYPE)),
+        LedgerEntryChangesXdr.fromXdrJsonTree(XdrJson.field(json, "changes", XDR_JSON_TYPE))
+      )
+    }
   }
 
   fun encode(writer: XdrWriter) {
     upgrade.encode(writer)
     changes.encode(writer)
   }
+
+  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+    put("upgrade", upgrade.toXdrJsonElement())
+    put("changes", changes.toXdrJsonElement())
+  }
+
+  fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }
