@@ -63,6 +63,10 @@ try {
 // Also thrown by: KeyPair.fromSecretSeed(), amount parsing (e.g. PaymentOperation with bad amount)
 ```
 
+A strkey is only accepted in canonical form: `=` padding, whitespace and
+lowercase all produce `IllegalArgumentException` on every platform. Trim input
+arriving from a UI or an external system; the full rules are in security.md.
+
 ### Soroban RPC Exceptions
 
 | Exception | Trigger | Key Properties |

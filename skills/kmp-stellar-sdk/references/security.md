@@ -221,6 +221,33 @@ fun isValidSeed(seed: String): Boolean {
 }
 ```
 
+`StrKey` validation requires canonical encoding, and JVM, Android, JS and native
+apply the same rule. All of the following are rejected:
+
+- trailing `=` padding, and any content following a `=`
+- whitespace anywhere in the string, including whitespace inserted mid-string
+- lowercase base32 characters
+- any character outside the base32 alphabet, including a non-ASCII character
+  whose low byte would alias onto a legal one
+
+Trim untrusted input before validating it. A strkey pasted from a user interface
+frequently carries surrounding whitespace, and such a value is rejected rather
+than silently normalized.
+
+```kotlin
+val address = userInput.trim()
+if (!isValidStellarAddress(address)) {
+    // reject the input -- do not attempt any further normalization
+}
+```
+
+Validation agrees with decoding. `isValidSignedPayload` enforces the same `P...`
+framing that `SignerKey` and the XDR decoders require -- declared payload length
+in 1..64, an exact fit, zero padding -- and `isValidClaimableBalance` rejects a
+`B...` strkey whose discriminant is not `CLAIMABLE_BALANCE_ID_TYPE_V0`, as does
+the `Address` constructor. Every `StrKey.decode*` entry point signals a rejection
+with `IllegalArgumentException`.
+
 ### Asset Code Validation
 
 ```kotlin
@@ -509,6 +536,8 @@ The SDK uses audited cryptographic libraries with no custom crypto:
 - [ ] Secret `CharArray` zeroed with `fill('\u0000')` after use
 - [ ] `Mnemonic.close()` called when HD wallet instance is no longer needed
 - [ ] All user-supplied addresses validated with `StrKey` methods
+- [ ] Untrusted strkey input trimmed before validation -- `=` padding, whitespace
+      and lowercase characters are rejected as non-canonical
 - [ ] `StrKey.isValidEd25519SecretSeed()` called with `CharArray`, not `String`
 - [ ] Asset codes validated (1-12 alphanumeric characters)
 - [ ] Amounts validated as positive decimals with at most 7 decimal places

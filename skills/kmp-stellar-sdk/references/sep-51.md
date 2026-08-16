@@ -167,7 +167,7 @@ These types render as strkeys rather than as their structural XDR shape:
 
 An `AssetCode12` is never trimmed below five bytes, which is what keeps it distinguishable from an `AssetCode4`: the code `ABC` padded to twelve bytes renders as `"ABC\\0\\0"` in the document, and an all-NUL code renders as five escaped NUL bytes.
 
-A strkey that fails its checksum, or one whose prefix does not match the arm being read, is rejected — a `C...` where an account key is expected raises rather than silently decoding.
+A strkey that fails its checksum, or one whose prefix does not match the arm being read, is rejected — a `C...` where an account key is expected raises rather than silently decoding. The canonical-form rules are in security.md.
 
 ## Worked Example: a Transaction Envelope
 

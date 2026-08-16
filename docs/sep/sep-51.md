@@ -366,6 +366,9 @@ Types that already have a text form use it, rather than rendering their internal
 | `AssetCode` | rendered as its `AssetCode4` or `AssetCode12` arm |
 | `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string |
 
+Reading a strkey applies the same rules the codec applies everywhere else. A strkey
+whose prefix does not match the arm being read is rejected.
+
 ```kotlin
 import com.soneso.stellar.sdk.xdr.AssetCode12Xdr
 import com.soneso.stellar.sdk.xdr.AssetCode4Xdr
