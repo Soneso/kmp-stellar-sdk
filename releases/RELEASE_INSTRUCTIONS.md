@@ -34,6 +34,10 @@ Before starting a release, ensure you have:
 
 ### Phase 1: Prepare Release
 
+#### Step 0: Merge the pending docs branch
+
+If a `release-docs` branch exists, merge it into `main` before anything else. User-facing documentation and skill content that describes unreleased behavior is kept on that branch (not on the feature branches) so that main's docs always match the released SDK. A release that skips this step ships stale docs. Skill archives (`skills/*.zip`) are never rebuilt on feature branches; Step 2 rebuilds the archive after the skill metadata is updated. If the branch does not exist, continue.
+
 #### Step 1: Determine Version Number
 
 Follow [Semantic Versioning](https://semver.org/):
@@ -204,6 +208,9 @@ Always pass `-PexcludeIntegrationTests` during release verification. Integration
 
 # Run macOS native unit tests (if on macOS)
 ./gradlew :stellar-sdk:macosArm64Test -PexcludeIntegrationTests
+
+# Run Android unit tests (the JVM suite on the Android variant)
+./gradlew :stellar-sdk:testDebugUnitTest -PexcludeIntegrationTests
 ```
 
 **Note**: the integration tests run later, as the pre-publish gate in Phase 3 (Step 10).

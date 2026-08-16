@@ -1044,44 +1044,32 @@ data class CreateClaimableBalanceOperation(
 /**
  * Represents a [ClaimClaimableBalance](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#claim-claimable-balance) operation.
  *
- * @property balanceId The hex-encoded claimable balance ID to claim
+ * @property balanceId The claimable balance ID to claim, in any spelling
+ * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or that
+ * hash behind a type discriminant of either width in hexadecimal
  */
 data class ClaimClaimableBalanceOperation(
     val balanceId: String
 ) : Operation() {
 
-    init {
-        require(balanceId.length == 72) {
-            "Invalid balance ID length: expected 72 characters, got ${balanceId.length}"
-        }
-        // Validate hex string
-        try {
-            Util.hexToBytes(balanceId)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Balance ID must be valid hex string", e)
-        }
-    }
+    /**
+     * Resolving the id here holds every spelling to the same rules at construction, and
+     * equivalent spellings reach the wire as the same bytes.
+     */
+    private val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
 
     override fun toOperationBody(): OperationBodyXdr {
-        val balanceIdBytes = Util.hexToBytes(balanceId)
-        // Deserialize the full XDR bytes to get the ClaimableBalanceID
-        val reader = XdrReader(balanceIdBytes)
-        val claimableBalanceId = ClaimableBalanceIDXdr.decode(reader)
-
         val op = ClaimClaimableBalanceOpXdr(
-            balanceId = claimableBalanceId
+            balanceId = claimableBalanceId.toXdr()
         )
         return OperationBodyXdr.ClaimClaimableBalanceOp(op)
     }
 
     companion object {
         fun fromXdr(op: ClaimClaimableBalanceOpXdr): ClaimClaimableBalanceOperation {
-            // Serialize the entire ClaimableBalanceID XDR to bytes
-            val writer = XdrWriter()
-            op.balanceId.encode(writer)
-            val balanceIdBytes = writer.toByteArray()
-            val balanceId = Util.bytesToHex(balanceIdBytes).lowercase()
-            return ClaimClaimableBalanceOperation(balanceId)
+            return ClaimClaimableBalanceOperation(
+                ClaimableBalanceId.fromXdr(op.balanceId).toPaddedHex()
+            )
         }
     }
 }
@@ -1089,44 +1077,32 @@ data class ClaimClaimableBalanceOperation(
 /**
  * Represents a [ClawbackClaimableBalance](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#clawback-claimable-balance) operation.
  *
- * @property balanceId The hex-encoded claimable balance ID to claw back
+ * @property balanceId The claimable balance ID to claw back, in any spelling
+ * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or that
+ * hash behind a type discriminant of either width in hexadecimal
  */
 data class ClawbackClaimableBalanceOperation(
     val balanceId: String
 ) : Operation() {
 
-    init {
-        require(balanceId.length == 72) {
-            "Invalid balance ID length: expected 72 characters, got ${balanceId.length}"
-        }
-        // Validate hex string
-        try {
-            Util.hexToBytes(balanceId)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Balance ID must be valid hex string", e)
-        }
-    }
+    /**
+     * Resolving the id here holds every spelling to the same rules at construction, and
+     * equivalent spellings reach the wire as the same bytes.
+     */
+    private val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
 
     override fun toOperationBody(): OperationBodyXdr {
-        val balanceIdBytes = Util.hexToBytes(balanceId)
-        // Deserialize the full XDR bytes to get the ClaimableBalanceID
-        val reader = XdrReader(balanceIdBytes)
-        val claimableBalanceId = ClaimableBalanceIDXdr.decode(reader)
-
         val op = ClawbackClaimableBalanceOpXdr(
-            balanceId = claimableBalanceId
+            balanceId = claimableBalanceId.toXdr()
         )
         return OperationBodyXdr.ClawbackClaimableBalanceOp(op)
     }
 
     companion object {
         fun fromXdr(op: ClawbackClaimableBalanceOpXdr): ClawbackClaimableBalanceOperation {
-            // Serialize the entire ClaimableBalanceID XDR to bytes
-            val writer = XdrWriter()
-            op.balanceId.encode(writer)
-            val balanceIdBytes = writer.toByteArray()
-            val balanceId = Util.bytesToHex(balanceIdBytes).lowercase()
-            return ClawbackClaimableBalanceOperation(balanceId)
+            return ClawbackClaimableBalanceOperation(
+                ClaimableBalanceId.fromXdr(op.balanceId).toPaddedHex()
+            )
         }
     }
 }
@@ -1293,11 +1269,11 @@ data class RevokeSponsorshipOperation(
                 )
             }
             is Sponsorship.ClaimableBalance -> {
-                val balanceIdBytes = Util.hexToBytes(sponsorship.balanceId)
-                val claimableBalanceId = ClaimableBalanceIDXdr.V0(HashXdr(balanceIdBytes))
                 RevokeSponsorshipOpXdr.LedgerKey(
                     LedgerKeyXdr.ClaimableBalance(
-                        LedgerKeyClaimableBalanceXdr(balanceId = claimableBalanceId)
+                        LedgerKeyClaimableBalanceXdr(
+                            balanceId = sponsorship.claimableBalanceId.toXdr()
+                        )
                     )
                 )
             }
@@ -1350,10 +1326,9 @@ data class RevokeSponsorshipOperation(
                             Sponsorship.Data(accountId, ledgerKey.value.dataName.value)
                         }
                         is LedgerKeyXdr.ClaimableBalance -> {
-                            val balanceId = when (val id = ledgerKey.value.balanceId) {
-                                is ClaimableBalanceIDXdr.V0 -> Util.bytesToHex(id.value.value)
-                            }
-                            Sponsorship.ClaimableBalance(balanceId.lowercase())
+                            Sponsorship.ClaimableBalance(
+                                ClaimableBalanceId.fromXdr(ledgerKey.value.balanceId).toPaddedHex()
+                            )
                         }
                         else -> throw IllegalArgumentException("Unknown ledger key type for revoke sponsorship")
                     }
@@ -1405,9 +1380,17 @@ sealed class Sponsorship {
 
     /**
      * Revoke sponsorship of a claimable balance.
-     * @property balanceId The hex-encoded claimable balance ID
+     * @property balanceId The claimable balance ID, in any spelling
+     * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or
+     * that hash behind a type discriminant of either width in hexadecimal
      */
-    data class ClaimableBalance(val balanceId: String) : Sponsorship()
+    data class ClaimableBalance(val balanceId: String) : Sponsorship() {
+        /**
+         * Resolving the id here holds every spelling to the same rules at construction, and
+         * equivalent spellings reach the wire as the same bytes.
+         */
+        internal val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
+    }
 
     /**
      * Revoke sponsorship of a signer.

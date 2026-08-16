@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.horizon.requests
 
 import io.ktor.client.*
 import io.ktor.http.*
+import com.soneso.stellar.sdk.ClaimableBalanceId
 import com.soneso.stellar.sdk.horizon.exceptions.*
 import com.soneso.stellar.sdk.horizon.responses.Page
 import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
@@ -53,12 +54,21 @@ class OperationsRequestBuilder(
      * Builds request to GET /claimable_balances/{claimable_balance_id}/operations
      * Returns all operations for a specific claimable balance.
      *
+     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route carries
+     * the one Horizon serves, the hexadecimal of the XDR form.
+     *
      * @param claimableBalance Claimable Balance ID for which to get operations
      * @return This request builder instance
+     * @throws IllegalArgumentException If [claimableBalance] names no claimable balance, in
+     * which case no request is sent
      * @see <a href="https://developers.stellar.org/api/resources/claimablebalances/operations/">Operations for ClaimableBalance</a>
      */
     fun forClaimableBalance(claimableBalance: String): OperationsRequestBuilder {
-        setSegments("claimable_balances", claimableBalance, "operations")
+        setSegments(
+            "claimable_balances",
+            ClaimableBalanceId.forId(claimableBalance).toPaddedHex(),
+            "operations"
+        )
         return this
     }
 

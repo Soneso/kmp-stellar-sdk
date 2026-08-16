@@ -77,18 +77,6 @@ class EffectsRequestBuilder(
         return this
     }
 
-    /**
-     * Builds request to `GET /claimable_balances/{claimableBalanceId}/effects`
-     *
-     * @param claimableBalanceId Claimable balance ID for which to get effects
-     * @return Current [EffectsRequestBuilder] instance
-     * @see [Effects for Claimable Balance](https://developers.stellar.org/api/resources/claimablebalances/effects/)
-     */
-    fun forClaimableBalance(claimableBalanceId: String): EffectsRequestBuilder {
-        setSegments("claimable_balances", claimableBalanceId, "effects")
-        return this
-    }
-
     override fun cursor(cursor: String): EffectsRequestBuilder {
         super.cursor(cursor)
         return this

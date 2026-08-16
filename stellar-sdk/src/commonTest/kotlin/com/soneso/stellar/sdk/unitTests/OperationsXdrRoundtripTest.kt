@@ -19,6 +19,44 @@ class OperationsXdrRoundtripTest {
         val ASSET_EUR = AssetTypeCreditAlphaNum4("EUR", ACCOUNT_B)
         val ASSET_LONG = AssetTypeCreditAlphaNum12("LONGASSET", ACCOUNT_A)
         val MUXED_B: String = MuxedAccount(ACCOUNT_B, 42UL).address
+
+        /** The 32-byte hash of the claimable balance the spelling vectors name. */
+        const val BALANCE_HASH_HEX =
+            "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
+
+        /** That balance in the spelling Horizon reports and the operations report back. */
+        const val BALANCE_PADDED_HEX = "00000000$BALANCE_HASH_HEX"
+
+        /** Every spelling of the one balance, the strkey and a case variant among them. */
+        val BALANCE_SPELLINGS = listOf(
+            "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU",
+            BALANCE_HASH_HEX,
+            "00$BALANCE_HASH_HEX",
+            BALANCE_PADDED_HEX,
+            BALANCE_HASH_HEX.uppercase()
+        )
+
+        /**
+         * Ids naming no claimable balance: lengths no spelling has, a discriminant the union
+         * does not declare in either width (among them an XDR form carrying its value only in
+         * the bytes above the last one), and hexadecimal the alphabet does not contain.
+         */
+        val BALANCE_REJECTIONS = listOf(
+            "abc",
+            BALANCE_HASH_HEX.dropLast(1),
+            BALANCE_PADDED_HEX + "0",
+            "01$BALANCE_HASH_HEX",
+            "01000000$BALANCE_HASH_HEX",
+            "00000001$BALANCE_HASH_HEX",
+            "z".repeat(72)
+        )
+
+        /** The XDR bytes [body] encodes to, which is what equivalent spellings must share. */
+        fun encodedBody(body: OperationBodyXdr): ByteArray {
+            val writer = XdrWriter()
+            body.encode(writer)
+            return writer.toByteArray()
+        }
     }
 
     // ========== CreateAccountOperation ==========
@@ -725,9 +763,51 @@ class OperationsXdrRoundtripTest {
     }
 
     @Test
-    fun testClaimClaimableBalanceInvalidLength() {
-        assertFailsWith<IllegalArgumentException> {
-            ClaimClaimableBalanceOperation("abc")
+    fun testClaimClaimableBalanceAcceptsEverySpelling() {
+        val canonical = ClaimClaimableBalanceOperation(BALANCE_PADDED_HEX).toOperationBody()
+        for (spelling in BALANCE_SPELLINGS) {
+            val op = ClaimClaimableBalanceOperation(spelling)
+            assertTrue(
+                encodedBody(op.toOperationBody()).contentEquals(encodedBody(canonical)),
+                "spelling $spelling must reach the wire as the same bytes"
+            )
+            val restored = when (val xdr = op.toOperationBody()) {
+                is OperationBodyXdr.ClaimClaimableBalanceOp ->
+                    ClaimClaimableBalanceOperation.fromXdr(xdr.value)
+                else -> fail("Wrong XDR type")
+            }
+            assertEquals(
+                BALANCE_PADDED_HEX, restored.balanceId,
+                "spelling $spelling must be reported in one form"
+            )
+        }
+    }
+
+    @Test
+    fun testClaimClaimableBalanceRejectsAnIdNamingNoBalance() {
+        for (candidate in BALANCE_REJECTIONS) {
+            val resolver = assertFailsWith<IllegalArgumentException>(
+                "\"$candidate\" must name no balance"
+            ) { ClaimableBalanceId.forId(candidate) }
+            val failure = assertFailsWith<IllegalArgumentException>("\"$candidate\" must be rejected") {
+                ClaimClaimableBalanceOperation(candidate)
+            }
+            assertEquals(
+                resolver.message, failure.message,
+                "\"$candidate\": the operation must reject as the resolver does"
+            )
+        }
+    }
+
+    @Test
+    fun testClaimClaimableBalanceCopyJudgesTheNewId() {
+        // copy() runs the primary constructor, so an id put in this way is held to the same
+        // rules as one given at construction.
+        val op = ClaimClaimableBalanceOperation(BALANCE_PADDED_HEX)
+        for (candidate in BALANCE_REJECTIONS) {
+            assertFailsWith<IllegalArgumentException>("copy to \"$candidate\" must be rejected") {
+                op.copy(balanceId = candidate)
+            }
         }
     }
 
@@ -742,6 +822,53 @@ class OperationsXdrRoundtripTest {
             else -> fail("Wrong XDR type")
         }
         assertEquals(balanceId, restored.balanceId)
+    }
+
+    @Test
+    fun testClawbackClaimableBalanceAcceptsEverySpelling() {
+        val canonical = ClawbackClaimableBalanceOperation(BALANCE_PADDED_HEX).toOperationBody()
+        for (spelling in BALANCE_SPELLINGS) {
+            val op = ClawbackClaimableBalanceOperation(spelling)
+            assertTrue(
+                encodedBody(op.toOperationBody()).contentEquals(encodedBody(canonical)),
+                "spelling $spelling must reach the wire as the same bytes"
+            )
+            val restored = when (val xdr = op.toOperationBody()) {
+                is OperationBodyXdr.ClawbackClaimableBalanceOp ->
+                    ClawbackClaimableBalanceOperation.fromXdr(xdr.value)
+                else -> fail("Wrong XDR type")
+            }
+            assertEquals(
+                BALANCE_PADDED_HEX, restored.balanceId,
+                "spelling $spelling must be reported in one form"
+            )
+        }
+    }
+
+    @Test
+    fun testClawbackClaimableBalanceRejectsAnIdNamingNoBalance() {
+        for (candidate in BALANCE_REJECTIONS) {
+            val resolver = assertFailsWith<IllegalArgumentException>(
+                "\"$candidate\" must name no balance"
+            ) { ClaimableBalanceId.forId(candidate) }
+            val failure = assertFailsWith<IllegalArgumentException>("\"$candidate\" must be rejected") {
+                ClawbackClaimableBalanceOperation(candidate)
+            }
+            assertEquals(
+                resolver.message, failure.message,
+                "\"$candidate\": the operation must reject as the resolver does"
+            )
+        }
+    }
+
+    @Test
+    fun testClawbackClaimableBalanceCopyJudgesTheNewId() {
+        val op = ClawbackClaimableBalanceOperation(BALANCE_PADDED_HEX)
+        for (candidate in BALANCE_REJECTIONS) {
+            assertFailsWith<IllegalArgumentException>("copy to \"$candidate\" must be rejected") {
+                op.copy(balanceId = candidate)
+            }
+        }
     }
 
     // ========== Clawback ==========
@@ -963,7 +1090,62 @@ class OperationsXdrRoundtripTest {
             is OperationBodyXdr.RevokeSponsorshipOp -> RevokeSponsorshipOperation.fromXdr(xdr.value)
             else -> fail("Wrong XDR type")
         }
-        assertTrue(restored.sponsorship is Sponsorship.ClaimableBalance)
+        val sponsorship = restored.sponsorship
+        assertTrue(sponsorship is Sponsorship.ClaimableBalance)
+        assertEquals("00000000" + hash, sponsorship.balanceId)
+    }
+
+    @Test
+    fun testRevokeSponsorshipClaimableBalanceAcceptsEverySpelling() {
+        val canonical =
+            RevokeSponsorshipOperation(Sponsorship.ClaimableBalance(BALANCE_PADDED_HEX))
+                .toOperationBody()
+        for (spelling in BALANCE_SPELLINGS) {
+            val op = RevokeSponsorshipOperation(Sponsorship.ClaimableBalance(spelling))
+            assertTrue(
+                encodedBody(op.toOperationBody()).contentEquals(encodedBody(canonical)),
+                "spelling $spelling must reach the wire as the same bytes"
+            )
+            val restored = when (val xdr = op.toOperationBody()) {
+                is OperationBodyXdr.RevokeSponsorshipOp ->
+                    RevokeSponsorshipOperation.fromXdr(xdr.value)
+                else -> fail("Wrong XDR type")
+            }
+            val sponsorship = restored.sponsorship
+            assertTrue(sponsorship is Sponsorship.ClaimableBalance, "spelling: $spelling")
+            assertEquals(
+                BALANCE_PADDED_HEX, sponsorship.balanceId,
+                "spelling $spelling must be reported in one form"
+            )
+        }
+    }
+
+    @Test
+    fun testRevokeSponsorshipClaimableBalanceRejectsAnIdNamingNoBalance() {
+        // The rejection belongs where the id is given: a ledger key built from an id naming no
+        // balance would otherwise fail only once the transaction is built.
+        for (candidate in BALANCE_REJECTIONS) {
+            val resolver = assertFailsWith<IllegalArgumentException>(
+                "\"$candidate\" must name no balance"
+            ) { ClaimableBalanceId.forId(candidate) }
+            val failure = assertFailsWith<IllegalArgumentException>("\"$candidate\" must be rejected") {
+                Sponsorship.ClaimableBalance(candidate)
+            }
+            assertEquals(
+                resolver.message, failure.message,
+                "\"$candidate\": the sponsorship must reject as the resolver does"
+            )
+        }
+    }
+
+    @Test
+    fun testRevokeSponsorshipClaimableBalanceCopyJudgesTheNewId() {
+        val sponsorship = Sponsorship.ClaimableBalance(BALANCE_PADDED_HEX)
+        for (candidate in BALANCE_REJECTIONS) {
+            assertFailsWith<IllegalArgumentException>("copy to \"$candidate\" must be rejected") {
+                sponsorship.copy(balanceId = candidate)
+            }
+        }
     }
 
     @Test
@@ -1502,14 +1684,7 @@ class OperationsXdrRoundtripTest {
         val exception = assertFailsWith<IllegalArgumentException> {
             ClaimClaimableBalanceOperation(badHex)
         }
-        assertTrue(exception.message!!.contains("valid hex string"))
-    }
-
-    @Test
-    fun testClawbackClaimableBalanceInvalidLengthThrows() {
-        assertFailsWith<IllegalArgumentException> {
-            ClawbackClaimableBalanceOperation("abc")
-        }
+        assertEquals("claimable balance id \"$badHex\" is not hexadecimal", exception.message)
     }
 
     @Test
@@ -1518,7 +1693,7 @@ class OperationsXdrRoundtripTest {
         val exception = assertFailsWith<IllegalArgumentException> {
             ClawbackClaimableBalanceOperation(badHex)
         }
-        assertTrue(exception.message!!.contains("valid hex string"))
+        assertEquals("claimable balance id \"$badHex\" is not hexadecimal", exception.message)
     }
 
     // ========== Clawback source (from) address validation ==========

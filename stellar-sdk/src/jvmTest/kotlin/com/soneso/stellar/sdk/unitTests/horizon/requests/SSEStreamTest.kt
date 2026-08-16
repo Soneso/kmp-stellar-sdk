@@ -21,6 +21,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -408,7 +409,60 @@ class SSEStreamTest {
         }
     }
 
+    @Test
+    fun testClaimableBalanceStreamAsksForTheHorizonHexOfEverySpelling() {
+        // A stream builds its URL from the request builder's path segments, so the spelling the
+        // builder normalizes an id to is the one every reconnect carries.
+        for (spelling in CLAIMABLE_BALANCE_SPELLINGS) {
+            val (engine, requests) = engineServing(sseEvent("1", record("a", "1", "x")))
+            val listener = RecordingListener()
+            val stream = HorizonServer(SERVER_URI, sseClient(engine))
+                .transactions()
+                .forClaimableBalance(spelling)
+                .stream(StreamedRecord.serializer(), listener, 30_000.milliseconds)
+            try {
+                awaitUntil(description = "the stream connects for spelling $spelling") {
+                    requests.isNotEmpty()
+                }
+                assertEquals(
+                    "/claimable_balances/$CLAIMABLE_BALANCE_HORIZON_HEX/transactions",
+                    requests[0].url.encodedPath,
+                    "spelling: $spelling"
+                )
+            } finally {
+                stream.close()
+            }
+        }
+    }
+
+    @Test
+    fun testClaimableBalanceStreamReportsAnIdNamingNoBalanceBeforeConnecting() {
+        val (engine, requests) = engineServing("")
+        assertFailsWith<IllegalArgumentException> {
+            HorizonServer(SERVER_URI, sseClient(engine))
+                .transactions()
+                .forClaimableBalance("not a claimable balance id")
+        }
+        assertTrue(requests.isEmpty(), "no request may be sent for an id naming no balance")
+    }
+
     companion object {
         private const val SERVER_URI = "https://horizon-testnet.stellar.org"
+
+        /** The 32-byte hash of the claimable balance the spelling vectors name. */
+        private const val CLAIMABLE_BALANCE_HASH_HEX =
+            "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
+
+        /** The spelling Horizon serves: the hexadecimal of the XDR form. */
+        private const val CLAIMABLE_BALANCE_HORIZON_HEX = "00000000$CLAIMABLE_BALANCE_HASH_HEX"
+
+        /** Every spelling of the one balance, the strkey and a case variant among them. */
+        private val CLAIMABLE_BALANCE_SPELLINGS = listOf(
+            "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU",
+            CLAIMABLE_BALANCE_HASH_HEX,
+            "00$CLAIMABLE_BALANCE_HASH_HEX",
+            CLAIMABLE_BALANCE_HORIZON_HEX,
+            CLAIMABLE_BALANCE_HASH_HEX.uppercase()
+        )
     }
 }

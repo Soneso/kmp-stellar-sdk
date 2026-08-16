@@ -97,8 +97,9 @@ The SDK uses **production-ready, audited cryptographic libraries** - no custom/e
 
 #### Base32 Encoding (StrKey)
 - **JVM**: Apache Commons Codec (`commons-codec:commons-codec:1.16.1`)
-- **JS**: Pure Kotlin implementation (not security-critical)
-- **Native**: Pure Kotlin implementation (not security-critical)
+- **JS**: Pure Kotlin implementation
+- **Native**: Pure Kotlin implementation
+- **Strict alphabet**: All three accept only the 32 characters of the base32 alphabet. The pad character `=`, whitespace, lowercase letters and every other byte are rejected, so the same string gets the same verdict on JVM, Android, JS and Native. Alphabet membership is decided in the SDK rather than delegated to Commons Codec, which also maps lowercase and the pad character.
 
 ### Security Principles
 
@@ -585,6 +586,14 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 - ✅ Version byte validation
 - ✅ Base32 encoding (platform-specific: Apache Commons on JVM, pure Kotlin on JS/Native)
 
+Decoding accepts canonical strkeys only, and rejects everything else with
+`IllegalArgumentException`:
+- The encoded length is checked against the requested type before any base32 decoding runs.
+- `=` padding, anything following a `=`, whitespace anywhere in the string, lowercase base32 and characters outside the ASCII range are all rejected. `IndexOutOfBoundsException` escapes no decode entry point.
+- Signed payload (P...) framing is validated on encode and decode: declared length 1..64, a data size that fits that length exactly, zero padding after the payload.
+- Claimable balance (B...) payloads must carry the `CLAIMABLE_BALANCE_ID_TYPE_V0` discriminant, on encode and decode, in the single byte the strkey body leads with and in the four big-endian bytes the XDR wire form carries. `Address` rejects any other value at construction rather than at `toSCAddress()`.
+- `StrKey.encodeClaimableBalance` takes three widths: the 32-byte hash, the 33-byte strkey body and the 36-byte XDR wire form. Nothing in between is padded or truncated to one of them.
+
 ### Transactions & Operations
 
 #### Transaction Building
@@ -613,6 +622,15 @@ The `demo` directory demonstrates **comprehensive SDK usage** with a Compose Mul
 
 **Claimable Balance Operations**:
 - ✅ CreateClaimableBalance, ClaimClaimableBalance, ClawbackClaimableBalance
+
+`ClaimableBalanceId` is the one resolver for a balance id. It reads the `B...` strkey, the bare
+hash as 64 hexadecimal characters, and that hash behind a discriminant of one byte (66
+characters) or four (72 characters). `ClaimClaimableBalanceOperation`,
+`ClawbackClaimableBalanceOperation`, `Sponsorship.ClaimableBalance` and the Horizon request
+builders all read an id through it, judge it where the id is given, and report the 72-character
+form back. `TransactionResponse.getCreatedClaimableBalanceId()` reports a created balance as a
+strkey. Horizon serves no `/claimable_balances/{id}/effects` route, so `EffectsRequestBuilder`
+has no claimable balance method.
 
 **Liquidity Pool Operations**:
 - ✅ LiquidityPoolDeposit, LiquidityPoolWithdraw

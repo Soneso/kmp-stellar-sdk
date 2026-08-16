@@ -113,9 +113,8 @@ class Address(address: String) {
                 SCAddressXdr.MuxedAccount(muxedAccount)
             }
             AddressType.CLAIMABLE_BALANCE -> {
-                require(key[0] == 0.toByte()) {
-                    "The claimable balance ID type is not supported, it must be `CLAIMABLE_BALANCE_ID_TYPE_V0`."
-                }
+                // The strkey decoder only admits the V0 type discriminant, so the bytes
+                // after it are the V0 hash.
                 val hashBytes = key.copyOfRange(1, key.size)
                 val hash = HashXdr(hashBytes)
                 val claimableBalanceId = ClaimableBalanceIDXdr.V0(hash)
@@ -207,8 +206,15 @@ class Address(address: String) {
         /**
          * Creates a new [Address] from a Stellar Claimable Balance ID.
          *
+         * Accepts the 33-byte strkey body (the type discriminant followed by the 32-byte
+         * hash), the 32-byte hash alone, or the 36-byte XDR wire form (the four-byte
+         * big-endian union discriminant followed by the hash).
+         *
          * @param claimableBalanceId the byte array of the Stellar Claimable Balance ID (B...)
          * @return a new [Address] object from the given Stellar Claimable Balance ID
+         * @throws IllegalArgumentException if [claimableBalanceId] has none of those widths,
+         * or if the discriminant in the 33- or 36-byte form is not the one the XDR union
+         * declares
          */
         fun fromClaimableBalance(claimableBalanceId: ByteArray): Address {
             return Address(StrKey.encodeClaimableBalance(claimableBalanceId))

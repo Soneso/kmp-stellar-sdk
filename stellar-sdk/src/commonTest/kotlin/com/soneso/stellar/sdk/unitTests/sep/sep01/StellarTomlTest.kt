@@ -869,6 +869,17 @@ class StellarTomlTest {
     }
 
     @Test
+    fun fromDomain_non200Response_reportsTheStatusCode() = runTest {
+        val engine = MockEngine {
+            respond(content = "", status = HttpStatusCode.InternalServerError)
+        }
+        val e = assertFailsWith<IllegalStateException> {
+            StellarToml.fromDomain("anchor.example.org", HttpClient(engine))
+        }
+        assertEquals("Stellar toml not found, response status code 500", e.message)
+    }
+
+    @Test
     fun fromDomain_uppercaseLocalhost_usesHttp() = runTest {
         // Host comparison must be case-insensitive.
         val (client, captured) = captureTomlFetchUrl()

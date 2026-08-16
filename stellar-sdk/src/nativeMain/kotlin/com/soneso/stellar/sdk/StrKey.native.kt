@@ -1,16 +1,16 @@
 package com.soneso.stellar.sdk
 
 /**
- * Native (iOS/macOS) base32 encoding/decoding implementation.
+ * Native (iOS/macOS) base32 codec.
  *
- * This is a basic implementation. For production use, consider using:
- * - A Kotlin/Native library like libsodium bindings
- * - Swift interop with Apple's Security framework
+ * A pure Kotlin implementation that carries the same strictness as the codecs on the other
+ * platforms: the 32 alphabet characters are the only input it accepts, so the pad character,
+ * whitespace and every other byte are rejected.
  */
 internal actual object Base32Codec {
-    private const val BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    private val NOT_IN_ALPHABET: Byte = 0xff.toByte()
 
-    private val decodingTable: ByteArray = ByteArray(256) { 0xff.toByte() }.apply {
+    private val decodingTable: ByteArray = ByteArray(256) { NOT_IN_ALPHABET }.apply {
         BASE32_ALPHABET.forEachIndexed { index, char ->
             this[char.code] = index.toByte()
         }
@@ -47,16 +47,24 @@ internal actual object Base32Codec {
         return output.toByteArray()
     }
 
+    /**
+     * Decodes [data], which must have passed [isInAlphabet].
+     *
+     * A byte outside the alphabet carries no five-bit value, so decoding it would either
+     * corrupt the result or cut it short. Such a byte is reported instead.
+     *
+     * @throws IllegalArgumentException if [data] holds a byte outside the base32 alphabet
+     */
     actual fun decode(data: ByteArray): ByteArray {
         val output = mutableListOf<Byte>()
         var buffer = 0
         var bitsLeft = 0
 
         for (byte in data) {
-            if (byte == '='.code.toByte()) break
+            val value = decodingTable[byte.toInt() and 0xFF]
+            require(value != NOT_IN_ALPHABET) { "Invalid base32 encoded string" }
 
-            val value = decodingTable[byte.toInt() and 0xFF].toInt() and 0xFF
-            buffer = (buffer shl 5) or value
+            buffer = (buffer shl 5) or value.toInt()
             bitsLeft += 5
 
             if (bitsLeft >= 8) {
@@ -68,11 +76,15 @@ internal actual object Base32Codec {
         return output.toByteArray()
     }
 
+    /**
+     * Reports whether every byte of [data] is one of the 32 base32 alphabet characters.
+     *
+     * The pad character and whitespace are not among them: a strkey is written without padding,
+     * and accepting either would let one key be written as more than one string.
+     */
     actual fun isInAlphabet(data: ByteArray): Boolean {
         for (byte in data) {
-            if (byte == '='.code.toByte()) continue
-            val index = byte.toInt() and 0xFF
-            if (index >= decodingTable.size || decodingTable[index] == 0xff.toByte()) {
+            if (decodingTable[byte.toInt() and 0xFF] == NOT_IN_ALPHABET) {
                 return false
             }
         }

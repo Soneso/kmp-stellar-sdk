@@ -8,6 +8,7 @@ import com.soneso.stellar.sdk.sep.sep01.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -234,65 +235,30 @@ class StellarTomlIntegrationTest {
 
     @Test
     fun testHttp404NotFound() = runTest {
-        // Domain that doesn't exist
-        try {
-            StellarToml.fromDomain("this-domain-definitely-does-not-exist-12345.com")
-            fail("Should throw exception for 404")
-        } catch (e: Throwable) {
-            // Expected - network error or 404 (any exception is acceptable)
-            assertNotNull(e)
+        // example.com exists and serves no stellar.toml, so the fetch is a
+        // real HTTP 404 reported with its status code.
+        val e = assertFailsWith<IllegalStateException> {
+            StellarToml.fromDomain("example.com")
         }
-    }
-
-    @Test
-    fun testHttp500ServerError() = runTest {
-        // We can't reliably test a 500 error without a mock server,
-        // but we can verify error handling works
-        try {
-            StellarToml.fromDomain("httpstat.us/500")
-            fail("Should throw exception for server error")
-        } catch (e: Throwable) {
-            // Expected - network error or non-200 status
-            assertNotNull(e.message)
-        }
+        assertEquals("Stellar toml not found, response status code 404", e.message)
     }
 
     @Test
     fun testInvalidUrl() = runTest {
-        // Test with invalid domain format - HTTP clients may accept this
-        // This test verifies that malformed domains don't cause crashes
-        try {
+        // An unresolvable domain must be reported to the caller, not returned
+        // as a toml.
+        assertFailsWith<Exception> {
             StellarToml.fromDomain("not-a-valid-domain-12345678.invalidtld9999")
-        } catch (e: Throwable) {
-            // Expected - network error (but not required)
-            assertNotNull(e)
         }
-        // If no exception, that's also acceptable behavior
-    }
-
-    @Test
-    fun testDnsResolutionFailure() = runTest {
-        // Domain with invalid TLD - DNS may still resolve
-        // This test verifies that malformed domains don't cause crashes
-        try {
-            StellarToml.fromDomain("stellar-test-nonexistent-domain-xyz.invalidtld")
-        } catch (e: Throwable) {
-            // Expected - DNS resolution error (but not required)
-            assertNotNull(e)
-        }
-        // If no exception, that's also acceptable behavior
     }
 
     // ========== currencyFromUrl Tests ==========
 
     @Test
     fun testCurrencyFromUrlInvalidUrl() = runTest {
-        try {
+        // An unresolvable host must be reported to the caller.
+        assertFailsWith<Exception> {
             StellarToml.currencyFromUrl("https://stellar-test-invalid-domain-xyz-12345.com/currency.toml")
-            fail("Should throw exception for invalid URL")
-        } catch (e: Throwable) {
-            // Expected - network error
-            assertNotNull(e)
         }
     }
 
