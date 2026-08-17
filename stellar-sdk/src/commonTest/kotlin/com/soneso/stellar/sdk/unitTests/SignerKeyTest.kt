@@ -454,6 +454,9 @@ class SignerKeyTest {
             // A signed payload strkey cut short: fewer characters than the shortest signed
             // payload has, so it describes no signer key rather than a malformed one.
             "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ",
+            // A signed payload strkey run past its end: more characters than the longest signed
+            // payload has, so it describes no signer key rather than a malformed one.
+            "P" + "A".repeat(200),
             // A valid account id with pad characters appended, and a string of pad characters
             // alone: a strkey is written without padding, so neither is one.
             "$validAccountId========",

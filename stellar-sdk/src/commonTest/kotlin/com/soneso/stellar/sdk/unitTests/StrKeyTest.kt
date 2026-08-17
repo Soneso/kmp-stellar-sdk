@@ -1107,6 +1107,58 @@ class StrKeyTest {
         }
     }
 
+    @Test
+    fun testEncodeRefusesAPayloadOnEitherSideOfTheLengthItsTypeAdmits() {
+        // A payload is read on both sides of the length its type admits: one byte short and one
+        // byte long are each refused, and the refusal names the length the type has. A check that
+        // only bounded the payload from below would write a key carrying more bytes than its type
+        // holds.
+        val encoders = listOf(
+            Triple("Public key", 32) { data: ByteArray -> StrKey.encodeEd25519PublicKey(data) },
+            Triple("Secret seed", 32) { data: ByteArray -> StrKey.encodeEd25519SecretSeed(data) },
+            Triple("Muxed public key", 40) { data: ByteArray ->
+                StrKey.encodeMed25519PublicKey(data)
+            },
+            Triple("Pre-auth transaction hash", 32) { data: ByteArray ->
+                StrKey.encodePreAuthTx(data)
+            },
+            Triple("SHA-256 hash", 32) { data: ByteArray -> StrKey.encodeSha256Hash(data) },
+            Triple("Contract address", 32) { data: ByteArray -> StrKey.encodeContract(data) },
+            Triple("Liquidity pool ID", 32) { data: ByteArray -> StrKey.encodeLiquidityPool(data) }
+        )
+
+        for ((name, size, encode) in encoders) {
+            for (given in listOf(size - 1, size + 1)) {
+                val failure = assertFailsWith<IllegalArgumentException>(
+                    "$name: $given bytes must be refused"
+                ) {
+                    encode(ByteArray(given))
+                }
+                assertEquals(
+                    "$name must be $size bytes, got $given", failure.message,
+                    "$name: the refusal must name the length the type has"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testTheCodecRefusesABytePastItsAlphabet() {
+        // The alphabet gate is the precondition the codec decodes under. A codec that dropped
+        // the byte instead would hand back a result the input does not spell.
+        for (outside in listOf('1', '0', '8', '9', 'a', 'z', '=', ' ')) {
+            val failure = assertFailsWith<IllegalArgumentException>(
+                "\"$outside\" must be refused"
+            ) {
+                Base32Codec.decode(byteArrayOf('A'.code.toByte(), outside.code.toByte()))
+            }
+            assertEquals(
+                INVALID_BASE32_MESSAGE, failure.message,
+                "\"$outside\": the refusal must name the rule broken"
+            )
+        }
+    }
+
     // ========== Decode: payload-length validation ==========
     //
     // Two checks bound the payload, and they read the type from different places. The encoded

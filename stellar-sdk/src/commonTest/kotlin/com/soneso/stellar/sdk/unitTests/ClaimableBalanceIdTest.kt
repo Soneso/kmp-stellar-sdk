@@ -6,6 +6,7 @@ import com.soneso.stellar.sdk.xdr.HashXdr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -96,6 +97,24 @@ class ClaimableBalanceIdTest {
         assertEquals(
             "a 58 character claimable balance id must be a strkey beginning with \"B\"",
             failure.message
+        )
+    }
+
+    @Test
+    fun testOneBalanceIsEqualToItselfAndToNoOtherValue() {
+        val resolved = ClaimableBalanceId.forId(strKey)
+
+        assertEquals(resolved, resolved, "a balance must be equal to itself")
+        assertEquals(ClaimableBalanceId.forId(hashHex), resolved, "the same balance, resolved twice")
+        // The balance is the left operand of each comparison, so it is its own equals that runs.
+        assertNotEquals<Any?>(resolved, hashHex, "a balance names no string")
+        assertNotEquals<Any?>(resolved, null, "a balance names nothing absent")
+
+        // A second balance, one hash byte apart from the first.
+        val otherHashHex = hashHex.dropLast(1) + if (hashHex.last() == '0') "1" else "0"
+        assertNotEquals(
+            ClaimableBalanceId.forId(otherHashHex), resolved,
+            "two hashes name two balances"
         )
     }
 

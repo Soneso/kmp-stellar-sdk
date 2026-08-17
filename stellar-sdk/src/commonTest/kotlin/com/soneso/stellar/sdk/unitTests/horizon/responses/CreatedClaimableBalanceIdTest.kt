@@ -81,6 +81,28 @@ class CreatedClaimableBalanceIdTest {
         "AAAAAAAAAZAAAAABMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAAAAAyP////8AAAA" +
             "BAAAAAAAAAA4AAAAAAAAAAPXqf7PeGNrp8Sr5bPB1B0kBb7y6a/CekCpp5UVodx2CAAAAAAAAAAA="
 
+    /**
+     * A succeeded transaction whose only operation was turned away before it ran: the operation
+     * result carries the code opBAD_AUTH and no inner result at all.
+     */
+    private val operationWithoutAnInnerResult = "AAAAAAAAAMgAAAAAAAAAAf////8AAAAA"
+
+    /**
+     * A succeeded transaction whose only operation is a CreateClaimableBalance the ledger
+     * refused: the result carries CREATE_CLAIMABLE_BALANCE_MALFORMED, so it names the operation
+     * but holds no balance id.
+     */
+    private val createRefused = "AAAAAAAAAMgAAAAAAAAAAQAAAAAAAAAO/////wAAAAA="
+
+    /**
+     * A fee bump whose outer result reads txFEE_BUMP_INNER_SUCCESS while the inner one reads
+     * txBAD_SEQ, a code that carries no operation results. The two codes disagree, so no ledger
+     * produces this result; a response that carried it would otherwise be read for operation
+     * results the inner transaction does not have.
+     */
+    private val feeBumpInnerCarriesNoResults =
+        "AAAAAAAAAZAAAAABMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAAAAAyP////sAAAAAAAAAAA=="
+
     private val firstBalanceId = ClaimableBalanceVectors.strKey
     private val secondBalanceId = "BAAPL2T7WPPBRWXJ6EVPS3HQOUDUSALPXS5GX4E6SAVGTZKFNB3R3ATZWM"
 
@@ -228,6 +250,37 @@ class CreatedClaimableBalanceIdTest {
         val response = response(outerSuccessInnerFailed, successful = true)
         assertNull(response.getCreatedClaimableBalanceId())
         assertNull(response.getCreatedClaimableBalanceId(operationIndex = 0))
+    }
+
+    @Test
+    fun testAnswersNullForAnOperationResultCarryingNoInnerResult() {
+        assertNull(response(operationWithoutAnInnerResult).getCreatedClaimableBalanceId())
+    }
+
+    @Test
+    fun testAnswersNullForACreateClaimableBalanceTheLedgerRefused() {
+        assertNull(response(createRefused).getCreatedClaimableBalanceId())
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun testAnswersNullWhenTheInnerResultOfASucceededFeeBumpCarriesNoOperationResults() {
+        val result = TransactionResultXdr.decode(
+            XdrReader(Base64.decode(feeBumpInnerCarriesNoResults))
+        )
+        val outerResult = assertIs<TransactionResultResultXdr.InnerResultPair>(
+            result.result, "the fixture must carry a fee bump result"
+        )
+        assertEquals(
+            TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS, outerResult.discriminant,
+            "the outer result code"
+        )
+        assertIs<InnerTransactionResultResultXdr.Void>(
+            outerResult.value.result.result,
+            "the inner result must carry no operation results"
+        )
+
+        assertNull(response(feeBumpInnerCarriesNoResults).getCreatedClaimableBalanceId())
     }
 
     @Test

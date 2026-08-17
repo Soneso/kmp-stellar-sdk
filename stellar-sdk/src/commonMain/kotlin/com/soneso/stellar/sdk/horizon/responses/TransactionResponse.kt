@@ -151,12 +151,12 @@ data class TransactionResponse(
         }
 
         val operationResult = operationResults.getOrNull(operationIndex) ?: return null
-        val inner = (operationResult as? OperationResultXdr.Tr)?.value ?: return null
-        val created = (inner as? OperationResultTrXdr.CreateClaimableBalanceResult)?.value
-            ?: return null
-        val balanceId = (created as? CreateClaimableBalanceResultXdr.BalanceID)?.value
-            ?: return null
-        return ClaimableBalanceId.fromXdr(balanceId).toStrKey()
+        if (operationResult !is OperationResultXdr.Tr) return null
+        val inner = operationResult.value
+        if (inner !is OperationResultTrXdr.CreateClaimableBalanceResult) return null
+        val created = inner.value
+        if (created !is CreateClaimableBalanceResultXdr.BalanceID) return null
+        return ClaimableBalanceId.fromXdr(created.value).toStrKey()
     }
 
     /**
