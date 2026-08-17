@@ -389,12 +389,12 @@ CreateClaimableBalanceOperation(
 
 // Recipient claims the balance (if predicate conditions are met)
 ClaimClaimableBalanceOperation(
-    balanceId = "00000000abc123..."
+    balanceId = "000000003f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
 )
 
 // Issuer reclaims unclaimed balance (requires CLAWBACK_ENABLED flag on asset)
 ClawbackClaimableBalanceOperation(
-    balanceId = "00000000abc123..."
+    balanceId = "000000003f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
 )
 ```
 
@@ -714,7 +714,7 @@ val ledgerTxs = server.transactions()
 
 // Get transactions for a specific claimable balance (track who claimed it)
 val claimableTxs = server.transactions()
-    .forClaimableBalance("00000000abc...")
+    .forClaimableBalance("000000003f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a")
     .execute()
 
 // Get transactions for a liquidity pool (track deposits/withdrawals)
@@ -1019,7 +1019,7 @@ val assetBalances = server.claimableBalances()
     .execute()
 
 // Get specific claimable balance by ID
-val balance = server.claimableBalances().claimableBalance("00000000abc...")
+val balance = server.claimableBalances().claimableBalance("000000003f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a")
 println("Amount: ${balance.amount}, Claimants: ${balance.claimants.size}")
 ```
 

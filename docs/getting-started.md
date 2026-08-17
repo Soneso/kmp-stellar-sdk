@@ -601,7 +601,7 @@ fun main() {
 
 ## Error Handling
 
-Always handle potential errors:
+Constructors and factories that take encoded values, such as `KeyPair.fromSecretSeed` and `KeyPair.fromAccountId`, verify their input and throw `IllegalArgumentException` for anything malformed. The examples in these guides call the API directly when the input is a fixed, known-good value; a failure there is a programming error. Wrap the call in `try`/`catch` where the value arrives at runtime, such as user input, or check it first with `StrKey.isValidEd25519PublicKey` or `StrKey.isValidEd25519SecretSeed` (the seed check takes a `CharArray`).
 
 ```kotlin
 suspend fun robustExample() {
