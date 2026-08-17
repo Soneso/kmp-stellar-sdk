@@ -177,6 +177,21 @@ class MuxedAccountTest {
     }
 
     @Test
+    fun testAMultiplexingIdOfZeroIsWrittenAsAMuxedAddress() {
+        // Zero is a multiplexing id like any other, so SEP-23 writes it as an M... address and
+        // reads it back as the id it is. Only an account that carries no id at all is written
+        // as the G... address.
+        val muxed = MuxedAccount(accountId, 0UL)
+
+        assertTrue(muxed.address.startsWith("M"))
+        assertEquals(
+            "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ",
+            muxed.address
+        )
+        assertEquals(0UL, MuxedAccount(muxed.address).id)
+    }
+
+    @Test
     fun testDifferentAccountIds() {
         val accountId2 = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ"
 

@@ -62,7 +62,7 @@ internal actual object Base32Codec {
 
         for (byte in data) {
             val value = decodingTable[byte.toInt() and 0xFF]
-            require(value != NOT_IN_ALPHABET) { "Invalid base32 encoded string" }
+            require(value != NOT_IN_ALPHABET) { INVALID_BASE32_MESSAGE }
 
             buffer = (buffer shl 5) or value.toInt()
             bitsLeft += 5

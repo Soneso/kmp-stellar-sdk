@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.contract
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
@@ -1157,14 +1158,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     }
 
     /**
-     * Convert hex string to bytes
+     * Convert hex string to bytes, accepting an optional "0x" prefix.
      */
     private fun hexToBytes(hex: String): ByteArray {
-        val cleanHex = hex.removePrefix("0x").replace(" ", "")
-        require(cleanHex.length % 2 == 0) { "Hex string must have even length" }
-
-        return ByteArray(cleanHex.length / 2) { i ->
-            cleanHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
-        }
+        return Util.hexToBytes(hex.removePrefix("0x"))
     }
 }

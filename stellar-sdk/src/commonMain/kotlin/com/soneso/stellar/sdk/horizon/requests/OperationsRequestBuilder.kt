@@ -54,8 +54,8 @@ class OperationsRequestBuilder(
      * Builds request to GET /claimable_balances/{claimable_balance_id}/operations
      * Returns all operations for a specific claimable balance.
      *
-     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route carries
-     * the one Horizon serves, the hexadecimal of the XDR form.
+     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route
+     * carries the 72-character hexadecimal of the XDR form, the spelling Horizon serves.
      *
      * @param claimableBalance Claimable Balance ID for which to get operations
      * @return This request builder instance

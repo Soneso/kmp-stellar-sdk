@@ -302,6 +302,24 @@ class StrKeyTest {
         )
     }
 
+    /**
+     * Asserts that [candidate] is rejected with [rejection] by both [decode] and [isValid].
+     * [label] names the rule the candidate breaks; the strkeys here are too long to read.
+     */
+    private fun assertRejectedByRule(
+        label: String,
+        candidate: String,
+        rejection: String,
+        decode: (String) -> ByteArray,
+        isValid: (String) -> Boolean
+    ) {
+        val failure = assertFailsWith<IllegalArgumentException>("$label: must be rejected") {
+            decode(candidate)
+        }
+        assertEquals(rejection, failure.message, "$label: the rejection must name the rule broken")
+        assertFalse(isValid(candidate), "$label: isValid must agree with decode")
+    }
+
     // Test vectors for invalid public keys
     @Test
     fun testInvalidPublicKeys() {
@@ -653,7 +671,7 @@ class StrKeyTest {
     // that check.
 
     /** The 32-byte hash the SEP-0023 vectors are built around. */
-    private val sep23Hash = "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
+    private val sep23Hash = ClaimableBalanceVectors.hashHex
 
     private val sep23AccountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 
@@ -682,7 +700,7 @@ class StrKeyTest {
 
     private val sep23LiquidityPoolId = "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"
 
-    private val sep23ClaimableBalanceId = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
+    private val sep23ClaimableBalanceId = ClaimableBalanceVectors.strKey
 
     private class Sep23ValidVector(
         val description: String,
@@ -788,7 +806,7 @@ class StrKeyTest {
             Sep23InvalidVector(
                 "the unused trailing bit of the last character must be zero",
                 trailingBitSet,
-                "Unused bits should be set to 0",
+                unusedBitsRejection,
                 m, mValid,
                 evidence = {
                     // Padding is a second way to write the same characters, and it must not turn
@@ -885,7 +903,7 @@ class StrKeyTest {
             Sep23InvalidVector(
                 "the unused trailing two bits of the last character must be zero",
                 "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TV",
-                "Unused bits should be set to 0",
+                unusedBitsRejection,
                 b, bValid
             ),
             Sep23InvalidVector(
@@ -1131,6 +1149,23 @@ class StrKeyTest {
             if (it == -1) encoded.size else it
         }
         return encoded.copyOfRange(0, unpaddedLength).map { it.toInt().toChar() }.joinToString("")
+    }
+
+    /**
+     * The data bytes [strKey] carries, having checked that its checksum matches and that it is
+     * written under [versionByte], the version byte of [type]. A vector that failed either check
+     * would be rejected for that rather than for what it is written to exercise.
+     */
+    private fun checkedData(strKey: String, versionByte: Byte, type: String): ByteArray {
+        val decoded = Base32Codec.decode(strKey.map { it.code.toByte() }.toByteArray())
+        val payload = decoded.copyOfRange(0, decoded.size - 2)
+        val checksum = decoded.copyOfRange(decoded.size - 2, decoded.size)
+        assertTrue(
+            crc16XModem(payload).contentEquals(checksum),
+            "the vector must carry a valid checksum"
+        )
+        assertEquals(versionByte, payload[0], "the vector must be $type")
+        return payload.copyOfRange(1, payload.size)
     }
 
     @Test
@@ -1498,43 +1533,19 @@ class StrKeyTest {
     // alphabet check rejects the pad character, whitespace and every other byte, and reports the
     // same verdict on every platform even though the codec behind it is platform-specific.
 
-    private fun assertRejectedForNonAlphabetCharacter(
-        label: String,
-        candidate: String,
-        check: String,
-        decode: (String) -> ByteArray,
-        isValid: (String) -> Boolean
-    ) {
-        val failure = assertFailsWith<IllegalArgumentException>("$label: must be rejected") {
-            decode(candidate)
-        }
-        assertEquals(
-            nonAlphabetCharacterRejection, failure.message,
-            "$label: rejected by a check other than $check"
-        )
-        assertFalse(isValid(candidate), "$label: isValid must agree with decode")
-    }
-
-    /**
-     * Asserts that [candidate] is turned away by the alphabet check, which every character it
-     * carries reaches: they are all inside the ASCII range, so the guard ahead of that check lets
-     * them through.
-     */
+    /** Asserts that [candidate], every character of which is ASCII, fails the alphabet check. */
     private fun assertRejectedByAlphabet(
         label: String,
         candidate: String,
         decode: (String) -> ByteArray,
         isValid: (String) -> Boolean
     ) {
-        assertRejectedForNonAlphabetCharacter(
-            label, candidate, "the base32 alphabet", decode, isValid
-        )
+        assertRejectedByRule(label, candidate, nonAlphabetCharacterRejection, decode, isValid)
     }
 
     /**
-     * Asserts that [candidate] is turned away by the guard that admits only characters inside the
-     * ASCII range. A character above that range is stopped there rather than by the alphabet
-     * check, because the guard runs ahead of the narrowing that every later check reads.
+     * Asserts that [candidate], which carries a character above the ASCII range, fails the guard
+     * on that range.
      */
     private fun assertRejectedByTheAsciiRangeGuard(
         label: String,
@@ -1542,9 +1553,7 @@ class StrKeyTest {
         decode: (String) -> ByteArray,
         isValid: (String) -> Boolean
     ) {
-        assertRejectedForNonAlphabetCharacter(
-            label, candidate, "the guard on the ASCII range", decode, isValid
-        )
+        assertRejectedByRule(label, candidate, nonAlphabetCharacterRejection, decode, isValid)
     }
 
     @Test
@@ -1593,13 +1602,21 @@ class StrKeyTest {
     @Test
     fun testDecodeRejectsLowercaseAlphabet() {
         // The base32 alphabet is uppercase. Lowercasing keeps the length, so the candidate gets
-        // past the encoded-length check. The last character is left as the vector had it: it is
-        // the one the unused-trailing-bits check reads, and that check runs first, so a lowercase
-        // character there would stop the candidate before it reached the alphabet.
+        // past the encoded-length check. Every character is lowercased, the last one included:
+        // the alphabet check runs ahead of the unused-trailing-bits check, so a string written
+        // in characters no strkey is written in is reported as that, whatever five-bit value a
+        // decoder would otherwise read from its last character.
         for (type in strKeyTypes()) {
-            val lowercased = type.valid.dropLast(1).lowercase() + type.valid.last()
+            val lowercased = type.valid.lowercase()
             assertEquals(type.valid.length, lowercased.length)
             assertNotEquals(type.valid, lowercased)
+            if ((type.valid.length * 5) % 8 > 0) {
+                assertNotEquals(
+                    type.valid.last(), lowercased.last(),
+                    "${type.name}: the vector must end in a letter, so that lowercasing leaves " +
+                        "the unused-trailing-bits check a character it cannot read"
+                )
+            }
             assertRejectedByAlphabet(
                 "${type.name} in lowercase", lowercased, type.decode, type.isValid
             )
@@ -1680,8 +1697,8 @@ class StrKeyTest {
     //
     // Every variant below lengthens the string, so for a type of one fixed encoded length the
     // check that reports it is the encoded-length check rather than the alphabet. For the signed
-    // payload, whose legal lengths form a range, the variant stays inside the range and the check
-    // its resulting length reaches is the one that reports it.
+    // payload, whose legal lengths form a range, the variant stays inside the range and is
+    // reported by the first check it fails.
 
     private class NonCanonicalVariant(
         val description: String,
@@ -1692,12 +1709,19 @@ class StrKeyTest {
 
     private fun nonCanonicalVariants(): List<NonCanonicalVariant> = listOf(
         NonCanonicalVariant("one pad character appended", { "$it=" }, leftoverCharacterRejection),
-        NonCanonicalVariant("three pad characters appended", { "$it===" }, unusedBitsRejection),
-        NonCanonicalVariant("a full pad group appended", { "$it========" }, unusedBitsRejection),
         NonCanonicalVariant(
-            "characters written after a pad character", { "$it=ZZZZZZZ" }, unusedBitsRejection
+            "three pad characters appended", { "$it===" }, nonAlphabetCharacterRejection
         ),
-        NonCanonicalVariant("eight trailing spaces", { "$it        " }, unusedBitsRejection),
+        NonCanonicalVariant(
+            "a full pad group appended", { "$it========" }, nonAlphabetCharacterRejection
+        ),
+        NonCanonicalVariant(
+            "characters written after a pad character", { "$it=ZZZZZZZ" },
+            nonAlphabetCharacterRejection
+        ),
+        NonCanonicalVariant(
+            "eight trailing spaces", { "$it        " }, nonAlphabetCharacterRejection
+        ),
         NonCanonicalVariant(
             "a space inserted mid-string",
             { it.substring(0, 10) + " " + it.substring(10) },
@@ -1762,30 +1786,8 @@ class StrKeyTest {
         return length
     }
 
-    /**
-     * The data bytes [strKey] carries, having checked that it is a signed payload whose checksum
-     * matches. A vector that failed either check would be rejected for that rather than for the
-     * framing it is written to exercise.
-     */
-    private fun checkedSignedPayloadData(strKey: String): ByteArray {
-        val decoded = Base32Codec.decode(strKey.map { it.code.toByte() }.toByteArray())
-        val payload = decoded.copyOfRange(0, decoded.size - 2)
-        val checksum = decoded.copyOfRange(decoded.size - 2, decoded.size)
-        assertTrue(
-            crc16XModem(payload).contentEquals(checksum),
-            "the vector must carry a valid checksum"
-        )
-        assertEquals(signedPayloadVersionByte, payload[0], "the vector must be a signed payload")
-        return payload.copyOfRange(1, payload.size)
-    }
-
-    private fun assertSignedPayloadRejected(label: String, candidate: String, rejection: String) {
-        val failure = assertFailsWith<IllegalArgumentException>("$label: must be rejected") {
-            StrKey.decodeSignedPayload(candidate)
-        }
-        assertEquals(rejection, failure.message, "$label: the rejection must name the rule broken")
-        assertFalse(StrKey.isValidSignedPayload(candidate), "$label: isValid must agree with decode")
-    }
+    private fun checkedSignedPayloadData(strKey: String): ByteArray =
+        checkedData(strKey, signedPayloadVersionByte, "a signed payload")
 
     @Test
     fun testDecodeRejectsSignedPayloadDeclaringALengthItCannotCarry() {
@@ -1795,9 +1797,10 @@ class StrKeyTest {
         val zeroData = checkedSignedPayloadData(declaresZero)
         assertEquals(40, zeroData.size)
         assertEquals(0L, declaredPayloadLength(zeroData))
-        assertSignedPayloadRejected(
+        assertRejectedByRule(
             "a declared length of 0", declaresZero,
-            "$signedPayloadDeclaredLengthRejection, expected between 1 and 64 bytes, got 0"
+            "$signedPayloadDeclaredLengthRejection, expected between 1 and 64 bytes, got 0",
+            { StrKey.decodeSignedPayload(it) }, { StrKey.isValidSignedPayload(it) }
         )
 
         // A 32-byte ed25519 public key, a declared length of 65 and 64 payload bytes: the largest
@@ -1809,9 +1812,10 @@ class StrKeyTest {
         val sixtyFiveData = checkedSignedPayloadData(declaresSixtyFive)
         assertEquals(100, sixtyFiveData.size)
         assertEquals(65L, declaredPayloadLength(sixtyFiveData))
-        assertSignedPayloadRejected(
+        assertRejectedByRule(
             "a declared length of 65", declaresSixtyFive,
-            "$signedPayloadDeclaredLengthRejection, expected between 1 and 64 bytes, got 65"
+            "$signedPayloadDeclaredLengthRejection, expected between 1 and 64 bytes, got 65",
+            { StrKey.decodeSignedPayload(it) }, { StrKey.isValidSignedPayload(it) }
         )
     }
 
@@ -1824,10 +1828,11 @@ class StrKeyTest {
         val data = checkedSignedPayloadData(declaresMoreThanItHolds)
         assertEquals(40, data.size)
         assertEquals(64L, declaredPayloadLength(data))
-        assertSignedPayloadRejected(
+        assertRejectedByRule(
             "a declared length of 64 inside 40 bytes",
             declaresMoreThanItHolds,
-            "$signedPayloadSizeRejection, a declared length of 64 requires 100 bytes, got 40"
+            "$signedPayloadSizeRejection, a declared length of 64 requires 100 bytes, got 40",
+            { StrKey.decodeSignedPayload(it) }, { StrKey.isValidSignedPayload(it) }
         )
     }
 
@@ -1850,10 +1855,11 @@ class StrKeyTest {
             data.copyOfRange(36 + 29, data.size).all { it != 0.toByte() },
             "every padding byte must be non-zero"
         )
-        assertSignedPayloadRejected(
+        assertRejectedByRule(
             "non-zero padding", nonZeroPadding,
             "$signedPayloadPaddingRejection, expected zero at index 65 after a declared length " +
-                "of 29, got 255"
+                "of 29, got 255",
+            { StrKey.decodeSignedPayload(it) }, { StrKey.isValidSignedPayload(it) }
         )
     }
 
@@ -1952,40 +1958,8 @@ class StrKeyTest {
 
     private val claimableBalanceHash = ByteArray(32) { index -> (index * 5 + 1).toByte() }
 
-    /**
-     * The data bytes [strKey] carries, having checked that it is a claimable balance id whose
-     * checksum matches. A vector that failed either check would be rejected for that rather than
-     * for the discriminant it is written to exercise.
-     */
-    private fun checkedClaimableBalanceData(strKey: String): ByteArray {
-        val decoded = Base32Codec.decode(strKey.map { it.code.toByte() }.toByteArray())
-        val payload = decoded.copyOfRange(0, decoded.size - 2)
-        val checksum = decoded.copyOfRange(decoded.size - 2, decoded.size)
-        assertTrue(
-            crc16XModem(payload).contentEquals(checksum),
-            "the vector must carry a valid checksum"
-        )
-        assertEquals(
-            claimableBalanceVersionByte, payload[0],
-            "the vector must be a claimable balance id"
-        )
-        return payload.copyOfRange(1, payload.size)
-    }
-
-    private fun assertClaimableBalanceRejected(
-        label: String,
-        candidate: String,
-        rejection: String
-    ) {
-        val failure = assertFailsWith<IllegalArgumentException>("$label: must be rejected") {
-            StrKey.decodeClaimableBalance(candidate)
-        }
-        assertEquals(rejection, failure.message, "$label: the rejection must name the rule broken")
-        assertFalse(
-            StrKey.isValidClaimableBalance(candidate),
-            "$label: isValid must agree with decode"
-        )
-    }
+    private fun checkedClaimableBalanceData(strKey: String): ByteArray =
+        checkedData(strKey, claimableBalanceVersionByte, "a claimable balance id")
 
     @Test
     fun testDecodeRejectsClaimableBalanceDiscriminantOtherThanTheOneDeclared() {
@@ -2002,9 +1976,10 @@ class StrKeyTest {
                 discriminant, checkedClaimableBalanceData(candidate)[0].toInt() and 0xFF,
                 "discriminant $discriminant: the vector must carry it"
             )
-            assertClaimableBalanceRejected(
+            assertRejectedByRule(
                 "a discriminant of $discriminant", candidate,
-                "$claimableBalanceDiscriminantRejection, expected 0, got $discriminant"
+                "$claimableBalanceDiscriminantRejection, expected 0, got $discriminant",
+                { StrKey.decodeClaimableBalance(it) }, { StrKey.isValidClaimableBalance(it) }
             )
         }
     }

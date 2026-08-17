@@ -68,6 +68,31 @@ class InvokeHostFunctionOperationResponseTest {
         assertNull(response.assetBalanceChanges!![0].destinationMuxedId)
     }
 
+    /**
+     * Horizon omits "from" on a mint balance change and "to" on a burn or clawback, so both
+     * fields read as null rather than failing the whole operation page.
+     */
+    @Test
+    fun testDeserializesMintAndBurnBalanceChanges() {
+        val mint = json.decodeFromString<AssetContractBalanceChange>(
+            """{"asset_type":"credit_alphanum4","asset_code":"USD",""" +
+                """"asset_issuer":"${OperationTestHelpers.TEST_ACCOUNT_2}",""" +
+                """"type":"mint","to":"${OperationTestHelpers.TEST_ACCOUNT}","amount":"100.0000000"}"""
+        )
+        assertEquals("mint", mint.type)
+        assertNull(mint.from)
+        assertEquals(OperationTestHelpers.TEST_ACCOUNT, mint.to)
+
+        val burn = json.decodeFromString<AssetContractBalanceChange>(
+            """{"asset_type":"credit_alphanum4","asset_code":"USD",""" +
+                """"asset_issuer":"${OperationTestHelpers.TEST_ACCOUNT_2}",""" +
+                """"type":"burn","from":"${OperationTestHelpers.TEST_SOURCE_ACCOUNT}","amount":"100.0000000"}"""
+        )
+        assertEquals("burn", burn.type)
+        assertNull(burn.to)
+        assertEquals(OperationTestHelpers.TEST_SOURCE_ACCOUNT, burn.from)
+    }
+
     @Test
     fun testAllNullOptionals() {
         val response = createResponse(

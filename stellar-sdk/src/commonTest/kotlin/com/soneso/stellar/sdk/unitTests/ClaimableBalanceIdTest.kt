@@ -13,19 +13,11 @@ import kotlin.test.assertTrue
  */
 class ClaimableBalanceIdTest {
 
-    /** The 32-byte balance hash the vectors are built around. */
-    private val hashHex = "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
-
-    private val strKey = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
-
-    /** The hash behind the single discriminant byte the strkey body leads with. */
-    private val bodyHex = "00$hashHex"
-
-    /** The hash behind the four-byte union discriminant, the spelling Horizon reports. */
-    private val paddedHex = "00000000$hashHex"
-
-    /** Every spelling of the one balance, the strkey and a case variant among them. */
-    private val spellings = listOf(strKey, hashHex, bodyHex, paddedHex, hashHex.uppercase())
+    private val hashHex = ClaimableBalanceVectors.hashHex
+    private val strKey = ClaimableBalanceVectors.strKey
+    private val bodyHex = ClaimableBalanceVectors.bodyHex
+    private val paddedHex = ClaimableBalanceVectors.paddedHex
+    private val spellings = ClaimableBalanceVectors.spellings
 
     private val spellingMessage =
         "claimable balance id must be a 58 character strkey (B...), or hex of the bare id " +
@@ -160,6 +152,23 @@ class ClaimableBalanceIdTest {
                 "${candidate.length} characters: the rejection must name the rule broken"
             )
         }
+    }
+
+    @Test
+    fun testAStrKeyCarryingADiscriminantTheUnionDoesNotDeclareIsRejected() {
+        // The SEP-23 invalid vector below is the strkey of the same hash the valid vectors
+        // carry, written under the discriminant 1, at the length and version byte of a
+        // claimable balance id. The pinned message shows the discriminant check is what
+        // rejects it.
+        val nonV0 = "BAAT6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGXACA"
+        val failure = assertFailsWith<IllegalArgumentException> {
+            ClaimableBalanceId.forId(nonV0)
+        }
+        assertEquals(
+            "Invalid claimable balance discriminant, expected 0, got 1",
+            failure.message,
+            "the rejection must name the rule broken"
+        )
     }
 
     @Test

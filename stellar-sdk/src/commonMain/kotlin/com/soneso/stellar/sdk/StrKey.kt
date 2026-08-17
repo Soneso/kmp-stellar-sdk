@@ -8,8 +8,7 @@ import kotlin.experimental.and
  * [isInAlphabet] is the gate every strkey decode passes through. It accepts only the 32
  * characters of the base32 alphabet, so the pad character, whitespace and any other byte make it
  * return false and the same string is accepted or rejected identically on every platform.
- * [decode] takes input that gate accepts, and reports anything else as an invalid argument
- * rather than decoding it to bytes the input does not spell.
+ * [decode] takes input that gate accepts, and reports anything else as an invalid argument.
  */
 internal expect object Base32Codec {
     fun encode(data: ByteArray): ByteArray
@@ -39,6 +38,14 @@ private fun paddedToFourBytes(length: Int): Int = (length + 3) / 4 * 4
 internal const val BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
 /**
+ * What a decode reports about a string that is not written in [BASE32_ALPHABET].
+ *
+ * Every check that asks that question - the guard on the ASCII range, the alphabet check and each
+ * platform codec - reports it in these words, so one string is never described two ways.
+ */
+internal const val INVALID_BASE32_MESSAGE = "Invalid base32 encoded string"
+
+/**
  * Renders the lengths [range] admits for an error message: the single value of a one-element
  * range, or the bounds of a wider one.
  */
@@ -48,6 +55,31 @@ private fun expectedLengthText(range: IntRange): String =
 /**
  * StrKey is a helper class for encoding and decoding Stellar keys to/from strings.
  * Stellar uses a base32 encoding with checksums called "strkey" for human-readable keys.
+ *
+ * ## The decode contract
+ *
+ * Every `decodeX` runs the same checks in the same order and reports the first one the string
+ * fails as an `IllegalArgumentException`:
+ *
+ * 1. the character count is one the requested type has;
+ * 2. every character is inside the ASCII range;
+ * 3. the character count leaves no partially filled trailing character;
+ * 4. every character is one of the 32 in [BASE32_ALPHABET];
+ * 5. the unused trailing bits of the last character are zero;
+ * 6. the version byte names a strkey type;
+ * 7. the decoded payload has a size that type admits;
+ * 8. the framing that type defines inside its payload holds;
+ * 9. the version byte names the type the caller asked for;
+ * 10. the checksum matches the payload it covers.
+ *
+ * Checks 2 and 4 answer one question - whether the string is written in the characters a strkey
+ * is written in - and report it in the same words. Check 5 has nothing to read for a type whose
+ * character count fills its last character, and check 8 nothing to read for a type whose payload
+ * is an opaque key of a fixed size.
+ *
+ * Each `decodeX` documents only what its own type fixes: the character count it has, the version
+ * byte it is written under and the framing it defines. Each `isValidX` reports whether the
+ * matching `decodeX` accepts the string, so it is false wherever that decode throws.
  */
 object StrKey {
 
@@ -153,6 +185,13 @@ object StrKey {
     internal val CLAIMABLE_BALANCE_STRKEY_LENGTH: Int =
         VersionByte.CLAIMABLE_BALANCE.encodedLengths.first
 
+    /**
+     * Characters an encoded signed payload strkey (P...) has, across the payload lengths the
+     * type declares.
+     */
+    internal val SIGNED_PAYLOAD_STRKEY_LENGTHS: IntRange =
+        VersionByte.SIGNED_PAYLOAD.encodedLengths
+
     // Decoding table for base32
     private val decodingTable: ByteArray = ByteArray(256) { 0xff.toByte() }.apply {
         BASE32_ALPHABET.forEachIndexed { index, char ->
@@ -176,9 +215,8 @@ object StrKey {
      *
      * @param data The strkey to decode. An ed25519 public key strkey is 56 characters long.
      * @return The 32 raw public key bytes
-     * @throws IllegalArgumentException if the string is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the ed25519 public key version
-     * byte, or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the ed25519 public key version byte
      */
     fun decodeEd25519PublicKey(data: String): ByteArray {
         return decodeCheck(VersionByte.ACCOUNT_ID, data.toCharArray())
@@ -188,8 +226,7 @@ object StrKey {
      * Checks validity of Stellar account ID (G...)
      *
      * @param accountId The strkey to check
-     * @return true if [accountId] is a 56-character G... strkey with a matching checksum,
-     * false otherwise
+     * @return true if [accountId] is a strkey [decodeEd25519PublicKey] accepts, false otherwise
      */
     fun isValidEd25519PublicKey(accountId: String): Boolean {
         return try {
@@ -216,9 +253,8 @@ object StrKey {
      *
      * @param data The strkey to decode. An ed25519 secret seed strkey is 56 characters long.
      * @return The 32 raw seed bytes
-     * @throws IllegalArgumentException if the input is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the secret seed version byte,
-     * or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the secret seed version byte
      */
     fun decodeEd25519SecretSeed(data: CharArray): ByteArray {
         return decodeCheck(VersionByte.SEED, data)
@@ -228,8 +264,7 @@ object StrKey {
      * Checks validity of seed (S...)
      *
      * @param seed The strkey to check
-     * @return true if [seed] is a 56-character S... strkey with a matching checksum,
-     * false otherwise
+     * @return true if [seed] is a strkey [decodeEd25519SecretSeed] accepts, false otherwise
      */
     fun isValidEd25519SecretSeed(seed: CharArray): Boolean {
         return try {
@@ -256,10 +291,8 @@ object StrKey {
      *
      * @param data The strkey to decode. A muxed ed25519 public key strkey is 69 characters long.
      * @return The 40 raw bytes: the 32-byte ed25519 public key followed by the 8-byte muxed id
-     * @throws IllegalArgumentException if the string is not 69 characters long, contains
-     * characters outside the base32 alphabet, leaves the unused trailing bits of its last
-     * character non-zero, does not carry the muxed ed25519 public key version byte, or fails
-     * the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 69 characters and the muxed ed25519 public key version byte
      */
     fun decodeMed25519PublicKey(data: String): ByteArray {
         return decodeCheck(VersionByte.MED25519_PUBLIC_KEY, data.toCharArray())
@@ -272,8 +305,8 @@ object StrKey {
      * but have different IDs. They are used for memo-less payments as defined in SEP-0023.
      *
      * @param med25519PublicKey The muxed public key to check
-     * @return true if [med25519PublicKey] is a 69-character M... strkey whose unused trailing
-     * bits are zero and whose checksum matches, false otherwise
+     * @return true if [med25519PublicKey] is a strkey [decodeMed25519PublicKey] accepts,
+     * false otherwise
      * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md">SEP-0023</a>
      */
     fun isValidMed25519PublicKey(med25519PublicKey: String): Boolean {
@@ -301,9 +334,8 @@ object StrKey {
      *
      * @param data The strkey to decode. A pre-authorized transaction strkey is 56 characters long.
      * @return The 32 raw hash bytes
-     * @throws IllegalArgumentException if the string is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the pre-authorized transaction
-     * version byte, or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the pre-authorized transaction version byte
      */
     fun decodePreAuthTx(data: String): ByteArray {
         return decodeCheck(VersionByte.PRE_AUTH_TX, data.toCharArray())
@@ -313,8 +345,7 @@ object StrKey {
      * Checks validity of pre-authorized transaction hash (T...)
      *
      * @param preAuthTx The strkey to check
-     * @return true if [preAuthTx] is a 56-character T... strkey with a matching checksum,
-     * false otherwise
+     * @return true if [preAuthTx] is a strkey [decodePreAuthTx] accepts, false otherwise
      */
     fun isValidPreAuthTx(preAuthTx: String): Boolean {
         return try {
@@ -341,9 +372,8 @@ object StrKey {
      *
      * @param data The strkey to decode. A SHA-256 hash strkey is 56 characters long.
      * @return The 32 raw hash bytes
-     * @throws IllegalArgumentException if the string is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the SHA-256 hash version byte,
-     * or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the SHA-256 hash version byte
      */
     fun decodeSha256Hash(data: String): ByteArray {
         return decodeCheck(VersionByte.SHA256_HASH, data.toCharArray())
@@ -353,8 +383,7 @@ object StrKey {
      * Checks validity of SHA-256 hash (X...)
      *
      * @param sha256Hash The strkey to check
-     * @return true if [sha256Hash] is a 56-character X... strkey with a matching checksum,
-     * false otherwise
+     * @return true if [sha256Hash] is a strkey [decodeSha256Hash] accepts, false otherwise
      */
     fun isValidSha256Hash(sha256Hash: String): Boolean {
         return try {
@@ -394,13 +423,10 @@ object StrKey {
      * characters long, depending on the size of the payload it carries.
      * @return The raw bytes: the 32-byte ed25519 public key, the 4-byte declared payload
      * length and the payload padded to a four-byte boundary
-     * @throws IllegalArgumentException if the string length is outside 69 to 165 characters,
-     * has a length that leaves a partially filled trailing character, contains characters
-     * outside the base32 alphabet, leaves the unused trailing bits of its last character
-     * non-zero, does not carry the signed payload version byte, decodes to fewer than 40 or
-     * more than 100 data bytes, declares a payload length outside 1 to 64, decodes to a size
-     * that does not fit its declared payload length exactly, leaves a padding byte after the
-     * payload non-zero, or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 69 to 165 characters, the signed payload version byte, 40 to 100
+     * data bytes, and the framing it defines inside them: a declared payload length of 1 to 64
+     * that the data size fits exactly, and zero padding after the payload
      */
     fun decodeSignedPayload(data: String): ByteArray {
         return decodeCheck(VersionByte.SIGNED_PAYLOAD, data.toCharArray())
@@ -410,8 +436,7 @@ object StrKey {
      * Checks validity of signed payload (P...)
      *
      * @param signedPayload The strkey to check
-     * @return true if [signedPayload] is a signed payload strkey [decodeSignedPayload] accepts,
-     * false otherwise
+     * @return true if [signedPayload] is a strkey [decodeSignedPayload] accepts, false otherwise
      */
     fun isValidSignedPayload(signedPayload: String): Boolean {
         return try {
@@ -438,9 +463,8 @@ object StrKey {
      *
      * @param data The strkey to decode. A contract address strkey is 56 characters long.
      * @return The 32 raw contract id bytes
-     * @throws IllegalArgumentException if the string is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the contract version byte,
-     * or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the contract version byte
      */
     fun decodeContract(data: String): ByteArray {
         return decodeCheck(VersionByte.CONTRACT, data.toCharArray())
@@ -450,8 +474,7 @@ object StrKey {
      * Checks validity of contract address (C...)
      *
      * @param address The strkey to check
-     * @return true if [address] is a 56-character C... strkey with a matching checksum,
-     * false otherwise
+     * @return true if [address] is a strkey [decodeContract] accepts, false otherwise
      */
     fun isValidContract(address: String): Boolean {
         return try {
@@ -478,9 +501,8 @@ object StrKey {
      *
      * @param data The strkey to decode. A liquidity pool id strkey is 56 characters long.
      * @return The 32 raw liquidity pool id bytes
-     * @throws IllegalArgumentException if the string is not 56 characters long, contains
-     * characters outside the base32 alphabet, does not carry the liquidity pool version byte,
-     * or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 56 characters and the liquidity pool version byte
      */
     fun decodeLiquidityPool(data: String): ByteArray {
         return decodeCheck(VersionByte.LIQUIDITY_POOL, data.toCharArray())
@@ -490,8 +512,7 @@ object StrKey {
      * Checks validity of liquidity pool ID (L...)
      *
      * @param liquidityPoolId The strkey to check
-     * @return true if [liquidityPoolId] is a 56-character L... strkey with a matching
-     * checksum, false otherwise
+     * @return true if [liquidityPoolId] is a strkey [decodeLiquidityPool] accepts, false otherwise
      */
     fun isValidLiquidityPool(liquidityPoolId: String): Boolean {
         return try {
@@ -524,8 +545,7 @@ object StrKey {
             // type the XDR union declares.
             CLAIMABLE_BALANCE_BODY_SIZE -> data
             // The XDR wire form. Every byte of the wider discriminant is judged before the id
-            // is narrowed to the strkey body, so a value that names another type cannot reach
-            // the strkey by having its high bytes dropped.
+            // is narrowed to the strkey body.
             CLAIMABLE_BALANCE_XDR_SIZE -> {
                 requireClaimableBalanceXdrDiscriminant(data)
                 byteArrayOf(CLAIMABLE_BALANCE_V0_DISCRIMINANT) +
@@ -548,10 +568,9 @@ object StrKey {
      *
      * @param data The strkey to decode. A claimable balance id strkey is 58 characters long.
      * @return The 33 raw bytes: the type discriminant followed by the 32-byte hash
-     * @throws IllegalArgumentException if the string is not 58 characters long, contains
-     * characters outside the base32 alphabet, leaves the unused trailing bits of its last
-     * character non-zero, does not carry the claimable balance version byte, carries a type
-     * discriminant other than the one the XDR union declares, or fails the checksum
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 58 characters, the claimable balance version byte, and the
+     * framing it defines inside its payload: the one type discriminant the XDR union declares
      */
     fun decodeClaimableBalance(data: String): ByteArray {
         return decodeCheck(VersionByte.CLAIMABLE_BALANCE, data.toCharArray())
@@ -561,9 +580,8 @@ object StrKey {
      * Checks validity of claimable balance ID (B...)
      *
      * @param claimableBalanceId The strkey to check
-     * @return true if [claimableBalanceId] is a 58-character B... strkey whose unused trailing
-     * bits are zero, whose type discriminant is the one the XDR union declares and whose
-     * checksum matches, false otherwise
+     * @return true if [claimableBalanceId] is a strkey [decodeClaimableBalance] accepts,
+     * false otherwise
      */
     fun isValidClaimableBalance(claimableBalanceId: String): Boolean {
         return try {
@@ -602,13 +620,18 @@ object StrKey {
         // reads those bytes. A character outside the ASCII range would be narrowed onto whatever
         // alphabet character its low byte spells, which would let two different strings decode
         // to one key, so only characters that survive the narrowing unchanged get past here.
-        require(encoded.all { it.code <= 0x7F }) { "Invalid base32 encoded string" }
+        require(encoded.all { it.code <= 0x7F }) { INVALID_BASE32_MESSAGE }
 
         val bytes = encoded.map { it.code.toByte() }.toByteArray()
 
         // Validate no leftover character
         val leftoverBits = (bytes.size * 5) % 8
         require(leftoverBits < 5) { "Encoded char array has leftover character" }
+
+        // A character outside the alphabet stands for no five-bit value, so the string is held to
+        // the alphabet before anything reads the value of one of its characters. That makes the
+        // lookup below total, and it is also the precondition the codec decodes under.
+        require(Base32Codec.isInAlphabet(bytes)) { INVALID_BASE32_MESSAGE }
 
         // Validate unused bits are zero
         if (leftoverBits > 0) {
@@ -618,7 +641,7 @@ object StrKey {
             require((decodedLastChar and leftoverBitsMask) == 0.toByte()) { "Unused bits should be set to 0" }
         }
 
-        val decoded = base32Decode(bytes)
+        val decoded = Base32Codec.decode(bytes)
         val decodedVersionByte = decoded[0]
         val decodedVersion = VersionByte.fromValue(decodedVersionByte)
             ?: throw IllegalArgumentException("Version byte is invalid")
@@ -715,8 +738,7 @@ object StrKey {
     /**
      * Checks the type discriminant the XDR wire form of a claimable balance id carries: the
      * type as a big-endian value across [XDR_UNION_DISCRIMINANT_SIZE] bytes. All of them are
-     * read, so a value that differs only in the bytes above the last one is rejected rather
-     * than narrowed away.
+     * read.
      *
      * [data] must hold at least [XDR_UNION_DISCRIMINANT_SIZE] bytes. The per-width size check
      * establishes that, and it is what makes reading the discriminant here safe.
@@ -754,15 +776,5 @@ object StrKey {
 
         // Return little-endian
         return byteArrayOf(crc.toByte(), (crc ushr 8).toByte())
-    }
-
-
-    private fun base32Decode(data: ByteArray): ByteArray {
-        // Validate all characters are in alphabet
-        require(Base32Codec.isInAlphabet(data)) {
-            "Invalid base32 encoded string"
-        }
-
-        return Base32Codec.decode(data)
     }
 }

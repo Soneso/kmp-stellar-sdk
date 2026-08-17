@@ -221,6 +221,17 @@ sealed class SignerKey {
         const val SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH = 64
 
         /**
+         * The character a signed payload strkey is written under.
+         */
+        private const val SIGNED_PAYLOAD_PREFIX = "P"
+
+        /**
+         * Characters a signed payload strkey has. The range is the codec's own, so the two
+         * cannot drift apart.
+         */
+        private val signedPayloadEncodedLengths: IntRange = StrKey.SIGNED_PAYLOAD_STRKEY_LENGTHS
+
+        /**
          * Creates a SignerKey from an encoded signer key string.
          *
          * This method automatically detects the signer key type based on the encoded string format and
@@ -231,7 +242,9 @@ sealed class SignerKey {
          * @throws IllegalArgumentException if [encodedSignerKey] is not a well-formed strkey of
          * one of the four signer key forms. It is the only exception this function raises: a
          * signed payload is checked against the framing it declares before any byte that framing
-         * names is read.
+         * names is read. A string written under the character a signed payload carries and as
+         * long as one is refused for the rule it broke; every other input is refused by naming
+         * itself.
          */
         fun fromEncodedSignerKey(encodedSignerKey: String): SignerKey {
             return when {
@@ -260,7 +273,21 @@ sealed class SignerKey {
                     val payload = decoded.copyOfRange(36, 36 + payloadLength)
                     ed25519SignedPayload(publicKey, payload)
                 }
-                else -> throw IllegalArgumentException("Invalid encoded signer key: $encodedSignerKey")
+                else -> {
+                    if (encodedSignerKey.startsWith(SIGNED_PAYLOAD_PREFIX) &&
+                        encodedSignerKey.length in signedPayloadEncodedLengths
+                    ) {
+                        // The string is written under the character a signed payload carries and
+                        // holds a count of characters one holds, so it describes a signed payload
+                        // and no other signer key. Decoding it raises the rule it broke, which
+                        // the refusal below cannot name.
+                        StrKey.decodeSignedPayload(encodedSignerKey)
+                        throw IllegalStateException(
+                            "decodeSignedPayload accepted a string isValidSignedPayload rejected"
+                        )
+                    }
+                    throw IllegalArgumentException("Invalid encoded signer key: $encodedSignerKey")
+                }
             }
         }
 

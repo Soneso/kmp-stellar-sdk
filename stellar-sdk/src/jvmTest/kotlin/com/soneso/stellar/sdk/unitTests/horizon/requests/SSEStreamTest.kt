@@ -6,6 +6,7 @@ import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.requests.SSEStream
 import com.soneso.stellar.sdk.horizon.responses.Pageable
 import com.soneso.stellar.sdk.horizon.responses.Response
+import com.soneso.stellar.sdk.unitTests.ClaimableBalanceVectors
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
@@ -449,20 +450,9 @@ class SSEStreamTest {
     companion object {
         private const val SERVER_URI = "https://horizon-testnet.stellar.org"
 
-        /** The 32-byte hash of the claimable balance the spelling vectors name. */
-        private const val CLAIMABLE_BALANCE_HASH_HEX =
-            "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
-
         /** The spelling Horizon serves: the hexadecimal of the XDR form. */
-        private const val CLAIMABLE_BALANCE_HORIZON_HEX = "00000000$CLAIMABLE_BALANCE_HASH_HEX"
+        private const val CLAIMABLE_BALANCE_HORIZON_HEX = ClaimableBalanceVectors.paddedHex
 
-        /** Every spelling of the one balance, the strkey and a case variant among them. */
-        private val CLAIMABLE_BALANCE_SPELLINGS = listOf(
-            "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU",
-            CLAIMABLE_BALANCE_HASH_HEX,
-            "00$CLAIMABLE_BALANCE_HASH_HEX",
-            CLAIMABLE_BALANCE_HORIZON_HEX,
-            CLAIMABLE_BALANCE_HASH_HEX.uppercase()
-        )
+        private val CLAIMABLE_BALANCE_SPELLINGS = ClaimableBalanceVectors.spellings
     }
 }

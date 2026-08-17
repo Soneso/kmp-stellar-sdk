@@ -969,15 +969,19 @@ class SorobanServer(
      * }
      * ```
      *
-     * @param wasmId The contract WASM ID as a hex-encoded hash string
+     * @param wasmId The contract WASM ID as a hex-encoded hash string (64 characters)
      * @return The contract code entry if found, null otherwise
      * @throws SorobanRpcException If the RPC request fails
-     * @throws IllegalArgumentException If wasmId is not a valid hex string
+     * @throws IllegalArgumentException If wasmId is not 64 characters or is not a valid hex string
      *
      * @see loadContractCodeForContractId
      * @see loadContractInfoForWasmId
      */
     suspend fun loadContractCodeForWasmId(wasmId: String): ContractCodeEntryXdr? {
+        require(wasmId.length == 64) {
+            "WASM ID must be 64 hex characters, got ${wasmId.length}"
+        }
+
         // Create ledger key for contract code
         val ledgerKey = LedgerKeyXdr.ContractCode(
             LedgerKeyContractCodeXdr(
@@ -1092,11 +1096,11 @@ class SorobanServer(
      * }
      * ```
      *
-     * @param wasmId The contract WASM ID as a hex-encoded hash string
+     * @param wasmId The contract WASM ID as a hex-encoded hash string (64 characters)
      * @return The parsed contract information if found, null if the contract code doesn't exist
      * @throws SorobanRpcException If the RPC request fails
      * @throws com.soneso.stellar.sdk.contract.SorobanContractParserException If the WASM bytecode cannot be parsed
-     * @throws IllegalArgumentException If wasmId is not a valid hex string
+     * @throws IllegalArgumentException If wasmId is not 64 characters or is not a valid hex string
      *
      * @see loadContractCodeForWasmId
      * @see loadContractInfoForContractId

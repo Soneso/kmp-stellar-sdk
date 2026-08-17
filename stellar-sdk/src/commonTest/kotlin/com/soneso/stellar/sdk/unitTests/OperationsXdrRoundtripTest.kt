@@ -20,36 +20,23 @@ class OperationsXdrRoundtripTest {
         val ASSET_LONG = AssetTypeCreditAlphaNum12("LONGASSET", ACCOUNT_A)
         val MUXED_B: String = MuxedAccount(ACCOUNT_B, 42UL).address
 
-        /** The 32-byte hash of the claimable balance the spelling vectors name. */
-        const val BALANCE_HASH_HEX =
-            "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
+        const val BALANCE_HASH_HEX = ClaimableBalanceVectors.hashHex
 
         /** That balance in the spelling Horizon reports and the operations report back. */
-        const val BALANCE_PADDED_HEX = "00000000$BALANCE_HASH_HEX"
+        const val BALANCE_PADDED_HEX = ClaimableBalanceVectors.paddedHex
 
-        /** Every spelling of the one balance, the strkey and a case variant among them. */
-        val BALANCE_SPELLINGS = listOf(
-            "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU",
-            BALANCE_HASH_HEX,
-            "00$BALANCE_HASH_HEX",
-            BALANCE_PADDED_HEX,
-            BALANCE_HASH_HEX.uppercase()
-        )
+        val BALANCE_SPELLINGS = ClaimableBalanceVectors.spellings
 
         /**
-         * Ids naming no claimable balance: lengths no spelling has, a discriminant the union
-         * does not declare in either width (among them an XDR form carrying its value only in
-         * the bytes above the last one), and hexadecimal the alphabet does not contain.
+         * Ids naming no claimable balance, beyond [ClaimableBalanceVectors.rejections]: lengths
+         * no spelling has, and an XDR form carrying its discriminant in the last byte.
          */
         val BALANCE_REJECTIONS = listOf(
             "abc",
             BALANCE_HASH_HEX.dropLast(1),
             BALANCE_PADDED_HEX + "0",
-            "01$BALANCE_HASH_HEX",
-            "01000000$BALANCE_HASH_HEX",
-            "00000001$BALANCE_HASH_HEX",
-            "z".repeat(72)
-        )
+            "00000001$BALANCE_HASH_HEX"
+        ) + ClaimableBalanceVectors.rejections
 
         /** The XDR bytes [body] encodes to, which is what equivalent spellings must share. */
         fun encodedBody(body: OperationBodyXdr): ByteArray {

@@ -372,9 +372,8 @@ class SignerKeyTest {
 
     /**
      * Checks that [encoded] is refused as a signed payload for [rejection], the framing rule the
-     * case is written to exercise. [SignerKey.fromEncodedSignerKey] reports every input it cannot
-     * read in the same words, so without this the case would stand on a rejection that names no
-     * reason at all.
+     * case is written to exercise, both by the codec and by [SignerKey.fromEncodedSignerKey],
+     * which reports the rule rather than the refusal it gives a string it cannot place at all.
      */
     private fun assertSignedPayloadFramingRejection(encoded: String, rejection: String) {
         assertFalse(StrKey.isValidSignedPayload(encoded))
@@ -382,6 +381,10 @@ class SignerKeyTest {
             StrKey.decodeSignedPayload(encoded)
         }
         assertEquals(rejection, failure.message, "the rejection must name the rule broken")
+        assertEquals(
+            rejection, signerKeyRejection(encoded).message,
+            "the signer key rejection must name the rule broken"
+        )
     }
 
     @Test
@@ -390,32 +393,20 @@ class SignerKeyTest {
         // four zero bytes. A signed payload declares at least one payload byte, so this string
         // describes no signer key. It is written out in full because the encoder does not produce
         // framing its own decoder rejects.
-        val encoded = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAABO6A"
         assertSignedPayloadFramingRejection(
-            encoded,
+            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAABO6A",
             "Invalid signed payload declared length, expected between 1 and 64 bytes, got 0"
         )
-
-        val exception = assertFailsWith<IllegalArgumentException> {
-            SignerKey.fromEncodedSignerKey(encoded)
-        }
-        assertEquals("Invalid encoded signer key: $encoded", exception.message)
     }
 
     @Test
     fun testFromEncodedSignerKeyPayloadLengthExceedsMaxThrows() {
         // The same framing declaring 1000 payload bytes, which exceeds the 64 a signed payload
         // can carry and the 40 bytes this strkey holds.
-        val encoded = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAPUAAAAAACOBO"
         assertSignedPayloadFramingRejection(
-            encoded,
+            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAPUAAAAAACOBO",
             "Invalid signed payload declared length, expected between 1 and 64 bytes, got 1000"
         )
-
-        val exception = assertFailsWith<IllegalArgumentException> {
-            SignerKey.fromEncodedSignerKey(encoded)
-        }
-        assertEquals("Invalid encoded signer key: $encoded", exception.message)
     }
 
     @Test
@@ -423,14 +414,10 @@ class SignerKeyTest {
         // A 32-byte ed25519 public key, a declared payload length of 64 and four payload bytes.
         // The declared length is one a signed payload can carry, but these 40 bytes do not carry
         // it, so the payload the length names ends past the end of the decoded bytes.
-        val encoded = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ3PY"
         assertSignedPayloadFramingRejection(
-            encoded,
+            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ3PY",
             "Invalid signed payload size, a declared length of 64 requires 100 bytes, got 40"
         )
-
-        val failure = signerKeyRejection(encoded)
-        assertEquals("Invalid encoded signer key: $encoded", failure.message)
     }
 
     @Test
@@ -459,41 +446,59 @@ class SignerKeyTest {
     }
 
     @Test
-    fun testFromEncodedSignerKeyRejectsMalformedInputWithoutReadingPastTheDecodedBytes() {
-        val malformed = listOf(
+    fun testFromEncodedSignerKeyNamesTheInputItCannotPlace() {
+        val unplaceable = listOf(
             // Nothing to decode, and a single character that names a type but carries no key.
             "",
             "P",
-            // The three SEP-0023 invalid signed payload vectors: a declared length shorter than
-            // the payload present, one longer than the payload present, and a payload written
-            // without the padding that fills it to a four-byte boundary.
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAQACAQDAQ" +
-                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IAAAAAAAAPM",
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
-                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4Z2PQ",
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
-                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DXFH6",
-            // A declared length of 0, one of 64 inside 40 bytes, and 29 payload bytes followed by
-            // padding of 0xff.
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAABO6A",
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ3PY",
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
-                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DX77776K34",
-            // A signed payload strkey cut short, and one carrying a character the base32 alphabet
-            // does not hold.
+            // A signed payload strkey cut short: fewer characters than the shortest signed
+            // payload has, so it describes no signer key rather than a malformed one.
             "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ",
-            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAq3PY",
             // A valid account id with pad characters appended, and a string of pad characters
             // alone: a strkey is written without padding, so neither is one.
             "$validAccountId========",
             "========"
         )
 
-        for (candidate in malformed) {
+        for (candidate in unplaceable) {
             val failure = signerKeyRejection(candidate)
             assertEquals(
                 "Invalid encoded signer key: $candidate", failure.message,
                 "the rejection must name the input it refused"
+            )
+        }
+    }
+
+    @Test
+    fun testFromEncodedSignerKeyNamesTheRuleAMalformedSignedPayloadBroke() {
+        val rejections = mapOf(
+            // The three SEP-0023 invalid signed payload vectors: a declared length shorter than
+            // the payload present, one longer than the payload present, and a payload written
+            // without the padding that fills it to a four-byte boundary.
+            ("PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAQACAQDAQ" +
+                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IAAAAAAAAPM") to
+                "Invalid signed payload size, a declared length of 32 requires 68 bytes, got 72",
+            ("PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
+                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4Z2PQ") to
+                "Invalid signed payload size, a declared length of 29 requires 68 bytes, got 64",
+            ("PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
+                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DXFH6") to
+                "Invalid signed payload size, a declared length of 29 requires 68 bytes, got 65",
+            // 29 payload bytes followed by padding of 0xff.
+            ("PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
+                "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DX77776K34") to
+                "Invalid signed payload padding, expected zero at index 65 after a declared " +
+                "length of 29, got 255",
+            // A signed payload strkey carrying a character the base32 alphabet does not hold.
+            "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAq3PY" to
+                "Invalid base32 encoded string"
+        )
+
+        for ((candidate, rejection) in rejections) {
+            val failure = signerKeyRejection(candidate)
+            assertEquals(
+                rejection, failure.message,
+                "the rejection must name the rule broken for \"$candidate\""
             )
         }
     }

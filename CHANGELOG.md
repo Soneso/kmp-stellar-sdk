@@ -86,13 +86,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   round-tripped through `SignerKey` to a different strkey with the surplus bytes
   silently dropped, and the third raised `IndexOutOfBoundsException` from
   `SignerKey.fromEncodedSignerKey`, which its documentation says raises
-  `IllegalArgumentException`.
+  `IllegalArgumentException`. `SignerKey.fromEncodedSignerKey` names the rule a
+  malformed signed payload broke rather than answering with the generic
+  invalid-signer-key message.
 - Claimable balance strkeys (`B...`) that carry a discriminant other than
   `CLAIMABLE_BALANCE_ID_TYPE_V0` are rejected by `StrKey.isValidClaimableBalance`,
-  `StrKey.decodeClaimableBalance` and the `Address` constructor. Such a strkey
-  previously validated, decoded, produced an `Address` that reported
-  `AddressType.CLAIMABLE_BALANCE` and re-encoded to the same string; only
-  `toSCAddress()` refused it.
+  `StrKey.decodeClaimableBalance`, the `Address` constructor and XDR-JSON
+  decoding. Such a strkey previously validated, decoded, produced an `Address`
+  that reported `AddressType.CLAIMABLE_BALANCE` and re-encoded to the same
+  string; only `toSCAddress()` refused it.
 - `StrKey.encodeSignedPayload` and `StrKey.encodeClaimableBalance` run the same
   checks their decoders run, so neither emits a string the SDK will not read
   back. `encodeSignedPayload` validated a 40 to 100 byte count only and now
@@ -101,16 +103,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prepends the discriminant itself. `Address.fromClaimableBalance(ByteArray)`
   therefore rejects a non-V0 33-byte value at construction rather than at
   `toSCAddress()`.
+- Hexadecimal id and hash parsing holds input to the ASCII hex alphabet. The
+  per-pair radix parse accepted a leading sign and non-ASCII Unicode digits, so
+  a string of signed pairs such as `-1` repeated built a pool id, wasm hash,
+  memo hash or contract spec bytes argument of different bytes than its
+  characters spell, through the liquidity pool operations,
+  `InvokeHostFunctionOperation.createContract`, `MemoHash`, `MemoReturn`, the
+  contract spec and the OpenZeppelin credential storage, whose rejection is now
+  `IllegalArgumentException` with a message where it was `NumberFormatException`.
+  Contract spec hex arguments no longer have interior spaces removed; the `0x`
+  prefix is still accepted there.
+  `SorobanServer.loadContractCodeForWasmId` requires a 64-character wasm id
+  before building the ledger key it queries.
 - SEP-8 service construction fails on JVM and Android when a `stellar.toml`
   `CURRENCIES` entry names an issuer that is not a canonical strkey, for example
   one with whitespace inside the quotes, which the TOML parser preserves. It
   already failed that way on JavaScript and Native: `Sep08Service.fromDomain`
   builds a `RegulatedAsset` per regulated entry, and each one passes its issuer
   to `Asset.createNonNativeAsset`.
-- SEP-10 challenge validation is unchanged in outcome. A non-canonical
-  `SIGNING_KEY` makes the challenge source-account guard skip on JVM and Android
-  as it already did elsewhere, and the signature check then rejects the
-  challenge.
+- Mint, burn and clawback asset balance changes on invoke host function
+  operations deserialize. Horizon omits `from` on a mint and `to` on a burn or
+  clawback, and the response model required both, so an operations page carrying
+  one failed to parse as a whole. Both fields are now optional.
 - SEP-12 callback signature verification fails closed when the configured signing
   key is not a canonical strkey. Its verifier catches `Throwable`, so a key that
   JVM and Android previously decoded now yields a `false` verification result

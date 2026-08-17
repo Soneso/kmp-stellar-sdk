@@ -82,8 +82,7 @@ class ClaimableBalanceId private constructor(val hashHex: String) {
          * A string as long as a strkey is read as one: the base32 and the hexadecimal alphabets
          * overlap, but no hexadecimal spelling has that length, so the strkey reading is the
          * only one that can succeed. A hexadecimal spelling is read in either case, and every
-         * byte of a discriminant it carries is judged, so an id that names another type is
-         * rejected rather than having its high bytes dropped.
+         * byte of a discriminant it carries is judged.
          *
          * @param claimableBalanceId the balance id as a `B...` strkey, as the bare hash in
          * hexadecimal, or as the hash behind a type discriminant of either width in hexadecimal

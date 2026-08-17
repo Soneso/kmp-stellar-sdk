@@ -48,8 +48,8 @@ class ClaimableBalancesRequestBuilder(
     /**
      * Requests a specific claimable balance by ID.
      *
-     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route carries
-     * the one Horizon serves, the hexadecimal of the XDR form.
+     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route
+     * carries the 72-character hexadecimal of the XDR form, the spelling Horizon serves.
      *
      * @param claimableBalanceId The claimable balance ID to fetch
      * @return The claimable balance response

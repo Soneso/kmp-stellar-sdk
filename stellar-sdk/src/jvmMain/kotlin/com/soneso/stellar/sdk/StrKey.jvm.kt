@@ -26,7 +26,7 @@ internal actual object Base32Codec {
      * @throws IllegalArgumentException if [data] holds a byte outside the base32 alphabet
      */
     actual fun decode(data: ByteArray): ByteArray {
-        require(isInAlphabet(data)) { "Invalid base32 encoded string" }
+        require(isInAlphabet(data)) { INVALID_BASE32_MESSAGE }
         return codec.decode(data)
     }
 

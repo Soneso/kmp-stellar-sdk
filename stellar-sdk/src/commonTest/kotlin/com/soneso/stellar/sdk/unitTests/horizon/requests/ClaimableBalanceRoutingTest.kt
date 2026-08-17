@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.unitTests.horizon.requests
 
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.unitTests.ClaimableBalanceVectors
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -27,29 +28,21 @@ class ClaimableBalanceRoutingTest {
 
     private val serverUrl = "https://horizon-testnet.stellar.org"
 
-    /** The 32-byte balance hash the vectors are built around. */
-    private val hashHex = "3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a"
-
-    private val strKey = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
+    private val strKey = ClaimableBalanceVectors.strKey
 
     /** The spelling Horizon serves: the hexadecimal of the XDR form. */
-    private val horizonHex = "00000000$hashHex"
+    private val horizonHex = ClaimableBalanceVectors.paddedHex
 
-    /** Every spelling of the one balance, the strkey and a case variant among them. */
-    private val spellings = listOf(strKey, hashHex, "00$hashHex", horizonHex, hashHex.uppercase())
+    private val spellings = ClaimableBalanceVectors.spellings
 
     /**
-     * Ids naming no claimable balance: a length no spelling has, the legacy 63-character id,
-     * a discriminant the union does not declare in either width - the second carries it only
-     * above the last byte - and hexadecimal the alphabet does not contain.
+     * Ids naming no claimable balance, beyond [ClaimableBalanceVectors.rejections]: a length no
+     * spelling has, and the legacy 63-character id.
      */
     private val rejected = listOf(
         "not a claimable balance id",
-        "BAAAAAAAJXMXZMNAXINW4GQYRNE55L523HRUZAHCO7BXEX4BLR2XYLIF3X7IL2Y",
-        "01$hashHex",
-        "01000000$hashHex",
-        "z".repeat(72)
-    )
+        "BAAAAAAAJXMXZMNAXINW4GQYRNE55L523HRUZAHCO7BXEX4BLR2XYLIF3X7IL2Y"
+    ) + ClaimableBalanceVectors.rejections
 
     private val claimableBalanceJson = """
         {

@@ -174,6 +174,95 @@ class UtilTest {
         assertEquals("TESTASSET", Util.paddedByteArrayToString(padded12))
     }
 
+    // ========== hexToBytes: strict ASCII hex alphabet ==========
+
+    @Test
+    fun testHexToBytesRoundTrip() {
+        val bytes = ByteArray(32) { it.toByte() }
+        assertContentEquals(bytes, Util.hexToBytes(Util.bytesToHex(bytes)))
+    }
+
+    @Test
+    fun testHexToBytesAcceptsMixedCase() {
+        // The documented contract is case-insensitive: mixed-case valid hex must parse
+        // to the same bytes as its lowercase form.
+        val mixed = "0A1b2C3d4E5f6789AbCdEf0123456789abcdef0123456789ABCDEF0123456789"
+        assertContentEquals(Util.hexToBytes(mixed.lowercase()), Util.hexToBytes(mixed))
+        assertEquals(32, Util.hexToBytes(mixed).size)
+    }
+
+    @Test
+    fun testHexToBytesEmptyStringYieldsEmptyArray() {
+        assertContentEquals(ByteArray(0), Util.hexToBytes(""))
+    }
+
+    @Test
+    fun testHexToBytesRejectsOddLength() {
+        val exception = assertFailsWith<IllegalArgumentException> { Util.hexToBytes("abc") }
+        assertTrue(
+            exception.message?.contains("even length") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testHexToBytesRejectsNegativeSignPairs() {
+        // A per-pair radix parse reads "-1" as -1 and truncates it to 0xff, so a 64-character
+        // string of sign pairs would decode to a full 32-byte id that the caller never wrote.
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Util.hexToBytes("-1".repeat(32))
+        }
+        assertTrue(
+            exception.message?.contains("0-9 and a-f") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testHexToBytesRejectsPositiveSignPairs() {
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("+1".repeat(32)) }
+    }
+
+    @Test
+    fun testHexToBytesRejectsArabicIndicDigits() {
+        // U+0661 U+0662 are Unicode decimal digits that a radix parse accepts as 1 and 2.
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("١٢") }
+    }
+
+    @Test
+    fun testHexToBytesRejectsFullwidthDigits() {
+        // U+FF11 U+FF12 are the fullwidth forms of 1 and 2.
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("１２") }
+    }
+
+    @Test
+    fun testHexToBytesRejectsFullwidthLetters() {
+        // Fullwidth letters lowercase to fullwidth letters, so case folding alone does not
+        // map U+FF21 U+FF22 onto the ASCII alphabet.
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("ＡＢ") }
+    }
+
+    @Test
+    fun testHexToBytesRejectsNonHexLetters() {
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("0g") }
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("zz") }
+    }
+
+    @Test
+    fun testHexToBytesRejectsWhitespaceAndPrefix() {
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("01 02") }
+        assertFailsWith<IllegalArgumentException> { Util.hexToBytes("0x0102") }
+    }
+
+    @Test
+    fun testHexToBytesErrorNamesTheOffendingCharacter() {
+        val exception = assertFailsWith<IllegalArgumentException> { Util.hexToBytes("00zz") }
+        assertTrue(
+            exception.message?.contains("'z'") ?: false,
+            "Message should name the offending character: ${exception.message}"
+        )
+    }
+
     @Test
     fun testIsFatal_cancellationException_isFatal() {
         assertTrue(isFatal(CancellationException("cancelled")))

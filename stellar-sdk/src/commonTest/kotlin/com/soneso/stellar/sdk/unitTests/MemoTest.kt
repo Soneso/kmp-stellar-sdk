@@ -212,6 +212,23 @@ class MemoTest {
     }
 
     @Test
+    fun testMemoHashRejectsNonHexCharacters() {
+        // 64 characters of sign pairs satisfy the length check, so only the hex alphabet
+        // gate stops them from decoding to a 32-byte hash the caller never supplied.
+        val exception = assertFailsWith<IllegalArgumentException> {
+            MemoHash("-1".repeat(32))
+        }
+        assertTrue(
+            exception.message?.contains("0-9 and a-f") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+
+        assertFailsWith<IllegalArgumentException> { MemoHash("+1".repeat(32)) }
+        assertFailsWith<IllegalArgumentException> { MemoHash("١".repeat(64)) }
+        assertFailsWith<IllegalArgumentException> { MemoHash("１".repeat(64)) }
+    }
+
+    @Test
     fun testMemoHashEquality() {
         val hash = ByteArray(32) { it.toByte() }
         val memo1 = MemoHash(hash)
@@ -283,6 +300,20 @@ class MemoTest {
         assertFailsWith<IllegalArgumentException> {
             MemoReturn(hexString63Chars)
         }
+    }
+
+    @Test
+    fun testMemoReturnRejectsNonHexCharacters() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            MemoReturn("-1".repeat(32))
+        }
+        assertTrue(
+            exception.message?.contains("0-9 and a-f") ?: false,
+            "Unexpected message: ${exception.message}"
+        )
+
+        assertFailsWith<IllegalArgumentException> { MemoReturn("+1".repeat(32)) }
+        assertFailsWith<IllegalArgumentException> { MemoReturn("１".repeat(64)) }
     }
 
     @Test

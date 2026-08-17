@@ -1259,10 +1259,12 @@ class StorageAdapterTest {
             createdAt = 1700000000000L
         )
 
-        // NumberFormatException is an IllegalArgumentException, which is what
-        // toStoredCredential documents for malformed hex. The message is left unasserted:
-        // the stdlib supplies none on Kotlin/Native.
-        assertFailsWith<NumberFormatException> { dto.toStoredCredential() }
+        // IllegalArgumentException is what toStoredCredential documents for malformed hex.
+        val ex = assertFailsWith<IllegalArgumentException> { dto.toStoredCredential() }
+        assertTrue(
+            ex.message?.contains("0-9 and a-f") ?: false,
+            "The failure must name the hex alphabet; got: ${ex.message}"
+        )
 
         // The same DTO with the two offending digits corrected decodes, so the rejection
         // above is attributable to them and not to anything else in the fixture.

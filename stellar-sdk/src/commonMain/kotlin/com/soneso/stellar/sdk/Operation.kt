@@ -1044,18 +1044,14 @@ data class CreateClaimableBalanceOperation(
 /**
  * Represents a [ClaimClaimableBalance](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#claim-claimable-balance) operation.
  *
- * @property balanceId The claimable balance ID to claim, in any spelling
- * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or that
- * hash behind a type discriminant of either width in hexadecimal
+ * @property balanceId The claimable balance ID, in any spelling [ClaimableBalanceId.forId]
+ * accepts. Equality and `toString` follow the spelling as given, while equivalent spellings
+ * encode to the same XDR.
  */
 data class ClaimClaimableBalanceOperation(
     val balanceId: String
 ) : Operation() {
 
-    /**
-     * Resolving the id here holds every spelling to the same rules at construction, and
-     * equivalent spellings reach the wire as the same bytes.
-     */
     private val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
 
     override fun toOperationBody(): OperationBodyXdr {
@@ -1077,18 +1073,14 @@ data class ClaimClaimableBalanceOperation(
 /**
  * Represents a [ClawbackClaimableBalance](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#clawback-claimable-balance) operation.
  *
- * @property balanceId The claimable balance ID to claw back, in any spelling
- * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or that
- * hash behind a type discriminant of either width in hexadecimal
+ * @property balanceId The claimable balance ID, in any spelling [ClaimableBalanceId.forId]
+ * accepts. Equality and `toString` follow the spelling as given, while equivalent spellings
+ * encode to the same XDR.
  */
 data class ClawbackClaimableBalanceOperation(
     val balanceId: String
 ) : Operation() {
 
-    /**
-     * Resolving the id here holds every spelling to the same rules at construction, and
-     * equivalent spellings reach the wire as the same bytes.
-     */
     private val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
 
     override fun toOperationBody(): OperationBodyXdr {
@@ -1380,15 +1372,11 @@ sealed class Sponsorship {
 
     /**
      * Revoke sponsorship of a claimable balance.
-     * @property balanceId The claimable balance ID, in any spelling
-     * [ClaimableBalanceId.forId] accepts: the `B...` strkey, the bare hash in hexadecimal, or
-     * that hash behind a type discriminant of either width in hexadecimal
+     * @property balanceId The claimable balance ID, in any spelling [ClaimableBalanceId.forId]
+     * accepts. Equality and `toString` follow the spelling as given, while equivalent spellings
+     * encode to the same XDR.
      */
     data class ClaimableBalance(val balanceId: String) : Sponsorship() {
-        /**
-         * Resolving the id here holds every spelling to the same rules at construction, and
-         * equivalent spellings reach the wire as the same bytes.
-         */
         internal val claimableBalanceId: ClaimableBalanceId = ClaimableBalanceId.forId(balanceId)
     }
 
