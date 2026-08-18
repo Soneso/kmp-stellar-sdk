@@ -27,6 +27,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   XDR is absent or unreadable, when no operation sits at the index, or when the
   operation there creates no balance. Fee bump transactions are read through to
   the inner transaction's results.
+- `SorobanServer.getExternalRefWasmHash(ref)` resolves a CAP-85 external
+  reference (Protocol 28) to the 32-byte WASM hash it names: the reference's
+  owner contract holds a persistent contract data entry keyed by the tag whose
+  value is the hash, and the entry is read without invoking the owner.
+  `loadContractCodeForContractId` and `loadContractInfoForContractId` apply the
+  resolution when an instance carries an external reference executable, and
+  `ContractClient.forContract` builds clients for such contracts, where all
+  three previously answered null or "Contract spec not found". An external
+  reference that cannot be resolved now throws rather than returning null; a
+  null from the loaders still means the instance or its code was not found, or
+  the contract is a Stellar Asset Contract, which has no WASM on-chain. A
+  missing, wrongly typed or wrong-length tag entry raises
+  `IllegalStateException` naming the owner and tag, which
+  `ContractClient.forContract` passes through unwrapped; a reference
+  whose owner is not a contract address raises `IllegalArgumentException`,
+  which `forContract` wraps as `IllegalStateException("Failed to load contract
+  spec for ...")` with the cause preserved. A tag that is not valid UTF-8
+  cannot be resolved: XDR strings decode into Kotlin strings with replacement
+  characters, so the lookup key would name a different entry, and such a tag
+  surfaces as a missing tag entry. `ContractSpec.scValToNative` converts an
+  `SCV_EXECUTABLE_TAG` value to its tag string; it previously failed the
+  conversion.
 
 ### Changed
 - `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and

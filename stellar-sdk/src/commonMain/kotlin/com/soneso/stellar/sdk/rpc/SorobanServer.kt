@@ -1006,10 +1006,81 @@ class SorobanServer(
     }
 
     /**
+     * Resolves a CAP-85 external reference to the 32-byte WASM hash it names.
+     *
+     * A contract created from an external reference does not carry its own code hash.
+     * The reference names an owner contract and a tag, and the owner holds a persistent
+     * contract data entry keyed by that tag whose value is the 32-byte hash of an
+     * already uploaded WASM. This method reads that entry off the ledger; the owner
+     * contract is never invoked. The tag is passed through exactly as the reference
+     * carries it, so the ledger key matches the entry the owner wrote. A tag that is
+     * not valid UTF-8 cannot be resolved: XDR strings decode into Kotlin strings with
+     * replacement characters, so such a tag builds a key for a different entry and
+     * surfaces as a missing tag entry.
+     *
+     * @param ref The external reference naming the owner contract and the tag
+     * @return The 32-byte WASM hash the tag entry holds
+     * @throws IllegalArgumentException If the owner is not a contract address; only a
+     * contract can hold the executable tag entry, so no request is issued
+     * @throws IllegalStateException If the owner has no entry under the tag (missing or
+     * archived), if the entry is not a contract data entry, or if the entry value does
+     * not hold exactly 32 bytes
+     * @throws SorobanRpcException If the RPC request fails
+     *
+     * @see loadContractCodeForContractId
+     */
+    suspend fun getExternalRefWasmHash(ref: ContractExecutableExternalRefXdr): ByteArray {
+        val owner = Address.fromSCAddress(ref.executableOwner).getEncodedAddress()
+        if (ref.executableOwner !is SCAddressXdr.ContractId) {
+            throw IllegalArgumentException(
+                "External reference owner $owner is not a contract address; " +
+                    "only a contract can hold the executable tag entry"
+            )
+        }
+        val tag = ref.tag.value
+
+        val entry = getContractData(
+            owner,
+            SCValXdr.ExecutableTag(ref.tag),
+            Durability.PERSISTENT
+        ) ?: throw IllegalStateException(
+            "No executable tag entry found on owner contract $owner for tag \"$tag\""
+        )
+
+        val ledgerEntryData = entry.parseXdr()
+        val contractData = when (ledgerEntryData) {
+            is LedgerEntryDataXdr.ContractData -> ledgerEntryData.value
+            else -> throw IllegalStateException(
+                "Executable tag entry on owner contract $owner for tag \"$tag\" is not " +
+                    "a contract data entry, got ${ledgerEntryData.discriminant}"
+            )
+        }
+
+        val value = contractData.`val`
+        val wasmHash = when (value) {
+            is SCValXdr.Bytes -> value.value.value
+            else -> throw IllegalStateException(
+                "Executable tag entry on owner contract $owner for tag \"$tag\" does " +
+                    "not hold a 32-byte WASM hash, got ${value.discriminant}"
+            )
+        }
+        if (wasmHash.size != 32) {
+            throw IllegalStateException(
+                "Executable tag entry on owner contract $owner for tag \"$tag\" does " +
+                    "not hold a 32-byte WASM hash; the value has ${wasmHash.size} bytes"
+            )
+        }
+        return wasmHash
+    }
+
+    /**
      * Loads the contract code entry (including WASM bytecode) for a given contract ID.
      *
      * This method:
-     * 1. Fetches the contract instance to get the WASM hash
+     * 1. Fetches the contract instance to determine the WASM hash from its executable:
+     *    a WASM executable carries the hash directly, and a CAP-85 external reference
+     *    is resolved through the owner contract's tag entry via [getExternalRefWasmHash].
+     *    A Stellar Asset Contract has no WASM on-chain, so it yields null.
      * 2. Fetches the contract code using the WASM hash
      *
      * ## Example
@@ -1023,9 +1094,13 @@ class SorobanServer(
      * ```
      *
      * @param contractId The contract address (C... format)
-     * @return The contract code entry if found, null otherwise
+     * @return The contract code entry, or null when the instance or its code entry
+     * is not found, or when the contract is a Stellar Asset Contract
      * @throws SorobanRpcException If the RPC request fails
-     * @throws IllegalArgumentException If contractId is not a valid contract address
+     * @throws IllegalArgumentException If contractId is not a valid contract address, or
+     * if the instance carries an external reference whose owner is not a contract address
+     * @throws IllegalStateException If an external reference cannot be resolved: the tag
+     * entry is missing, is not a contract data entry, or does not hold a 32-byte hash
      *
      * @see loadContractCodeForWasmId
      * @see loadContractInfoForContractId
@@ -1061,9 +1136,11 @@ class SorobanServer(
             else -> throw IllegalStateException("Expected Instance SCVal, got ${contractData.`val`.discriminant}")
         }
 
-        val wasmHash = when (instance.executable) {
-            is ContractExecutableXdr.WasmHash -> instance.executable.value.value
-            else -> return null
+        val executable = instance.executable
+        val wasmHash = when (executable) {
+            is ContractExecutableXdr.WasmHash -> executable.value.value
+            is ContractExecutableXdr.ExternalRef -> getExternalRefWasmHash(executable.value)
+            is ContractExecutableXdr.Void -> return null
         }
 
         // Convert hash to hex string
@@ -1137,10 +1214,14 @@ class SorobanServer(
      * ```
      *
      * @param contractId The contract address (C... format)
-     * @return The parsed contract information if found, null if the contract doesn't exist
+     * @return The parsed contract information, or null when the instance or its code
+     * entry is not found, or when the contract is a Stellar Asset Contract
      * @throws SorobanRpcException If the RPC request fails
      * @throws com.soneso.stellar.sdk.contract.SorobanContractParserException If the WASM bytecode cannot be parsed
-     * @throws IllegalArgumentException If contractId is not a valid contract address
+     * @throws IllegalArgumentException If contractId is not a valid contract address, or
+     * if the instance carries an external reference whose owner is not a contract address
+     * @throws IllegalStateException If an external reference cannot be resolved: the tag
+     * entry is missing, is not a contract data entry, or does not hold a 32-byte hash
      *
      * @see loadContractCodeForContractId
      * @see loadContractInfoForWasmId
