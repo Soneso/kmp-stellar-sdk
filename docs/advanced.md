@@ -434,6 +434,50 @@ suspend fun loadContractInfo() {
 }
 ```
 
+#### External Reference Executables (CAP-85)
+
+From Protocol 28 on, a contract can be created from an external reference: instead of
+carrying its own WASM hash, the instance names an owner contract and a tag, and the owner
+holds a persistent contract data entry under that tag whose value is the 32-byte hash of an
+already uploaded WASM. `loadContractCodeForContractId` and `loadContractInfoForContractId`
+resolve such instances without any extra step. An external reference that cannot be
+resolved throws rather than returning null; a null from the loaders still means the
+instance or its code was not found, or the contract is a Stellar Asset Contract, which has
+no WASM on-chain. To resolve a reference directly, use `getExternalRefWasmHash`:
+
+```kotlin
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
+import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
+
+suspend fun resolveExternalRef() {
+    val server = SorobanServer("https://soroban-testnet.stellar.org")
+
+    // Read the contract instance to inspect its executable.
+    val entry = server.getContractData(
+        contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
+        key = Scv.toLedgerKeyContractInstance(),
+        durability = SorobanServer.Durability.PERSISTENT
+    )
+    val contractData = entry?.parseXdr() as? LedgerEntryDataXdr.ContractData
+    val instance = contractData?.value?.`val` as? SCValXdr.Instance
+    val executable = instance?.value?.executable
+    if (executable is ContractExecutableXdr.ExternalRef) {
+        // The tag entry on the owner contract holds the WASM hash the instance runs.
+        val wasmHash = server.getExternalRefWasmHash(executable.value)
+        println("Resolved a ${wasmHash.size}-byte WASM hash")
+    }
+}
+```
+
+`getExternalRefWasmHash` returns the 32-byte WASM hash. It throws
+`IllegalArgumentException` when the reference's owner is not a contract address, and
+`IllegalStateException` when the owner has no entry under the tag, the entry is not a
+contract data entry, or the value does not hold a 32-byte hash. The owner contract is
+read, never invoked.
+
 ## Advanced Transaction Patterns
 
 ### Transaction Preconditions

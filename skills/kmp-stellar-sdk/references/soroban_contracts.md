@@ -754,6 +754,9 @@ val infoByWasm: SorobanContractInfo? = server.loadContractInfoForWasmId(wasmId)
 val infoByContract: SorobanContractInfo? = server.loadContractInfoForContractId(contractId)
 ```
 
+A contract created from a CAP-85 external reference (Protocol 28) resolves automatically.
+See `rpc.md` > the contract loading section for `getExternalRefWasmHash()`.
+
 ### SorobanContractInfo Properties
 
 | Property | Type | Description |

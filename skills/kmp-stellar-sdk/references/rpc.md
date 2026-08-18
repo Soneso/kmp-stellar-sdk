@@ -754,6 +754,17 @@ if (info != null) {
 }
 ```
 
+The `...ForContractId` loaders resolve a CAP-85 external reference executable (Protocol 28)
+automatically: the instance names an owner contract and a tag, and the owner's persistent tag
+entry holds the WASM hash. An unresolvable reference throws rather than returning null; a
+null from the loaders still means not found or a Stellar Asset Contract.
+`getExternalRefWasmHash(ContractExecutableExternalRefXdr)`
+resolves a reference directly and returns the 32-byte hash as `ByteArray`; it throws
+`IllegalArgumentException` for a non-contract owner and `IllegalStateException` when the tag
+entry is missing, is not contract data, or does not hold a 32-byte hash. A tag that is not
+valid UTF-8 cannot be resolved (XDR strings decode into Kotlin strings with replacement
+characters) and surfaces as a missing tag entry.
+
 For full introspection details (enumerating parameters, UDTs, events), see [Soroban Contracts](./soroban_contracts.md).
 
 ---
@@ -838,6 +849,7 @@ try {
 - `loadContractCodeForWasmId(String)` -- returns `ContractCodeEntryXdr?`
 - `loadContractInfoForContractId(String)` -- returns `SorobanContractInfo?`
 - `loadContractInfoForWasmId(String)` -- returns `SorobanContractInfo?`
+- `getExternalRefWasmHash(ContractExecutableExternalRefXdr)` -- returns `ByteArray`
 
 **Top-level function:**
 - `assembleTransaction(Transaction, SimulateTransactionResponse)` -- applies simulation results without a server instance
