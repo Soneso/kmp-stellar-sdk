@@ -2476,6 +2476,55 @@ class ContractSpecTest {
         }
     }
 
+    // ========== hexToBytes: strict hex alphabet ==========
+
+    @Test
+    fun testBytesConversionFromSignedHexPairsThrows() {
+        // "-1" pairs parse as -1 per pair under a bare radix parse and would truncate to 0xff,
+        // producing bytes that do not correspond to the supplied string.
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES)
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("-1-1-1-1", typeDef) }
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("0x+1+1", typeDef) }
+    }
+
+    @Test
+    fun testBytesConversionFromUnicodeDigitHexThrows() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES)
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("１２", typeDef) }
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("١٢", typeDef) }
+    }
+
+    @Test
+    fun testBytesConversionFromSpacedHexThrows() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES)
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("01 02 03", typeDef) }
+    }
+
+    @Test
+    fun testBytesConversionFromMixedCaseHex() {
+        // The hex input is case-insensitive, with or without the "0x" prefix.
+        val spec = ContractSpec(emptyList())
+        val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_BYTES)
+
+        val prefixed = spec.nativeToXdrSCVal("0xAbCdEf", typeDef)
+        assertTrue(prefixed is SCValXdr.Bytes)
+        assertContentEquals(byteArrayOf(0xAB.toByte(), 0xCD.toByte(), 0xEF.toByte()), prefixed.value.value)
+
+        val bare = spec.nativeToXdrSCVal("aBcDeF", typeDef)
+        assertTrue(bare is SCValXdr.Bytes)
+        assertContentEquals(byteArrayOf(0xAB.toByte(), 0xCD.toByte(), 0xEF.toByte()), bare.value.value)
+    }
+
+    @Test
+    fun testBytesNConversionFromSignedHexPairsThrows() {
+        val spec = ContractSpec(emptyList())
+        val typeDef = SCSpecTypeDefXdr.BytesN(SCSpecTypeBytesNXdr(Uint32Xdr(3u)))
+        assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal("-1-1-1", typeDef) }
+    }
+
     // ========== handleResultType: non-null "ok" value with a VOID ok type ==========
 
     @Test

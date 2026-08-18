@@ -85,10 +85,10 @@ data class InvokeHostFunctionOperationResponse(
         val type: String,
 
         @SerialName("from")
-        val from: String,
+        val from: String? = null,
 
         @SerialName("to")
-        val to: String,
+        val to: String? = null,
 
         @SerialName("amount")
         val amount: String,

@@ -115,6 +115,17 @@ object Util {
      * @throws IllegalArgumentException if the hex string has odd length or contains invalid characters
      */
     internal fun hexToBytes(hex: String): ByteArray {
+        // Restricting to the ASCII hex alphabet is load-bearing: a bare radix parse of each pair
+        // also accepts sign characters and non-ASCII Unicode digits, which would silently decode
+        // to a byte array that does not correspond to the caller's string. Judging the caller's
+        // own characters also names the offender as written and keeps the length check below on
+        // the caller's count, which case folding a non-ASCII character can change.
+        val invalidChar = hex.firstOrNull {
+            it !in '0'..'9' && it !in 'a'..'f' && it !in 'A'..'F'
+        }
+        require(invalidChar == null) {
+            "Hex string must contain only the characters 0-9 and a-f, got: '$invalidChar'"
+        }
         val cleanHex = hex.lowercase()
         require(cleanHex.length % 2 == 0) { "Hex string must have even length" }
 

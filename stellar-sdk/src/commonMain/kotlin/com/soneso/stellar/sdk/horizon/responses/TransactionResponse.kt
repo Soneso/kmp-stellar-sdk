@@ -1,5 +1,17 @@
 package com.soneso.stellar.sdk.horizon.responses
 
+import com.soneso.stellar.sdk.ClaimableBalanceId
+import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.xdr.CreateClaimableBalanceResultXdr
+import com.soneso.stellar.sdk.xdr.InnerTransactionResultResultXdr
+import com.soneso.stellar.sdk.xdr.OperationResultTrXdr
+import com.soneso.stellar.sdk.xdr.OperationResultXdr
+import com.soneso.stellar.sdk.xdr.TransactionResultCodeXdr
+import com.soneso.stellar.sdk.xdr.TransactionResultResultXdr
+import com.soneso.stellar.sdk.xdr.TransactionResultXdr
+import com.soneso.stellar.sdk.xdr.XdrReader
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -94,6 +106,58 @@ data class TransactionResponse(
     @SerialName("_links")
     val links: Links
 ) : Response(), Pageable {
+
+    /**
+     * The id of the claimable balance the operation at [operationIndex] created, as a `B...`
+     * strkey.
+     *
+     * A fee bump transaction carries no operations of its own, so the inner transaction's
+     * operation results are read for it.
+     *
+     * @param operationIndex the position of the CreateClaimableBalance operation within the
+     * transaction, 0 for the first
+     * @return the created balance id, or null when the transaction did not succeed, when
+     * [resultXdr] is absent or cannot be decoded, when no operation sits at [operationIndex],
+     * or when the operation there is not a CreateClaimableBalance
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun getCreatedClaimableBalanceId(operationIndex: Int = 0): String? {
+        val encodedResult = resultXdr ?: return null
+        val result = try {
+            TransactionResultXdr.decode(XdrReader(Base64.decode(encodedResult)))
+        } catch (e: Throwable) {
+            if (isFatal(e)) throw e
+            return null
+        }
+
+        val operationResults = when (val outcome = result.result) {
+            is TransactionResultResultXdr.Results -> {
+                if (outcome.discriminant != TransactionResultCodeXdr.txSUCCESS) return null
+                outcome.value
+            }
+            is TransactionResultResultXdr.InnerResultPair -> {
+                if (outcome.discriminant != TransactionResultCodeXdr.txFEE_BUMP_INNER_SUCCESS) {
+                    return null
+                }
+                when (val inner = outcome.value.result.result) {
+                    is InnerTransactionResultResultXdr.Results -> {
+                        if (inner.discriminant != TransactionResultCodeXdr.txSUCCESS) return null
+                        inner.value
+                    }
+                    is InnerTransactionResultResultXdr.Void -> return null
+                }
+            }
+            is TransactionResultResultXdr.Void -> return null
+        }
+
+        val operationResult = operationResults.getOrNull(operationIndex) ?: return null
+        if (operationResult !is OperationResultXdr.Tr) return null
+        val inner = operationResult.value
+        if (inner !is OperationResultTrXdr.CreateClaimableBalanceResult) return null
+        val created = inner.value
+        if (created !is CreateClaimableBalanceResultXdr.BalanceID) return null
+        return ClaimableBalanceId.fromXdr(created.value).toStrKey()
+    }
 
     /**
      * Preconditions of a transaction per CAP-21.

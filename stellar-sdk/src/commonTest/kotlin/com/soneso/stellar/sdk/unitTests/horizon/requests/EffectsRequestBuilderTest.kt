@@ -64,16 +64,6 @@ class EffectsRequestBuilderTest {
     }
 
     @Test
-    fun testForClaimableBalance() {
-        val server = HorizonServer("https://horizon-testnet.stellar.org")
-        val balanceId = "00000000da0d57da7d4850e7fc10d2a9d0ebc731f7afb40574c03395b17d49149b91f5be"
-        val builder = server.effects().forClaimableBalance(balanceId)
-        val url = builder.buildUrl().toString()
-        assertTrue(url.contains("claimable_balances/$balanceId/effects"))
-        server.close()
-    }
-
-    @Test
     fun testCursor() {
         val server = HorizonServer("https://horizon-testnet.stellar.org")
         val builder = server.effects().cursor("cursor123")

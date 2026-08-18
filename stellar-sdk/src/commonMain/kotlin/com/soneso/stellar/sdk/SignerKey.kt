@@ -1,7 +1,6 @@
 package com.soneso.stellar.sdk
 
 import com.soneso.stellar.sdk.xdr.SignerKeyEd25519SignedPayloadXdr
-import com.soneso.stellar.sdk.xdr.SignerKeyTypeXdr
 import com.soneso.stellar.sdk.xdr.SignerKeyXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 
@@ -171,7 +170,9 @@ sealed class SignerKey {
         fun encodedEd25519PublicKey(): String = StrKey.encodeEd25519PublicKey(ed25519PublicKey)
 
         override fun encodeSignerKey(): String {
-            // Encode as described in Java SDK: public key (32) + length (4) + padded payload
+            // A signed payload strkey carries the 32-byte ed25519 public key, the payload length
+            // as a big-endian four-byte value, and the payload padded with zeros to a four-byte
+            // boundary.
             val payloadLength = payload.size
             val paddingSize = (4 - payloadLength % 4) % 4
             val paddedPayload = ByteArray(payloadLength + paddingSize)
@@ -220,6 +221,17 @@ sealed class SignerKey {
         const val SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH = 64
 
         /**
+         * The character a signed payload strkey is written under.
+         */
+        private const val SIGNED_PAYLOAD_PREFIX = "P"
+
+        /**
+         * Characters a signed payload strkey has. The range is the codec's own, so the two
+         * cannot drift apart.
+         */
+        private val signedPayloadEncodedLengths: IntRange = StrKey.SIGNED_PAYLOAD_STRKEY_LENGTHS
+
+        /**
          * Creates a SignerKey from an encoded signer key string.
          *
          * This method automatically detects the signer key type based on the encoded string format and
@@ -227,7 +239,12 @@ sealed class SignerKey {
          *
          * @param encodedSignerKey The StrKey-encoded signer key string
          * @return A new SignerKey instance
-         * @throws IllegalArgumentException if the encoded signer key is invalid
+         * @throws IllegalArgumentException if [encodedSignerKey] is not a well-formed strkey of
+         * one of the four signer key forms. It is the only exception this function raises: a
+         * signed payload is checked against the framing it declares before any byte that framing
+         * names is read. A string written under the character a signed payload carries and as
+         * long as one is refused for the rule it broke; every other input is refused by naming
+         * itself.
          */
         fun fromEncodedSignerKey(encodedSignerKey: String): SignerKey {
             return when {
@@ -240,12 +257,16 @@ sealed class SignerKey {
                 StrKey.isValidSha256Hash(encodedSignerKey) -> {
                     hashX(StrKey.decodeSha256Hash(encodedSignerKey))
                 }
-                StrKey.isValidSignedPayload(encodedSignerKey) -> {
+                encodedSignerKey.startsWith(SIGNED_PAYLOAD_PREFIX) &&
+                    encodedSignerKey.length in signedPayloadEncodedLengths -> {
+                    // The string is written under the character a signed payload carries and holds
+                    // a count of characters one holds, so it describes a signed payload and no
+                    // other signer key. Decoding is what judges it: the format is the public key
+                    // (32), the declared length (4) and the payload padded with zeros to a
+                    // four-byte boundary, so a string the decode accepts declares a payload length
+                    // the type admits and carries every byte of the payload that length names, and
+                    // one it refuses is refused for the rule it broke.
                     val decoded = StrKey.decodeSignedPayload(encodedSignerKey)
-                    // Decode the signed payload format: public key (32) + length (4) + padded payload
-                    require(decoded.size >= 36) {
-                        "Invalid signed payload encoding, must be at least 36 bytes"
-                    }
 
                     val publicKey = decoded.copyOfRange(0, 32)
                     val payloadLength = ((decoded[32].toInt() and 0xFF) shl 24) or
@@ -253,14 +274,12 @@ sealed class SignerKey {
                             ((decoded[34].toInt() and 0xFF) shl 8) or
                             (decoded[35].toInt() and 0xFF)
 
-                    require(payloadLength in 1..SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH) {
-                        "Invalid payload length: $payloadLength"
-                    }
-
                     val payload = decoded.copyOfRange(36, 36 + payloadLength)
                     ed25519SignedPayload(publicKey, payload)
                 }
-                else -> throw IllegalArgumentException("Invalid encoded signer key: $encodedSignerKey")
+                else -> throw IllegalArgumentException(
+                    "Invalid encoded signer key: $encodedSignerKey"
+                )
             }
         }
 

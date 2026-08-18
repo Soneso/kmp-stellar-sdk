@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.horizon.requests
 
 import io.ktor.client.*
 import io.ktor.http.*
+import com.soneso.stellar.sdk.ClaimableBalanceId
 import com.soneso.stellar.sdk.horizon.exceptions.*
 import com.soneso.stellar.sdk.horizon.responses.ClaimableBalanceResponse
 import com.soneso.stellar.sdk.horizon.responses.Page
@@ -47,8 +48,13 @@ class ClaimableBalancesRequestBuilder(
     /**
      * Requests a specific claimable balance by ID.
      *
+     * The id may be given in any spelling [ClaimableBalanceId.forId] accepts; the route
+     * carries the 72-character hexadecimal of the XDR form, the spelling Horizon serves.
+     *
      * @param claimableBalanceId The claimable balance ID to fetch
      * @return The claimable balance response
+     * @throws IllegalArgumentException If [claimableBalanceId] names no claimable balance, in
+     * which case no request is sent
      * @throws NetworkException All the exceptions below are subclasses of NetworkException
      * @throws BadRequestException If the request fails due to a bad request (4xx)
      * @throws BadResponseException If the request fails due to a bad response from the server (5xx)
@@ -60,7 +66,7 @@ class ClaimableBalancesRequestBuilder(
      * @see <a href="https://developers.stellar.org/api/resources/claimablebalances/single/">Claimable Balance Details</a>
      */
     suspend fun claimableBalance(claimableBalanceId: String): ClaimableBalanceResponse {
-        setSegments("claimable_balances", claimableBalanceId)
+        setSegments("claimable_balances", ClaimableBalanceId.forId(claimableBalanceId).toPaddedHex())
         return executeGetRequest(buildUrl())
     }
 

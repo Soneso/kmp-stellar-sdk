@@ -16,6 +16,10 @@ All documentation is written for **Group 1: SDK Users** - developers who want to
 
 **Contributor documentation** (testing guides, architecture internals, build instructions) exists separately and is not part of the main learning path.
 
+## Release Policy for Docs
+
+Main's user-facing documentation and skill content describe the released SDK, because users read them on GitHub against the SDK they can install. Documentation and skill content for unreleased behavior goes to the `release-docs` branch, not to the feature branch that implements the behavior; `release-docs` is merged as the first step of release preparation. Feature branches carry only code, tests, the CHANGELOG's `[Unreleased]` section, CLAUDE.md updates, and version-independent process documents. Skill archives are rebuilt only during release preparation, never on feature branches.
+
 ## Core Principles
 
 ### 1. Progressive Learning
@@ -81,6 +85,25 @@ Platform guides show **one primary framework** to avoid decision paralysis:
 - **JVM Server**: Ktor
 
 **Rationale**: Multiple framework examples create confusion and maintenance burden. Choose the most common/recommended approach.
+
+### 8. No Changelog Residue
+
+Documentation states the current contract, never the story of how the code got there — and never the counterfactual of what the code would do without one of its checks. Sentences shaped like "X happens rather than Y" or "X instead of Y", where Y is a former defect or a hypothetical failure, leak the author's editing context into the reader's head: the reader never imagined Y, learns nothing about the API from it, and is left wondering why it is mentioned.
+
+Keep a "rather than"/"instead of" contrast only when both branches are real choices or plausible expectations for the reader ("returns null rather than throwing"). Delete it when the second branch exists only in the author's memory of the code.
+
+```
+DON'T: The checksum is verified, so a corrupted seed is rejected rather than
+       imported as the signing key of a different account.
+
+DO:    The checksum is verified, so a corrupted seed is rejected.
+```
+
+The justification for a check ("this guards against X") belongs in the commit message or release notes, not in user documentation.
+
+### 9. Error Handling in Examples
+
+Call the API directly when the input is fixed and known good (hardcoded literals, freshly generated values) — a failure there is a programming error. Wrap the call in `try`/`catch` where a value arrives at runtime (user input, network data). Never show runtime input handled without a catch. Explain the convention to readers once in the entry-level guide; other pages follow it without restating it.
 
 ## Content Guidelines
 
@@ -163,6 +186,7 @@ Before publishing or updating documentation, verify:
 
 ### Clarity
 - [ ] Comments explain WHY, not WHAT
+- [ ] No changelog residue: no "rather than"/"instead of" clause whose second branch is former behavior or a hypothetical defect
 - [ ] Real-world use cases shown
 - [ ] Platform compatibility noted
 - [ ] Links to related documentation

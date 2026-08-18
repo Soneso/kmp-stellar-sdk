@@ -226,6 +226,13 @@ kotlin {
             }
         }
 
+        // Android unit tests compile against the JVM actual declarations, matching the
+        // dependsOn(jvmMain) above. Without it the Android unit test compilation sees the
+        // common expect declarations with no actuals and fails to resolve them.
+        val androidUnitTest by getting {
+            dependsOn(jvmTest)
+        }
+
         val jsMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-js:3.3.2")
@@ -306,6 +313,22 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // The Android unit test variant compiles the JVM test source set, whose framework is
+    // JUnit 5. Selecting the same framework here keeps one kotlin-test implementation on the
+    // variant's classpath; the JUnit 4 runner AGP defaults to would bring a second one, and the
+    // two collide on the capability they share.
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+
+            // The variant runs the common test source set, so the property that keeps the
+            // network-bound tests out of the other targets has to reach it too.
+            if (project.hasProperty("excludeIntegrationTests")) {
+                it.exclude("**/integrationTests/**")
+            }
+        }
     }
 }
 

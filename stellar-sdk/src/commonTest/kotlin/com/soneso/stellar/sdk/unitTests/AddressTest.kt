@@ -335,22 +335,53 @@ class AddressTest {
         assertContentEquals(original.getBytes(), reconstructed.getBytes())
     }
 
-    // ========== toSCAddress: claimable balance type validation ==========
+    // ========== Claimable balance: type discriminant ==========
 
     @Test
-    fun testClaimableBalanceToSCAddressInvalidTypeThrows() {
-        // StrKey.encodeClaimableBalance accepts any 33-byte payload as-is; only the SDK-level
-        // toSCAddress() check enforces that the leading type byte is CLAIMABLE_BALANCE_ID_TYPE_V0.
+    fun testClaimableBalanceAddressRejectsATypeDiscriminantOtherThanV0() {
+        // A claimable balance id names the one type the XDR union declares. Both ways of
+        // building such an address reject any other discriminant, so no Address holds one and
+        // toSCAddress() has no non-V0 discriminant left to meet.
         val nonV0Bytes = ByteArray(33)
         nonV0Bytes[0] = 1
-        val address = Address.fromClaimableBalance(nonV0Bytes)
+        val fromBytes = assertFailsWith<IllegalArgumentException> {
+            Address.fromClaimableBalance(nonV0Bytes)
+        }
+        assertEquals(
+            "Invalid claimable balance discriminant, expected 0, got 1",
+            fromBytes.message
+        )
+
+        // The SEP-0023 invalid claimable balance type vector: a B... strkey whose checksum
+        // holds and whose leading byte is 1.
+        val nonV0StrKey = "BAAT6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGXACA"
+        assertFalse(StrKey.isValidClaimableBalance(nonV0StrKey))
+        val fromStrKey = assertFailsWith<IllegalArgumentException> { Address(nonV0StrKey) }
+        assertEquals("Unsupported address type", fromStrKey.message)
+    }
+
+    @Test
+    fun testClaimableBalanceAddressAcceptsTheTypeDiscriminantV0() {
+        // The counterpart of the rejection above: the discriminant the XDR union declares is
+        // carried through construction, encoding and conversion unchanged.
+        val v0Bytes = ByteArray(33) { index -> if (index == 0) 0 else (index * 7).toByte() }
+        val address = Address.fromClaimableBalance(v0Bytes)
 
         assertEquals(Address.AddressType.CLAIMABLE_BALANCE, address.addressType)
+        assertContentEquals(v0Bytes, address.getBytes())
 
-        val exception = assertFailsWith<IllegalArgumentException> {
-            address.toSCAddress()
-        }
-        assertTrue(exception.message!!.contains("CLAIMABLE_BALANCE_ID_TYPE_V0"))
+        val scAddress = assertIs<SCAddressXdr.ClaimableBalanceId>(address.toSCAddress())
+        val v0 = assertIs<ClaimableBalanceIDXdr.V0>(scAddress.value)
+        assertContentEquals(v0Bytes.copyOfRange(1, v0Bytes.size), v0.value.value)
+
+        // The 32-byte hash and the 36-byte XDR wire form name the same balance, so all
+        // three widths build the same address.
+        val hash = v0Bytes.copyOfRange(1, v0Bytes.size)
+        assertEquals(address.toString(), Address.fromClaimableBalance(hash).toString())
+        assertEquals(
+            address.toString(),
+            Address.fromClaimableBalance(ByteArray(4) + hash).toString()
+        )
     }
 
     // ========== equals: reflexive, null, different runtime type, same type different key ==========

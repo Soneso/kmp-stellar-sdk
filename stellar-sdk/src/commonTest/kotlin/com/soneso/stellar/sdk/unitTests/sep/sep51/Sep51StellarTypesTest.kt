@@ -855,12 +855,20 @@ class Sep51StellarTypesTest {
         assertTrue(error.message!!.contains("expects a G, T, X or P strkey"), error.message!!)
     }
 
-    /** A B strkey carries a leading type byte; only the one type the XDR declares is readable. */
+    /**
+     * A B strkey carries a leading type byte; only the one type the XDR declares is readable.
+     *
+     * The strkey below is the SEP-0023 invalid claimable balance type vector: its checksum holds
+     * and its leading byte is 1, a type the union does not declare, so it is not a B strkey.
+     */
     @Test
     fun aClaimableBalanceIdRejectsALeadingTypeByteThatNamesNoType() {
-        val strkey = StrKey.encodeClaimableBalance(byteArrayOf(0x01) + filled(0x55))
+        val strkey = "BAAT6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGXACA"
         val error = rejects { ClaimableBalanceIDXdr.fromXdrJsonElement(JsonPrimitive(strkey)) }
-        assertEquals("ClaimableBalanceIDXdr: has no type numbered 1", error.message)
+        assertEquals(
+            "ClaimableBalanceIDXdr: expects a B strkey, got \"$strkey\"",
+            error.message
+        )
     }
 
     @Test

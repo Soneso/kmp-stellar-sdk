@@ -56,9 +56,10 @@ class ClaimableBalanceIntegrationTest {
      *    - First claimant: Unconditional predicate
      *    - Second claimant: Complex nested predicate with And, Or, Not, BeforeAbsoluteTime, BeforeRelativeTime
      * 3. Creates a claimable balance with CreateClaimableBalance operation
-     * 4. Verifies the transaction succeeds
+     * 4. Verifies the transaction succeeds and reads the created balance id from the submit
+     *    response with getCreatedClaimableBalanceId
      * 5. Queries effects to extract the claimable balance ID
-     * 6. Tests StrKey encoding for the balance ID (hex to B... format)
+     * 6. Checks that the submit response and the effect name the same balance
      * 7. Queries claimable balances for the first claimant
      * 8. Funds the first claimant account
      * 9. Claims the balance with ClaimClaimableBalance operation
@@ -146,6 +147,14 @@ class ClaimableBalanceIntegrationTest {
 
         println("CreateClaimableBalance transaction hash: ${response.hash}")
 
+        // The result XDR the submit response carries names the created balance, so the id
+        // is available before any effect is queried.
+        val createdBalanceId = assertNotNull(
+            response.getCreatedClaimableBalanceId(),
+            "the submit response must yield the created balance id"
+        )
+        println("Created claimable balance ID: $createdBalanceId")
+
         realDelay(3000)
 
         // Query effects to find the claimable balance ID
@@ -162,33 +171,19 @@ class ClaimableBalanceIntegrationTest {
             if (effect is ClaimableBalanceCreatedEffectResponse) {
                 balanceId = effect.balanceId
                 println("Claimable Balance ID: $balanceId")
-
-                // Test StrKey encoding if balance ID is in hex format (72 chars = 36 bytes hex)
-                // Claimable balance ID format: 1 byte type (0x00) + 32 bytes hash = 33 bytes total
-                if (!balanceId.startsWith("B") && balanceId.length == 72) {
-                    try {
-                        // Hex string is 72 chars = 36 bytes, but we need 33 bytes for StrKey
-                        // The first byte in hex is the type discriminant (0x00 for V0)
-                        val balanceIdBytes = Util.hexToBytes(balanceId)
-                        // For V0 claimable balance: first byte is 0x00, followed by 32-byte hash
-                        // StrKey expects 33 bytes: type byte + 32-byte hash
-                        if (balanceIdBytes.size == 36) {
-                            // Extract the first 33 bytes (type + hash)
-                            val strKeyBytes = balanceIdBytes.copyOfRange(0, 33)
-                            val strKeyId = StrKey.encodeClaimableBalance(strKeyBytes)
-                            println("Claimable Balance ID StrKey: $strKeyId")
-                            assertTrue(strKeyId.startsWith("B"), "StrKey encoded balance ID should start with 'B'")
-                        }
-                    } catch (e: Exception) {
-                        // If hex conversion fails, balance ID might already be in StrKey format
-                        println("Balance ID encoding info: ${e.message}")
-                    }
-                }
                 break
             }
         }
 
-        assertNotNull(balanceId, "Balance ID should be found in effects")
+        val effectBalanceId = assertNotNull(balanceId, "Balance ID should be found in effects")
+
+        // The effect reports the balance in the spelling Horizon serves, the submit response
+        // as the strkey; resolved, both must name the balance the transaction created.
+        assertEquals(
+            ClaimableBalanceId.forId(createdBalanceId),
+            ClaimableBalanceId.forId(effectBalanceId),
+            "the submit response and the effect must name the same balance"
+        )
 
         // Verify operations can be parsed
         val operationsPage = horizonServer.operations()
@@ -204,7 +199,7 @@ class ClaimableBalanceIntegrationTest {
         assertEquals(1, claimableBalances.records.size, "Should have exactly 1 claimable balance")
         val claimableBalance = claimableBalances.records[0]
 
-        assertEquals(balanceId, claimableBalance.id, "Balance IDs should match")
+        assertEquals(effectBalanceId, claimableBalance.id, "Balance IDs should match")
         assertEquals("12.3300000", claimableBalance.amount, "Amount should match (7 decimal places)")
         assertEquals(sourceAccountId, claimableBalance.sponsor, "Sponsor should be source account")
 

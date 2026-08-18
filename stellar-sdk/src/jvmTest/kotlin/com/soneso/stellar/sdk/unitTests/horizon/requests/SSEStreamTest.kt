@@ -6,6 +6,7 @@ import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.requests.SSEStream
 import com.soneso.stellar.sdk.horizon.responses.Pageable
 import com.soneso.stellar.sdk.horizon.responses.Response
+import com.soneso.stellar.sdk.unitTests.ClaimableBalanceVectors
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
@@ -21,6 +22,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -408,7 +410,49 @@ class SSEStreamTest {
         }
     }
 
+    @Test
+    fun testClaimableBalanceStreamAsksForTheHorizonHexOfEverySpelling() {
+        // A stream builds its URL from the request builder's path segments, so the spelling the
+        // builder normalizes an id to is the one every reconnect carries.
+        for (spelling in CLAIMABLE_BALANCE_SPELLINGS) {
+            val (engine, requests) = engineServing(sseEvent("1", record("a", "1", "x")))
+            val listener = RecordingListener()
+            val stream = HorizonServer(SERVER_URI, sseClient(engine))
+                .transactions()
+                .forClaimableBalance(spelling)
+                .stream(StreamedRecord.serializer(), listener, 30_000.milliseconds)
+            try {
+                awaitUntil(description = "the stream connects for spelling $spelling") {
+                    requests.isNotEmpty()
+                }
+                assertEquals(
+                    "/claimable_balances/$CLAIMABLE_BALANCE_HORIZON_HEX/transactions",
+                    requests[0].url.encodedPath,
+                    "spelling: $spelling"
+                )
+            } finally {
+                stream.close()
+            }
+        }
+    }
+
+    @Test
+    fun testClaimableBalanceStreamReportsAnIdNamingNoBalanceBeforeConnecting() {
+        val (engine, requests) = engineServing("")
+        assertFailsWith<IllegalArgumentException> {
+            HorizonServer(SERVER_URI, sseClient(engine))
+                .transactions()
+                .forClaimableBalance("not a claimable balance id")
+        }
+        assertTrue(requests.isEmpty(), "no request may be sent for an id naming no balance")
+    }
+
     companion object {
         private const val SERVER_URI = "https://horizon-testnet.stellar.org"
+
+        /** The spelling Horizon serves: the hexadecimal of the XDR form. */
+        private const val CLAIMABLE_BALANCE_HORIZON_HEX = ClaimableBalanceVectors.paddedHex
+
+        private val CLAIMABLE_BALANCE_SPELLINGS = ClaimableBalanceVectors.spellings
     }
 }

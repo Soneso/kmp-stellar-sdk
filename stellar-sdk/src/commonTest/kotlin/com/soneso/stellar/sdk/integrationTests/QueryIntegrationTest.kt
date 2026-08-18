@@ -409,112 +409,104 @@ class QueryIntegrationTest {
     }
 
     /**
+     * A claimable balance id, in the spelling Horizon reports.
+     *
+     * The balance need not exist: claimable balance ids change frequently on testnet, so what
+     * these tests check is the route the SDK builds and the answer Horizon gives for it.
+     */
+    private val claimableBalanceId =
+        "000000004dd97cb1a0ba1b6e1a188b49deafbad9e34c80e277c3725f815c757c2d05ddfe"
+
+    /**
+     * The same balance in every spelling a caller may hold: the hexadecimal Horizon reports and
+     * the `B...` strkey, which the SDK normalizes to that hexadecimal before asking for it.
+     */
+    private val claimableBalanceSpellings: List<String>
+        get() = listOf(
+            claimableBalanceId,
+            ClaimableBalanceId.forId(claimableBalanceId).toStrKey()
+        )
+
+    /**
+     * An id naming no claimable balance: 63 characters is a length no spelling has.
+     */
+    private val malformedClaimableBalanceId =
+        "BAAAAAAAJXMXZMNAXINW4GQYRNE55L523HRUZAHCO7BXEX4BLR2XYLIF3X7IL2Y"
+
+    /**
      * Test querying operations for claimable balance.
      *
-     * This test queries operations associated with a claimable balance ID.
-     * Note: Claimable balance IDs change frequently on testnet, so this test
-     * verifies the query mechanism works but doesn't assert on specific results.
+     * This test queries operations associated with a claimable balance ID in each spelling the
+     * SDK accepts, and checks that an id naming no balance is reported without a request.
      */
     @Test
     fun testQueryOperationsForClaimableBalance() = runTest(timeout = 60.seconds) {
-        // Try to query operations with a claimable balance ID
-            // The ID may not exist, which is fine - we're testing the endpoint works
+        assertFailsWith<IllegalArgumentException>(
+            "an id naming no balance must be reported before any request"
+        ) {
+            horizonServer.operations().forClaimableBalance(malformedClaimableBalanceId)
+        }
+
+        for (spelling in claimableBalanceSpellings) {
             try {
-                val operationsPage1 = horizonServer.operations()
-                    .forClaimableBalance("000000004dd97cb1a0ba1b6e1a188b49deafbad9e34c80e277c3725f815c757c2d05ddfe")
+                val operationsPage = horizonServer.operations()
+                    .forClaimableBalance(spelling)
                     .limit(1)
                     .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
                     .execute()
 
-                // If we get results, verify they're valid
-                if (operationsPage1.records.isNotEmpty()) {
-                    val operation = operationsPage1.records.first()
-                    assertNotNull(operation.id, "Operation should have an ID")
+                operationsPage.records.forEach {
+                    assertNotNull(it.id, "Operation should have an ID")
                 }
             } catch (e: Exception) {
-                // 400 or 404 is acceptable if the claimable balance doesn't exist
+                // A well formed id naming no balance is a 404; a 400 would mean the id did not
+                // reach Horizon in the spelling it serves.
                 assertTrue(
-                    e.message?.contains("400") == true ||
                     e.message?.contains("404") == true ||
                     e.message?.contains("not found") == true,
-                    "Expected 400/404 error for non-existent claimable balance, got: ${e.message}"
+                    "Expected 404 for a claimable balance that does not exist, " +
+                        "spelling $spelling, got: ${e.message}"
                 )
             }
-
-            // Try base58 format
-            try {
-                val operationsPage2 = horizonServer.operations()
-                    .forClaimableBalance("BAAAAAAAJXMXZMNAXINW4GQYRNE55L523HRUZAHCO7BXEX4BLR2XYLIF3X7IL2Y")
-                    .limit(1)
-                    .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
-                    .execute()
-
-                if (operationsPage2.records.isNotEmpty()) {
-                    assertNotNull(operationsPage2.records.first().id, "Operation should have an ID")
-                }
-            } catch (e: Exception) {
-                // 400 or 404 is acceptable
-                assertTrue(
-                    e.message?.contains("400") == true ||
-                    e.message?.contains("404") == true ||
-                    e.message?.contains("not found") == true,
-                    "Expected 400/404 error for non-existent claimable balance"
-                )
-            }
+        }
     }
 
     /**
      * Test querying transactions for claimable balance.
      *
-     * This test queries transactions associated with a claimable balance ID.
-     * Note: Claimable balance IDs change frequently on testnet, so this test
-     * verifies the query mechanism works but doesn't assert on specific results.
+     * This test queries transactions associated with a claimable balance ID in each spelling the
+     * SDK accepts, and checks that an id naming no balance is reported without a request.
      */
     @Test
     fun testQueryTransactionsForClaimableBalance() = runTest(timeout = 60.seconds) {
-        // Try to query transactions with a claimable balance ID
-            // The ID may not exist, which is fine - we're testing the endpoint works
+        assertFailsWith<IllegalArgumentException>(
+            "an id naming no balance must be reported before any request"
+        ) {
+            horizonServer.transactions().forClaimableBalance(malformedClaimableBalanceId)
+        }
+
+        for (spelling in claimableBalanceSpellings) {
             try {
-                val transactionsPage1 = horizonServer.transactions()
-                    .forClaimableBalance("000000004dd97cb1a0ba1b6e1a188b49deafbad9e34c80e277c3725f815c757c2d05ddfe")
+                val transactionsPage = horizonServer.transactions()
+                    .forClaimableBalance(spelling)
                     .limit(1)
                     .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
                     .execute()
 
-                // If we get results, verify they're valid
-                if (transactionsPage1.records.isNotEmpty()) {
-                    assertNotNull(transactionsPage1.records.first().hash, "Transaction should have a hash")
+                transactionsPage.records.forEach {
+                    assertNotNull(it.hash, "Transaction should have a hash")
                 }
             } catch (e: Exception) {
-                // 400 or 404 is acceptable if the claimable balance doesn't exist
+                // A well formed id naming no balance is a 404; a 400 would mean the id did not
+                // reach Horizon in the spelling it serves.
                 assertTrue(
-                    e.message?.contains("400") == true ||
                     e.message?.contains("404") == true ||
                     e.message?.contains("not found") == true,
-                    "Expected 400/404 error for non-existent claimable balance, got: ${e.message}"
+                    "Expected 404 for a claimable balance that does not exist, " +
+                        "spelling $spelling, got: ${e.message}"
                 )
             }
-
-            // Try base58 format
-            try {
-                val transactionsPage2 = horizonServer.transactions()
-                    .forClaimableBalance("BAAAAAAAJXMXZMNAXINW4GQYRNE55L523HRUZAHCO7BXEX4BLR2XYLIF3X7IL2Y")
-                    .limit(1)
-                    .order(com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order.DESC)
-                    .execute()
-
-                if (transactionsPage2.records.isNotEmpty()) {
-                    assertNotNull(transactionsPage2.records.first().hash, "Transaction should have a hash")
-                }
-            } catch (e: Exception) {
-                // 400 or 404 is acceptable
-                assertTrue(
-                    e.message?.contains("400") == true ||
-                    e.message?.contains("404") == true ||
-                    e.message?.contains("not found") == true,
-                    "Expected 400/404 error for non-existent claimable balance"
-                )
-            }
+        }
     }
 
     /**

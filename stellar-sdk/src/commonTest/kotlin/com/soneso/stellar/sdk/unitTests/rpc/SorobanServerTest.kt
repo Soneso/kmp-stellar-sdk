@@ -1471,6 +1471,61 @@ class SorobanServerTest {
     }
 
     @Test
+    fun testLoadContractCodeForWasmId_wrongLength_rejectsBeforeRequest() = runTest {
+        // Given: A WASM ID that is not a 32-byte hash. Without the length check the failure
+        // still happens, but only once the fixed-opaque writer rejects the short hash, so the
+        // message must name the WASM ID rather than the XDR field.
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            // When: Loading the code
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.loadContractCodeForWasmId("abc123")
+            }
+
+            // Then: The length is named and no request went out
+            assertTrue(
+                exception.message?.contains("WASM ID must be 64 hex characters, got 6") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(requests.isEmpty(), "No request should be issued for an invalid WASM ID")
+        }
+    }
+
+    @Test
+    fun testLoadContractCodeForWasmId_nonHexId_rejectsBeforeRequest() = runTest {
+        // Given: A 64-character WASM ID made of sign pairs, which a radix parse would
+        // silently decode to a 32-byte hash of 0xff bytes and query the wrong ledger key
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.loadContractCodeForWasmId("-1".repeat(32))
+            }
+
+            assertTrue(
+                exception.message?.contains("0-9 and a-f") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(requests.isEmpty(), "No request should be issued for an invalid WASM ID")
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForWasmId_wrongLength_rejectsBeforeRequest() = runTest {
+        // The info path delegates to the code path, so it inherits the same check.
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.loadContractInfoForWasmId("abc123")
+            }
+            assertTrue(
+                exception.message?.contains("WASM ID must be 64 hex characters, got 6") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(requests.isEmpty(), "No request should be issued for an invalid WASM ID")
+        }
+    }
+
+    @Test
     fun testLoadContractCodeForWasmId_noEntries_returnsNull() = runTest {
         createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
             assertNull(server.loadContractCodeForWasmId(TEST_WASM_ID))

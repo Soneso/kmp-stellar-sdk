@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.unitTests.xdr.json
 
+import com.soneso.stellar.sdk.xdr.SignerKeyEd25519SignedPayloadXdr
 import com.soneso.stellar.sdk.xdr.XdrJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -1549,6 +1550,63 @@ class XdrJsonHelperTest {
         key[35] = 9
         val error = rejects { XdrJson.signedPayload(key, type) }
         assertTrue(error.message!!.contains("does not fit"))
+    }
+
+    // -------------------------------------------------------------------------------------
+    // Signed payload framing through the document path
+    // -------------------------------------------------------------------------------------
+    //
+    // A P strkey names its payload through a declared length, and the bytes it carries have to
+    // agree with that length: the size fits it exactly and the padding after the payload is
+    // zero. The strkey codec is what enforces this, and a document reaches the codec through
+    // [XdrJson.strkey], which reports a rejection in the vocabulary of the XDR-JSON contract
+    // rather than passing the codec's own message on. The cases below read a document rather
+    // than a byte array, so they cover the framing on the path a document actually takes.
+
+    private val signedPayloadType = "SignerKeyEd25519SignedPayloadXdr"
+
+    private fun signedPayloadDocument(strKey: String): String = "\"$strKey\""
+
+    @Test
+    fun signedPayloadDocumentReadsAWellFramedStrkey() {
+        // 29 payload bytes, padded with three zeros to the four-byte boundary the framing sets.
+        val strKey = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
+            "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUAAAAFGBU"
+        val decoded = SignerKeyEd25519SignedPayloadXdr.fromXdrJson(signedPayloadDocument(strKey))
+
+        assertEquals(
+            (1..29).map { it.toByte() }, decoded.payload.toList(),
+            "the payload the strkey declares must be the payload read back"
+        )
+        assertEquals(strKey, text(decoded.toXdrJsonElement()))
+    }
+
+    @Test
+    fun signedPayloadDocumentRejectsNonZeroPadding() {
+        // 29 payload bytes followed by padding of 0xff, where the framing requires zeros. The
+        // preview the message carries is truncated, as it is for any value past the limit.
+        val strKey = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQ" +
+            "CQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DX77776K34"
+        val error = rejects { SignerKeyEd25519SignedPayloadXdr.fromXdrJson(signedPayloadDocument(strKey)) }
+
+        assertEquals(
+            "$signedPayloadType: expects a P strkey, got " +
+                "\"PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAOQCAQDAQCQMBYIBEFAWDA...",
+            error.message
+        )
+    }
+
+    @Test
+    fun signedPayloadDocumentRejectsADeclaredLengthTheBytesDoNotCarry() {
+        // A declared payload length of 64 inside 40 bytes, which names a payload that ends past
+        // the end of the bytes the strkey carries.
+        val strKey = "PA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAABAACAQDAQ3PY"
+        val error = rejects { SignerKeyEd25519SignedPayloadXdr.fromXdrJson(signedPayloadDocument(strKey)) }
+
+        assertEquals(
+            "$signedPayloadType: expects a P strkey, got \"$strKey\"",
+            error.message
+        )
     }
 
     // -------------------------------------------------------------------------------------

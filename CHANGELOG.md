@@ -5,6 +5,131 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `ClaimableBalanceId` reads a claimable balance id in whichever spelling it is
+  written: the `B...` strkey, the bare 32-byte hash as 64 hexadecimal characters,
+  and that hash behind a type discriminant carried either in the single byte the
+  strkey body leads with (66 characters) or in the four big-endian bytes the XDR
+  union writes (72 characters), the shape Horizon reports. Hexadecimal is read in
+  upper or lower case. It reports the balance as the canonical lower case hash
+  (`hashHex`), as the 72-character form Horizon takes (`toPaddedHex()`), as the
+  strkey (`toStrKey()`) and as the XDR union (`toXdr()`). Every byte of a
+  discriminant is checked, so an id that names another type is rejected rather
+  than having its high bytes dropped.
+- `StrKey.encodeClaimableBalance` accepts the 36-byte XDR wire form alongside the
+  32-byte hash and the 33-byte strkey body, so
+  `Address.fromClaimableBalance(ByteArray)` takes it as well.
+- `TransactionResponse.getCreatedClaimableBalanceId(operationIndex)` reports the
+  id of the claimable balance the operation at that position created, as a `B...`
+  strkey. It answers null when the transaction did not succeed, when the result
+  XDR is absent or unreadable, when no operation sits at the index, or when the
+  operation there creates no balance. Fee bump transactions are read through to
+  the inner transaction's results.
+
+### Changed
+- `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and
+  `Sponsorship.ClaimableBalance` take a balance id in any spelling
+  `ClaimableBalanceId` accepts, judge it when the operation is constructed, and
+  put the same bytes on the wire for equivalent spellings. The first two required
+  the 72-character form before. `Sponsorship.ClaimableBalance` validated nothing:
+  a 72-character id became a 36-byte hash that the ledger key rejected only once
+  the transaction was built. Reading an operation back from XDR reports the
+  72-character form throughout. `Sponsorship.ClaimableBalance` reported the bare
+  64-character hash before.
+- `ClaimableBalancesRequestBuilder.claimableBalance`,
+  `OperationsRequestBuilder.forClaimableBalance` and
+  `TransactionsRequestBuilder.forClaimableBalance` take a balance id in any of
+  those spellings and put the 72-character form Horizon serves in the route. An
+  id naming no balance raises `IllegalArgumentException` before a request is sent
+  rather than reaching Horizon as a 400. Streams build their URL from the same
+  path segments, so they carry the same id.
+- The Android unit test source set builds on the JVM one, so it resolves the JVM
+  `actual` declarations the common tests need. It did not compile before. The
+  variant runs on JUnit 5, as the JVM target does, and
+  `-PexcludeIntegrationTests` reaches it too.
+
+### Removed
+- `EffectsRequestBuilder.forClaimableBalance`. Horizon serves no
+  `/claimable_balances/{id}/effects` route, so every call this method made
+  answered with a route-not-found error. The effects of a claimable balance are
+  reachable through the operations that touched it.
+
+### Fixed
+- Strkey decoding requires canonical encoding. Input that at least one target
+  previously accepted now raises `IllegalArgumentException` on all of them: trailing
+  `=` padding, any content after a `=`, whitespace anywhere in the string
+  including mid-string, lowercase base32, and characters outside the ASCII range.
+  Padding also defeated the unused-trailing-bits check, so appending `===` to a
+  strkey whose last character carried non-zero leftover bits made it decode; the
+  padding drove the leftover bit count to zero and the check was skipped. A
+  non-ASCII character was narrowed to its low byte before decoding, so a `G...`
+  key with one character replaced by U+0141 decoded to the same key as the
+  canonical string. Two different strings named one account. Decoding now also
+  checks the encoded string length against the requested type before running the
+  codec, so an oversized input is rejected without it running at all. Consumers
+  that passed padded or whitespace-bearing strkeys, for example values pasted
+  from a user interface, will now see rejections and should trim input before
+  validating it.
+- Every target reaches the same verdict on the same strkey. JVM and Android
+  accepted whitespace and lowercase base32 where JavaScript and Native rejected
+  the identical string. The exception type is uniform as well: `"========"` raised
+  `ArrayIndexOutOfBoundsException` on JVM and Native but `IllegalArgumentException`
+  on JavaScript, and `IndexOutOfBoundsException` no longer escapes any decode
+  entry point on any platform.
+- Signed payload strkeys (`P...`) are checked against the framing the XDR wire
+  form defines: a declared payload length of 1 to 64, a data size that fits that
+  length exactly, and zero padding after the payload. `StrKey.isValidSignedPayload`
+  now reflects what `SignerKey` and the XDR decoders accept. The three SEP-0023
+  signed payload vectors with malformed framing all decoded before: two
+  round-tripped through `SignerKey` to a different strkey with the surplus bytes
+  silently dropped, and the third raised `IndexOutOfBoundsException` from
+  `SignerKey.fromEncodedSignerKey`, which its documentation says raises
+  `IllegalArgumentException`. `SignerKey.fromEncodedSignerKey` names the rule a
+  malformed signed payload broke rather than answering with the generic
+  invalid-signer-key message.
+- Claimable balance strkeys (`B...`) that carry a discriminant other than
+  `CLAIMABLE_BALANCE_ID_TYPE_V0` are rejected by `StrKey.isValidClaimableBalance`,
+  `StrKey.decodeClaimableBalance`, the `Address` constructor and XDR-JSON
+  decoding. Such a strkey previously validated, decoded, produced an `Address`
+  that reported `AddressType.CLAIMABLE_BALANCE` and re-encoded to the same
+  string; only `toSCAddress()` refused it.
+- `StrKey.encodeSignedPayload` and `StrKey.encodeClaimableBalance` run the same
+  checks their decoders run, so neither emits a string the SDK will not read
+  back. `encodeSignedPayload` validated a 40 to 100 byte count only and now
+  validates the framing. `encodeClaimableBalance` requires a 33-byte input to
+  carry a zero discriminant; the 32-byte hash-only form is unchanged and still
+  prepends the discriminant itself. `Address.fromClaimableBalance(ByteArray)`
+  therefore rejects a non-V0 33-byte value at construction rather than at
+  `toSCAddress()`.
+- Hexadecimal id and hash parsing holds input to the ASCII hex alphabet. The
+  per-pair radix parse accepted a leading sign and non-ASCII Unicode digits, so
+  a string of signed pairs such as `-1` repeated built a pool id, wasm hash,
+  memo hash or contract spec bytes argument of different bytes than its
+  characters spell, through the liquidity pool operations,
+  `InvokeHostFunctionOperation.createContract`, `MemoHash`, `MemoReturn`, the
+  contract spec and the OpenZeppelin credential storage, whose rejection is now
+  `IllegalArgumentException` with a message where it was `NumberFormatException`.
+  Contract spec hex arguments no longer have interior spaces removed; the `0x`
+  prefix is still accepted there.
+  `SorobanServer.loadContractCodeForWasmId` requires a 64-character wasm id
+  before building the ledger key it queries.
+- SEP-8 service construction fails on JVM and Android when a `stellar.toml`
+  `CURRENCIES` entry names an issuer that is not a canonical strkey, for example
+  one with whitespace inside the quotes, which the TOML parser preserves. It
+  already failed that way on JavaScript and Native: `Sep08Service.fromDomain`
+  builds a `RegulatedAsset` per regulated entry, and each one passes its issuer
+  to `Asset.createNonNativeAsset`.
+- Mint, burn and clawback asset balance changes on invoke host function
+  operations deserialize. Horizon omits `from` on a mint and `to` on a burn or
+  clawback, and the response model required both, so an operations page carrying
+  one failed to parse as a whole. Both fields are now optional.
+- SEP-12 callback signature verification fails closed when the configured signing
+  key is not a canonical strkey. Its verifier catches `Throwable`, so a key that
+  JVM and Android previously decoded now yields a `false` verification result
+  rather than an error.
+
 ## [1.11.0] - 2026-08-10
 
 ### Added
