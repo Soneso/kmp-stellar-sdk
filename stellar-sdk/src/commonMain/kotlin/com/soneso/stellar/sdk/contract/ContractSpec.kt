@@ -298,6 +298,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * - **UDT (enum)** → UInt
      * - **Error** → SCErrorXdr
      * - **ContractInstance** → SCContractInstanceXdr
+     * - **ExecutableTag** → String
      *
      * @param scVal The XDR value to convert
      * @param typeDef The type specification (nullable for direct type inference)
@@ -453,6 +454,11 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 }
                 // Return the SCContractInstanceXdr directly
                 scVal.value
+            }
+
+            SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
+                require(scVal is SCValXdr.ExecutableTag) { "Expected SCValXdr.ExecutableTag for SCV_EXECUTABLE_TAG" }
+                scVal.value.value
             }
 
             else -> {

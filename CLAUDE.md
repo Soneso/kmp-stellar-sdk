@@ -27,7 +27,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Assets**: Native (XLM), AlphaNum4, AlphaNum12, SAC contract ID derivation
 - **Accounts**: Account management, muxed accounts, sequence numbers
 - **Horizon Client**: Full REST API coverage, SSE streaming, request builders
-- **Soroban RPC**: Contract calls, simulation, state restoration, polling
+- **Soroban RPC**: Contract calls, simulation, state restoration, polling, CAP-85 external reference resolution
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
 - **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-51 (XDR-JSON), SEP-53 (Sign and Verify Messages)

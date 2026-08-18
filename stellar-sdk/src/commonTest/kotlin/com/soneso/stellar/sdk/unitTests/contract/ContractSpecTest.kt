@@ -941,6 +941,17 @@ class ContractSpecTest {
     // ========== scValToNative Tests ==========
 
     @Test
+    fun testScValToNativeExecutableTag() {
+        val spec = ContractSpec(emptyList())
+
+        // The executable tag carries its tag text; no spec type describes it,
+        // so the conversion runs on the discriminant alone.
+        val tagVal = SCValXdr.ExecutableTag(SCStringXdr("token-v1"))
+        val tagResult = spec.scValToNative(tagVal, null)
+        assertEquals("token-v1", tagResult)
+    }
+
+    @Test
     fun testScValToNativePrimitives() {
         val spec = ContractSpec(emptyList())
 

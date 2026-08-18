@@ -138,3 +138,14 @@ suspend fun fundTestAccountAndAwaitVisibility(
         )
     }
 }
+
+/**
+ * Returns true when the connected network's current protocol version is at
+ * least [version], read from the RPC's latest ledger.
+ *
+ * Tests whose body needs a minimum protocol call this and return early with a
+ * printed reason when it is false, so a skipped run is visible in the output.
+ */
+suspend fun networkProtocolAtLeast(server: SorobanServer, version: Int): Boolean {
+    return server.getLatestLedger().protocolVersion >= version
+}

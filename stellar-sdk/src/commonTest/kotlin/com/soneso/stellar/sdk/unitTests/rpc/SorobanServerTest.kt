@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.TransactionStatus
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
+import kotlin.io.encoding.Base64
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -285,6 +286,10 @@ class SorobanServerTest {
         /** Hex-encoded 32-byte WASM hash. */
         private const val TEST_WASM_ID =
             "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+
+        /** A valid contract id distinct from [TEST_CONTRACT_ID]; owns executable tag entries. */
+        private const val TEST_OWNER_CONTRACT_ID =
+            "CDCYWK73YTYFJZZSJ5V7EDFNHYBG4QN3VUNG2IGD27KJDDPNCZKBCBXK"
 
         /**
          * Builds WASM bytecode that [com.soneso.stellar.sdk.contract.SorobanContractParser]
@@ -1660,6 +1665,370 @@ class SorobanServerTest {
             // When/Then: No code is returned and no second lookup is attempted
             assertNull(server.loadContractCodeForContractId(TEST_CONTRACT_ID))
             assertEquals(1, requests.size)
+        }
+    }
+
+    // ========== External Reference Resolution Tests ==========
+
+    private fun externalRefInstanceEntryXdr(owner: SCAddressXdr, tag: SCStringXdr): String {
+        val instanceValue = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                executable = ContractExecutableXdr.ExternalRef(
+                    ContractExecutableExternalRefXdr(executableOwner = owner, tag = tag)
+                ),
+                storage = null
+            )
+        )
+        return contractDataEntryXdr(
+            contractAddress = Address(TEST_CONTRACT_ID).toSCAddress(),
+            key = Scv.toLedgerKeyContractInstance(),
+            value = instanceValue
+        )
+    }
+
+    private fun externalRefTagEntryXdr(owner: SCAddressXdr, tag: SCStringXdr, value: SCValXdr): String {
+        return contractDataEntryXdr(
+            contractAddress = owner,
+            key = SCValXdr.ExecutableTag(tag),
+            value = value
+        )
+    }
+
+    private fun externalRef(tag: String = "token-v1"): ContractExecutableExternalRefXdr {
+        return ContractExecutableExternalRefXdr(
+            executableOwner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress(),
+            tag = SCStringXdr(tag)
+        )
+    }
+
+    /** Replaces the single occurrence of [needle] in [bytes] with [replacement]. */
+    private fun replaceOnce(bytes: ByteArray, needle: ByteArray, replacement: ByteArray): ByteArray {
+        var found = -1
+        var count = 0
+        for (start in 0..bytes.size - needle.size) {
+            var match = true
+            for (i in needle.indices) {
+                if (bytes[start + i] != needle[i]) {
+                    match = false
+                    break
+                }
+            }
+            if (match) {
+                count++
+                found = start
+            }
+        }
+        assertEquals(1, count, "The placeholder must occur exactly once in the fixture bytes")
+        return bytes.copyOfRange(0, found) + replacement +
+            bytes.copyOfRange(found + needle.size, bytes.size)
+    }
+
+    @Test
+    fun testLoadContractCodeForContractId_resolvesExternalRef() = runTest {
+        val code = byteArrayOf(0, 97, 115, 109, 1, 0, 0, 0)
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+        val tag = SCStringXdr("token-v1")
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = externalRefInstanceEntryXdr(owner, tag)),
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = externalRefTagEntryXdr(owner, tag, SCValXdr.Bytes(SCBytesXdr(Util.hexToBytes(TEST_WASM_ID))))
+            ),
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = contractCodeEntryXdr(code)),
+            capturedRequests = requests
+        ).use { server ->
+            val entry = server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+
+            val codeEntry = assertNotNull(entry)
+            assertEquals(code.toList(), codeEntry.code.toList())
+
+            // The request sequence pins the resolution: the tag lookup carries the
+            // executable tag key on the owner at persistent durability, and the code
+            // lookup carries the hash the tag entry held.
+            assertEquals(3, requests.size)
+            val expectedTagKey = LedgerKeyXdr.ContractData(
+                LedgerKeyContractDataXdr(
+                    contract = owner,
+                    key = SCValXdr.ExecutableTag(tag),
+                    durability = ContractDataDurabilityXdr.PERSISTENT
+                )
+            ).toXdrBase64()
+            assertTrue(
+                requests[1].contains(expectedTagKey),
+                "Second request must carry the executable tag key. Body: ${requests[1]}"
+            )
+            val expectedCodeKey = LedgerKeyXdr.ContractCode(
+                LedgerKeyContractCodeXdr(hash = HashXdr(Util.hexToBytes(TEST_WASM_ID)))
+            ).toXdrBase64()
+            assertTrue(
+                requests[2].contains(expectedCodeKey),
+                "Third request must key on the resolved WASM hash. Body: ${requests[2]}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_returnsTheHashTheTagEntryHolds() = runTest {
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+        val tag = SCStringXdr("token-v1")
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = externalRefTagEntryXdr(owner, tag, SCValXdr.Bytes(SCBytesXdr(Util.hexToBytes(TEST_WASM_ID))))
+            )
+        ).use { server ->
+            val hash = server.getExternalRefWasmHash(externalRef())
+            assertEquals(Util.hexToBytes(TEST_WASM_ID).toList(), hash.toList())
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_tagBytesReachTheLedgerKeyExactly() = runTest {
+        // The fixture tag originates from raw XDR bytes, not from an
+        // SDK-constructed String, so a lossy decode/encode round trip would
+        // change the key this test pins. The tag bytes are valid UTF-8 with an
+        // embedded NUL and multi-byte characters: "t", NUL, U+00F8, U+706B.
+        val rawTagBytes = byteArrayOf(
+            0x74, 0x00, 0xC3.toByte(), 0xB8.toByte(), 0xE7.toByte(), 0x81.toByte(), 0xAB.toByte()
+        )
+        val placeholder = "0123456" // same byte length as rawTagBytes
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+
+        val instanceEntryBytes = Base64.decode(
+            externalRefInstanceEntryXdr(owner, SCStringXdr(placeholder))
+        )
+        val splicedInstanceEntry = Base64.encode(
+            replaceOnce(instanceEntryBytes, placeholder.encodeToByteArray(), rawTagBytes)
+        )
+        val expectedTagKeyBytes = replaceOnce(
+            Base64.decode(
+                LedgerKeyXdr.ContractData(
+                    LedgerKeyContractDataXdr(
+                        contract = owner,
+                        key = SCValXdr.ExecutableTag(SCStringXdr(placeholder)),
+                        durability = ContractDataDurabilityXdr.PERSISTENT
+                    )
+                ).toXdrBase64()
+            ),
+            placeholder.encodeToByteArray(),
+            rawTagBytes
+        )
+        val expectedTagKey = Base64.encode(expectedTagKeyBytes)
+
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = splicedInstanceEntry),
+            GET_LEDGER_ENTRIES_RESPONSE,
+            capturedRequests = requests
+        ).use { server ->
+            assertFailsWith<IllegalStateException> {
+                server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+            }
+            assertEquals(2, requests.size)
+            assertTrue(
+                requests[1].contains(expectedTagKey),
+                "The tag bytes must reach the ledger key unchanged. Body: ${requests[1]}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_nonUtf8TagBytesAreReplaced() = runTest {
+        // Kotlin decodes XDR strings with replacement characters, so a tag that
+        // is not valid UTF-8 cannot round-trip: the SDK builds the lookup key
+        // from the replaced text. This pins that limitation; such a tag is an
+        // unsupported input, and its resolution surfaces as a missing entry.
+        val rawTagBytes = byteArrayOf(0x80.toByte(), 0xFF.toByte())
+        val placeholder = "01" // same byte length as rawTagBytes
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+
+        val instanceEntryBytes = Base64.decode(
+            externalRefInstanceEntryXdr(owner, SCStringXdr(placeholder))
+        )
+        val splicedInstanceEntry = Base64.encode(
+            replaceOnce(instanceEntryBytes, placeholder.encodeToByteArray(), rawTagBytes)
+        )
+        val rawByteKey = Base64.encode(
+            replaceOnce(
+                Base64.decode(
+                    LedgerKeyXdr.ContractData(
+                        LedgerKeyContractDataXdr(
+                            contract = owner,
+                            key = SCValXdr.ExecutableTag(SCStringXdr(placeholder)),
+                            durability = ContractDataDurabilityXdr.PERSISTENT
+                        )
+                    ).toXdrBase64()
+                ),
+                placeholder.encodeToByteArray(),
+                rawTagBytes
+            )
+        )
+        val replacementKey = LedgerKeyXdr.ContractData(
+            LedgerKeyContractDataXdr(
+                contract = owner,
+                key = SCValXdr.ExecutableTag(SCStringXdr("\uFFFD\uFFFD")),
+                durability = ContractDataDurabilityXdr.PERSISTENT
+            )
+        ).toXdrBase64()
+
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = splicedInstanceEntry),
+            GET_LEDGER_ENTRIES_RESPONSE,
+            capturedRequests = requests
+        ).use { server ->
+            assertFailsWith<IllegalStateException> {
+                server.loadContractCodeForContractId(TEST_CONTRACT_ID)
+            }
+            assertEquals(2, requests.size)
+            assertTrue(
+                !requests[1].contains(rawByteKey),
+                "The raw non-UTF-8 tag bytes cannot reach the key. Body: ${requests[1]}"
+            )
+            assertTrue(
+                requests[1].contains(replacementKey),
+                "The key is built from the replacement text. Body: ${requests[1]}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_missingTagEntry_throwsIllegalStateException() = runTest {
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            GET_LEDGER_ENTRIES_RESPONSE,
+            capturedRequests = requests
+        ).use { server ->
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getExternalRefWasmHash(externalRef())
+            }
+            assertTrue(
+                exception.message?.contains("No executable tag entry found on owner contract $TEST_OWNER_CONTRACT_ID") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("token-v1") ?: false,
+                "The message must name the tag: ${exception.message}"
+            )
+            assertEquals(1, requests.size)
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_nonContractDataEntry_throwsIllegalStateException() = runTest {
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = accountEntryXdr(TEST_ACCOUNT_ID, 1L)
+            )
+        ).use { server ->
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getExternalRefWasmHash(externalRef())
+            }
+            assertTrue(
+                exception.message?.contains("is not a contract data entry") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("token-v1") ?: false,
+                "The message must name the tag: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_nonBytesValue_throwsIllegalStateException() = runTest {
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+        val tag = SCStringXdr("token-v1")
+        createSequencedMockServer(
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = externalRefTagEntryXdr(owner, tag, Scv.toSymbol("not_a_hash"))
+            )
+        ).use { server ->
+            val exception = assertFailsWith<IllegalStateException> {
+                server.getExternalRefWasmHash(externalRef())
+            }
+            assertTrue(
+                exception.message?.contains("does not hold a 32-byte WASM hash") ?: false,
+                "Unexpected message: ${exception.message}"
+            )
+            assertTrue(
+                exception.message?.contains("token-v1") ?: false,
+                "The message must name the tag: ${exception.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_wrongLengthBytes_throwsIllegalStateException() = runTest {
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+        val tag = SCStringXdr("token-v1")
+        for (length in listOf(31, 33)) {
+            createSequencedMockServer(
+                ledgerEntriesResult(
+                    keyXdr = "AAAAAA==",
+                    entryXdr = externalRefTagEntryXdr(owner, tag, SCValXdr.Bytes(SCBytesXdr(ByteArray(length))))
+                )
+            ).use { server ->
+                val exception = assertFailsWith<IllegalStateException> {
+                    server.getExternalRefWasmHash(externalRef())
+                }
+                assertTrue(
+                    exception.message?.contains("the value has $length bytes") ?: false,
+                    "Unexpected message for length $length: ${exception.message}"
+                )
+                assertTrue(
+                    exception.message?.contains("token-v1") ?: false,
+                    "The message must name the tag: ${exception.message}"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testGetExternalRefWasmHash_nonContractOwner_rejectsWithoutRequest() = runTest {
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(
+            GET_LEDGER_ENTRIES_RESPONSE,
+            capturedRequests = requests
+        ).use { server ->
+            val ref = ContractExecutableExternalRefXdr(
+                executableOwner = Address(TEST_ACCOUNT_ID).toSCAddress(),
+                tag = SCStringXdr("token-v1")
+            )
+            val exception = assertFailsWith<IllegalArgumentException> {
+                server.getExternalRefWasmHash(ref)
+            }
+            assertTrue(
+                exception.message?.contains("$TEST_ACCOUNT_ID is not a contract address") ?: false,
+                "The message must name the owner: ${exception.message}"
+            )
+            assertTrue(requests.isEmpty(), "No request may be issued for a non-contract owner")
+        }
+    }
+
+    @Test
+    fun testLoadContractInfoForContractId_resolvesExternalRef() = runTest {
+        val owner = Address(TEST_OWNER_CONTRACT_ID).toSCAddress()
+        val tag = SCStringXdr("token-v1")
+        createSequencedMockServer(
+            ledgerEntriesResult(keyXdr = "AAAAAA==", entryXdr = externalRefInstanceEntryXdr(owner, tag)),
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = externalRefTagEntryXdr(owner, tag, SCValXdr.Bytes(SCBytesXdr(Util.hexToBytes(TEST_WASM_ID))))
+            ),
+            ledgerEntriesResult(
+                keyXdr = "AAAAAA==",
+                entryXdr = contractCodeEntryXdr(parseableContractByteCode(functionName = "resolve"))
+            )
+        ).use { server ->
+            val info = assertNotNull(server.loadContractInfoForContractId(TEST_CONTRACT_ID))
+
+            assertEquals(22UL, info.envInterfaceVersion)
+            assertEquals(1, info.funcs.size)
+            assertEquals("resolve", info.funcs[0].name.value)
         }
     }
 
