@@ -158,3 +158,6 @@ tools/sep-51-corpus/.tmp/
 
 # Generated API docs staging area used by the pages workflow (rebuilt every deploy)
 docs/api/latest/
+
+# P28 owner fixture build output
+tools/p28-owner-fixture/target/

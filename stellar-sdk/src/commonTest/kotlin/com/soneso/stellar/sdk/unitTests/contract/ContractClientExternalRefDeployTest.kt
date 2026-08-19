@@ -56,7 +56,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -109,11 +111,11 @@ class ContractClientExternalRefDeployTest {
         return LedgerEntryDataXdr.ContractData(entry).toXdrBase64()
     }
 
-    private fun codeEntryB64(): String {
+    private fun codeEntryB64(code: ByteArray = helloWasm): String {
         val entry = ContractCodeEntryXdr(
             ext = ContractCodeEntryExtXdr.Void,
             hash = HashXdr(wasmHashBytes),
-            code = helloWasm
+            code = code
         )
         return LedgerEntryDataXdr.ContractCode(entry).toXdrBase64()
     }
@@ -138,10 +140,18 @@ class ContractClientExternalRefDeployTest {
     private fun externalRefDeployMockServer(
         sourceAccount: String,
         capturedBodies: MutableList<String>,
-        tagEntryExists: Boolean = true
+        tagEntryExists: Boolean = true,
+        codeParseable: Boolean = true,
+        simulateError: Boolean = false,
+        sendHashMissing: Boolean = false,
+        getTxNotFoundFirst: Boolean = false,
+        getTxStatus: String = "SUCCESS",
+        getTxReturnValue: SCValXdr = SCValXdr.Address(
+            SCAddressXdr.ContractId(ContractIDXdr(HashXdr(createdContractHash))))
     ): SorobanServer {
         val tagKey = tagKeyB64()
         val codeKey = codeKeyB64()
+        var getTxCalls = 0
         val engine = MockEngine { request ->
             val body = request.body.toByteArray().decodeToString()
             capturedBodies.add(body)
@@ -149,20 +159,31 @@ class ContractClientExternalRefDeployTest {
                 "\"getLedgerEntries\"" in body && tagKey in body ->
                     if (tagEntryExists) entriesResultJson(tagEntryB64()) else emptyEntriesResultJson
                 "\"getLedgerEntries\"" in body && codeKey in body ->
-                    entriesResultJson(codeEntryB64())
+                    entriesResultJson(codeEntryB64(
+                        if (codeParseable) helloWasm else "not wasm".encodeToByteArray()))
                 "\"getLedgerEntries\"" in body -> ledgerEntriesResultJson(sourceAccount)
-                "\"simulateTransaction\"" in body -> simulateResultJson(Scv.toVoid())
+                "\"simulateTransaction\"" in body ->
+                    if (simulateError) """{ "error": "host function failed", "latestLedger": 14245 }"""
+                    else simulateResultJson(Scv.toVoid())
                 "\"sendTransaction\"" in body ->
-                    """{ "status": "PENDING", "hash": "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304", "latestLedger": 14245 }"""
-                "\"getTransaction\"" in body -> """
-                    {
-                      "status": "SUCCESS",
-                      "latestLedger": 14246,
-                      "resultMetaXdr": "${successResultMetaBase64(
-                          SCValXdr.Address(SCAddressXdr.ContractId(ContractIDXdr(HashXdr(createdContractHash))))
-                      )}"
+                    if (sendHashMissing) """{ "status": "PENDING", "latestLedger": 14245 }"""
+                    else """{ "status": "PENDING", "hash": "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304", "latestLedger": 14245 }"""
+                "\"getTransaction\"" in body -> {
+                    getTxCalls += 1
+                    when {
+                        getTxNotFoundFirst && getTxCalls == 1 ->
+                            """{ "status": "NOT_FOUND", "latestLedger": 14245 }"""
+                        getTxStatus != "SUCCESS" ->
+                            """{ "status": "$getTxStatus", "latestLedger": 14246 }"""
+                        else -> """
+                            {
+                              "status": "SUCCESS",
+                              "latestLedger": 14246,
+                              "resultMetaXdr": "${successResultMetaBase64(getTxReturnValue)}"
+                            }
+                        """.trimIndent()
                     }
-                """.trimIndent()
+                }
                 else -> error("unrouted JSON-RPC request: $body")
             }
             respond(
@@ -334,6 +355,179 @@ class ContractClientExternalRefDeployTest {
         assertTrue(captured.isEmpty())
     }
 
+    @Test
+    fun testPublicDeployRejectsNonContractOwnerBeforeAnyRequest() = runTest {
+        val signer = KeyPair.random()
+        val accountOwner = KeyPair.random().getAccountId()
+
+        // The public overload builds its own server from the rpc url; the
+        // non-contract owner is rejected before any request, so the
+        // unroutable url is never contacted.
+        val e = assertFailsWith<IllegalArgumentException> {
+            ContractClient.deployFromExternalRef(
+                executableOwner = accountOwner,
+                tag = executableTag,
+                source = signer.getAccountId(),
+                signer = signer,
+                network = Network.TESTNET,
+                rpcUrl = "http://127.0.0.1:1"
+            )
+        }
+        assertTrue(e.message!!.contains("is not a contract"), "unexpected message: ${e.message}")
+    }
+
+    @Test
+    fun testDeployWithoutSpecLoadSkipsTheCodeEntry() = runTest {
+        val signer = KeyPair.random()
+        val source = signer.getAccountId()
+        val captured = mutableListOf<String>()
+
+        val client = ContractClient.deployFromExternalRefInternal(
+            executableOwner = ownerContractId,
+            tag = executableTag,
+            constructorArgs = emptyList(),
+            source = source,
+            signer = signer,
+            network = Network.TESTNET,
+            rpcUrl = MOCK_RPC_SERVER_URL,
+            salt = fixedSalt,
+            loadSpec = false,
+            server = externalRefDeployMockServer(source, captured)
+        )
+
+        assertEquals(createdContractId, client.contractId)
+        assertTrue(client.getMethodNames().isEmpty())
+        // Only the tag resolution and the account fetch read the ledger; the
+        // code entry is never requested.
+        assertEquals(2, captured.count { "\"getLedgerEntries\"" in it })
+        assertTrue(captured.none { codeKeyB64() in it })
+    }
+
+    @Test
+    fun testDeployProceedsWhenResolvedCodeHasNoParseableSpec() = runTest {
+        val signer = KeyPair.random()
+        val source = signer.getAccountId()
+        val captured = mutableListOf<String>()
+
+        // The unparseable code makes the spec preload throw and get caught,
+        // and the deployment still submits. The client is then built through
+        // the forContract fallback, which contacts the rpc url with its own
+        // connection; the unroutable url turns that into the failure asserted
+        // here, after the submission already proved the deploy went through.
+        assertFails {
+            ContractClient.deployFromExternalRefInternal(
+                executableOwner = ownerContractId,
+                tag = executableTag,
+                constructorArgs = emptyList(),
+                source = source,
+                signer = signer,
+                network = Network.TESTNET,
+                rpcUrl = "http://127.0.0.1:1",
+                salt = fixedSalt,
+                loadSpec = true,
+                server = externalRefDeployMockServer(source, captured, codeParseable = false)
+            )
+        }
+        assertTrue(captured.any { "\"sendTransaction\"" in it },
+            "the parser failure must not abort the deployment")
+    }
+
+    private suspend fun deployWithMockServer(server: SorobanServer, signer: KeyPair): ContractClient =
+        ContractClient.deployFromExternalRefInternal(
+            executableOwner = ownerContractId,
+            tag = executableTag,
+            constructorArgs = emptyList(),
+            source = signer.getAccountId(),
+            signer = signer,
+            network = Network.TESTNET,
+            rpcUrl = MOCK_RPC_SERVER_URL,
+            salt = fixedSalt,
+            loadSpec = true,
+            server = server
+        )
+
+    @Test
+    fun testDeployThrowsWhenSimulationFails() = runTest {
+        val signer = KeyPair.random()
+        val server = externalRefDeployMockServer(
+            signer.getAccountId(), mutableListOf(), simulateError = true)
+
+        val e = assertFailsWith<IllegalStateException> { deployWithMockServer(server, signer) }
+        assertTrue(e.message!!.contains("simulation failed"), "unexpected message: ${e.message}")
+    }
+
+    @Test
+    fun testDeployThrowsWhenSendResponseCarriesNoHash() = runTest {
+        val signer = KeyPair.random()
+        val server = externalRefDeployMockServer(
+            signer.getAccountId(), mutableListOf(), sendHashMissing = true)
+
+        val e = assertFailsWith<IllegalStateException> { deployWithMockServer(server, signer) }
+        assertTrue(e.message!!.contains("Failed to send"), "unexpected message: ${e.message}")
+    }
+
+    @Test
+    fun testDeployThrowsWhenTransactionFails() = runTest {
+        val signer = KeyPair.random()
+        val server = externalRefDeployMockServer(
+            signer.getAccountId(), mutableListOf(), getTxStatus = "FAILED")
+
+        val e = assertFailsWith<IllegalStateException> { deployWithMockServer(server, signer) }
+        assertTrue(e.message!!.contains("failed with status"), "unexpected message: ${e.message}")
+    }
+
+    @Test
+    fun testDeployThrowsWhenMetaCarriesNoCreatedContractId() = runTest {
+        val signer = KeyPair.random()
+        val server = externalRefDeployMockServer(
+            signer.getAccountId(), mutableListOf(), getTxReturnValue = Scv.toVoid())
+
+        val e = assertFailsWith<IllegalStateException> { deployWithMockServer(server, signer) }
+        assertTrue(e.message!!.contains("Failed to extract contract ID"),
+            "unexpected message: ${e.message}")
+    }
+
+    @Test
+    fun testWasmDeployPathSharesTheSubmissionHelper() = runTest {
+        val signer = KeyPair.random()
+        val captured = mutableListOf<String>()
+        val server = externalRefDeployMockServer(signer.getAccountId(), captured)
+
+        val contractId = ContractClient.deployContractInternal(
+            wasmHash = wasmHashBytes,
+            constructorParams = emptyList(),
+            source = signer.getAccountId(),
+            signer = signer,
+            network = Network.TESTNET,
+            rpcUrl = MOCK_RPC_SERVER_URL,
+            salt = fixedSalt,
+            server = server
+        )
+
+        assertEquals(createdContractId, contractId)
+        // The wasm-hash deploy path submits through the same helper as the
+        // external-ref path; its envelope carries the wasm executable arm.
+        val hostFunction = submittedHostFunction(captured)
+        assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+        val executable = hostFunction.value.executable
+        assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.WasmHash>(executable)
+        assertTrue(executable.value.value.contentEquals(wasmHashBytes))
+    }
+
+    @Test
+    fun testDeployPollsPastAnUnsettledTransaction() = runTest {
+        val signer = KeyPair.random()
+        val captured = mutableListOf<String>()
+        val server = externalRefDeployMockServer(
+            signer.getAccountId(), captured, getTxNotFoundFirst = true)
+
+        val client = deployWithMockServer(server, signer)
+
+        assertEquals(createdContractId, client.contractId)
+        // The first poll answered NOT_FOUND, so the result took a second query.
+        assertEquals(2, captured.count { "\"getTransaction\"" in it })
+    }
+
     // ==================== Builder ====================
 
     @Test
@@ -389,6 +583,25 @@ class ContractClientExternalRefDeployTest {
         val decodedExecutable = decoded.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(decodedExecutable)
         assertEquals("token-v2", decodedExecutable.value.tag.value)
+    }
+
+    @Test
+    fun testBuilderGeneratesRandomSaltWhenNotProvided() {
+        val salts = List(2) {
+            val op = InvokeHostFunctionOperation.createContractFromExternalRef(
+                executableOwner = Address(ownerContractId),
+                tag = executableTag,
+                address = Address(MOCK_RPC_SOURCE_ACCOUNT)
+            )
+            val hostFunction = op.hostFunction
+            assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+            val preimage = hostFunction.value.contractIdPreimage
+            assertIs<com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr.FromAddress>(preimage)
+            preimage.value.salt.value
+        }
+        assertEquals(32, salts[0].size)
+        assertEquals(32, salts[1].size)
+        assertFalse(salts[0].contentEquals(salts[1]))
     }
 
     @Test

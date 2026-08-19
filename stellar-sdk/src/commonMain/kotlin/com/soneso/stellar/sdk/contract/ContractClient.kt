@@ -1229,18 +1229,20 @@ class ContractClient private constructor(
         }
 
         /**
-         * Internal helper to deploy contract from WASM hash.
+         * Internal helper to deploy contract from WASM hash. The [server]
+         * parameter is the seam through which unit tests inject a mocked
+         * server; it defaults to a server over [rpcUrl].
          */
-        private suspend fun deployContractInternal(
+        internal suspend fun deployContractInternal(
             wasmHash: ByteArray,
             constructorParams: List<SCValXdr>,
             source: String,
             signer: KeyPair,
             network: Network,
             rpcUrl: String,
-            salt: ByteArray
+            salt: ByteArray,
+            server: SorobanServer = SorobanServer(rpcUrl)
         ): String {
-            val server = SorobanServer(rpcUrl)
             val account = server.getAccount(source)
 
             val addressObj = Address(source)
