@@ -101,6 +101,39 @@ val client = ContractClient.deployFromWasmId(
 )
 ```
 
+### Deploy from an External Reference (Protocol 28)
+
+A CAP-85 external reference names an owner contract and a tag; the owner's persistent
+entry under that tag holds the WASM hash the new instance runs. There is no install
+step, and the one-step `deploy(wasmBytes)` has no external reference counterpart --
+nothing is uploaded. `ContractClient.deployFromExternalRef` resolves the reference
+before the transaction is built (`IllegalArgumentException` for a non-contract owner
+before any request, `IllegalStateException` naming the owner and the tag for a missing
+or malformed tag entry), loads the spec from the resolved WASM, and returns a ready
+client:
+
+```kotlin
+val client = ContractClient.deployFromExternalRef(
+    executableOwner = "COWNER...",  // "C..." contract id holding the tag entry
+    tag = "token-v1",               // matched byte for byte; non-UTF-8 tags are unresolvable
+    constructorArgs = listOf(Scv.toUint32(7u)),  // List<SCValXdr>, as for deployFromWasmId
+    source = keyPair.getAccountId(),
+    signer = keyPair,
+    network = Network.TESTNET,
+    rpcUrl = "https://soroban-testnet.stellar.org:443"
+)
+```
+
+`InvokeHostFunctionOperation.createContractFromExternalRef(executableOwner: Address,
+tag: String, address: Address, constructorArgs: List<SCValXdr>? = null, salt:
+ByteArray? = null)` builds the underlying create operation directly, next to
+`createContract`.
+
+`Address.deriveContractId(deployer: Address, salt: ByteArray, network: Network)`
+(suspend) returns the contract id ("C...") a deployment creates. The id derives from
+deployer, salt and network only (the executable does not enter it), so the address is
+known before deploying. The salt is 32 raw bytes, not hex.
+
 ### Deploy with Constructor Arguments
 
 The one-step `deploy()` accepts constructor args as `Map<String, Any?>` with automatic type conversion based on the contract spec. The two-step `deployFromWasmId()` accepts `List<SCValXdr>`.

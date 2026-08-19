@@ -478,6 +478,62 @@ suspend fun resolveExternalRef() {
 contract data entry, or the value does not hold a 32-byte hash. The owner contract is
 read, never invoked.
 
+#### Deployment from an External Reference (Protocol 28)
+
+`ContractClient.deployFromExternalRef` creates a contract instance that runs the WASM
+named by an external reference. There is no install step; the owner already holds the
+tag entry. The reference is resolved before the transaction is built with the exception
+behavior above, so an unresolvable reference fails naming the owner and the tag rather
+than failing on-chain. The contract spec is loaded from the resolved WASM before
+submission and the returned client is ready to invoke, the same flow `deployFromWasmId`
+uses.
+
+```kotlin
+import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.contract.ContractClient
+
+suspend fun deployFromExternalRef(keyPair: KeyPair) {
+    val client = ContractClient.deployFromExternalRef(
+        executableOwner = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
+        tag = "token-v1", // matched byte for byte
+        source = keyPair.getAccountId(),
+        signer = keyPair,
+        network = Network.TESTNET,
+        rpcUrl = "https://soroban-testnet.stellar.org"
+    )
+    println("Deployed at ${client.contractId}")
+}
+```
+
+`constructorArgs` (a `List<SCValXdr>`, as for `deployFromWasmId`) and `salt` are
+optional. The underlying create operation can also be built directly with
+`InvokeHostFunctionOperation.createContractFromExternalRef`, next to `createContract`.
+
+#### Deriving a Contract Id Before Deploying
+
+`Address.deriveContractId` returns the contract id ("C...") a deployment by a given
+deployer with a given salt creates on a given network. The id derives from the
+deployer, the salt and the network only; the executable (WASM hash, external reference
+or Stellar asset) does not enter the derivation. Use it when the address is needed
+before the deployment, for example in constructor arguments of another contract.
+
+```kotlin
+import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.secureRandomBytes
+
+suspend fun predictContractId() {
+    val deployer = Address("GABC...")
+    val salt = secureRandomBytes(32)
+
+    val futureContractId = Address.deriveContractId(deployer, salt, Network.TESTNET)
+
+    // Deploying with the same deployer and salt creates exactly this contract id
+    println(futureContractId)
+}
+```
+
 ## Advanced Transaction Patterns
 
 ### Transaction Preconditions
