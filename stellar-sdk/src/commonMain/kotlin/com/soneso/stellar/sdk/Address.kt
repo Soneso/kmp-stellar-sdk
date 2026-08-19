@@ -231,6 +231,42 @@ class Address(address: String) {
         }
 
         /**
+         * Derives the contract id a deployment by the given [deployer] with the
+         * given [salt] creates on the given [network].
+         *
+         * The id depends only on the deployer address, the salt and the network;
+         * the executable the contract is created with (WASM hash, CAP-85 external
+         * reference or Stellar asset) does not enter the derivation. Use it to know
+         * a contract's address before deploying, for example when the address is
+         * needed in constructor arguments of another contract.
+         *
+         * @param deployer the address the deployment is issued from (account or contract)
+         * @param salt the 32 byte salt the deployment uses
+         * @param network the network the contract is deployed to
+         * @return the derived contract id ("C...")
+         * @throws IllegalArgumentException if [salt] is not exactly 32 bytes
+         */
+        suspend fun deriveContractId(deployer: Address, salt: ByteArray, network: Network): String {
+            require(salt.size == 32) { "salt must be exactly 32 bytes, got ${salt.size}" }
+
+            val contractIdPreimage = ContractIDPreimageXdr.FromAddress(
+                ContractIDPreimageFromAddressXdr(
+                    address = deployer.toSCAddress(),
+                    salt = Uint256Xdr(salt)
+                )
+            )
+            val preimage = HashIDPreimageXdr.ContractID(
+                HashIDPreimageContractIDXdr(
+                    networkId = HashXdr(network.networkId()),
+                    contractIdPreimage = contractIdPreimage
+                )
+            )
+            val writer = XdrWriter()
+            preimage.encode(writer)
+            return StrKey.encodeContract(Util.hash(writer.toByteArray()))
+        }
+
+        /**
          * Creates a new [Address] from a [SCAddressXdr] XDR object.
          *
          * @param scAddress the [SCAddressXdr] object to convert
