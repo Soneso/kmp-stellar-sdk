@@ -49,6 +49,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surfaces as a missing tag entry. `ContractSpec.scValToNative` converts an
   `SCV_EXECUTABLE_TAG` value to its tag string; it previously failed the
   conversion.
+- `ContractClient.deployFromExternalRef` deploys a contract instance from a
+  CAP-85 external reference; the parameters name the owner contract and the tag
+  instead of a wasm id, next to `deployFromWasmId`. The reference is resolved
+  through `SorobanServer.getExternalRefWasmHash` before the transaction is
+  built, so its exceptions apply unchanged: `IllegalArgumentException` for a
+  non-contract owner before any request, `IllegalStateException` naming the
+  owner and the tag for a missing, wrongly typed or wrong-length tag entry. The
+  contract spec is loaded from the resolved WASM before submission and the
+  returned client is ready to invoke, the same flow `deployFromWasmId` uses.
+  Nothing is installed as part of the deployment, and the one-step
+  `deploy(wasmBytes)` has no external reference counterpart, because there is
+  nothing to upload. Without constructor arguments the operation carries the
+  `CREATE_CONTRACT` arm, with them `CREATE_CONTRACT_V2`. The UTF-8 tag
+  limitation above applies.
+- `InvokeHostFunctionOperation.createContractFromExternalRef` builds the
+  underlying create operation directly, next to `createContract`, with the same
+  argument shape and internal `CREATE_CONTRACT`/`CREATE_CONTRACT_V2` branch.
+- `Address.deriveContractId(deployer, salt, network)` returns the contract id
+  ("C...") a deployment by the given deployer with the given salt creates on
+  the given network. The id derives from the deployer, the salt and the network
+  only; the executable does not enter the derivation. A salt that is not
+  exactly 32 bytes raises `IllegalArgumentException`.
 
 ### Changed
 - `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and

@@ -1715,6 +1715,73 @@ data class InvokeHostFunctionOperation(
                 auth = emptyList()
             )
         }
+
+        /**
+         * Creates an operation to instantiate a contract from a CAP-85 external
+         * reference (Protocol 28).
+         *
+         * The executable names an owner contract and a tag; the owner holds a
+         * persistent contract data entry under that tag whose value is the 32-byte
+         * hash of an already uploaded WASM, and the created instance runs that code.
+         * Nothing is uploaded as part of the deployment.
+         *
+         * Uses CREATE_CONTRACT when [constructorArgs] is null or empty and
+         * CREATE_CONTRACT_V2 otherwise, like [createContract].
+         *
+         * @param executableOwner The contract holding the executable tag entry
+         * @param tag The tag of the executable entry on the owner; matched byte for byte
+         * @param address The deployer address (account or contract)
+         * @param constructorArgs Optional arguments passed to the contract constructor
+         * @param salt Optional 32 byte salt for contract id generation; random if not provided
+         * @throws IllegalArgumentException if a provided salt is not exactly 32 bytes
+         */
+        fun createContractFromExternalRef(
+            executableOwner: Address,
+            tag: String,
+            address: Address,
+            constructorArgs: List<SCValXdr>? = null,
+            salt: ByteArray? = null
+        ): InvokeHostFunctionOperation {
+            // The salt determines the deployed contract ID, so it must come from a CSPRNG
+            val actualSalt = salt ?: secureRandomBytes(32)
+
+            require(actualSalt.size == 32) { "Salt must be 32 bytes, got ${actualSalt.size}" }
+
+            // Create the contract preimage
+            val fromAddress = ContractIDPreimageFromAddressXdr(
+                address = address.toSCAddress(),
+                salt = Uint256Xdr(actualSalt)
+            )
+
+            val preimage = ContractIDPreimageXdr.FromAddress(fromAddress)
+            val executable = ContractExecutableXdr.ExternalRef(
+                ContractExecutableExternalRefXdr(
+                    executableOwner = executableOwner.toSCAddress(),
+                    tag = SCStringXdr(tag)
+                )
+            )
+
+            // Use CreateContractV2 if constructor args are provided, otherwise use CreateContract
+            val hostFunction = if (constructorArgs != null && constructorArgs.isNotEmpty()) {
+                val createContractArgs = CreateContractArgsV2Xdr(
+                    contractIdPreimage = preimage,
+                    executable = executable,
+                    constructorArgs = constructorArgs
+                )
+                HostFunctionXdr.CreateContractV2(createContractArgs)
+            } else {
+                val createContractArgs = CreateContractArgsXdr(
+                    contractIdPreimage = preimage,
+                    executable = executable
+                )
+                HostFunctionXdr.CreateContract(createContractArgs)
+            }
+
+            return InvokeHostFunctionOperation(
+                hostFunction = hostFunction,
+                auth = emptyList()
+            )
+        }
     }
 }
 

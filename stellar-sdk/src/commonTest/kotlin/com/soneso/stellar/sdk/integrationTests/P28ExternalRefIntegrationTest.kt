@@ -3,30 +3,41 @@ package com.soneso.stellar.sdk.integrationTests
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.secureRandomBytes
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.ContractDataDurabilityXdr
 import com.soneso.stellar.sdk.xdr.ContractExecutableExternalRefXdr
+import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
 import com.soneso.stellar.sdk.xdr.LedgerKeyContractDataXdr
 import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
+import com.soneso.stellar.sdk.xdr.SCBytesXdr
+import com.soneso.stellar.sdk.xdr.SCSpecEntryXdr
 import com.soneso.stellar.sdk.xdr.SCStringXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runTest
 
 /**
- * Verifies CAP-85 external reference resolution against a live network.
+ * Verifies the CAP-85 external reference lifecycle against a live network.
  *
- * Self-contained: deploys its own contract, checks that the contract code
- * loader still reads it, and checks that a protocol 28 RPC accepts the
- * executable tag ledger key the resolver builds. The full resolution happy
- * path needs an owner contract that writes an executable tag entry, which no
- * fixture provides yet.
+ * Self-contained: installs the owner fixture contract (source in this repo
+ * under tools/p28-owner-fixture), deploys it, installs the hello world
+ * contract's WASM, writes an executable tag entry naming it, resolves the
+ * reference, and deploys a new instance from it with an explicit salt. It
+ * verifies the created contract id against [Address.deriveContractId], and
+ * checks the instance's executable arm, the loading paths behind the
+ * reference, and a live invocation.
  *
  * The body is gated on protocol 28 via [networkProtocolAtLeast]; below that the
  * test prints why it skipped and returns. Futurenet runs protocol 28 already.
@@ -44,7 +55,7 @@ class P28ExternalRefIntegrationTest {
     private val network = if (testOn == "testnet") Network.TESTNET else Network.FUTURENET
 
     @Test
-    fun testExternalRefLedgerKeyAcceptedByRpc() = runTest(timeout = 300.seconds) {
+    fun testExternalRefLifecycle() = runTest(timeout = 600.seconds) {
         if (!networkProtocolAtLeast(sorobanServer, 28)) {
             println("Skipping P28 external-ref test: the network at $rpcUrl runs a protocol below 28")
             return@runTest
@@ -57,20 +68,45 @@ class P28ExternalRefIntegrationTest {
             useFuturenet = testOn != "testnet"
         )
 
-        val contractId = ContractClient.deploy(
+        // Install and deploy the owner fixture holding the executable tag entries.
+        val owner = ContractClient.deploy(
+            wasmBytes = TestResourceUtil.readWasmFile("p28_owner_fixture.wasm"),
+            source = keyPair.getAccountId(),
+            signer = keyPair,
+            network = network,
+            rpcUrl = rpcUrl
+        )
+        assertTrue(owner.getMethodNames().contains("set_executable"))
+
+        // Install the target code and write the tag entry naming it.
+        val targetWasmId = ContractClient.install(
             wasmBytes = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm"),
             source = keyPair.getAccountId(),
             signer = keyPair,
             network = network,
             rpcUrl = rpcUrl
-        ).contractId
+        )
+        val executableTag = "sdk-e2e-v1"
+        owner.invoke<SCValXdr>(
+            functionName = "set_executable",
+            parameters = listOf(
+                Scv.toString(executableTag),
+                SCValXdr.Bytes(SCBytesXdr(Util.hexToBytes(targetWasmId)))
+            ),
+            source = keyPair.getAccountId(),
+            signer = keyPair
+        )
 
         realDelay(3000)
 
-        // The executable dispatch still loads a wasm instance from the live ledger.
-        val codeEntry = sorobanServer.loadContractCodeForContractId(contractId)
-        assertNotNull(codeEntry, "The deployed contract's code should load by contract id")
-        assertTrue(codeEntry.code.isNotEmpty(), "Loaded code should not be empty")
+        // The reference resolves to the stored wasm hash.
+        val ownerAddress = Address(owner.contractId)
+        val ref = ContractExecutableExternalRefXdr(
+            executableOwner = ownerAddress.toSCAddress(),
+            tag = SCStringXdr(executableTag)
+        )
+        val resolvedHash = sorobanServer.getExternalRefWasmHash(ref)
+        assertEquals(targetWasmId, Util.bytesToHex(resolvedHash))
 
         // The RPC must accept the executable tag ledger key the resolver builds,
         // answering an empty entry list for a tag no entry exists under. This is
@@ -79,7 +115,7 @@ class P28ExternalRefIntegrationTest {
         val unusedTag = "no entry exists under this tag"
         val tagKey = LedgerKeyXdr.ContractData(
             LedgerKeyContractDataXdr(
-                contract = Address(contractId).toSCAddress(),
+                contract = ownerAddress.toSCAddress(),
                 key = SCValXdr.ExecutableTag(SCStringXdr(unusedTag)),
                 durability = ContractDataDurabilityXdr.PERSISTENT
             )
@@ -91,16 +127,78 @@ class P28ExternalRefIntegrationTest {
         )
 
         // The resolver reports the same absence with its missing-entry exception.
-        val ref = ContractExecutableExternalRefXdr(
-            executableOwner = Address(contractId).toSCAddress(),
+        val unusedRef = ContractExecutableExternalRefXdr(
+            executableOwner = ownerAddress.toSCAddress(),
             tag = SCStringXdr(unusedTag)
         )
         val exception = assertFailsWith<IllegalStateException> {
-            sorobanServer.getExternalRefWasmHash(ref)
+            sorobanServer.getExternalRefWasmHash(unusedRef)
         }
         assertTrue(
             exception.message?.contains("No executable tag entry found") ?: false,
             "Unexpected message: ${exception.message}"
         )
+
+        // Deploy from the reference with an explicit salt; the created contract id
+        // must match the derivation, and the instance must run the target's code.
+        val salt = secureRandomBytes(32)
+        val predictedContractId = Address.deriveContractId(
+            deployer = Address(keyPair.getAccountId()),
+            salt = salt,
+            network = network
+        )
+        val client = ContractClient.deployFromExternalRef(
+            executableOwner = owner.contractId,
+            tag = executableTag,
+            source = keyPair.getAccountId(),
+            signer = keyPair,
+            network = network,
+            rpcUrl = rpcUrl,
+            salt = salt
+        )
+        assertEquals(predictedContractId, client.contractId)
+        assertTrue(client.getMethodNames().contains("hello"))
+
+        realDelay(3000)
+
+        // The instance entry carries the external reference arm naming owner and
+        // tag, and the code loader resolves it to the target's code.
+        val instanceEntry = sorobanServer.getContractData(
+            contractId = client.contractId,
+            key = Scv.toLedgerKeyContractInstance(),
+            durability = SorobanServer.Durability.PERSISTENT
+        )
+        assertNotNull(instanceEntry)
+        val contractData = instanceEntry.parseXdr()
+        assertIs<com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr.ContractData>(contractData)
+        val instance = contractData.value.`val`
+        assertIs<SCValXdr.Instance>(instance)
+        val executable = instance.value.executable
+        assertIs<ContractExecutableXdr.ExternalRef>(executable)
+        assertEquals(owner.contractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
+        assertEquals(executableTag, executable.value.tag.value)
+
+        val codeEntry = sorobanServer.loadContractCodeForContractId(client.contractId)
+        assertNotNull(codeEntry)
+        assertContentEquals(
+            TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm"),
+            codeEntry.code
+        )
+        val info = assertNotNull(sorobanServer.loadContractInfoForContractId(client.contractId))
+        assertTrue(
+            info.specEntries.filterIsInstance<SCSpecEntryXdr.FunctionV0>()
+                .any { it.value.name.value == "hello" }
+        )
+
+        // The deployed instance is live: it answers as the target contract,
+        // whose hello function takes a string parameter.
+        val resultXdr = client.invoke<SCValXdr>(
+            functionName = "hello",
+            parameters = listOf(Scv.toString("friend")),
+            source = keyPair.getAccountId(),
+            signer = keyPair
+        )
+        val result = client.funcResToNative("hello", resultXdr) as List<*>
+        assertEquals(listOf("Hello", "friend"), result)
     }
 }
