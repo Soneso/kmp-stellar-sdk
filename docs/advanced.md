@@ -496,7 +496,7 @@ import com.soneso.stellar.sdk.contract.ContractClient
 suspend fun deployFromExternalRef(keyPair: KeyPair) {
     val client = ContractClient.deployFromExternalRef(
         executableOwner = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
-        tag = "token-v1", // matched byte for byte
+        tag = "token-v1", // matched byte for byte, encoded as UTF-8
         source = keyPair.getAccountId(),
         signer = keyPair,
         network = Network.TESTNET,
@@ -509,6 +509,8 @@ suspend fun deployFromExternalRef(keyPair: KeyPair) {
 `constructorArgs` (a `List<SCValXdr>`, as for `deployFromWasmId`) and `salt` are
 optional. The underlying create operation can also be built directly with
 `InvokeHostFunctionOperation.createContractFromExternalRef`, next to `createContract`.
+Both entry points also take the tag as `ByteArray` for tags that are not text; the
+String form encodes as UTF-8.
 
 #### Deriving a Contract Id Before Deploying
 

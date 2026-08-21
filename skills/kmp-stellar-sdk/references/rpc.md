@@ -761,9 +761,9 @@ null from the loaders still means not found or a Stellar Asset Contract.
 `getExternalRefWasmHash(ContractExecutableExternalRefXdr)`
 resolves a reference directly and returns the 32-byte hash as `ByteArray`; it throws
 `IllegalArgumentException` for a non-contract owner and `IllegalStateException` when the tag
-entry is missing, is not contract data, or does not hold a 32-byte hash. A tag that is not
-valid UTF-8 cannot be resolved (XDR strings decode into Kotlin strings with replacement
-characters) and surfaces as a missing tag entry.
+entry is missing, is not contract data, or does not hold a 32-byte hash. The tag is
+`ByteArray` on the XDR type and reaches the ledger key byte for byte, so the tag bytes
+are never the reason resolution fails, whether or not they are valid UTF-8.
 
 For full introspection details (enumerating parameters, UDTs, events), see [Soroban Contracts](./soroban_contracts.md).
 

@@ -115,7 +115,7 @@ client:
 ```kotlin
 val client = ContractClient.deployFromExternalRef(
     executableOwner = "COWNER...",  // "C..." contract id holding the tag entry
-    tag = "token-v1",               // matched byte for byte; non-UTF-8 tags are unresolvable
+    tag = "token-v1",               // matched byte for byte, encoded as UTF-8
     constructorArgs = listOf(Scv.toUint32(7u)),  // List<SCValXdr>, as for deployFromWasmId
     source = keyPair.getAccountId(),
     signer = keyPair,
@@ -127,7 +127,8 @@ val client = ContractClient.deployFromExternalRef(
 `InvokeHostFunctionOperation.createContractFromExternalRef(executableOwner: Address,
 tag: String, address: Address, constructorArgs: List<SCValXdr>? = null, salt:
 ByteArray? = null)` builds the underlying create operation directly, next to
-`createContract`.
+`createContract`. Both it and `deployFromExternalRef` also take the tag as
+`ByteArray` for tags that are not text; the String overloads encode as UTF-8.
 
 `Address.deriveContractId(deployer: Address, salt: ByteArray, network: Network)`
 (suspend) returns the contract id ("C...") a deployment creates. The id derives from
