@@ -12,19 +12,20 @@ private val XDR_JSON_KEYS: Array<String> = arrayOf("executable_owner", "tag")
 
 /**
  * XDR Source:
- * struct ContractExecutableExternalRef {
- *     SCAddress executable_owner;
+ * struct ContractExecutableExternalRef
+ * {
+ *     opaque executable_owner[32];
  *     SCString tag;
  * };
  */
 data class ContractExecutableExternalRefXdr(
-  val executableOwner: SCAddressXdr,
+  val executableOwner: ByteArray,
   val tag: ByteArray
 ) {
   companion object {
 
     fun decode(reader: XdrReader): ContractExecutableExternalRefXdr {
-      val executableOwner = SCAddressXdr.decode(reader)
+      val executableOwner = reader.readFixedOpaque(32)
       val tag = reader.readVariableOpaque()
       return ContractExecutableExternalRefXdr(executableOwner, tag)
     }
@@ -36,19 +37,19 @@ data class ContractExecutableExternalRefXdr(
     internal fun fromXdrJsonTree(element: JsonElement): ContractExecutableExternalRefXdr {
       val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return ContractExecutableExternalRefXdr(
-        SCAddressXdr.fromXdrJsonTree(XdrJson.field(json, "executable_owner", XDR_JSON_TYPE)),
+        XdrJson.hex(XdrJson.field(json, "executable_owner", XDR_JSON_TYPE), XDR_JSON_TYPE, "executable_owner", expectedLength = 32),
         XdrJson.unescapeStringBytes(XdrJson.field(json, "tag", XDR_JSON_TYPE), XDR_JSON_TYPE, "tag")
       )
     }
   }
 
   fun encode(writer: XdrWriter) {
-    executableOwner.encode(writer)
+    writer.writeFixedOpaque(executableOwner, 32)
     writer.writeVariableOpaque(tag)
   }
 
   fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("executable_owner", executableOwner.toXdrJsonElement())
+    put("executable_owner", XdrJson.hex(executableOwner))
     put("tag", XdrJson.escapedString(tag))
   }
 

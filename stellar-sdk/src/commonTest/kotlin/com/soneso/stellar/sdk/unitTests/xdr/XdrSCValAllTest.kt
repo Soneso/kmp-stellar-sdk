@@ -2,7 +2,9 @@ package com.soneso.stellar.sdk.unitTests.xdr
 
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class XdrSCValAllTest {
 
@@ -80,8 +82,25 @@ class XdrSCValAllTest {
 
     @Test fun testNonceKey() = rt(SCValXdr.NonceKey(SCNonceKeyXdr(nonce = Int64Xdr(9876543210L))))
 
-    @Test fun testExecutableTag() = rt(SCValXdr.ExecutableTag(SCStringXdr("my-tag")))
-    @Test fun testExecutableTagEmpty() = rt(SCValXdr.ExecutableTag(SCStringXdr("")))
+    @Test fun testExecutableTag() = rt(SCValXdr.ExecutableTag("my-tag".encodeToByteArray()))
+    @Test fun testExecutableTagEmpty() = rt(SCValXdr.ExecutableTag(byteArrayOf()))
+
+    @Test fun testExecutableTagBinaryContent() {
+        // 0xC0, 0xFF and 0xFE never appear in valid UTF-8; the arm carries the
+        // bytes exactly. The wire form is pinned byte for byte, independent of
+        // the codec: discriminant 22, length 4, the tag bytes, no padding.
+        val tagBytes = byteArrayOf(0xC0.toByte(), 0x00, 0xFF.toByte(), 0xFE.toByte())
+        val value = SCValXdr.ExecutableTag(tagBytes)
+        rt(value)
+
+        val writer = XdrWriter()
+        value.encode(writer)
+        assertContentEquals(byteArrayOf(0, 0, 0, 22, 0, 0, 0, 4) + tagBytes, writer.toByteArray())
+
+        val decoded = SCValXdr.decode(XdrReader(writer.toByteArray()))
+        assertIs<SCValXdr.ExecutableTag>(decoded)
+        assertContentEquals(tagBytes, decoded.value)
+    }
 
     @Test fun testSCValTypeEnum() {
         for (e in SCValTypeXdr.entries) {
@@ -93,7 +112,7 @@ class XdrSCValAllTest {
         SCContractInstanceXdr(
             executable = ContractExecutableXdr.ExternalRef(ContractExecutableExternalRefXdr(
                 executableOwner = SCAddressXdr.ContractId(XdrTestHelpers.contractId()),
-                tag = SCStringXdr("tag")
+                tag = "tag".encodeToByteArray()
             )),
             storage = null
         )

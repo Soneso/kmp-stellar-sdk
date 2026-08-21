@@ -129,7 +129,7 @@ internal fun sampleSCAddressXdr(seed: Int, depth: Int): SCAddressXdr =
 
 internal fun sampleContractExecutableExternalRefXdr(seed: Int, depth: Int): ContractExecutableExternalRefXdr = ContractExecutableExternalRefXdr(
   sampleSCAddressXdr(seed, depth + 1),
-  sampleSCStringXdr(seed + 3, depth + 1)
+  sampleBytes(seed + 3, 4)
 )
 
 internal fun sampleContractExecutableXdrWasmHashArm(seed: Int, depth: Int): ContractExecutableXdr =
@@ -230,7 +230,7 @@ internal fun sampleSCValXdrNonceKeyArm(seed: Int, depth: Int): SCValXdr =
   SCValXdr.NonceKey(sampleSCNonceKeyXdr(seed, depth + 1))
 
 internal fun sampleSCValXdrExecutableTagArm(seed: Int, depth: Int): SCValXdr =
-  SCValXdr.ExecutableTag(sampleSCStringXdr(seed, depth + 1))
+  SCValXdr.ExecutableTag(sampleBytes(seed, 4))
 
 internal fun sampleSCValXdr(seed: Int, depth: Int): SCValXdr =
   when (seed.mod(23)) {

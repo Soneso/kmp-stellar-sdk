@@ -1569,7 +1569,15 @@ private fun formatSCVal(scVal: SCValXdr, indentLevel: Int = 0): String {
         is SCValXdr.Address -> "Address: ${formatAddress(scVal.value)}"
         is SCValXdr.Instance -> "ContractInstance"
         is SCValXdr.NonceKey -> "LedgerKeyNonce: ${scVal.value.nonce.value}"
-        is SCValXdr.ExecutableTag -> "ExecutableTag: \"${scVal.value.value}\""
+        is SCValXdr.ExecutableTag -> {
+            // The tag is raw bytes; show it as text when it decodes as UTF-8 and as
+            // bytes otherwise.
+            try {
+                "ExecutableTag: \"${scVal.value.decodeToString(throwOnInvalidSequence = true)}\""
+            } catch (_: CharacterCodingException) {
+                "ExecutableTag: ${formatBytes(scVal.value)}"
+            }
+        }
     }
 }
 

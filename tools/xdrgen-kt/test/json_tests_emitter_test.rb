@@ -51,11 +51,28 @@ class JsonTestsEmitterTest < Minitest::Test
     emitted = Dir.glob(File.join(@output_dir, '*.kt')).map { |f| File.basename(f) }.sort
     assert_equal %w[
       XdrJsonSampleValues.kt
+      XdrJsonTestBytesBackedTest.kt
       XdrJsonTestEnumTest.kt
       XdrJsonTestStructTest.kt
       XdrJsonTestTypedefTest.kt
       XdrJsonTestUnionTest.kt
     ], emitted
+  end
+
+  # A bytes-backed string position is a ByteArray in the generated type, so its sample is
+  # bytes; the string position beside it keeps the sampled wrapper.
+  def test_bytes_backed_positions_are_sampled_as_bytes
+    content = File.read(File.join(@output_dir, 'XdrJsonTestBytesBackedTest.kt'))
+    struct_sample = content[/internal fun sampleContractExecutableExternalRefXdr.*?^\)$/m]
+    assert_includes struct_sample, 'sampleBytes(seed + 3, 4)'
+    refute_includes struct_sample, 'sampleSCStringXdr(seed + 3'
+
+    assert_includes content,
+                    'internal fun sampleSCValXdrExecutableTagArm(seed: Int, depth: Int): SCValXdr ='
+    tag_arm = content[/internal fun sampleSCValXdrExecutableTagArm.*?\n  (.*?)\n/m, 1]
+    assert_equal 'SCValXdr.ExecutableTag(sampleBytes(seed, 4))', tag_arm
+    str_arm = content[/internal fun sampleSCValXdrStrArm.*?\n  (.*?)\n/m, 1]
+    assert_equal 'SCValXdr.Str(sampleSCStringXdr(seed, depth + 1))', str_arm
   end
 
   def test_every_emitted_file_carries_the_generated_marker_and_test_package

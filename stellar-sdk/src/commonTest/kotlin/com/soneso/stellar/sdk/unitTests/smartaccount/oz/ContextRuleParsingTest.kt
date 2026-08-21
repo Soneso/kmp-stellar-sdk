@@ -27,7 +27,6 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
-import com.soneso.stellar.sdk.xdr.SCStringXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
@@ -1367,7 +1366,7 @@ class ContextRuleParsingTest {
                         executable = ContractExecutableXdr.ExternalRef(
                             ContractExecutableExternalRefXdr(
                                 executableOwner = Address(validContractAddress2).toSCAddress(),
-                                tag = SCStringXdr("my-tag")
+                                tag = "my-tag".encodeToByteArray()
                             )
                         )
                     )

@@ -180,7 +180,7 @@ class ScValHostOrderTest {
         assertEquals(0, compareScValHostOrder(a, Scv.toString("apple")))
     }
 
-    // ExecutableTag comparands carry an SCString and compare by content, byte for byte,
+    // ExecutableTag comparands carry raw tag bytes and compare by content, byte for byte,
     // with the shorter value first on a prefix tie.
     @Test
     fun testExecutableTagComparands_contentOrder() {
@@ -192,6 +192,20 @@ class ScValHostOrderTest {
         val prefix = Scv.toExecutableTag("a")
         assertTrue(compareScValHostOrder(prefix, a) < 0, "a prefix sorts before its extension")
         assertEquals(0, compareScValHostOrder(a, Scv.toExecutableTag("aa")))
+    }
+
+    // ExecutableTag comparands with high bytes: the comparison is unsigned and reads the
+    // raw bytes, which no Kotlin String can carry.
+    @Test
+    fun testExecutableTagComparands_unsignedRawBytes() {
+        val low = Scv.toExecutableTagBytes(byteArrayOf(0xC0.toByte()))
+        val high = Scv.toExecutableTagBytes(byteArrayOf(0xFF.toByte()))
+        assertTrue(compareScValHostOrder(low, high) < 0, "0xC0 sorts below 0xFF unsigned")
+        assertTrue(compareScValHostOrder(high, low) > 0)
+
+        val ascii = Scv.toExecutableTagBytes(byteArrayOf(0x7F))
+        assertTrue(compareScValHostOrder(ascii, low) < 0, "a high byte is not negative")
+        assertEquals(0, compareScValHostOrder(low, Scv.toExecutableTagBytes(byteArrayOf(0xC0.toByte()))))
     }
 
     // Vec comparands: on a shared prefix, the shorter vec sorts first.

@@ -62,7 +62,7 @@ Xdrgen::Compilation.new(
   output_dir: output_dir,
   generator: Xdrgen::Generators::Kotlin,
   namespace: 'com.soneso.stellar.sdk.xdr',
-  options: { verify_json_overrides: true }
+  options: { verify_json_overrides: true, verify_bytes_backed_fields: true }
 ).compile
 
 puts ""

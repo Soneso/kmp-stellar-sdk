@@ -16,8 +16,8 @@ import com.soneso.stellar.sdk.xdr.LedgerKeyContractDataXdr
 import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
 import com.soneso.stellar.sdk.xdr.SCBytesXdr
 import com.soneso.stellar.sdk.xdr.SCSpecEntryXdr
-import com.soneso.stellar.sdk.xdr.SCStringXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.tagString
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -103,7 +103,7 @@ class P28ExternalRefIntegrationTest {
         val ownerAddress = Address(owner.contractId)
         val ref = ContractExecutableExternalRefXdr(
             executableOwner = ownerAddress.toSCAddress(),
-            tag = SCStringXdr(executableTag)
+            tag = executableTag.encodeToByteArray()
         )
         val resolvedHash = sorobanServer.getExternalRefWasmHash(ref)
         assertEquals(targetWasmId, Util.bytesToHex(resolvedHash))
@@ -116,7 +116,7 @@ class P28ExternalRefIntegrationTest {
         val tagKey = LedgerKeyXdr.ContractData(
             LedgerKeyContractDataXdr(
                 contract = ownerAddress.toSCAddress(),
-                key = SCValXdr.ExecutableTag(SCStringXdr(unusedTag)),
+                key = SCValXdr.ExecutableTag(unusedTag.encodeToByteArray()),
                 durability = ContractDataDurabilityXdr.PERSISTENT
             )
         )
@@ -129,7 +129,7 @@ class P28ExternalRefIntegrationTest {
         // The resolver reports the same absence with its missing-entry exception.
         val unusedRef = ContractExecutableExternalRefXdr(
             executableOwner = ownerAddress.toSCAddress(),
-            tag = SCStringXdr(unusedTag)
+            tag = unusedTag.encodeToByteArray()
         )
         val exception = assertFailsWith<IllegalStateException> {
             sorobanServer.getExternalRefWasmHash(unusedRef)
@@ -176,7 +176,7 @@ class P28ExternalRefIntegrationTest {
         val executable = instance.value.executable
         assertIs<ContractExecutableXdr.ExternalRef>(executable)
         assertEquals(owner.contractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
-        assertEquals(executableTag, executable.value.tag.value)
+        assertEquals(executableTag, executable.value.tagString)
 
         val codeEntry = sorobanServer.loadContractCodeForContractId(client.contractId)
         assertNotNull(codeEntry)

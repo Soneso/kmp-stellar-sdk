@@ -984,12 +984,11 @@ class ContractClient private constructor(
          * instead of on-chain. The contract spec is loaded from the resolved WASM
          * before submission, like [deployFromWasmId].
          *
-         * A tag that is not valid UTF-8 cannot be resolved: XDR strings decode into
-         * Kotlin strings with replacement characters, so the lookup key would name a
-         * different entry, and such a tag surfaces as a missing tag entry.
+         * The tag bytes put on the wire are the UTF-8 encoding of [tag]; the
+         * ByteArray overload carries arbitrary tag bytes.
          *
          * @param executableOwner The contract holding the executable tag entry ("C..." contract id)
-         * @param tag The tag the owner holds the executable entry under
+         * @param tag The tag the owner holds the executable entry under, as text
          * @param constructorArgs Optional arguments passed to the contract constructor
          * @param source The account id the deployment is issued from
          * @param signer The keypair signing the deployment transaction
@@ -1016,6 +1015,64 @@ class ContractClient private constructor(
             rpcUrl: String,
             salt: ByteArray = secureRandomBytes(32),
             loadSpec: Boolean = true
+        ): ContractClient = deployFromExternalRef(
+            executableOwner = executableOwner,
+            tag = tag.encodeToByteArray(),
+            constructorArgs = constructorArgs,
+            source = source,
+            signer = signer,
+            network = network,
+            rpcUrl = rpcUrl,
+            salt = salt,
+            loadSpec = loadSpec
+        )
+
+        /**
+         * Deploys a contract instance from a CAP-85 external reference (Protocol 28)
+         * and returns a [ContractClient] for it.
+         *
+         * The executable of the new instance names an owner contract and a tag; the
+         * owner's persistent entry under that tag holds the hash of the WASM the
+         * instance runs. Nothing is installed as part of the deployment; the owner
+         * contract already holds the tag entry.
+         *
+         * The reference is resolved through [SorobanServer.getExternalRefWasmHash]
+         * before the transaction is built, so an unresolvable reference fails here
+         * instead of on-chain. The contract spec is loaded from the resolved WASM
+         * before submission, like [deployFromWasmId].
+         *
+         * The one [tag] value feeds both the resolution and the built operation, so
+         * the entry the deployment names on-chain is the entry that resolved: the
+         * bytes reach both byte for byte, whether or not they are valid UTF-8.
+         *
+         * @param executableOwner The contract holding the executable tag entry ("C..." contract id)
+         * @param tag The tag bytes the owner holds the executable entry under; matched byte for byte
+         * @param constructorArgs Optional arguments passed to the contract constructor
+         * @param source The account id the deployment is issued from
+         * @param signer The keypair signing the deployment transaction
+         * @param network The network the contract is deployed to
+         * @param rpcUrl The Soroban RPC endpoint
+         * @param salt 32 byte salt for contract id generation; random if not provided
+         * @param loadSpec Whether to load the contract spec for the returned client
+         * @return A [ContractClient] for the newly deployed contract
+         * @throws IllegalArgumentException if [executableOwner] is not a valid address,
+         * or is not a contract address (before any request is issued)
+         * @throws IllegalStateException if the reference cannot be resolved (the tag
+         * entry is missing, is not a contract data entry, or does not hold a 32-byte
+         * hash; the message names the owner and the tag), or if deployment fails
+         * @throws SendTransactionFailedException if the network refuses the deployment
+         * transaction at submission
+         */
+        suspend fun deployFromExternalRef(
+            executableOwner: String,
+            tag: ByteArray,
+            constructorArgs: List<SCValXdr> = emptyList(),
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray = secureRandomBytes(32),
+            loadSpec: Boolean = true
         ): ContractClient = deployFromExternalRefInternal(
             executableOwner = executableOwner,
             tag = tag,
@@ -1030,13 +1087,41 @@ class ContractClient private constructor(
         )
 
         /**
+         * [deployFromExternalRefInternal] with the tag given as text, encoded as
+         * UTF-8, the counterpart of the public String overload.
+         */
+        internal suspend fun deployFromExternalRefInternal(
+            executableOwner: String,
+            tag: String,
+            constructorArgs: List<SCValXdr>,
+            source: String,
+            signer: KeyPair,
+            network: Network,
+            rpcUrl: String,
+            salt: ByteArray,
+            loadSpec: Boolean,
+            server: SorobanServer
+        ): ContractClient = deployFromExternalRefInternal(
+            executableOwner = executableOwner,
+            tag = tag.encodeToByteArray(),
+            constructorArgs = constructorArgs,
+            source = source,
+            signer = signer,
+            network = network,
+            rpcUrl = rpcUrl,
+            salt = salt,
+            loadSpec = loadSpec,
+            server = server
+        )
+
+        /**
          * [deployFromExternalRef] with the server supplied by the caller, the
          * seam through which unit tests inject a mocked server. The server is
          * closed when the deployment ends.
          */
         internal suspend fun deployFromExternalRefInternal(
             executableOwner: String,
-            tag: String,
+            tag: ByteArray,
             constructorArgs: List<SCValXdr>,
             source: String,
             signer: KeyPair,
@@ -1052,9 +1137,11 @@ class ContractClient private constructor(
                 // Resolve the reference before building the transaction. A non-contract
                 // owner raises IllegalArgumentException before any request; a tag entry
                 // failure raises IllegalStateException naming the owner and the tag.
+                // The operation below reads its tag back out of this reference, so the
+                // resolved entry and the deployed executable cannot diverge.
                 val ref = ContractExecutableExternalRefXdr(
                     executableOwner = owner.toSCAddress(),
-                    tag = SCStringXdr(tag)
+                    tag = tag
                 )
                 val wasmHash = rpc.getExternalRefWasmHash(ref)
                 val wasmId = Util.bytesToHex(wasmHash)
@@ -1076,7 +1163,7 @@ class ContractClient private constructor(
 
                 val operation = InvokeHostFunctionOperation.createContractFromExternalRef(
                     executableOwner = owner,
-                    tag = tag,
+                    tag = ref.tag,
                     address = Address(source),
                     constructorArgs = constructorArgs,
                     salt = salt

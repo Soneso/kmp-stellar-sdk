@@ -624,6 +624,13 @@ internal object XdrJson {
         throw IllegalArgumentException("$type: $detail")
 
     /**
+     * Renders raw bytes for an error message through the [escapedString] ladder: printable
+     * ASCII other than the backslash stays verbatim and every other byte becomes an escape,
+     * so arbitrary bytes cannot inject line breaks or terminal control sequences into a log.
+     */
+    fun displayString(bytes: ByteArray): String = escape(bytes)
+
+    /**
      * Renders an untrusted value for an error message: truncated, with control bytes escaped so
      * a hostile document cannot inject line breaks or terminal control sequences into a log.
      */
