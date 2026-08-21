@@ -173,6 +173,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key is not a canonical strkey. Its verifier catches `Throwable`, so a key that
   JVM and Android previously decoded now yields a `false` verification result
   rather than an error.
+- SEP-10 and SEP-45 challenge validation propagates coroutine cancellation. A
+  cancellation arriving while the server signature was being verified was
+  reported as an invalid server signature; it now surfaces as the original
+  `CancellationException`.
 
 ## [1.11.0] - 2026-08-10
 
